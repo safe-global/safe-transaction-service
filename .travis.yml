@@ -1,0 +1,44 @@
+language: python
+cache: pip
+python:
+  - "3.6"
+dist: trusty
+env:
+  global:
+  - DOCKERHUB_PROJECT=safe-transaction-history
+  - SOURCE_FOLDER=safe_transaction_history
+  - PIP_USE_MIRRORS=true
+  - DJANGO_SETTINGS_MODULE=config.settings.test
+  - DATABASE_URL=psql://postgres@localhost/travisci
+  - ETHEREUM_NODE_URL=http://localhost:8545
+services:
+  - docker
+  - postgresql
+  - redis-server
+install:
+  - travis_retry pip install -r requirements-test.txt
+  - travis_retry pip install coveralls
+  - npm install -g ganache-cli
+before_script:
+  - psql -c 'create database travisci;' -U postgres
+script:
+  - ganache-cli -d -p 8545 --defaultBalanceEther 10000 -a 30 > /dev/null &
+  - sleep 5
+  - coverage run --source=$SOURCE_FOLDER -m py.test
+deploy:
+  - provider: script
+    script: bash scripts/deploy_docker.sh staging
+    on:
+      branch: master
+  - provider: script
+    script: bash scripts/deploy_docker.sh develop
+    on:
+      branch: develop
+  - provider: script
+    script: bash scripts/deploy_docker.sh $TRAVIS_TAG
+    on:
+      tags: true
+      branch: master
+
+after_success:
+  - coveralls
