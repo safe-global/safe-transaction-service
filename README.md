@@ -3,7 +3,7 @@
 ![Python 3.6](https://img.shields.io/badge/Python-3.6-blue.svg)
 ![Django 2](https://img.shields.io/badge/Django-2-blue.svg)
 
-# Gnosis Safe Notification Service
+# Gnosis Transaction History service
 Gnosis Transaction History service
 
 ## Index of contents
