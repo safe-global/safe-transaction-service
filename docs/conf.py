@@ -183,7 +183,7 @@ latex_documents = [
     (
         "index",
         "safe_transaction_history.tex",
-        "Gnosis Safe Relay Service Documentation",
+        "Gnosis Transaction History Documentation",
         """Gnosis""",
         "manual",
     )

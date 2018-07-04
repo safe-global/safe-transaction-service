@@ -2,6 +2,10 @@ from django.conf import settings
 from ethereum import utils
 
 
+def calculate_hex_hash(message: object, prefix: str='0x') -> str:
+    return prefix + utils.sha3(message).hex()
+
+
 class EthereumSignedMessage:
 
     def __init__(self, message: str, v: int, r: int, s: int, hash_prefix: str=settings.ETH_HASH_PREFIX):

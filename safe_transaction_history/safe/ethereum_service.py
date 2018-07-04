@@ -36,6 +36,9 @@ class EthereumService:
         except (ConnectionError, FileNotFoundError):
             self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
+    def get_fast_gas_price(self):
+        return self.gas_station.get_gas_prices().fast
+
     def get_nonce_for_account(self, address):
         return self.w3.eth.getTransactionCount(address, 'pending')
 
