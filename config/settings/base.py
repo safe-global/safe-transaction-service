@@ -282,3 +282,5 @@ SAFE_TX_SENDER_PRIVATE_KEY = env('SAFE_TX_SENDER_PRIVATE_KEY', default=None)
 
 SAFE_CHECK_DEPLOYER_FUNDED_DELAY = env.int('SAFE_CHECK_DEPLOYER_FUNDED_DELAY', default=1 * 30)
 SAFE_CHECK_DEPLOYER_FUNDED_RETRIES = env.int('SAFE_CHECK_DEPLOYER_FUNDED_RETRIES', default=10)
+
+SAFE_REORG_BLOCKS = env.int('SAFE_REORG_BLOCKS', default=10) # Number of blocks from the current block number needed to consider a transaction valid/stable

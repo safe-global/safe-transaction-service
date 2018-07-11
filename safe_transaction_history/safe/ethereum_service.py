@@ -33,6 +33,7 @@ class EthereumService:
             if self.w3.net.chainId != 1:
                 self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
             # For tests using dummy connections (like IPC)
+            # For tests using dummy connections (like IPC)
         except (ConnectionError, FileNotFoundError):
             self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
@@ -58,6 +59,9 @@ class EthereumService:
 
     def get_balance(self, address, block_identifier=None):
         return self.w3.eth.getBalance(address, block_identifier)
+
+    def get_transaction(self, tx_hash):
+        return self.w3.eth.getTransaction(tx_hash)
 
     def get_transaction_receipt(self, tx_hash, timeout=None):
         if not timeout:

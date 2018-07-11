@@ -285,11 +285,9 @@ class SafeService:
 
     @staticmethod
     def get_hash_for_safe_tx(safe_address: str, to: str, value: int, data: bytes,
-                             operation: int, safe_tx_gas: int, data_gas: int, gas_price: int,
-                             gas_token: str, nonce: int) -> HexBytes:
+                             operation: int, nonce: int) -> HexBytes:
 
         data = data or b''
-        gas_token = gas_token or NULL_ADDRESS
         to = to or NULL_ADDRESS
 
         data_bytes = (
@@ -300,10 +298,6 @@ class SafeService:
                 eth_abi.encode_single('uint256', value) +
                 data +  # Data is always zero-padded to be even on solidity. So, 0x1 becomes 0x01
                 operation.to_bytes(1, byteorder='big') +  # abi.encodePacked packs it on 1 byte
-                eth_abi.encode_single('uint256', safe_tx_gas) +
-                eth_abi.encode_single('uint256', data_gas) +
-                eth_abi.encode_single('uint256', gas_price) +
-                HexBytes(gas_token) +
                 eth_abi.encode_single('uint256', nonce)
         )
 

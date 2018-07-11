@@ -1,26 +1,24 @@
 import logging
+import json
+from random import randint
 
-from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from hexbytes import HexBytes
 
-from .factories import generate_valid_s
-from safe_transaction_history.ether.utils import NULL_ADDRESS
-from safe_transaction_history.ether.tests.factories import (get_transaction_with_info, get_eth_address_with_key)
-from ..contracts import get_safe_team_contract
-from ..safe_creation_tx import SafeCreationTx
-from ..serializers import BaseSafeMultisigTransactionSerializer, SafeMultisigHistorySerializer
+from ..serializers import SafeMultisigTransactionSerializer
+from ..models import MultisigTransaction, MultisigConfirmation
 from .safe_test_case import TestCaseWithSafeContractMixin
+from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory
 
 
 logger = logging.getLogger(__name__)
-GAS_PRICE = settings.SAFE_GAS_PRICE
-LOG_TITLE_WIDTH=100
 
 
 class TestViews(APITestCase, TestCaseWithSafeContractMixin):
+
+    CALL = 0
+    WITHDRAW_AMOUNT = 50000000000000000
 
     @classmethod
     def setUpTestData(cls):
@@ -30,88 +28,347 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         request = self.client.get(reverse('v1:about'))
         self.assertEqual(request.status_code, status.HTTP_200_OK)
 
-    def test_multisig_transaction_creation(self):
+    def test_multisig_transaction_creation_flow(self):
         w3 = self.w3
+        safe_nonce = randint(0, 10)
 
-        safe_address, _ = get_eth_address_with_key()
-        # Generate transaction
-        transaction_hash, transaction_data = get_transaction_with_info()
+        logger.info("Test Safe Proxy creation without payment".center(self.LOG_TITLE_WIDTH, '-'))
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
 
-        transaction_data.update({
-            'safe': safe_address,
-            'operation': 0,
-            'contract_transaction_hash': '0x' + transaction_hash,
-            'sender': transaction_data['from']
+        balance = w3.eth.getBalance(safe_address)
+        self.assertEquals(fund_amount, balance)
+
+        # address to,
+        # uint256 value, send 0.05 ETH
+        # bytes data,
+        # Enum.Operation operation,
+        # uint256 nonce
+        tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).transact({
+            'from': owners[0]
         })
 
-        invalid_transaction_data = transaction_data.copy()
-        invalid_transaction_data['contract_transaction_hash'] = '0x0' # invaid hash
-
-        serializer = BaseSafeMultisigTransactionSerializer(data=invalid_transaction_data)
-        self.assertFalse(serializer.is_valid())
-        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
-                                   data=serializer.data, format='json')
-        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
-
-
-        # Create Safe on blockchain
-        s = generate_valid_s()
-        funder = w3.eth.accounts[1]
-        owners = w3.eth.accounts[2:6]
-        threshold = len(owners) - 1
-        gas_price = GAS_PRICE
-
-        logger.info("Test Safe Proxy creation without payment".center(LOG_TITLE_WIDTH, '-'))
-
-        safe_builder = SafeCreationTx(w3=w3,
-                                      owners=owners,
-                                      threshold=threshold,
-                                      signature_s=s,
-                                      master_copy=self.safe_personal_contract_address,
-                                      gas_price=gas_price,
-                                      funder=NULL_ADDRESS)
-
-        response = w3.eth.sendTransaction({
-            'from': funder,
-            'to': safe_builder.deployer_address,
-            'value': safe_builder.payment
+        internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).call({
+            'from': owners[0]
         })
 
-        logger.info("Create proxy contract with address %s", safe_builder.safe_address)
+        is_approved = safe_instance.functions.isApproved(internal_tx_hash_owner0.hex(), owners[0]).call()
+        self.assertTrue(is_approved)
 
-        tx_hash = w3.eth.sendRawTransaction(safe_builder.raw_tx)
-        tx_receipt = w3.eth.waitForTransactionReceipt(tx_hash)
-        safe_address = tx_receipt.contractAddress
-
-        self.assertEqual(tx_receipt.contractAddress, safe_builder.safe_address)
-
-        deployed_safe_proxy_contract = get_safe_team_contract(w3, safe_address)
-
-        logger.info("Deployer account has still %d gwei left (will be lost)",
-                    w3.fromWei(w3.eth.getBalance(safe_builder.deployer_address), 'gwei'))
-
-        self.assertEqual(deployed_safe_proxy_contract.functions.getThreshold().call(), threshold)
-        self.assertEqual(deployed_safe_proxy_contract.functions.getOwners().call(), owners)
-
-
-        # TODO review
         transaction_data = {
-            'sender': funder,
-            'to': safe_builder.deployer_address,
-            'value': safe_builder.payment,
+            'sender': owners[0],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
             'safe': safe_address,
-            'operation': 0,
-            'nonce': 0,
-            'data': HexBytes(0x0),
-            'contract_transaction_hash': tx_hash.hex()
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
         }
 
-        serializer = BaseSafeMultisigTransactionSerializer(data=transaction_data)
-        self.assertTrue(serializer.is_valid())
+        serializer = SafeMultisigTransactionSerializer(data=transaction_data)
+        self.assertTrue((serializer.is_valid()))
 
+        # Save
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=serializer.data, format='json')
         self.assertEquals(request.status_code, status.HTTP_201_CREATED)
 
-    def test_get_multisig_transaction(self):
-        pass
+        db_safe_transactions = MultisigTransaction.objects.filter(safe=safe_address, to=owners[0],
+                                                                  value=self.WITHDRAW_AMOUNT, data=b'',
+                                                                  operation=self.CALL, nonce=safe_nonce)
+
+        self.assertEquals(db_safe_transactions.count(), 1)
+
+        # Send Tx signed by owner 2
+        tx_hash_owner1 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).transact({
+            'from': owners[1]
+        })
+
+        internal_tx_hash_owner1 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).call({
+            'from': owners[1]
+        })
+
+        is_approved = safe_instance.functions.isApproved(internal_tx_hash_owner1.hex(), owners[1]).call()
+        self.assertTrue(is_approved)
+
+        # Send confirmation from owner1 to API
+        transaction_data = {
+            'sender': owners[1],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'safe': safe_address,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner1.hex()
+        }
+
+        serializer = SafeMultisigTransactionSerializer(data=transaction_data)
+        self.assertTrue((serializer.is_valid()))
+
+        # Save
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=serializer.data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+
+        # Execute Multisig Transaction
+        tx_hash_owner2 = safe_instance.functions.execTransactionIfApproved(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).transact({
+            'from': owners[2]
+        })
+
+        internal_tx_hash_owner2 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).call({
+            'from': owners[2]
+        })
+
+        is_executed = safe_instance.functions.isExecuted(internal_tx_hash_owner2.hex()).call()
+        self.assertTrue(is_executed)
+
+        # Send confirmation from owner2 to API
+        transaction_data = {
+            'sender': owners[2],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'safe': safe_address,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner2.hex()
+        }
+
+        serializer = SafeMultisigTransactionSerializer(data=transaction_data)
+        self.assertTrue((serializer.is_valid()))
+
+        # Save
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=serializer.data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+
+        balance = w3.eth.getBalance(safe_address)
+        self.assertEquals(fund_amount-self.WITHDRAW_AMOUNT, balance)
+
+        # Get multisig transaction data
+        request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': safe_address}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(json.loads(request.content)), 1)
+        self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 3)
+        self.assertEquals(json.loads(request.content)[0]['confirmations'][2]['owner'], owners[0]) # confirmations are sorted by creation date DESC
+
+    def test_create_multisig_invalid_transaction_parameters(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        self.assertIsNotNone(safe_address)
+        safe_nonce = randint(0, 10)
+
+        tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).transact({
+            'from': owners[0]
+        })
+
+        internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).call({
+            'from': owners[0]
+        })
+
+        # Call API with invalid contract_transaction_hash sent by owner1 to API
+        transaction_data = {
+            'sender': owners[0],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2]
+        }
+
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Use correct contract_transaction_hash
+        transaction_data = {
+            'sender': owners[0],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+        }
+
+        # Create wrong safe address
+        wrong_safe_address = safe_address[:-5] + 'fffff' # not checksumed address
+
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': wrong_safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        with self.assertRaises(MultisigTransaction.DoesNotExist):
+            MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        # Create invalid not base16 address
+        wrong_safe_address = safe_address[:-4] + 'test'  # not base16 address
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': wrong_safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        with self.assertRaises(MultisigTransaction.DoesNotExist):
+            MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        # Call API using wrong sender (owner1), which has not been approved yet
+        transaction_data = {
+            'sender': owners[1],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+        }
+
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
+
+        with self.assertRaises(MultisigTransaction.DoesNotExist):
+            MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        # Call API using invalid sender address
+        transaction_data = {
+            'sender': owners[0][:-5] + 'fffff',
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+        }
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
+        with self.assertRaises(MultisigTransaction.DoesNotExist):
+            MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        # Call API using invalid 'to' address
+        transaction_data = {
+            'sender': owners[0][:-5] + 'fffff',
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+        }
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
+        with self.assertRaises(MultisigTransaction.DoesNotExist):
+            MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        # Call API with correct data values and parameters
+        transaction_data = {
+            'sender': owners[0],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+        }
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+        self.assertEquals(MultisigTransaction.objects.filter(safe=safe_address, nonce=safe_nonce).count(), 1)
+        self.assertEquals(MultisigConfirmation.objects.filter(
+            owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex()).count(), 1)
+
+    def test_create_multisig_invalid_owner(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        self.assertIsNotNone(safe_address)
+        safe_nonce = randint(0, 10)
+
+        tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).transact({
+            'from': owners[0]
+        })
+
+        internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+        ).call({
+            'from': owners[0]
+        })
+
+        # Send confirmation from owner1 to API
+        transaction_data = {
+            'sender': owners[1],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'safe': safe_address,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2]
+        }
+
+        serializer = SafeMultisigTransactionSerializer(data=transaction_data)
+        self.assertFalse((serializer.is_valid()))
+
+        transaction_data['contract_transaction_hash'] = internal_tx_hash_owner0.hex()
+        serializer = SafeMultisigTransactionSerializer(data=transaction_data)
+        self.assertTrue((serializer.is_valid()))
+
+    def test_get_multisig_info(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_nonce = randint(0, 10)
+
+        request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': safe_address}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_404_NOT_FOUND)
+
+        multisig_transaction_instance = MultisigTransactionFactory()
+        request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(json.loads(request.content)), 1)
+        self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 0)
+
+        multisig_confirmation_instance = MultisigTransactionConfirmationFactory(
+            multisig_transaction=multisig_transaction_instance)
+        request = self.client.get(reverse('v1:get-multisig-transactions',
+                                          kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(json.loads(request.content)), 1)
+        self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 1)

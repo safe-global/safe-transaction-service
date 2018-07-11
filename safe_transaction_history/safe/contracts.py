@@ -17,7 +17,8 @@ CreateAndAddModules: 0x8513246e65c474ad05e88ae8ca7c5a6b04246550
 MultiSend: 0x7830ceb6f513568c05bd995d0767cceea2ef9662
 """
 
-GNOSIS_SAFE_PERSONAL_INTERFACE = load_contract_interface('GnosisSafeTeamEdition.json')
+GNOSIS_SAFE_TEAM_INTERFACE = load_contract_interface('GnosisSafeTeamEdition.json')
+GNOSIS_SAFE_OWNER_MANAGER_INTERFACE = load_contract_interface('GnosisSafeOwnerManager.json')
 PAYING_PROXY_INTERFACE = load_contract_interface('PayingProxy.json')
 
 
@@ -30,8 +31,21 @@ def get_safe_team_contract(w3: Web3, address=None):
     """
     address = settings.SAFE_TEAM_CONTRACT_ADDRESS if not address else address
     return w3.eth.contract(address,
-                           abi=GNOSIS_SAFE_PERSONAL_INTERFACE['abi'],
-                           bytecode=GNOSIS_SAFE_PERSONAL_INTERFACE['bytecode'])
+                           abi=GNOSIS_SAFE_TEAM_INTERFACE['abi'],
+                           bytecode=GNOSIS_SAFE_TEAM_INTERFACE['bytecode'])
+
+
+def get_safe_owner_manager_contract(w3: Web3, address=None):
+    """
+    Get Safe Contract - OwnerManager class.
+    :param w3: Web3 instance
+    :param address: address of the safe contract/proxy contract
+    :return: Safe Contract
+    """
+    address = settings.SAFE_TEAM_CONTRACT_ADDRESS if not address else address
+    return w3.eth.contract(address,
+                           abi=GNOSIS_SAFE_OWNER_MANAGER_INTERFACE['abi'],
+                           bytecode=GNOSIS_SAFE_OWNER_MANAGER_INTERFACE['bytecode'])
 
 
 def get_paying_proxy_contract(w3: Web3, address=NULL_ADDRESS):
