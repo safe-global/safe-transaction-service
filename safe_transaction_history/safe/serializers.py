@@ -127,11 +127,31 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
 
 class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     submission_date = serializers.SerializerMethodField()
-    confirmations = SafeMultisigConfirmationSerializer(many=True)
+    confirmations = serializers.SerializerMethodField()
     is_executed = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        self.owners = kwargs.get('owners', None)
+        if 'owners' in kwargs:
+            del kwargs['owners']
+
+        super(BaseSafeMultisigTransactionSerializer, self).__init__(*args, **kwargs)
 
     def get_submission_date(self, obj):
         return obj.created
 
     def get_is_executed(self, obj):
         return obj.status
+
+    def get_confirmations(self, obj):
+        """
+        Filters confirmations queryset
+        :param obj: MultisigConfirmation instance
+        :return: serialized queryset
+        """
+        if self.owners:
+            confirmations = MultisigConfirmation.objects.filter(owner__in=self.owners, multisig_transaction=obj.id)
+        else:
+            confirmations = MultisigConfirmation.objects.filter(multisig_transaction=obj.id)
+
+        return SafeMultisigConfirmationSerializer(confirmations, many=True).data
