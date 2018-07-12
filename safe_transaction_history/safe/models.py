@@ -63,6 +63,9 @@ class MultisigTransaction(TimeStampedModel):
         default=False
     ) # True if transaction executed, 0 otherwise
 
+    def __str__(self):
+        return self.safe
+
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
@@ -76,3 +79,6 @@ class MultisigConfirmation(TimeStampedModel):
     ) # True if transaction mined and executed successfully, 0 otherwise
 
     multisig_transaction = models.ForeignKey(MultisigTransaction, on_delete=models.CASCADE, related_name="confirmations")
+
+    def __str__(self):
+        return self.owner

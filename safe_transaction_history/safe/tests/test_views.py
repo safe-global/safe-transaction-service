@@ -349,9 +349,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
         self.assertTrue((serializer.is_valid()))
 
-    def test_get_multisig_info(self):
+    def test_get_multisig_transactions(self):
         safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
-        safe_nonce = randint(0, 10)
 
         request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': safe_address}),
                                   format='json')
@@ -428,3 +427,23 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(request.status_code, status.HTTP_200_OK)
         self.assertEquals(len(json.loads(request.content)), 1)
         self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 2)
+
+    def test_get_multiple_safe_transactions(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_nonce1 = 11
+        safe_nonce2 = 12
+
+        multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce1)
+        request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(json.loads(request.content)), 1)
+        self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 0)
+
+        multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce2)
+        request = self.client.get(reverse('v1:get-multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(json.loads(request.content)), 2)
+        self.assertEquals(len(json.loads(request.content)[0]['confirmations']), 0)
+        self.assertEquals(len(json.loads(request.content)[1]['confirmations']), 0)

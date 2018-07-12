@@ -17,6 +17,7 @@ class TestCaseWithSafeContractMixin:
 
     GAS_PRICE = settings.SAFE_GAS_PRICE
     LOG_TITLE_WIDTH = 100
+    CALL_OPERATION = 0
 
     @classmethod
     def prepare_safe_tests(cls):
@@ -31,12 +32,12 @@ class TestCaseWithSafeContractMixin:
         cls.safe_service.valid_master_copy_addresses = [cls.safe_personal_contract_address]
         cls.safe_personal_contract = get_safe_team_contract(cls.w3, cls.safe_personal_contract_address)
 
-    def deploy_safe(self):
+    def deploy_safe(self, max_owners=3):
         fund_amount = 100000000000000000 # 0.1 ETH
         # Create Safe on blockchain
         s = generate_valid_s()
         funder = self.w3.eth.accounts[0]
-        owners = self.w3.eth.accounts[0:3]
+        owners = self.w3.eth.accounts[0:max_owners]
         threshold = len(owners) - 1
         gas_price = self.GAS_PRICE
 

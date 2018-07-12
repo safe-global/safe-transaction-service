@@ -85,7 +85,9 @@ class SafeMultisigTransactionView(CreateAPIView):
                 serializer.save()
 
                 # Create task
-                check_approve_transaction.delay(safe_address=address, contract_transaction_hash=data['contract_transaction_hash'])
+                check_approve_transaction.delay(safe_address=address,
+                                                contract_transaction_hash=data['contract_transaction_hash'],
+                                                owner=data['sender'])
 
                 return Response(status=status.HTTP_201_CREATED)
             else:
@@ -96,10 +98,12 @@ class SafeMultisigTransactionView(CreateAPIView):
     def is_owner_and_confirmed(self, safe_address, contract_transaction_hash, owner) -> bool:
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3 # Web3 instance
+        safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
         safe_contract = get_safe_team_contract(w3, safe_address)
 
+        is_owner = safe_owner_contract.functions.isOwner(owner).call()
         is_approved = safe_contract.functions.isApproved(contract_transaction_hash, owner).call()
-        return is_approved
+        return is_owner and is_approved
 
     def is_owner_and_executed(self, safe_address, transaction_hash, owner) -> bool:
         # TODO review
