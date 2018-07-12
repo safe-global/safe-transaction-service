@@ -44,13 +44,13 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         # Enum.Operation operation,
         # uint256 nonce
         tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).transact({
             'from': owners[0]
         })
 
         internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).call({
             'from': owners[0]
         })
@@ -85,13 +85,13 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
 
         # Send Tx signed by owner 2
         tx_hash_owner1 = safe_instance.functions.approveTransactionWithParameters(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).transact({
             'from': owners[1]
         })
 
         internal_tx_hash_owner1 = safe_instance.functions.getTransactionHash(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).call({
             'from': owners[1]
         })
@@ -121,13 +121,13 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
 
         # Execute Multisig Transaction
         tx_hash_owner2 = safe_instance.functions.execTransactionIfApproved(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).transact({
             'from': owners[2]
         })
 
         internal_tx_hash_owner2 = safe_instance.functions.getTransactionHash(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).call({
             'from': owners[2]
         })
@@ -172,13 +172,13 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         safe_nonce = randint(0, 10)
 
         tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).transact({
             'from': owners[0]
         })
 
         internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
-            owners[0], self.WITHDRAW_AMOUNT, b'', 0, safe_nonce
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).call({
             'from': owners[0]
         })
