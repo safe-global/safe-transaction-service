@@ -15,6 +15,7 @@ from .serializers import SafeMultisigTransactionSerializer, SafeMultisigHistoryS
 from .contracts import get_safe_team_contract, get_safe_owner_manager_contract
 from .ethereum_service import EthereumServiceProvider
 from .tasks import check_approve_transaction
+from .filters import DefaultPagination
 
 
 class AboutView(APIView):
@@ -35,6 +36,7 @@ class AboutView(APIView):
 class SafeMultisigTransactionListView(ListAPIView):
     permission_classes = (AllowAny,)
     serializer_class = SafeMultisigHistorySerializer
+    pagination_class = DefaultPagination
 
     def get(self, request, address, format=None):
         try:
@@ -55,7 +57,10 @@ class SafeMultisigTransactionListView(ListAPIView):
             owners = [owner for owner in query_owners.split(',') if owner != '']
 
         serializer = self.serializer_class(multisig_transactions, many=True, owners=owners)
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        # Paginate results
+        page = self.paginate_queryset(serializer.data)
+        pagination = self.get_paginated_response(page)
+        return Response(status=status.HTTP_200_OK, data=pagination.data)
 
 
 class SafeMultisigTransactionView(CreateAPIView):

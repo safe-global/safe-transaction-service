@@ -29,6 +29,11 @@ def get_eth_address() -> str:
     return address
 
 
+def generate_multisig_transactions(quantity=100):
+    for x in range(0, quantity):
+        MultisigTransactionFactory()
+
+
 class MultisigTransactionFactory(factory_boy.DjangoModelFactory):
     class Meta:
         model = MultisigTransaction
