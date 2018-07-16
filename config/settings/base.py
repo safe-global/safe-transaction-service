@@ -272,13 +272,15 @@ SAFE_FUNDER_PRIVATE_KEY = env('SAFE_FUNDER_PRIVATE_KEY', default=None)
 # Maximum ether (no wei) for a single transaction (security limit)
 SAFE_FUNDER_MAX_ETH = env.int('SAFE_FUNDER_MAX_ETH', default=0.1)
 SAFE_FUNDING_CONFIRMATIONS = env.int('SAFE_FUNDING_CONFIRMATIONS', default=0)  # Set to at least 3
-# Master Copy Address of Safe Personal Edition Contract
-SAFE_PERSONAL_CONTRACT_ADDRESS = env('SAFE_PERSONAL_CONTRACT_ADDRESS', default='0x' + '0' * 39 + '1')
-SAFE_PERSONAL_VALID_CONTRACT_ADDRESSES = env.list('SAFE_PERSONAL_VALID_CONTRACT_ADDRESSES',
-                                                  default=[SAFE_PERSONAL_CONTRACT_ADDRESS])
+# Master Copy Address of Safe Team Edition Contract
+SAFE_TEAM_CONTRACT_ADDRESS = env('SAFE_TEAM_CONTRACT_ADDRESS', default='0x' + '0' * 39 + '1')
+SAFE_TEAM_VALID_CONTRACT_ADDRESSES = env.list('SAFE_PERSONAL_VALID_CONTRACT_ADDRESSES',
+                                                  default=[SAFE_TEAM_CONTRACT_ADDRESS])
 # If SAFE_GAS_PRICE is None, GasStation will be used
 SAFE_GAS_PRICE = env.int('SAFE_GAS_PRICE', default=None)
 SAFE_TX_SENDER_PRIVATE_KEY = env('SAFE_TX_SENDER_PRIVATE_KEY', default=None)
 
 SAFE_CHECK_DEPLOYER_FUNDED_DELAY = env.int('SAFE_CHECK_DEPLOYER_FUNDED_DELAY', default=1 * 30)
 SAFE_CHECK_DEPLOYER_FUNDED_RETRIES = env.int('SAFE_CHECK_DEPLOYER_FUNDED_RETRIES', default=10)
+
+SAFE_REORG_BLOCKS = env.int('SAFE_REORG_BLOCKS', default=10) # Number of blocks from the current block number needed to consider a transaction valid/stable

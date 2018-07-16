@@ -7,7 +7,7 @@ from django.views import defaults as default_views
 
 from .swagger import get_swagger_view
 
-schema_view = get_swagger_view(title='Gnosis SAFE API')
+schema_view = get_swagger_view(title='Gnosis Safe Transaction History API')
 
 
 urlpatterns = [
