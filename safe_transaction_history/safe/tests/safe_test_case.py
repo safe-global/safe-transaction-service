@@ -25,12 +25,12 @@ class TestCaseWithSafeContractMixin:
         cls.ethereum_service = EthereumServiceProvider()
         cls.w3 = cls.ethereum_service.w3
 
-        cls.safe_personal_deployer = cls.w3.eth.accounts[0]
-        cls.safe_personal_contract_address = cls.safe_service.deploy_master_contract(deployer_account=
-                                                                                     cls.safe_personal_deployer)
-        cls.safe_service.master_copy_address = cls.safe_personal_contract_address
-        cls.safe_service.valid_master_copy_addresses = [cls.safe_personal_contract_address]
-        cls.safe_personal_contract = get_safe_team_contract(cls.w3, cls.safe_personal_contract_address)
+        cls.safe_team_deployer = cls.w3.eth.accounts[0]
+        cls.safe_team_contract_address = cls.safe_service.deploy_master_contract(deployer_account=
+                                                                                     cls.safe_team_deployer)
+        cls.safe_service.master_copy_address = cls.safe_team_contract_address
+        cls.safe_service.valid_master_copy_addresses = [cls.safe_team_contract_address]
+        cls.safe_team_contract = get_safe_team_contract(cls.w3, cls.safe_team_contract_address)
 
     def deploy_safe(self, max_owners=3):
         fund_amount = 100000000000000000 # 0.1 ETH
@@ -47,7 +47,7 @@ class TestCaseWithSafeContractMixin:
                                       owners=owners,
                                       threshold=threshold,
                                       signature_s=s,
-                                      master_copy=self.safe_personal_contract_address,
+                                      master_copy=self.safe_team_contract_address,
                                       gas_price=gas_price,
                                       funder=NULL_ADDRESS)
 
