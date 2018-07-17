@@ -1,4 +1,4 @@
-FROM python:3-slim-stretch
+FROM python:3.6-slim-stretch
 
 ENV PYTHONUNBUFFERED 1
 WORKDIR /app
