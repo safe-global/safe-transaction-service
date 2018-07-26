@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from .safe_test_case import TestCaseWithSafeContractMixin
 from ..ethereum_service import EthereumServiceProvider
-from ..models import MultisigTransaction, MultisigConfirmation
+from ..models import MultisigTransaction
 from ..tasks import check_approve_transaction
 from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory
 
@@ -49,7 +49,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
                                                                        contract_transaction_hash=internal_tx_hash_owner0.hex())
 
         # Execute task
-        check_approve_transaction(safe_address, internal_tx_hash_owner0.hex(), owners[0], retry=False)
+        check_approve_transaction(safe_address, internal_tx_hash_owner0.hex(), tx_hash_owner0.hex(), owners[0], retry=False)
 
         # Send Tx signed by owner 1
         tx_hash_owner1 = safe_instance.functions.approveTransactionWithParameters(
@@ -76,7 +76,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         })
 
         # Execute task
-        check_approve_transaction(safe_address, internal_tx_hash_owner1.hex(), owners[1], retry=False)
+        check_approve_transaction(safe_address, internal_tx_hash_owner1.hex(), tx_hash_owner1.hex(), owners[1], retry=False)
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=owners[0],
                                                                      value=self.WITHDRAW_AMOUNT, nonce=safe_nonce)

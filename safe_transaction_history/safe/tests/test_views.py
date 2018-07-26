@@ -1,3 +1,4 @@
+import datetime
 import logging
 import json
 from random import randint
@@ -66,7 +67,10 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+            'contract_transaction_hash': internal_tx_hash_owner0.hex(),
+            'transaction_hash': tx_hash_owner0.hex(),
+            'block_number': 0,
+            'block_date_time': datetime.datetime.now()
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -108,7 +112,10 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner1.hex()
+            'contract_transaction_hash': internal_tx_hash_owner1.hex(),
+            'transaction_hash': tx_hash_owner1.hex(),
+            'block_number': 0,
+            'block_date_time': datetime.datetime.now()
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -144,7 +151,10 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner2.hex()
+            'contract_transaction_hash': internal_tx_hash_owner2.hex(),
+            'transaction_hash': tx_hash_owner2.hex(),
+            'block_number': 0,
+            'block_date_time': datetime.datetime.now()
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -304,7 +314,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()
+            'contract_transaction_hash': internal_tx_hash_owner0.hex(),
+            'transaction_hash': tx_hash_owner0.hex()
         }
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
@@ -339,7 +350,10 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2]
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2],
+            'transaction_hash': tx_hash_owner0.hex(),
+            'block_number': 0,
+            'block_date_time': datetime.datetime.today()
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)

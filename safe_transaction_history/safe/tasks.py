@@ -24,8 +24,48 @@ def read_data_from_stream(self, stream):
 decoding.Fixed32ByteSizeDecoder.read_data_from_stream = read_data_from_stream
 
 
+# @app.shared_task(bind=True)
+# def check_approve_transaction_old(self, safe_address: str, contract_transaction_hash: str, owner: str, retry: bool=True) -> None:
+#     w3 = ethereum_service.w3  # Web3 instance
+#     safe_contract = get_safe_team_contract(w3, safe_address)
+#
+#     block_identifier = ethereum_service.current_block_number - settings.SAFE_REORG_BLOCKS
+#     multisig_confirmation = MultisigConfirmation.objects.get(contract_transaction_hash=contract_transaction_hash, owner=owner)
+#
+#     is_executed_latest = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
+#         block_identifier='latest')
+#     is_executed_prev = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
+#         block_identifier=block_identifier)
+#     is_approved_latest = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
+#         block_identifier='latest')
+#     is_approved_prev = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
+#         block_identifier=block_identifier)
+#
+#     if is_approved_prev and not is_approved_latest:
+#         # reorg, delete confirmation
+#         multisig_confirmation.delete()
+#     elif not is_approved_latest and is_executed_latest:
+#         # Check if multisig transaction executed
+#         multisig_transaction = multisig_confirmation.multisig_transaction
+#         if not multisig_transaction.status:
+#             multisig_transaction.status = is_executed_latest
+#             multisig_transaction.save()
+#     elif is_approved_latest:
+#         multisig_confirmation.status = is_approved_latest
+#         multisig_confirmation.save()
+#
+#         if is_executed_latest:
+#             # Check if multisig transaction executed
+#             multisig_transaction = multisig_confirmation.multisig_transaction
+#             if not multisig_transaction.status:
+#                 multisig_transaction.status = is_executed_latest
+#                 multisig_transaction.save()
+#     elif retry:
+#         self.retry(countdown=COUNTDOWN)
+
+
 @app.shared_task(bind=True)
-def check_approve_transaction(self, safe_address: str, contract_transaction_hash: str, owner: str, retry: bool=True) -> None:
+def check_approve_transaction(self, safe_address: str, contract_transaction_hash: str, transaction_hash: str, owner: str, retry: bool=True) -> None:
     w3 = ethereum_service.w3  # Web3 instance
     safe_contract = get_safe_team_contract(w3, safe_address)
 
@@ -41,24 +81,55 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
     is_approved_prev = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
         block_identifier=block_identifier)
 
-    if is_approved_prev and not is_approved_latest:
-        # reorg, delete confirmation
-        multisig_confirmation.delete()
-    elif not is_approved_latest and is_executed_latest:
-        # Check if multisig transaction executed
-        multisig_transaction = multisig_confirmation.multisig_transaction
-        if not multisig_transaction.status:
-            multisig_transaction.status = is_executed_latest
-            multisig_transaction.save()
-    elif is_approved_latest:
-        multisig_confirmation.status = is_approved_latest
-        multisig_confirmation.save()
-
-        if is_executed_latest:
+    transaction_data = ethereum_service.get_transaction(transaction_hash)
+    if transaction_data and transaction_data['blockNumber'] == multisig_confirmation.block_number:
+        # ok
+        if not is_approved_latest and is_executed_latest:
             # Check if multisig transaction executed
             multisig_transaction = multisig_confirmation.multisig_transaction
             if not multisig_transaction.status:
                 multisig_transaction.status = is_executed_latest
                 multisig_transaction.save()
-    elif retry:
+            return
+        elif is_approved_latest:
+            multisig_confirmation.status = is_approved_latest
+            multisig_confirmation.save()
+
+            if is_executed_latest:
+                # Check if multisig transaction executed
+                multisig_transaction = multisig_confirmation.multisig_transaction
+                if not multisig_transaction.status:
+                    multisig_transaction.status = is_executed_latest
+                    multisig_transaction.save()
+            return
+    elif transaction_data and transaction_data['blockNumber'] != multisig_confirmation.block_number:
+        # check reorg
+        if is_approved_prev and not is_approved_latest:
+            # reorg, delete confirmation
+            multisig_confirmation.delete()
+            return
+        elif not is_approved_latest and is_executed_latest:
+            # Check if multisig transaction executed
+            multisig_transaction = multisig_confirmation.multisig_transaction
+            if not multisig_transaction.status:
+                multisig_transaction.status = is_executed_latest
+                multisig_transaction.save()
+            return
+        elif is_approved_latest:
+            multisig_confirmation.status = is_approved_latest
+            multisig_confirmation.save()
+
+            if is_executed_latest:
+                # Check if multisig transaction executed
+                multisig_transaction = multisig_confirmation.multisig_transaction
+                if not multisig_transaction.status:
+                    multisig_transaction.status = is_executed_latest
+                    multisig_transaction.save()
+            return
+    elif not transaction_data:
+        # reorg, delete confirmation
+        multisig_confirmation.delete()
+        return
+
+    if retry:
         self.retry(countdown=COUNTDOWN)

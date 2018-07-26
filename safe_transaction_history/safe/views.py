@@ -1,4 +1,4 @@
-import binascii
+import datetime
 
 import ethereum.utils
 from rest_framework import status
@@ -78,6 +78,16 @@ class SafeMultisigTransactionView(CreateAPIView):
         except ValueError:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
+        if 'transaction_hash' in request.data:
+            ethereum_service = EthereumServiceProvider()
+            transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
+            if transaction_data:
+                tx_block_number = transaction_data['blockNumber']
+                block_data = ethereum_service.get_block(tx_block_number)
+                block_date_time = datetime.datetime.fromtimestamp(block_data['timestamp'])
+                request.data['block_number'] = tx_block_number
+                request.data['block_date_time'] = block_date_time
+
         request.data['safe'] = address
         serializer = self.serializer_class(data=request.data)
 
@@ -92,6 +102,7 @@ class SafeMultisigTransactionView(CreateAPIView):
                 # Create task
                 check_approve_transaction.delay(safe_address=address,
                                                 contract_transaction_hash=data['contract_transaction_hash'],
+                                                transaction_hash=data['transaction_hash'],
                                                 owner=data['sender'])
 
                 return Response(status=status.HTTP_201_CREATED)
