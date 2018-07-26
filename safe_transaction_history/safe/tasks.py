@@ -70,66 +70,75 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
     safe_contract = get_safe_team_contract(w3, safe_address)
 
     block_identifier = ethereum_service.current_block_number - settings.SAFE_REORG_BLOCKS
-    multisig_confirmation = MultisigConfirmation.objects.get(contract_transaction_hash=contract_transaction_hash, owner=owner)
+    try:
+        multisig_confirmation = MultisigConfirmation.objects.get(contract_transaction_hash=contract_transaction_hash,
+                                                                 owner=owner, transaction_hash=transaction_hash)
 
-    is_executed_latest = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
-        block_identifier='latest')
-    is_executed_prev = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
-        block_identifier=block_identifier)
-    is_approved_latest = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
-        block_identifier='latest')
-    is_approved_prev = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
-        block_identifier=block_identifier)
+        is_executed_latest = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
+            block_identifier='latest')
+        is_executed_prev = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
+            block_identifier=block_identifier)
+        is_approved_latest = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
+            block_identifier='latest')
+        is_approved_prev = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
+            block_identifier=block_identifier)
 
-    transaction_data = ethereum_service.get_transaction(transaction_hash)
-    if transaction_data and transaction_data['blockNumber'] == multisig_confirmation.block_number:
-        # ok
-        if not is_approved_latest and is_executed_latest:
-            # Check if multisig transaction executed
-            multisig_transaction = multisig_confirmation.multisig_transaction
-            if not multisig_transaction.status:
-                multisig_transaction.status = is_executed_latest
-                multisig_transaction.save()
-            return
-        elif is_approved_latest:
-            multisig_confirmation.status = is_approved_latest
-            multisig_confirmation.save()
-
-            if is_executed_latest:
+        transaction_data = ethereum_service.get_transaction(transaction_hash)
+        if transaction_data and transaction_data['blockNumber'] == multisig_confirmation.block_number:
+            # ok
+            if not is_approved_latest and is_executed_latest:
                 # Check if multisig transaction executed
                 multisig_transaction = multisig_confirmation.multisig_transaction
                 if not multisig_transaction.status:
                     multisig_transaction.status = is_executed_latest
                     multisig_transaction.save()
-            return
-    elif transaction_data and transaction_data['blockNumber'] != multisig_confirmation.block_number:
-        # check reorg
-        if is_approved_prev and not is_approved_latest:
-            # reorg, delete confirmation
-            multisig_confirmation.delete()
-            return
-        elif not is_approved_latest and is_executed_latest:
-            # Check if multisig transaction executed
-            multisig_transaction = multisig_confirmation.multisig_transaction
-            if not multisig_transaction.status:
-                multisig_transaction.status = is_executed_latest
-                multisig_transaction.save()
-            return
-        elif is_approved_latest:
-            multisig_confirmation.status = is_approved_latest
-            multisig_confirmation.save()
+                return
+            elif is_approved_latest:
+                multisig_confirmation.status = is_approved_latest
+                multisig_confirmation.save()
 
-            if is_executed_latest:
+                if is_executed_latest:
+                    # Check if multisig transaction executed
+                    multisig_transaction = multisig_confirmation.multisig_transaction
+                    if not multisig_transaction.status:
+                        multisig_transaction.status = is_executed_latest
+                        multisig_transaction.save()
+                return
+        elif transaction_data and transaction_data['blockNumber'] != multisig_confirmation.block_number:
+            # Todo review case with wrong blockNumber and multisig transaction executed (which sets attrs to 0)
+
+            # check reorg
+            if is_approved_prev and not is_approved_latest:
+                # reorg, delete confirmation
+                multisig_confirmation.delete()
+                return
+            elif not is_approved_latest and is_executed_latest:
                 # Check if multisig transaction executed
                 multisig_transaction = multisig_confirmation.multisig_transaction
                 if not multisig_transaction.status:
                     multisig_transaction.status = is_executed_latest
                     multisig_transaction.save()
-            return
-    elif not transaction_data:
-        # reorg, delete confirmation
-        multisig_confirmation.delete()
+                return
+            elif is_approved_latest:
+                multisig_confirmation.status = is_approved_latest
+                multisig_confirmation.save()
+
+                if is_executed_latest:
+                    # Check if multisig transaction executed
+                    multisig_transaction = multisig_confirmation.multisig_transaction
+                    if not multisig_transaction.status:
+                        multisig_transaction.status = is_executed_latest
+                        multisig_transaction.save()
+                return
+        elif not transaction_data:
+            # Check if more then X blocks have passed from the block number the transaction was created in DB
+            if ethereum_service.current_block_number - multisig_confirmation.block_number > settings.SAFE_REORG_BLOCKS:
+                # reorg, delete confirmation
+                multisig_confirmation.delete()
+                return
+
+        if retry:
+            self.retry(countdown=COUNTDOWN)
+    except MultisigConfirmation.DoesNotExist:
+        # TODO decide what todo in this case
         return
-
-    if retry:
-        self.retry(countdown=COUNTDOWN)

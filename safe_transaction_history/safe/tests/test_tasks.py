@@ -2,10 +2,11 @@ import logging
 from random import randint
 
 from django.test import TestCase
+from django.conf import settings
 
 from .safe_test_case import TestCaseWithSafeContractMixin
 from ..ethereum_service import EthereumServiceProvider
-from ..models import MultisigTransaction
+from ..models import MultisigTransaction, MultisigConfirmation
 from ..tasks import check_approve_transaction
 from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory
 
@@ -65,11 +66,13 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         })
 
         multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                                                       block_number=self.w3.eth.blockNumber,
                                                                        owner=owners[1],
+                                                                       transaction_hash=tx_hash_owner1.hex(),
                                                                        contract_transaction_hash=internal_tx_hash_owner1.hex())
 
-
-        tx_hash_owner1 = safe_instance.functions.execTransactionIfApproved(
+        # Execute transaction
+        tx_exec_hash_owner1 = safe_instance.functions.execTransactionIfApproved(
             owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
         ).transact({
             'from': owners[1]
@@ -81,3 +84,82 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=owners[0],
                                                                      value=self.WITHDRAW_AMOUNT, nonce=safe_nonce)
         self.assertTrue(multisig_transaction_check.status)
+
+    def test_block_number_different_confirmation_ok(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_nonce = randint(0, 10)
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
+                                                          operation=self.CALL_OPERATION, nonce=safe_nonce)
+
+        # Send Tx signed by owner 0
+        tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
+        ).transact({
+            'from': owners[0]
+        })
+
+        internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
+        ).call({
+            'from': owners[0]
+        })
+
+        is_approved = safe_instance.functions.isApproved(internal_tx_hash_owner0.hex(), owners[0]).call()
+        self.assertTrue(is_approved)
+
+        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                                                       owner=owners[0],
+                                                                       transaction_hash=tx_hash_owner0.hex(),
+                                                                       contract_transaction_hash=internal_tx_hash_owner0.hex())
+
+        multisig_confirmation.block_number = multisig_confirmation.block_number + self.w3.eth.blockNumber
+        multisig_confirmation.save()
+
+        # Execute task
+        check_approve_transaction(safe_address, internal_tx_hash_owner0.hex(), tx_hash_owner0.hex(), owners[0], retry=False)
+
+        multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
+                                                                       owner=owners[0],
+                                                                       transaction_hash=tx_hash_owner0.hex())
+        self.assertTrue(multisig_confirmation_check.status)
+
+    def test_block_number_different_confirmation_ko(self):
+        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_nonce = randint(0, 10)
+        not_owners = self.w3.eth.accounts[3:-1]
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
+                                                          operation=self.CALL_OPERATION, nonce=safe_nonce)
+
+        # Send Tx signed by owner 0
+        tx_hash_owner0 = safe_instance.functions.approveTransactionWithParameters(
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
+        ).transact({
+            'from': owners[0]
+        })
+
+        internal_tx_hash_owner0 = safe_instance.functions.getTransactionHash(
+            owners[0], self.WITHDRAW_AMOUNT, b'', self.CALL_OPERATION, safe_nonce
+        ).call({
+            'from': owners[0]
+        })
+
+        # Emulate reorg, transaction not existing on the blockchain
+        transaction_hash = '0xb7b9b497b5138507b767e2433df124a6ffc1cb0812d63e3e38bb6b3667a53149'
+
+        is_approved = safe_instance.functions.isApproved(transaction_hash, owners[0]).call()
+        self.assertFalse(is_approved)
+
+        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                                                       owner=owners[0],
+                                                                       transaction_hash=transaction_hash,
+                                                                       contract_transaction_hash=transaction_hash)
+
+        # Execute task
+        check_approve_transaction(safe_address, transaction_hash, transaction_hash, owners[0], retry=False)
+
+        with self.assertRaises(MultisigConfirmation.DoesNotExist):
+            multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
+                                                                           owner=owners[0],
+                                                                           transaction_hash=transaction_hash)

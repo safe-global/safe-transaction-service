@@ -59,8 +59,8 @@ class MultisigTransaction(TimeStampedModel):
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
-    contract_transaction_hash = models.CharField(max_length=66)
-    transaction_hash = models.CharField(max_length=66)
+    contract_transaction_hash = models.CharField(max_length=66, null=False, blank=False)
+    transaction_hash = models.CharField(max_length=66, null=False, blank=False)
     block_number = models.IntegerField()
     block_date_time = models.DateTimeField()
     status = models.BooleanField(
