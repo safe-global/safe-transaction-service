@@ -8,8 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
 
-
-from safe_transaction_history.safe.models import MultisigTransaction, MultisigConfirmation
+from safe_transaction_history.safe.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 from .serializers import SafeMultisigTransactionSerializer, SafeMultisigHistorySerializer
 from .contracts import get_safe_team_contract, get_safe_owner_manager_contract
@@ -28,12 +27,16 @@ class AboutView(APIView):
         content = {
             'name': 'Safe Transaction History Service',
             'version': __version__,
-            'api_version': self.request.version
+            'api_version': self.request.version,
+            'secure': self.request.is_secure()
         }
         return Response(content)
 
 
 class SafeMultisigTransactionListView(ListAPIView):
+    """
+    Returns the history of a multisig (safe)
+    """
     permission_classes = (AllowAny,)
     serializer_class = SafeMultisigHistorySerializer
     pagination_class = DefaultPagination
@@ -122,7 +125,6 @@ class SafeMultisigTransactionView(CreateAPIView):
         return is_owner and is_approved
 
     def is_owner_and_executed(self, safe_address, transaction_hash, owner) -> bool:
-        # TODO review
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3 # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
