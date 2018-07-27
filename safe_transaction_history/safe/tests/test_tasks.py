@@ -2,13 +2,13 @@ import logging
 from random import randint
 
 from django.test import TestCase
-from django.conf import settings
 
 from .safe_test_case import TestCaseWithSafeContractMixin
 from ..ethereum_service import EthereumServiceProvider
 from ..models import MultisigTransaction, MultisigConfirmation
 from ..tasks import check_approve_transaction
 from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
             'from': owners[0]
         })
 
-        # Emulate reorg, transaction not existing on the blockchain
+        # Simulate reorg, transaction not existing on the blockchain
         transaction_hash = '0xb7b9b497b5138507b767e2433df124a6ffc1cb0812d63e3e38bb6b3667a53149'
 
         is_approved = safe_instance.functions.isApproved(transaction_hash, owners[0]).call()

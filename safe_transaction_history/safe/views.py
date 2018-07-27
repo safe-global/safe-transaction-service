@@ -105,7 +105,7 @@ class SafeMultisigTransactionView(CreateAPIView):
                                                 transaction_hash=data['transaction_hash'],
                                                 owner=data['sender'])
 
-                return Response(status=status.HTTP_201_CREATED)
+                return Response(status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
         else:

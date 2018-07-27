@@ -79,7 +79,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         # Save
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=serializer.data, format='json')
-        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+        self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
 
         db_safe_transactions = MultisigTransaction.objects.filter(safe=safe_address, to=owners[0],
                                                                   value=self.WITHDRAW_AMOUNT, data=b'',
@@ -124,7 +124,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         # Save
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=serializer.data, format='json')
-        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+        self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
 
         # Execute Multisig Transaction
         tx_hash_owner2 = safe_instance.functions.execTransactionIfApproved(
@@ -163,7 +163,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         # Save
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=serializer.data, format='json')
-        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+        self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
 
         balance = w3.eth.getBalance(safe_address)
         self.assertEquals(fund_amount-self.WITHDRAW_AMOUNT, balance)
@@ -319,7 +319,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         }
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        self.assertEquals(request.status_code, status.HTTP_201_CREATED)
+        self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
         self.assertEquals(MultisigTransaction.objects.filter(safe=safe_address, nonce=safe_nonce).count(), 1)
         self.assertEquals(MultisigConfirmation.objects.filter(
             owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex()).count(), 1)
