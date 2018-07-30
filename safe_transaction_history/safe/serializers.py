@@ -82,7 +82,10 @@ class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
 class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
     safe = EthereumAddressField()
     contract_transaction_hash = serializers.CharField(max_length=66)
+    transaction_hash = serializers.CharField(max_length=66)
     sender = EthereumAddressField()
+    block_number = serializers.IntegerField()
+    block_date_time = serializers.DateTimeField()
 
     def validate(self, data):
         super().validate(data)
@@ -118,14 +121,22 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
 
         # Confirmation Transaction
         confirmation_instance = MultisigConfirmation.objects.create(
-            owner=self.validated_data['sender'],
+            block_number=self.validated_data['block_number'],
+            block_date_time=self.validated_data['block_date_time'],
             contract_transaction_hash=self.validated_data['contract_transaction_hash'],
+            owner=self.validated_data['sender'],
+            transaction_hash=self.validated_data['transaction_hash'],
             multisig_transaction=multisig_instance
         )
         return confirmation_instance
 
 
 class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
+    to = serializers.CharField()
+    value = serializers.CharField()
+    data = serializers.CharField()
+    operation = serializers.IntegerField()
+    nonce = serializers.IntegerField()
     submission_date = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
     is_executed = serializers.SerializerMethodField()

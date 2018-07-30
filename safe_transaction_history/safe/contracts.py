@@ -30,7 +30,7 @@ def get_safe_team_contract(w3: Web3, address=None):
     :return: Safe Contract
     """
     address = settings.SAFE_TEAM_CONTRACT_ADDRESS if not address else address
-    return w3.eth.contract(address,
+    return w3.eth.contract(Web3.toChecksumAddress(address),
                            abi=GNOSIS_SAFE_TEAM_INTERFACE['abi'],
                            bytecode=GNOSIS_SAFE_TEAM_INTERFACE['bytecode'])
 
@@ -43,7 +43,7 @@ def get_safe_owner_manager_contract(w3: Web3, address=None):
     :return: Safe Contract
     """
     address = settings.SAFE_TEAM_CONTRACT_ADDRESS if not address else address
-    return w3.eth.contract(address,
+    return w3.eth.contract(Web3.toChecksumAddress(address),
                            abi=GNOSIS_SAFE_OWNER_MANAGER_INTERFACE['abi'],
                            bytecode=GNOSIS_SAFE_OWNER_MANAGER_INTERFACE['bytecode'])
 
@@ -57,7 +57,7 @@ def get_paying_proxy_contract(w3: Web3, address=NULL_ADDRESS):
     :param address: address of the proxy contract
     :return: Paying Proxy Contract
     """
-    return w3.eth.contract(address,
+    return w3.eth.contract(Web3.toChecksumAddress(address),
                            abi=PAYING_PROXY_INTERFACE['abi'],
                            bytecode=PAYING_PROXY_INTERFACE['bytecode'])
 

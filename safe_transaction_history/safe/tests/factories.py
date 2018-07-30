@@ -1,8 +1,9 @@
 import os
+import datetime
 from logging import getLogger
 
 import factory as factory_boy
-from factory.fuzzy import FuzzyInteger
+from factory.fuzzy import FuzzyInteger, FuzzyNaiveDateTime
 from faker import Factory as FakerFactory
 from faker import Faker
 from ethereum.transactions import secpk1n
@@ -54,4 +55,6 @@ class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
     owner = get_eth_address()
     contract_transaction_hash = factory_boy.Sequence(lambda n: '{:066d}'.format(n))
     multisig_transaction = factory_boy.SubFactory(MultisigTransaction)
+    block_number = 0
+    block_date_time = FuzzyNaiveDateTime(datetime.datetime.now())
     status = False

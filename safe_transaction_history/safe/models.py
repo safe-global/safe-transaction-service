@@ -46,22 +46,12 @@ class EthereumAddressField(models.CharField):
 
 class MultisigTransaction(TimeStampedModel):
     safe = EthereumAddressField()
-
     to = EthereumAddressField()
-
     value = models.BigIntegerField()
-
-    data = models.BinaryField(
-        null=True
-    )
-
+    data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField()
-
     nonce = models.PositiveIntegerField()
-
-    status = models.BooleanField(
-        default=False
-    ) # True if transaction executed, 0 otherwise
+    status = models.BooleanField(default=False) # True if transaction executed, 0 otherwise
 
     def __str__(self):
         return self.safe
@@ -69,15 +59,13 @@ class MultisigTransaction(TimeStampedModel):
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
-
-    contract_transaction_hash = models.CharField(
-        max_length=66
-    )
-
+    contract_transaction_hash = models.CharField(max_length=66, null=False, blank=False)
+    transaction_hash = models.CharField(max_length=66, null=False, blank=False)
+    block_number = models.IntegerField()
+    block_date_time = models.DateTimeField()
     status = models.BooleanField(
         default=False
     ) # True if transaction mined and executed successfully, 0 otherwise
-
     multisig_transaction = models.ForeignKey(MultisigTransaction, on_delete=models.CASCADE, related_name="confirmations")
 
     def __str__(self):
