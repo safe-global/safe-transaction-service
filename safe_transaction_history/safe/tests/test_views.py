@@ -70,7 +70,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'contract_transaction_hash': internal_tx_hash_owner0.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
-            'block_date_time': datetime.datetime.now()
+            'block_date_time': datetime.datetime.now(),
+            'type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -115,7 +116,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'contract_transaction_hash': internal_tx_hash_owner1.hex(),
             'transaction_hash': tx_hash_owner1.hex(),
             'block_number': 0,
-            'block_date_time': datetime.datetime.now()
+            'block_date_time': datetime.datetime.now(),
+            'type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -154,7 +156,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'contract_transaction_hash': internal_tx_hash_owner2.hex(),
             'transaction_hash': tx_hash_owner2.hex(),
             'block_number': 0,
-            'block_date_time': datetime.datetime.now()
+            'block_date_time': datetime.datetime.now(),
+            'type': 'execution'
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)
@@ -175,6 +178,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(len(json.loads(request.content)['results']), 1)
         self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 3)
         self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][2]['owner'], owners[0]) # confirmations are sorted by creation date DESC
+        self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][2]['type'], 'confirmation')
+        self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][0]['type'], 'execution')
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
@@ -202,6 +207,23 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'nonce': safe_nonce,
             'data': b'',
             'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2]
+        }
+
+        request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Call API with invalid 'type' property
+        transaction_data = {
+            'sender': owners[0],
+            'to': owners[0],
+            'value': self.WITHDRAW_AMOUNT,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': b'',
+            'contract_transaction_hash': internal_tx_hash_owner0.hex(),
+            'transaction_hash': tx_hash_owner0.hex(),
+            'type': 'wrong_type'
         }
 
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
@@ -315,7 +337,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'nonce': safe_nonce,
             'data': b'',
             'contract_transaction_hash': internal_tx_hash_owner0.hex(),
-            'transaction_hash': tx_hash_owner0.hex()
+            'transaction_hash': tx_hash_owner0.hex(),
+            'type': 'confirmation'
         }
         request = self.client.post(reverse('v1:create-multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
@@ -353,7 +376,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2],
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
-            'block_date_time': datetime.datetime.today()
+            'block_date_time': datetime.datetime.today(),
+            'type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionSerializer(data=transaction_data)

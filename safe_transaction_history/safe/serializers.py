@@ -1,3 +1,4 @@
+from django.conf import settings
 from ethereum.utils import checksum_encode, check_checksum
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -65,7 +66,7 @@ class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MultisigConfirmation
-        fields = ('owner', 'submission_date',)
+        fields = ('owner', 'submission_date', 'type', 'transaction_hash',)
 
     def get_submission_date(self, obj):
         return obj.created
@@ -86,6 +87,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
     sender = EthereumAddressField()
     block_number = serializers.IntegerField()
     block_date_time = serializers.DateTimeField()
+    type = serializers.ChoiceField(settings.SAFE_TRANSACTION_TYPES)
 
     def validate(self, data):
         super().validate(data)
@@ -125,6 +127,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
             block_date_time=self.validated_data['block_date_time'],
             contract_transaction_hash=self.validated_data['contract_transaction_hash'],
             owner=self.validated_data['sender'],
+            type=self.validated_data['type'],
             transaction_hash=self.validated_data['transaction_hash'],
             multisig_transaction=multisig_instance
         )
@@ -138,6 +141,7 @@ class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     operation = serializers.IntegerField()
     nonce = serializers.IntegerField()
     submission_date = serializers.SerializerMethodField()
+    execution_date = serializers.DateTimeField()
     confirmations = serializers.SerializerMethodField()
     is_executed = serializers.SerializerMethodField()
 
