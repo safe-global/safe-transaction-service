@@ -82,14 +82,17 @@ class SafeMultisigTransactionView(CreateAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         if 'transaction_hash' in request.data:
-            ethereum_service = EthereumServiceProvider()
-            transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
-            if transaction_data:
-                tx_block_number = transaction_data['blockNumber']
-                block_data = ethereum_service.get_block(tx_block_number)
-                block_date_time = datetime.datetime.fromtimestamp(block_data['timestamp'])
-                request.data['block_number'] = tx_block_number
-                request.data['block_date_time'] = block_date_time
+            try:
+                ethereum_service = EthereumServiceProvider()
+                transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
+                if transaction_data:
+                    tx_block_number = transaction_data['blockNumber']
+                    block_data = ethereum_service.get_block(tx_block_number)
+                    block_date_time = datetime.datetime.fromtimestamp(block_data['timestamp'])
+                    request.data['block_number'] = tx_block_number
+                    request.data['block_date_time'] = block_date_time
+            except ValueError:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
         request.data['safe'] = address
         serializer = self.serializer_class(data=request.data)
