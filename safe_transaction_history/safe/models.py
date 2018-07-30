@@ -52,6 +52,7 @@ class MultisigTransaction(TimeStampedModel):
     operation = models.PositiveSmallIntegerField()
     nonce = models.PositiveIntegerField()
     status = models.BooleanField(default=False) # True if transaction executed, 0 otherwise
+    execution_date = models.DateTimeField(blank=True, null=True) # Defines when a multisig transaction gets executed (confirmations included)
 
     def __str__(self):
         return self.safe
@@ -61,6 +62,7 @@ class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
     contract_transaction_hash = models.CharField(max_length=66, null=False, blank=False)
     transaction_hash = models.CharField(max_length=66, null=False, blank=False)
+    type = models.CharField(max_length=20, null=False, blank=False)
     block_number = models.IntegerField()
     block_date_time = models.DateTimeField()
     status = models.BooleanField(

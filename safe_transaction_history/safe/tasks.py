@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -52,6 +54,7 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
                 multisig_transaction = multisig_confirmation.multisig_transaction
                 if not multisig_transaction.status:
                     multisig_transaction.status = is_executed_latest
+                    multisig_transaction.execution_date = datetime.now()
                     multisig_transaction.save()
                 return
             elif is_approved_latest:
@@ -63,6 +66,7 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
                     multisig_transaction = multisig_confirmation.multisig_transaction
                     if not multisig_transaction.status:
                         multisig_transaction.status = is_executed_latest
+                        multisig_transaction.execution_date = datetime.now()
                         multisig_transaction.save()
                 return
         elif transaction_data and transaction_data['blockNumber'] != multisig_confirmation.block_number:
@@ -79,6 +83,7 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
                 multisig_transaction = multisig_confirmation.multisig_transaction
                 if not multisig_transaction.status:
                     multisig_transaction.status = is_executed_latest
+                    multisig_transaction.execution_date = datetime.now()
                     multisig_transaction.save()
                 return
             # case with multisig transaction not executed and approval True
@@ -91,6 +96,7 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
                     multisig_transaction = multisig_confirmation.multisig_transaction
                     if not multisig_transaction.status:
                         multisig_transaction.status = is_executed_latest
+                        multisig_transaction.execution_date = datetime.now()
                         multisig_transaction.save()
                 return
         elif not transaction_data:
