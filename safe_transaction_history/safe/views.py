@@ -77,11 +77,21 @@ class SafeMultisigTransactionView(CreateAPIView):
     def post(self, request, address, format=None):
         try:
             if not ethereum.utils.check_checksum(address):
-                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+                raise ValueError
         except ValueError:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        if 'transaction_hash' in request.data:
+        request.data['safe'] = address
+        serializer = self.serializer_class(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
+        else:
+            data = serializer.validated_data
+            contract_transaction_hash = data['contract_transaction_hash']
+            sender = data['sender']
+            transaction_hash = data['transaction_hash']
+
             try:
                 ethereum_service = EthereumServiceProvider()
                 transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
@@ -93,33 +103,26 @@ class SafeMultisigTransactionView(CreateAPIView):
                     request.data['block_date_time'] = block_date_time
             except ValueError:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        request.data['safe'] = address
-        serializer = self.serializer_class(data=request.data)
-
-        if serializer.is_valid():
-            data = serializer.validated_data
-            # check isOwnerAndConfirmed
-            if self.is_owner_and_confirmed(data['safe'], data['contract_transaction_hash'], data['sender']) \
-                    or self.is_owner_and_executed(data['safe'], data['contract_transaction_hash'], data['sender']):
-                # Save data into Database
-                serializer.save()
-
-                # Create task
-                check_approve_transaction.delay(safe_address=address,
-                                                contract_transaction_hash=data['contract_transaction_hash'],
-                                                transaction_hash=data['transaction_hash'],
-                                                owner=data['sender'])
-
-                return Response(status=status.HTTP_202_ACCEPTED)
             else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
+                # check isOwnerAndConfirmed
+                if (self.is_owner_and_confirmed(address, contract_transaction_hash, sender)
+                        or self.is_owner_and_executed(address, contract_transaction_hash, sender)):
+                    # Save data into Database
+                    serializer.save()
+
+                    # Create task
+                    check_approve_transaction.delay(safe_address=address,
+                                                    contract_transaction_hash=contract_transaction_hash,
+                                                    transaction_hash=transaction_hash,
+                                                    owner=sender)
+
+                    return Response(status=status.HTTP_202_ACCEPTED)
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
 
     def is_owner_and_confirmed(self, safe_address, contract_transaction_hash, owner) -> bool:
         ethereum_service = EthereumServiceProvider()
-        w3 = ethereum_service.w3 # Web3 instance
+        w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
         safe_contract = get_safe_team_contract(w3, safe_address)
 
@@ -127,13 +130,13 @@ class SafeMultisigTransactionView(CreateAPIView):
         is_approved = safe_contract.functions.isApproved(contract_transaction_hash, owner).call()
         return is_owner and is_approved
 
-    def is_owner_and_executed(self, safe_address, transaction_hash, owner) -> bool:
+    def is_owner_and_executed(self, safe_address, contract_transaction_hash, owner) -> bool:
         ethereum_service = EthereumServiceProvider()
-        w3 = ethereum_service.w3 # Web3 instance
+        w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
         safe_contract = get_safe_team_contract(w3, safe_address)
 
         is_owner = safe_owner_contract.functions.isOwner(owner).call()
-        is_executed = safe_contract.functions.isExecuted(transaction_hash).call()
+        is_executed = safe_contract.functions.isExecuted(contract_transaction_hash).call()
 
         return is_owner and is_executed
