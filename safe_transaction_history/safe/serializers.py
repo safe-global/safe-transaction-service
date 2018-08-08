@@ -7,10 +7,10 @@ from rest_framework.exceptions import ValidationError
 from .models import MultisigConfirmation, MultisigTransaction
 from .safe_service import SafeServiceProvider
 
+
 # ================================================ #
 #                Custom Fields
 # ================================================ #
-
 class EthereumAddressField(serializers.Field):
     """
     Ethereum address checksumed
@@ -76,7 +76,7 @@ class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
     value = serializers.IntegerField(min_value=0)
     data = HexadecimalField(default=None, allow_null=True)
     operation = serializers.IntegerField(min_value=0, max_value=2)  # Call, DelegateCall or Create
-    nonce = serializers.IntegerField(allow_null=True)
+    nonce = serializers.IntegerField(allow_null=True, min_value=0)
 
 
 class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
@@ -103,7 +103,8 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
             raise ValidationError('Operation is not create, but `to` was not provided')
 
         safe_service = SafeServiceProvider()
-        contract_transaction_hash = safe_service.get_hash_for_safe_tx(data['safe'], data['to'], data['value'], data['data'], data['operation'], data['nonce'])
+        contract_transaction_hash = safe_service.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
+                                                                      data['data'], data['operation'], data['nonce'])
 
         if contract_transaction_hash != HexBytes(data['contract_transaction_hash']):
             raise ValidationError('contract_transaction_hash is not valid')
@@ -137,8 +138,8 @@ class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     to = serializers.CharField()
     value = serializers.CharField()
     data = serializers.CharField()
-    operation = serializers.IntegerField()
-    nonce = serializers.IntegerField()
+    operation = serializers.IntegerField(min_value=0)
+    nonce = serializers.IntegerField(min_value=0)
     submission_date = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
     confirmations = serializers.SerializerMethodField()
