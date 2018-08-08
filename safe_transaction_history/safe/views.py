@@ -36,14 +36,19 @@ class AboutView(APIView):
 
 
 class SafeMultisigTransactionListView(ListAPIView):
-    """
-    Returns the history of a multisig (safe)
-    """
     permission_classes = (AllowAny,)
-    serializer_class = SafeMultisigHistorySerializer
     pagination_class = DefaultPagination
 
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return SafeMultisigHistorySerializer
+        elif self.request.method == 'POST':
+            return SafeMultisigTransactionSerializer
+
     def get(self, request, address, format=None):
+        """
+        Returns the history of a multisig (safe)
+        """
         try:
             if not ethereum.utils.check_checksum(address):
                 raise ValueError
@@ -61,22 +66,17 @@ class SafeMultisigTransactionListView(ListAPIView):
         if query_owners:
             owners = [owner for owner in query_owners.split(',') if owner != '']
 
-        serializer = self.serializer_class(multisig_transactions, many=True, owners=owners)
+        serializer = self.get_serializer_class()(multisig_transactions, many=True, owners=owners)
         # Paginate results
         page = self.paginate_queryset(serializer.data)
         pagination = self.get_paginated_response(page)
         return Response(status=status.HTTP_200_OK, data=pagination.data)
 
-
-class SafeMultisigTransactionView(CreateAPIView):
-    """
-    Allows to create a multisig transaction with its confirmations and to retrieve all the information related with
-    a Safe.
-    """
-    permission_classes = (AllowAny,)
-    serializer_class = SafeMultisigTransactionSerializer
-
     def post(self, request, address, format=None):
+        """
+        Allows to create a multisig transaction with its confirmations and to retrieve all the information related with
+        a Safe.
+        """
         try:
             if not ethereum.utils.check_checksum(address):
                 raise ValueError
@@ -99,7 +99,7 @@ class SafeMultisigTransactionView(CreateAPIView):
             except ValueError:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data='Cannot get info from transaction_hash')
 
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.get_serializer_class()(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
