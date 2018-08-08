@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 from random import randint
 
@@ -176,11 +175,12 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 3)
-        self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][2]['owner'], owners[0]) # confirmations are sorted by creation date DESC
-        self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][2]['type'], 'confirmation')
-        self.assertEquals(json.loads(request.content)['results'][0]['confirmations'][0]['type'], 'execution')
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 3)
+        self.assertEquals(request.json()['results'][0]['confirmations'][2]['owner'],
+                          owners[0])  # confirmations are sorted by creation date DESC
+        self.assertEquals(request.json()['results'][0]['confirmations'][2]['type'], 'confirmation')
+        self.assertEquals(request.json()['results'][0]['confirmations'][0]['type'], 'execution')
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
@@ -243,7 +243,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         }
 
         # Create wrong safe address
-        wrong_safe_address = safe_address[:-5] + 'fffff' # not checksumed address
+        wrong_safe_address = safe_address[:-5] + 'fffff'  # not checksumed address
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': wrong_safe_address}),
                                    data=transaction_data, format='json')
@@ -396,11 +396,12 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(request.status_code, status.HTTP_404_NOT_FOUND)
 
         multisig_transaction_instance = MultisigTransactionFactory()
-        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+        request = self.client.get(reverse('v1:multisig-transactions',
+                                          kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 0)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 0)
 
         multisig_confirmation_instance = MultisigTransactionConfirmationFactory(
             multisig_transaction=multisig_transaction_instance)
@@ -408,8 +409,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 1)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 1)
 
         # Filter by owners
         multisig_confirmation_instance = MultisigTransactionConfirmationFactory(
@@ -420,32 +421,32 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 1)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 1)
 
         query_string = '?owners=%s,%s' % (owners[0], owners[1])
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 1)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 1)
 
         query_string = '?owners=%s,%s,' % (owners[0], owners[1])
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 1)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 1)
 
         query_string = '?owners=%s' % owners[1]
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 0)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 0)
 
         # Add confirmation for owner1
         multisig_confirmation_instance = MultisigTransactionConfirmationFactory(
@@ -456,39 +457,42 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 1)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 1)
 
         query_string = '?owners=%s,%s' % (owners[0], owners[1])
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_confirmation_instance.multisig_transaction.safe})
                                   + query_string, format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 2)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 2)
 
     def test_get_multiple_safe_transactions(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        _, _, _, _, _ = self.deploy_safe()
         safe_nonce1 = 11
         safe_nonce2 = 12
 
         multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce1)
-        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+        request = self.client.get(reverse('v1:multisig-transactions',
+                                          kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 1)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 0)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 0)
 
         multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce2)
-        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+        request = self.client.get(reverse('v1:multisig-transactions',
+                                          kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(len(json.loads(request.content)['results']), 2)
-        self.assertEquals(len(json.loads(request.content)['results'][0]['confirmations']), 0)
-        self.assertEquals(len(json.loads(request.content)['results'][1]['confirmations']), 0)
+        self.assertEquals(len(request.json()['results']), 2)
+        self.assertEquals(len(request.json()['results'][0]['confirmations']), 0)
+        self.assertEquals(len(request.json()['results'][1]['confirmations']), 0)
 
         generate_multisig_transactions(quantity=200)
-        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': multisig_transaction_instance.safe}),
+        request = self.client.get(reverse('v1:multisig-transactions',
+                                          kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
-        self.assertEquals(json.loads(request.content)['count'], MultisigTransaction.objects.all().count())
+        self.assertEquals(request.json()['count'], MultisigTransaction.objects.all().count())
