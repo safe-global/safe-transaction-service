@@ -50,7 +50,7 @@ class MultisigTransaction(TimeStampedModel):
     value = models.BigIntegerField()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField()
-    nonce = models.PositiveIntegerField()
+    nonce = models.BigIntegerField()
     status = models.BooleanField(default=False) # True if transaction executed, 0 otherwise
     execution_date = models.DateTimeField(blank=True, null=True) # Defines when a multisig transaction gets executed (confirmations included)
 
