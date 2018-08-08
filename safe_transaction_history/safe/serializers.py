@@ -105,7 +105,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
         safe_service = SafeServiceProvider()
         contract_transaction_hash = safe_service.get_hash_for_safe_tx(data['safe'], data['to'], data['value'], data['data'], data['operation'], data['nonce'])
 
-        if contract_transaction_hash.hex()[2:] != data['contract_transaction_hash']:
+        if contract_transaction_hash != HexBytes(data['contract_transaction_hash']):
             raise ValidationError('contract_transaction_hash is not valid')
 
         return data
