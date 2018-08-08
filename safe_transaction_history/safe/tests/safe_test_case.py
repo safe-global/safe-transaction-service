@@ -3,12 +3,12 @@ import logging
 from django.conf import settings
 
 from safe_transaction_history.ether.utils import NULL_ADDRESS
+
 from ..contracts import get_safe_team_contract
 from ..ethereum_service import EthereumServiceProvider
-from ..safe_service import SafeServiceProvider
 from ..safe_creation_tx import SafeCreationTx
+from ..safe_service import SafeServiceProvider
 from .factories import generate_valid_s
-
 
 logger = logging.getLogger(__name__)
 

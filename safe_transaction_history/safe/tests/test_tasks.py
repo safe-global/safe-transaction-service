@@ -3,12 +3,12 @@ from random import randint
 
 from django.test import TestCase
 
-from .safe_test_case import TestCaseWithSafeContractMixin
 from ..ethereum_service import EthereumServiceProvider
-from ..models import MultisigTransaction, MultisigConfirmation
+from ..models import MultisigConfirmation, MultisigTransaction
 from ..tasks import check_approve_transaction
-from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory
-
+from .factories import (MultisigTransactionConfirmationFactory,
+                        MultisigTransactionFactory)
+from .safe_test_case import TestCaseWithSafeContractMixin
 
 logger = logging.getLogger(__name__)
 
@@ -350,4 +350,3 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=owners[0],
                                                                      value=self.WITHDRAW_AMOUNT, nonce=safe_nonce)
         self.assertTrue(multisig_transaction_check.status)
-

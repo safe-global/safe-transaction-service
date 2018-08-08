@@ -3,10 +3,8 @@ from django.conf.urls import include, url
 from django.contrib import admin
 from django.http import HttpResponse
 from django.views import defaults as default_views
-
-from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-
+from drf_yasg.views import get_schema_view
 
 schema_view = get_schema_view(
     openapi.Info(
