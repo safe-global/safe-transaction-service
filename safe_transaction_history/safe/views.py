@@ -82,6 +82,21 @@ class SafeMultisigTransactionView(CreateAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         request.data['safe'] = address
+
+        # Get block_number and block_date_time from transaction_hash
+        if 'transaction_hash' in request.data:
+            try:
+                ethereum_service = EthereumServiceProvider()
+                transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
+                if transaction_data:
+                    tx_block_number = transaction_data['blockNumber']
+                    block_data = ethereum_service.get_block(tx_block_number)
+                    block_date_time = datetime.datetime.utcfromtimestamp(block_data['timestamp'])
+                    request.data['block_number'] = tx_block_number
+                    request.data['block_date_time'] = block_date_time
+            except ValueError:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data='Cannot get info from transaction_hash')
+
         serializer = self.serializer_class(data=request.data)
 
         if not serializer.is_valid():
@@ -91,34 +106,21 @@ class SafeMultisigTransactionView(CreateAPIView):
             contract_transaction_hash = data['contract_transaction_hash']
             sender = data['sender']
             transaction_hash = data['transaction_hash']
+            # check isOwnerAndConfirmed
+            if (self.is_owner_and_confirmed(address, contract_transaction_hash, sender)
+                    or self.is_owner_and_executed(address, contract_transaction_hash, sender)):
+                # Save data into Database
+                serializer.save()
 
-            try:
-                ethereum_service = EthereumServiceProvider()
-                transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
-                if transaction_data:
-                    tx_block_number = transaction_data['blockNumber']
-                    block_data = ethereum_service.get_block(tx_block_number)
-                    block_date_time = datetime.datetime.fromtimestamp(block_data['timestamp'])
-                    request.data['block_number'] = tx_block_number
-                    request.data['block_date_time'] = block_date_time
-            except ValueError:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                # Create task
+                check_approve_transaction.delay(safe_address=address,
+                                                contract_transaction_hash=contract_transaction_hash,
+                                                transaction_hash=transaction_hash,
+                                                owner=sender)
+
+                return Response(status=status.HTTP_202_ACCEPTED)
             else:
-                # check isOwnerAndConfirmed
-                if (self.is_owner_and_confirmed(address, contract_transaction_hash, sender)
-                        or self.is_owner_and_executed(address, contract_transaction_hash, sender)):
-                    # Save data into Database
-                    serializer.save()
-
-                    # Create task
-                    check_approve_transaction.delay(safe_address=address,
-                                                    contract_transaction_hash=contract_transaction_hash,
-                                                    transaction_hash=transaction_hash,
-                                                    owner=sender)
-
-                    return Response(status=status.HTTP_202_ACCEPTED)
-                else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
     def is_owner_and_confirmed(self, safe_address, contract_transaction_hash, owner) -> bool:
         ethereum_service = EthereumServiceProvider()
