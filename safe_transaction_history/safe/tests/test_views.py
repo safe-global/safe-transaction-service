@@ -1,17 +1,18 @@
 import datetime
-import logging
 import json
+import logging
 from random import randint
 
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from ..models import MultisigConfirmation, MultisigTransaction
 from ..serializers import SafeMultisigTransactionSerializer
-from ..models import MultisigTransaction, MultisigConfirmation
+from .factories import (MultisigTransactionConfirmationFactory,
+                        MultisigTransactionFactory,
+                        generate_multisig_transactions)
 from .safe_test_case import TestCaseWithSafeContractMixin
-from .factories import MultisigTransactionFactory, MultisigTransactionConfirmationFactory, generate_multisig_transactions
-
 
 logger = logging.getLogger(__name__)
 

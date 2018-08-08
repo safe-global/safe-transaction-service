@@ -1,21 +1,19 @@
-from django.utils import timezone
-
 from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from django.utils import timezone
 from eth_abi import decoding
 
+from .contracts import get_safe_team_contract
 from .ethereum_service import EthereumServiceProvider
 from .models import MultisigConfirmation
-from .contracts import get_safe_team_contract
-
 
 logger = get_task_logger(__name__)
 
 ethereum_service = EthereumServiceProvider()
 
 
-COUNTDOWN = 60 # seconds
+COUNTDOWN = 60  # seconds
 
 
 def read_data_from_stream(self, stream):

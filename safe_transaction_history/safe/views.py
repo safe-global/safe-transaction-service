@@ -3,18 +3,20 @@ import datetime
 import ethereum.utils
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView
-from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from safe_transaction_history.safe.models import MultisigTransaction
 from safe_transaction_history.version import __version__
-from .serializers import SafeMultisigTransactionSerializer, SafeMultisigHistorySerializer
-from .contracts import get_safe_team_contract, get_safe_owner_manager_contract
+
+from .contracts import get_safe_owner_manager_contract, get_safe_team_contract
 from .ethereum_service import EthereumServiceProvider
-from .tasks import check_approve_transaction
 from .filters import DefaultPagination
+from .serializers import (SafeMultisigHistorySerializer,
+                          SafeMultisigTransactionSerializer)
+from .tasks import check_approve_transaction
 
 
 class AboutView(APIView):
@@ -44,9 +46,9 @@ class SafeMultisigTransactionListView(ListAPIView):
     def get(self, request, address, format=None):
         try:
             if not ethereum.utils.check_checksum(address):
-                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        except:
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+                raise ValueError
+        except ValueError:
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         multisig_transactions = MultisigTransaction.objects.filter(safe=address)
 
@@ -79,7 +81,7 @@ class SafeMultisigTransactionView(CreateAPIView):
             if not ethereum.utils.check_checksum(address):
                 raise ValueError
         except ValueError:
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
 
@@ -120,7 +122,8 @@ class SafeMultisigTransactionView(CreateAPIView):
 
                 return Response(status=status.HTTP_202_ACCEPTED)
             else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                data='User is not an owner or tx not approved/executed')
 
     def is_owner_and_confirmed(self, safe_address, contract_transaction_hash, owner) -> bool:
         ethereum_service = EthereumServiceProvider()

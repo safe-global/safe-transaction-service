@@ -1,19 +1,19 @@
-from typing import Dict, List, Tuple
-from logging import getLogger
 import os
+from logging import getLogger
+from typing import Dict, List, Tuple
 
+import rlp
+from eth_account.internal.transactions import (encode_transaction,
+                                               serializable_unsigned_transaction_from_dict)
 from ethereum.exceptions import InvalidTransaction
 from ethereum.transactions import Transaction, secpk1n
 from ethereum.utils import checksum_encode, mk_contract_address
 from hexbytes import HexBytes
 from web3 import Web3
-import rlp
 
 from safe_transaction_history.ether.utils import NULL_ADDRESS
-from eth_account.internal.transactions import (encode_transaction,
-                                               serializable_unsigned_transaction_from_dict)
-from .contracts import get_safe_team_contract, get_paying_proxy_contract
 
+from .contracts import get_paying_proxy_contract, get_safe_team_contract
 
 logger = getLogger(__name__)
 

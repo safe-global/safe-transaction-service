@@ -1,9 +1,8 @@
+import ethereum.utils
 from django.db import models
 from model_utils.models import TimeStampedModel
-import ethereum.utils
 
 from .validators import validate_checksumed_address
-
 
 # =========================================
 #                  Fields

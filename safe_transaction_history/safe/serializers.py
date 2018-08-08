@@ -1,12 +1,11 @@
 from django.conf import settings
-from ethereum.utils import checksum_encode, check_checksum
+from ethereum.utils import check_checksum, checksum_encode
+from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from hexbytes import HexBytes
 
-from .models import MultisigTransaction, MultisigConfirmation
+from .models import MultisigConfirmation, MultisigTransaction
 from .safe_service import SafeServiceProvider
-
 
 # ================================================ #
 #                Custom Fields

@@ -1,16 +1,17 @@
 import os
-from django.utils import timezone
 from logging import getLogger
 
 import factory as factory_boy
-from factory.fuzzy import FuzzyInteger, FuzzyDateTime
+from django.utils import timezone
+from ethereum.transactions import secpk1n
+from factory.fuzzy import FuzzyDateTime, FuzzyInteger
 from faker import Factory as FakerFactory
 from faker import Faker
-from ethereum.transactions import secpk1n
 
-from ..models import MultisigTransaction, MultisigConfirmation
-from safe_transaction_history.ether.tests.factories import get_eth_address_with_key
+from safe_transaction_history.ether.tests.factories import \
+    get_eth_address_with_key
 
+from ..models import MultisigConfirmation, MultisigTransaction
 
 fakerFactory = FakerFactory.create()
 faker = Faker()
