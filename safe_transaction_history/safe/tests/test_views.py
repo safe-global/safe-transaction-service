@@ -83,8 +83,10 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
 
         db_safe_transactions = MultisigTransaction.objects.filter(safe=safe_address, to=owners[0],
-                                                                  value=self.WITHDRAW_AMOUNT, data=b'',
-                                                                  operation=self.CALL, nonce=safe_nonce)
+                                                                  value=self.WITHDRAW_AMOUNT,
+                                                                  data=None,
+                                                                  operation=self.CALL,
+                                                                  nonce=safe_nonce)
 
         self.assertEquals(db_safe_transactions.count(), 1)
 

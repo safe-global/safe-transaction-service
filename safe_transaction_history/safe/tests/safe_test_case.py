@@ -1,8 +1,7 @@
 import logging
 
 from django.conf import settings
-
-from safe_transaction_history.ether.utils import NULL_ADDRESS
+from django_eth.constants import NULL_ADDRESS
 
 from ..contracts import get_safe_team_contract
 from ..ethereum_service import EthereumServiceProvider

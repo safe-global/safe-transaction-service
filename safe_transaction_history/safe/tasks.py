@@ -25,7 +25,8 @@ decoding.Fixed32ByteSizeDecoder.read_data_from_stream = read_data_from_stream
 
 
 @app.shared_task(bind=True)
-def check_approve_transaction(self, safe_address: str, contract_transaction_hash: str, transaction_hash: str, owner: str, retry: bool=True) -> None:
+def check_approve_transaction(self, safe_address: str, contract_transaction_hash: str,
+                              transaction_hash: str, owner: str, retry: bool=True) -> None:
     w3 = ethereum_service.w3  # Web3 instance
     safe_contract = get_safe_team_contract(w3, safe_address)
 
@@ -34,14 +35,19 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
         multisig_confirmation = MultisigConfirmation.objects.get(contract_transaction_hash=contract_transaction_hash,
                                                                  owner=owner, transaction_hash=transaction_hash)
 
-        is_executed_latest = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
-            block_identifier='latest')
+        is_executed_latest = safe_contract.functions.isExecuted(
+            multisig_confirmation.contract_transaction_hash
+        ).call(block_identifier='latest')
         # is_executed_prev = safe_contract.functions.isExecuted(multisig_confirmation.contract_transaction_hash).call(
         #    block_identifier=block_identifier)
-        is_approved_latest = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
-            block_identifier='latest')
-        is_approved_prev = safe_contract.functions.isApproved(contract_transaction_hash, multisig_confirmation.owner).call(
-            block_identifier=block_identifier)
+
+        is_approved_latest = safe_contract.functions.isApproved(
+            contract_transaction_hash, multisig_confirmation.owner
+        ).call(block_identifier='latest')
+
+        is_approved_prev = safe_contract.functions.isApproved(
+            contract_transaction_hash, multisig_confirmation.owner
+        ).call(block_identifier=block_identifier)
 
         transaction_data = ethereum_service.get_transaction(transaction_hash)
 

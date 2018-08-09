@@ -3,13 +3,11 @@ from logging import getLogger
 
 import factory as factory_boy
 from django.utils import timezone
+from django_eth.tests.factories import get_eth_address_with_key
 from ethereum.transactions import secpk1n
 from factory.fuzzy import FuzzyDateTime, FuzzyInteger
 from faker import Factory as FakerFactory
 from faker import Faker
-
-from safe_transaction_history.ether.tests.factories import \
-    get_eth_address_with_key
 
 from ..models import MultisigConfirmation, MultisigTransaction
 

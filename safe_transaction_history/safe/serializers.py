@@ -1,5 +1,6 @@
 from django.conf import settings
-from ethereum.utils import check_checksum, checksum_encode
+from django_eth.serializers import EthereumAddressField, HexadecimalField
+from ethereum.utils import check_checksum
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -9,57 +10,8 @@ from .safe_service import SafeServiceProvider
 
 
 # ================================================ #
-#                Custom Fields
-# ================================================ #
-class EthereumAddressField(serializers.Field):
-    """
-    Ethereum address checksumed
-    https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
-    """
-
-    def to_representation(self, obj):
-        return obj
-
-    def to_internal_value(self, data):
-        # Check if address is valid
-
-        try:
-            if checksum_encode(data) != data:
-                raise ValueError
-            elif int(data, 16) == 0:
-                raise ValidationError("0x0 address is not allowed")
-            elif int(data, 16) == 1:
-                raise ValidationError("0x1 address is not allowed")
-            elif not check_checksum(data):
-                raise ValidationError("Address %s is not checksumed" % data)
-        except ValueError:
-            raise ValidationError("Address %s is not checksumed" % data)
-        except Exception:
-            raise ValidationError("Address %s is not valid" % data)
-
-        return data
-
-
-class HexadecimalField(serializers.Field):
-    def to_representation(self, obj):
-        if obj == b'':
-            return '0x'
-        else:
-            return obj.hex()
-
-    def to_internal_value(self, data):
-        if not data or data == '0x':
-            return HexBytes('')
-        try:
-            return HexBytes(data)
-        except ValueError:
-            raise ValidationError("%s is not hexadecimal" % data)
-
-
-# ================================================ #
 #                   Serializers
 # ================================================ #
-
 class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
     submission_date = serializers.SerializerMethodField()
 

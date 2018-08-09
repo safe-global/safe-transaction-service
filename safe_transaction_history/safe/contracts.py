@@ -1,8 +1,7 @@
 from django.conf import settings
+from django_eth.constants import NULL_ADDRESS
 from hexbytes import HexBytes
 from web3 import Web3
-
-from safe_transaction_history.ether.utils import NULL_ADDRESS
 
 from .abis import load_contract_interface
 
