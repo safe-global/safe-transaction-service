@@ -1,5 +1,5 @@
 from django.db import models
-from django_eth.models import EthereumAddressField, Uint256Field
+from django_eth.models import EthereumAddressField, HexField, Uint256Field
 from model_utils.models import TimeStampedModel
 
 
@@ -20,8 +20,8 @@ class MultisigTransaction(TimeStampedModel):
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
-    contract_transaction_hash = models.CharField(max_length=66, null=False, blank=False)
-    transaction_hash = models.CharField(max_length=66, null=False, blank=False)
+    contract_transaction_hash = HexField(null=False, blank=False)
+    transaction_hash = HexField(null=False, blank=False)
     type = models.CharField(max_length=20, null=False, blank=False)
     block_number = models.BigIntegerField()
     block_date_time = models.DateTimeField()
