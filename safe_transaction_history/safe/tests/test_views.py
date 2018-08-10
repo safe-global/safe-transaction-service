@@ -33,7 +33,6 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         w3 = self.w3
         safe_nonce = randint(0, 10)
 
-        logger.info("Test Safe Proxy creation without payment".center(self.LOG_TITLE_WIDTH, '-'))
         safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
 
         balance = w3.eth.getBalance(safe_address)

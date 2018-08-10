@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class TestCaseWithSafeContractMixin:
 
     GAS_PRICE = settings.SAFE_GAS_PRICE
-    LOG_TITLE_WIDTH = 100
     CALL_OPERATION = 0
 
     @classmethod
@@ -39,8 +38,6 @@ class TestCaseWithSafeContractMixin:
         owners = self.w3.eth.accounts[0:max_owners]
         threshold = len(owners) - 1
         gas_price = self.GAS_PRICE
-
-        logger.info("Test Safe Proxy creation without payment".center(self.LOG_TITLE_WIDTH, '-'))
 
         safe_builder = SafeCreationTx(w3=self.w3,
                                       owners=owners,
