@@ -1,7 +1,7 @@
 from django.db import models
 from model_utils.models import TimeStampedModel
 
-from django_eth.models import EthereumAddressField, HexField, Uint256Field
+from django_eth.models import EthereumAddressField, Sha3HashField, Uint256Field
 
 
 class MultisigTransaction(TimeStampedModel):
@@ -16,13 +16,14 @@ class MultisigTransaction(TimeStampedModel):
     execution_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return self.safe
+        executed = 'Executed' if self.status else 'Pending'
+        return '{} - {}'.format(self.safe, executed)
 
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
-    contract_transaction_hash = HexField(null=False, blank=False)
-    transaction_hash = HexField(null=False, blank=False)
+    contract_transaction_hash = Sha3HashField(null=False, blank=False)
+    transaction_hash = Sha3HashField(null=False, blank=False)
     type = models.CharField(max_length=20, null=False, blank=False)
     block_number = models.BigIntegerField()
     block_date_time = models.DateTimeField()
@@ -32,4 +33,5 @@ class MultisigConfirmation(TimeStampedModel):
                                              related_name="confirmations")
 
     def __str__(self):
-        return self.owner
+        mined = 'Mined and executed' if self.status else 'Pending'
+        return '{} - {}'.format(self.safe, mined)

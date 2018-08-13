@@ -53,7 +53,7 @@ class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
         model = MultisigConfirmation
 
     owner = get_eth_address()
-    contract_transaction_hash = factory_boy.Sequence(lambda n: '{:066d}'.format(n))
+    contract_transaction_hash = factory_boy.Sequence(lambda n: '{:064d}'.format(n))
     multisig_transaction = factory_boy.SubFactory(MultisigTransaction)
     block_number = 0
     block_date_time = FuzzyDateTime(timezone.now())
