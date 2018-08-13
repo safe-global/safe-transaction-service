@@ -1,6 +1,7 @@
 import datetime
 
 import ethereum.utils
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import AllowAny
@@ -45,6 +46,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         elif self.request.method == 'POST':
             return SafeMultisigTransactionSerializer
 
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    422: 'Invalid ethereum address'})
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig (safe)
@@ -72,6 +75,9 @@ class SafeMultisigTransactionListView(ListAPIView):
         pagination = self.get_paginated_response(page)
         return Response(status=status.HTTP_200_OK, data=pagination.data)
 
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Invalid data',
+                                    422: 'Invalid ethereum address/User is not an owner or tx not approved/executed'})
     def post(self, request, address, format=None):
         """
         Allows to create a multisig transaction with its confirmations and to retrieve all the information related with
