@@ -26,7 +26,7 @@ class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
 class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
     to = EthereumAddressField()
     value = serializers.IntegerField(min_value=0)
-    data = HexadecimalField(default=None, allow_null=True)
+    data = HexadecimalField(default=None, allow_null=True, allow_blank=True)
     operation = serializers.IntegerField(min_value=0, max_value=2)  # Call, DelegateCall or Create
     nonce = serializers.IntegerField(allow_null=True, min_value=0)
 

@@ -65,7 +65,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'safe': safe_address,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
@@ -113,7 +113,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'safe': safe_address,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner1.hex(),
             'transaction_hash': tx_hash_owner1.hex(),
             'block_number': 0,
@@ -153,7 +153,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'safe': safe_address,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner2.hex(),
             'transaction_hash': tx_hash_owner2.hex(),
             'block_number': 0,
@@ -207,8 +207,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2]
+            'data': b''.hex(),
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[:-2]
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -222,7 +222,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'type': 'wrong_type'
@@ -239,7 +239,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex()
         }
 
@@ -275,7 +275,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex()
         }
 
@@ -297,7 +297,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex()
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -317,7 +317,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex()
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -337,7 +337,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'value': self.WITHDRAW_AMOUNT,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
+            'data': b''.hex(),
             'contract_transaction_hash': internal_tx_hash_owner0.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'type': 'confirmation'
@@ -374,8 +374,8 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'safe': safe_address,
             'operation': self.CALL,
             'nonce': safe_nonce,
-            'data': b'',
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()[0:-2],
+            'data': b''.hex(),
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[:-2],
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.today(),
