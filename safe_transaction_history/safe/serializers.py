@@ -1,9 +1,11 @@
 from django.conf import settings
-from django_eth.serializers import EthereumAddressField, HexadecimalField
 from ethereum.utils import check_checksum
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+
+from django_eth.serializers import (EthereumAddressField, HexadecimalField,
+                                    Sha3HashField)
 
 from .models import MultisigConfirmation, MultisigTransaction
 from .safe_service import SafeServiceProvider
@@ -33,8 +35,8 @@ class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
 
 class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
     safe = EthereumAddressField()
-    contract_transaction_hash = serializers.CharField(max_length=66)
-    transaction_hash = serializers.CharField(max_length=66)
+    contract_transaction_hash = Sha3HashField()
+    transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     block_number = serializers.IntegerField()
     block_date_time = serializers.DateTimeField()
@@ -58,7 +60,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
         contract_transaction_hash = safe_service.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
                                                                       data['data'], data['operation'], data['nonce'])
 
-        if contract_transaction_hash != HexBytes(data['contract_transaction_hash']):
+        if contract_transaction_hash != data['contract_transaction_hash']:
             raise ValidationError('contract_transaction_hash is not valid')
 
         return data
@@ -89,7 +91,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
 class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     to = serializers.CharField()
     value = serializers.CharField()
-    data = serializers.CharField()
+    data = HexadecimalField(allow_blank=True, allow_null=True)
     operation = serializers.IntegerField(min_value=0)
     nonce = serializers.IntegerField(min_value=0)
     submission_date = serializers.SerializerMethodField()

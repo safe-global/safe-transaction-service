@@ -1,6 +1,7 @@
 from django.db import models
-from django_eth.models import EthereumAddressField, HexField, Uint256Field
 from model_utils.models import TimeStampedModel
+
+from django_eth.models import EthereumAddressField, HexField, Uint256Field
 
 
 class MultisigTransaction(TimeStampedModel):

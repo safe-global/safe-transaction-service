@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+
 from django_eth.constants import NULL_ADDRESS
 
 from ..contracts import get_safe_team_contract

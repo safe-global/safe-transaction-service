@@ -2,9 +2,10 @@ from logging import getLogger
 from typing import List, Tuple
 
 import eth_abi
-from django_eth.constants import NULL_ADDRESS
 from ethereum.utils import sha3
 from hexbytes import HexBytes
+
+from django_eth.constants import NULL_ADDRESS
 
 from .contracts import (get_paying_proxy_contract,
                         get_paying_proxy_deployed_bytecode,
