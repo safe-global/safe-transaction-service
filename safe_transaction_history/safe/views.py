@@ -111,9 +111,9 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
         else:
             data = serializer.validated_data
-            contract_transaction_hash = data['contract_transaction_hash']
+            contract_transaction_hash = data['contract_transaction_hash'].hex()
+            transaction_hash = data['transaction_hash'].hex()
             sender = data['sender']
-            transaction_hash = data['transaction_hash']
             # check isOwnerAndConfirmed
             if (self.is_owner_and_confirmed(address, contract_transaction_hash, sender)
                     or self.is_owner_and_executed(address, contract_transaction_hash, sender)):
@@ -131,7 +131,7 @@ class SafeMultisigTransactionListView(ListAPIView):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner or tx not approved/executed')
 
-    def is_owner_and_confirmed(self, safe_address, contract_transaction_hash, owner) -> bool:
+    def is_owner_and_confirmed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
@@ -141,7 +141,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         is_approved = safe_contract.functions.isApproved(contract_transaction_hash, owner).call()
         return is_owner and is_approved
 
-    def is_owner_and_executed(self, safe_address, contract_transaction_hash, owner) -> bool:
+    def is_owner_and_executed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)

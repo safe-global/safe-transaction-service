@@ -1,6 +1,5 @@
 from django.conf import settings
 from ethereum.utils import check_checksum
-from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
