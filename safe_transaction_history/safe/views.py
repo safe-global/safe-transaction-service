@@ -3,7 +3,7 @@ import datetime
 import ethereum.utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
