@@ -73,4 +73,4 @@ class TestCaseWithSafeContractMixin:
             'value': fund_amount
         })
 
-        return safe_address, safe_instance, owners, funder, fund_amount
+        return safe_address, safe_instance, owners, funder, fund_amount, threshold

@@ -33,7 +33,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         w3 = self.w3
         safe_nonce = randint(0, 10)
 
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
 
         balance = w3.eth.getBalance(safe_address)
         self.assertEquals(fund_amount, balance)
@@ -184,7 +184,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(request.json()['results'][0]['confirmations'][0]['type'], 'execution')
 
     def test_create_multisig_invalid_transaction_parameters(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         self.assertIsNotNone(safe_address)
         safe_nonce = randint(0, 10)
 
@@ -208,7 +208,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             'operation': self.CALL,
             'nonce': safe_nonce,
             'data': b''.hex(),
-            'contract_transaction_hash': internal_tx_hash_owner0.hex()[:-2]
+            'contract_transaction_hash': internal_tx_hash_owner0.hex()[:-2] # invalid contract_transaction_hash
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -350,7 +350,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
             owner=owners[0], contract_transaction_hash=internal_tx_hash_owner0.hex()).count(), 1)
 
     def test_create_multisig_invalid_owner(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         self.assertIsNotNone(safe_address)
         safe_nonce = randint(0, 10)
 
@@ -390,7 +390,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertTrue((serializer.is_valid()))
 
     def test_get_multisig_transactions(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
 
         request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                   format='json')
@@ -470,7 +470,7 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEquals(len(request.json()['results'][0]['confirmations']), 2)
 
     def test_get_multiple_safe_transactions(self):
-        _, _, _, _, _ = self.deploy_safe()
+        _, _, _, _, _, _ = self.deploy_safe()
         safe_nonce1 = 11
         safe_nonce2 = 12
 
@@ -497,3 +497,51 @@ class TestViews(APITestCase, TestCaseWithSafeContractMixin):
                                   format='json')
         self.assertEquals(request.status_code, status.HTTP_200_OK)
         self.assertEquals(request.json()['count'], MultisigTransaction.objects.all().count())
+
+    def test_hex_data(self):
+        safe_address, safe_instance, owners, _, _, threshold = self.deploy_safe()
+        safe_nonce = randint(0, 10)
+
+        # Get removeOwner transaction data
+        call_data_owner1 = safe_instance.encodeABI(fn_name='removeOwner', args=[owners[0], owners[1], threshold-1])
+
+        # Send removeOwner transaction from Owner 0
+        remove_owner_tx_hash0 = safe_instance.functions.approveTransactionWithParameters(
+            safe_address, 0, call_data_owner1, self.CALL_OPERATION, safe_nonce
+        ).transact({
+            'from': owners[0]
+        })
+
+        remove_owner_internal_tx_hash0 = safe_instance.functions.getTransactionHash(
+            safe_address, 0, call_data_owner1, self.CALL_OPERATION, safe_nonce
+        ).call({
+            'from': owners[0]
+        })
+
+        # Call API
+        transaction_data = {
+            'sender': owners[0],
+            'to': safe_address,
+            'value': 0,
+            'operation': self.CALL,
+            'nonce': safe_nonce,
+            'data': call_data_owner1,
+            'contract_transaction_hash': remove_owner_internal_tx_hash0.hex(),
+            'transaction_hash': remove_owner_tx_hash0.hex(),
+            'type': 'confirmation'
+        }
+
+        request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
+                                   data=transaction_data, format='json')
+        self.assertEquals(request.status_code, status.HTTP_202_ACCEPTED)
+
+        # Get multisig transaction data
+        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
+                                  format='json')
+        self.assertEquals(request.status_code, status.HTTP_200_OK)
+        self.assertEquals(len(request.json()['results']), 1)
+        self.assertTrue(request.json()['results'][0]['to'].startswith('0x'))
+        self.assertTrue(request.json()['results'][0]['data'].startswith('0x'))
+        self.assertTrue(request.json()['results'][0]['confirmations'][0]['owner'].startswith('0x'))
+        self.assertTrue(request.json()['results'][0]['confirmations'][0]['transactionHash'].startswith('0x'))
+

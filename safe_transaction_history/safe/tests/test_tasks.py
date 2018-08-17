@@ -23,7 +23,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         cls.prepare_safe_tests()
 
     def test_task_flow(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         safe_nonce = randint(0, 10)
 
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
@@ -88,7 +88,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         self.assertTrue(multisig_transaction_check.status)
 
     def test_task_flow_bis(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         safe_nonce = randint(0, 10)
 
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
@@ -188,7 +188,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         self.assertTrue(multisig_transaction_check.status)
 
     def test_block_number_different_confirmation_ok(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         safe_nonce = randint(0, 10)
 
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
@@ -228,7 +228,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
         self.assertTrue(multisig_confirmation_check.status)
 
     def test_confirmation_ko(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         safe_nonce = randint(0, 10)
         not_owners = self.w3.eth.accounts[3:-1]
 
@@ -268,7 +268,7 @@ class TestTasks(TestCase, TestCaseWithSafeContractMixin):
                                                                            transaction_hash=transaction_hash)
 
     def test_block_number_different(self):
-        safe_address, safe_instance, owners, funder, fund_amount = self.deploy_safe()
+        safe_address, safe_instance, owners, funder, fund_amount, _ = self.deploy_safe()
         safe_nonce = randint(0, 10)
 
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=owners[0], value=self.WITHDRAW_AMOUNT,
