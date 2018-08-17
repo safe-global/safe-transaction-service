@@ -41,6 +41,9 @@ class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = DefaultPagination
 
     def get_serializer_class(self):
+        """
+        Proxy returning a serializer class according to the request's verb.
+        """
         if self.request.method == 'GET':
             return SafeMultisigHistorySerializer
         elif self.request.method == 'POST':
@@ -54,8 +57,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         try:
             if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+                raise Exception
+        except Exception:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         multisig_transactions = MultisigTransaction.objects.filter(safe=address)
@@ -85,8 +88,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         try:
             if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+                raise Exception
+        except Exception:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
@@ -102,8 +105,11 @@ class SafeMultisigTransactionListView(ListAPIView):
                     block_date_time = datetime.datetime.utcfromtimestamp(block_data['timestamp'])
                     request.data['block_number'] = tx_block_number
                     request.data['block_date_time'] = block_date_time
+                else:
+                    raise ValueError
             except ValueError:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data='Cannot get info from transaction_hash')
+                return Response(status=status.HTTP_400_BAD_REQUEST, data='Cannot get info from transaction_hash %s' %
+                                                                         request.data['transaction_hash'])
 
         serializer = self.get_serializer_class()(data=request.data)
 
@@ -132,6 +138,10 @@ class SafeMultisigTransactionListView(ListAPIView):
                                 data='User is not an owner or tx not approved/executed')
 
     def is_owner_and_confirmed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
+        """
+        Checks whether an account (owner) is one of the Safe's owners and the incoming contract_transaction_hash
+        was approved
+        """
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
@@ -142,6 +152,10 @@ class SafeMultisigTransactionListView(ListAPIView):
         return is_owner and is_approved
 
     def is_owner_and_executed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
+        """
+        Checks whether an account (owner) is one of the Safe's owners and the incoming contract_transaction_hash
+        was executed
+        """
         ethereum_service = EthereumServiceProvider()
         w3 = ethereum_service.w3  # Web3 instance
         safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
