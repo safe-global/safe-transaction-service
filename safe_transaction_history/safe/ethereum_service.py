@@ -6,7 +6,7 @@ from web3 import HTTPProvider, Web3
 from web3.middleware import geth_poa_middleware
 from web3.utils.threads import Timeout
 
-from safe_transaction_history.ether.utils import NULL_ADDRESS
+from django_eth.constants import NULL_ADDRESS
 
 logger = getLogger(__name__)
 
@@ -33,8 +33,12 @@ class EthereumService:
             if self.w3.net.chainId != 1:
                 self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
             # For tests using dummy connections (like IPC)
+            # For tests using dummy connections (like IPC)
         except (ConnectionError, FileNotFoundError):
             self.w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+
+    def get_fast_gas_price(self):
+        return self.gas_station.get_gas_prices().fast
 
     def get_nonce_for_account(self, address):
         return self.w3.eth.getTransactionCount(address, 'pending')
@@ -56,6 +60,9 @@ class EthereumService:
     def get_balance(self, address, block_identifier=None):
         return self.w3.eth.getBalance(address, block_identifier)
 
+    def get_transaction(self, tx_hash):
+        return self.w3.eth.getTransaction(tx_hash)
+
     def get_transaction_receipt(self, tx_hash, timeout=None):
         if not timeout:
             return self.w3.eth.getTransactionReceipt(tx_hash)
@@ -64,6 +71,9 @@ class EthereumService:
                 return self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=timeout)
             except Timeout:
                 return None
+
+    def get_block(self, block_number, full_transactions=False):
+        return self.w3.eth.getBlock(block_number, full_transactions=full_transactions)
 
     def send_raw_transaction(self, raw_transaction):
         return self.w3.eth.sendRawTransaction(bytes(raw_transaction))
