@@ -284,24 +284,30 @@ class SafeService:
         return self.w3.eth.sendRawTransaction(tx_signed.rawTransaction), tx
 
     @staticmethod
-    def get_hash_for_safe_tx(safe_address: str, to: str, value: int, data: bytes,
+    def get_hash_for_safe_tx(safe_tx_typehash: str, safe_address: str, to: str, value: int, data: bytes,
                              operation: int, nonce: int) -> HexBytes:
 
         data = data or b''
         to = to or NULL_ADDRESS
 
-        data_bytes = (
-                bytes.fromhex('19') +
-                bytes.fromhex('00') +
-                HexBytes(safe_address) +
-                HexBytes(to) +
-                eth_abi.encode_single('uint256', value) +
-                data +  # Data is always zero-padded to be even on solidity. So, 0x1 becomes 0x01
-                operation.to_bytes(1, byteorder='big') +  # abi.encodePacked packs it on 1 byte
-                eth_abi.encode_single('uint256', nonce)
+        # Solidity: abi.encode(params)
+        encoded_transaction_params =  eth_abi.encode_abi(
+            ['bytes32', 'address', 'uint256', 'bytes32', 'uint', 'uint256'],
+            [HexBytes(safe_tx_typehash), to, value, sha3(data), operation, nonce]
         )
 
-        return HexBytes(sha3(data_bytes))
+        # Solidity: keccak256(seed)
+        safe_transaction_hash = sha3(encoded_transaction_params)
+
+        # Solidity: Keccak256(abi.encodePacked(params))
+        safe_final_transaction_hash = sha3(
+            bytes.fromhex('19') +
+            bytes.fromhex('01') +
+            HexBytes(safe_address) +
+            safe_transaction_hash
+        )
+
+        return HexBytes(safe_final_transaction_hash)
 
     def check_hash(self, tx_hash: str, signatures: bytes, owners: List[str]) -> bool:
         for i, owner in enumerate(sorted(owners, key=lambda x: x.lower())):

@@ -85,7 +85,7 @@ class SafeCreationTx:
 
     @staticmethod
     def _calculate_gas(owners: List[str], encoded_data: bytes) -> int:
-        base_gas = 30000  # Transaction standard gas
+        base_gas = 40580  # Transaction standard gas
         data_gas = 68 * len(encoded_data)  # Data gas
         gas_per_owner = 18020  # Magic number calculated by testing and averaging owners
         return base_gas + data_gas + 270000 + len(owners) * gas_per_owner

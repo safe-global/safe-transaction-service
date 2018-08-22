@@ -24,9 +24,9 @@ class TestCaseWithSafeContractMixin:
         cls.ethereum_service = EthereumServiceProvider()
         cls.w3 = cls.ethereum_service.w3
 
-        cls.safe_team_deployer = cls.w3.eth.accounts[0]
+        cls.safe_team_deployer_account = cls.w3.eth.accounts[0]
         cls.safe_team_contract_address = cls.safe_service.deploy_master_contract(deployer_account=
-                                                                                     cls.safe_team_deployer)
+                                                                                     cls.safe_team_deployer_account)
         cls.safe_service.master_copy_address = cls.safe_team_contract_address
         cls.safe_service.valid_master_copy_addresses = [cls.safe_team_contract_address]
         cls.safe_team_contract = get_safe_team_contract(cls.w3, cls.safe_team_contract_address)

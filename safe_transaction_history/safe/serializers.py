@@ -67,8 +67,14 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
             raise ValidationError('Operation is not create, but `to` was not provided')
 
         safe_service = SafeServiceProvider()
-        contract_transaction_hash = safe_service.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
-                                                                      data['data'], data['operation'], data['nonce'])
+        # Get contract instance
+        safe_contract = safe_service.get_contract(data['safe'])
+        # Get safe_tx_typehash value
+        safe_tx_typehash = safe_contract.functions.SAFE_TX_TYPEHASH().call().hex()
+        # Get the internal contract transaction hash and check if the incoming value is valid
+        contract_transaction_hash = safe_service.get_hash_for_safe_tx(safe_tx_typehash, data['safe'],
+                                                                      data['to'], data['value'], data['data'],
+                                                                      data['operation'], data['nonce'])
 
         if contract_transaction_hash != data['contract_transaction_hash']:
             raise ValidationError('contract_transaction_hash is not valid')
