@@ -11,17 +11,6 @@ from .safe_service import SafeServiceProvider
 
 
 # ================================================ #
-#                  Custom Fields
-# ================================================ #
-class DataHexField(HexadecimalField):
-    """
-    Serializes a HexBytes object into a string starting with 0x prefix.
-    """
-    def to_representation(self, obj):
-        return obj and '0x%s' % obj.hex() or None
-
-
-# ================================================ #
 #                   Serializers
 # ================================================ #
 class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
@@ -38,7 +27,7 @@ class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
 class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
     to = EthereumAddressField()
     value = serializers.IntegerField(min_value=0)
-    data = DataHexField(default=None, allow_null=True, allow_blank=True)
+    data = HexadecimalField(default=None, allow_null=True, allow_blank=True)
     operation = serializers.IntegerField(min_value=0, max_value=2)  # Call, DelegateCall or Create
     nonce = serializers.IntegerField(allow_null=True, min_value=0)
 
@@ -107,7 +96,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
 class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     to = serializers.CharField()
     value = serializers.CharField()
-    data = DataHexField(allow_blank=True, allow_null=True)
+    data = HexadecimalField(allow_blank=True, allow_null=True)
     operation = serializers.IntegerField(min_value=0)
     nonce = serializers.IntegerField(min_value=0)
     submission_date = serializers.SerializerMethodField()
