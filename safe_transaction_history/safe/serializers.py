@@ -14,14 +14,11 @@ from .safe_service import SafeServiceProvider
 #                   Serializers
 # ================================================ #
 class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
-    submission_date = serializers.SerializerMethodField()
+    submission_date = serializers.DateTimeField(source='created')
 
     class Meta:
         model = MultisigConfirmation
         fields = ('owner', 'submission_date', 'type', 'transaction_hash',)
-
-    def get_submission_date(self, obj):
-        return obj.created
 
 
 class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
@@ -99,10 +96,10 @@ class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
     data = HexadecimalField(allow_blank=True, allow_null=True)
     operation = serializers.IntegerField(min_value=0)
     nonce = serializers.IntegerField(min_value=0)
-    submission_date = serializers.SerializerMethodField()
+    submission_date = serializers.DateTimeField(source='created')
     execution_date = serializers.DateTimeField()
     confirmations = serializers.SerializerMethodField()
-    is_executed = serializers.SerializerMethodField()
+    is_executed = serializers.BooleanField(source='status')
 
     def __init__(self, *args, **kwargs):
         self.owners = kwargs.get('owners', None)
@@ -110,12 +107,6 @@ class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
             del kwargs['owners']
 
         super(BaseSafeMultisigTransactionSerializer, self).__init__(*args, **kwargs)
-
-    def get_submission_date(self, obj):
-        return obj.created
-
-    def get_is_executed(self, obj):
-        return obj.status
 
     def get_confirmations(self, obj):
         """
