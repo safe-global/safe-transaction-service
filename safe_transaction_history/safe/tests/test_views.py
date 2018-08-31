@@ -5,18 +5,18 @@ from random import randint
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from gnosis.safe.tests.safe_team_test_case import TestCaseWithSafeTeamContractMixin
 
 from ..models import MultisigConfirmation, MultisigTransaction
 from ..serializers import SafeMultisigTransactionSerializer
 from .factories import (MultisigTransactionConfirmationFactory,
                         MultisigTransactionFactory,
                         generate_multisig_transactions)
-from .safe_test_case import TestCaseWithSafeContractMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TestViews(APITestCase, TestCaseWithSafeContractMixin):
+class TestViewsTeam(APITestCase, TestCaseWithSafeTeamContractMixin):
 
     CALL = 0
     WITHDRAW_AMOUNT = 50000000000000000

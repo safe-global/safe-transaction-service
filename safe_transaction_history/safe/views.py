@@ -12,8 +12,8 @@ from rest_framework.views import APIView
 from safe_transaction_history.safe.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 
-from .contracts import get_safe_owner_manager_contract, get_safe_team_contract
-from .ethereum_service import EthereumServiceProvider
+from gnosis.safe.contracts import get_safe_owner_manager_contract, get_safe_team_contract
+from gnosis.safe.ethereum_service import EthereumServiceProvider
 from .filters import DefaultPagination
 from .serializers import (SafeMultisigHistorySerializer,
                           SafeMultisigTransactionSerializer)
@@ -137,6 +137,7 @@ class SafeMultisigTransactionListView(ListAPIView):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner or tx not approved/executed')
 
+    # TODO Refactor this, these methods should be on SafeService
     def is_owner_and_confirmed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
         """
         Checks whether an account (owner) is one of the Safe's owners and the incoming contract_transaction_hash

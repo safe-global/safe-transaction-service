@@ -7,7 +7,7 @@ from django_eth.serializers import (EthereumAddressField, HexadecimalField,
                                     Sha3HashField)
 
 from .models import MultisigConfirmation, MultisigTransaction
-from .safe_service import SafeServiceProvider
+from gnosis.safe.safe_service import SafeTeamServiceProvider
 
 
 # ================================================ #
@@ -52,7 +52,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
         elif not data['to']:
             raise ValidationError('Operation is not create, but `to` was not provided')
 
-        safe_service = SafeServiceProvider()
+        safe_service = SafeTeamServiceProvider()
         # Get contract instance
         safe_contract = safe_service.get_contract(data['safe'])
         # Get safe_tx_typehash value

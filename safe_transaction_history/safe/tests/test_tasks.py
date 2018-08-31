@@ -2,18 +2,18 @@ import logging
 from random import randint
 
 from django.test import TestCase
+from gnosis.safe.tests.safe_team_test_case import TestCaseWithSafeTeamContractMixin
+from gnosis.safe.ethereum_service import EthereumServiceProvider
 
-from ..ethereum_service import EthereumServiceProvider
 from ..models import MultisigConfirmation, MultisigTransaction
 from ..tasks import check_approve_transaction
 from .factories import (MultisigTransactionConfirmationFactory,
                         MultisigTransactionFactory)
-from .safe_test_case import TestCaseWithSafeContractMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TestTasks(TestCase, TestCaseWithSafeContractMixin):
+class TestTasksTeam(TestCase, TestCaseWithSafeTeamContractMixin):
     WITHDRAW_AMOUNT = 50000000000000000
 
     @classmethod

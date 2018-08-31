@@ -4,8 +4,8 @@ from django.conf import settings
 from django.utils import timezone
 from eth_abi import decoding
 
-from .contracts import get_safe_team_contract
-from .ethereum_service import EthereumServiceProvider
+from gnosis.safe.contracts import get_safe_team_contract
+from gnosis.safe.ethereum_service import EthereumServiceProvider
 from .models import MultisigConfirmation
 
 logger = get_task_logger(__name__)
