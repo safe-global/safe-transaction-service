@@ -9,5 +9,6 @@ timestamp_regex = '\\d{4}[-]?\\d{1,2}[-]?\\d{1,2} \\d{1,2}:\\d{1,2}:\\d{1,2}'
 
 urlpatterns = [
     url(r'^about/$', views.AboutView.as_view(), name='about'),
-    path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(), name='multisig-transactions'),
+    path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
+         name='multisig-transactions'),
 ]

@@ -1,13 +1,14 @@
 from django.conf import settings
-from ethereum.utils import check_checksum
+from django_eth.serializers import (EthereumAddressField, HexadecimalField,
+                                    Sha3HashField)
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from django_eth.serializers import (EthereumAddressField, HexadecimalField,
-                                    Sha3HashField)
+from gnosis.safe.safe_service import SafeService
+from gnosis.safe.serializers import (SafeMultisigEstimateTxSerializer,
+                                     SafeMultisigTxSerializer)
 
 from .models import MultisigConfirmation, MultisigTransaction
-from gnosis.safe.safe_service import SafeTeamServiceProvider
 
 
 # ================================================ #
@@ -21,18 +22,9 @@ class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
         fields = ('owner', 'submission_date', 'type', 'transaction_hash',)
 
 
-class BaseSafeMultisigTransactionSerializer(serializers.Serializer):
-    to = EthereumAddressField()
-    value = serializers.IntegerField(min_value=0)
-    data = HexadecimalField(default=None, allow_null=True, allow_blank=True)
-    operation = serializers.IntegerField(min_value=0, max_value=2)  # Call, DelegateCall or Create
-    nonce = serializers.IntegerField(allow_null=True, min_value=0)
-
-
-class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
-    safe = EthereumAddressField()
+class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
     contract_transaction_hash = Sha3HashField()
-    transaction_hash = Sha3HashField()
+    transaction_hash = Sha3HashField()  # Tx that includes the tx
     sender = EthereumAddressField()
     block_number = serializers.IntegerField()
     block_date_time = serializers.DateTimeField()
@@ -41,26 +33,12 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
     def validate(self, data):
         super().validate(data)
 
-        if not data['to'] and not data['data']:
-            raise ValidationError('`data` and `to` cannot both be null')
-        if 'to' in data and not check_checksum(data['to']):
-            raise ValidationError('`to` must be a valid checksumed address')
-
-        if data['operation'] == 2:
-            if data['to']:
-                raise ValidationError('Operation is Create, but `to` was provided')
-        elif not data['to']:
-            raise ValidationError('Operation is not create, but `to` was not provided')
-
-        safe_service = SafeTeamServiceProvider()
-        # Get contract instance
-        safe_contract = safe_service.get_contract(data['safe'])
-        # Get safe_tx_typehash value
-        safe_tx_typehash = safe_contract.functions.SAFE_TX_TYPEHASH().call().hex()
-        # Get the internal contract transaction hash and check if the incoming value is valid
-        contract_transaction_hash = safe_service.get_hash_for_safe_tx(safe_tx_typehash, data['safe'],
-                                                                      data['to'], data['value'], data['data'],
-                                                                      data['operation'], data['nonce'])
+        contract_transaction_hash = SafeService.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
+                                                                     data['data'], data['operation'],
+                                                                     data['safe_tx_gas'], data['data_gas'],
+                                                                     data['gas_price'], data['gas_token'],
+                                                                     data['refund_receiver'],
+                                                                     data['nonce'])
 
         if contract_transaction_hash != data['contract_transaction_hash']:
             raise ValidationError('contract_transaction_hash is not valid')
@@ -68,6 +46,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
         return data
 
     def save(self, **kwargs):
+        # Store more arguments
         multisig_instance, _ = MultisigTransaction.objects.get_or_create(
             safe=self.validated_data['safe'],
             to=self.validated_data['to'],
@@ -90,11 +69,7 @@ class SafeMultisigTransactionSerializer(BaseSafeMultisigTransactionSerializer):
         return confirmation_instance
 
 
-class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
-    to = serializers.CharField()
-    value = serializers.CharField()
-    data = HexadecimalField(allow_blank=True, allow_null=True)
-    operation = serializers.IntegerField(min_value=0)
+class SafeMultisigHistoryDbSerializer(SafeMultisigEstimateTxSerializer):
     nonce = serializers.IntegerField(min_value=0)
     submission_date = serializers.DateTimeField(source='created')
     execution_date = serializers.DateTimeField()
@@ -106,7 +81,7 @@ class SafeMultisigHistorySerializer(BaseSafeMultisigTransactionSerializer):
         if 'owners' in kwargs:
             del kwargs['owners']
 
-        super(BaseSafeMultisigTransactionSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_confirmations(self, obj):
         """
