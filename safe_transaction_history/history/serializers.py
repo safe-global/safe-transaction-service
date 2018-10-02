@@ -5,8 +5,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from gnosis.safe.safe_service import SafeService
-from gnosis.safe.serializers import (SafeMultisigEstimateTxSerializer,
-                                     SafeMultisigTxSerializer)
+from gnosis.safe.serializers import SafeMultisigTxSerializer
 
 from .models import MultisigConfirmation, MultisigTransaction
 
@@ -53,6 +52,11 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
             value=self.validated_data['value'],
             data=self.validated_data['data'],
             operation=self.validated_data['operation'],
+            safe_tx_gas=self.validated_data['safe_tx_gas'],
+            data_gas=self.validated_data['data_gas'],
+            gas_price=self.validated_data['gas_price'],
+            gas_token=self.validated_data['gas_token'],
+            refund_receiver=self.validated_data['refund_receiver'],
             nonce=self.validated_data['nonce']
         )
 
@@ -69,12 +73,11 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
         return confirmation_instance
 
 
-class SafeMultisigHistoryDbSerializer(SafeMultisigEstimateTxSerializer):
-    nonce = serializers.IntegerField(min_value=0)
+class SafeMultisigHistoryDbSerializer(SafeMultisigTxSerializer):
     submission_date = serializers.DateTimeField(source='created')
     execution_date = serializers.DateTimeField()
     confirmations = serializers.SerializerMethodField()
-    is_executed = serializers.BooleanField(source='status')
+    is_executed = serializers.BooleanField(source='mined')
 
     def __init__(self, *args, **kwargs):
         self.owners = kwargs.get('owners', None)

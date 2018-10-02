@@ -542,11 +542,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 2)
 
     def test_get_multiple_safe_transactions(self):
-        _, _, _, _, _, _ = self.deploy_test_safe()
-        safe_nonce1 = 11
-        safe_nonce2 = 12
-
-        multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce1)
+        multisig_transaction_instance = MultisigTransactionFactory()
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
@@ -554,7 +550,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(len(request.json()['results']), 1)
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 0)
 
-        multisig_transaction_instance = MultisigTransactionFactory(nonce=safe_nonce2)
+        multisig_transaction_instance = MultisigTransactionFactory()
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')

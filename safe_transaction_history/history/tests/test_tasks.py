@@ -86,7 +86,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)
-        self.assertTrue(multisig_transaction_check.status)
+        self.assertTrue(multisig_transaction_check.mined)
 
     def test_task_flow_bis(self):
         safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -126,7 +126,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
                                                                        transaction_hash=tx_hash_owner0.hex())
-        self.assertTrue(multisig_confirmation_check.status)
+        self.assertTrue(multisig_confirmation_check.mined)
 
         # Send Tx signed by owner 1
         sender = owners[1]
@@ -146,7 +146,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
                                                                        transaction_hash=tx_hash_owner1.hex())
-        self.assertTrue(multisig_confirmation_check.status)
+        self.assertTrue(multisig_confirmation_check.mined)
 
         # send other approval from a third user
         sender = owners[2]
@@ -178,7 +178,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)
-        self.assertTrue(multisig_transaction_check.status)
+        self.assertTrue(multisig_transaction_check.mined)
 
     def test_block_number_different_confirmation_ok(self):
         safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -220,7 +220,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
                                                                        transaction_hash=tx_hash_owner0.hex())
-        self.assertTrue(multisig_confirmation_check.status)
+        self.assertTrue(multisig_confirmation_check.mined)
 
     def test_confirmation_ko(self):
         safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -306,7 +306,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
                                                                        transaction_hash=tx_hash_owner0.hex())
-        self.assertTrue(multisig_confirmation_check.status)
+        self.assertTrue(multisig_confirmation_check.mined)
 
         # Send Tx signed by owner 1
         sender = owners[1]
@@ -328,7 +328,7 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
                                                                        transaction_hash=tx_hash_owner1.hex())
-        self.assertTrue(multisig_confirmation_check.status)
+        self.assertTrue(multisig_confirmation_check.mined)
 
         # v == 1, r = owner -> Signed previously
         signatures = self.safe_service.signatures_to_bytes([(1, int(owner, 16), 0)
@@ -346,4 +346,4 @@ class TestHistoryTasks(TestCase, TestCaseWithSafeContractMixin):
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)
-        self.assertTrue(multisig_transaction_check.status)
+        self.assertTrue(multisig_transaction_check.mined)
