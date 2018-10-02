@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
+
 from django.conf import settings
-from django_eth.serializers import (EthereumAddressField, HexadecimalField,
-                                    Sha3HashField)
+from django_eth.serializers import EthereumAddressField, Sha3HashField
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from gnosis.safe.ethereum_service import EthereumServiceProvider
 from gnosis.safe.safe_service import SafeService
 from gnosis.safe.serializers import SafeMultisigTxSerializer
 
@@ -25,12 +27,25 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
     contract_transaction_hash = Sha3HashField()
     transaction_hash = Sha3HashField()  # Tx that includes the tx
     sender = EthereumAddressField()
-    block_number = serializers.IntegerField()
-    block_date_time = serializers.DateTimeField()
+    block_number = serializers.IntegerField(allow_null=True)
+    block_date_time = serializers.DateTimeField(allow_null=True)
     type = serializers.ChoiceField(settings.SAFE_TRANSACTION_TYPES)
 
     def validate(self, data):
         super().validate(data)
+
+        ethereum_service = EthereumServiceProvider()
+        tx_hash = data['transaction_hash']
+        transaction_data = ethereum_service.get_transaction(tx_hash)
+
+        if not transaction_data:
+            raise ValidationError("No transaction data found for tx-hash=%s" % tx_hash)
+
+        tx_block_number = transaction_data['blockNumber']
+        block_data = ethereum_service.get_block(tx_block_number)
+        tx_block_date_time = datetime.fromtimestamp(block_data['timestamp'], timezone.utc)
+        data['block_number'] = tx_block_number
+        data['block_date_time'] = tx_block_date_time
 
         contract_transaction_hash = SafeService.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
                                                                      data['data'], data['operation'],

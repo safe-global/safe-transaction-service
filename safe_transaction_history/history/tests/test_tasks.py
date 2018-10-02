@@ -1,5 +1,4 @@
 import logging
-from random import randint
 
 from django.test import TestCase
 from django_eth.constants import NULL_ADDRESS

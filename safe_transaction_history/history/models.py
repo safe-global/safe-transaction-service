@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django_eth.models import EthereumAddressField, Sha3HashField, Uint256Field
 from model_utils.models import TimeStampedModel
 
@@ -26,6 +27,14 @@ class MultisigTransaction(TimeStampedModel):
         executed = 'Executed' if self.mined else 'Pending'
         return '{} - {}'.format(self.safe, executed)
 
+    def set_mined(self):
+        self.mined = True
+        self.execution_date = timezone.now()
+        self.save(update_fields=['mined', 'execution_date'])
+
+        # Mark every confirmation as mined
+        MultisigConfirmation.objects.filter(multisig_transaction=self).update(mined=True)
+
 
 class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
@@ -42,6 +51,10 @@ class MultisigConfirmation(TimeStampedModel):
     def __str__(self):
         mined = 'Mined' if self.mined else 'Pending'
         return '{} - {}'.format(self.safe, mined)
+
+    def set_mined(self):
+        self.mined = True
+        return self.save()
 
     # FIXME Use enum for confirmation/execution
     def is_execution(self):

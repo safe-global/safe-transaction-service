@@ -9,9 +9,6 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.safe.contracts import (get_safe_contract,
-                                   get_safe_owner_manager_contract)
-from gnosis.safe.ethereum_service import EthereumServiceProvider
 from gnosis.safe.safe_service import SafeServiceProvider
 from safe_transaction_history.history.models import MultisigTransaction
 from safe_transaction_history.version import __version__
@@ -95,25 +92,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
-
-        # TODO Fix this, it shouldn't be on the view
-        # Get block_number and block_date_time from transaction_hash
-        if 'transaction_hash' in request.data:
-            try:
-                ethereum_service = EthereumServiceProvider()
-                transaction_data = ethereum_service.get_transaction(request.data['transaction_hash'])
-                if transaction_data:
-                    tx_block_number = transaction_data['blockNumber']
-                    block_data = ethereum_service.get_block(tx_block_number)
-                    block_date_time = datetime.datetime.utcfromtimestamp(block_data['timestamp'])
-                    request.data['block_number'] = tx_block_number
-                    request.data['block_date_time'] = block_date_time
-                else:
-                    raise ValueError
-            except ValueError:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data='Cannot get info from transaction_hash %s' %
-                                                                         request.data['transaction_hash'])
-
         serializer = self.get_serializer_class()(data=request.data)
 
         if not serializer.is_valid():
