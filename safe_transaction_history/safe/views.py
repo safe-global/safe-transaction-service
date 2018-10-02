@@ -9,14 +9,16 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from gnosis.safe.contracts import (get_safe_contract,
+                                   get_safe_owner_manager_contract)
+from gnosis.safe.ethereum_service import EthereumServiceProvider
+from gnosis.safe.safe_service import SafeServiceProvider
 from safe_transaction_history.safe.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 
-from gnosis.safe.contracts import get_safe_owner_manager_contract, get_safe_team_contract
-from gnosis.safe.ethereum_service import EthereumServiceProvider
 from .filters import DefaultPagination
-from .serializers import (SafeMultisigHistorySerializer,
-                          SafeMultisigTransactionSerializer)
+from .serializers import (SafeMultisigHistoryDbSerializer,
+                          SafeMultisigTransactionHistorySerializer)
 from .tasks import check_approve_transaction
 
 
@@ -45,15 +47,15 @@ class SafeMultisigTransactionListView(ListAPIView):
         Proxy returning a serializer class according to the request's verb.
         """
         if self.request.method == 'GET':
-            return SafeMultisigHistorySerializer
+            return SafeMultisigHistoryDbSerializer
         elif self.request.method == 'POST':
-            return SafeMultisigTransactionSerializer
+            return SafeMultisigTransactionHistorySerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     422: 'Invalid ethereum address'})
     def get(self, request, address, format=None):
         """
-        Returns the history of a multisig (safe)
+        Returns the history of a multisig tx (safe)
         """
         try:
             if not ethereum.utils.check_checksum(address):
@@ -94,6 +96,7 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         request.data['safe'] = address
 
+        # TODO Fix this, it shouldn't be on the view
         # Get block_number and block_date_time from transaction_hash
         if 'transaction_hash' in request.data:
             try:
@@ -120,9 +123,14 @@ class SafeMultisigTransactionListView(ListAPIView):
             contract_transaction_hash = data['contract_transaction_hash'].hex()
             transaction_hash = data['transaction_hash'].hex()
             sender = data['sender']
-            # check isOwnerAndConfirmed
-            if (self.is_owner_and_confirmed(address, contract_transaction_hash, sender)
-                    or self.is_owner_and_executed(address, contract_transaction_hash, sender)):
+
+            safe_service = SafeServiceProvider()
+
+            # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
+            if (safe_service.retrieve_is_owner(address, sender) and
+                    (safe_service.retrieve_is_hash_approved(address, sender, contract_transaction_hash) or
+                     safe_service.retrieve_nonce(address) > data['nonce'])):
+
                 # Save data into Database
                 serializer.save()
 
@@ -136,33 +144,3 @@ class SafeMultisigTransactionListView(ListAPIView):
             else:
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner or tx not approved/executed')
-
-    # TODO Refactor this, these methods should be on SafeService
-    def is_owner_and_confirmed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
-        """
-        Checks whether an account (owner) is one of the Safe's owners and the incoming contract_transaction_hash
-        was approved
-        """
-        ethereum_service = EthereumServiceProvider()
-        w3 = ethereum_service.w3  # Web3 instance
-        safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
-        safe_contract = get_safe_team_contract(w3, safe_address)
-
-        is_owner = safe_owner_contract.functions.isOwner(owner).call()
-        is_approved = safe_contract.functions.isApproved(contract_transaction_hash, owner).call()
-        return is_owner and is_approved
-
-    def is_owner_and_executed(self, safe_address: str, contract_transaction_hash: str, owner: str) -> bool:
-        """
-        Checks whether an account (owner) is one of the Safe's owners and the incoming contract_transaction_hash
-        was executed
-        """
-        ethereum_service = EthereumServiceProvider()
-        w3 = ethereum_service.w3  # Web3 instance
-        safe_owner_contract = get_safe_owner_manager_contract(w3, safe_address)
-        safe_contract = get_safe_team_contract(w3, safe_address)
-
-        is_owner = safe_owner_contract.functions.isOwner(owner).call()
-        is_executed = safe_contract.functions.isExecuted(contract_transaction_hash).call()
-
-        return is_owner and is_executed
