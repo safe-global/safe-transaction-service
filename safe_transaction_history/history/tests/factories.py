@@ -19,8 +19,13 @@ class MultisigTransactionFactory(factory_boy.DjangoModelFactory):
     value = FuzzyInteger(low=0, high=10)
     data = b''
     operation = FuzzyInteger(low=0, high=3)
-    nonce = FuzzyInteger(low=0, high=10)
-    status = False
+    safe_tx_gas = FuzzyInteger(low=400000, high=500000)
+    data_gas = FuzzyInteger(low=400000, high=500000)
+    gas_price = FuzzyInteger(low=1, high=10)
+    gas_token = '0x' + '0' * 40
+    refund_receiver = '0x' + '0' * 40
+    nonce = factory_boy.Sequence(lambda n: n, type=int)
+    mined = False
 
 
 class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
@@ -32,4 +37,4 @@ class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
     multisig_transaction = factory_boy.SubFactory(MultisigTransaction)
     block_number = 0
     block_date_time = FuzzyDateTime(timezone.now())
-    status = False
+    mined = False

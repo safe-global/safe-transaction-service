@@ -61,19 +61,19 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
             if not is_approved_latest and is_executed_latest:
                 # Mark multisig tx as executed
                 # TODO Mark every confirmation as executed
-                if not multisig_transaction.status:
-                    multisig_transaction.status = True
+                if not multisig_transaction.mined:
+                    multisig_transaction.mined = True
                     multisig_transaction.execution_date = timezone.now()
                     multisig_transaction.save()
                 return
             elif is_approved_latest:
-                multisig_confirmation.status = True
+                multisig_confirmation.mined = True
                 multisig_confirmation.save()
 
                 if is_executed_latest:
                     # Check if multisig transaction executed
-                    if not multisig_transaction.status:
-                        multisig_transaction.status = True
+                    if not multisig_transaction.mined:
+                        multisig_transaction.mined = True
                         multisig_transaction.execution_date = timezone.now()
                         multisig_transaction.save()
                 return
@@ -88,23 +88,23 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
             elif not is_approved_latest and is_executed_latest:
                 # Check if multisig transaction executed
                 multisig_transaction = multisig_confirmation.multisig_transaction
-                if not multisig_transaction.status:
-                    multisig_transaction.status = True
+                if not multisig_transaction.mined:
+                    multisig_transaction.mined = True
                     multisig_transaction.execution_date = timezone.now()
                     multisig_transaction.save()
                     # TODO Update multisig_confirmation block_number
                 return
             # case with multisig transaction not executed and approval True
             elif is_approved_latest:
-                multisig_confirmation.status = is_approved_latest
+                multisig_confirmation.mined = is_approved_latest
                 # TODO Update multisig_confirmation block_number
                 multisig_confirmation.save()
 
                 if is_executed_latest:
                     # Check if multisig transaction executed
                     multisig_transaction = multisig_confirmation.multisig_transaction
-                    if not multisig_transaction.status:
-                        multisig_transaction.status = True
+                    if not multisig_transaction.mined:
+                        multisig_transaction.mined = True
                         multisig_transaction.execution_date = timezone.now()
                         multisig_transaction.save()
                 return
