@@ -3,7 +3,8 @@ from django.utils import timezone
 from django_eth.tests.factories import get_eth_address_with_key
 from factory.fuzzy import FuzzyDateTime, FuzzyInteger
 
-from ..models import MultisigConfirmation, MultisigTransaction
+from ..models import (HistoryOperation, MultisigConfirmation,
+                      MultisigTransaction)
 
 
 def generate_multisig_transactions(quantity=100):
@@ -38,3 +39,4 @@ class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
     block_number = 0
     block_date_time = FuzzyDateTime(timezone.now())
     mined = False
+    type = HistoryOperation.CONFIRMATION.value

@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 
-from django.conf import settings
 from django_eth.serializers import EthereumAddressField, Sha3HashField
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -9,27 +8,27 @@ from gnosis.safe.ethereum_service import EthereumServiceProvider
 from gnosis.safe.safe_service import SafeService
 from gnosis.safe.serializers import SafeMultisigTxSerializer
 
-from .models import MultisigConfirmation, MultisigTransaction
+from .models import HistoryOperation, MultisigConfirmation, MultisigTransaction
 
 
 # ================================================ #
 #                   Serializers
 # ================================================ #
-class SafeMultisigConfirmationSerializer(serializers.ModelSerializer):
-    submission_date = serializers.DateTimeField(source='created')
-
-    class Meta:
-        model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'type', 'transaction_hash',)
-
-
 class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
     contract_transaction_hash = Sha3HashField()
     transaction_hash = Sha3HashField()  # Tx that includes the tx
     sender = EthereumAddressField()
     block_number = serializers.IntegerField(allow_null=True)
     block_date_time = serializers.DateTimeField(allow_null=True)
-    type = serializers.ChoiceField(settings.SAFE_TRANSACTION_TYPES)
+    type = serializers.CharField()
+
+    def validate_type(self, value: str):
+        value = value.upper()
+        try:
+            HistoryOperation[value.upper()]
+            return value
+        except KeyError:
+            raise ValidationError('History Operation %s not recognised' % value)
 
     def validate(self, data):
         super().validate(data)
@@ -81,11 +80,23 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
             block_date_time=self.validated_data['block_date_time'],
             contract_transaction_hash=self.validated_data['contract_transaction_hash'],
             owner=self.validated_data['sender'],
-            type=self.validated_data['type'],
+            type=HistoryOperation[self.validated_data['type']].value,
             transaction_hash=self.validated_data['transaction_hash'],
             multisig_transaction=multisig_instance
         )
         return confirmation_instance
+
+
+class SafeMultisigConfirmationDbSerializer(serializers.ModelSerializer):
+    submission_date = serializers.DateTimeField(source='created')
+    type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MultisigConfirmation
+        fields = ('owner', 'submission_date', 'transaction_hash', 'type')
+
+    def get_type(self, obj):
+        return HistoryOperation(obj.type).name
 
 
 class SafeMultisigHistoryDbSerializer(SafeMultisigTxSerializer):
@@ -112,4 +123,4 @@ class SafeMultisigHistoryDbSerializer(SafeMultisigTxSerializer):
         else:
             confirmations = MultisigConfirmation.objects.filter(multisig_transaction=obj.id)
 
-        return SafeMultisigConfirmationSerializer(confirmations, many=True).data
+        return SafeMultisigConfirmationDbSerializer(confirmations, many=True).data

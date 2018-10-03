@@ -289,5 +289,3 @@ SAFE_CHECK_DEPLOYER_FUNDED_RETRIES = env.int('SAFE_CHECK_DEPLOYER_FUNDED_RETRIES
 
 # Number of blocks from the current block number needed to consider a transaction valid/stable
 SAFE_REORG_BLOCKS = env.int('SAFE_REORG_BLOCKS', default=10)
-
-SAFE_TRANSACTION_TYPES = (('confirmation', 'confirmation',), ('execution', 'execution',),)

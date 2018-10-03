@@ -183,8 +183,8 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 3)
         self.assertEqual(request.json()['results'][0]['confirmations'][2]['owner'],
                          owners[0])  # confirmations are sorted by creation date DESC
-        self.assertEqual(request.json()['results'][0]['confirmations'][2]['type'], 'confirmation')
-        self.assertEqual(request.json()['results'][0]['confirmations'][0]['type'], 'execution')
+        self.assertEqual(request.json()['results'][0]['confirmations'][2]['type'], 'CONFIRMATION')
+        self.assertEqual(request.json()['results'][0]['confirmations'][0]['type'], 'EXECUTION')
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -455,11 +455,11 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
-        self.assertFalse((serializer.is_valid()))
+        self.assertFalse(serializer.is_valid())
 
         transaction_data['contract_transaction_hash'] = safe_tx_hash.hex()
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
-        self.assertTrue((serializer.is_valid()))
+        self.assertTrue(serializer.is_valid())
 
     def test_get_multisig_transactions(self):
         safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()

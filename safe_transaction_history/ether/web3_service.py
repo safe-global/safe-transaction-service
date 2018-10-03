@@ -250,9 +250,9 @@ class Web3Service(object):
             Recover logs using filter
             """
 
-            return self.web3.eth.getLogs(({'fromBlock': from_block,
-                                           'toBlock': to_block,
-                                           'address': address}))
+            return self.web3.eth.getLogs({'fromBlock': from_block,
+                                          'toBlock': to_block,
+                                          'address': address})
 
         def _do_request(self, rpc_request):
             if isinstance(self.provider, HTTPProvider):

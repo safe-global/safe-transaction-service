@@ -1,7 +1,14 @@
+from enum import Enum
+
 from django.db import models
 from django.utils import timezone
 from django_eth.models import EthereumAddressField, Sha3HashField, Uint256Field
 from model_utils.models import TimeStampedModel
+
+
+class HistoryOperation(Enum):
+    CONFIRMATION = 0
+    EXECUTION = 1
 
 
 class MultisigTransaction(TimeStampedModel):
@@ -40,7 +47,7 @@ class MultisigConfirmation(TimeStampedModel):
     owner = EthereumAddressField()
     contract_transaction_hash = Sha3HashField(null=False, blank=False)
     transaction_hash = Sha3HashField(null=False, blank=False)
-    type = models.CharField(max_length=20, null=False, blank=False)
+    type = models.PositiveSmallIntegerField(null=False, blank=False)
     block_number = models.BigIntegerField()
     block_date_time = models.DateTimeField()
     mined = models.BooleanField(default=False)
@@ -56,9 +63,8 @@ class MultisigConfirmation(TimeStampedModel):
         self.mined = True
         return self.save()
 
-    # FIXME Use enum for confirmation/execution
     def is_execution(self):
-        return self.type == 'execution'
+        return HistoryOperation(self.type) == HistoryOperation.EXECUTION
 
     def is_confirmation(self):
-        return self.type == 'confirmation'
+        return HistoryOperation(self.type) == HistoryOperation.CONFIRMATION
