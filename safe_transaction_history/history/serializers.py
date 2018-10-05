@@ -18,8 +18,8 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
     contract_transaction_hash = Sha3HashField()
     transaction_hash = Sha3HashField()  # Tx that includes the tx
     sender = EthereumAddressField()
-    block_number = serializers.IntegerField(allow_null=True)
-    block_date_time = serializers.DateTimeField(allow_null=True)
+    block_number = serializers.IntegerField(required=False)
+    block_date_time = serializers.DateTimeField(required=False)
     type = serializers.CharField()
 
     def validate_type(self, value: str):

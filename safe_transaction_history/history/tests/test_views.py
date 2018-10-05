@@ -76,8 +76,6 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_contract_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
-            'block_number': 0,
-            'block_date_time': datetime.datetime.now(),
             'sender': sender,
             'type': 'confirmation'
         }
