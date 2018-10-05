@@ -105,20 +105,22 @@ class SafeMultisigTransactionListView(ListAPIView):
             safe_service = SafeServiceProvider()
 
             # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-            if (safe_service.retrieve_is_owner(address, sender) and
-                    (safe_service.retrieve_is_hash_approved(address, sender, contract_transaction_hash) or
-                     safe_service.retrieve_nonce(address) > data['nonce'])):
-
-                # Save data into Database
-                serializer.save()
-
-                # Create task
-                check_approve_transaction.delay(safe_address=address,
-                                                contract_transaction_hash=contract_transaction_hash,
-                                                transaction_hash=transaction_hash,
-                                                owner=sender)
-
-                return Response(status=status.HTTP_202_ACCEPTED)
-            else:
+            if not safe_service.retrieve_is_owner(address, sender):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                data='User is not an owner or tx not approved/executed')
+                                data='User is not an owner')
+            else:
+                if not (safe_service.retrieve_is_hash_approved(address, sender, contract_transaction_hash) or
+                        safe_service.retrieve_nonce(address) > data['nonce']):
+                    return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    data='Tx hash is not approved or tx not executed')
+                else:
+                    # Save data into Database
+                    serializer.save()
+
+                    # Create task
+                    check_approve_transaction.delay(safe_address=address,
+                                                    contract_transaction_hash=contract_transaction_hash,
+                                                    transaction_hash=transaction_hash,
+                                                    owner=sender)
+
+                    return Response(status=status.HTTP_202_ACCEPTED)
