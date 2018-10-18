@@ -27,9 +27,6 @@ class MultisigTransaction(TimeStampedModel):
     # Defines when a multisig transaction gets executed (confirmations included)
     execution_date = models.DateTimeField(blank=True, null=True)
 
-    class Meta:
-        unique_together = (('safe', 'nonce'),)
-
     def __str__(self):
         executed = 'Executed' if self.mined else 'Pending'
         return '{} - {}'.format(self.safe, executed)
