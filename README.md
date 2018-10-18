@@ -14,3 +14,8 @@ Docs
 ------------
 You can open the diagrams with [Staruml](http://staruml.io/)
 
+Contributors
+------------
+- Denís Graña (denis@gnosis.pm)
+- Giacomo Licari (giacomo.licari@gnosis.pm)
+- Uxío Fuentefría (uxio@gnosis.pm)
