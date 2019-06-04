@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 
-from django_eth.serializers import EthereumAddressField, Sha3HashField
+from gnosis.eth.django.serializers import EthereumAddressField, Sha3HashField
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from gnosis.safe.ethereum_service import EthereumServiceProvider
-from gnosis.safe.safe_service import SafeService
+from gnosis.eth import EthereumClientProvider
+from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializer
 
 from .models import HistoryOperation, MultisigConfirmation, MultisigTransaction
@@ -25,36 +25,35 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializer):
     def validate_type(self, value: str):
         value = value.upper()
         try:
-            HistoryOperation[value.upper()]
-            return value
+            return HistoryOperation[value].name
         except KeyError:
-            raise ValidationError('History Operation %s not recognised' % value)
+            raise ValidationError('History Operation %s not recognized' % value)
 
     def validate(self, data):
         super().validate(data)
 
-        ethereum_service = EthereumServiceProvider()
         tx_hash = data['transaction_hash']
-        transaction_data = ethereum_service.get_transaction(tx_hash)
+
+        ethereum_client = EthereumClientProvider()
+        transaction_data = ethereum_client.get_transaction(tx_hash)
 
         if not transaction_data:
             raise ValidationError("No transaction data found for tx-hash=%s" % tx_hash)
 
         tx_block_number = transaction_data['blockNumber']
-        block_data = ethereum_service.get_block(tx_block_number)
+        block_data = ethereum_client.get_block(tx_block_number)
         tx_block_date_time = datetime.fromtimestamp(block_data['timestamp'], timezone.utc)
         data['block_number'] = tx_block_number
         data['block_date_time'] = tx_block_date_time
 
-        contract_transaction_hash = SafeService.get_hash_for_safe_tx(data['safe'], data['to'], data['value'],
-                                                                     data['data'], data['operation'],
-                                                                     data['safe_tx_gas'], data['data_gas'],
-                                                                     data['gas_price'], data['gas_token'],
-                                                                     data['refund_receiver'],
-                                                                     data['nonce'])
+        safe = Safe(data['safe'], ethereum_client)
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safe_tx_gas'], data['data_gas'], data['gas_price'], data['gas_token'],
+                                         data['refund_receiver'], safe_nonce=data['nonce'])
+        contract_transaction_hash = safe_tx.safe_tx_hash
 
         if contract_transaction_hash != data['contract_transaction_hash']:
-            raise ValidationError('contract_transaction_hash is not valid')
+            raise ValidationError('contract_transaction_hash does not match provided tx')
 
         return data
 

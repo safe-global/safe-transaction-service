@@ -2,39 +2,48 @@ import datetime
 import logging
 
 from django.urls import reverse
-from django_eth.constants import NULL_ADDRESS
+from gnosis.eth.contracts import get_safe_contract
+from gnosis.eth.constants import NULL_ADDRESS
+from gnosis.safe.signatures import signatures_to_bytes
 from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from gnosis.safe.safe_service import SafeOperation
-from gnosis.safe.tests.factories import get_eth_address_with_key
-from gnosis.safe.tests.safe_test_case import TestCaseWithSafeContractMixin
+from gnosis.safe import SafeOperation, Safe
+from gnosis.eth.utils import get_eth_address_with_key
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from web3 import Web3
 
 from ..models import MultisigConfirmation, MultisigTransaction
 from ..serializers import SafeMultisigTransactionHistorySerializer
 from .factories import (MultisigTransactionConfirmationFactory,
-                        MultisigTransactionFactory,
-                        generate_multisig_transactions)
+                        MultisigTransactionFactory)
 
 logger = logging.getLogger(__name__)
 
 
-class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
+class TestHistoryViews(APITestCase, SafeTestCaseMixin):
 
     operation = 0
-    WITHDRAW_AMOUNT = 50000000000000000
+    WITHDRAW_AMOUNT = Web3.toWei(0.00001, 'ether')
 
     @classmethod
     def setUpTestData(cls):
-        cls.prepare_safe_tests()
+        cls.prepare_tests()
+
+    def deploy_test_safe(self):
+        owners = self.w3.eth.accounts[:4]
+        initial_funding_wei = self.w3.toWei(0.01, 'ether')
+        safe_create2_tx = super().deploy_test_safe(owners=owners, threshold=2, initial_funding_wei=initial_funding_wei)
+        return (safe_create2_tx.safe_address, get_safe_contract(self.w3, safe_create2_tx.safe_address),
+                safe_create2_tx.owners, NULL_ADDRESS, initial_funding_wei, safe_create2_tx.threshold)
 
     def test_about(self):
         request = self.client.get(reverse('v1:about'))
         self.assertEqual(request.status_code, status.HTTP_200_OK)
 
     def test_multisig_transaction_creation_flow(self):
-        safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
+        safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
 
         balance = self.w3.eth.getBalance(safe_address)
         self.assertEqual(initial_funding_wei, balance)
@@ -50,18 +59,20 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        safe_tx_hash = self.safe_service.get_hash_for_safe_tx(safe_address, to, value, data, operation, safe_tx_gas,
-                                                              data_gas, gas_price, gas_token, refund_receiver, nonce)
+        safe = Safe(safe_address, self.ethereum_client)
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+                                         refund_receiver, safe_nonce=nonce)
+        safe_tx_hash = safe_tx.safe_tx_hash
 
-        safe_tx_contract_hash = safe_instance.functions.getTransactionHash(to, value, data, operation,
+        safe_tx_contract_hash = safe_contract.functions.getTransactionHash(to, value, data, operation,
                                                                            safe_tx_gas, data_gas, gas_price, gas_token,
                                                                            refund_receiver, nonce).call()
 
         self.assertEqual(safe_tx_hash, safe_tx_contract_hash)
 
         sender = owners[0]
-        tx_hash_owner0 = safe_instance.functions.approveHash(safe_tx_hash).transact({'from': sender})
-        is_approved = safe_instance.functions.approvedHashes(sender, safe_tx_hash).call()
+        tx_hash_owner0 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
         transaction_data = {
@@ -99,8 +110,8 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
 
         # Send Tx signed by owner 1
         sender = owners[1]
-        tx_hash_owner1 = safe_instance.functions.approveHash(safe_tx_hash).transact({'from': sender})
-        is_approved = safe_instance.functions.approvedHashes(sender, safe_tx_hash).call()
+        tx_hash_owner1 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
         # Send confirmation from owner1 to API
@@ -131,17 +142,16 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(request.status_code, status.HTTP_202_ACCEPTED)
 
         # v == 1, r = owner -> Signed previously
-        signatures = self.safe_service.signatures_to_bytes([(1, int(owner, 16), 0)
-                                                            for owner in
-                                                            sorted(owners[:2], key=lambda x: x.lower())])
+        signatures = signatures_to_bytes([(1, int(owner, 16), 0)
+                                          for owner in
+                                          sorted(owners[:2], key=lambda x: x.lower())])
 
         # Execute Multisig Transaction
-        tx_execute_hash, _ = self.safe_service.send_multisig_tx(safe_address, to, value, data, operation,
-                                                                safe_tx_gas, data_gas, gas_price, gas_token,
-                                                                refund_receiver, signatures)
+        safe_tx.signatures = signatures
+        tx_execute_hash, _ = safe_tx.execute(self.ethereum_test_account.privateKey)
 
-        is_executed = self.safe_service.retrieve_nonce(safe_address) == (nonce + 1)
-        self.assertTrue(is_executed)
+        # Is executed
+        self.assertEqual(safe.retrieve_nonce(), nonce + 1)
 
         # Send confirmation from owner2 to API
         transaction_data = {
@@ -163,6 +173,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
+        serializer.is_valid()
         self.assertTrue(serializer.is_valid())
 
         # Save
@@ -185,10 +196,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(request.json()['results'][0]['confirmations'][0]['type'], 'EXECUTION')
 
     def test_create_multisig_invalid_transaction_parameters(self):
-        safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
-        self.assertIsNotNone(safe_address)
-        safe_nonce = self.safe_service.retrieve_nonce(safe_address)
-        self.assertEqual(safe_nonce, 0)
+        safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
 
         to, _ = get_eth_address_with_key()
         value = self.WITHDRAW_AMOUNT
@@ -200,12 +208,16 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
-        safe_tx_hash = self.safe_service.get_hash_for_safe_tx(safe_address, to, value, data, operation, safe_tx_gas,
-                                                              data_gas, gas_price, gas_token, refund_receiver, nonce)
+        safe_nonce = nonce
+
+        safe = Safe(safe_address, self.ethereum_client)
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+                                         refund_receiver, safe_nonce=nonce)
+        safe_tx_hash = safe_tx.safe_tx_hash
 
         sender = owners[0]
-        tx_hash_owner0 = safe_instance.functions.approveHash(safe_tx_hash).transact({'from': sender})
-        is_approved = safe_instance.functions.approvedHashes(sender, safe_tx_hash).call()
+        tx_hash_owner0 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
         # Call API with invalid contract_transaction_hash sent by owner1 to API
@@ -410,10 +422,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
             owner=owners[0], contract_transaction_hash=safe_tx_hash.hex()).count(), 1)
 
     def test_create_multisig_invalid_owner(self):
-        safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
-        self.assertIsNotNone(safe_address)
-        safe_nonce = self.safe_service.retrieve_nonce(safe_address)
-        self.assertEqual(safe_nonce, 0)
+        safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
 
         to, _ = get_eth_address_with_key()
         value = self.WITHDRAW_AMOUNT
@@ -425,12 +434,17 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
-        safe_tx_hash = self.safe_service.get_hash_for_safe_tx(safe_address, to, value, data, operation, safe_tx_gas,
-                                                              data_gas, gas_price, gas_token, refund_receiver, nonce)
+
+        safe = Safe(safe_address, self.ethereum_client)
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+                                         refund_receiver, safe_nonce=nonce)
+        safe_tx_hash = safe_tx.safe_tx_hash
+        safe_nonce = safe.retrieve_nonce()
+        self.assertEqual(safe_nonce, 0)
 
         sender = owners[0]
-        tx_hash_owner0 = safe_instance.functions.approveHash(safe_tx_hash).transact({'from': sender})
-        is_approved = safe_instance.functions.approvedHashes(sender, safe_tx_hash).call()
+        tx_hash_owner0 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
         # Send confirmation from owner1 to API
@@ -460,7 +474,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertTrue(serializer.is_valid())
 
     def test_get_multisig_transactions(self):
-        safe_address, safe_instance, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
+        safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
 
         request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                   format='json')
@@ -548,7 +562,7 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(len(request.json()['results']), 1)
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 0)
 
-        multisig_transaction_instance = MultisigTransactionFactory()
+        multisig_transaction_instance = MultisigTransactionFactory(safe=multisig_transaction_instance.safe)
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
@@ -557,7 +571,8 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 0)
         self.assertEqual(len(request.json()['results'][1]['confirmations']), 0)
 
-        generate_multisig_transactions(quantity=200)
+        [MultisigTransactionFactory(safe=multisig_transaction_instance.safe) for _ in range(200)]
+
         request = self.client.get(reverse('v1:multisig-transactions',
                                           kwargs={'address': multisig_transaction_instance.safe}),
                                   format='json')
@@ -565,12 +580,10 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         self.assertEqual(request.json()['count'], MultisigTransaction.objects.all().count())
 
     def test_hex_data(self):
-        safe_address, safe_instance, owners, _, _, threshold = self.deploy_test_safe()
-        safe_nonce = self.safe_service.retrieve_nonce(safe_address)
-        self.assertEqual(safe_nonce, 0)
+        safe_address, safe_contract, owners, _, _, threshold = self.deploy_test_safe()
 
         # Get removeOwner transaction data
-        call_data_owner1 = safe_instance.encodeABI(fn_name='removeOwner', args=[owners[0], owners[1], threshold - 1])
+        call_data_owner1 = safe_contract.encodeABI(fn_name='removeOwner', args=[owners[0], owners[1], threshold - 1])
 
         to = safe_address
         value = self.WITHDRAW_AMOUNT
@@ -581,13 +594,16 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
-        nonce = safe_nonce
-        safe_tx_hash = self.safe_service.get_hash_for_safe_tx(safe_address, to, value, data, operation, safe_tx_gas,
-                                                              data_gas, gas_price, gas_token, refund_receiver, nonce)
+        nonce = 0
+
+        safe = Safe(safe_address, self.ethereum_client)
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+                                         refund_receiver, safe_nonce=nonce)
+        safe_tx_hash = safe_tx.safe_tx_hash
 
         sender = owners[0]
-        tx_hash_owner0 = safe_instance.functions.approveHash(safe_tx_hash).transact({'from': sender})
-        is_approved = safe_instance.functions.approvedHashes(sender, safe_tx_hash).call()
+        tx_hash_owner0 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
         # Call API
@@ -611,7 +627,6 @@ class TestHistoryViews(APITestCase, TestCaseWithSafeContractMixin):
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        print(request.content)
         self.assertEqual(request.status_code, status.HTTP_202_ACCEPTED)
 
         # Get multisig transaction data

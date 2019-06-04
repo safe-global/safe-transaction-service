@@ -2,7 +2,8 @@ from enum import Enum
 
 from django.db import models
 from django.utils import timezone
-from django_eth.models import EthereumAddressField, Sha3HashField, Uint256Field
+
+from gnosis.eth.django.models import EthereumAddressField, Sha3HashField, Uint256Field
 from model_utils.models import TimeStampedModel
 
 

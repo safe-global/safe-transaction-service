@@ -1,5 +1,3 @@
-import datetime
-
 import ethereum.utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -9,7 +7,8 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.safe.safe_service import SafeServiceProvider
+from gnosis.eth import EthereumClientProvider
+from gnosis.safe import Safe
 from safe_transaction_history.history.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 
@@ -102,15 +101,16 @@ class SafeMultisigTransactionListView(ListAPIView):
             transaction_hash = data['transaction_hash'].hex()
             sender = data['sender']
 
-            safe_service = SafeServiceProvider()
+            ethereum_client = EthereumClientProvider()
+            safe = Safe(address, ethereum_client=ethereum_client)
 
             # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-            if not safe_service.retrieve_is_owner(address, sender):
+            if not safe.retrieve_is_owner(sender):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner')
             else:
-                if not (safe_service.retrieve_is_hash_approved(address, sender, contract_transaction_hash) or
-                        safe_service.retrieve_nonce(address) > data['nonce']):
+                if not (safe.retrieve_is_hash_approved(sender, contract_transaction_hash) or
+                        safe.retrieve_nonce() > data['nonce']):
                     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     data='Tx hash is not approved or tx not executed')
                 else:

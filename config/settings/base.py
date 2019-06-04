@@ -66,7 +66,6 @@ DJANGO_APPS = [
 ]
 THIRD_PARTY_APPS = [
     'rest_framework',
-    'rest_framework_swagger',
     'drf_yasg',
 ]
 LOCAL_APPS = [

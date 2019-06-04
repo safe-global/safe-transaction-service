@@ -1,22 +1,18 @@
-import factory as factory_boy
+import factory
 from django.utils import timezone
-from django_eth.tests.factories import get_eth_address_with_key
+from eth_account import Account
 from factory.fuzzy import FuzzyDateTime, FuzzyInteger
 
 from ..models import (HistoryOperation, MultisigConfirmation,
                       MultisigTransaction)
 
 
-def generate_multisig_transactions(quantity=100):
-    return [MultisigTransactionFactory() for _ in range(quantity)]
-
-
-class MultisigTransactionFactory(factory_boy.DjangoModelFactory):
+class MultisigTransactionFactory(factory.DjangoModelFactory):
     class Meta:
         model = MultisigTransaction
 
-    safe, _ = get_eth_address_with_key()
-    to, _ = get_eth_address_with_key()
+    safe = factory.LazyFunction(lambda: Account.create().address)
+    to = factory.LazyFunction(lambda: Account.create().address)
     value = FuzzyInteger(low=0, high=10)
     data = b''
     operation = FuzzyInteger(low=0, high=3)
@@ -25,17 +21,17 @@ class MultisigTransactionFactory(factory_boy.DjangoModelFactory):
     gas_price = FuzzyInteger(low=1, high=10)
     gas_token = '0x' + '0' * 40
     refund_receiver = '0x' + '0' * 40
-    nonce = factory_boy.Sequence(lambda n: n, type=int)
+    nonce = factory.Sequence(lambda n: n)
     mined = False
 
 
-class MultisigTransactionConfirmationFactory(factory_boy.DjangoModelFactory):
+class MultisigTransactionConfirmationFactory(factory.DjangoModelFactory):
     class Meta:
         model = MultisigConfirmation
 
-    owner, _ = get_eth_address_with_key()
-    contract_transaction_hash = factory_boy.Sequence(lambda n: '{:064d}'.format(n))
-    multisig_transaction = factory_boy.SubFactory(MultisigTransaction)
+    owner = factory.LazyFunction(lambda: Account.create().address)
+    contract_transaction_hash = factory.Sequence(lambda n: '{:064d}'.format(n))
+    multisig_transaction = factory.SubFactory(MultisigTransaction)
     block_number = 0
     block_date_time = FuzzyDateTime(timezone.now())
     mined = False
