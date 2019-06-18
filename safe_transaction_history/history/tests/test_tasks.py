@@ -1,12 +1,10 @@
 import logging
 
 from django.test import TestCase
-from gnosis.eth import EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract
-
-from gnosis.safe import SafeOperation, Safe
 from gnosis.eth.utils import get_eth_address_with_key
+from gnosis.safe import Safe, SafeOperation
 from gnosis.safe.signatures import signatures_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -18,12 +16,8 @@ from .factories import (MultisigTransactionConfirmationFactory,
 logger = logging.getLogger(__name__)
 
 
-class TestHistoryTasks(TestCase, SafeTestCaseMixin):
+class TestHistoryTasks(SafeTestCaseMixin, TestCase):
     WITHDRAW_AMOUNT = 50000000000000000
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.prepare_tests()
 
     def deploy_test_safe(self):
         owners = self.w3.eth.accounts[:4]

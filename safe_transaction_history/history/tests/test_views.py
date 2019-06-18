@@ -2,16 +2,15 @@ import datetime
 import logging
 
 from django.urls import reverse
-from gnosis.eth.contracts import get_safe_contract
 from gnosis.eth.constants import NULL_ADDRESS
+from gnosis.eth.contracts import get_safe_contract
+from gnosis.eth.utils import get_eth_address_with_key
+from gnosis.safe import Safe, SafeOperation
 from gnosis.safe.signatures import signatures_to_bytes
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from gnosis.safe import SafeOperation, Safe
-from gnosis.eth.utils import get_eth_address_with_key
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from web3 import Web3
 
 from ..models import MultisigConfirmation, MultisigTransaction
@@ -22,14 +21,10 @@ from .factories import (MultisigTransactionConfirmationFactory,
 logger = logging.getLogger(__name__)
 
 
-class TestHistoryViews(APITestCase, SafeTestCaseMixin):
+class TestHistoryViews(SafeTestCaseMixin, APITestCase):
 
     operation = 0
     WITHDRAW_AMOUNT = Web3.toWei(0.00001, 'ether')
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.prepare_tests()
 
     def deploy_test_safe(self):
         owners = self.w3.eth.accounts[:4]

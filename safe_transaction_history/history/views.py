@@ -1,5 +1,7 @@
 import ethereum.utils
 from drf_yasg.utils import swagger_auto_schema
+from gnosis.eth import EthereumClientProvider
+from gnosis.safe import Safe
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
@@ -7,8 +9,6 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe
 from safe_transaction_history.history.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 

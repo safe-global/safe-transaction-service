@@ -2,7 +2,6 @@ from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from eth_abi import decoding
-
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe
 
