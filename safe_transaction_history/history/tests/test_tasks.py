@@ -9,7 +9,7 @@ from gnosis.safe.signatures import signatures_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import MultisigConfirmation, MultisigTransaction
-from ..tasks import check_approve_transaction
+from ..tasks import check_approve_transaction_task
 from .factories import (MultisigTransactionConfirmationFactory,
                         MultisigTransactionFactory)
 
@@ -34,19 +34,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
-                                                          operation=operation, nonce=nonce)
-
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
+                                                          operation=operation, nonce=nonce,
+                                                          safe_tx_hash=safe_tx_hash.hex())
 
         # Send Tx signed by owner 0
         sender = owners[0]
@@ -54,12 +55,12 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
-        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
-                                                                       owner=sender,
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+        MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                               owner=sender)
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), owners[0], retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), owners[0],
+                                             retry=False)
 
         # Send Tx signed by owner 1
         sender = owners[1]
@@ -70,8 +71,7 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
                                                block_number=self.w3.eth.blockNumber,
                                                owner=sender,
-                                               transaction_hash=tx_hash_owner1.hex(),
-                                               contract_transaction_hash=safe_tx_hash.hex())
+                                               transaction_hash=tx_hash_owner1.hex())
 
         # v == 1, r = owner -> Signed previously
         signatures = signatures_to_bytes([(1, int(owner, 16), 0)
@@ -83,7 +83,8 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         tx_exec_hash_owner1, _ = safe_tx.execute(self.ethereum_test_account.privateKey)
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender,
+                                             retry=False)
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)
@@ -97,19 +98,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
-                                                          operation=operation, nonce=nonce)
-
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
+                                                          operation=operation, nonce=nonce,
+                                                          safe_tx_hash=safe_tx_hash.hex())
 
         # Send Tx signed by owner 0
         sender = owners[0]
@@ -117,14 +119,13 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
-        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
-                                                                       owner=sender,
-                                                                       transaction_hash=tx_hash_owner0.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+        MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                               owner=sender,
+                                               transaction_hash=tx_hash_owner0.hex())
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender,
-                                  retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender,
+                                       retry=False)
 
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
@@ -140,11 +141,11 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
                                                                        block_number=self.w3.eth.blockNumber,
                                                                        owner=sender,
-                                                                       transaction_hash=tx_hash_owner1.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+                                                                       transaction_hash=tx_hash_owner1.hex())
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), owners[1], retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), owners[1],
+                                             retry=False)
 
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
@@ -157,14 +158,14 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
-        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
-                                                                       block_number=self.w3.eth.blockNumber,
-                                                                       owner=sender,
-                                                                       transaction_hash=tx_hash_owner2.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+        MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                               owner=sender,
+                                               block_number=self.w3.eth.blockNumber,
+                                               transaction_hash=tx_hash_owner2.hex())
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner2.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner2.hex(), sender,
+                                             retry=False)
 
         # v == 1, r = owner -> Signed previously
         signatures = signatures_to_bytes([(1, int(owner, 16), 0)
@@ -176,7 +177,8 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         safe_tx.signatures = signatures
         tx_exec_hash_owner2, _ = safe_tx.execute(self.ethereum_test_account.privateKey)
 
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner2.hex(), owners[2], retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner2.hex(), owners[2],
+                                             retry=False)
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)
@@ -190,19 +192,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
-                                                          operation=operation, nonce=nonce)
-
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
+                                                          operation=operation, nonce=nonce,
+                                                          safe_tx_hash=safe_tx_hash.hex())
 
         # Send Tx signed by owner 0
         sender = owners[0]
@@ -212,14 +215,14 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
 
         multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
                                                                        owner=sender,
-                                                                       transaction_hash=tx_hash_owner0.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+                                                                       transaction_hash=tx_hash_owner0.hex())
 
         multisig_confirmation.block_number = multisig_confirmation.block_number + self.w3.eth.blockNumber
         multisig_confirmation.save()
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender,
+                                             retry=False)
 
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
@@ -234,19 +237,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
-                                                          operation=operation, nonce=nonce)
-
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
+                                                          operation=operation, nonce=nonce,
+                                                          safe_tx_hash=safe_tx_hash.hex())
 
         # Send Tx signed by owner 0
         sender = owners[0]
@@ -257,20 +261,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         # Simulate reorg, transaction not existing on the blockchain
         fake_transaction_hash = self.w3.sha3(text='hello').hex()
 
-        multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
-                                                                       owner=sender,
-                                                                       transaction_hash=fake_transaction_hash,
-                                                                       contract_transaction_hash=safe_tx_hash.hex(),
-                                                                       block_number=self.w3.eth.blockNumber - 1)
+        MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
+                                               owner=sender,
+                                               transaction_hash=fake_transaction_hash,
+                                               block_number=self.w3.eth.blockNumber - 1)
 
         # Execute task
         with self.settings(SAFE_REORG_BLOCKS=0):
-            check_approve_transaction(safe_address, safe_tx_hash.hex(), fake_transaction_hash, sender, retry=False)
+            check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), fake_transaction_hash, sender,
+                                                 retry=False)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
-                                                                           owner=sender,
-                                                                           transaction_hash=fake_transaction_hash)
+            MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
+                                             owner=sender,
+                                             transaction_hash=fake_transaction_hash)
 
     def test_block_number_different(self):
         safe_address, safe_contract, owners, funder, initial_funding_wei, threshold = self.deploy_test_safe()
@@ -280,19 +284,20 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
-                                                          operation=operation, nonce=nonce)
-
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, to=to, value=value,
+                                                          operation=operation, nonce=nonce,
+                                                          safe_tx_hash=safe_tx_hash.hex())
 
         # Send Tx signed by owner 0
         sender = owners[0]
@@ -302,14 +307,14 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
 
         multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
                                                                        owner=sender,
-                                                                       transaction_hash=tx_hash_owner0.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+                                                                       transaction_hash=tx_hash_owner0.hex())
 
         multisig_confirmation.block_number = self.w3.eth.blockNumber - 1
         multisig_confirmation.save()
 
         # Execute task
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner0.hex(), sender,
+                                             retry=False)
 
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
@@ -325,13 +330,13 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
         multisig_confirmation = MultisigTransactionConfirmationFactory(multisig_transaction=multisig_transaction,
                                                                        block_number=self.w3.eth.blockNumber,
                                                                        owner=sender,
-                                                                       transaction_hash=tx_hash_owner1.hex(),
-                                                                       contract_transaction_hash=safe_tx_hash.hex())
+                                                                       transaction_hash=tx_hash_owner1.hex())
 
         multisig_confirmation.block_number = self.w3.eth.blockNumber - 1
         multisig_confirmation.save()
 
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender,
+                                             retry=False)
 
         multisig_confirmation_check = MultisigConfirmation.objects.get(multisig_transaction__safe=safe_address,
                                                                        owner=sender,
@@ -343,13 +348,12 @@ class TestHistoryTasks(SafeTestCaseMixin, TestCase):
                                           for owner in
                                           sorted(owners[:2], key=lambda x: x.lower())])
 
-
-
         # Execute transaction
         safe_tx.signatures = signatures
         tx_exec_hash_owner1, _ = safe_tx.execute(self.ethereum_test_account.privateKey)
 
-        check_approve_transaction(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender, retry=False)
+        check_approve_transaction_task.delay(safe_address, safe_tx_hash.hex(), tx_hash_owner1.hex(), sender,
+                                             retry=False)
 
         multisig_transaction_check = MultisigTransaction.objects.get(safe=safe_address, to=to,
                                                                      value=value, nonce=nonce)

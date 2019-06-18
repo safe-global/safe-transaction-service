@@ -1,7 +1,6 @@
 from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
-from eth_abi import decoding
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe
 
@@ -13,17 +12,9 @@ logger = get_task_logger(__name__)
 COUNTDOWN = 60  # seconds
 
 
-def read_data_from_stream(self, stream):
-    data = stream.read(self.data_byte_size)
-    return data
-
-# Workaround to fix InsufficientDataBytes exception raised by a wrong value format returned by
-decoding.Fixed32ByteSizeDecoder.read_data_from_stream = read_data_from_stream
-
-
 @app.shared_task(bind=True)
-def check_approve_transaction(self, safe_address: str, contract_transaction_hash: str,
-                              transaction_hash: str, owner: str, retry: bool=True) -> None:
+def check_approve_transaction_task(self, safe_address: str, safe_tx_hash: str,
+                                   transaction_hash: str, owner: str, retry: bool = True) -> None:
     safe_reorg_blocks = settings.SAFE_REORG_BLOCKS
     ethereum_client = EthereumClientProvider()
     safe = Safe(safe_address, ethereum_client)
@@ -31,10 +22,11 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
     current_block_number = ethereum_client.current_block_number
     block_identifier = current_block_number - settings.SAFE_REORG_BLOCKS
     try:
-        multisig_confirmation = MultisigConfirmation.objects \
-            .select_related('multisig_transaction').get(contract_transaction_hash=contract_transaction_hash,
-                                                        owner=owner,
-                                                        transaction_hash=transaction_hash)
+        multisig_confirmation = MultisigConfirmation.objects.select_related(
+            'multisig_transaction'
+        ).get(multisig_transaction_id=safe_tx_hash,
+              owner=owner,
+              transaction_hash=transaction_hash)
 
         multisig_transaction = multisig_confirmation.multisig_transaction
 
@@ -44,11 +36,11 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
 
         # If tx is executed hash in `approvedHashes` will be deleted to free storage and use gas for tx
         is_approved_latest = safe.retrieve_is_hash_approved(multisig_confirmation.owner,
-                                                            contract_transaction_hash,
+                                                            safe_tx_hash,
                                                             block_identifier='latest')
 
         is_approved_prev = safe.retrieve_is_hash_approved(multisig_confirmation.owner,
-                                                          contract_transaction_hash,
+                                                          safe_tx_hash,
                                                           block_identifier=block_identifier)
 
         transaction_data = ethereum_client.get_transaction(transaction_hash)
@@ -88,4 +80,3 @@ def check_approve_transaction(self, safe_address: str, contract_transaction_hash
         logger.warning('Multisig confirmation for safe=%s and transaction_hash=%s does not exist',
                        safe_address,
                        transaction_hash)
-        return

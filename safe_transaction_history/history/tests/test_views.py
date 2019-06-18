@@ -48,19 +48,19 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
 
         safe_tx_contract_hash = safe_contract.functions.getTransactionHash(to, value, data, operation,
-                                                                           safe_tx_gas, data_gas, gas_price, gas_token,
+                                                                           safe_tx_gas, base_gas, gas_price, gas_token,
                                                                            refund_receiver, nonce).call()
 
         self.assertEqual(safe_tx_hash, safe_tx_contract_hash)
@@ -78,12 +78,12 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_contract_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
@@ -118,14 +118,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_contract_hash.hex(),
             'transaction_hash': tx_hash_owner1.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
@@ -148,7 +148,8 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         # Is executed
         self.assertEqual(safe.retrieve_nonce(), nonce + 1)
 
-        # Send confirmation from owner2 to API
+        # Send execution from owner to API
+        sender = owners[0]
         transaction_data = {
             'safe': safe_address,
             'to': to,
@@ -157,14 +158,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_contract_hash.hex(),
             'transaction_hash': tx_execute_hash.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
-            'sender': owners[0],
-            'type': 'execution'
+            'sender': sender,
+            'confirmation_type': 'execution'
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
@@ -187,8 +188,8 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(request.json()['results'][0]['confirmations']), 3)
         self.assertEqual(request.json()['results'][0]['confirmations'][2]['owner'],
                          owners[0])  # confirmations are sorted by creation date DESC
-        self.assertEqual(request.json()['results'][0]['confirmations'][2]['type'], 'CONFIRMATION')
-        self.assertEqual(request.json()['results'][0]['confirmations'][0]['type'], 'EXECUTION')
+        self.assertEqual(request.json()['results'][0]['confirmations'][2]['confirmationType'], 'CONFIRMATION')
+        self.assertEqual(request.json()['results'][0]['confirmations'][0]['confirmationType'], 'EXECUTION')
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -198,7 +199,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
@@ -206,7 +207,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         safe_nonce = nonce
 
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
 
@@ -224,21 +225,21 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex()[:-2],   # invalid contract_transaction_hash
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
         self.assertEqual(request.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # Call API with invalid 'type' property
+        # Call API with invalid 'confirmation_type' property
         transaction_data = {
             'safe': safe_address,
             'to': to,
@@ -247,14 +248,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'wrong_type'
+            'confirmation_type': 'wrong_type'
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -270,14 +271,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         # Create wrong safe address
@@ -291,7 +292,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[0], multisig_transaction_id=safe_tx_hash.hex())
 
         # Create invalid not base16 address
         wrong_safe_address = safe_address[:-4] + 'test'  # not base16 address
@@ -303,7 +304,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[0], multisig_transaction_id=safe_tx_hash.hex())
 
         # Call API using wrong sender (owner1), which has not been approved yet
         transaction_data = {
@@ -314,14 +315,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': owners[1],
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
@@ -332,8 +333,8 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=safe_tx_hash.hex())
-            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[0], multisig_transaction_id=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], multisig_transaction_id=safe_tx_hash.hex())
 
         # Call API using invalid sender address
         transaction_data = {
@@ -344,14 +345,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': owners[0][:-5] + 'fffff',
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
@@ -360,8 +361,8 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=safe_tx_hash.hex())
-            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[0], multisig_transaction_id=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], multisig_transaction_id=safe_tx_hash.hex())
 
         # Call API using invalid 'to' address
         transaction_data = {
@@ -372,14 +373,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
@@ -388,8 +389,8 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
         with self.assertRaises(MultisigConfirmation.DoesNotExist):
-            MultisigConfirmation.objects.get(owner=owners[0], contract_transaction_hash=safe_tx_hash.hex())
-            MultisigConfirmation.objects.get(owner=owners[1], contract_transaction_hash=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[0], multisig_transaction_id=safe_tx_hash.hex())
+            MultisigConfirmation.objects.get(owner=owners[1], multisig_transaction_id=safe_tx_hash.hex())
 
         # Call API with correct data values and parameters
         transaction_data = {
@@ -400,21 +401,21 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
         self.assertEqual(request.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=safe_nonce).count(), 1)
         self.assertEqual(MultisigConfirmation.objects.filter(
-            owner=owners[0], contract_transaction_hash=safe_tx_hash.hex()).count(), 1)
+            owner=owners[0], multisig_transaction_id=safe_tx_hash.hex()).count(), 1)
 
     def test_create_multisig_invalid_owner(self):
         safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
@@ -424,14 +425,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         data = b''
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_nonce = safe.retrieve_nonce()
@@ -451,14 +452,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex()[:-2],  # invalid contract_transaction_hash
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
@@ -585,14 +586,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         data = HexBytes(call_data_owner1)
         operation = SafeOperation.CALL.value
         safe_tx_gas = 500000
-        data_gas = 500000
+        base_gas = 500000
         gas_price = 1
         gas_token = NULL_ADDRESS
         refund_receiver = NULL_ADDRESS
         nonce = 0
 
         safe = Safe(safe_address, self.ethereum_client)
-        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, data_gas, gas_price, gas_token,
+        safe_tx = safe.build_multisig_tx(to, value, data, operation, safe_tx_gas, base_gas, gas_price, gas_token,
                                          refund_receiver, safe_nonce=nonce)
         safe_tx_hash = safe_tx.safe_tx_hash
 
@@ -610,14 +611,14 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'operation': operation,
             'nonce': nonce,
             'safe_tx_gas': safe_tx_gas,
-            'data_gas': data_gas,
+            'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_hash.hex(),
             'transaction_hash': tx_hash_owner0.hex(),
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
-            'type': 'confirmation'
+            'confirmation_type': 'confirmation'
         }
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
