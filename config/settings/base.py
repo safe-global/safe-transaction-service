@@ -4,8 +4,8 @@ Base settings to build other settings files upon.
 
 import environ
 
-ROOT_DIR = environ.Path(__file__) - 3  # (safe_transaction_history/config/settings/base.py - 3 = safe-transaction-history/)
-APPS_DIR = ROOT_DIR.path('safe_transaction_history')
+ROOT_DIR = environ.Path(__file__) - 3  # (safe_transaction_service/config/settings/base.py - 3 = safe-transaction-service/)
+APPS_DIR = ROOT_DIR.path('safe_transaction_service')
 
 env = environ.Env()
 
@@ -69,7 +69,7 @@ THIRD_PARTY_APPS = [
     'drf_yasg',
 ]
 LOCAL_APPS = [
-    'safe_transaction_history.history.apps.HistoryConfig',
+    'safe_transaction_service.history.apps.HistoryConfig',
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -174,7 +174,7 @@ MANAGERS = ADMINS
 # Celery
 # ------------------------------------------------------------------------------
 INSTALLED_APPS += [
-    'safe_transaction_history.taskapp.celery.CeleryConfig',
+    'safe_transaction_service.taskapp.celery.CeleryConfig',
     'django_celery_beat',
 ]
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-broker_url

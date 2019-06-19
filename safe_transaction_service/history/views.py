@@ -9,8 +9,8 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from safe_transaction_history.history.models import MultisigTransaction
-from safe_transaction_history.version import __version__
+from safe_transaction_service.history.models import MultisigTransaction
+from safe_transaction_service.version import __version__
 
 from .filters import DefaultPagination
 from .serializers import (SafeMultisigHistoryResponseSerializer,

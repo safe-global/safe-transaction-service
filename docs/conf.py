@@ -163,7 +163,7 @@ html_static_path = ["_static"]
 # html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "safe_transaction_historydoc"
+htmlhelp_basename = "safe_transaction_servicedoc"
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -182,7 +182,7 @@ latex_elements = {
 latex_documents = [
     (
         "index",
-        "safe_transaction_history.tex",
+        "safe_transaction_service.tex",
         "Gnosis Transaction History Documentation",
         """Gnosis""",
         "manual",
@@ -217,7 +217,7 @@ latex_documents = [
 man_pages = [
     (
         "index",
-        "safe_transaction_history",
+        "safe_transaction_service",
         "Gnosis Safe Relay Service Documentation",
         ["""Gnosis"""],
         1,
@@ -236,7 +236,7 @@ man_pages = [
 texinfo_documents = [
     (
         "index",
-        "safe_transaction_history",
+        "safe_transaction_service",
         "Gnosis Safe Relay Service Documentation",
         """Gnosis""",
         "Gnosis Safe Relay Service",

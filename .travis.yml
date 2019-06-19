@@ -5,8 +5,8 @@ python:
   - "3.7"
 env:
   global:
-  - DOCKERHUB_PROJECT=safe-transaction-history
-  - SOURCE_FOLDER=safe_transaction_history
+  - DOCKERHUB_PROJECT=safe-transaction-service
+  - SOURCE_FOLDER=safe_transaction_service
   - PIP_USE_MIRRORS=true
   - DJANGO_SETTINGS_MODULE=config.settings.test
   - DATABASE_URL=psql://postgres@localhost/travisci
