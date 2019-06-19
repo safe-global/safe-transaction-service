@@ -13,9 +13,9 @@ from safe_transaction_history.history.models import MultisigTransaction
 from safe_transaction_history.version import __version__
 
 from .filters import DefaultPagination
-from .serializers import (SafeMultisigHistoryDbSerializer,
+from .serializers import (SafeMultisigHistoryResponseSerializer,
                           SafeMultisigTransactionHistorySerializer)
-from .tasks import check_approve_transaction
+from .tasks import check_approve_transaction_task
 
 
 class AboutView(APIView):
@@ -43,7 +43,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         Proxy returning a serializer class according to the request's verb.
         """
         if self.request.method == 'GET':
-            return SafeMultisigHistoryDbSerializer
+            return SafeMultisigHistoryResponseSerializer
         elif self.request.method == 'POST':
             return SafeMultisigTransactionHistorySerializer
 
@@ -55,8 +55,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         try:
             if not ethereum.utils.check_checksum(address):
-                raise Exception
-        except Exception:
+                raise ValueError
+        except ValueError:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         multisig_transactions = MultisigTransaction.objects.filter(safe=address)
@@ -70,7 +70,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         if query_owners:
             owners = [owner for owner in query_owners.split(',') if owner != '']
 
-        serializer = self.get_serializer_class()(multisig_transactions, many=True, owners=owners)
+        serializer = self.get_serializer(multisig_transactions, many=True, owners=owners)
         # Paginate results
         page = self.paginate_queryset(serializer.data)
         pagination = self.get_paginated_response(page)
@@ -81,13 +81,12 @@ class SafeMultisigTransactionListView(ListAPIView):
                                     422: 'Invalid ethereum address/User is not an owner or tx not approved/executed'})
     def post(self, request, address, format=None):
         """
-        Allows to create a multisig transaction with its confirmations and to retrieve all the information related with
-        a Safe.
+        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
         try:
             if not ethereum.utils.check_checksum(address):
-                raise Exception
-        except Exception:
+                raise ValueError
+        except ValueError:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
@@ -97,7 +96,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
         else:
             data = serializer.validated_data
-            contract_transaction_hash = data['contract_transaction_hash'].hex()
+            safe_tx_hash = data['contract_transaction_hash'].hex()
             transaction_hash = data['transaction_hash'].hex()
             sender = data['sender']
 
@@ -109,7 +108,7 @@ class SafeMultisigTransactionListView(ListAPIView):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner')
             else:
-                if not (safe.retrieve_is_hash_approved(sender, contract_transaction_hash) or
+                if not (safe.retrieve_is_hash_approved(sender, safe_tx_hash) or
                         safe.retrieve_nonce() > data['nonce']):
                     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     data='Tx hash is not approved or tx not executed')
@@ -118,9 +117,9 @@ class SafeMultisigTransactionListView(ListAPIView):
                     serializer.save()
 
                     # Create task
-                    check_approve_transaction.delay(safe_address=address,
-                                                    contract_transaction_hash=contract_transaction_hash,
-                                                    transaction_hash=transaction_hash,
-                                                    owner=sender)
+                    check_approve_transaction_task.delay(safe_address=address,
+                                                         safe_tx_hash=safe_tx_hash,
+                                                         transaction_hash=transaction_hash,
+                                                         owner=sender)
 
                     return Response(status=status.HTTP_202_ACCEPTED)
