@@ -103,11 +103,13 @@ class SafeMultisigTransactionListView(ListAPIView):
             ethereum_client = EthereumClientProvider()
             safe = Safe(address, ethereum_client=ethereum_client)
 
-            # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-            if not safe.retrieve_is_owner(sender):
+            # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
+            if (not safe.retrieve_is_owner(sender) and
+                    not safe.retrieve_is_owner(sender, block_identifier=ethereum_client.current_block_number - 100)):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data='User is not an owner')
             else:
+                # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
                 if not (safe.retrieve_is_hash_approved(sender, safe_tx_hash) or
                         safe.retrieve_nonce() > data['nonce']):
                     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
