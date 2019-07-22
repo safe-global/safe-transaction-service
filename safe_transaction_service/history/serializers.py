@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.serializers import EthereumAddressField, Sha3HashField
-from gnosis.safe import Safe, SafeOperation
+from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -104,6 +104,7 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 
 
 class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
+    safe_tx_hash = Sha3HashField()
     submission_date = serializers.DateTimeField(source='created')
     execution_date = serializers.DateTimeField()
     confirmations = serializers.SerializerMethodField()

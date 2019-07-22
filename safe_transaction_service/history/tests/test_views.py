@@ -190,6 +190,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
                          owners[0])  # confirmations are sorted by creation date DESC
         self.assertEqual(request.json()['results'][0]['confirmations'][2]['confirmationType'], 'CONFIRMATION')
         self.assertEqual(request.json()['results'][0]['confirmations'][0]['confirmationType'], 'EXECUTION')
+        self.assertIsNotNone(request.json()['results'][0]['safeTxHash'])
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe()
