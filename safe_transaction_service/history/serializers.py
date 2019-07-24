@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+from ethereum import utils
 
 from gnosis.eth import EthereumClientProvider
-from gnosis.eth.django.serializers import EthereumAddressField, Sha3HashField
+from gnosis.eth.django.serializers import EthereumAddressField, Sha3HashField, HexadecimalField
 from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 from rest_framework import serializers
@@ -20,6 +21,7 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
     block_number = serializers.IntegerField(required=False)
     block_date_time = serializers.DateTimeField(required=False)
     confirmation_type = serializers.CharField()
+    signature = HexadecimalField(required=False)
 
     def validate_confirmation_type(self, value: str) -> int:
         value = value.upper()
@@ -54,6 +56,15 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         if contract_transaction_hash != data['contract_transaction_hash']:
             raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash} '
                                   f'does not match provided contract-tx-hash={data["contract_transaction_hash"]}')
+
+        signature = data.get('signature')
+        if signature is not None:  # Until contract signatures are supported
+            encoded_64_address = utils.ecrecover_to_pub(self.message_hash, self.v, self.r, self.s)
+            address_bytes = utils.sha3(encoded_64_address)[-20:]
+            address = utils.checksum_encode(address_bytes)
+            if address != data['sender']:
+                raise ValidationError(f'Signature does not match sender=f{data["sender"]}. '
+                                      f'Calculated owner is f{address}')
 
         return data
 
