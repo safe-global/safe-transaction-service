@@ -26,7 +26,7 @@ class AboutView(APIView):
 
     def get(self, request, format=None):
         content = {
-            'name': 'Safe Transaction History Service',
+            'name': 'Safe Transaction Service',
             'version': __version__,
             'api_version': self.request.version,
             'secure': self.request.is_secure()
