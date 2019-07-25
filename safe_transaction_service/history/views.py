@@ -1,10 +1,7 @@
 import ethereum.utils
 from drf_yasg.utils import swagger_auto_schema
-from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe
 from rest_framework import status
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,7 +32,6 @@ class AboutView(APIView):
 
 
 class SafeMultisigTransactionListView(ListAPIView):
-    permission_classes = (AllowAny,)
     pagination_class = DefaultPagination
 
     def get_serializer_class(self):
@@ -93,35 +89,17 @@ class SafeMultisigTransactionListView(ListAPIView):
         serializer = self.get_serializer_class()(data=request.data)
 
         if not serializer.is_valid():
-            return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
         else:
+            serializer.save()
+
+            # Create task if transaction hash
             data = serializer.validated_data
-            safe_tx_hash = data['contract_transaction_hash'].hex()
-            transaction_hash = data['transaction_hash'].hex()
-            sender = data['sender']
+            transaction_hash = data.get('transaction_hash')
+            if transaction_hash:
+                check_approve_transaction_task.delay(safe_address=address,
+                                                     safe_tx_hash=data['contract_transaction_hash'].hex(),
+                                                     transaction_hash=transaction_hash.hex(),
+                                                     owner=data['sender'])
 
-            ethereum_client = EthereumClientProvider()
-            safe = Safe(address, ethereum_client=ethereum_client)
-
-            # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
-            if (not safe.retrieve_is_owner(sender) and
-                    not safe.retrieve_is_owner(sender, block_identifier=ethereum_client.current_block_number - 100)):
-                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                data='User is not an owner')
-            else:
-                # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-                if not (safe.retrieve_is_hash_approved(sender, safe_tx_hash) or
-                        safe.retrieve_nonce() > data['nonce']):
-                    return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                    data='Tx hash is not approved or tx not executed')
-                else:
-                    # Save data into Database
-                    serializer.save()
-
-                    # Create task
-                    check_approve_transaction_task.delay(safe_address=address,
-                                                         safe_tx_hash=safe_tx_hash,
-                                                         transaction_hash=transaction_hash,
-                                                         owner=sender)
-
-                    return Response(status=status.HTTP_202_ACCEPTED)
+            return Response(status=status.HTTP_202_ACCEPTED)
