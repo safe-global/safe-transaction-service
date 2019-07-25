@@ -1,10 +1,10 @@
-[![Build Status](https://travis-ci.org/gnosis/safe-transaction-history.svg?branch=master)](https://travis-ci.org/gnosis/safe-transaction-history)
-[![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-history/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-history?branch=master)
-![Python 3.6](https://img.shields.io/badge/Python-3.6-blue.svg)
-![Django 2](https://img.shields.io/badge/Django-2-blue.svg)
+[![Build Status](https://travis-ci.org/gnosis/safe-transaction-service.svg?branch=master)](https://travis-ci.org/gnosis/safe-transaction-service)
+[![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-service?branch=master)
+![Python 3.7](https://img.shields.io/badge/Python-3.7-blue.svg)
+![Django 2.2](https://img.shields.io/badge/Django-2.2-blue.svg)
 
-# Gnosis Transaction History service
-Gnosis Transaction History service
+# Gnosis Transaction Service
+Gnosis Transaction Service
 
 ## Index of contents
 
@@ -12,5 +12,10 @@ Gnosis Transaction History service
 
 Docs
 ------------
-You can open the diagrams with [Staruml](http://staruml.io/)
+You can open the diagrams under `docs/` with [Staruml](http://staruml.io/)
 
+Contributors
+------------
+- Denís Graña (denis@gnosis.pm)
+- Giacomo Licari (giacomo.licari@gnosis.pm)
+- Uxío Fuentefría (uxio@gnosis.pm)

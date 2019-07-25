@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-celery -A safe_transaction_history.taskapp worker -l INFO
+celery -A safe_transaction_service.taskapp worker -l INFO

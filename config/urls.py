@@ -24,7 +24,7 @@ urlpatterns = [
     url(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=None), name='schema-json'),
     url(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=None), name='schema-redoc'),
     url(settings.ADMIN_URL, admin.site.urls),
-    url(r'^api/v1/', include('safe_transaction_history.safe.urls', namespace='v1')),
+    url(r'^api/v1/', include('safe_transaction_service.history.urls', namespace='v1')),
     url(r'^check/', lambda request: HttpResponse("Ok"), name='check'),
 ]
 

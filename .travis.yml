@@ -1,30 +1,30 @@
+dist: xenial
 language: python
 cache: pip
 python:
-  - "3.6"
-dist: trusty
+  - "3.7"
 env:
   global:
-  - DOCKERHUB_PROJECT=safe-transaction-history
-  - SOURCE_FOLDER=safe_transaction_history
+  - DOCKERHUB_PROJECT=safe-transaction-service
+  - SOURCE_FOLDER=safe_transaction_service
   - PIP_USE_MIRRORS=true
   - DJANGO_SETTINGS_MODULE=config.settings.test
   - DATABASE_URL=psql://postgres@localhost/travisci
   - ETHEREUM_NODE_URL=http://localhost:8545
+addons:
+  postgresql: "9.6"
 services:
   - docker
   - postgresql
   - redis-server
 install:
+  - npm install -g ganache-cli@6.4.5 && ganache-cli -d -p 8545 --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --noVMErrorsOnRPCResponse > /dev/null &
   - travis_retry pip install -r requirements-test.txt
   - travis_retry pip install coveralls
-  - npm install -g ganache-cli
 before_script:
   - psql -c 'create database travisci;' -U postgres
 script:
-  - ganache-cli -d -p 8545 --defaultBalanceEther 10000 -a 30 > /dev/null &
-  - sleep 5
-  - coverage run --source=$SOURCE_FOLDER -m py.test
+  - coverage run --source=$SOURCE_FOLDER -m py.test -W ignore::DeprecationWarning
 deploy:
   - provider: script
     script: bash scripts/deploy_docker.sh staging
@@ -39,6 +39,5 @@ deploy:
     on:
       tags: true
       branch: master
-
 after_success:
   - coveralls

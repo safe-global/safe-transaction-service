@@ -1,5 +1,6 @@
 -r requirements.txt
 -r requirements-test.txt
+flake8
 isort
 ipdb
-flake8==3.5.0
+ipython

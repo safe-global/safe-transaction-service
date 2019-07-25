@@ -1,0 +1,17 @@
+{% extends "drf-yasg/swagger-ui.html" %}
+{% load staticfiles %}
+
+{% block favicon %}
+    <link rel="icon" type="image/png" href="{% static 'safe/favicon.png' %}"/>
+{% endblock %}
+
+{% block main_styles %}
+    <link rel="stylesheet" type="text/css" href="{% static 'drf-yasg/style.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'drf-yasg/swagger-ui-dist/swagger-ui.css' %}">
+    <style>
+        .swagger-ui .topbar {background-color: black;}
+        .swagger-ui .topbar .download-url-wrapper .download-url-button {background-color: #27b3fa;}
+        .swagger-ui .topbar .download-url-wrapper input[type=text] {border: 2px solid #27b3fa;}
+        .topbar-wrapper img {content:url("{% static 'safe/logo.svg' %}");}
+    </style>
+{% endblock %}
