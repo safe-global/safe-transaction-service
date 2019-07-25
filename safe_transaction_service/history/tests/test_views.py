@@ -170,7 +170,6 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
-        serializer.is_valid()
         self.assertTrue(serializer.is_valid())
 
         # Save
@@ -196,8 +195,9 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
     def test_multisig_transaction_creation_with_signature(self):
         owners_with_account = [Account.create() for _ in range(4)]
         owners = [owners.address for owners in owners_with_account]
-        safe_create2_tx = self.deploy_test_safe(initial_funding_wei=Web3.toWei(0.1, 'ether'))
+        safe_create2_tx = self.deploy_test_safe(owners=owners, initial_funding_wei=Web3.toWei(0.1, 'ether'))
         safe_address = safe_create2_tx.safe_address
+        self.send_ether(owners[0], value=Web3.toWei(0.1, 'ether'))
 
         to, _ = get_eth_address_with_key()
         value = self.WITHDRAW_AMOUNT
@@ -222,8 +222,11 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
 
         self.assertEqual(safe_tx_hash, safe_tx_contract_hash)
 
-        sender = owners[0]
-        tx_hash_owner0 = safe_contract.functions.approveHash(safe_tx_hash).transact({'from': sender})
+        sender_account = owners_with_account[0]
+        sender = sender_account.address
+        signed = sender_account.signTransaction(safe_contract.functions.approveHash(
+            safe_tx_hash).buildTransaction({'from': sender, 'nonce': 0}))
+        tx_hash_owner0 = self.w3.eth.sendRawTransaction(signed.rawTransaction)
         is_approved = safe_contract.functions.approvedHashes(sender, safe_tx_hash).call()
         self.assertTrue(is_approved)
 
@@ -263,7 +266,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         # Send Tx signed by owner 1. Use off chain signature
         sender_account = owners_with_account[1]
         sender = sender_account.address
-        sender_account.signHash(safe_tx_hash)
+        signature = sender_account.signHash(safe_tx_hash)
 
         # Send confirmation from owner1 to API
         transaction_data = {
@@ -277,12 +280,11 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
             'base_gas': base_gas,
             'gas_price': gas_price,
             'contract_transaction_hash': safe_tx_contract_hash.hex(),
-            'transaction_hash': None,
             'block_number': 0,
             'block_date_time': datetime.datetime.now(),
             'sender': sender,
             'confirmation_type': 'confirmation',
-            'signature': b''
+            'signature': signature['signature'].hex()
         }
 
         serializer = SafeMultisigTransactionHistorySerializer(data=transaction_data)
@@ -292,6 +294,13 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=serializer.data, format='json')
         self.assertEqual(request.status_code, status.HTTP_202_ACCEPTED)
+
+        request = self.client.get(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
+                                  format='json')
+        self.assertEqual(request.status_code, status.HTTP_200_OK)
+        result = request.json()['results'][0]
+        self.assertIsNotNone(result['confirmations'][0]['signature'])
+        self.assertIsNone(result['confirmations'][1]['signature'])
 
     def test_create_multisig_invalid_transaction_parameters(self):
         safe_address, safe_contract, owners, funder, initial_funding_wei, _ = self.deploy_test_safe_old()
@@ -339,7 +348,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        self.assertEqual(request.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # Call API with invalid 'confirmation_type' property
         transaction_data = {
@@ -362,7 +371,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
 
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        self.assertEqual(request.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # Use correct contract_transaction_hash
         transaction_data = {
@@ -458,7 +467,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        self.assertEqual(request.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         with self.assertRaises(MultisigTransaction.DoesNotExist):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
@@ -486,7 +495,7 @@ class TestHistoryViews(SafeTestCaseMixin, APITestCase):
         }
         request = self.client.post(reverse('v1:multisig-transactions', kwargs={'address': safe_address}),
                                    data=transaction_data, format='json')
-        self.assertEqual(request.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(request.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         with self.assertRaises(MultisigTransaction.DoesNotExist):
             MultisigTransaction.objects.get(safe=safe_address, nonce=safe_nonce)
 
