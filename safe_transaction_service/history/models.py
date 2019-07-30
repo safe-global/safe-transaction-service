@@ -2,8 +2,8 @@ from enum import Enum
 
 from django.db import models
 from django.utils import timezone
-from gnosis.eth.django.models import (EthereumAddressField, Sha3HashField,
-                                      Uint256Field)
+from gnosis.eth.django.models import (EthereumAddressField, HexField,
+                                      Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
 from model_utils.models import TimeStampedModel
 
@@ -48,11 +48,12 @@ class MultisigConfirmation(TimeStampedModel):
                                              on_delete=models.CASCADE,
                                              related_name="confirmations")
     owner = EthereumAddressField()
-    transaction_hash = Sha3HashField(null=False, blank=False)
+    transaction_hash = Sha3HashField(null=True)  # Confirmation with signatures don't have transaction_hash
     confirmation_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in ConfirmationType])
-    block_number = Uint256Field()
-    block_date_time = models.DateTimeField()
+    block_number = Uint256Field(null=True)
+    block_date_time = models.DateTimeField(null=True)
     mined = models.BooleanField(default=False)
+    signature = HexField(null=True, max_length=500)
 
     class Meta:
         unique_together = (('multisig_transaction', 'owner', 'confirmation_type'),)
