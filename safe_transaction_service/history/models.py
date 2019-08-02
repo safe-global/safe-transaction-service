@@ -274,6 +274,9 @@ class MonitoredAddress(models.Model):
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
     events_block_number = models.IntegerField(null=True, default=None)  # Block number when last events scan ended
 
+    class Meta:
+        verbose_name_plural = "monitored_addresses"
+
     def __str__(self):
         return f'Address {self.address} - Initial-block-number={self.initial_block_number}' \
                f' - Tx-block-number={self.tx_block_number} - Events-block-number={self.events_block_number}'
