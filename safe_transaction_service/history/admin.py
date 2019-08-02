@@ -1,5 +1,56 @@
 from django.contrib import admin
 
-from .models import MultisigConfirmation, MultisigTransaction
+from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
+                     MonitoredAddress, MultisigConfirmation,
+                     MultisigTransaction)
 
-admin.site.register([MultisigTransaction, MultisigConfirmation])
+
+@admin.register(MultisigConfirmation)
+class MultisigConfirmationAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created'
+    list_display = ('created', 'multisig_transaction', 'transaction_hash', 'mined')
+    list_filter = ('confirmation_type',)
+    ordering = ['-created']
+    search_fields = ['transaction_hash', 'owner']
+
+
+@admin.register(MultisigTransaction)
+class MultisigTransactionAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created'
+    list_display = ('created', 'safe', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
+    list_filter = ('operation',)
+    ordering = ['-created']
+    search_fields = ['=safe', '=ethereum_tx__tx_hash', 'to']
+
+
+@admin.register(EthereumBlock)
+class EthereumBlockAdmin(admin.ModelAdmin):
+    date_hierarchy = 'timestamp'
+    list_display = ('number', 'timestamp', 'gas_limit', 'gas_used', 'block_hash')
+    search_fields = ['=number']
+    ordering = ['-number']
+
+
+@admin.register(EthereumEvent)
+class EthereumEventAdmin(admin.ModelAdmin):
+    list_display = ('ethereum_tx_id', 'log_index', 'data')
+
+
+@admin.register(EthereumTx)
+class EthereumTxAdmin(admin.ModelAdmin):
+    list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
+    search_fields = ['=tx_hash', '=_from', '=to']
+    ordering = ['-block_id']
+
+
+@admin.register(InternalTx)
+class InternalTxAdmin(admin.ModelAdmin):
+    list_display = ('ethereum_tx_id', '_from', 'to', 'value', 'call_type')
+    list_filter = ('tx_type', 'call_type')
+    search_fields = ['=ethereum_tx__block__number', '=_from', '=to']
+
+
+@admin.register(MonitoredAddress)
+class MonitoredAddressAdmin(admin.ModelAdmin):
+    list_display = ('address', 'ethereum_tx_id', 'initial_block_number', 'tx_block_number', 'events_block_number')
+    search_fields = ['address']
