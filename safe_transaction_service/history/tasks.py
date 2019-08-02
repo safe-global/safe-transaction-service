@@ -104,7 +104,8 @@ def index_new_proxies(self) -> int:
             while not updated:
                 created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
                 new_monitored_addresses += len(created_objects)
-            logger.info('Indexed new %d proxies', new_monitored_addresses)
+            if new_monitored_addresses:
+                logger.info('Indexed new %d proxies', new_monitored_addresses)
 
             return new_monitored_addresses
     except LockError:
