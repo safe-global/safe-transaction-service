@@ -249,7 +249,7 @@ class MonitoredAddressManager(models.Manager):
                     events_block_number=initial_block_number)
 
     def update_addresses(self, addresses: List[str], block_number: str, database_field: str) -> int:
-        self.filter(address__int=addresses).update(**{database_field: block_number})
+        self.filter(address__in=addresses).update(**{database_field: block_number})
 
 
 class MonitoredAddressQuerySet(models.QuerySet):

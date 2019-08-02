@@ -103,7 +103,7 @@ class TransactionScanService(ABC):
         :return:
         """
         return MonitoredAddress.objects.almost_updated(current_block_number, self.database_field,
-                                                        self.updated_blocks_behind, self.confirmations)
+                                                       self.updated_blocks_behind, self.confirmations)
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
