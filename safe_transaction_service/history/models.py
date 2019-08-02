@@ -180,7 +180,7 @@ class InternalTx(models.Model):
 class MultisigTransaction(TimeStampedModel):
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField()
-    ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None,
+    ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,
                                     on_delete=models.SET_NULL, related_name='multisig_txs')
     to = EthereumAddressField(null=True, db_index=True)
     value = Uint256Field()
@@ -268,7 +268,7 @@ class MonitoredAddressQuerySet(models.QuerySet):
 class MonitoredAddress(models.Model):
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
-    ethereum_tx = models.ForeignKey(EthereumTx,
+    ethereum_tx = models.ForeignKey(EthereumTx, blank=True,
                                     null=True, on_delete=models.SET_NULL, related_name='monitored_addresses')
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
