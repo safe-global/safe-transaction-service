@@ -13,6 +13,13 @@ logger = getLogger(__name__)
 
 
 class TransactionScanService(ABC):
+    """
+    This service allows indexing of Ethereum blockchain.
+    `database_field` should be defined with the field used to store the current block number for a monitored address
+    `find_relevant_elements` elements should be defined with the query to get the relevant txs/events/etc.
+    `process_element` defines what happens with elements found
+    So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
+    """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 10,
                  block_process_limit: int = 10000, updated_blocks_behind: int = 100,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000):

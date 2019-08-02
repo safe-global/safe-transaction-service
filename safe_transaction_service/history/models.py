@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
@@ -110,7 +110,7 @@ class EthereumEvent(models.Model):
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='events')
     log_index = models.PositiveIntegerField()
     address = EthereumAddressField(db_index=True)
-    data = HexField(null=True)
+    data = HexField(null=True, max_length=2048)
     first_topic = Sha3HashField(db_index=True)
     topics = ArrayField(Sha3HashField())
 
@@ -180,7 +180,9 @@ class InternalTx(models.Model):
 class MultisigTransaction(TimeStampedModel):
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField()
-    to = EthereumAddressField()
+    ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None,
+                                    on_delete=models.SET_NULL, related_name='multisig_txs')
+    to = EthereumAddressField(null=True, db_index=True)
     value = Uint256Field()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in SafeOperation])
@@ -238,8 +240,10 @@ class MultisigConfirmation(TimeStampedModel):
 
 
 class MonitoredAddressManager(models.Manager):
-    def create_from_address(self, address: str, initial_block_number: int) -> 'MonitoredAddress':
+    def create_from_address(self, address: str, initial_block_number: int,
+                            ethereum_tx: EthereumTx = None) -> 'MonitoredAddress':
         self.create(address=address,
+                    ethereum_tx=ethereum_tx,
                     initial_block_number=initial_block_number,
                     tx_block_number=initial_block_number,
                     events_block_number=initial_block_number)
@@ -264,9 +268,11 @@ class MonitoredAddressQuerySet(models.QuerySet):
 class MonitoredAddress(models.Model):
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
+    ethereum_tx = models.ForeignKey(EthereumTx,
+                                    null=True, on_delete=models.SET_NULL, related_name='monitored_addresses')
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
-    tx_block_number = models.IntegerField(default=0)  # Block number when last internal tx scan ended
-    events_block_number = models.IntegerField(default=0)  # Block number when last events scan ended
+    tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
+    events_block_number = models.IntegerField(null=True, default=None)  # Block number when last events scan ended
 
     def __str__(self):
         return f'Address {self.address} - Initial-block-number={self.initial_block_number}' \

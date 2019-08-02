@@ -5,6 +5,7 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe
 
 from .models import MultisigConfirmation
+from .services.proxy_factory_indexer import ProxyIndexerServiceProvider
 
 logger = get_task_logger(__name__)
 
@@ -80,3 +81,21 @@ def check_approve_transaction_task(self, safe_address: str, safe_tx_hash: str,
         logger.warning('Multisig confirmation for safe=%s and transaction_hash=%s does not exist',
                        safe_address,
                        transaction_hash)
+
+
+@app.shared_task(bind=True)
+def index_new_proxies(self) -> int:
+    """
+    :param self:
+    :return: Number of proxies created
+    """
+
+    proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
+    proxy_indexer_service = ProxyIndexerServiceProvider()
+
+    new_monitored_addresses = 0
+    updated = False
+    while not updated:
+        created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
+        new_monitored_addresses += len(created_objects)
+    return new_monitored_addresses
