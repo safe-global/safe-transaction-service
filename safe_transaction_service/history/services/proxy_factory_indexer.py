@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Set
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.contracts import get_proxy_factory_contract
+from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
@@ -88,7 +89,7 @@ class ProxyIndexerService(TransactionScanService):
         """
         ethereum_tx = self.create_or_update_ethereum_tx(log['transactionHash'])
         block_number = log['blockNumber']
-        int_address = int.from_bytes(log['data'], byteorder='big')
+        int_address = int.from_bytes(HexBytes(log['data']), byteorder='big')
         address = Web3.toChecksumAddress('{:#042x}'.format(int_address))
 
         return [MonitoredAddress.objects.create_from_address(address, block_number, ethereum_tx=ethereum_tx)]
