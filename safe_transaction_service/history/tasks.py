@@ -4,6 +4,7 @@ from django.conf import settings
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe
 from redis import Redis
+from redis.exceptions import LockError
 
 from .models import MultisigConfirmation
 from .services.proxy_factory_indexer import ProxyIndexerServiceProvider
@@ -92,16 +93,19 @@ def index_new_proxies(self) -> int:
     """
 
     redis = Redis.from_url(settings.REDIS_URL)
-    with redis.lock('tasks:index_new_proxies', blocking_timeout=1, timeout=60 * 30):
-        proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
-        proxy_indexer_service = ProxyIndexerServiceProvider()
+    try:
+        with redis.lock('tasks:index_new_proxies', blocking_timeout=1, timeout=60 * 30):
+            proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
+            proxy_indexer_service = ProxyIndexerServiceProvider()
 
-        new_monitored_addresses = 0
-        updated = False
+            new_monitored_addresses = 0
+            updated = False
 
-        while not updated:
-            created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
-            new_monitored_addresses += len(created_objects)
-        logger.info('Indexed new %d proxies', new_monitored_addresses)
+            while not updated:
+                created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
+                new_monitored_addresses += len(created_objects)
+            logger.info('Indexed new %d proxies', new_monitored_addresses)
 
-    return new_monitored_addresses
+            return new_monitored_addresses
+    except LockError:
+        pass
