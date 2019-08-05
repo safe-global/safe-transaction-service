@@ -6,9 +6,8 @@ from gnosis.safe import Safe
 from redis import Redis
 from redis.exceptions import LockError
 
-from .services import InternalTxIndexerProvider, ProxyIndexerServiceProvider
+from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .models import MultisigConfirmation
-
 
 logger = get_task_logger(__name__)
 
@@ -129,4 +128,3 @@ def index_internal_txs_task() -> int:
     except LockError:
         pass
     return number_addresses
-

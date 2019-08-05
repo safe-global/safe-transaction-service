@@ -1,8 +1,8 @@
 from logging import getLogger
-from gnosis.eth.contracts import get_safe_contract
-from typing import Any, Dict, List, Set, Union, Tuple, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from gnosis.eth import EthereumClient
+from gnosis.eth.contracts import get_safe_contract
 from hexbytes import HexBytes
 from web3 import Web3
 
