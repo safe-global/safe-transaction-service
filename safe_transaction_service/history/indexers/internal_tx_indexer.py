@@ -3,17 +3,17 @@ from typing import Any, Dict, List, Set
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumTxCallType, EthereumTxType, InternalTx
-from .transaction_scan_service import TransactionScanService
+from safe_transaction_service.history.models import InternalTx
+from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
 
 
-class InternalTxServiceProvider:
+class InternalTxIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = InternalTxService(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+            cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
                                              block_process_limit=settings.INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
         return cls.instance
 
@@ -23,7 +23,7 @@ class InternalTxServiceProvider:
             del cls.instance
 
 
-class InternalTxService(TransactionScanService):
+class InternalTxIndexer(TransactionIndexer):
     @property
     def database_field(self):
         return 'tx_block_number'

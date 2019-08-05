@@ -6,13 +6,13 @@ from django.db.models import Min
 from gnosis.eth import EthereumClient
 from web3 import Web3
 
-from ..models import EthereumBlock, EthereumTx, MonitoredAddress
-from ..utils import chunks
+from safe_transaction_service.history.models import EthereumBlock, EthereumTx, MonitoredAddress
+from safe_transaction_service.history.utils import chunks
 
 logger = getLogger(__name__)
 
 
-class TransactionScanService(ABC):
+class TransactionIndexer(ABC):
     """
     This service allows indexing of Ethereum blockchain.
     `database_field` should be defined with the field used to store the current block number for a monitored address

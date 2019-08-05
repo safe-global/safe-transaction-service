@@ -7,9 +7,9 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
-from ..models import (EthereumTxCallType, EthereumTxType, InternalTx,
-                      MonitoredAddress)
-from .transaction_scan_service import TransactionScanService
+from safe_transaction_service.history.models import (EthereumTxCallType, EthereumTxType, InternalTx,
+                                                     MonitoredAddress)
+from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ProxyIndexerServiceProvider:
             del cls.instance
 
 
-class ProxyIndexerService(TransactionScanService):
+class ProxyIndexerService(TransactionIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)

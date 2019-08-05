@@ -177,6 +177,13 @@ class InternalTx(models.Model):
             return 'Internal tx hash={} from={}'.format(self.ethereum_tx.tx_hash, self._from)
 
 
+class InternalTxDecoded(models.Model):
+    internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
+                                       primary_key=True)
+    function_name = models.CharField(max_length=256)
+    arguments = JSONField()
+
+
 class MultisigTransaction(TimeStampedModel):
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField()
