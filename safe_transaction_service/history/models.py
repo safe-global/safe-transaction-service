@@ -176,6 +176,10 @@ class InternalTx(models.Model):
         else:
             return 'Internal tx hash={} from={}'.format(self.ethereum_tx.tx_hash, self._from)
 
+    @property
+    def is_call(self):
+        return EthereumTxType(self.tx_type) == EthereumTxType.CALL
+
 
 class InternalTxDecoded(models.Model):
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',

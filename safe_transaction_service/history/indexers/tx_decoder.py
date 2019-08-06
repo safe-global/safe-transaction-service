@@ -1,43 +1,28 @@
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from gnosis.eth import EthereumClient
 from gnosis.eth.contracts import get_safe_contract
 from hexbytes import HexBytes
 from web3 import Web3
 
 from ..models import InternalTx, InternalTxDecoded
-from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
 
 
-class TxDecoderServiceException(Exception):
+class TxDecoderException(Exception):
     pass
 
 
-class UnexpectedProblemDecoding(TxDecoderServiceException):
+class UnexpectedProblemDecoding(TxDecoderException):
     pass
 
 
-class CannotDecode(TxDecoderServiceException):
+class CannotDecode(TxDecoderException):
     pass
 
 
-class TxDecoderServiceProvider:
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            from django.conf import settings
-            cls.instance = TxDecoderService()
-        return cls.instance
-
-    @classmethod
-    def del_singleton(cls):
-        if hasattr(cls, "instance"):
-            del cls.instance
-
-
-class TxDecoderService:
+class TxDecoder:
     def __init__(self):
         self.supported_contracts = [get_safe_contract(Web3())]
 
@@ -72,7 +57,7 @@ class TxDecoderService:
         :return: Dict[str, Any]
         """
         parsed = {}
-        for k, v in decoded:
+        for k, v in decoded.items():
             if isinstance(v, bytes):
                 value = HexBytes(v).hex()
             else:

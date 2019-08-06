@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Set
 
 from gnosis.eth import EthereumClient
 
-from ..models import InternalTx
-
+from ..models import InternalTx, InternalTxDecoded
 from .transaction_indexer import TransactionIndexer
+from .tx_decoder import CannotDecode, TxDecoder
 
 logger = getLogger(__name__)
 
@@ -25,6 +25,10 @@ class InternalTxIndexerProvider:
 
 
 class InternalTxIndexer(TransactionIndexer):
+    def __init__(self):
+        super().__init__()
+        self.tx_decoder = TxDecoder()
+
     @property
     def database_field(self):
         return 'tx_block_number'
@@ -66,7 +70,21 @@ class InternalTxIndexer(TransactionIndexer):
 
     def _process_trace(self, trace: Dict[str, Any]) -> InternalTx:
         ethereum_tx = self.create_or_update_ethereum_tx(trace['transactionHash'])
-        return InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
+        internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
+
+        # Decode internal tx
+        if created and internal_tx.is_call and not internal_tx.decoded_tx:
+            try:
+                function_name, arguments = self.tx_decoder.decode_transaction(internal_tx.data)
+                internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
+                                                                                 defaults={
+                                                                                     'function_name': function_name,
+                                                                                     'arguments': arguments}
+                                                                                 )
+            except CannotDecode:
+                pass
+
+        return internal_tx
 
     def _process_traces(self, traces: List[Dict[str, Any]]) -> List[InternalTx]:
         return [self._process_trace(trace) for trace in traces]

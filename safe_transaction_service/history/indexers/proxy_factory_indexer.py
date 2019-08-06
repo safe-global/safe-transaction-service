@@ -7,11 +7,8 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
-from ..models import (EthereumTxCallType,
-                                                     EthereumTxType,
-                                                     InternalTx,
-                                                     MonitoredAddress)
-
+from ..models import (EthereumTxCallType, EthereumTxType, InternalTx,
+                      MonitoredAddress)
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)

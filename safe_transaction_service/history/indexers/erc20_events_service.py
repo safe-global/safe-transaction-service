@@ -4,7 +4,6 @@ from typing import List, Set
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumEvent
-
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
