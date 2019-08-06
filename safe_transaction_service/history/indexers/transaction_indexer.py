@@ -6,9 +6,9 @@ from django.db.models import Min
 from gnosis.eth import EthereumClient
 from web3 import Web3
 
-from safe_transaction_service.history.models import (EthereumBlock, EthereumTx,
+from ..models import (EthereumBlock, EthereumTx,
                                                      MonitoredAddress)
-from safe_transaction_service.history.utils import chunks
+from ..utils import chunks
 
 logger = getLogger(__name__)
 

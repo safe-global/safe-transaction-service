@@ -7,7 +7,7 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
-from safe_transaction_service.history.models import (EthereumTxCallType,
+from ..models import (EthereumTxCallType,
                                                      EthereumTxType,
                                                      InternalTx,
                                                      MonitoredAddress)
