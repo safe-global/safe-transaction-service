@@ -73,7 +73,7 @@ class InternalTxIndexer(TransactionIndexer):
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
         # Decode internal tx
-        if created and internal_tx.is_call and not internal_tx.decoded_tx:
+        if created and internal_tx.is_call and not internal_tx.decoded_tx_id:
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(internal_tx.data)
                 internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
