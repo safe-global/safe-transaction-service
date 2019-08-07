@@ -48,7 +48,6 @@ class TxDecoder:
         except ValueError as exc:  # ValueError: Could not find any function with matching selector
             if not exc.args or exc.args[0] != 'Could not find any function with matching selector':
                 raise UnexpectedProblemDecoding from exc
-            raise exc
         raise CannotDecode(HexBytes(data).hex())
 
     def __parse_decoded_arguments(self, decoded: Dict[str, Any]) -> Dict[str, Any]:
