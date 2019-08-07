@@ -198,6 +198,9 @@ class InternalTxDecoded(models.Model):
     arguments = JSONField()
     processed = models.BooleanField(default=False)
 
+    class Meta:
+        verbose_name_plural = "internal_txs_decoded"
+
 
 class MultisigTransaction(TimeStampedModel):
     safe_tx_hash = Sha3HashField(primary_key=True)
