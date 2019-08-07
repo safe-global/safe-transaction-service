@@ -20,7 +20,7 @@ class TransactionIndexer(ABC):
     `process_element` defines what happens with elements found
     So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
     """
-    def __init__(self, ethereum_client: EthereumClient, confirmations: int = 10,
+    def __init__(self, ethereum_client: EthereumClient, confirmations: int = 6,
                  block_process_limit: int = 10000, updated_blocks_behind: int = 100,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000):
         """
@@ -113,7 +113,7 @@ class TransactionIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        return MonitoredAddress.objects.not_updated(self.database_field, current_block_number, self.confirmations)
+        return MonitoredAddress.objects.not_updated(current_block_number, self.database_field, self.confirmations)
 
     def update_monitored_contract(self, addresses: List[str], to_block_number: int) -> int:
         return MonitoredAddress.objects.update_addresses(addresses, to_block_number, self.database_field)
