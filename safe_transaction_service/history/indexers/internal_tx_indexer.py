@@ -75,7 +75,7 @@ class InternalTxIndexer(TransactionIndexer):
         # Decode internal tx
         if internal_tx.is_call and (created or not internal_tx.is_decoded):
             try:
-                function_name, arguments = self.tx_decoder.decode_transaction(internal_tx.data)
+                function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
                 internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
                                                                                  defaults={
                                                                                      'function_name': function_name,

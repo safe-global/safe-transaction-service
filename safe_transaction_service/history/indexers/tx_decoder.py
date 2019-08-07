@@ -28,7 +28,7 @@ class TxDecoder:
 
     def process_transaction_from_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTxDecoded]:
         try:
-            function_name, arguments = self.decode_transaction(internal_tx.data)
+            function_name, arguments = self.decode_transaction(HexBytes(internal_tx.data))
             internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
                                                                              defaults={
                                                                                  'function_name': function_name,
@@ -48,6 +48,7 @@ class TxDecoder:
         except ValueError as exc:  # ValueError: Could not find any function with matching selector
             if not exc.args or exc.args[0] != 'Could not find any function with matching selector':
                 raise UnexpectedProblemDecoding from exc
+            raise exc
         raise CannotDecode(HexBytes(data).hex())
 
     def __parse_decoded_arguments(self, decoded: Dict[str, Any]) -> Dict[str, Any]:
