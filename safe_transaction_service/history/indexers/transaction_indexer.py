@@ -76,17 +76,19 @@ class TransactionIndexer(ABC):
     def create_or_update_ethereum_tx(self, tx_hash: str) -> EthereumTx:
         try:
             ethereum_tx = EthereumTx.objects.get(tx_hash=tx_hash)
+            # For txs stored before being mined
             if ethereum_tx.block is None:
                 tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
                 ethereum_tx.block = self.get_or_create_ethereum_block(tx_receipt.blockNumber)
                 ethereum_tx.gas_used = tx_receipt.gasUsed
-                ethereum_tx.save()
+                ethereum_tx.transaction_index = tx_receipt.transactionIndex
+                ethereum_tx.save(update_fields=['block', 'gas_used', 'transaction_index'])
             return ethereum_tx
         except EthereumTx.DoesNotExist:
             tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
             ethereum_block = self.get_or_create_ethereum_block(tx_receipt.blockNumber)
             tx = self.ethereum_client.get_transaction(tx_hash)
-            return EthereumTx.objects.create_from_tx(tx, tx_hash, tx_receipt.gasUsed, ethereum_block)
+            return EthereumTx.objects.create_from_tx(tx, tx_hash, tx_receipt, ethereum_block)
 
     def get_or_create_ethereum_block(self, block_number: int):
         try:

@@ -25,8 +25,8 @@ class InternalTxIndexerProvider:
 
 
 class InternalTxIndexer(TransactionIndexer):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
 
     @property

@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
@@ -72,7 +72,8 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
-    def create_from_tx(self, tx: Dict[str, Any], tx_hash: Union[bytes, str], gas_used: Optional[int] = None,
+    def create_from_tx(self, tx: Dict[str, Any], tx_hash: Union[bytes, str],
+                       tx_receipt: Optional[Dict[str, Any]] = None,
                        ethereum_block: Optional[EthereumBlock] = None):
         return super().create(
             block=ethereum_block,
@@ -80,7 +81,8 @@ class EthereumTxManager(models.Manager):
             _from=tx['from'],
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
-            gas_used=gas_used,
+            gas_used=tx_receipt and tx_receipt.gasUsed,
+            transaction_index=tx_receipt and tx_receipt.transactionIndex,
             data=HexBytes(tx.get('data') or tx.get('input')),
             nonce=tx['nonce'],
             to=tx.get('to'),
@@ -94,6 +96,7 @@ class EthereumTx(TimeStampedModel):
                               related_name='txs')  # If mined
     tx_hash = Sha3HashField(unique=True, primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
+    transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
     _from = EthereumAddressField(null=True, db_index=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
@@ -122,11 +125,11 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(models.Manager):
-    def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx):
+    def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
         trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
-        internal_tx, _ = self.get_or_create(
+        return self.get_or_create(
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
             defaults={
@@ -145,7 +148,6 @@ class InternalTxManager(models.Manager):
                 'error': trace.get('error'),
             }
         )
-        return internal_tx
 
 
 class InternalTx(models.Model):
@@ -186,6 +188,7 @@ class InternalTxDecoded(models.Model):
                                        primary_key=True)
     function_name = models.CharField(max_length=256)
     arguments = JSONField()
+    processed = models.BooleanField(default=False)
 
 
 class MultisigTransaction(TimeStampedModel):
