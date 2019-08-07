@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      MonitoredAddress, MultisigConfirmation,
-                     MultisigTransaction)
+                     MultisigTransaction, InternalTxDecoded)
 
 
 @admin.register(MultisigConfirmation)
@@ -48,6 +48,13 @@ class InternalTxAdmin(admin.ModelAdmin):
     list_display = ('ethereum_tx_id', '_from', 'to', 'value', 'call_type')
     list_filter = ('tx_type', 'call_type')
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to']
+
+
+@admin.register(InternalTxDecoded)
+class InternalTxDecodedAdmin(admin.ModelAdmin):
+    list_display = ('internal_tx', 'function_name', 'arguments', 'processed')
+    list_filter = ('function_name', 'processed')
+    search_fields = ['function_name', 'arguments']
 
 
 @admin.register(MonitoredAddress)
