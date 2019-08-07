@@ -182,6 +182,14 @@ class InternalTx(models.Model):
     def is_call(self):
         return EthereumTxType(self.tx_type) == EthereumTxType.CALL
 
+    @property
+    def is_decoded(self):
+        try:
+            self.decoded_tx
+            return True
+        except InternalTxDecoded.DoesNotExist:
+            return False
+
 
 class InternalTxDecoded(models.Model):
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
