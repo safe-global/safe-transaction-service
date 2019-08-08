@@ -265,6 +265,7 @@ class MultisigConfirmation(TimeStampedModel):
 
 
 class MonitoredAddressManager(models.Manager):
+    #FIXME get_or_create
     def create_from_address(self, address: str, initial_block_number: int,
                             ethereum_tx: EthereumTx = None) -> 'MonitoredAddress':
         self.create(address=address,
