@@ -52,7 +52,7 @@ class InternalTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
-    list_display = ('internal_tx', 'function_name', 'arguments', 'processed')
+    list_display = ('internal_tx_id', 'function_name', 'arguments', 'processed')
     list_filter = ('function_name', 'processed')
     search_fields = ['function_name', 'arguments']
 
