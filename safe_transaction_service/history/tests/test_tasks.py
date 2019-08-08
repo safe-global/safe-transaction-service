@@ -1,6 +1,7 @@
 import logging
 
 from django.test import TestCase
+
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract
 from gnosis.eth.utils import get_eth_address_with_key

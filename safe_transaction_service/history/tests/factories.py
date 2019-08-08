@@ -2,8 +2,9 @@ import factory
 from django.utils import timezone
 from eth_account import Account
 from factory.fuzzy import FuzzyDateTime, FuzzyInteger
-from gnosis.eth.constants import NULL_ADDRESS
 from web3 import Web3
+
+from gnosis.eth.constants import NULL_ADDRESS
 
 from ..models import (ConfirmationType, MultisigConfirmation,
                       MultisigTransaction)

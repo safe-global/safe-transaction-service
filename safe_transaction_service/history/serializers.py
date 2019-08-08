@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 
 from eth_account import Account
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField, Sha3HashField)
 from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 

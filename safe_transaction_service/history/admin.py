@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
-                     MonitoredAddress, MultisigConfirmation,
-                     MultisigTransaction, InternalTxDecoded)
+                     InternalTxDecoded, MonitoredAddress, MultisigConfirmation,
+                     MultisigTransaction)
 
 
 @admin.register(MultisigConfirmation)

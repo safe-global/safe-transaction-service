@@ -1,13 +1,15 @@
 from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
-from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe
+from django.db import transaction
 from redis import Redis
 from redis.exceptions import LockError
 
+from gnosis.eth import EthereumClientProvider
+from gnosis.safe import Safe
+
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .models import MultisigConfirmation, InternalTxDecoded, SafeStatus
+from .models import InternalTxDecoded, MultisigConfirmation, SafeStatus
 
 logger = get_task_logger(__name__)
 
@@ -144,48 +146,50 @@ def process_decoded_internal_txs_task() -> int:
                 arguments = internal_tx_decoded.arguments
                 contract_address = internal_tx_decoded.internal_tx.to
                 processed = True
-                if function_name == 'setup':
-                    owners = arguments['_owners']
-                    threshold = arguments['_threshold']
-                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                              owners=owners, threshold=threshold)
-                elif function_name in ('addOwnerWithThreshold', 'removeOwner'):
-                    owner = arguments['owner']
-                    threshold = arguments['_threshold']
-                    safe_status = SafeStatus.objects.last_for_address(contract_address)
-                    if function_name == 'addOwnerWithThreshold':
-                        owners = list(safe_status.owners) + [owner]
-                        owners.append(owner)
-                    else:  # removeOwner
+                with transaction.atomic():
+                    if function_name == 'setup':
+                        owners = arguments['_owners']
+                        threshold = arguments['_threshold']
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold)
+                    elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
+                        owner = arguments['owner']
+                        threshold = arguments['_threshold']
+                        safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        if function_name == 'addOwnerWithThreshold':
+                            owners = list(safe_status.owners) + [owner]
+                            owners.append(owner)
+                        else:  # removeOwner
+                            owners = list(safe_status.owners)
+                            owners.remove(owner)
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold)
+                    elif function_name == 'swapOwner':
+                        old_owner = arguments['oldOwner']
+                        new_owner = arguments['newOwner']
+                        safe_status = SafeStatus.objects.last_for_address(contract_address)
                         owners = list(safe_status.owners)
-                        owners.remove(owner)
-                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                              owners=owners, threshold=threshold)
-                elif function_name == 'swapOwner':
-                    old_owner = arguments['oldOwner']
-                    new_owner = arguments['newOwner']
-                    safe_status = SafeStatus.objects.last_for_address(contract_address)
-                    owners = list(safe_status.owners)
-                    owners.remove(old_owner)
-                    owners.append(new_owner)
-                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                              owners=owners, threshold=threshold)
-                elif function_name == 'changeThreshold':
-                    safe_status = SafeStatus.objects.last_for_address(contract_address)
-                    threshold = arguments['_threshold']
-                    owners = safe_status.owners
-                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                              owners=owners, threshold=threshold)
-                elif function_name == 'execTransaction':
-                    pass
-                elif function_name == 'approveHash':
-                    MultisigConfirmation.objects.get_or_create(transaction_hash=arguments['hashToApprove'],
-                                                               owner=internal_tx_decoded.internal_tx._from)
-                else:
-                    processed = False
-                if processed:
-                    number_processed += 1
-                    internal_tx_decoded.set_processed()
+                        owners.remove(old_owner)
+                        owners.append(new_owner)
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold)
+                    elif function_name == 'changeThreshold':
+                        safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        threshold = arguments['_threshold']
+                        owners = safe_status.owners
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold)
+                    elif function_name == 'execTransaction':
+                        # FIXME
+                        pass
+                    elif function_name == 'approveHash':
+                        MultisigConfirmation.objects.get_or_create(transaction_hash=arguments['hashToApprove'],
+                                                                   owner=internal_tx_decoded.internal_tx._from)
+                    else:
+                        processed = False
+                    if processed:
+                        number_processed += 1
+                        internal_tx_decoded.set_processed()
             logger.info('%d decoded internal txs processed', number_processed)
     except LockError:
         pass

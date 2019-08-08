@@ -2,6 +2,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Set
 
 from django.db import transaction
+
 from gnosis.eth import EthereumClient
 
 from ..models import InternalTx, InternalTxDecoded

@@ -1,9 +1,10 @@
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from gnosis.eth.contracts import get_safe_contract
 from hexbytes import HexBytes
 from web3 import Web3
+
+from gnosis.eth.contracts import get_safe_contract
 
 from ..models import InternalTx, InternalTxDecoded
 

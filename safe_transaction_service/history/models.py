@@ -1,15 +1,16 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.utils import timezone
+from hexbytes import HexBytes
+from model_utils.models import TimeStampedModel
+
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
-from hexbytes import HexBytes
-from model_utils.models import TimeStampedModel
 
 
 class EthereumTxCallType(Enum):
