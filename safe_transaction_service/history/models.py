@@ -12,11 +12,6 @@ from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
 
-class ConfirmationType(Enum):
-    CONFIRMATION = 0
-    EXECUTION = 1
-
-
 class EthereumTxCallType(Enum):
     CALL = 0
     DELEGATE_CALL = 1
@@ -191,7 +186,20 @@ class InternalTx(models.Model):
             return False
 
 
+class InternalTxDecodedQuerySet(models.QuerySet):
+    def pending(self):
+        return self.filter(
+            processed=False
+        ).select_related(
+            'internal_tx__ethereum_tx'
+        ).order_by(
+            'internal_tx__ethereum_tx__block_id',
+            'internal_tx__ethereum_tx__transaction_index'
+        )
+
+
 class InternalTxDecoded(models.Model):
+    objects = InternalTxDecodedQuerySet.as_manager()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
                                        primary_key=True)
     function_name = models.CharField(max_length=256)
@@ -200,6 +208,10 @@ class InternalTxDecoded(models.Model):
 
     class Meta:
         verbose_name_plural = "internal_txs_decoded"
+
+    def set_processed(self):
+        self.processed = True
+        self.save(update_fields=['processed'])
 
 
 class MultisigTransaction(TimeStampedModel):
@@ -216,16 +228,25 @@ class MultisigTransaction(TimeStampedModel):
     gas_price = Uint256Field()
     gas_token = EthereumAddressField(null=True)
     refund_receiver = EthereumAddressField(null=True)
+    signatures = models.BinaryField(null=True)
     nonce = Uint256Field()
-    mined = models.BooleanField(default=False)  # True if transaction executed, 0 otherwise
-    # Defines when a multisig transaction gets executed (confirmations included)
-    execution_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         executed = 'Executed' if self.mined else 'Pending'
         return f'{self.safe} - {self.nonce} - {self.safe_tx_hash} - {executed}'
 
+    @property
+    def execution_date(self) -> Optional[datetime.datetime]:
+        if self.ethereum_tx and self.ethereum_tx.block:
+            return self.ethereum_tx.block.timestamp
+        return None
+
+    @property
+    def mined(self) -> bool:
+        return self.ethereum_tx.block_id is not None
+
     def set_mined(self):
+        raise NotImplemented
         self.mined = True
         self.execution_date = timezone.now()
         self.save(update_fields=['mined', 'execution_date'])
@@ -234,45 +255,45 @@ class MultisigTransaction(TimeStampedModel):
         MultisigConfirmation.objects.filter(multisig_transaction=self).update(mined=True)
 
 
-class MultisigConfirmation(TimeStampedModel):
+# Allow off-chain confirmations
+class MultisigConfirmationQuerySet(models.QuerySet):
+    def without_transaction(self):
+        return self.filter(multisig_transaction=None)
+
+    def with_transaction(self):
+        return self.exclude(multisig_transaction=None)
+
+
+class MultisigConfirmation(models.Model):
+    objects = MultisigConfirmationQuerySet.as_manager()
     multisig_transaction = models.ForeignKey(MultisigTransaction,
                                              on_delete=models.CASCADE,
+                                             null=True,
                                              related_name="confirmations")
+    transaction_hash = Sha3HashField()  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
-    transaction_hash = Sha3HashField(null=True)  # Confirmation with signatures don't have transaction_hash
-    confirmation_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in ConfirmationType])
-    block_number = Uint256Field(null=True)
-    block_date_time = models.DateTimeField(null=True)
-    mined = models.BooleanField(default=False)
-    signature = HexField(null=True, max_length=500)
 
     class Meta:
-        unique_together = (('multisig_transaction', 'owner', 'confirmation_type'),)
+        unique_together = (('transaction_hash', 'owner'),)
 
     def __str__(self):
-        mined = 'Mined' if self.mined else 'Pending'
-        return '{} - {}'.format(self.safe, mined)
-
-    def set_mined(self):
-        self.mined = True
-        return self.save()
-
-    def is_execution(self):
-        return ConfirmationType(self.confirmation_type) == ConfirmationType.EXECUTION
-
-    def is_confirmation(self):
-        return ConfirmationType(self.confirmation_type) == ConfirmationType.CONFIRMATION
+        if self.multisig_transaction:
+            return f'Confirmation of owner={self.owner} for transaction-hash={self.transaction_hash}'
+        else:
+            return f'Confirmation of owner={self.owner} for existing transaction={self.transaction_hash}'
 
 
 class MonitoredAddressManager(models.Manager):
-    #FIXME get_or_create
     def create_from_address(self, address: str, initial_block_number: int,
                             ethereum_tx: EthereumTx = None) -> 'MonitoredAddress':
-        self.create(address=address,
-                    ethereum_tx=ethereum_tx,
-                    initial_block_number=initial_block_number,
-                    tx_block_number=initial_block_number,
-                    events_block_number=initial_block_number)
+        monitored_address, _ = self.get_or_create(address=address,
+                                                  defaults={
+                                                      'ethereum_tx': ethereum_tx,
+                                                      'initial_block_number': initial_block_number,
+                                                      'tx_block_number': initial_block_number,
+                                                      'events_block_number': initial_block_number,
+                                                  })
+        return monitored_address
 
     def update_addresses(self, addresses: List[str], block_number: str, database_field: str) -> int:
         self.filter(address__in=addresses).update(**{database_field: block_number})
@@ -306,3 +327,27 @@ class MonitoredAddress(models.Model):
     def __str__(self):
         return f'Address {self.address} - Initial-block-number={self.initial_block_number}' \
                f' - Tx-block-number={self.tx_block_number} - Events-block-number={self.events_block_number}'
+
+
+class SafeStatusQuerySet(models.QuerySet):
+    def last_for_address(self, address: str):
+        return self.filter(
+            address=address
+        ).select_related(
+            'internal_tx__ethereum_tx'
+        ).order_by(
+            'internal_tx__ethereum_tx__block_id',
+            'internal_tx__ethereum_tx__transaction_index',
+        ).last()
+
+
+class SafeStatus(models.Model):
+    objects = SafeStatusQuerySet.as_manager()
+    internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
+                                       primary_key=True)
+    address = EthereumAddressField()
+    owners = ArrayField(EthereumAddressField())
+    threshold = Uint256Field()
+
+    class Meta:
+        unique_together = (('internal_tx', 'address'),)

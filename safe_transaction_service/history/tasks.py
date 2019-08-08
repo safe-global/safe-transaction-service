@@ -7,12 +7,16 @@ from redis import Redis
 from redis.exceptions import LockError
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .models import MultisigConfirmation
+from .models import MultisigConfirmation, InternalTxDecoded, SafeStatus
 
 logger = get_task_logger(__name__)
 
 
 COUNTDOWN = 60  # seconds
+
+
+def get_redis() -> Redis:
+    return Redis.from_url(settings.REDIS_URL)
 
 
 @app.shared_task(bind=True)
@@ -85,14 +89,13 @@ def check_approve_transaction_task(self, safe_address: str, safe_tx_hash: str,
                        transaction_hash)
 
 
-@app.shared_task(bind=True)
-def index_new_proxies_task(self) -> int:
+@app.shared_task()
+def index_new_proxies_task() -> int:
     """
-    :param self:
     :return: Number of proxies created
     """
 
-    redis = Redis.from_url(settings.REDIS_URL)
+    redis = get_redis()
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=60 * 30):
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
@@ -112,19 +115,78 @@ def index_new_proxies_task(self) -> int:
         pass
 
 
-@app.shared_task(soft_time_limit=60 * 30)
+@app.shared_task()
 def index_internal_txs_task() -> int:
     """
     Find and process internal txs for monitored addresses
     :return: Number of addresses processed
     """
 
-    redis = Redis.from_url(settings.REDIS_URL)
+    redis = get_redis()
     number_addresses = 0
     try:
-        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=60 * 30):
+        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1):
             number_addresses = InternalTxIndexerProvider().process_all()
             logger.info('Find internal txs task processed %d addresses', number_addresses)
     except LockError:
         pass
     return number_addresses
+
+
+@app.shared_task()
+def process_decoded_internal_txs_task() -> int:
+    redis = get_redis()
+    number_processed = 0
+    try:
+        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1):
+            for internal_tx_decoded in InternalTxDecoded.objects.pending():
+                function_name = internal_tx_decoded.function_name
+                arguments = internal_tx_decoded.arguments
+                contract_address = internal_tx_decoded.internal_tx.to
+                processed = True
+                if function_name == 'setup':
+                    owners = arguments['_owners']
+                    threshold = arguments['_threshold']
+                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                              owners=owners, threshold=threshold)
+                elif function_name in ('addOwnerWithThreshold', 'removeOwner'):
+                    owner = arguments['owner']
+                    threshold = arguments['_threshold']
+                    safe_status = SafeStatus.objects.last_for_address(contract_address)
+                    if function_name == 'addOwnerWithThreshold':
+                        owners = list(safe_status.owners) + [owner]
+                        owners.append(owner)
+                    else:  # removeOwner
+                        owners = list(safe_status.owners)
+                        owners.remove(owner)
+                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                              owners=owners, threshold=threshold)
+                elif function_name == 'swapOwner':
+                    old_owner = arguments['oldOwner']
+                    new_owner = arguments['newOwner']
+                    safe_status = SafeStatus.objects.last_for_address(contract_address)
+                    owners = list(safe_status.owners)
+                    owners.remove(old_owner)
+                    owners.append(new_owner)
+                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                              owners=owners, threshold=threshold)
+                elif function_name == 'changeThreshold':
+                    safe_status = SafeStatus.objects.last_for_address(contract_address)
+                    threshold = arguments['_threshold']
+                    owners = safe_status.owners
+                    SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                              owners=owners, threshold=threshold)
+                elif function_name == 'execTransaction':
+                    pass
+                elif function_name == 'approveHash':
+                    MultisigConfirmation.objects.get_or_create(transaction_hash=arguments['hashToApprove'],
+                                                               owner=internal_tx_decoded.internal_tx._from)
+                else:
+                    processed = False
+                if processed:
+                    number_processed += 1
+                    internal_tx_decoded.set_processed()
+            logger.info('%d decoded internal txs processed', number_processed)
+    except LockError:
+        pass
+    return number_processed

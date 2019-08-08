@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Any, Dict, List, Set
 
+from django.db import transaction
 from gnosis.eth import EthereumClient
 
 from ..models import InternalTx, InternalTxDecoded
@@ -68,19 +69,20 @@ class InternalTxIndexer(TransactionIndexer):
         """
         return self._process_traces(self.ethereum_client.parity.trace_transaction(tx_hash))
 
+    @transaction.atomic
     def _process_trace(self, trace: Dict[str, Any]) -> InternalTx:
         ethereum_tx = self.create_or_update_ethereum_tx(trace['transactionHash'])
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
-        # Decode internal tx
+        # Decode internal tx if it's a call/delegate call and has data
         if internal_tx.is_call and internal_tx.data and (created or not internal_tx.is_decoded):
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
                 internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
                                                                                  defaults={
                                                                                      'function_name': function_name,
-                                                                                     'arguments': arguments}
-                                                                                 )
+                                                                                     'arguments': arguments,
+                                                                                 })
             except CannotDecode:
                 pass
 
