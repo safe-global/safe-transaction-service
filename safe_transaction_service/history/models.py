@@ -164,9 +164,10 @@ class InternalTx(models.Model):
     code = models.BinaryField(null=True)                # Create
     output = models.BinaryField(null=True)              # Call
     refund_address = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT
-    tx_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in EthereumTxType])
+    tx_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in EthereumTxType], db_index=True)
     call_type = models.PositiveSmallIntegerField(null=True,
-                                                 choices=[(tag.value, tag.name) for tag in EthereumTxCallType])  # Call
+                                                 choices=[(tag.value, tag.name) for tag in EthereumTxCallType],
+                                                 db_index=True)  # Call
     trace_address = models.CharField(max_length=100)  # Stringified traceAddress
     error = models.CharField(max_length=100, null=True)
 
