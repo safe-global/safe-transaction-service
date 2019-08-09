@@ -24,4 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class TestHistoryViews(SafeTestCaseMixin, APITestCase):
-    pass
+
+    def test_1(self):
+        self.assertTrue(True)
