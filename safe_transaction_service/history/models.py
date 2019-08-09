@@ -176,9 +176,9 @@ class InternalTx(models.Model):
 
     def __str__(self):
         if self.to:
-            return 'Internal tx hash={} from={} to={}'.format(self.ethereum_tx.tx_hash, self._from, self.to)
+            return 'Internal tx hash={} from={} to={}'.format(self.ethereum_tx_id, self._from, self.to)
         else:
-            return 'Internal tx hash={} from={}'.format(self.ethereum_tx.tx_hash, self._from)
+            return 'Internal tx hash={} from={}'.format(self.ethereum_tx_id, self._from)
 
     @property
     def is_call(self):
@@ -221,7 +221,7 @@ class InternalTxDecoded(models.Model):
     processed = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name_plural = "internal_txs_decoded"
+        verbose_name_plural = "Internal Txs Decoded"
 
     def set_processed(self):
         self.processed = True
@@ -336,7 +336,7 @@ class MonitoredAddress(models.Model):
     events_block_number = models.IntegerField(null=True, default=None)  # Block number when last events scan ended
 
     class Meta:
-        verbose_name_plural = "monitored_addresses"
+        verbose_name_plural = "Monitored Addresses"
 
     def __str__(self):
         return f'Address {self.address} - Initial-block-number={self.initial_block_number}' \
@@ -365,3 +365,7 @@ class SafeStatus(models.Model):
 
     class Meta:
         unique_together = (('internal_tx_decoded', 'address'),)
+        verbose_name_plural = 'Safe Statuses'
+
+    def __str__(self):
+        return f'safe={self.address} threshold={self.threshold} owners={self.owners}'
