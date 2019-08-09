@@ -184,7 +184,7 @@ def process_decoded_internal_txs_task() -> int:
                         pass
                     elif function_name == 'approveHash':
                         MultisigConfirmation.objects.get_or_create(transaction_hash=arguments['hashToApprove'],
-                                                                   owner=internal_tx_decoded.internal_tx.from_)
+                                                                   owner=internal_tx_decoded.internal_tx._from)
                     else:
                         processed = False
                     if processed:
