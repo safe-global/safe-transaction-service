@@ -156,11 +156,10 @@ def process_decoded_internal_txs_task() -> int:
                         owner = arguments['owner']
                         threshold = arguments['_threshold']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        owners = list(safe_status.owners)
                         if function_name == 'addOwnerWithThreshold':
-                            owners = list(safe_status.owners) + [owner]
                             owners.append(owner)
-                        else:  # removeOwner
-                            owners = list(safe_status.owners)
+                        else:  # removeOwner, removeOwnerWithThreshold
                             owners.remove(owner)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold)
@@ -177,7 +176,7 @@ def process_decoded_internal_txs_task() -> int:
                     elif function_name == 'changeThreshold':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
                         threshold = arguments['_threshold']
-                        owners = safe_status.owners
+                        owners = list(safe_status.owners)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold)
                     elif function_name == 'execTransaction':
