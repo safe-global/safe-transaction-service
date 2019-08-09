@@ -15,7 +15,7 @@ RUN set -ex \
 		libssl-dev \
 		" \
     && apt-get update \
-    && apt-get install -y --no-install-recommends $buildDeps postgresql-client \
+    && apt-get install -y --no-install-recommends $buildDeps \
     && pip install --no-cache-dir -r requirements.txt \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
