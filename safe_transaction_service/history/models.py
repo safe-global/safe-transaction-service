@@ -181,6 +181,13 @@ class InternalTx(models.Model):
             return 'Internal tx hash={} from={}'.format(self.ethereum_tx_id, self._from)
 
     @property
+    def can_be_decoded(self):
+        return (self.is_call
+                and not self.is_delegate_call
+                and not self.error
+                and self.data)
+
+    @property
     def is_call(self):
         return EthereumTxType(self.tx_type) == EthereumTxType.CALL
 
