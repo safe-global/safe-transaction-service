@@ -1,4 +1,4 @@
-FROM python:3.6-slim-stretch
+FROM python:3.7-slim-stretch
 
 ENV PYTHONUNBUFFERED 1
 WORKDIR /app
@@ -15,7 +15,7 @@ RUN set -ex \
 		libssl-dev \
 		" \
     && apt-get update \
-    && apt-get install -y --no-install-recommends $buildDeps \
+    && apt-get install -y --no-install-recommends $buildDeps postgresql-client \
     && pip install --no-cache-dir -r requirements.txt \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
