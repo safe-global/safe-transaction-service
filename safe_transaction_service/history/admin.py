@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MonitoredAddress, MultisigConfirmation,
-                     MultisigTransaction)
+                     MultisigTransaction, SafeStatus)
 
 
 @admin.register(MultisigConfirmation)
@@ -57,3 +57,10 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
 class MonitoredAddressAdmin(admin.ModelAdmin):
     list_display = ('address', 'ethereum_tx_id', 'initial_block_number', 'tx_block_number', 'events_block_number')
     search_fields = ['address']
+
+
+@admin.register(SafeStatus)
+class SafeStatusAdmin(admin.ModelAdmin):
+    list_display = ('internal_tx_decoded_id', 'address', 'owners', 'threshold')
+    list_filter = ('threshold',)
+    search_fields = ['address', 'owners']

@@ -19,4 +19,3 @@ logger = logging.getLogger(__name__)
 
 class TestTasks(SafeTestCaseMixin, TestCase):
     pass
-
