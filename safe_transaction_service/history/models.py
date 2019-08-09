@@ -13,6 +13,11 @@ from gnosis.eth.django.models import (EthereumAddressField, HexField,
 from gnosis.safe import SafeOperation
 
 
+class ConfirmationType(Enum):
+    CONFIRMATION = 0
+    EXECUTION = 1
+
+
 class EthereumTxCallType(Enum):
     CALL = 0
     DELEGATE_CALL = 1
@@ -271,7 +276,7 @@ class MultisigConfirmation(models.Model):
                                              on_delete=models.CASCADE,
                                              null=True,
                                              related_name="confirmations")
-    transaction_hash = Sha3HashField()  # Use this while we don't have a `multisig_transaction`
+    transaction_hash = Sha3HashField(null=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
     class Meta:
@@ -344,11 +349,11 @@ class SafeStatusQuerySet(models.QuerySet):
 
 class SafeStatus(models.Model):
     objects = SafeStatusQuerySet.as_manager()
-    internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
-                                       primary_key=True)
+    internal_tx_decoded = models.OneToOneField(InternalTxDecoded, on_delete=models.CASCADE, related_name='safe_status',
+                                               primary_key=True)
     address = EthereumAddressField()
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
 
     class Meta:
-        unique_together = (('internal_tx', 'address'),)
+        unique_together = (('internal_tx_decoded', 'address'),)

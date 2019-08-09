@@ -7,20 +7,16 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
 
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
-    date_hierarchy = 'created'
-    list_display = ('created', 'multisig_transaction', 'transaction_hash', 'mined')
-    list_filter = ('confirmation_type',)
-    ordering = ['-created']
+    list_display = ('multisig_transaction', 'transaction_hash', 'owner')
     search_fields = ['transaction_hash', 'owner']
 
 
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
-    list_filter = ('operation',)
+    list_display = ('created', 'safe', 'mined', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
     ordering = ['-created']
-    search_fields = ['=safe', '=ethereum_tx__tx_hash', 'to']
+    search_fields = ['=safe', '=ethereum_tx_id', 'to']
 
 
 @admin.register(EthereumBlock)
