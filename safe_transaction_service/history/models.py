@@ -194,10 +194,10 @@ class InternalTx(models.Model):
 
     @property
     def is_delegate_call(self) -> bool:
-        if not self.call_type:
+        if self.call_type is None:
             return False
         else:
-            return EthereumTxType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
+            return EthereumTxCallType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
