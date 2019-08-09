@@ -74,7 +74,7 @@ class EthereumTxManager(models.Manager):
         return super().create(
             block=ethereum_block,
             tx_hash=tx_hash,
-            _from=tx['from'],
+            from_=tx['from'],
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
             gas_used=tx_receipt and tx_receipt.gasUsed,
@@ -93,7 +93,7 @@ class EthereumTx(TimeStampedModel):
     tx_hash = Sha3HashField(unique=True, primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
-    _from = EthereumAddressField(null=True, db_index=True)
+    from_ = EthereumAddressField(null=True, db_index=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
     data = models.BinaryField(null=True)
@@ -102,7 +102,7 @@ class EthereumTx(TimeStampedModel):
     value = Uint256Field()
 
     def __str__(self):
-        return '{} from={} to={}'.format(self.tx_hash, self._from, self.to)
+        return '{} from={} to={}'.format(self.tx_hash, self.from_, self.to)
 
 
 class EthereumEvent(models.Model):
@@ -129,7 +129,7 @@ class InternalTxManager(models.Manager):
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
             defaults={
-                '_from': trace['action'].get('from'),
+                'from_': trace['action'].get('from'),
                 'gas': trace['action'].get('gas', 0),
                 'data': trace['action'].get('input') or trace['action'].get('init'),
                 'to': trace['action'].get('to') or trace['action'].get('address'),
@@ -149,7 +149,7 @@ class InternalTxManager(models.Manager):
 class InternalTx(models.Model):
     objects = InternalTxManager()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='internal_txs')
-    _from = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT it can be null
+    from_ = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
     to = EthereumAddressField(null=True, db_index=True)
@@ -170,9 +170,9 @@ class InternalTx(models.Model):
 
     def __str__(self):
         if self.to:
-            return 'Internal tx hash={} from={} to={}'.format(self.ethereum_tx.tx_hash, self._from, self.to)
+            return 'Internal tx hash={} from={} to={}'.format(self.ethereum_tx.tx_hash, self.from_, self.to)
         else:
-            return 'Internal tx hash={} from={}'.format(self.ethereum_tx.tx_hash, self._from)
+            return 'Internal tx hash={} from={}'.format(self.ethereum_tx.tx_hash, self.from_)
 
     @property
     def is_call(self):

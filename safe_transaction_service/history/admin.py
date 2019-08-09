@@ -38,16 +38,16 @@ class EthereumEventAdmin(admin.ModelAdmin):
 
 @admin.register(EthereumTx)
 class EthereumTxAdmin(admin.ModelAdmin):
-    list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
-    search_fields = ['=tx_hash', '=_from', '=to']
+    list_display = ('block_id', 'tx_hash', 'nonce', 'from_', 'to')
+    search_fields = ['=tx_hash', '=from_', '=to']
     ordering = ['-block_id']
 
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', '_from', 'to', 'value', 'call_type')
+    list_display = ('ethereum_tx_id', 'from_', 'to', 'value', 'call_type')
     list_filter = ('tx_type', 'call_type')
-    search_fields = ['=ethereum_tx__block__number', '=_from', '=to']
+    search_fields = ['=ethereum_tx__block__number', '=from_', '=to']
 
 
 @admin.register(InternalTxDecoded)
