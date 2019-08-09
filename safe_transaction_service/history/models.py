@@ -202,6 +202,9 @@ class InternalTx(models.Model):
 
 class InternalTxDecodedQuerySet(models.QuerySet):
     def pending(self):
+        """
+        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
+        """
         return self.filter(
             processed=False
         ).select_related(
@@ -357,14 +360,14 @@ class SafeStatusQuerySet(models.QuerySet):
 
 class SafeStatus(models.Model):
     objects = SafeStatusQuerySet.as_manager()
-    internal_tx_decoded = models.OneToOneField(InternalTxDecoded, on_delete=models.CASCADE, related_name='safe_status',
-                                               primary_key=True)
+    internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
+                                       primary_key=True)
     address = EthereumAddressField()
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
 
     class Meta:
-        unique_together = (('internal_tx_decoded', 'address'),)
+        unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe Statuses'
 
     def __str__(self):

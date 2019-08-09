@@ -61,6 +61,6 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
-    list_display = ('internal_tx_decoded_id', 'address', 'owners', 'threshold')
+    list_display = ('internal_tx_id', 'address', 'owners', 'threshold')
     list_filter = ('threshold',)
     search_fields = ['address', 'owners']
