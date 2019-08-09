@@ -168,6 +168,7 @@ def process_decoded_internal_txs_task() -> int:
                         old_owner = arguments['oldOwner']
                         new_owner = arguments['newOwner']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        threshold = safe_status.threshold
                         owners = list(safe_status.owners)
                         owners.remove(old_owner)
                         owners.append(new_owner)
