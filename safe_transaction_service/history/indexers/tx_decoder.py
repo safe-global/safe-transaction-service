@@ -1,12 +1,11 @@
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 from hexbytes import HexBytes
 from web3 import Web3
 
 from gnosis.eth.contracts import get_safe_contract
 
-from ..models import InternalTx, InternalTxDecoded
 
 logger = getLogger(__name__)
 
@@ -26,19 +25,6 @@ class CannotDecode(TxDecoderException):
 class TxDecoder:
     def __init__(self):
         self.supported_contracts = [get_safe_contract(Web3())]
-
-    def process_transaction_from_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTxDecoded]:
-        try:
-            function_name, arguments = self.decode_transaction(HexBytes(internal_tx.data))
-            internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
-                                                                             defaults={
-                                                                                 'function_name': function_name,
-                                                                                 'arguments': arguments}
-                                                                             )
-            return internal_tx_decoded
-        except CannotDecode:
-            pass
-        return None
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         try:

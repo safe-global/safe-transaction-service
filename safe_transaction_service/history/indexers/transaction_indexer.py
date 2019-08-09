@@ -147,7 +147,7 @@ class TransactionIndexer(ABC):
 
         return from_block_number, to_block_number
 
-    def process_addresses(self, addresses: List[str]) -> Optional[Tuple[List[Any], bool]]:
+    def process_addresses(self, addresses: List[str]) -> Tuple[List[Any], bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
         :param addresses: Addresses to process
@@ -159,7 +159,7 @@ class TransactionIndexer(ABC):
 
         parameters = self.get_block_numbers_for_search(addresses)
         if parameters is None:
-            return
+            return [], True
         from_block_number, to_block_number = parameters
         updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
         elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)

@@ -192,6 +192,13 @@ class InternalTx(models.Model):
         except InternalTxDecoded.DoesNotExist:
             return False
 
+    @property
+    def is_delegate_call(self) -> bool:
+        if not self.call_type:
+            return False
+        else:
+            return EthereumTxType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
+
 
 class InternalTxDecodedQuerySet(models.QuerySet):
     def pending(self):
