@@ -15,6 +15,7 @@ logger = get_task_logger(__name__)
 
 
 COUNTDOWN = 60  # seconds
+LOCK_TIMEOUT = 60 * 10
 
 
 def get_redis() -> Redis:
@@ -87,11 +88,10 @@ def check_approve_transaction_task(self, safe_address: str, safe_tx_hash: str,
 
     except MultisigConfirmation.DoesNotExist:
         logger.warning('Multisig confirmation for safe=%s and transaction_hash=%s does not exist',
-                       safe_address,
-                       transaction_hash)
+                       safe_address, transaction_hash)
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def index_new_proxies_task() -> int:
     """
     :return: Number of proxies created
@@ -99,7 +99,7 @@ def index_new_proxies_task() -> int:
 
     redis = get_redis()
     try:
-        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=60 * 30):
+        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
             proxy_indexer_service = ProxyIndexerServiceProvider()
 
@@ -118,7 +118,7 @@ def index_new_proxies_task() -> int:
         pass
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def index_internal_txs_task() -> int:
     """
     Find and process internal txs for monitored addresses
@@ -126,22 +126,21 @@ def index_internal_txs_task() -> int:
     """
 
     redis = get_redis()
-    number_addresses = 0
     try:
-        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1):
+        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             number_addresses = InternalTxIndexerProvider().process_all()
             logger.info('Find internal txs task processed %d addresses', number_addresses)
+            return number_addresses
     except LockError:
         pass
-    return number_addresses
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task() -> int:
     redis = get_redis()
-    number_processed = 0
     try:
-        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1):
+        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            number_processed = 0
             for internal_tx_decoded in InternalTxDecoded.objects.pending():
                 function_name = internal_tx_decoded.function_name
                 arguments = internal_tx_decoded.arguments
@@ -191,7 +190,8 @@ def process_decoded_internal_txs_task() -> int:
                     if processed:
                         number_processed += 1
                         internal_tx_decoded.set_processed()
-            logger.info('%d decoded internal txs processed', number_processed)
+            if number_processed:
+                logger.info('%d decoded internal txs processed', number_processed)
+            return number_processed
     except LockError:
         pass
-    return number_processed
