@@ -151,7 +151,7 @@ def process_decoded_internal_txs_task() -> int:
                     if function_name == 'setup':
                         owners = arguments['_owners']
                         threshold = arguments['_threshold']
-                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                        SafeStatus.objects.create(internal_tx_decoded=internal_tx_decoded, address=contract_address,
                                                   owners=owners, threshold=threshold)
                     elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
                         owner = arguments['owner']
@@ -163,7 +163,7 @@ def process_decoded_internal_txs_task() -> int:
                         else:  # removeOwner
                             owners = list(safe_status.owners)
                             owners.remove(owner)
-                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                        SafeStatus.objects.create(internal_tx_decoded=internal_tx_decoded, address=contract_address,
                                                   owners=owners, threshold=threshold)
                     elif function_name == 'swapOwner':
                         old_owner = arguments['oldOwner']
@@ -172,13 +172,13 @@ def process_decoded_internal_txs_task() -> int:
                         owners = list(safe_status.owners)
                         owners.remove(old_owner)
                         owners.append(new_owner)
-                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                        SafeStatus.objects.create(internal_tx_decoded=internal_tx_decoded, address=contract_address,
                                                   owners=owners, threshold=threshold)
                     elif function_name == 'changeThreshold':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
                         threshold = arguments['_threshold']
                         owners = safe_status.owners
-                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                        SafeStatus.objects.create(internal_tx_decoded=internal_tx_decoded, address=contract_address,
                                                   owners=owners, threshold=threshold)
                     elif function_name == 'execTransaction':
                         # FIXME
