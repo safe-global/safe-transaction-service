@@ -223,7 +223,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return self.not_processed(
         ).filter(
-            internal_tx__to__in=MonitoredAddress.objects.values('address')
+            internal_tx__to__in=MonitoredAddress.objects.values('address')  #TODO Maybe not here?
         ).select_related(
             'internal_tx__ethereum_tx'
         ).order_by(
