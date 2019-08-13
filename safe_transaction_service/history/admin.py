@@ -49,7 +49,7 @@ class InternalTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
-    list_display = ('internal_tx_id', 'processed', 'function_name', 'arguments')
+    list_display = ('block_number', 'internal_tx_id', 'processed', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
     list_select_related = ('internal_tx__ethereum_tx',)
     search_fields = ['function_name', 'arguments']
