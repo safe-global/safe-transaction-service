@@ -2,6 +2,7 @@ from celery import app
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.db import transaction
+from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
 
@@ -190,7 +191,7 @@ def process_decoded_internal_txs_task() -> int:
                         safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'], arguments['data'],
                                          arguments['operation'], arguments['safeTxGas'], arguments['baseGas'],
                                          arguments['gasPrice'], arguments['gasToken'], arguments['refundReceiver'],
-                                         arguments['signatures'], safe_nonce=nonce)
+                                         HexBytes(arguments['signatures']), safe_nonce=nonce)
                         safe_tx_hash = safe_tx.safe_tx_hash
 
                         MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
