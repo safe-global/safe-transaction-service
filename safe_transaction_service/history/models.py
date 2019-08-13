@@ -182,7 +182,7 @@ class InternalTx(models.Model):
 
     @property
     def block_number(self):
-        return self.internal_tx.ethereum_tx.block_id
+        return self.ethereum_tx.block_id
 
     @property
     def can_be_decoded(self):
