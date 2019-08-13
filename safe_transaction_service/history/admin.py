@@ -66,5 +66,5 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold')
     list_filter = ('threshold',)
     list_select_related = ('internal_tx__ethereum_tx',)
-    ordering = ['-block_number']
+    ordering = ['-internal_tx__ethereum_tx__block_id']
     search_fields = ['address', 'owners']
