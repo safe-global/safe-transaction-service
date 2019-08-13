@@ -53,7 +53,7 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_filter = ('function_name', 'processed')
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     list_select_related = ('internal_tx__ethereum_tx',)
-    search_fields = ['function_name', 'arguments']
+    search_fields = ['function_name', 'arguments', '=internal_tx__to']
 
 
 @admin.register(MonitoredAddress)
