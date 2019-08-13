@@ -51,7 +51,9 @@ class InternalTxAdmin(admin.ModelAdmin):
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'internal_tx_id', 'processed', 'address', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
-    ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
+    ordering = ['-internal_tx__ethereum_tx__block_id',
+                '-internal_tx__ethereum_tx__transaction_index',
+                '-internal_tx_id']
     list_select_related = ('internal_tx__ethereum_tx',)
     search_fields = ['function_name', 'arguments', '=internal_tx__to']
 

@@ -212,17 +212,20 @@ class InternalTx(models.Model):
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
+    def not_processed(self):
+        return self.filter(processed=False)
+
     def pending(self):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.filter(
-            processed=False
+        return self.not_processed(
         ).select_related(
             'internal_tx__ethereum_tx'
         ).order_by(
             'internal_tx__ethereum_tx__block_id',
-            'internal_tx__ethereum_tx__transaction_index'
+            'internal_tx__ethereum_tx__transaction_index',
+            'internal_tx_id',
         )
 
 
@@ -374,6 +377,7 @@ class SafeStatusQuerySet(models.QuerySet):
         ).order_by(
             'internal_tx__ethereum_tx__block_id',
             'internal_tx__ethereum_tx__transaction_index',
+            'internal_tx_id',
         ).last()
 
 
@@ -384,6 +388,7 @@ class SafeStatus(models.Model):
     address = EthereumAddressField()
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
+    nonce = Uint256Field(default=0)
 
     class Meta:
         unique_together = (('internal_tx', 'address'),)
