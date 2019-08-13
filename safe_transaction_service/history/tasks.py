@@ -195,20 +195,25 @@ def process_decoded_internal_txs_task() -> int:
                         safe_tx_hash = safe_tx.safe_tx_hash
 
                         ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
-                        MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
-                                                                  defaults={
-                                                                      'ethereum_tx': ethereum_tx,
-                                                                      'to': safe_tx.to,
-                                                                      'value': safe_tx.value,
-                                                                      'data': safe_tx.data,
-                                                                      'operation': safe_tx.operation,
-                                                                      'safe_tx_gas': safe_tx.safe_tx_gas,
-                                                                      'base_gas': safe_tx.base_gas,
-                                                                      'gas_price': safe_tx.gas_price,
-                                                                      'gas_token': safe_tx.gas_token,
-                                                                      'refund_receiver': safe_tx.refund_receiver,
-                                                                      'nonce': safe_tx.safe_nonce,
-                                                                  })
+                        multisig_tx, created = MultisigTransaction.objects.get_or_create(
+                            safe_tx_hash=safe_tx_hash,
+                            defaults={
+                                'ethereum_tx': ethereum_tx,
+                                'to': safe_tx.to,
+                                'value': safe_tx.value,
+                                'data': safe_tx.data,
+                                'operation': safe_tx.operation,
+                                'safe_tx_gas': safe_tx.safe_tx_gas,
+                                'base_gas': safe_tx.base_gas,
+                                'gas_price': safe_tx.gas_price,
+                                'gas_token': safe_tx.gas_token,
+                                'refund_receiver': safe_tx.refund_receiver,
+                                'nonce': safe_tx.safe_nonce,
+                            })
+                        if not created and not multisig_tx.ethereum_tx:
+                            multisig_tx.ethereum_tx = ethereum_tx
+                            multisig_tx.save(update_fields=['ethereum_tx'])
+
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold, nonce=nonce + 1)
                     elif function_name == 'approveHash':
