@@ -31,7 +31,7 @@ class Erc20EventsService(TransactionIndexer):
         return 'erc_20_block_number'
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                                to_block_number: int) -> Set[str]:
+                               to_block_number: int) -> Set[str]:
         """
         Search for tx hashes with erc20 transfer events (`from` and `to`) of a `safe_address`
         :param addresses:
