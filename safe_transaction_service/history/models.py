@@ -238,6 +238,10 @@ class InternalTxDecoded(models.Model):
         verbose_name_plural = "Internal Txs Decoded"
 
     @property
+    def address(self):
+        return self.internal_tx.to
+
+    @property
     def block_number(self):
         return self.internal_tx.ethereum_tx.block_id
 
