@@ -6,10 +6,10 @@ from redis import Redis
 from redis.exceptions import LockError
 
 from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe
+from gnosis.safe import Safe, SafeTx
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .models import InternalTxDecoded, MultisigConfirmation, SafeStatus
+from .models import InternalTxDecoded, MultisigConfirmation, SafeStatus, MultisigTransaction
 
 logger = get_task_logger(__name__)
 
@@ -151,40 +151,76 @@ def process_decoded_internal_txs_task() -> int:
                         owners = arguments['_owners']
                         threshold = arguments['_threshold']
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold)
+                                                  owners=owners, threshold=threshold, nonce=0)
                     elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
                         owner = arguments['owner']
                         threshold = arguments['_threshold']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        nonce = safe_status.nonce
                         owners = list(safe_status.owners)
                         if function_name == 'addOwnerWithThreshold':
                             owners.append(owner)
                         else:  # removeOwner, removeOwnerWithThreshold
                             owners.remove(owner)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold)
+                                                  owners=owners, threshold=threshold, nonce=nonce)
                     elif function_name == 'swapOwner':
                         old_owner = arguments['oldOwner']
                         new_owner = arguments['newOwner']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        nonce = safe_status.nonce
                         threshold = safe_status.threshold
                         owners = list(safe_status.owners)
                         owners.remove(old_owner)
                         owners.append(new_owner)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold)
+                                                  owners=owners, threshold=threshold, nonce=nonce)
                     elif function_name == 'changeThreshold':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        nonce = safe_status.nonce
                         threshold = arguments['_threshold']
                         owners = list(safe_status.owners)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold)
+                                                  owners=owners, threshold=threshold, nonce=nonce)
                     elif function_name == 'execTransaction':
-                        # FIXME
-                        pass
+                        safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        nonce = safe_status.nonce
+                        threshold = safe_status.threshold
+                        owners = safe_status.owners
+                        safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'], arguments['data'],
+                                         arguments['operation'], arguments['safeTxGas'], arguments['baseGas'],
+                                         arguments['gasPrice'], arguments['gasToken'], arguments['refundReceiver'],
+                                         arguments['signatures'], safe_nonce=nonce)
+                        safe_tx_hash = safe_tx.safe_tx_hash
+
+                        MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
+                                                                  defaults={
+                                                                      'to': safe_tx.to,
+                                                                      'value': safe_tx.value,
+                                                                      'data': safe_tx.data,
+                                                                      'operation': safe_tx.operation,
+                                                                      'safe_tx_gas': safe_tx.safe_tx_gas,
+                                                                      'base_gas': safe_tx.base_gas,
+                                                                      'gas_price': safe_tx.gas_price,
+                                                                      'gas_token': safe_tx.gas_token,
+                                                                      'refund_receiver': safe_tx.refund_receiver,
+                                                                      'nonce': safe_tx.safe_nonce,
+                                                                  })
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold, nonce=nonce + 1)
                     elif function_name == 'approveHash':
-                        MultisigConfirmation.objects.get_or_create(transaction_hash=arguments['hashToApprove'],
-                                                                   owner=internal_tx_decoded.internal_tx._from)
+                        transaction_hash = arguments['hashToApprove']
+                        owner = internal_tx_decoded.internal_tx._from
+                        try:
+                            multisig_transaction = MultisigTransaction.objects.get(safe_tx_hash=transaction_hash)
+                        except MultisigTransaction.DoesNotExist:
+                            multisig_transaction = None
+
+                        MultisigConfirmation.objects.get_or_create(transaction_hash=transaction_hash,
+                                                                   owner=owner,
+                                                                   defaults={
+                                                                       'multisig_transaction': multisig_transaction
+                                                                   })
                     else:
                         processed = False
                     if processed:
