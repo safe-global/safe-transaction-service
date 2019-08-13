@@ -20,7 +20,9 @@ LOCK_TIMEOUT = 60 * 10
 
 
 def get_redis() -> Redis:
-    return Redis.from_url(settings.REDIS_URL)
+    if not hasattr(get_redis, 'redis'):
+        get_redis.redis = Redis.from_url(settings.REDIS_URL)
+    return get_redis.redis
 
 
 @app.shared_task(bind=True)
