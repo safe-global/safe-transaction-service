@@ -82,8 +82,9 @@ class TransactionIndexer(ABC):
                 tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
                 ethereum_tx.block = self.get_or_create_ethereum_block(tx_receipt.blockNumber)
                 ethereum_tx.gas_used = tx_receipt.gasUsed
+                ethereum_tx.status = tx_receipt.status
                 ethereum_tx.transaction_index = tx_receipt.transactionIndex
-                ethereum_tx.save(update_fields=['block', 'gas_used', 'transaction_index'])
+                ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
             return ethereum_tx
         except EthereumTx.DoesNotExist:
             tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)

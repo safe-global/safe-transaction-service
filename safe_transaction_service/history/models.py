@@ -83,6 +83,7 @@ class EthereumTxManager(models.Manager):
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
             gas_used=tx_receipt and tx_receipt.gasUsed,
+            status=tx_receipt and tx_receipt.status,
             transaction_index=tx_receipt and tx_receipt.transactionIndex,
             data=HexBytes(tx.get('data') or tx.get('input')),
             nonce=tx['nonce'],
@@ -97,6 +98,7 @@ class EthereumTx(TimeStampedModel):
                               related_name='txs')  # If mined
     tx_hash = Sha3HashField(unique=True, primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
+    status = models.IntegerField(null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
     _from = EthereumAddressField(null=True, db_index=True)
     gas = Uint256Field()
