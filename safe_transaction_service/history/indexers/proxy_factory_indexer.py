@@ -1,7 +1,7 @@
 from logging import getLogger
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
-from gnosis.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
+from gnosis.eth.constants import NULL_ADDRESS
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import construct_event_topic_set
@@ -9,8 +9,7 @@ from web3.utils.events import construct_event_topic_set
 from gnosis.eth import EthereumClient
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import (EthereumTxCallType, EthereumTxType, InternalTx,
-                      MonitoredAddress)
+from ..models import MonitoredAddress
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
@@ -94,7 +93,7 @@ class ProxyIndexerService(TransactionIndexer):
         int_address = int.from_bytes(HexBytes(log['data']), byteorder='big')
         address = Web3.toChecksumAddress('{:#042x}'.format(int_address))
 
-        if address == NULL_ADDRESS or address == SENTINEL_ADDRESS:
+        if address == NULL_ADDRESS:
             return []
         else:
             return [MonitoredAddress.objects.create_from_address(address, block_number, ethereum_tx=ethereum_tx)]
