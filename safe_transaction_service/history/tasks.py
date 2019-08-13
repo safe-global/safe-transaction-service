@@ -194,8 +194,10 @@ def process_decoded_internal_txs_task() -> int:
                                          HexBytes(arguments['signatures']), safe_nonce=nonce)
                         safe_tx_hash = safe_tx.safe_tx_hash
 
+                        ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
                         MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
                                                                   defaults={
+                                                                      'ethereum_tx': ethereum_tx,
                                                                       'to': safe_tx.to,
                                                                       'value': safe_tx.value,
                                                                       'data': safe_tx.data,
