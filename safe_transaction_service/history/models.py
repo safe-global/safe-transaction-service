@@ -285,8 +285,8 @@ class MultisigTransaction(TimeStampedModel):
         return None
 
     @property
-    def mined(self) -> bool:
-        return self.ethereum_tx.block_id is not None
+    def mined(self) -> Optional[bool]:
+        return self.ethereum_tx and (self.ethereum_tx.block_id is not None)
 
     def set_mined(self):
         raise NotImplemented
