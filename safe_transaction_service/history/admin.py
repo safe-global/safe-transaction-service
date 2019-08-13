@@ -66,7 +66,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
-    list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold')
+    list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold', 'nonce')
     list_filter = ('threshold',)
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
