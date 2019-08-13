@@ -182,7 +182,7 @@ class InternalTx(models.Model):
 
     @property
     def block_number(self):
-        self.internal_tx.ethereum_tx.block_id
+        return self.internal_tx.ethereum_tx.block_id
 
     @property
     def can_be_decoded(self):
@@ -239,7 +239,7 @@ class InternalTxDecoded(models.Model):
 
     @property
     def block_number(self):
-        self.internal_tx.ethereum_tx.block_id
+        return self.internal_tx.ethereum_tx.block_id
 
     def set_processed(self):
         self.processed = True
@@ -387,7 +387,7 @@ class SafeStatus(models.Model):
 
     @property
     def block_number(self):
-        self.internal_tx.ethereum_tx.block_id
+        return self.internal_tx.ethereum_tx.block_id
 
     def __str__(self):
         return f'safe={self.address} threshold={self.threshold} owners={self.owners}'

@@ -51,6 +51,7 @@ class InternalTxAdmin(admin.ModelAdmin):
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'internal_tx_id', 'processed', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
+    ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     list_select_related = ('internal_tx__ethereum_tx',)
     search_fields = ['function_name', 'arguments']
 
@@ -66,5 +67,5 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold')
     list_filter = ('threshold',)
     list_select_related = ('internal_tx__ethereum_tx',)
-    ordering = ['-internal_tx__ethereum_tx__block_id']
+    ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     search_fields = ['address', 'owners']
