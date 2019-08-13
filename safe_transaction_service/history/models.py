@@ -181,6 +181,10 @@ class InternalTx(models.Model):
             return 'Internal tx hash={} from={}'.format(self.ethereum_tx_id, self._from)
 
     @property
+    def block_number(self):
+        self.internal_tx.ethereum_tx.block_id
+
+    @property
     def can_be_decoded(self):
         return (self.is_call
                 and not self.is_delegate_call
@@ -232,6 +236,10 @@ class InternalTxDecoded(models.Model):
 
     class Meta:
         verbose_name_plural = "Internal Txs Decoded"
+
+    @property
+    def block_number(self):
+        self.internal_tx.ethereum_tx.block_id
 
     def set_processed(self):
         self.processed = True
@@ -376,6 +384,10 @@ class SafeStatus(models.Model):
     class Meta:
         unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe Statuses'
+
+    @property
+    def block_number(self):
+        self.internal_tx.ethereum_tx.block_id
 
     def __str__(self):
         return f'safe={self.address} threshold={self.threshold} owners={self.owners}'

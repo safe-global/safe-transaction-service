@@ -41,8 +41,9 @@ class EthereumTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', '_from', 'to', 'value', 'call_type')
+    list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type')
     list_filter = ('tx_type', 'call_type')
+    list_select_related = ('ethereum_tx',)
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to']
 
 
@@ -50,6 +51,7 @@ class InternalTxAdmin(admin.ModelAdmin):
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_display = ('internal_tx_id', 'processed', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
+    list_select_related = ('internal_tx__ethereum_tx',)
     search_fields = ['function_name', 'arguments']
 
 
@@ -61,6 +63,8 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
-    list_display = ('internal_tx_id', 'address', 'owners', 'threshold')
+    list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold')
     list_filter = ('threshold',)
+    list_select_related = ('internal_tx__ethereum_tx',)
+    ordering = ['-block_number']
     search_fields = ['address', 'owners']
