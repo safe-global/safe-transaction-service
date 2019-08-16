@@ -60,6 +60,7 @@ class EthereumBlockManager(models.Manager):
             gas_used=block['gasUsed'],
             timestamp=datetime.datetime.fromtimestamp(block['timestamp'], datetime.timezone.utc),
             block_hash=block['hash'],
+            parent_hash=block['parentHash'],
         )
 
 
@@ -70,6 +71,7 @@ class EthereumBlock(models.Model):
     gas_used = models.PositiveIntegerField()
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
+    parent_hash = Sha3HashField(unique=True)
 
 
 class EthereumTxManager(models.Manager):
