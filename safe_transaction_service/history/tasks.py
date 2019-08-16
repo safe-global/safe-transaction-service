@@ -200,6 +200,7 @@ def process_decoded_internal_txs_task() -> int:
                         multisig_tx, created = MultisigTransaction.objects.get_or_create(
                             safe_tx_hash=safe_tx_hash,
                             defaults={
+                                'safe': contract_address,
                                 'ethereum_tx': ethereum_tx,
                                 'to': safe_tx.to,
                                 'value': safe_tx.value,
