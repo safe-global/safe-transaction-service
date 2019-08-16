@@ -53,7 +53,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
     list_display = ('multisig_transaction_hash', 'ethereum_tx_id', 'owner')
-    search_fields = ['=ethereum_tx_id', '=multisig_transaction_hash', '=owner']
+    search_fields = ['=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 
 
 @admin.register(MultisigTransaction)
@@ -61,7 +61,7 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
     list_display = ('created', 'safe', 'mined', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
     ordering = ['-created']
-    search_fields = ['=ethereum_tx_id', '=safe', 'to']
+    search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
 
 
 @admin.register(SafeStatus)
