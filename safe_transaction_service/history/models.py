@@ -311,15 +311,16 @@ class MultisigConfirmationQuerySet(models.QuerySet):
 
 class MultisigConfirmation(models.Model):
     objects = MultisigConfirmationQuerySet.as_manager()
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations')
     multisig_transaction = models.ForeignKey(MultisigTransaction,
                                              on_delete=models.CASCADE,
                                              null=True,
                                              related_name="confirmations")
-    transaction_hash = Sha3HashField(null=True)  # Use this while we don't have a `multisig_transaction`
+    multisig_transaction_hash = Sha3HashField(null=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
     class Meta:
-        unique_together = (('transaction_hash', 'owner'),)
+        unique_together = (('multisig_transaction_hash', 'owner'),)
 
     def __str__(self):
         if self.multisig_transaction:

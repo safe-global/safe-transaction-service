@@ -138,11 +138,12 @@ def index_internal_txs_task() -> int:
         pass
 
 
-@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
+PROCESS_DECODED_TIMEOUT: int = 60
+@app.shared_task(soft_time_limit=PROCESS_DECODED_TIMEOUT)
 def process_decoded_internal_txs_task() -> int:
     redis = get_redis()
     try:
-        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=PROCESS_DECODED_TIMEOUT):
             number_processed = 0
             for internal_tx_decoded in InternalTxDecoded.objects.pending():
                 function_name = internal_tx_decoded.function_name
@@ -219,17 +220,21 @@ def process_decoded_internal_txs_task() -> int:
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold, nonce=nonce + 1)
                     elif function_name == 'approveHash':
-                        transaction_hash = arguments['hashToApprove']
+                        multisig_transaction_hash = arguments['hashToApprove']
+                        ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
                         owner = internal_tx_decoded.internal_tx._from
                         try:
-                            multisig_transaction = MultisigTransaction.objects.get(safe_tx_hash=transaction_hash)
+                            multisig_transaction = MultisigTransaction.objects.get(
+                                safe_tx_hash=multisig_transaction_hash
+                            )
                         except MultisigTransaction.DoesNotExist:
                             multisig_transaction = None
 
-                        MultisigConfirmation.objects.get_or_create(transaction_hash=transaction_hash,
+                        MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
                                                                    owner=owner,
                                                                    defaults={
-                                                                       'multisig_transaction': multisig_transaction
+                                                                       'multisig_transaction': multisig_transaction,
+                                                                       'ethereum_tx': ethereum_tx,
                                                                    })
                     else:
                         processed = False

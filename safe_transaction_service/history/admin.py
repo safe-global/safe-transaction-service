@@ -7,7 +7,7 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
 
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
-    list_display = ('multisig_transaction', 'transaction_hash', 'owner')
+    list_display = ('multisig_transaction_hash', 'ethereum_tx', 'owner')
     search_fields = ['transaction_hash', 'owner']
 
 
