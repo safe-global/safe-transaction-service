@@ -259,7 +259,18 @@ class InternalTxDecoded(models.Model):
         self.save(update_fields=['processed'])
 
 
+class MultisigTransactionManager(models.Manager):
+    def create(self, **kwargs):
+        multisig_transaction = super().create(**kwargs)
+        for multisig_confirmation in MultisigConfirmation.objects.without_transaction().filter(
+                multisig_transaction_hash=multisig_transaction.safe_tx_hash):
+            multisig_confirmation.multisig_transaction = multisig_transaction
+            multisig_confirmation.save(update_fields=['multisig_transaction'])
+        return multisig_transaction
+
+
 class MultisigTransaction(TimeStampedModel):
+    objects = MultisigTransactionManager()
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField()
     ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,
@@ -299,7 +310,21 @@ class MultisigTransaction(TimeStampedModel):
         MultisigConfirmation.objects.filter(multisig_transaction=self).update(mined=True)
 
 
-# Allow off-chain confirmations
+#TODO Maybe use signals
+class MultisigConfirmationManager(models.Manager):
+    def create(self, **kwargs):
+        multisig_transaction = kwargs.get('multisig_transaction', None)
+        if not multisig_transaction:
+            try:
+                multisig_transaction_hash = kwargs.get('multisig_transaction_hash', None)
+                if multisig_transaction_hash:
+                    kwargs['multisig_transaction'] = MultisigTransaction.objects.get(
+                        safe_tx_hash=multisig_transaction_hash)
+            except MultisigTransaction.DoesNotExist:
+                pass
+        return super().create(**kwargs)
+
+
 class MultisigConfirmationQuerySet(models.QuerySet):
     def without_transaction(self):
         return self.filter(multisig_transaction=None)
@@ -308,14 +333,16 @@ class MultisigConfirmationQuerySet(models.QuerySet):
         return self.exclude(multisig_transaction=None)
 
 
+#TODO Allow off-chain confirmations
 class MultisigConfirmation(models.Model):
-    objects = MultisigConfirmationQuerySet.as_manager()
+    objects = MultisigConfirmationManager.from_queryset(MultisigConfirmationQuerySet)()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations')
     multisig_transaction = models.ForeignKey(MultisigTransaction,
                                              on_delete=models.CASCADE,
                                              null=True,
                                              related_name="confirmations")
-    multisig_transaction_hash = Sha3HashField(null=True)  # Use this while we don't have a `multisig_transaction`
+    multisig_transaction_hash = Sha3HashField(null=True,
+                                              db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
     class Meta:

@@ -1,10 +1,5 @@
-from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from eth_account import Account
-
-from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe, ProxyFactory
 from ...models import MultisigConfirmation, MultisigTransaction
 
 
