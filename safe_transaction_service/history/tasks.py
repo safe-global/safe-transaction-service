@@ -140,6 +140,7 @@ def index_internal_txs_task() -> int:
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task() -> int:
+    #FIXME it seems that it cannot manage so many decoded objects, even though we are using an iterable
     redis = get_redis()
     try:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
