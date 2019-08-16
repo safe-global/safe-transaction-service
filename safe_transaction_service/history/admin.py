@@ -5,20 +5,6 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      MultisigTransaction, SafeStatus)
 
 
-@admin.register(MultisigConfirmation)
-class MultisigConfirmationAdmin(admin.ModelAdmin):
-    list_display = ('multisig_transaction_hash', 'ethereum_tx', 'owner')
-    search_fields = ['transaction_hash', 'owner']
-
-
-@admin.register(MultisigTransaction)
-class MultisigTransactionAdmin(admin.ModelAdmin):
-    date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'mined', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
-    ordering = ['-created']
-    search_fields = ['=safe', '=ethereum_tx_id', 'to']
-
-
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
@@ -62,6 +48,20 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
 class MonitoredAddressAdmin(admin.ModelAdmin):
     list_display = ('address', 'ethereum_tx_id', 'initial_block_number', 'tx_block_number', 'events_block_number')
     search_fields = ['address']
+
+
+@admin.register(MultisigConfirmation)
+class MultisigConfirmationAdmin(admin.ModelAdmin):
+    list_display = ('multisig_transaction_hash', 'ethereum_tx_id', 'owner')
+    search_fields = ['ethereum_tx_id', '=multisig_transaction_hash', '=owner']
+
+
+@admin.register(MultisigTransaction)
+class MultisigTransactionAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created'
+    list_display = ('created', 'safe', 'mined', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
+    ordering = ['-created']
+    search_fields = ['=ethereum_tx_id', '=safe', 'to']
 
 
 @admin.register(SafeStatus)
