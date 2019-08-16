@@ -63,6 +63,10 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     ordering = ['-created']
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
 
+    def mined(self, obj: MultisigTransaction):
+        return obj.mined
+    mined.boolean = True
+
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):

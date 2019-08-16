@@ -21,6 +21,6 @@ gunicorn==19.9.0
 hexbytes==0.2.0
 jsonschema==3.0.1
 psycopg2-binary==2.8.3
-redis==3.3.6
+redis==3.3.7
 requests==2.22.0
 web3==4.9.2
