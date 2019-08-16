@@ -142,7 +142,7 @@ def index_internal_txs_task() -> int:
 def process_decoded_internal_txs_task() -> int:
     redis = get_redis()
     try:
-        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=PROCESS_DECODED_TIMEOUT):
+        with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             number_processed = 0
             for internal_tx_decoded in InternalTxDecoded.objects.pending():
                 function_name = internal_tx_decoded.function_name
