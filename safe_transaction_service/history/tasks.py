@@ -16,7 +16,7 @@ logger = get_task_logger(__name__)
 
 
 COUNTDOWN = 60  # seconds
-LOCK_TIMEOUT = 60 * 10
+LOCK_TIMEOUT = 60 * 10  # 10 minutes
 
 
 def get_redis() -> Redis:
@@ -138,8 +138,7 @@ def index_internal_txs_task() -> int:
         pass
 
 
-PROCESS_DECODED_TIMEOUT: int = 60
-@app.shared_task(soft_time_limit=PROCESS_DECODED_TIMEOUT)
+@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task() -> int:
     redis = get_redis()
     try:
