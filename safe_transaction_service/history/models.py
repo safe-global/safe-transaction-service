@@ -277,8 +277,7 @@ class MultisigTransaction(TimeStampedModel):
     nonce = Uint256Field()
 
     def __str__(self):
-        executed = 'Executed' if self.mined else 'Pending'
-        return f'{self.safe} - {self.nonce} - {self.safe_tx_hash} - {executed}'
+        return f'{self.safe} - {self.nonce} - {self.safe_tx_hash}'
 
     @property
     def execution_date(self) -> Optional[datetime.datetime]:
@@ -323,10 +322,10 @@ class MultisigConfirmation(models.Model):
         unique_together = (('multisig_transaction_hash', 'owner'),)
 
     def __str__(self):
-        if self.multisig_transaction:
-            return f'Confirmation of owner={self.owner} for transaction-hash={self.transaction_hash}'
+        if self.multisig_transaction_id:
+            return f'Confirmation of owner={self.owner} for transaction-hash={self.multisig_transaction_hash}'
         else:
-            return f'Confirmation of owner={self.owner} for existing transaction={self.transaction_hash}'
+            return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
 
 
 class MonitoredAddressManager(models.Manager):
@@ -371,7 +370,7 @@ class MonitoredAddress(models.Model):
         verbose_name_plural = "Monitored Addresses"
 
     def __str__(self):
-        return f'Address {self.address} - Initial-block-number={self.initial_block_number}' \
+        return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
                f' - Tx-block-number={self.tx_block_number} - Events-block-number={self.events_block_number}'
 
 
@@ -406,4 +405,4 @@ class SafeStatus(models.Model):
         return self.internal_tx.ethereum_tx.block_id
 
     def __str__(self):
-        return f'safe={self.address} threshold={self.threshold} owners={self.owners}'
+        return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'

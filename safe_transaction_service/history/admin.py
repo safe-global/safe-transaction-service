@@ -53,7 +53,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
     list_display = ('multisig_transaction_hash', 'ethereum_tx_id', 'owner')
-    search_fields = ['ethereum_tx_id', '=multisig_transaction_hash', '=owner']
+    search_fields = ['=ethereum_tx_id', '=multisig_transaction_hash', '=owner']
 
 
 @admin.register(MultisigTransaction)
