@@ -3,6 +3,7 @@ from logging import getLogger
 from typing import Any, Collection, List, Optional, Tuple
 
 from django.db.models import Min
+
 from web3 import Web3
 
 from gnosis.eth import EthereumClient

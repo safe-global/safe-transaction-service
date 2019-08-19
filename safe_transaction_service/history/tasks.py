@@ -1,7 +1,8 @@
-from celery import app
-from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.db import transaction
+
+from celery import app
+from celery.utils.log import get_task_logger
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
@@ -10,7 +11,8 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe, SafeTx
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .models import InternalTxDecoded, MultisigConfirmation, SafeStatus, MultisigTransaction
+from .models import (InternalTxDecoded, MultisigConfirmation,
+                     MultisigTransaction, SafeStatus)
 
 logger = get_task_logger(__name__)
 

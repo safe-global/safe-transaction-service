@@ -20,4 +20,3 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'Bind confirmation with multisig tx={tx.safe_tx_hash}'))
             except MultisigTransaction.DoesNotExist:
                 pass
-

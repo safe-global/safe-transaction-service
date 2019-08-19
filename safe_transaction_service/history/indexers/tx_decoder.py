@@ -6,7 +6,6 @@ from web3 import Web3
 
 from gnosis.eth.contracts import get_safe_contract
 
-
 logger = getLogger(__name__)
 
 

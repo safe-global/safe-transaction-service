@@ -4,7 +4,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
+from django.db.models.signals import post_save
 from django.utils import timezone
+
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
@@ -353,6 +355,30 @@ class MultisigConfirmation(models.Model):
             return f'Confirmation of owner={self.owner} for transaction-hash={self.multisig_transaction_hash}'
         else:
             return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
+
+
+def bind_confirmation(sender, instance, created, **kwargs):
+    if not created:
+        return
+    if sender == MultisigTransaction:
+        for multisig_confirmation in MultisigConfirmation.objects.without_transaction().filter(
+                multisig_transaction_hash=instance.safe_tx_hash):
+            multisig_confirmation.multisig_transaction = instance
+            multisig_confirmation.save(update_fields=['multisig_transaction'])
+    elif sender == MultisigConfirmation:
+        if not instance.multisig_transaction_id:
+            try:
+                if instance.multisig_transaction_hash:
+                    instance.multisig_transaction = MultisigTransaction.objects.get(
+                        safe_tx_hash=instance.multisig_transaction_hash)
+                    instance.save(update_fields=['multisig_transaction'])
+            except MultisigTransaction.DoesNotExist:
+                pass
+
+
+# TODO Use receiver decorator
+post_save.connect(bind_confirmation, sender=MultisigConfirmation)
+post_save.connect(bind_confirmation, sender=MultisigTransaction)
 
 
 class MonitoredAddressManager(models.Manager):

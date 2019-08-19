@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from ...models import MultisigConfirmation, MultisigTransaction, SafeStatus, InternalTxDecoded
+from ...models import (InternalTxDecoded, MultisigConfirmation,
+                       MultisigTransaction, SafeStatus)
 
 
 class Command(BaseCommand):
