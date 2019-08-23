@@ -188,6 +188,13 @@ def process_decoded_internal_txs_task() -> int:
                         owners = list(safe_status.owners)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold, nonce=nonce)
+                    elif function_name == 'changeMasterCopy':
+                        new_master_copy = arguments['_masterCopy']
+                        #TODO Store new master copy
+                        #TODO Ban address if it doesn't have a valid master copy
+                        # safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        # SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                        #                          owners=owners, threshold=threshold, nonce=nonce)
                     elif function_name == 'execTransaction':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
                         nonce = safe_status.nonce
