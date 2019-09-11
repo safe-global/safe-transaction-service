@@ -214,6 +214,7 @@ def process_decoded_internal_txs_task() -> int:
                                                   master_copy=new_master_copy)
                     elif function_name == 'execTransaction':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        master_copy = safe_status.master_copy
                         nonce = safe_status.nonce
                         threshold = safe_status.threshold
                         owners = safe_status.owners
@@ -245,7 +246,8 @@ def process_decoded_internal_txs_task() -> int:
                             multisig_tx.save(update_fields=['ethereum_tx'])
 
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold, nonce=nonce + 1)
+                                                  owners=owners, threshold=threshold, nonce=nonce + 1,
+                                                  master_copy=master_copy)
                     elif function_name == 'approveHash':
                         multisig_transaction_hash = arguments['hashToApprove']
                         ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
