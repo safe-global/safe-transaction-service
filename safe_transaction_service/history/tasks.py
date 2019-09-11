@@ -208,7 +208,7 @@ def process_decoded_internal_txs_task() -> int:
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
                         nonce = safe_status.nonce
                         owners = list(safe_status.owners)
-                        threshold = arguments['_threshold']
+                        threshold = safe_status.threshold
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
                                                   owners=owners, threshold=threshold, nonce=nonce,
                                                   master_copy=new_master_copy)
