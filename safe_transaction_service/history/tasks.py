@@ -8,6 +8,7 @@ from redis import Redis
 from redis.exceptions import LockError
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import Safe, SafeTx
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
@@ -154,14 +155,22 @@ def process_decoded_internal_txs_task() -> int:
                 processed = True
                 with transaction.atomic():
                     if function_name == 'setup':
+                        # We need to get the master_copy from the next trace `DELEGATE_CALL`
+                        next_trace = internal_tx_decoded.internal_tx.get_next_trace()
+                        if next_trace:
+                            master_copy = next_trace.to
+                        else:
+                            master_copy = NULL_ADDRESS
                         owners = arguments['_owners']
                         threshold = arguments['_threshold']
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold, nonce=0)
+                                                  owners=owners, threshold=threshold, nonce=0,
+                                                  master_copy=master_copy)
                     elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
                         owner = arguments['owner']
                         threshold = arguments['_threshold']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        master_copy = safe_status.master_copy
                         nonce = safe_status.nonce
                         owners = list(safe_status.owners)
                         if function_name == 'addOwnerWithThreshold':
@@ -169,32 +178,40 @@ def process_decoded_internal_txs_task() -> int:
                         else:  # removeOwner, removeOwnerWithThreshold
                             owners.remove(owner)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold, nonce=nonce)
+                                                  owners=owners, threshold=threshold, nonce=nonce,
+                                                  master_copy=master_copy)
                     elif function_name == 'swapOwner':
                         old_owner = arguments['oldOwner']
                         new_owner = arguments['newOwner']
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        master_copy = safe_status.master_copy
                         nonce = safe_status.nonce
                         threshold = safe_status.threshold
                         owners = list(safe_status.owners)
                         owners.remove(old_owner)
                         owners.append(new_owner)
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold, nonce=nonce)
+                                                  owners=owners, threshold=threshold, nonce=nonce,
+                                                  master_copy=master_copy)
                     elif function_name == 'changeThreshold':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        master_copy = safe_status.master_copy
                         nonce = safe_status.nonce
-                        threshold = arguments['_threshold']
                         owners = list(safe_status.owners)
+                        threshold = arguments['_threshold']
                         SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                                  owners=owners, threshold=threshold, nonce=nonce)
+                                                  owners=owners, threshold=threshold, nonce=nonce,
+                                                  master_copy=master_copy)
                     elif function_name == 'changeMasterCopy':
-                        new_master_copy = arguments['_masterCopy']
-                        #TODO Store new master copy
                         #TODO Ban address if it doesn't have a valid master copy
-                        # safe_status = SafeStatus.objects.last_for_address(contract_address)
-                        # SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                        #                          owners=owners, threshold=threshold, nonce=nonce)
+                        new_master_copy = arguments['_masterCopy']
+                        safe_status = SafeStatus.objects.last_for_address(contract_address)
+                        nonce = safe_status.nonce
+                        owners = list(safe_status.owners)
+                        threshold = arguments['_threshold']
+                        SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
+                                                  owners=owners, threshold=threshold, nonce=nonce,
+                                                  master_copy=new_master_copy)
                     elif function_name == 'execTransaction':
                         safe_status = SafeStatus.objects.last_for_address(contract_address)
                         nonce = safe_status.nonce

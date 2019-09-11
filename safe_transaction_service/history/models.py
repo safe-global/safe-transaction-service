@@ -216,6 +216,15 @@ class InternalTx(models.Model):
         else:
             return EthereumTxCallType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
 
+    def get_next_trace(self) -> Optional['InternalTx']:
+        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
+        traces = [it.trace_address for it in internal_txs]
+        index = traces.index(self.trace_address)
+        try:
+            return internal_txs[index + 1]
+        except IndexError:
+            return None
+
 
 class InternalTxDecodedQuerySet(models.QuerySet):
     def not_processed(self):
@@ -447,6 +456,7 @@ class SafeStatus(models.Model):
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
+    master_copy = EthereumAddressField()
 
     class Meta:
         unique_together = (('internal_tx', 'address'),)
