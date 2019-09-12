@@ -268,8 +268,8 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
         return self.not_processed(
-        ).filter(
-            internal_tx__to__in=MonitoredAddress.objects.values('address')  #TODO Maybe not here?
+        #).filter(
+        #    internal_tx__to__in=MonitoredAddress.objects.values('address')  #TODO Maybe not here?
         ).select_related(
             'internal_tx__ethereum_tx'
         ).order_by(
