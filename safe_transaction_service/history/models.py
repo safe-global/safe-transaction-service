@@ -6,6 +6,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models.signals import post_save
 from django.utils import timezone
+from gnosis.eth import EthereumClientProvider
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -55,6 +56,14 @@ class EthereumTxType(Enum):
 
 
 class EthereumBlockManager(models.Manager):
+    def get_or_create_from_block_number(self, block_number: int):
+        try:
+            return self.get(number=block_number)
+        except self.model.DoesNotExist:
+            current_block_number = self.ethereum_client.current_block_number  # For reorgs
+            block = self.ethereum_client.get_block(block_number)
+            return self.create_from_block(block, current_block_number=current_block_number)
+
     def create_from_block(self, block: Dict[str, Any], current_block_number: Optional[int]) -> 'EthereumBlock':
         # If confirmed, we will not check for reorgs in the future
         confirmed = (current_block_number - block['number']) >= 6 if current_block_number else False
@@ -81,9 +90,28 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
+    def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
+        ethereum_client = EthereumClientProvider()
+        try:
+            ethereum_tx = self.get(tx_hash=tx_hash)
+            # For txs stored before being mined
+            if ethereum_tx.block is None:
+                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
+                ethereum_tx.block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt.blockNumber)
+                ethereum_tx.gas_used = tx_receipt.gasUsed
+                ethereum_tx.status = tx_receipt.status
+                ethereum_tx.transaction_index = tx_receipt.transactionIndex
+                ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
+            return ethereum_tx
+        except self.model.DoesNotExist:
+            tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
+            ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt.blockNumber)
+            tx = ethereum_client.get_transaction(tx_hash)
+            return self.create_from_tx(tx, tx_hash, tx_receipt, ethereum_block)
+
     def create_from_tx(self, tx: Dict[str, Any], tx_hash: Union[bytes, str],
                        tx_receipt: Optional[Dict[str, Any]] = None,
-                       ethereum_block: Optional[EthereumBlock] = None):
+                       ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
         return super().create(
             block=ethereum_block,
             tx_hash=tx_hash,

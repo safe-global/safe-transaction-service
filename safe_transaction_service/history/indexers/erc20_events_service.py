@@ -59,7 +59,7 @@ class Erc20EventsService(TransactionIndexer):
         :param tx_hash:
         :return: List of `Erc20TransferEvent` already stored in database
         """
-        ethereum_tx = self.create_or_update_ethereum_tx(tx_hash)
+        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
         tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
         decoded_logs = self.ethereum_client.erc20.decode_logs(tx_receipt.logs)
         return [EthereumEvent.objects.get_or_create_erc20_or_721_event(event) for event in decoded_logs]

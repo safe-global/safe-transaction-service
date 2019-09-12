@@ -75,32 +75,6 @@ class TransactionIndexer(ABC):
         """
         pass
 
-    def create_or_update_ethereum_tx(self, tx_hash: str) -> EthereumTx:
-        try:
-            ethereum_tx = EthereumTx.objects.get(tx_hash=tx_hash)
-            # For txs stored before being mined
-            if ethereum_tx.block is None:
-                tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-                ethereum_tx.block = self.get_or_create_ethereum_block(tx_receipt.blockNumber)
-                ethereum_tx.gas_used = tx_receipt.gasUsed
-                ethereum_tx.status = tx_receipt.status
-                ethereum_tx.transaction_index = tx_receipt.transactionIndex
-                ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
-            return ethereum_tx
-        except EthereumTx.DoesNotExist:
-            tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-            ethereum_block = self.get_or_create_ethereum_block(tx_receipt.blockNumber)
-            tx = self.ethereum_client.get_transaction(tx_hash)
-            return EthereumTx.objects.create_from_tx(tx, tx_hash, tx_receipt, ethereum_block)
-
-    def get_or_create_ethereum_block(self, block_number: int):
-        try:
-            return EthereumBlock.objects.get(number=block_number)
-        except EthereumBlock.DoesNotExist:
-            current_block_number = self.ethereum_client.current_block_number  # For reorgs
-            block = self.ethereum_client.get_block(block_number)
-            return EthereumBlock.objects.create_from_block(block, current_block_number=current_block_number)
-
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
         For addresses almost updated (< `updated_blocks_behind` blocks) we process them together

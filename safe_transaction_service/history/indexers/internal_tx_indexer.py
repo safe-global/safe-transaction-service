@@ -5,7 +5,7 @@ from django.db import transaction
 
 from gnosis.eth import EthereumClient
 
-from ..models import InternalTx, InternalTxDecoded
+from ..models import InternalTx, InternalTxDecoded, EthereumTx
 from .transaction_indexer import TransactionIndexer
 from .tx_decoder import CannotDecode, TxDecoder
 
@@ -72,7 +72,7 @@ class InternalTxIndexer(TransactionIndexer):
 
     @transaction.atomic
     def _process_trace(self, trace: Dict[str, Any]) -> InternalTx:
-        ethereum_tx = self.create_or_update_ethereum_tx(trace['transactionHash'])
+        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(trace['transactionHash'])
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
         # Decode internal tx if it's a call/delegate call and has data
