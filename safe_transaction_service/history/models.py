@@ -60,8 +60,9 @@ class EthereumBlockManager(models.Manager):
         try:
             return self.get(number=block_number)
         except self.model.DoesNotExist:
-            current_block_number = self.ethereum_client.current_block_number  # For reorgs
-            block = self.ethereum_client.get_block(block_number)
+            ethereum_client = EthereumClientProvider()
+            current_block_number = ethereum_client.current_block_number  # For reorgs
+            block = ethereum_client.get_block(block_number)
             return self.create_from_block(block, current_block_number=current_block_number)
 
     def create_from_block(self, block: Dict[str, Any], current_block_number: Optional[int]) -> 'EthereumBlock':
