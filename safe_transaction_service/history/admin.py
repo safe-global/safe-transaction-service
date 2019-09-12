@@ -8,7 +8,7 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
-    list_display = ('number', 'timestamp', 'gas_limit', 'gas_used', 'block_hash')
+    list_display = ('number', 'timestamp', 'confirmed', 'gas_limit', 'gas_used', 'block_hash')
     search_fields = ['=number']
     ordering = ['-number']
 
