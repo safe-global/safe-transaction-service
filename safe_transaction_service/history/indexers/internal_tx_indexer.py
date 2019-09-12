@@ -30,6 +30,7 @@ class InternalTxIndexer(TransactionIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
+        self.ethereum_tx_cache: Dict[str, Any] = {}
 
     @property
     def database_field(self):
@@ -44,6 +45,7 @@ class InternalTxIndexer(TransactionIndexer):
         :param to_block_number: Ending block number
         :return: Tx hashes of txs with internal txs relevant for the `addresses`
         """
+        self.ethereum_tx_cache = {}  # TODO Improve this caching, Empty cache
         logger.debug('Searching for internal txs from block-number=%d to block-number=%d - Addresses=%s',
                      from_block_number, to_block_number, addresses)
 
@@ -56,11 +58,12 @@ class InternalTxIndexer(TransactionIndexer):
                                                                from_address=addresses)
 
         # Log INFO if traces found, DEBUG if not
-        log_fn = logger.info if to_traces + from_traces else logger.debug
-        log_fn('Found %d relevant txs between block-number=%d and block-number=%d. Addresses=%s',
-               len(to_traces + from_traces), from_block_number, to_block_number, addresses)
+        transaction_hashes = set([trace['transactionHash'] for trace in (to_traces + from_traces)])
+        log_fn = logger.info if len(transaction_hashes) else logger.debug
+        log_fn('Found %d relevant txs with %d internal txs between block-number=%d and block-number=%d. Addresses=%s',
+               len(to_traces + from_traces), len(transaction_hashes), from_block_number, to_block_number, addresses)
 
-        return set([trace['transactionHash'] for trace in (to_traces + from_traces)])
+        return transaction_hashes
 
     def process_element(self, tx_hash: str) -> List[InternalTx]:
         """
@@ -72,7 +75,10 @@ class InternalTxIndexer(TransactionIndexer):
 
     @transaction.atomic
     def _process_trace(self, trace: Dict[str, Any]) -> InternalTx:
-        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(trace['transactionHash'])
+        transaction_hash = trace['transactionHash']
+        if transaction_hash not in self.ethereum_tx_cache:  # TODO Improve this cache
+            self.ethereum_tx_cache[transaction_hash] = EthereumTx.objects.create_or_update_from_tx_hash(transaction_hash)
+        ethereum_tx = self.ethereum_tx_cache[transaction_hash]
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
         # Decode internal tx if it's a call/delegate call and has data
