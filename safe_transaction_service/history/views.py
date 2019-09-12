@@ -5,6 +5,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from web3 import Web3
 
 from safe_transaction_service.history.models import MultisigTransaction
 from safe_transaction_service.version import __version__
@@ -49,10 +50,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         Returns the history of a multisig tx (safe)
         """
-        try:
-            if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+        if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         multisig_transactions = MultisigTransaction.objects.filter(safe=address)
@@ -61,10 +59,8 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         # Check if the 'owners' query parameter was passed in input
-        owners = None
         query_owners = self.request.query_params.get('owners', None)
-        if query_owners:
-            owners = [owner for owner in query_owners.split(',') if owner != '']
+        owners = [owner for owner in query_owners.split(',') if owner != ''] if query_owners else None
 
         serializer = self.get_serializer(multisig_transactions, many=True, owners=owners)
         # Paginate results
@@ -79,10 +75,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
-        try:
-            if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+        if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address

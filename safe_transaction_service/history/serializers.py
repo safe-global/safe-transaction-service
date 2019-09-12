@@ -153,7 +153,7 @@ class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
         :return: serialized queryset
         """
         if self.owners:
-            confirmations = MultisigConfirmation.objects.filter(owner__in=self.owners, multisig_transaction=obj)
+            confirmations = obj.confirmations.filter(owner__in=self.owners, multisig_transaction=obj)
         else:
             # TODO obj.confirmations
             confirmations = MultisigConfirmation.objects.filter(multisig_transaction=obj)
