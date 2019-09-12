@@ -97,8 +97,9 @@ class TransactionIndexer(ABC):
         try:
             return EthereumBlock.objects.get(number=block_number)
         except EthereumBlock.DoesNotExist:
+            current_block_number = self.ethereum_client.current_block_number  # For reorgs
             block = self.ethereum_client.get_block(block_number)
-            return EthereumBlock.objects.create_from_block(block)
+            return EthereumBlock.objects.create_from_block(block, current_block_number=current_block_number)
 
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """

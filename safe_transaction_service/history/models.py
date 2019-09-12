@@ -55,7 +55,9 @@ class EthereumTxType(Enum):
 
 
 class EthereumBlockManager(models.Manager):
-    def create_from_block(self, block: Dict[str, Any]) -> 'EthereumBlock':
+    def create_from_block(self, block: Dict[str, Any], current_block_number: Optional[int]) -> 'EthereumBlock':
+        # If confirmed, we will not check for reorgs in the future
+        confirmed = (current_block_number - block['number']) >= 6 if current_block_number else False
         return super().create(
             number=block['number'],
             gas_limit=block['gasLimit'],
@@ -63,6 +65,7 @@ class EthereumBlockManager(models.Manager):
             timestamp=datetime.datetime.fromtimestamp(block['timestamp'], datetime.timezone.utc),
             block_hash=block['hash'],
             parent_hash=block['parentHash'],
+            confirmed=confirmed,
         )
 
 
@@ -74,6 +77,7 @@ class EthereumBlock(models.Model):
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
     parent_hash = Sha3HashField(unique=True)
+    confirmed = models.BooleanField(default=False)  # For reorgs, True if `current_block_number` - `number` >= 6
 
 
 class EthereumTxManager(models.Manager):
