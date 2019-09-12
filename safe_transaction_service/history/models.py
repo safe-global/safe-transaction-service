@@ -1,5 +1,6 @@
 import datetime
 from enum import Enum
+from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
@@ -14,6 +15,9 @@ from model_utils.models import TimeStampedModel
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
+
+
+logger = getLogger(__name__)
 
 
 class ConfirmationType(Enum):
@@ -470,7 +474,7 @@ class MonitoredAddress(models.Model):
 
 class SafeStatusQuerySet(models.QuerySet):
     def last_for_address(self, address: str):
-        return self.filter(
+        safe_status = self.filter(
             address=address
         ).select_related(
             'internal_tx__ethereum_tx'
@@ -479,6 +483,9 @@ class SafeStatusQuerySet(models.QuerySet):
             'internal_tx__ethereum_tx__transaction_index',
             'internal_tx_id',
         ).last()
+        if not safe_status:
+           logger.error('SafeStatus not found for address=%s', address)
+        return safe_status
 
 
 class SafeStatus(models.Model):
