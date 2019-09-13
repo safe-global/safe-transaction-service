@@ -94,5 +94,5 @@ class InternalTxIndexer(TransactionIndexer):
             except CannotDecode:
                 pass
 
-        logger.info('Trace processed')
+        logger.info('Trace processed and created=%s', created)
         return internal_tx
