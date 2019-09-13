@@ -63,6 +63,7 @@ class InternalTxIndexer(TransactionIndexer):
 
         return transaction_hashes
 
+    @transaction.atomic
     def process_element(self, tx_hash: str) -> List[InternalTx]:
         """
         Search on Ethereum and store internal txs for provided `tx_hash`
@@ -77,7 +78,6 @@ class InternalTxIndexer(TransactionIndexer):
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
         return [self._process_trace(trace, ethereum_tx) for trace in traces]
 
-    @transaction.atomic
     def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
         logger.info('Processing trace')
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
