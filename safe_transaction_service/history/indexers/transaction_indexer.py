@@ -140,7 +140,11 @@ class TransactionIndexer(ABC):
         from_block_number, to_block_number = parameters
         updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
         elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
-        processed_objects = [self.process_element(element) for element in elements]
+        processed_objects = []
+        for i, element in enumerate(elements):
+            logger.info('Processing element %d of %d', i, len(elements))
+            processed_objects.append(self.process_element(element))
+        # processed_objects = [self.process_element(element) for element in elements]
         flatten_processed_objects = [item for sublist in processed_objects for item in sublist]
 
         self.update_monitored_contract(addresses, to_block_number)
