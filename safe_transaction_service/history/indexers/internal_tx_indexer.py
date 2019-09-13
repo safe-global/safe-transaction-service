@@ -30,7 +30,6 @@ class InternalTxIndexer(TransactionIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
-        self.ethereum_tx_cache: Dict[str, Any] = {}
 
     @property
     def database_field(self):
@@ -45,7 +44,6 @@ class InternalTxIndexer(TransactionIndexer):
         :param to_block_number: Ending block number
         :return: Tx hashes of txs with internal txs relevant for the `addresses`
         """
-        self.ethereum_tx_cache = {}  # TODO Improve this caching, Empty cache
         logger.debug('Searching for internal txs from block-number=%d to block-number=%d - Addresses=%s',
                      from_block_number, to_block_number, addresses)
 
@@ -71,14 +69,17 @@ class InternalTxIndexer(TransactionIndexer):
         :param tx_hash:
         :return: List of `InternalTx` already stored in database
         """
-        return self._process_traces(self.ethereum_client.parity.trace_transaction(tx_hash))
+        logger.info('Fetching traces for tx-hash=%s', tx_hash)
+        traces = self.ethereum_client.parity.trace_transaction(tx_hash)
+        logger.info('Got traces %d for tx-hash=%s', len(traces), tx_hash)
+        logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
+        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
+        logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
+        return [self._process_trace(trace, ethereum_tx) for trace in traces]
 
     @transaction.atomic
-    def _process_trace(self, trace: Dict[str, Any]) -> InternalTx:
-        transaction_hash = trace['transactionHash']
-        if transaction_hash not in self.ethereum_tx_cache:  # TODO Improve this cache
-            self.ethereum_tx_cache[transaction_hash] = EthereumTx.objects.create_or_update_from_tx_hash(transaction_hash)
-        ethereum_tx = self.ethereum_tx_cache[transaction_hash]
+    def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
+        logger.info('Processing trace')
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
         # Decode internal tx if it's a call/delegate call and has data
@@ -93,7 +94,5 @@ class InternalTxIndexer(TransactionIndexer):
             except CannotDecode:
                 pass
 
+        logger.info('Trace processed')
         return internal_tx
-
-    def _process_traces(self, traces: List[Dict[str, Any]]) -> List[InternalTx]:
-        return [self._process_trace(trace) for trace in traces]
