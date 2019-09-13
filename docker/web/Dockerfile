@@ -3,6 +3,11 @@ FROM python:3.7-slim-stretch
 ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
+# Signal handling for PID1 https://github.com/krallin/tini
+ENV TINI_VERSION v0.18.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+
 COPY requirements.txt ./
 RUN set -ex \
 	&& buildDeps=" \
@@ -20,3 +25,5 @@ RUN set -ex \
         -exec rm -rf '{}' +
 
 COPY . .
+
+ENTRYPOINT ["/tini", "--"]
