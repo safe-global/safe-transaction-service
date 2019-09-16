@@ -142,7 +142,7 @@ class TransactionIndexer(ABC):
         elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
         processed_objects = []
         for i, element in enumerate(elements):
-            logger.info('Processing element %d of %d', i, len(elements))
+            logger.info('Processing element %d/%d', i + 1, len(elements))
             processed_objects.append(self.process_element(element))
         # processed_objects = [self.process_element(element) for element in elements]
         flatten_processed_objects = [item for sublist in processed_objects for item in sublist]
