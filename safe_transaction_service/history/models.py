@@ -112,7 +112,7 @@ class EthereumTxManager(models.Manager):
             tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
             ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt.blockNumber)
             tx = ethereum_client.get_transaction(tx_hash)
-            return self.create_from_tx(tx, tx_hash, tx_receipt, ethereum_block)
+            return self.create_from_tx(tx, tx_hash, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
 
     def create_from_tx(self, tx: Dict[str, Any], tx_hash: Union[bytes, str],
                        tx_receipt: Optional[Dict[str, Any]] = None,
@@ -472,6 +472,10 @@ class MonitoredAddress(models.Model):
                f' - Tx-block-number={self.tx_block_number} - Events-block-number={self.events_block_number}'
 
 
+class SafeStatusManager(models.Manager):
+    pass
+
+
 class SafeStatusQuerySet(models.QuerySet):
     def last_for_address(self, address: str):
         safe_status = self.filter(
@@ -489,7 +493,7 @@ class SafeStatusQuerySet(models.QuerySet):
 
 
 class SafeStatus(models.Model):
-    objects = SafeStatusQuerySet.as_manager()
+    objects = SafeStatusManager.from_queryset(SafeStatusQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
                                        primary_key=True)
     address = EthereumAddressField()
@@ -508,3 +512,7 @@ class SafeStatus(models.Model):
 
     def __str__(self):
         return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
+
+    def store_new(self) -> None:
+        self.id = None
+        return self.save()
