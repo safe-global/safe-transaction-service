@@ -276,3 +276,4 @@ INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env('INTERNAL_TXS_BLOCK_PROCESS_LIMIT', defau
 SAFE_CONTRACT_ADDRESS = env('SAFE_CONTRACT_ADDRESS', default='0x' + '0' * 39 + '1')
 # Number of blocks from the current block number needed to consider a transaction valid/stable
 SAFE_REORG_BLOCKS = env.int('SAFE_REORG_BLOCKS', default=10)
+SAFE_PROXY_FACTORY_ADDRESS = env('SAFE_PROXY_FACTORY_ADDRESS', default='0x' + '0' * 39 + '2')
