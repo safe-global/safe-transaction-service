@@ -1,4 +1,5 @@
 from logging import getLogger
+from collections import OrderedDict
 from typing import Any, Dict, List, Set
 
 from django.db import transaction
@@ -56,7 +57,8 @@ class InternalTxIndexer(TransactionIndexer):
                                                                from_address=addresses)
 
         # Log INFO if traces found, DEBUG if not
-        transaction_hashes = set([trace['transactionHash'] for trace in (to_traces + from_traces)])
+        transaction_hashes = OrderedDict.fromkeys([trace['transactionHash']
+                                                   for trace in (to_traces + from_traces)]).keys()
         log_fn = logger.info if len(transaction_hashes) else logger.debug
         log_fn('Found %d relevant txs with %d internal txs between block-number=%d and block-number=%d. Addresses=%s',
                len(to_traces + from_traces), len(transaction_hashes), from_block_number, to_block_number, addresses)

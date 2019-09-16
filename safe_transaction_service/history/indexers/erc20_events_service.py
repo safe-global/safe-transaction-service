@@ -1,9 +1,10 @@
+from collections import OrderedDict
 from logging import getLogger
 from typing import List, Set
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumEvent
+from ..models import EthereumEvent, EthereumTx
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
@@ -51,7 +52,7 @@ class Erc20EventsService(TransactionIndexer):
         logger_fn('Found %d relevant erc20 txs between block-number=%d and block-number=%d. Safes=%s',
                   len(erc20_transfer_events), from_block_number, to_block_number, addresses)
 
-        return set([event['transactionHash'] for event in erc20_transfer_events])
+        return OrderedDict.fromkeys([event['transactionHash'] for event in erc20_transfer_events]).keys()
 
     def process_element(self, tx_hash: str) -> List[EthereumEvent]:
         """
