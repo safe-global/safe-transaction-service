@@ -60,6 +60,7 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
     list_display = ('created', 'safe', 'mined', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
+    list_select_related = ('ethereum_tx',)
     ordering = ['-created']
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
 
