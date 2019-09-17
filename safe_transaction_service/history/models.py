@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Type
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
@@ -406,7 +406,16 @@ class MultisigConfirmation(models.Model):
 
 @receiver(post_save, sender=MultisigConfirmation)
 @receiver(post_save, sender=MultisigTransaction)
-def bind_confirmation(sender, instance, created, **kwargs):
+def bind_confirmation(sender: Type[models.Model], instance: Union[MultisigConfirmation, MultisigTransaction],
+                      created: bool, **kwargs) -> None:
+    """
+    When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
+    :param sender: Could be MultisigConfirmation or MultisigTransaction
+    :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
+    :param created: True if model has just been created, `False` otherwise
+    :param kwargs:
+    :return:
+    """
     if not created:
         return
     if sender == MultisigTransaction:
