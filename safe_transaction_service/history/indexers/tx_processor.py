@@ -60,10 +60,7 @@ class TxProcessor:
             safe_status.store_new()
         elif function_name == 'execTransaction':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
-            master_copy = safe_status.master_copy
             nonce = safe_status.nonce
-            threshold = safe_status.threshold
-            owners = safe_status.owners
             safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'], arguments['data'],
                              arguments['operation'], arguments['safeTxGas'], arguments['baseGas'],
                              arguments['gasPrice'], arguments['gasToken'], arguments['refundReceiver'],
@@ -91,9 +88,8 @@ class TxProcessor:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.save(update_fields=['ethereum_tx'])
 
-            SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx, address=contract_address,
-                                      owners=owners, threshold=threshold, nonce=nonce + 1,
-                                      master_copy=master_copy)
+            safe_status.nonce = nonce + 1
+            safe_status.store_new()
         elif function_name == 'approveHash':
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx

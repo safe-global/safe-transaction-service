@@ -106,7 +106,6 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         confirmation_instance = MultisigConfirmation.objects.get_or_create(
             multisig_transaction=multisig_transaction,
             owner=self.validated_data['sender'],
-            confirmation_type=ConfirmationType[self.validated_data['confirmation_type']].value,
             defaults={
                 'block_date_time': self.validated_data.get('block_date_time'),
                 'block_number': self.validated_data.get('block_number'),
