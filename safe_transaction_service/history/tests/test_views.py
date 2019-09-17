@@ -24,6 +24,9 @@ class TestViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
+        self.assertEqual(response.data['results'][0]['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
+        # Test camelCase
+        self.assertEqual(response.json()['results'][0]['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
 
         MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
