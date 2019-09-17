@@ -121,14 +121,19 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
 class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     submission_date = serializers.DateTimeField(source='created')
     confirmation_type = serializers.SerializerMethodField()
-    signature = HexadecimalField()
+    # signature = HexadecimalField()
+    transaction_hash = serializers.SerializerMethodField()
 
     class Meta:
         model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature')
+        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type')  # 'signature'
 
     def get_confirmation_type(self, obj: MultisigConfirmation):
-        return ConfirmationType(obj.confirmation_type).name
+        #TODO Fix this
+        return ConfirmationType.CONFIRMATION.name
+
+    def get_transaction_hash(self, obj: MultisigConfirmation):
+        return obj.ethereum_tx_id
 
 
 class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):

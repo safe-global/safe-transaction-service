@@ -348,7 +348,7 @@ class MultisigConfirmationQuerySet(models.QuerySet):
 
 
 #TODO Allow off-chain confirmations
-class MultisigConfirmation(models.Model):
+class MultisigConfirmation(TimeStampedModel):
     objects = MultisigConfirmationQuerySet.as_manager()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations')
     multisig_transaction = models.ForeignKey(MultisigTransaction,

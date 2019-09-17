@@ -1,30 +1,33 @@
-import datetime
 import logging
 
 from django.urls import reverse
 
 from eth_account import Account
-from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
-from web3 import Web3
 
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_safe_contract
-from gnosis.eth.utils import get_eth_address_with_key
-from gnosis.safe import Safe, SafeOperation
-from gnosis.safe.signatures import signatures_to_bytes
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
-
-from ..models import MultisigConfirmation, MultisigTransaction
-from ..serializers import SafeMultisigTransactionHistorySerializer
-from .factories import (MultisigTransactionConfirmationFactory,
+from .factories import (MultisigConfirmationFactory,
                         MultisigTransactionFactory)
+
 
 logger = logging.getLogger(__name__)
 
 
-class TestHistoryViews(SafeTestCaseMixin, APITestCase):
+class TestViews(APITestCase):
+    def test_get_multisig_transactions(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_1(self):
-        self.assertTrue(True)
+        multisig_tx = MultisigTransactionFactory(safe=safe_address)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
+
+        MultisigConfirmationFactory(multisig_transaction=multisig_tx)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
+

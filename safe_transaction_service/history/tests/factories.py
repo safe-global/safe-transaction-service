@@ -45,28 +45,25 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
 
     safe_tx_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-tx-{n}').hex())
     safe = factory.LazyFunction(lambda: Account.create().address)
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = FuzzyInteger(low=0, high=10)
     data = b''
-    operation = FuzzyInteger(low=0, high=3)
+    operation = FuzzyInteger(low=0, high=2)
     safe_tx_gas = FuzzyInteger(low=400000, high=500000)
-    base_gas = FuzzyInteger(low=400000, high=500000)
+    base_gas = FuzzyInteger(low=200000, high=300000)
     gas_price = FuzzyInteger(low=1, high=10)
     gas_token = NULL_ADDRESS
     refund_receiver = NULL_ADDRESS
+    signatures = b''
     nonce = factory.Sequence(lambda n: n)
-    mined = False
-    execution_date = None
 
 
-class MultisigTransactionConfirmationFactory(factory.DjangoModelFactory):
+class MultisigConfirmationFactory(factory.DjangoModelFactory):
     class Meta:
         model = MultisigConfirmation
 
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
     multisig_transaction = factory.SubFactory(MultisigTransaction)
+    multisig_transaction_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
-    transaction_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-confirmation-tx-{n}').hex())
-    confirmation_type = ConfirmationType.CONFIRMATION.value
-    block_number = factory.Sequence(lambda n: n)
-    block_date_time = FuzzyDateTime(timezone.now())
-    mined = False
