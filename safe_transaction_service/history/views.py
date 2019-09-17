@@ -12,7 +12,6 @@ from safe_transaction_service.version import __version__
 from .filters import DefaultPagination
 from .serializers import (SafeMultisigHistoryResponseSerializer,
                           SafeMultisigTransactionHistorySerializer)
-from .tasks import check_approve_transaction_task
 
 
 class AboutView(APIView):
@@ -87,11 +86,13 @@ class SafeMultisigTransactionListView(ListAPIView):
 
             # Create task if transaction hash
             data = serializer.validated_data
+            """
             transaction_hash = data.get('transaction_hash')
             if transaction_hash:
                 check_approve_transaction_task.delay(safe_address=address,
                                                      safe_tx_hash=data['contract_transaction_hash'].hex(),
                                                      transaction_hash=transaction_hash.hex(),
                                                      owner=data['sender'])
+            """
 
             return Response(status=status.HTTP_202_ACCEPTED)

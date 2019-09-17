@@ -10,7 +10,6 @@ from gnosis.safe.signatures import signatures_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import MultisigConfirmation, MultisigTransaction
-from ..tasks import check_approve_transaction_task
 from .factories import (MultisigTransactionConfirmationFactory,
                         MultisigTransactionFactory)
 
