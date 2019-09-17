@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 from gnosis.eth import EthereumClientProvider
 
@@ -403,6 +404,8 @@ class MultisigConfirmation(models.Model):
             return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
 
 
+@receiver(post_save, sender=MultisigConfirmation)
+@receiver(post_save, sender=MultisigTransaction)
 def bind_confirmation(sender, instance, created, **kwargs):
     if not created:
         return
@@ -420,11 +423,6 @@ def bind_confirmation(sender, instance, created, **kwargs):
                     instance.save(update_fields=['multisig_transaction'])
             except MultisigTransaction.DoesNotExist:
                 pass
-
-
-# TODO Use receiver decorator
-post_save.connect(bind_confirmation, sender=MultisigConfirmation)
-post_save.connect(bind_confirmation, sender=MultisigTransaction)
 
 
 class MonitoredAddressManager(models.Manager):
