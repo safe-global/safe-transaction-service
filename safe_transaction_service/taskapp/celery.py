@@ -51,3 +51,11 @@ class IgnoreSucceededNone(logging.Filter):
     def filter(self, rec: logging.LogRecord):
         message = rec.getMessage()
         return not ('Task' in message and 'succeeded' in message and 'None' in message)
+
+
+class PatchedCeleryFormatter(TaskFormatter):
+    """
+    Patched to work as an standard logging formatter
+    """
+    def __init__(self, fmt=None, datefmt=None, style='%'):
+        super().__init__(fmt=fmt, use_color=True)
