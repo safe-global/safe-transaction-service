@@ -220,12 +220,19 @@ LOGGING = {
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
-        }
+        },
+        'ignore_succeeded_none': {
+            '()': 'safe_transaction_service.taskapp.celery.IgnoreSucceededNone'
+        },
     },
     'formatters': {
         'verbose': {
-            'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s',
+            'format': '%(name)s %(asctime)s [%(levelname)s] [%(processName)s] %(message)s',
         },
+        'celery_verbose': {
+            'format': '%(name)s %(asctime)s [%(levelname)s] [%(processName)s] %(message)s',
+        },
+
     },
     'handlers': {
         'mail_admins': {
@@ -238,15 +245,22 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'celery_console': {
+            'level': 'DEBUG',
+            'filters': ['ignore_succeeded_none'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'celery_verbose',
+        },
     },
     'loggers': {
         '': {
             'handlers': ['console'],
             'level': 'INFO',
         },
-        'celery.worker.strategy': {
-            'handlers': ['console'],
-            'level': 'INFO' if DEBUG else 'WARNING',
+        'celery': {
+            'handlers': ['celery_console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,  # If not it will be out for the root logger too
         },
         'django.request': {
             'handlers': ['mail_admins'],

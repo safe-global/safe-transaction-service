@@ -7,7 +7,6 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -56,7 +55,7 @@ class EthereumTxType(Enum):
         elif tx_type == 'SUICIDE':
             return EthereumTxType.SELF_DESTRUCT
         else:
-            raise ValueError('%s is not a valid EthereumTxType' % tx_type)
+            raise ValueError(f'{tx_type} is not a valid EthereumTxType')
 
 
 class EthereumBlockManager(models.Manager):

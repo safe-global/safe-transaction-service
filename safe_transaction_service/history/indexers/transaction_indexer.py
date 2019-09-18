@@ -93,7 +93,7 @@ class TransactionIndexer(ABC):
         """
         return MonitoredAddress.objects.not_updated(current_block_number, self.database_field, self.confirmations)
 
-    def update_monitored_contract(self, addresses: List[str], to_block_number: int) -> int:
+    def update_monitored_address(self, addresses: List[str], to_block_number: int) -> int:
         return MonitoredAddress.objects.update_addresses(addresses, to_block_number, self.database_field)
 
     def get_block_numbers_for_search(self, addresses: List[str]) -> Optional[Tuple[int, int]]:
@@ -147,7 +147,7 @@ class TransactionIndexer(ABC):
         # processed_objects = [self.process_element(element) for element in elements]
         flatten_processed_objects = [item for sublist in processed_objects for item in sublist]
 
-        self.update_monitored_contract(addresses, to_block_number)
+        self.update_monitored_address(addresses, to_block_number)
         return flatten_processed_objects, updated
 
     def process_all(self):
