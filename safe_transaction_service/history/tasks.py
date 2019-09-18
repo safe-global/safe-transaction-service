@@ -5,10 +5,9 @@ from celery.utils.log import get_task_logger
 from redis import Redis
 from redis.exceptions import LockError
 
-from .indexers.tx_processor import TxProcessor
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
+from .indexers.tx_processor import TxProcessor
 from .models import InternalTxDecoded
-
 
 logger = get_task_logger(__name__)
 

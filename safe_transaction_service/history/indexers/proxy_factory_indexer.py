@@ -9,7 +9,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import MonitoredAddress, EthereumTx
+from ..models import EthereumTx, MonitoredAddress
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)

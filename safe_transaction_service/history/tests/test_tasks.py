@@ -10,8 +10,7 @@ from gnosis.safe.signatures import signatures_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import MultisigConfirmation, MultisigTransaction
-from .factories import (MultisigConfirmationFactory,
-                        MultisigTransactionFactory)
+from .factories import MultisigConfirmationFactory, MultisigTransactionFactory
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumBlock, EthereumTx, MonitoredAddress
+from ..models import MonitoredAddress
 from ..utils import chunks
 
 logger = getLogger(__name__)

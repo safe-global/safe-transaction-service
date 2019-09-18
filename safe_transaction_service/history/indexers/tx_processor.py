@@ -1,10 +1,14 @@
 from logging import getLogger
 
 from django.db import transaction
+
+from hexbytes import HexBytes
+
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import SafeTx
-from hexbytes import HexBytes
-from ..models import InternalTxDecoded, SafeStatus, MultisigTransaction, MultisigConfirmation
+
+from ..models import (InternalTxDecoded, MultisigConfirmation,
+                      MultisigTransaction, SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -117,5 +121,3 @@ class TxProcessor:
         if processed:
             internal_tx_decoded.set_processed()
         return processed
-
-

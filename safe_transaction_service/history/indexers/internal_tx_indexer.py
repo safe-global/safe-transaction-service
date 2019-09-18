@@ -1,12 +1,12 @@
-from logging import getLogger
 from collections import OrderedDict
+from logging import getLogger
 from typing import Any, Dict, List, Set
 
 from django.db import transaction
 
 from gnosis.eth import EthereumClient
 
-from ..models import InternalTx, InternalTxDecoded, EthereumTx
+from ..models import EthereumTx, InternalTx, InternalTxDecoded
 from .transaction_indexer import TransactionIndexer
 from .tx_decoder import CannotDecode, TxDecoder
 

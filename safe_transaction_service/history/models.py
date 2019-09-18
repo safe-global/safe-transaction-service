@@ -1,22 +1,21 @@
 import datetime
 from enum import Enum
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Tuple, Union, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-from gnosis.eth import EthereumClientProvider
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
+from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
-
 
 logger = getLogger(__name__)
 

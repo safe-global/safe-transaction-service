@@ -3,14 +3,13 @@ import logging
 from django.urls import reverse
 
 from eth_account import Account
-from gnosis.safe import Safe
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .factories import (MultisigConfirmationFactory,
-                        MultisigTransactionFactory)
+from gnosis.safe import Safe
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from .factories import MultisigConfirmationFactory, MultisigTransactionFactory
 
 logger = logging.getLogger(__name__)
 
