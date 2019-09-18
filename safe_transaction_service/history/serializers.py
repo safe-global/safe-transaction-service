@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from eth_account import Account
+from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -51,18 +52,36 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
                                          data['refund_receiver'], safe_nonce=data['nonce'])
         contract_transaction_hash = safe_tx.safe_tx_hash
 
+        # Check safe tx hash matches
+        if contract_transaction_hash != data['contract_transaction_hash']:
+            raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
+                                  f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
+
+        # Check there's not duplicated tx with same nonce for the same Safe.
+        # We allow duplicated if existing tx is not executed
+        try:
+            multisig_transaction: MultisigTransaction = MultisigTransaction.objects.exclude(
+                ethereum_tx=None,
+                safe_tx_hash=contract_transaction_hash,
+            ).get(
+                safe=safe.address,
+                nonce=data['nonce']
+            )
+            if HexBytes(multisig_transaction.safe_tx_hash) != contract_transaction_hash:
+                raise ValidationError(f'Tx with nonce={safe_tx.safe_nonce} for safe={safe.address} already executed in '
+                                      f'tx-hash={multisig_transaction.ethereum_tx_id}')
+        except MultisigTransaction.DoesNotExist:
+            pass
+
         # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
         if not safe.retrieve_is_owner(data['sender']):
             try:
+                # TODO Fix this, we can use SafeStatus now
                 if not safe.retrieve_is_owner(data['sender'],
                                               block_identifier=max(0, ethereum_client.current_block_number - 100)):
                     raise ValidationError('User is not an owner')
             except BadFunctionCallOutput:  # If it didn't exist 100 blocks ago
                 raise ValidationError('User is not an owner')
-
-        if contract_transaction_hash != data['contract_transaction_hash']:
-            raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
-                                  f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
 
         if signature is not None:  # Until contract signatures are supported
             address = Account.recoverHash(contract_transaction_hash, signature=signature)
