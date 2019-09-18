@@ -37,10 +37,15 @@ class TxProcessor:
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
             owner = arguments['owner']
-            if function_name == 'addOwnerWithThreshold':
-                safe_status.owners.append(owner)
-            else:  # removeOwner, removeOwnerWithThreshold
-                safe_status.owners.remove(owner)
+            try:
+                if function_name == 'addOwnerWithThreshold':
+                    safe_status.owners.append(owner)
+                else:  # removeOwner, removeOwnerWithThreshold
+                    safe_status.owners.remove(owner)
+            except ValueError:
+                logger.warning('Error processing trace=%s for contract=%s with tx-hash=%s',
+                               internal_tx_decoded.internal_tx.trace_address, contract_address,
+                               internal_tx_decoded.internal_tx.ethereum_tx_id)
             safe_status.store_new()
         elif function_name == 'swapOwner':
             old_owner = arguments['oldOwner']

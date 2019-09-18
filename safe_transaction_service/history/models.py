@@ -276,11 +276,12 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         ).filter(
             internal_tx__to__in=MonitoredAddress.objects.values('address')  #TODO Maybe not here?
         ).select_related(
-            'internal_tx__ethereum_tx'
+            'internal_tx',
+            'internal_tx__ethereum_tx',
         ).order_by(
             'internal_tx__ethereum_tx__block_id',
             'internal_tx__ethereum_tx__transaction_index',
-            'internal_tx_id',
+            'internal_tx__trace_address',
         )
 
 
