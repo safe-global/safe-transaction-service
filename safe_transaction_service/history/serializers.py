@@ -9,6 +9,7 @@ from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField, Sha3HashField)
 from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
+from web3.exceptions import BadFunctionCallOutput
 
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 
@@ -22,7 +23,6 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
     sender = EthereumAddressField()
     block_number = serializers.IntegerField(required=False)
     block_date_time = serializers.DateTimeField(required=False)
-    confirmation_type = serializers.CharField()
     signature = HexadecimalField(required=False)
 
     def validate_confirmation_type(self, value: str) -> int:
@@ -52,39 +52,37 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         contract_transaction_hash = safe_tx.safe_tx_hash
 
         # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
-        if (not safe.retrieve_is_owner(data['sender'])
-                and not safe.retrieve_is_owner(data['sender'],
-                                               block_identifier=ethereum_client.current_block_number - 100)):
-            raise ValidationError('User is not an owner')
+        if not safe.retrieve_is_owner(data['sender']):
+            try:
+                if not safe.retrieve_is_owner(data['sender'],
+                                              block_identifier=max(0, ethereum_client.current_block_number - 100)):
+                    raise ValidationError('User is not an owner')
+            except BadFunctionCallOutput:  # If it didn't exist 100 blocks ago
+                raise ValidationError('User is not an owner')
 
         if contract_transaction_hash != data['contract_transaction_hash']:
-            raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash} '
-                                  f'does not match provided contract-tx-hash={data["contract_transaction_hash"]}')
+            raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
+                                  f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
 
         if signature is not None:  # Until contract signatures are supported
             address = Account.recoverHash(contract_transaction_hash, signature=signature)
             if address != data['sender']:
-                raise ValidationError(f'Signature does not match sender=f{data["sender"]}. '
-                                      f'Calculated owner is f{address}')
-        else:
-            sender = data['sender']
-            transaction_data = ethereum_client.get_transaction(tx_hash)
-            if not transaction_data:
-                raise ValidationError("No transaction data found for tx-hash=%s" % tx_hash)
+                raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
+        # else:
+            # sender = data['sender']
+
+            # transaction_data = ethereum_client.get_transaction(tx_hash)
+            # if not transaction_data:
+            #    raise ValidationError(f'No transaction data found for tx-hash{tx_hash.hex()}')
 
             # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-            if not (safe.retrieve_is_hash_approved(sender, contract_transaction_hash) or
-                    safe.retrieve_nonce() > data['nonce']):
-                raise ValidationError('Tx hash is not approved or tx not executed')
-
-            data['block_number'] = transaction_data['blockNumber']
-            block_data = ethereum_client.get_block(data['block_number'])
-            data['block_date_time'] = datetime.fromtimestamp(block_data['timestamp'], timezone.utc)
+            # if not (safe.retrieve_is_hash_approved(sender, contract_transaction_hash) or
+            #        safe.retrieve_nonce() > data['nonce']):
+            #    raise ValidationError('Tx hash is not approved or tx not executed')
 
         return data
 
     def save(self, **kwargs):
-        # Store more arguments
         multisig_transaction, _ = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=self.validated_data['contract_transaction_hash'],
             defaults={
@@ -103,18 +101,18 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         )
 
         # Confirmation Transaction
-        confirmation_instance = MultisigConfirmation.objects.get_or_create(
-            multisig_transaction=multisig_transaction,
-            owner=self.validated_data['sender'],
-            defaults={
-                'block_date_time': self.validated_data.get('block_date_time'),
-                'block_number': self.validated_data.get('block_number'),
-                'mined': bool(self.validated_data.get('signature')),
-                'signature': self.validated_data.get('signature'),
-                'transaction_hash': self.validated_data.get('transaction_hash'),
-            }
-        )
-        return confirmation_instance
+        # confirmation_instance = MultisigConfirmation.objects.get_or_create(
+        #     multisig_transaction=multisig_transaction,
+        #     owner=self.validated_data['sender'],
+        #     defaults={
+        #         'block_date_time': self.validated_data.get('block_date_time'),
+        #         'block_number': self.validated_data.get('block_number'),
+        #         'mined': bool(self.validated_data.get('signature')),
+        #         'signature': self.validated_data.get('signature'),
+        #         'transaction_hash': self.validated_data.get('transaction_hash'),
+        #     }
+        # )
+        return multisig_transaction
 
 
 # Responses ------------------------------------------------------------------

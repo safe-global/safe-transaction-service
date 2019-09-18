@@ -85,14 +85,12 @@ class SafeMultisigTransactionListView(ListAPIView):
             serializer.save()
 
             # Create task if transaction hash
-            data = serializer.validated_data
-            """
-            transaction_hash = data.get('transaction_hash')
-            if transaction_hash:
-                check_approve_transaction_task.delay(safe_address=address,
-                                                     safe_tx_hash=data['contract_transaction_hash'].hex(),
-                                                     transaction_hash=transaction_hash.hex(),
-                                                     owner=data['sender'])
-            """
+            # data = serializer.validated_data
+            # transaction_hash = data.get('transaction_hash')
+            # if transaction_hash:
+            #     check_approve_transaction_task.delay(safe_address=address,
+            #                                          safe_tx_hash=data['contract_transaction_hash'].hex(),
+            #                                          transaction_hash=transaction_hash.hex(),
+            #                                          owner=data['sender'])
 
             return Response(status=status.HTTP_202_ACCEPTED)

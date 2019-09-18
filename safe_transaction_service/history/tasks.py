@@ -5,12 +5,9 @@ from celery.utils.log import get_task_logger
 from redis import Redis
 from redis.exceptions import LockError
 
-from gnosis.eth import EthereumClientProvider
-from gnosis.safe import Safe
-
 from .indexers.tx_processor import TxProcessor
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .models import (InternalTxDecoded, MultisigConfirmation)
+from .models import InternalTxDecoded
 
 
 logger = get_task_logger(__name__)
