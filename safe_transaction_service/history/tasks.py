@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 
@@ -93,20 +93,21 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            number_reorgs = 0
             ethereum_client = EthereumClientProvider()
             current_block_number = ethereum_client.current_block_number
+            block_reorgs: List[int] = []
             for database_block in EthereumBlock.objects.not_confirmed():
                 blockchain_block = ethereum_client.get_block(database_block.number, full_transactions=False)
                 if HexBytes(blockchain_block['hash']) != HexBytes(database_block.block_hash):
                     logger.warning('Reorg found for block number=%d', database_block.number)
-                    blockchain_block.delete()
-                    number_reorgs += 1
+                    block_reorgs.append(database_block.number)
                 else:
                     if (current_block_number - database_block.number) > 6:
                         database_block.set_confirmed()
-            if number_reorgs:
-                logger.info('%d reorgs fixed', number_reorgs)
-                return number_reorgs
+
+            if block_reorgs:
+                EthereumBlock.objects.filter(number__gte=min(block_reorgs)).delete()
+                logger.info('%d reorgs fixed', len(block_reorgs))
+                return len(block_reorgs)
     except LockError:
         pass

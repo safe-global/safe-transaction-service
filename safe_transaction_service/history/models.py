@@ -84,7 +84,7 @@ class EthereumBlockManager(models.Manager):
 
 class EthereumBlockQuerySet(models.QuerySet):
     def not_confirmed(self):
-        return self.filter(confirmed=False)
+        return self.filter(confirmed=False).order_by('-number')
 
 
 class EthereumBlock(models.Model):
