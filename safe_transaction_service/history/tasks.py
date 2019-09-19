@@ -93,6 +93,7 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            #TODO Fetch multiple block hashes at once
             ethereum_client = EthereumClientProvider()
             current_block_number = ethereum_client.current_block_number
             block_reorgs: List[int] = []
