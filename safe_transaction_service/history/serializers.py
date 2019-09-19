@@ -20,10 +20,7 @@ from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 # ================================================ #
 class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
-    transaction_hash = Sha3HashField(required=False)  # Tx that includes the tx
     sender = EthereumAddressField()
-    block_number = serializers.IntegerField(required=False)
-    block_date_time = serializers.DateTimeField(required=False)
     signature = HexadecimalField(required=False)
 
     def validate_confirmation_type(self, value: str) -> int:
@@ -37,13 +34,6 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         super().validate(data)
 
         signature = data.get('signature')
-        tx_hash = data.get('transaction_hash')
-
-        if not signature and not tx_hash:
-            raise ValidationError('At least one of `signature` or `transaction_hash` must be provided')
-        elif signature and tx_hash:
-            raise ValidationError('Both `signature` and `transaction_hash` cannot be provided')
-
         ethereum_client = EthereumClientProvider()
         safe = Safe(data['safe'], ethereum_client)
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
@@ -83,21 +73,15 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
             except BadFunctionCallOutput:  # If it didn't exist 100 blocks ago
                 raise ValidationError('User is not an owner')
 
-        if signature is not None:  # Until contract signatures are supported
+        #  TODO Support contract signatures
+        if signature is not None:
+            #  TODO Support signatures with multiple owners
+            if len(signature) != 65:
+                raise ValidationError('Signatures with more than one owner still not supported')
+
             address = Account.recoverHash(contract_transaction_hash, signature=signature)
             if address != data['sender']:
                 raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
-        # else:
-            # sender = data['sender']
-
-            # transaction_data = ethereum_client.get_transaction(tx_hash)
-            # if not transaction_data:
-            #    raise ValidationError(f'No transaction data found for tx-hash{tx_hash.hex()}')
-
-            # Check operation type matches condition (hash_approved -> confirmation, nonce -> execution)
-            # if not (safe.retrieve_is_hash_approved(sender, contract_transaction_hash) or
-            #        safe.retrieve_nonce() > data['nonce']):
-            #    raise ValidationError('Tx hash is not approved or tx not executed')
 
         return data
 
@@ -119,18 +103,14 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
             }
         )
 
-        # Confirmation Transaction
-        # confirmation_instance = MultisigConfirmation.objects.get_or_create(
-        #     multisig_transaction=multisig_transaction,
-        #     owner=self.validated_data['sender'],
-        #     defaults={
-        #         'block_date_time': self.validated_data.get('block_date_time'),
-        #         'block_number': self.validated_data.get('block_number'),
-        #         'mined': bool(self.validated_data.get('signature')),
-        #         'signature': self.validated_data.get('signature'),
-        #         'transaction_hash': self.validated_data.get('transaction_hash'),
-        #     }
-        # )
+        if self.validated_data.get('signature'):
+            MultisigConfirmation.objects.get_or_create(
+                multisig_transaction=multisig_transaction,
+                owner=self.validated_data['sender'],
+                defaults={
+                    'signature': self.validated_data.get('signature'),
+                }
+            )
         return multisig_transaction
 
 
@@ -138,15 +118,15 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
 class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     submission_date = serializers.DateTimeField(source='created')
     confirmation_type = serializers.SerializerMethodField()
-    # signature = HexadecimalField()
     transaction_hash = serializers.SerializerMethodField()
+    signature = HexadecimalField()
 
     class Meta:
         model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type')  # 'signature'
+        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature')
 
     def get_confirmation_type(self, obj: MultisigConfirmation):
-        #TODO Fix this
+        #TODO Remove this field
         return ConfirmationType.CONFIRMATION.name
 
     def get_transaction_hash(self, obj: MultisigConfirmation):

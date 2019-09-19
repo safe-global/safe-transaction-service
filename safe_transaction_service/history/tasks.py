@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.conf import settings
 
 from celery import app
@@ -23,7 +25,7 @@ def get_redis() -> Redis:
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
-def index_new_proxies_task() -> int:
+def index_new_proxies_task() -> Optional[int]:
     """
     :return: Number of proxies created
     """
@@ -43,14 +45,13 @@ def index_new_proxies_task() -> int:
 
             if new_monitored_addresses:
                 logger.info('Indexed new %d proxies', new_monitored_addresses)
-
-            return new_monitored_addresses
+                return new_monitored_addresses
     except LockError:
         pass
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
-def index_internal_txs_task() -> int:
+def index_internal_txs_task() -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
     :return: Number of addresses processed
@@ -60,14 +61,15 @@ def index_internal_txs_task() -> int:
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             number_addresses = InternalTxIndexerProvider().process_all()
-            logger.info('Find internal txs task processed %d addresses', number_addresses)
-            return number_addresses
+            if number_addresses:
+                logger.info('Find internal txs task processed %d addresses', number_addresses)
+                return number_addresses
     except LockError:
         pass
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
-def process_decoded_internal_txs_task() -> int:
+def process_decoded_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
@@ -81,6 +83,6 @@ def process_decoded_internal_txs_task() -> int:
                     internal_tx_decoded.set_processed()
             if number_processed:
                 logger.info('%d decoded internal txs processed', number_processed)
-            return number_processed
+                return number_processed
     except LockError:
         pass

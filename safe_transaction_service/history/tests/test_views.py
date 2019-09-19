@@ -70,3 +70,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
+
+        # Test confirmation with signature
+        data['signature'] = safe_owner_1.signHash(safe_tx.safe_tx_hash)['signature'].hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
+
+        # Sign with a random user (not owner)
+        data['signature'] = Account.create().signHash(safe_tx.safe_tx_hash)['signature'].hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertIn('Signature does not match sender', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)

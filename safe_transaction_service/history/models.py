@@ -346,10 +346,10 @@ class MultisigConfirmationQuerySet(models.QuerySet):
         return self.exclude(multisig_transaction=None)
 
 
-#TODO Allow off-chain confirmations
 class MultisigConfirmation(TimeStampedModel):
     objects = MultisigConfirmationQuerySet.as_manager()
-    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations')
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations',
+                                    null=True)  # `null=True` for signature confirmations
     multisig_transaction = models.ForeignKey(MultisigTransaction,
                                              on_delete=models.CASCADE,
                                              null=True,
@@ -357,6 +357,8 @@ class MultisigConfirmation(TimeStampedModel):
     multisig_transaction_hash = Sha3HashField(null=True,
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
+
+    signature = HexField(null=True, default=None, max_length=500)
 
     class Meta:
         unique_together = (('multisig_transaction_hash', 'owner'),)
