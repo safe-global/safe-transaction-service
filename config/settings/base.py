@@ -231,7 +231,7 @@ LOGGING = {
         },
         'celery_verbose': {
             'class': 'safe_transaction_service.taskapp.celery.PatchedCeleryFormatter',
-            'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(name)s] [%(task_id)s/%(task_name)s] %(message)s'
+            'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
         },
 
     },
@@ -257,6 +257,11 @@ LOGGING = {
         '': {
             'handlers': ['console'],
             'level': 'INFO',
+        },
+        'celery.worker.strategy': {  # All the "Received task..."
+            'handlers': ['console'],
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'propagate': False,  # If not it will be out for the root logger too
         },
         'celery.app.trace': {
             'handlers': ['celery_console'],
