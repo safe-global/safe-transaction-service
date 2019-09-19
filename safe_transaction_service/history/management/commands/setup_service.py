@@ -29,8 +29,8 @@ class Command(BaseCommand):
                                 'Index new Proxies', 15, IntervalSchedule.SECONDS),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
                                 'Process Internal Txs', 15, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
-                                'Process Internal Txs', 90, IntervalSchedule.SECONDS),
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
+                                'Check Reorgs', 90, IntervalSchedule.SECONDS),
     ]
 
     def handle(self, *args, **options):
