@@ -92,7 +92,7 @@ class TxProcessor:
                     'gas_token': safe_tx.gas_token,
                     'refund_receiver': safe_tx.refund_receiver,
                     'nonce': safe_tx.safe_nonce,
-                    'signatures': arguments['signatures'],
+                    'signatures': HexBytes(arguments['signatures']),
                 })
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
