@@ -24,11 +24,13 @@ class Command(BaseCommand):
     help = 'Setup Transaction Service Required Tasks'
     tasks = [
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
-                                'Index Internal Txs', 30, IntervalSchedule.SECONDS),
+                                'Index Internal Txs', 15, IntervalSchedule.SECONDS),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
-                                'Index new Proxies', 30, IntervalSchedule.SECONDS),
+                                'Index new Proxies', 15, IntervalSchedule.SECONDS),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
-                                'Process Internal Txs', 30, IntervalSchedule.SECONDS),
+                                'Process Internal Txs', 15, IntervalSchedule.SECONDS),
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
+                                'Process Internal Txs', 90, IntervalSchedule.SECONDS),
     ]
 
     def handle(self, *args, **options):

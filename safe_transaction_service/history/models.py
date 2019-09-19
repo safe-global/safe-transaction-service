@@ -82,15 +82,25 @@ class EthereumBlockManager(models.Manager):
         )
 
 
+class EthereumBlockQuerySet(models.QuerySet):
+    def not_confirmed(self):
+        return self.filter(confirmed=False)
+
+
 class EthereumBlock(models.Model):
-    objects = EthereumBlockManager()
+    objects = EthereumBlockManager.from_queryset(EthereumBlockQuerySet)()
     number = models.PositiveIntegerField(primary_key=True, unique=True)
     gas_limit = models.PositiveIntegerField()
     gas_used = models.PositiveIntegerField()
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
     parent_hash = Sha3HashField(unique=True)
-    confirmed = models.BooleanField(default=False)  # For reorgs, True if `current_block_number` - `number` >= 6
+    confirmed = models.BooleanField(default=False,
+                                    db_index=True)  # For reorgs, True if `current_block_number` - `number` >= 6
+
+    def set_confirmed(self):
+        self.confirmed = True
+        self.save()
 
 
 class EthereumTxManager(models.Manager):
@@ -321,7 +331,7 @@ class MultisigTransaction(TimeStampedModel):
     gas_price = Uint256Field()
     gas_token = EthereumAddressField(null=True)
     refund_receiver = EthereumAddressField(null=True)
-    signatures = models.BinaryField(null=True)
+    signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field()
 
     def __str__(self):

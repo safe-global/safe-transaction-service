@@ -4,12 +4,14 @@ from django.conf import settings
 
 from celery import app
 from celery.utils.log import get_task_logger
+from gnosis.eth import EthereumClientProvider
+from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
-from .models import InternalTxDecoded
+from .models import InternalTxDecoded, EthereumBlock
 
 logger = get_task_logger(__name__)
 
@@ -75,14 +77,36 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             tx_processor = TxProcessor()
             number_processed = 0
-            # It seems that it cannot manage many decoded objects, so we limit them
-            for internal_tx_decoded in InternalTxDecoded.objects.pending()[:200]:
+            for internal_tx_decoded in InternalTxDecoded.objects.pending():
                 processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
                 if processed:
                     number_processed += 1
-                    internal_tx_decoded.set_processed()
             if number_processed:
                 logger.info('%d decoded internal txs processed', number_processed)
                 return number_processed
+    except LockError:
+        pass
+
+
+@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
+def check_reorgs_task() -> Optional[int]:
+    redis = get_redis()
+    try:
+        with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            number_reorgs = 0
+            ethereum_client = EthereumClientProvider()
+            current_block_number = ethereum_client.current_block_number
+            for database_block in EthereumBlock.objects.not_confirmed():
+                blockchain_block = ethereum_client.get_block(database_block.number, full_transactions=False)
+                if HexBytes(blockchain_block['hash']) != HexBytes(database_block.block_hash):
+                    logger.warning('Reorg found for block number=%d', database_block.number)
+                    blockchain_block.delete()
+                    number_reorgs += 1
+                else:
+                    if (current_block_number - database_block.number) > 6:
+                        database_block.set_confirmed()
+            if number_reorgs:
+                logger.info('%d reorgs fixed', number_reorgs)
+                return number_reorgs
     except LockError:
         pass

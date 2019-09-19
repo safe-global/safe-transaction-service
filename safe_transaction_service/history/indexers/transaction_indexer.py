@@ -22,7 +22,7 @@ class TransactionIndexer(ABC):
     `process_element` defines what happens with elements found
     So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
     """
-    def __init__(self, ethereum_client: EthereumClient, confirmations: int = 6,
+    def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
                  block_process_limit: int = 10000, updated_blocks_behind: int = 100,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000):
         """
