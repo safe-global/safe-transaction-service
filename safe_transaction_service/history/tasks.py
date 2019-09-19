@@ -11,7 +11,7 @@ from redis.exceptions import LockError
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
-from .models import InternalTxDecoded, EthereumBlock
+from .models import InternalTxDecoded, EthereumBlock, MonitoredAddress
 
 logger = get_task_logger(__name__)
 
@@ -107,7 +107,10 @@ def check_reorgs_task() -> Optional[int]:
                         database_block.set_confirmed()
 
             if block_reorgs:
-                EthereumBlock.objects.filter(number__gte=min(block_reorgs)).delete()
+                min_block = min(block_reorgs)
+                EthereumBlock.objects.filter(number__gte=min_block).delete()
+                # Check concurrency problems
+                MonitoredAddress.objects.filter(tx_block_number__gte=min_block).update(tx_block_number=min_block - 1)
                 logger.info('%d reorgs fixed', len(block_reorgs))
                 return len(block_reorgs)
     except LockError:
