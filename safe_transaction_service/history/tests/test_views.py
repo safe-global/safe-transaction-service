@@ -81,6 +81,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
+        self.assertEqual(response.data['results'][0]['confirmations'][0]['signature'], data['signature'])
 
         # Sign with a random user (not owner)
         data['signature'] = Account.create().signHash(safe_tx.safe_tx_hash)['signature'].hex()

@@ -334,8 +334,15 @@ class MultisigTransaction(TimeStampedModel):
         return None
 
     @property
-    def mined(self) -> Optional[bool]:
+    def executed(self) -> Optional[bool]:
         return self.ethereum_tx_id and (self.ethereum_tx.block_id is not None)
+
+    def owners(self) -> Optional[List[str]]:
+        if not self.signatures:
+            return None
+        else:
+            # TODO Get owners from signatures. Not very trivial
+            return []
 
 
 class MultisigConfirmationQuerySet(models.QuerySet):

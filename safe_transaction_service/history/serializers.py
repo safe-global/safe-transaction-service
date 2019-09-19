@@ -138,7 +138,7 @@ class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
     submission_date = serializers.DateTimeField(source='created')
     execution_date = serializers.DateTimeField()
-    is_executed = serializers.BooleanField(source='mined')
+    is_executed = serializers.BooleanField(source='executed')
     confirmations = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
