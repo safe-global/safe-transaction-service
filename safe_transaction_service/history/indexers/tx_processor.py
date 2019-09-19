@@ -92,9 +92,11 @@ class TxProcessor:
                     'gas_token': safe_tx.gas_token,
                     'refund_receiver': safe_tx.refund_receiver,
                     'nonce': safe_tx.safe_nonce,
+                    'signatures': arguments['signatures'],
                 })
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
+                multisig_tx.signatures = arguments['signatures']
                 multisig_tx.save(update_fields=['ethereum_tx'])
 
             safe_status.nonce = nonce + 1
