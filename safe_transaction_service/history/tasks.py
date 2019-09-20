@@ -15,6 +15,7 @@ from redis.exceptions import LockError
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
 from .models import InternalTxDecoded, EthereumBlock, MonitoredAddress
+from ..taskapp.celery import app as celery_app
 
 logger = get_task_logger(__name__)
 
@@ -40,7 +41,9 @@ def raise_task(request) -> NoReturn:
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, ** kwargs):
-    return revoke([str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)], terminate=True)
+    return celery_app.control.revoke([str(task_id)
+                                      for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)],
+                                     terminate=True)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
