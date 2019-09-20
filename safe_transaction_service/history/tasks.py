@@ -1,23 +1,26 @@
 import signal
-from typing import Optional, List, NoReturn
+from typing import List, NoReturn, Optional
 
-from celery.signals import worker_shutting_down, worker_ready, worker_process_init
-from celery.worker.control import revoke
-from celery.worker.request import Request
 from django.conf import settings
 
 from celery import app
+from celery.app.task import Context
+from celery.signals import (worker_process_init, worker_ready,
+                            worker_shutting_down)
 from celery.utils.log import get_task_logger
-from gnosis.eth import EthereumClientProvider
+from celery.worker.control import revoke
+from celery.worker.request import Request
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
 from redis.lock import Lock
 
+from gnosis.eth import EthereumClientProvider
+
+from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
-from .models import InternalTxDecoded, EthereumBlock, MonitoredAddress
-from ..taskapp.celery import app as celery_app
+from .models import EthereumBlock, InternalTxDecoded, MonitoredAddress
 
 logger = get_task_logger(__name__)
 
@@ -34,17 +37,23 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-def release_lock(request: Request, redis_lock: Lock) -> NoReturn:
-    def fn(signum, frame):
+def release_lock(request: Context, redis_lock: Lock) -> NoReturn:
+    def handler(signum, frame):
+        logger.warning('Received SIGTERM on task-id=%s', request.id)
         get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
-        redis_lock.release()
-        logger.warning('Received SIGTERM on task %s', request.name)
-    return fn
+        try:
+            if redis_lock:
+                redis_lock.release()
+                logger.warning('Released redis-lock on task-id=%s', request.id)
+        finally:
+            raise OSError('Worker shutting down - Task must exit')
+    return handler
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     tasks_to_kill = [task_id.decode() for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
+    # Not working, as the worker cannot answer anymore
     logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
     logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
     if tasks_to_kill:
