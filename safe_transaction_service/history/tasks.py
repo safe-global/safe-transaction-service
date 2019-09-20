@@ -3,6 +3,7 @@ from typing import Optional, List, NoReturn
 
 from celery.signals import worker_shutting_down, worker_ready, worker_process_init
 from celery.worker.control import revoke
+from celery.worker.request import Request
 from django.conf import settings
 
 from celery import app
@@ -11,6 +12,7 @@ from gnosis.eth import EthereumClientProvider
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
+from redis.lock import Lock
 
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
@@ -32,11 +34,11 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-def raise_task(request) -> NoReturn:
+def release_lock(request: Request, redis_lock: Lock) -> NoReturn:
     def fn(signum, frame):
         get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
-        logger.warning('Received SIGTERM on task')
-        raise OSError(f'SIGTERM Received for {request.name}')
+        redis_lock.release()
+        logger.warning(f'Received SIGTERM on task %s', request.name)
     return fn
 
 
@@ -57,8 +59,8 @@ def index_new_proxies_task() -> Optional[int]:
 
     redis = get_redis()
     try:
-        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, raise_task(index_new_proxies_task.request))
+        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
+            signal.signal(signal.SIGTERM, release_lock(index_new_proxies_task.request, redis_lock))
             redis.lpush(blockchain_running_tasks_key, index_new_proxies_task.request.id)
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
             proxy_indexer_service = ProxyIndexerServiceProvider()
@@ -87,8 +89,8 @@ def index_internal_txs_task() -> Optional[int]:
 
     redis = get_redis()
     try:
-        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, raise_task(index_internal_txs_task.request))
+        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
+            signal.signal(signal.SIGTERM, release_lock(index_internal_txs_task.request, redis_lock))
             redis.lpush(blockchain_running_tasks_key, index_internal_txs_task.request.id)
             number_addresses = InternalTxIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, index_internal_txs_task.request.id)
@@ -121,8 +123,8 @@ def process_decoded_internal_txs_task() -> Optional[int]:
 def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
-        with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, raise_task(check_reorgs_task.request))
+        with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
+            signal.signal(signal.SIGTERM, release_lock(check_reorgs_task.request, redis_lock))
             #TODO Fetch multiple block hashes at once
             ethereum_client = EthereumClientProvider()
             current_block_number = ethereum_client.current_block_number
