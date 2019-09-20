@@ -41,8 +41,10 @@ def generate_handler(request: Context) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', request.id)
         try:
+            logger.warning('Received SIGTERM, releasing redis task')
             get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         finally:
+            logger.warning('Received SIGTERM, raising exception')
             raise OSError('Worker shutting down - Task must exit')
     return handler
 
