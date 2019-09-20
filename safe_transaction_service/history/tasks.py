@@ -41,9 +41,10 @@ def raise_task(request) -> NoReturn:
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, ** kwargs):
-    return celery_app.control.revoke([str(task_id)
-                                      for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)],
-                                     terminate=True)
+    tasks_to_kill = [str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
+    if tasks_to_kill:
+        logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
+        celery_app.control.revoke(tasks_to_kill, terminate=True)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
