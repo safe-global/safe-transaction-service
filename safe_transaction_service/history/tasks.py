@@ -1,6 +1,7 @@
 import signal
 from typing import Optional, List, NoReturn
 
+from celery.signals import worker_shutting_down
 from celery.worker.control import revoke
 from django.conf import settings
 
@@ -35,6 +36,11 @@ def raise_task(request) -> NoReturn:
         get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         raise OSError(f'SIGTERM Received for {request.name}')
     return fn
+
+
+@worker_shutting_down.connect
+def worker_shutting_down_handler(sig, how, exitcode, ** kwargs):
+    return revoke([str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)], terminate=True)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
@@ -125,8 +131,7 @@ def check_reorgs_task() -> Optional[int]:
                         database_block.set_confirmed()
 
             if block_reorgs:
-                for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1):
-                    revoke(str(task_id), terminate=True)
+                revoke([str(task_id) for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)], terminate=True)
 
                 min_block = min(block_reorgs)
                 EthereumBlock.objects.filter(number__gte=min_block).delete()
