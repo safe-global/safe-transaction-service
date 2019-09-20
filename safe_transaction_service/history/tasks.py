@@ -46,6 +46,7 @@ def release_lock(request: Request, redis_lock: Lock) -> NoReturn:
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     tasks_to_kill = [task_id.decode() for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
     logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
+    logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
     if tasks_to_kill:
         get_redis().delete(blockchain_running_tasks_key)
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
