@@ -1,7 +1,7 @@
 import signal
 from typing import Optional, List, NoReturn
 
-from celery.signals import worker_shutting_down, worker_ready
+from celery.signals import worker_shutting_down, worker_ready, worker_process_init
 from celery.worker.control import revoke
 from django.conf import settings
 
@@ -40,22 +40,11 @@ def raise_task(request) -> NoReturn:
     return fn
 
 
-@worker_ready.connect
-def worker_ready(**kwargs):
-    # tasks_to_kill = [str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
-    i = celery_app.control.inspect()
-    print(i.active())
-    print(i.registered())
-    logger.warning('holaaa')
-
-
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
-    tasks_to_kill = [str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
-    i = celery_app.control.inspect()
-    logger.warning('Active workers %s', i.registered())
-    logger.warning('Active tasks %s', i.active())
+    tasks_to_kill = [task_id.decode() for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
     if tasks_to_kill:
+        get_redis().delete(blockchain_running_tasks_key)
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
         celery_app.control.revoke(tasks_to_kill, terminate=True)
 
