@@ -38,7 +38,7 @@ def release_lock(request: Request, redis_lock: Lock) -> NoReturn:
     def fn(signum, frame):
         get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         redis_lock.release()
-        logger.warning(f'Received SIGTERM on task %s', request.name)
+        logger.warning('Received SIGTERM on task %s', request.name)
     return fn
 
 
