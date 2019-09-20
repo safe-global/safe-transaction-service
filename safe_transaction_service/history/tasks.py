@@ -46,7 +46,7 @@ def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     if tasks_to_kill:
         get_redis().delete(blockchain_running_tasks_key)
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
-        celery_app.control.revoke(tasks_to_kill, terminate=True)
+        celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
