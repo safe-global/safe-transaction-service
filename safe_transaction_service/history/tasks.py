@@ -42,7 +42,7 @@ def raise_task(request) -> NoReturn:
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, ** kwargs):
     tasks_to_kill = [str(task_id) for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
-    i = app.control.inspect()
+    i = celery_app.control.inspect()
     print(i.active())
     if tasks_to_kill:
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
