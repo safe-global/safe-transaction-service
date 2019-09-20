@@ -37,12 +37,15 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-def generate_handler(request: Context) -> NoReturn:
+def generate_handler(request: Context, redis_lock: Optional[Lock] = None) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', request.id)
         try:
             logger.warning('Received SIGTERM, releasing redis task')
             get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
+            if redis_lock:
+                logger.warning('Received SIGTERM, releasing lock %s', redis_lock.name)
+                redis_lock.release()
         finally:
             logger.warning('Received SIGTERM, raising exception')
             raise OSError('Worker shutting down - Task must exit')
@@ -100,7 +103,7 @@ def index_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, generate_handler(index_internal_txs_task.request))
+            signal.signal(signal.SIGTERM, generate_handler(index_internal_txs_task.request, redis_lock))
             redis.lpush(blockchain_running_tasks_key, index_internal_txs_task.request.id)
             number_addresses = InternalTxIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, index_internal_txs_task.request.id)
