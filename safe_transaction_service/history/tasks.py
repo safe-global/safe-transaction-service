@@ -33,7 +33,7 @@ def get_redis() -> Redis:
 
 
 def raise_task(request) -> NoReturn:
-    def fn():
+    def fn(signum, frame):
         get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         logger.warning('Received SIGTERM on task')
         raise OSError(f'SIGTERM Received for {request.name}')
