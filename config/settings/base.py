@@ -258,14 +258,14 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'INFO',
         },
+        'celery': {
+            'handlers': ['celery_console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,  # If not it will be out for the root logger too
+        },
         'celery.worker.strategy': {  # All the "Received task..."
             'handlers': ['console'],
             'level': 'INFO' if DEBUG else 'WARNING',
-            'propagate': False,  # If not it will be out for the root logger too
-        },
-        'celery.app.trace': {
-            'handlers': ['celery_console'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,  # If not it will be out for the root logger too
         },
         'django.request': {
