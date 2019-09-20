@@ -37,14 +37,11 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-def release_lock(request: Context, redis_lock: Lock) -> NoReturn:
+def generate_handler(request: Context) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', request.id)
-        get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         try:
-            if redis_lock:
-                redis_lock.release()
-                logger.warning('Released redis-lock on task-id=%s', request.id)
+            get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
         finally:
             raise OSError('Worker shutting down - Task must exit')
     return handler
@@ -70,8 +67,8 @@ def index_new_proxies_task() -> Optional[int]:
 
     redis = get_redis()
     try:
-        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, release_lock(index_new_proxies_task.request, redis_lock))
+        with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            signal.signal(signal.SIGTERM, generate_handler(index_new_proxies_task.request))
             redis.lpush(blockchain_running_tasks_key, index_new_proxies_task.request.id)
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
             proxy_indexer_service = ProxyIndexerServiceProvider()
@@ -101,7 +98,7 @@ def index_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, release_lock(index_internal_txs_task.request, redis_lock))
+            signal.signal(signal.SIGTERM, generate_handler(index_internal_txs_task.request))
             redis.lpush(blockchain_running_tasks_key, index_internal_txs_task.request.id)
             number_addresses = InternalTxIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, index_internal_txs_task.request.id)
@@ -135,7 +132,7 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, release_lock(check_reorgs_task.request, redis_lock))
+            signal.signal(signal.SIGTERM, generate_handler(check_reorgs_task.request))
             #TODO Fetch multiple block hashes at once
             ethereum_client = EthereumClientProvider()
             current_block_number = ethereum_client.current_block_number
