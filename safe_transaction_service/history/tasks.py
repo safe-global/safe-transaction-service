@@ -39,7 +39,6 @@ def generate_handler(request: Context, redis_lock: Optional[Lock] = None) -> NoR
         logger.warning('Received SIGTERM on task-id=%s', request.id)
         try:
             logger.warning('Received SIGTERM, releasing redis task')
-            get_redis().lrem(blockchain_running_tasks_key, 0, request.id)
             if redis_lock:
                 logger.warning('Received SIGTERM, releasing lock %s', redis_lock.name)
                 redis_lock.release()
@@ -56,9 +55,9 @@ def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
     logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
     if tasks_to_kill:
-        get_redis().delete(blockchain_running_tasks_key)
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
         celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
+        get_redis().delete(blockchain_running_tasks_key)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
@@ -174,6 +173,7 @@ def check_reorgs_task() -> Optional[int]:
                 celery_app.control.revoke([str(task_id)
                                            for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
                                           terminate=True, signal=signal.SIGTERM)
+                redis.delete(blockchain_running_tasks_key)
                 return first_reorg_block_number
     except LockError:
         pass
