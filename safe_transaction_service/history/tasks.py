@@ -34,9 +34,9 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-def generate_handler(request: Context) -> NoReturn:
+def generate_handler(task_id: str) -> NoReturn:
     def handler(signum, frame):
-        logger.warning('Received SIGTERM on task-id=%s', request.id)
+        logger.warning('Received SIGTERM on task-id=%s', task_id)
         logger.warning('Received SIGTERM, releasing redis task')
         logger.warning('Received SIGTERM, raising exception')
         raise Exception('Worker shutting down - Task must exit')
@@ -64,7 +64,7 @@ def index_new_proxies_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, generate_handler(index_new_proxies_task.request))
+            signal.signal(signal.SIGTERM, generate_handler(index_new_proxies_task.request.id))
             redis.lpush(blockchain_running_tasks_key, index_new_proxies_task.request.id)
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
             proxy_indexer_service = ProxyIndexerServiceProvider()
@@ -84,8 +84,8 @@ def index_new_proxies_task() -> Optional[int]:
         pass
 
 
-@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
-def index_internal_txs_task() -> Optional[int]:
+@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+def index_internal_txs_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
     :return: Number of addresses processed
@@ -94,11 +94,12 @@ def index_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, generate_handler(index_internal_txs_task.request))
-            redis.lpush(blockchain_running_tasks_key, index_internal_txs_task.request.id)
+            task_id = self.request.id
+            signal.signal(signal.SIGTERM, generate_handler(task_id))
+            redis.lpush(blockchain_running_tasks_key, task_id)
             logger.info('Start indexing of internal txs')
             number_addresses = InternalTxIndexerProvider().process_all()
-            redis.lrem(blockchain_running_tasks_key, 0, index_internal_txs_task.request.id)
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_addresses:
                 logger.info('Find internal txs task processed %d addresses', number_addresses)
                 return number_addresses
@@ -161,7 +162,7 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, generate_handler(check_reorgs_task.request))
+            signal.signal(signal.SIGTERM, generate_handler(check_reorgs_task.request.id))
             first_reorg_block_number = check_reorgs()
 
             if first_reorg_block_number:
