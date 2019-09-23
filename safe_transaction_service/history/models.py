@@ -446,7 +446,7 @@ class MonitoredAddressQuerySet(models.QuerySet):
             **{database_field + '__lt': current_block_number - confirmations}
         )
 
-    def reset_block_number(self, block_number: Optional[int]) -> int:
+    def reset_block_number(self, block_number: Optional[int] = None) -> int:
         if block_number is not None:
             value = block_number
         else:
