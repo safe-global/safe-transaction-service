@@ -5,11 +5,8 @@ from django.conf import settings
 
 from celery import app
 from celery.app.task import Context
-from celery.signals import (worker_process_init, worker_ready,
-                            worker_shutting_down)
+from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
-from celery.worker.control import revoke
-from celery.worker.request import Request
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
@@ -132,33 +129,50 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         pass
 
 
+def check_reorgs() -> Optional[int]:
+    """
+    :return: Number of oldest block with reorg detected. `None` if not reorg found
+    """
+    ethereum_client = EthereumClientProvider()
+    current_block_number = ethereum_client.current_block_number
+    first_reorg_block_number: Optional[int] = None
+    for database_block in EthereumBlock.objects.not_confirmed():
+        blockchain_block = ethereum_client.get_block(database_block.number, full_transactions=False)
+        if HexBytes(blockchain_block['hash']) != HexBytes(database_block.block_hash):
+            logger.warning('Reorg found for block-number=%d', database_block.number)
+            first_reorg_block_number = database_block.number
+            break
+        else:
+            if (current_block_number - database_block.number) > 6:
+                database_block.set_confirmed()
+
+    if first_reorg_block_number is not None:
+        # Check concurrency problems
+        EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
+        MonitoredAddress.objects.filter(
+            tx_block_number__gte=first_reorg_block_number
+        ).reset_block_number(
+            block_number=first_reorg_block_number - 1
+        )
+        logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)
+    return first_reorg_block_number
+
+
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def check_reorgs_task() -> Optional[int]:
+    """
+    :return: Number of oldest block with reorg detected. `None` if not reorg found
+    """
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
             signal.signal(signal.SIGTERM, generate_handler(check_reorgs_task.request))
-            #TODO Fetch multiple block hashes at once
-            ethereum_client = EthereumClientProvider()
-            current_block_number = ethereum_client.current_block_number
-            block_reorgs: List[int] = []
-            for database_block in EthereumBlock.objects.not_confirmed():
-                blockchain_block = ethereum_client.get_block(database_block.number, full_transactions=False)
-                if HexBytes(blockchain_block['hash']) != HexBytes(database_block.block_hash):
-                    logger.warning('Reorg found for block number=%d', database_block.number)
-                    block_reorgs.append(database_block.number)
-                else:
-                    if (current_block_number - database_block.number) > 6:
-                        database_block.set_confirmed()
+            first_reorg_block_number = check_reorgs()
 
-            if block_reorgs:
-                revoke([str(task_id) for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)], terminate=True)
-
-                min_block = min(block_reorgs)
-                EthereumBlock.objects.filter(number__gte=min_block).delete()
-                # Check concurrency problems
-                MonitoredAddress.objects.filter(tx_block_number__gte=min_block).update(tx_block_number=min_block - 1)
-                logger.info('%d reorgs fixed', len(block_reorgs))
-                return len(block_reorgs)
+            if first_reorg_block_number:
+                celery_app.control.revoke([str(task_id)
+                                           for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
+                                          terminate=True, signal=signal.SIGTERM)
+                return first_reorg_block_number
     except LockError:
         pass

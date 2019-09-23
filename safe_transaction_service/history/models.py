@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
+from django.db.models import F
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -84,7 +85,7 @@ class EthereumBlockManager(models.Manager):
 
 class EthereumBlockQuerySet(models.QuerySet):
     def not_confirmed(self):
-        return self.filter(confirmed=False).order_by('-number')
+        return self.filter(confirmed=False).order_by('number')
 
 
 class EthereumBlock(models.Model):
@@ -430,7 +431,7 @@ class MonitoredAddressManager(models.Manager):
         return monitored_address
 
     def update_addresses(self, addresses: List[str], block_number: str, database_field: str) -> int:
-        self.filter(address__in=addresses).update(**{database_field: block_number})
+        return self.filter(address__in=addresses).update(**{database_field: block_number})
 
 
 class MonitoredAddressQuerySet(models.QuerySet):
@@ -442,7 +443,16 @@ class MonitoredAddressQuerySet(models.QuerySet):
 
     def not_updated(self, current_block_number: int, database_field: str, confirmations: int):
         return self.filter(
-            **{database_field + '__lt': current_block_number - confirmations})
+            **{database_field + '__lt': current_block_number - confirmations}
+        )
+
+    def reset_block_number(self, block_number: Optional[int]) -> int:
+        if block_number is not None:
+            value = block_number
+        else:
+            value = F('initial_block_number')
+        return self.update(tx_block_number=value,
+                           events_block_number=value)
 
 
 class MonitoredAddress(models.Model):
