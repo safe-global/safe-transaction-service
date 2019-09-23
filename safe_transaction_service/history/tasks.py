@@ -47,16 +47,16 @@ def generate_handler(task_id: str) -> NoReturn:
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     tasks_to_kill = [task_id.decode() for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
     # Not working, as the worker cannot answer anymore
-    logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
-    logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
     if tasks_to_kill:
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
         celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
         get_redis().delete(blockchain_running_tasks_key)
+    logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
+    logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
 
 
-@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
-def index_new_proxies_task() -> Optional[int]:
+@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+def index_new_proxies_task(self) -> Optional[int]:
     """
     :return: Number of proxies created
     """
@@ -64,8 +64,9 @@ def index_new_proxies_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            signal.signal(signal.SIGTERM, generate_handler(index_new_proxies_task.request.id))
-            redis.lpush(blockchain_running_tasks_key, index_new_proxies_task.request.id)
+            task_id = self.request.id
+            signal.signal(signal.SIGTERM, generate_handler(task_id))
+            redis.lpush(blockchain_running_tasks_key, task_id)
             proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
             proxy_indexer_service = ProxyIndexerServiceProvider()
 
@@ -76,7 +77,7 @@ def index_new_proxies_task() -> Optional[int]:
                 created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
                 new_monitored_addresses += len(created_objects)
 
-            redis.lrem(blockchain_running_tasks_key, 0, index_new_proxies_task.request.id)
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if new_monitored_addresses:
                 logger.info('Indexed new %d proxies', new_monitored_addresses)
                 return new_monitored_addresses
@@ -162,7 +163,6 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            signal.signal(signal.SIGTERM, generate_handler(check_reorgs_task.request.id))
             first_reorg_block_number = check_reorgs()
 
             if first_reorg_block_number:
