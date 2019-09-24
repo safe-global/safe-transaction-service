@@ -161,7 +161,7 @@ def check_reorgs_task() -> Optional[int]:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
             first_reorg_block_number = check_reorgs()
             if first_reorg_block_number:
-                celery_app.control.revoke([str(task_id)
+                celery_app.control.revoke([task_id.decode()  # Redis returns `bytes`
                                            for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
                                           terminate=True, signal=signal.SIGTERM)
                 redis.delete(blockchain_running_tasks_key)
