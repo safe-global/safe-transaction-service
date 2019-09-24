@@ -24,7 +24,7 @@ class TransactionIndexer(ABC):
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
                  block_process_limit: int = 10000, updated_blocks_behind: int = 100,
-                 query_chunk_size: int = 100, first_block_threshold: int = 150000):
+                 query_chunk_size: int = 200, first_block_threshold: int = 150000):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
@@ -34,7 +34,7 @@ class TransactionIndexer(ABC):
         `current block number` is 200, and last scan for an address was stopped on block 150, address
         is almost updated (200 - 100 < 150)
         :param query_chunk_size: Number of addresses to query for relevant data in the same request. By testing,
-        it seems that `100` can be a good value
+        it seems that `200` can be a good value
         :param first_block_threshold: First block to start scanning for address. For example, maybe a contract
         we are listening to was created in block 2000, but there's a tx sending funds to it in block 1500
         """
@@ -109,11 +109,12 @@ class TransactionIndexer(ABC):
         common_minimum_block_number = monitored_contract_queryset.aggregate(**{
             self.database_field: Min(self.database_field)
         })[self.database_field]
+
         if common_minimum_block_number is None:  # Empty queryset
             return
 
         from_block_number = common_minimum_block_number + 1
-        if (current_block_number - common_minimum_block_number) < confirmations:
+        if (current_block_number - common_minimum_block_number) <= confirmations:
             return  # We don't want problems with reorgs
 
         if block_process_limit:
