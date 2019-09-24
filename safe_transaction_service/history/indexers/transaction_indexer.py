@@ -23,8 +23,8 @@ class TransactionIndexer(ABC):
     So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
-                 block_process_limit: int = 10000, updated_blocks_behind: int = 100,
-                 query_chunk_size: int = 200, first_block_threshold: int = 150000):
+                 block_process_limit: int = 10000, updated_blocks_behind: int = 20,
+                 query_chunk_size: int = 300, first_block_threshold: int = 150000):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
