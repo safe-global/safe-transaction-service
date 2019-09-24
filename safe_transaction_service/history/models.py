@@ -99,9 +99,10 @@ class EthereumBlock(models.Model):
     confirmed = models.BooleanField(default=False,
                                     db_index=True)  # For reorgs, True if `current_block_number` - `number` >= 6
 
-    def set_confirmed(self):
-        self.confirmed = True
-        self.save()
+    def set_confirmed(self, current_block_number: int):
+        if (current_block_number - self.number) >= 6:
+            self.confirmed = True
+            self.save()
 
 
 class EthereumTxManager(models.Manager):

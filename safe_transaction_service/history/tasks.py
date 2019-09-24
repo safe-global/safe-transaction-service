@@ -137,8 +137,7 @@ def check_reorgs() -> Optional[int]:
             first_reorg_block_number = database_block.number
             break
         else:
-            if (current_block_number - database_block.number) > 6:
-                database_block.set_confirmed()
+            database_block.set_confirmed(current_block_number)
 
     if first_reorg_block_number is not None:
         # Check concurrency problems
