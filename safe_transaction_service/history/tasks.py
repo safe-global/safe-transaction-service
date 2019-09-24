@@ -37,22 +37,19 @@ def get_redis() -> Redis:
 def generate_handler(task_id: str) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', task_id)
-        logger.warning('Received SIGTERM, releasing redis task')
-        logger.warning('Received SIGTERM, raising exception')
-        raise Exception('Worker shutting down - Task must exit')
+        raise OSError('Task must exit')
     return handler
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
+    logger.warning('Worker shutting down')
     tasks_to_kill = [task_id.decode() for task_id in get_redis().lrange(blockchain_running_tasks_key, 0, -1)]
     # Not working, as the worker cannot answer anymore
     if tasks_to_kill:
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
         celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
         get_redis().delete(blockchain_running_tasks_key)
-    logger.warning('Worker shutting down, running tasks=%s', celery_app.control.inspect().active())
-    logger.warning('Worker shutting down, registered tasks=%s', celery_app.control.inspect().registered())
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -164,7 +161,6 @@ def check_reorgs_task() -> Optional[int]:
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
             first_reorg_block_number = check_reorgs()
-
             if first_reorg_block_number:
                 celery_app.control.revoke([str(task_id)
                                            for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
