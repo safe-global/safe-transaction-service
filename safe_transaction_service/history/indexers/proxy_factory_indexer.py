@@ -9,7 +9,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import EthereumTx, MonitoredAddress
+from ..models import EthereumTx, MonitoredAddress, SafeContract
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
@@ -38,7 +38,7 @@ class ProxyIndexerService(TransactionIndexer):
 
     @property
     def database_field(self):
-        return 'events_block_number'
+        return 'index_block_number'
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int) -> Set[str]:
@@ -89,11 +89,15 @@ class ProxyIndexerService(TransactionIndexer):
         :return: List of `Erc20TransferEvent` already stored in database
         """
         ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(log['transactionHash'])
-        block_number = log['blockNumber']
         int_address = int.from_bytes(HexBytes(log['data']), byteorder='big')
         address = Web3.toChecksumAddress('{:#042x}'.format(int_address))
 
+        # TODO Check `master_copy` address
         if address == NULL_ADDRESS:
             return []
         else:
-            return [MonitoredAddress.objects.create_from_address(address, block_number, ethereum_tx=ethereum_tx)]
+            return [SafeContract.objects.get_or_create(address=address,
+                                                       defaults={
+                                                           'ethereum_tx': ethereum_tx,
+                                                           # 'initial_block_number': log['blockNumber'],
+                                                       })[0]]

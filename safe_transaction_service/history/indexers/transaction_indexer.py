@@ -23,8 +23,8 @@ class TransactionIndexer(ABC):
     So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
-                 block_process_limit: int = 10000, updated_blocks_behind: int = 20,
-                 query_chunk_size: int = 300, first_block_threshold: int = 150000):
+                 block_process_limit: int = 200, updated_blocks_behind: int = 20,
+                 query_chunk_size: int = 100, first_block_threshold: int = 150000):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
@@ -49,10 +49,14 @@ class TransactionIndexer(ABC):
     @abstractmethod
     def database_field(self):
         """
-        Database field on `MonitoredAddress` to store scan status
+        Database field on `database_model` to store scan status
         :return:
         """
         pass
+
+    @property
+    def database_model(self):
+        return MonitoredAddress
 
     @abstractmethod
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
@@ -82,8 +86,8 @@ class TransactionIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        return MonitoredAddress.objects.almost_updated(current_block_number, self.database_field,
-                                                       self.updated_blocks_behind, self.confirmations)
+        return self.database_model.objects.almost_updated(current_block_number, self.database_field,
+                                                          self.updated_blocks_behind, self.confirmations)
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
@@ -91,10 +95,10 @@ class TransactionIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        return MonitoredAddress.objects.not_updated(current_block_number, self.database_field, self.confirmations)
+        return self.database_model.objects.not_updated(current_block_number, self.database_field, self.confirmations)
 
     def update_monitored_address(self, addresses: List[str], to_block_number: int) -> int:
-        return MonitoredAddress.objects.update_addresses(addresses, to_block_number, self.database_field)
+        return self.database_model.objects.update_addresses(addresses, to_block_number, self.database_field)
 
     def get_block_numbers_for_search(self, addresses: List[str]) -> Optional[Tuple[int, int]]:
         """
@@ -105,7 +109,7 @@ class TransactionIndexer(ABC):
         confirmations = self.confirmations
         current_block_number = self.ethereum_client.current_block_number
 
-        monitored_contract_queryset = MonitoredAddress.objects.filter(address__in=addresses)
+        monitored_contract_queryset = self.database_model.objects.filter(address__in=addresses)
         common_minimum_block_number = monitored_contract_queryset.aggregate(**{
             self.database_field: Min(self.database_field)
         })[self.database_field]

@@ -284,7 +284,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return self.not_processed(
         ).filter(
-            internal_tx__to__in=MonitoredAddress.objects.values('address')  #TODO Maybe not here?
+            internal_tx__to__in=SafeContract.objects.values('address')  #TODO Maybe not here?
         ).select_related(
             'internal_tx',
             'internal_tx__ethereum_tx',
@@ -491,6 +491,19 @@ class SafeStatusQuerySet(models.QuerySet):
         if not safe_status:
            logger.error('SafeStatus not found for address=%s', address)
         return safe_status
+
+
+class ProxyFactory(models.Model):
+    objects = MonitoredAddressQuerySet.as_manager()
+    address = EthereumAddressField()
+    initial_block_number = models.IntegerField(default=0)  # Block number when proxy was created
+    index_block_number = models.IntegerField(default=0)  # Block number of last scan
+
+
+class SafeContract(models.Model):
+    address = EthereumAddressField(primary_key=True)
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
+    # erc20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
 
 
 class SafeStatus(models.Model):
