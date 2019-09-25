@@ -304,7 +304,7 @@ class InternalTxDecoded(models.Model):
     processed = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name_plural = "Internal Txs Decoded"
+        verbose_name_plural = "Internal txs decoded"
 
     @property
     def address(self):
@@ -466,7 +466,7 @@ class MonitoredAddress(models.Model):
     events_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
 
     class Meta:
-        verbose_name_plural = "Monitored Addresses"
+        verbose_name_plural = "Monitored addresses"
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
@@ -500,7 +500,7 @@ class ProxyFactory(models.Model):
     index_block_number = models.IntegerField(default=0)  # Block number of last scan
 
     class Meta:
-        verbose_name_plural = "Proxy Factories"
+        verbose_name_plural = "Proxy factories"
 
     def __str__(self):
         return f'Proxy address={self.address} - initial-block-number={self.initial_block_number}' \
@@ -528,7 +528,7 @@ class SafeStatus(models.Model):
 
     class Meta:
         unique_together = (('internal_tx', 'address'),)
-        verbose_name_plural = 'Safe Statuses'
+        verbose_name_plural = 'Safe statuses'
 
     @property
     def block_number(self):
