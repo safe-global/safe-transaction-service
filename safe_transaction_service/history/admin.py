@@ -29,10 +29,11 @@ class EthereumTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type')
+    list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type', 'trace_address')
     list_filter = ('tx_type', 'call_type')
     list_select_related = ('ethereum_tx',)
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to']
+    ordering = ['-ethereum_tx__block_id', 'trace_address']
 
 
 @admin.register(InternalTxDecoded)
