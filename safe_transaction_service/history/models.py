@@ -494,7 +494,7 @@ class SafeStatusQuerySet(models.QuerySet):
 
 
 class ProxyFactory(models.Model):
-    objects = MonitoredAddressQuerySet.as_manager()
+    objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField()
     initial_block_number = models.IntegerField(default=0)  # Block number when proxy was created
     index_block_number = models.IntegerField(default=0)  # Block number of last scan
