@@ -81,7 +81,7 @@ class ProxyFactoryAdmin(admin.ModelAdmin):
 class SafeContractAdmin(admin.ModelAdmin):
     list_display = ('created_block_number', 'address', 'ethereum_tx_id')
     list_select_related = ('ethereum_tx',)
-    ordering = ['-internal_tx__ethereum_tx__block_id']
+    ordering = ['-ethereum_tx__block_id']
     search_fields = ['address']
 
     def created_block_number(self, obj: SafeContract) -> Optional[int]:
