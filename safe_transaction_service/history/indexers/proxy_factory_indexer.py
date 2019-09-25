@@ -9,7 +9,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import EthereumTx, MonitoredAddress, SafeContract
+from ..models import EthereumTx, MonitoredAddress, SafeContract, ProxyFactory
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
@@ -39,6 +39,10 @@ class ProxyIndexerService(TransactionIndexer):
     @property
     def database_field(self):
         return 'index_block_number'
+
+    @property
+    def database_model(self):
+        return ProxyFactory
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int) -> Set[str]:
