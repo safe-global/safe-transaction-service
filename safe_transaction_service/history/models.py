@@ -499,6 +499,9 @@ class ProxyFactory(models.Model):
     initial_block_number = models.IntegerField(default=0)  # Block number when proxy was created
     index_block_number = models.IntegerField(default=0)  # Block number of last scan
 
+    class Meta:
+        verbose_name_plural = "Proxy Factories"
+
     def __str__(self):
         return f'Proxy address={self.address} - initial-block-number={self.initial_block_number}' \
                f' - index-block-number={self.index_block_number}'
