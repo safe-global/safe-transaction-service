@@ -143,6 +143,7 @@ class TransactionIndexer(ABC):
         if parameters is None:
             return [], True
         from_block_number, to_block_number = parameters
+
         updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
         elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
         processed_objects = []

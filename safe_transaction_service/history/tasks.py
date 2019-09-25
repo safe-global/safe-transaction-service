@@ -17,7 +17,7 @@ from gnosis.eth import EthereumClientProvider
 from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import TxProcessor
-from .models import EthereumBlock, InternalTxDecoded, MonitoredAddress
+from .models import EthereumBlock, InternalTxDecoded, MonitoredAddress, ProxyFactory
 
 logger = get_task_logger(__name__)
 
@@ -142,11 +142,19 @@ def check_reorgs() -> Optional[int]:
     if first_reorg_block_number is not None:
         # Check concurrency problems
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
+
+        ProxyFactory.objects.filter(
+            index_block_number__gte=first_reorg_block_number
+        ).update(
+            index_block_number=first_reorg_block_number - 1
+        )
+
         MonitoredAddress.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).reset_block_number(
             block_number=first_reorg_block_number - 1
         )
+
         logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)
     return first_reorg_block_number
 
