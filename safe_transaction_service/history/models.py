@@ -463,14 +463,14 @@ class MonitoredAddress(models.Model):
                                     null=True, on_delete=models.SET_NULL, related_name='monitored_addresses')
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
-    events_block_number = models.IntegerField(null=True, default=None)  # Block number when last events scan ended
+    events_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
 
     class Meta:
         verbose_name_plural = "Monitored Addresses"
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
-               f' - Tx-block-number={self.tx_block_number} - Events-block-number={self.events_block_number}'
+               f' - Tx-block-number={self.tx_block_number}'
 
 
 class SafeStatusManager(models.Manager):
@@ -499,11 +499,18 @@ class ProxyFactory(models.Model):
     initial_block_number = models.IntegerField(default=0)  # Block number when proxy was created
     index_block_number = models.IntegerField(default=0)  # Block number of last scan
 
+    def __str__(self):
+        return f'Proxy address={self.address} - initial-block-number={self.initial_block_number}' \
+               f' - index-block-number={self.index_block_number}'
+
 
 class SafeContract(models.Model):
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
     # erc20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
+
+    def __str__(self):
+        return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
 
 
 class SafeStatus(models.Model):

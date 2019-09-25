@@ -1,8 +1,10 @@
+from typing import Optional
+
 from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MonitoredAddress, MultisigConfirmation,
-                     MultisigTransaction, SafeStatus)
+                     MultisigTransaction, SafeStatus, ProxyFactory, SafeContract)
 
 
 @admin.register(EthereumBlock)
@@ -67,6 +69,24 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     def executed(self, obj: MultisigTransaction):
         return obj.executed
     executed.boolean = True
+
+
+@admin.register(ProxyFactory)
+class ProxyFactoryAdmin(admin.ModelAdmin):
+    list_display = ('address', 'initial_block_number', 'index_block_number')
+    search_fields = ['address']
+
+
+@admin.register(SafeContract)
+class SafeContractAdmin(admin.ModelAdmin):
+    list_display = ('created_block_number', 'address', 'ethereum_tx_id')
+    list_select_related = ('ethereum_tx',)
+    ordering = ['-internal_tx__ethereum_tx__block_id']
+    search_fields = ['address']
+
+    def created_block_number(self, obj: SafeContract) -> Optional[int]:
+        if obj.ethereum_tx:
+            return obj.ethereum_tx.block_id
 
 
 @admin.register(SafeStatus)
