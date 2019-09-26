@@ -9,7 +9,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import EthereumTx, MonitoredAddress, SafeContract, ProxyFactory
+from ..models import EthereumTx, SafeContract, ProxyFactory
 from .transaction_indexer import TransactionIndexer
 
 logger = getLogger(__name__)
@@ -38,7 +38,7 @@ class ProxyIndexerService(TransactionIndexer):
 
     @property
     def database_field(self):
-        return 'index_block_number'
+        return 'tx_block_number'
 
     @property
     def database_model(self):
@@ -86,7 +86,7 @@ class ProxyIndexerService(TransactionIndexer):
                   len(logs), from_block_number, to_block_number)
         return logs
 
-    def process_element(self, log: Dict[str, any]) -> List[MonitoredAddress]:
+    def process_element(self, log: Dict[str, any]) -> List[SafeContract]:
         """
         Process every log
         :param log: Log fetched using `web3.eth.getLogs`

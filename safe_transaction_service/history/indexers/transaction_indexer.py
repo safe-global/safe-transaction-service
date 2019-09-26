@@ -86,7 +86,7 @@ class TransactionIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        return self.database_model.objects.almost_updated(current_block_number, self.database_field,
+        return self.database_model.objects.almost_updated(self.database_field, current_block_number,
                                                           self.updated_blocks_behind, self.confirmations)
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
@@ -95,7 +95,7 @@ class TransactionIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        return self.database_model.objects.not_updated(current_block_number, self.database_field, self.confirmations)
+        return self.database_model.objects.not_updated(self.database_field, current_block_number, self.confirmations)
 
     def update_monitored_address(self, addresses: List[str], to_block_number: int) -> int:
         return self.database_model.objects.update_addresses(addresses, to_block_number, self.database_field)

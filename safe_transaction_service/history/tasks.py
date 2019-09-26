@@ -144,9 +144,9 @@ def check_reorgs() -> Optional[int]:
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
 
         ProxyFactory.objects.filter(
-            index_block_number__gte=first_reorg_block_number
+            tx_block_number__gte=first_reorg_block_number
         ).update(
-            index_block_number=first_reorg_block_number - 1
+            tx_block_number=first_reorg_block_number - 1
         )
 
         MonitoredAddress.objects.filter(

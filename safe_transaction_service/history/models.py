@@ -420,29 +420,18 @@ def bind_confirmation(sender: Type[models.Model], instance: Union[MultisigConfir
 
 
 class MonitoredAddressManager(models.Manager):
-    def create_from_address(self, address: str, initial_block_number: int,
-                            ethereum_tx: EthereumTx = None) -> 'MonitoredAddress':
-        monitored_address, _ = self.get_or_create(address=address,
-                                                  defaults={
-                                                      'ethereum_tx': ethereum_tx,
-                                                      'initial_block_number': initial_block_number,
-                                                      'tx_block_number': initial_block_number,
-                                                      'events_block_number': initial_block_number,
-                                                  })
-        return monitored_address
-
     def update_addresses(self, addresses: List[str], block_number: str, database_field: str) -> int:
         return self.filter(address__in=addresses).update(**{database_field: block_number})
 
 
 class MonitoredAddressQuerySet(models.QuerySet):
-    def almost_updated(self, current_block_number: int, database_field: str,
+    def almost_updated(self, database_field: str, current_block_number: int,
                        confirmations: int, updated_blocks_behind: int):
         return self.filter(
             **{database_field + '__lt': current_block_number - confirmations,
                database_field + '__gt': current_block_number - updated_blocks_behind})
 
-    def not_updated(self, current_block_number: int, database_field: str, confirmations: int):
+    def not_updated(self, database_field: str, current_block_number: int, confirmations: int):
         return self.filter(
             **{database_field + '__lt': current_block_number - confirmations}
         )
@@ -457,20 +446,28 @@ class MonitoredAddressQuerySet(models.QuerySet):
 
 
 class MonitoredAddress(models.Model):
+    class Meta:
+        abstract = True
+        verbose_name_plural = "Monitored addresses"
+
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
-    ethereum_tx = models.ForeignKey(EthereumTx, blank=True,
-                                    null=True, on_delete=models.SET_NULL, related_name='monitored_addresses')
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
-    events_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
-
-    class Meta:
-        verbose_name_plural = "Monitored addresses"
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
                f' - Tx-block-number={self.tx_block_number}'
+
+
+class ProxyFactory(MonitoredAddress):
+    class Meta:
+        verbose_name_plural = "Proxy factories"
+
+
+class SafeMasterCopy(MonitoredAddress):
+    class Meta:
+        verbose_name_plural = "Safe Master Copies"
 
 
 class SafeStatusManager(models.Manager):
@@ -491,20 +488,6 @@ class SafeStatusQuerySet(models.QuerySet):
         if not safe_status:
            logger.error('SafeStatus not found for address=%s', address)
         return safe_status
-
-
-class ProxyFactory(models.Model):
-    objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
-    address = EthereumAddressField()
-    initial_block_number = models.IntegerField(default=0)  # Block number when proxy was created
-    index_block_number = models.IntegerField(default=0)  # Block number of last scan
-
-    class Meta:
-        verbose_name_plural = "Proxy factories"
-
-    def __str__(self):
-        return f'Proxy address={self.address} - initial-block-number={self.initial_block_number}' \
-               f' - index-block-number={self.index_block_number}'
 
 
 class SafeContract(models.Model):

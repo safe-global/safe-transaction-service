@@ -6,7 +6,7 @@ from django.db import transaction
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumTx, InternalTx, InternalTxDecoded
+from ..models import EthereumTx, InternalTx, InternalTxDecoded, SafeMasterCopy
 from .transaction_indexer import TransactionIndexer
 from .tx_decoder import CannotDecode, TxDecoder
 
@@ -35,6 +35,10 @@ class InternalTxIndexer(TransactionIndexer):
     @property
     def database_field(self):
         return 'tx_block_number'
+
+    @property
+    def database_model(self):
+        return SafeMasterCopy
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int) -> Set[str]:

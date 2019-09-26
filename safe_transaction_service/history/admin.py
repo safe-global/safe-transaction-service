@@ -4,7 +4,7 @@ from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MonitoredAddress, MultisigConfirmation,
-                     MultisigTransaction, SafeStatus, ProxyFactory, SafeContract)
+                     MultisigTransaction, SafeStatus, ProxyFactory, SafeContract, SafeMasterCopy)
 
 
 @admin.register(EthereumBlock)
@@ -47,12 +47,6 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
     search_fields = ['function_name', 'arguments', '=internal_tx__to']
 
 
-@admin.register(MonitoredAddress)
-class MonitoredAddressAdmin(admin.ModelAdmin):
-    list_display = ('address', 'ethereum_tx_id', 'initial_block_number', 'tx_block_number', 'events_block_number')
-    search_fields = ['address']
-
-
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
     list_display = ('multisig_transaction_hash', 'multisig_transaction_id', 'ethereum_tx_id', 'owner')
@@ -72,10 +66,19 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     executed.boolean = True
 
 
-@admin.register(ProxyFactory)
-class ProxyFactoryAdmin(admin.ModelAdmin):
-    list_display = ('address', 'initial_block_number', 'index_block_number')
+class MonitoredAddressAdmin(admin.ModelAdmin):
+    list_display = ('address', 'initial_block_number', 'tx_block_number')
     search_fields = ['address']
+
+
+@admin.register(SafeMasterCopy)
+class SafeMasterCopyAdmin(MonitoredAddressAdmin):
+    pass
+
+
+@admin.register(ProxyFactory)
+class ProxyFactoryAdmin(MonitoredAddressAdmin):
+    pass
 
 
 @admin.register(SafeContract)
