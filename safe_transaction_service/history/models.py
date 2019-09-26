@@ -467,7 +467,7 @@ class ProxyFactory(MonitoredAddress):
 
 class SafeMasterCopy(MonitoredAddress):
     class Meta:
-        verbose_name_plural = "Safe Master Copies"
+        verbose_name_plural = "Safe master copies"
 
 
 class SafeStatusManager(models.Manager):
