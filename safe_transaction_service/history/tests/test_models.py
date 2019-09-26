@@ -5,7 +5,7 @@ from django.test import TestCase
 from eth_account import Account
 from web3 import Web3
 
-from ..models import MultisigConfirmation, MultisigTransaction
+from ..models import MultisigConfirmation, MultisigTransaction, SafeStatus
 from .factories import EthereumTxFactory
 
 logger = logging.getLogger(__name__)
@@ -62,3 +62,11 @@ class TestModels(TestCase):
             owner=Account.create().address
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
+
+    def test_safe_status_store_new(self):
+        # InternalTxFactory
+        # safe_status = SafeStatus.objects.create()
+        # self.assertEqual(SafeStatus.objects.all().count(), 1)
+        # safe_status.store_new()
+        # self.assertEqual(SafeStatus.objects.all().count(), 1)
+        pass

@@ -9,7 +9,7 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 
 from ..models import (ConfirmationType, EthereumBlock, EthereumTx,
-                      MultisigConfirmation, MultisigTransaction)
+                      MultisigConfirmation, MultisigTransaction, InternalTx, EthereumTxType, EthereumTxCallType)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -37,6 +37,27 @@ class EthereumTxFactory(factory.DjangoModelFactory):
     nonce = factory.Sequence(lambda n: n)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
+
+
+class InternalTxFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = InternalTx
+
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
+    _from = factory.LazyFunction(lambda: Account.create().address)
+    gas = factory.fuzzy.FuzzyInteger(1000, 5000)
+    data = factory.Sequence(lambda n: HexBytes('%x' % (n + 1000)))
+    to = factory.LazyFunction(lambda: Account.create().address)
+    value = factory.fuzzy.FuzzyInteger(0, 1000)
+    gas_used = factory.fuzzy.FuzzyInteger(1000, 5000)
+    contract_address = None
+    code = None
+    output = None
+    refund_address = NULL_ADDRESS
+    tx_type = EthereumTxType.CALL.value
+    call_type = EthereumTxCallType.CALL.value
+    trace_address = factory.Sequence(lambda n: n)
+    error = None
 
 
 class MultisigTransactionFactory(factory.DjangoModelFactory):
