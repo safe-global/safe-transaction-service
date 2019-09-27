@@ -48,7 +48,7 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
             raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
                                   f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
 
-        # Check there's not duplicated tx with same nonce for the same Safe.
+        # Check there's not duplicated tx with same `nonce` for the same Safe.
         # We allow duplicated if existing tx is not executed
         try:
             multisig_transaction: MultisigTransaction = MultisigTransaction.objects.exclude(
@@ -69,7 +69,7 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
             try:
                 # TODO Fix this, we can use SafeStatus now
                 if not safe.retrieve_is_owner(data['sender'],
-                                              block_identifier=max(0, ethereum_client.current_block_number - 100)):
+                                              block_identifier=max(0, ethereum_client.current_block_number - 20)):
                     raise ValidationError('User is not an owner')
             except BadFunctionCallOutput:  # If it didn't exist 100 blocks ago
                 raise ValidationError('User is not an owner')
