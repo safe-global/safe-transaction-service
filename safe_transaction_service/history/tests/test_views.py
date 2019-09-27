@@ -58,7 +58,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "gasToken": "0x0000000000000000000000000000000000000000",
                 "refundReceiver": "0x0000000000000000000000000000000000000000",
                 # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
-                "transactionHash": "0x57f45a05893cc426d7465c7118842b0806a3d83bc994403fa25a4a7fdc28c805",
                 "sender": safe_owner_1.address,
                 }
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
@@ -86,8 +85,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
         self.assertEqual(response.data['results'][0]['confirmations'][0]['signature'], data['signature'])
 
-        # Sign with a random user (not owner)
-        data['signature'] = Account.create().signHash(safe_tx.safe_tx_hash)['signature'].hex()
+        # Sign with a different user that sender
+        random_user_account = Account.create()
+        data['signature'] = random_user_account.signHash(safe_tx.safe_tx_hash)['signature'].hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertIn('Signature does not match sender', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Sign with a random user (not owner)
+        data['sender'] = random_user_account.address
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertIn('User is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
