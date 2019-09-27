@@ -23,18 +23,19 @@ class TxProcessor:
         """
         function_name = internal_tx_decoded.function_name
         arguments = internal_tx_decoded.arguments
-        contract_address = internal_tx_decoded.internal_tx.to
+        internal_tx = internal_tx_decoded.internal_tx
+        contract_address = internal_tx.to
         processed = True
         if function_name == 'setup':
             # We need to get the master_copy from the next trace `DELEGATE_CALL`
-            next_trace = internal_tx_decoded.internal_tx.get_next_trace()
+            next_trace = internal_tx.get_next_trace()
             if next_trace:
                 master_copy = next_trace.to
             else:
                 master_copy = NULL_ADDRESS
             owners = arguments['_owners']
             threshold = arguments['_threshold']
-            SafeStatus.objects.create(internal_tx=internal_tx_decoded.internal_tx,
+            SafeStatus.objects.create(internal_tx=internal_tx,
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=0, master_copy=master_copy)
         elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
@@ -47,26 +48,26 @@ class TxProcessor:
                 else:  # removeOwner, removeOwnerWithThreshold
                     safe_status.owners.remove(owner)
             except ValueError:
-                logger.warning('Error processing trace=%s for contract=%s with tx-hash=%s',
-                               internal_tx_decoded.internal_tx.trace_address, contract_address,
-                               internal_tx_decoded.internal_tx.ethereum_tx_id)
-            safe_status.store_new()
+                logger.error('Error processing trace=%s for contract=%s with tx-hash=%s',
+                             internal_tx.trace_address, contract_address,
+                             internal_tx.ethereum_tx_id)
+            safe_status.store_new(internal_tx)
         elif function_name == 'swapOwner':
             old_owner = arguments['oldOwner']
             new_owner = arguments['newOwner']
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             safe_status.owners.remove(old_owner)
             safe_status.owners.append(new_owner)
-            safe_status.store_new()
+            safe_status.store_new(internal_tx)
         elif function_name == 'changeThreshold':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
-            safe_status.store_new()
+            safe_status.store_new(internal_tx)
         elif function_name == 'changeMasterCopy':
             # TODO Ban address if it doesn't have a valid master copy
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             safe_status.master_copy = arguments['_masterCopy']
-            safe_status.store_new()
+            safe_status.store_new(internal_tx)
         elif function_name == 'execTransaction':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             nonce = safe_status.nonce
@@ -76,7 +77,7 @@ class TxProcessor:
                              HexBytes(arguments['signatures']), safe_nonce=nonce)
             safe_tx_hash = safe_tx.safe_tx_hash
 
-            ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
+            ethereum_tx = internal_tx.ethereum_tx
             multisig_tx, created = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={
@@ -100,11 +101,11 @@ class TxProcessor:
                 multisig_tx.save(update_fields=['ethereum_tx'])
 
             safe_status.nonce = nonce + 1
-            safe_status.store_new()
+            safe_status.store_new(internal_tx)
         elif function_name == 'approveHash':
             multisig_transaction_hash = arguments['hashToApprove']
-            ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
-            owner = internal_tx_decoded.internal_tx._from
+            ethereum_tx = internal_tx.ethereum_tx
+            owner = internal_tx._from
             try:
                 multisig_transaction = MultisigTransaction.objects.get(
                     safe_tx_hash=multisig_transaction_hash

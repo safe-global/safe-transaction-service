@@ -6,7 +6,7 @@ from eth_account import Account
 from web3 import Web3
 
 from ..models import MultisigConfirmation, MultisigTransaction, SafeStatus
-from .factories import EthereumTxFactory
+from .factories import EthereumTxFactory, SafeStatusFactory, InternalTxFactory
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,8 @@ class TestModels(TestCase):
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
     def test_safe_status_store_new(self):
-        # InternalTxFactory
-        # safe_status = SafeStatus.objects.create()
-        # self.assertEqual(SafeStatus.objects.all().count(), 1)
-        # safe_status.store_new()
-        # self.assertEqual(SafeStatus.objects.all().count(), 1)
-        pass
+        safe_status = SafeStatusFactory()
+        self.assertEqual(SafeStatus.objects.all().count(), 1)
+        internal_tx = InternalTxFactory()
+        safe_status.store_new(internal_tx)
+        self.assertEqual(SafeStatus.objects.all().count(), 2)

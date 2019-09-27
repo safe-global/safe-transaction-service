@@ -278,7 +278,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
     def not_processed(self):
         return self.filter(processed=False)
 
-    def pending(self):
+    def pending_for_safes(self):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
@@ -520,6 +520,6 @@ class SafeStatus(models.Model):
     def __str__(self):
         return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
 
-    def store_new(self) -> None:
-        self.id = None
+    def store_new(self, internal_tx: InternalTx) -> None:
+        self.internal_tx = internal_tx
         return self.save()

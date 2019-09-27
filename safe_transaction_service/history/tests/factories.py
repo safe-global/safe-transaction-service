@@ -9,7 +9,8 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 
 from ..models import (ConfirmationType, EthereumBlock, EthereumTx,
-                      MultisigConfirmation, MultisigTransaction, InternalTx, EthereumTxType, EthereumTxCallType)
+                      MultisigConfirmation, MultisigTransaction, InternalTx, EthereumTxType, EthereumTxCallType,
+                      SafeStatus)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -88,3 +89,15 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
     multisig_transaction = factory.SubFactory(MultisigTransaction)
     multisig_transaction_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
+
+
+class SafeStatusFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = SafeStatus
+
+    internal_tx = factory.SubFactory(InternalTxFactory)
+    address = factory.LazyFunction(lambda: Account.create().address)
+    owners = factory.LazyFunction(lambda: [Account.create().address for _ in range(4)])
+    threshold = FuzzyInteger(low=1, high=2)
+    nonce = factory.Sequence(lambda n: n)
+    master_copy = factory.LazyFunction(lambda: Account.create().address)
