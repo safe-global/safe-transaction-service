@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional, Any, Dict
 
 from eth_account import Account
 from hexbytes import HexBytes
@@ -136,9 +137,10 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
     safe_tx_hash = Sha3HashField()
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
-    submission_date = serializers.DateTimeField(source='created')
-    execution_date = serializers.DateTimeField()
+    submission_date = serializers.DateTimeField(source='created')  # First seen by this service
     is_executed = serializers.BooleanField(source='executed')
+    execution_date = serializers.DateTimeField()
+    executor = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
@@ -148,16 +150,19 @@ class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
 
         super().__init__(*args, **kwargs)
 
-    def get_confirmations(self, obj):
+    def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
+        if obj.ethereum_tx_id:
+            return obj.ethereum_tx._from
+
+    def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
         Filters confirmations queryset
         :param obj: MultisigConfirmation instance
-        :return: serialized queryset
+        :return: Serialized queryset
         """
         if self.owners:
             confirmations = obj.confirmations.filter(owner__in=self.owners, multisig_transaction=obj)
         else:
-            # TODO obj.confirmations
-            confirmations = MultisigConfirmation.objects.filter(multisig_transaction=obj)
+            confirmations = obj.confirmations
 
         return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data

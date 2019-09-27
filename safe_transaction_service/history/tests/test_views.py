@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from web3 import Web3
 
 from .factories import MultisigConfirmationFactory, MultisigTransactionFactory
 
@@ -25,6 +26,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
+        self.assertTrue(Web3.isChecksumAddress(response.data['results'][0]['executor']))
         self.assertEqual(response.data['results'][0]['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
         # Test camelCase
         self.assertEqual(response.json()['results'][0]['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
@@ -70,6 +72,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
+        self.assertIsNone(response.data['results'][0]['executor'])
         self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
 
         # Test confirmation with signature

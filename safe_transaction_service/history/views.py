@@ -51,7 +51,9 @@ class SafeMultisigTransactionListView(ListAPIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        multisig_transactions = MultisigTransaction.objects.filter(safe=address).order_by('-nonce')
+        multisig_transactions = MultisigTransaction.objects.select_related('ethereum_tx').filter(
+            safe=address
+        ).order_by('-nonce')
 
         if multisig_transactions.count() == 0:
             return Response(status=status.HTTP_404_NOT_FOUND)
