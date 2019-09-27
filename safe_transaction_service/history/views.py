@@ -61,9 +61,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             '-nonce'
         )
 
-        if multisig_transactions.count() == 0:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         # Check if the 'owners' query parameter was passed in input
         query_owners = self.request.query_params.get('owners', None)
         owners = [owner for owner in query_owners.split(',') if owner != ''] if query_owners else None
@@ -71,6 +68,9 @@ class SafeMultisigTransactionListView(ListAPIView):
         serializer = self.get_serializer(multisig_transactions, many=True, owners=owners)
         # Paginate results
         page = self.paginate_queryset(serializer.data)
+        if not page:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         pagination = self.get_paginated_response(page)
         return Response(status=status.HTTP_200_OK, data=pagination.data)
 
