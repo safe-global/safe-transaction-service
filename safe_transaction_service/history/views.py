@@ -55,7 +55,13 @@ class SafeMultisigTransactionListView(ListAPIView):
         except ValueError:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        multisig_transactions = MultisigTransaction.objects.filter(safe=address)
+        multisig_transactions = MultisigTransaction.objects.filter(
+            safe=address
+        ).prefetch_related(
+            'confirmations'
+        ).order_by(
+            '-nonce'
+        )
 
         if multisig_transactions.count() == 0:
             return Response(status=status.HTTP_404_NOT_FOUND)
