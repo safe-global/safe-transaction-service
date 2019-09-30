@@ -90,7 +90,7 @@ class ProxyIndexerService(TransactionIndexer):
         """
         Process every log
         :param log: Log fetched using `web3.eth.getLogs`
-        :return: List of `Erc20TransferEvent` already stored in database
+        :return: List of `SafeContract` already stored in database
         """
         ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(log['transactionHash'])
         int_address = int.from_bytes(HexBytes(log['data']), byteorder='big')
