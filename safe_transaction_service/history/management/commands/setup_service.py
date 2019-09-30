@@ -24,7 +24,7 @@ class Command(BaseCommand):
     help = 'Setup Transaction Service Required Tasks'
     tasks = [
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
-                                'Index Internal Txs', 15, IntervalSchedule.SECONDS),
+                                'Index Internal Txs', 14, IntervalSchedule.SECONDS),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
                                 'Index new Proxies', 15, IntervalSchedule.SECONDS),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
