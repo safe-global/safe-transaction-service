@@ -16,8 +16,9 @@ from gnosis.eth import EthereumClientProvider
 
 from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
-from .indexers.tx_processor import TxProcessor
-from .models import EthereumBlock, InternalTxDecoded, MonitoredAddress, ProxyFactory
+from .indexers.tx_processor import SafeTxProcessor, TxProcessor
+from .models import (EthereumBlock, InternalTxDecoded, MonitoredAddress,
+                     ProxyFactory)
 
 logger = get_task_logger(__name__)
 
@@ -110,7 +111,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            tx_processor = TxProcessor()
+            tx_processor: TxProcessor = SafeTxProcessor()
             number_processed = 0
             for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes():
                 processed = tx_processor.process_decoded_transaction(internal_tx_decoded)

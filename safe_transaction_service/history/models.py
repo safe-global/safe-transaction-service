@@ -346,8 +346,8 @@ class MultisigTransaction(TimeStampedModel):
         return None
 
     @property
-    def executed(self) -> Optional[bool]:
-        return self.ethereum_tx_id and (self.ethereum_tx.block_id is not None)
+    def executed(self) -> bool:
+        return bool(self.ethereum_tx_id and (self.ethereum_tx.block_id is not None))
 
     def owners(self) -> Optional[List[str]]:
         if not self.signatures:

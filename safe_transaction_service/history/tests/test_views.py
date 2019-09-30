@@ -5,10 +5,10 @@ from django.urls import reverse
 from eth_account import Account
 from rest_framework import status
 from rest_framework.test import APITestCase
+from web3 import Web3
 
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
-from web3 import Web3
 
 from .factories import MultisigConfirmationFactory, MultisigTransactionFactory
 

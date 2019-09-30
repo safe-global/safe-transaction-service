@@ -22,10 +22,20 @@ class CannotDecode(TxDecoderException):
 
 
 class TxDecoder:
+    """
+    Decode txs for supported contracts
+    """
     def __init__(self):
         self.supported_contracts = [get_safe_contract(Web3())]
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
+        """
+        Decode tx data
+        :param data: Tx data as `hex string` or `bytes`
+        :return: Tuple with the `function name` and a dictionary with the arguments of the function
+        :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
+        :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
+        """
         try:
             for contract in self.supported_contracts:
                 contract_function, arguments = contract.decode_function_input(data)

@@ -6,7 +6,7 @@ from eth_account import Account
 from web3 import Web3
 
 from ..models import MultisigConfirmation, MultisigTransaction, SafeStatus
-from .factories import EthereumTxFactory, SafeStatusFactory, InternalTxFactory
+from .factories import EthereumTxFactory, InternalTxFactory, SafeStatusFactory
 
 logger = logging.getLogger(__name__)
 

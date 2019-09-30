@@ -9,8 +9,8 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 
 from ..models import (ConfirmationType, EthereumBlock, EthereumTx,
-                      MultisigConfirmation, MultisigTransaction, InternalTx, EthereumTxType, EthereumTxCallType,
-                      SafeStatus)
+                      EthereumTxCallType, EthereumTxType, InternalTx,
+                      MultisigConfirmation, MultisigTransaction, SafeStatus)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
 
 from eth_account import Account
 from hexbytes import HexBytes

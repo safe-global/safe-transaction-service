@@ -4,7 +4,8 @@ from django.contrib import admin
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MultisigConfirmation,
-                     MultisigTransaction, SafeStatus, ProxyFactory, SafeContract, SafeMasterCopy)
+                     MultisigTransaction, ProxyFactory, SafeContract,
+                     SafeMasterCopy, SafeStatus)
 
 
 @admin.register(EthereumBlock)

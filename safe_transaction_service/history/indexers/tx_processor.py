@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from logging import getLogger
 
 from django.db import transaction
@@ -13,7 +14,16 @@ from ..models import (InternalTxDecoded, MultisigConfirmation,
 logger = getLogger(__name__)
 
 
-class TxProcessor:
+class TxProcessor(ABC):
+    @abstractmethod
+    def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
+        pass
+
+
+class SafeTxProcessor(TxProcessor):
+    """
+    Processor for txs on Safe Contracts v1.0.0
+    """
     @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """
@@ -98,7 +108,7 @@ class TxProcessor:
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.signatures = arguments['signatures']
-                multisig_tx.save(update_fields=['ethereum_tx'])
+                multisig_tx.save(update_fields=['ethereum_tx', 'signatures'])
 
             safe_status.nonce = nonce + 1
             safe_status.store_new(internal_tx)
