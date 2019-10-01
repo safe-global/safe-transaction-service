@@ -313,16 +313,20 @@ class InternalTxDecoded(models.Model):
         verbose_name_plural = "Internal txs decoded"
 
     @property
-    def address(self):
-        return self.internal_tx.to
+    def address(self) -> str:
+        return self.internal_tx._from
 
     @property
-    def block_number(self):
+    def block_number(self) -> int:
         return self.internal_tx.ethereum_tx.block_id
+
+    @property
+    def tx_hash(self) -> str:
+        return self.internal_tx.ethereum_tx_id
 
     def set_processed(self):
         self.processed = True
-        self.save(update_fields=['processed'])
+        return self.save(update_fields=['processed'])
 
 
 class MultisigTransaction(TimeStampedModel):

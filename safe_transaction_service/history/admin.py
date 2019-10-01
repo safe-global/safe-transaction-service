@@ -39,13 +39,13 @@ class InternalTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
-    list_display = ('block_number', 'internal_tx_id', 'processed', 'address', 'function_name', 'arguments')
+    list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',
                 '-internal_tx_id']
     list_select_related = ('internal_tx__ethereum_tx',)
-    search_fields = ['function_name', 'arguments', '=internal_tx__to']
+    search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from']
 
 
 @admin.register(MultisigConfirmation)
