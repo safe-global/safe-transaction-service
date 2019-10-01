@@ -8,6 +8,7 @@ from gnosis.safe import Safe
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from web3.exceptions import BadFunctionCallOutput
 
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 
@@ -51,10 +52,13 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         contract_transaction_hash = safe_tx.safe_tx_hash
 
         # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
-        if (not safe.retrieve_is_owner(data['sender'])
-                and not safe.retrieve_is_owner(data['sender'],
-                                               block_identifier=ethereum_client.current_block_number - 100)):
-            raise ValidationError('User is not an owner')
+        if not safe.retrieve_is_owner(data['sender']):
+            try:
+                if not safe.retrieve_is_owner(data['sender'],
+                                              block_identifier=ethereum_client.current_block_number - 20):
+                    raise ValidationError('User is not an owner')
+            except BadFunctionCallOutput:
+                raise ValidationError('User is not an owner')
 
         if contract_transaction_hash != data['contract_transaction_hash']:
             raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash} '
