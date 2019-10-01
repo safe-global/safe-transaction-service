@@ -34,15 +34,16 @@ class SafeTxProcessor(TxProcessor):
         function_name = internal_tx_decoded.function_name
         arguments = internal_tx_decoded.arguments
         internal_tx = internal_tx_decoded.internal_tx
-        contract_address = internal_tx.to
+        contract_address = internal_tx._from
+        master_copy = internal_tx.to
         processed = True
         if function_name == 'setup':
             # We need to get the master_copy from the next trace `DELEGATE_CALL`
-            next_trace = internal_tx.get_next_trace()
-            if next_trace:
-                master_copy = next_trace.to
-            else:
-                master_copy = NULL_ADDRESS
+            #next_trace = internal_tx.get_next_trace()
+            #if next_trace:
+            #    master_copy = next_trace.to
+            #else:
+            #    master_copy = NULL_ADDRESS
             owners = arguments['_owners']
             threshold = arguments['_threshold']
             SafeStatus.objects.create(internal_tx=internal_tx,
