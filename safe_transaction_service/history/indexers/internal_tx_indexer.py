@@ -88,9 +88,9 @@ class InternalTxIndexer(TransactionIndexer):
         logger.info('Processing trace')
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
 
-        # Decode internal tx if it's a call/delegate call and has data
+        # Decode internal tx if it's a delegate call (not call) and has data
         # As creation of traces are atomic, we can never have an internal_tx without the decoded internal tx
-        if internal_tx.can_be_decoded and created:
+        if created and internal_tx.can_be_decoded:
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
                 internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,

@@ -163,6 +163,11 @@ class EthereumTx(TimeStampedModel):
     def __str__(self):
         return '{} from={} to={}'.format(self.tx_hash, self._from, self.to)
 
+    @property
+    def success(self) -> Optional[bool]:
+        if self.status is not None:
+            return self.status == 1
+
 
 class EthereumEvent(models.Model):
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='events')
@@ -241,9 +246,10 @@ class InternalTx(models.Model):
     @property
     def can_be_decoded(self):
         return (self.is_call
-                and not self.is_delegate_call
+                and self.is_delegate_call
                 and not self.error
-                and self.data)
+                and self.data
+                and self.ethereum_tx.success)
 
     @property
     def is_call(self):

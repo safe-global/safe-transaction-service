@@ -81,10 +81,16 @@ class SafeTxProcessor(TxProcessor):
         elif function_name == 'execTransaction':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             nonce = safe_status.nonce
+            if 'baseGas' in arguments:
+                base_gas = arguments['baseGas']
+                safe_version = '1.0.0'
+            else:
+                base_gas = arguments['dataGas']
+                safe_version = '0.0.1'
             safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'], arguments['data'],
-                             arguments['operation'], arguments['safeTxGas'], arguments['baseGas'],
+                             arguments['operation'], arguments['safeTxGas'], base_gas,
                              arguments['gasPrice'], arguments['gasToken'], arguments['refundReceiver'],
-                             HexBytes(arguments['signatures']), safe_nonce=nonce)
+                             HexBytes(arguments['signatures']), safe_nonce=nonce, safe_version=safe_version)
             safe_tx_hash = safe_tx.safe_tx_hash
 
             ethereum_tx = internal_tx.ethereum_tx

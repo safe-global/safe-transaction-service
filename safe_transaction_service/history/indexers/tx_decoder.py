@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple, Union
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth.contracts import get_safe_contract
+from gnosis.eth.contracts import get_safe_contract, get_old_safe_contract
 
 logger = getLogger(__name__)
 
@@ -26,7 +26,7 @@ class TxDecoder:
     Decode txs for supported contracts
     """
     def __init__(self):
-        self.supported_contracts = [get_safe_contract(Web3())]
+        self.supported_contracts = [get_safe_contract(Web3()), get_old_safe_contract(Web3())]
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """
@@ -36,14 +36,14 @@ class TxDecoder:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
-        try:
-            for contract in self.supported_contracts:
+        for contract in self.supported_contracts:
+            try:
                 contract_function, arguments = contract.decode_function_input(data)
                 function_name = contract_function.fn_name
                 return function_name, self.__parse_decoded_arguments(arguments)
-        except ValueError as exc:  # ValueError: Could not find any function with matching selector
-            if not exc.args or exc.args[0] != 'Could not find any function with matching selector':
-                raise UnexpectedProblemDecoding from exc
+            except ValueError as exc:  # ValueError: Could not find any function with matching selector
+                if not exc.args or exc.args[0] != 'Could not find any function with matching selector':
+                    raise UnexpectedProblemDecoding from exc
         raise CannotDecode(HexBytes(data).hex())
 
     def __parse_decoded_arguments(self, decoded: Dict[str, Any]) -> Dict[str, Any]:
