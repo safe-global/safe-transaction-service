@@ -106,6 +106,9 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
+    def create_or_update_from_tx_hashes(self, tx_hash: str) -> List['EthereumTx']:
+        pass
+
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
         ethereum_client = EthereumClientProvider()
         try:
