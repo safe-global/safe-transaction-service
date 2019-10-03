@@ -131,7 +131,6 @@ class EthereumTxManager(models.Manager):
                 return ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
-                tx = ethereum_client.get_transaction(tx['hash'])
                 return self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
 
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
