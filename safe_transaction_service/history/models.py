@@ -118,6 +118,7 @@ class EthereumTxManager(models.Manager):
         txs = ethereum_client.get_transactions(tx_hashes)
         tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes)
         blocks = ethereum_client.get_blocks([tx['blockNumber'] for tx in txs])
+        ethereum_txs = []
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
@@ -128,10 +129,11 @@ class EthereumTxManager(models.Manager):
                     ethereum_tx.status = tx_receipt['status']
                     ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                     ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
-                return ethereum_tx
+                ethereum_txs.append(ethereum_tx)
             except self.model.DoesNotExist:
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
-                return self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
+                ethereum_txs.append(self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block))
+        return ethereum_txs
 
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
         ethereum_client = EthereumClientProvider()
