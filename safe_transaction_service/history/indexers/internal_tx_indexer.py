@@ -69,7 +69,9 @@ class InternalTxIndexer(TransactionIndexer):
 
         # TODO Remove from here. Prefetch txs
         if transaction_hashes:
+            logger.info('Prefetching txs')
             EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes)
+            logger.info('End prefetching of txs')
 
         return transaction_hashes
 
