@@ -31,6 +31,7 @@ class InternalTxIndexer(TransactionIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
+        self.cached_ethereum_txs = {}
 
     @property
     def database_field(self):
@@ -70,7 +71,8 @@ class InternalTxIndexer(TransactionIndexer):
         # TODO Remove from here. Prefetch txs
         if transaction_hashes:
             logger.info('Prefetching txs')
-            EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes)
+            for ethereum_tx in EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes):
+                self.cached_ethereum_txs[ethereum_tx.hash] = ethereum_tx
             logger.info('End prefetching of txs')
 
         return transaction_hashes
@@ -86,7 +88,9 @@ class InternalTxIndexer(TransactionIndexer):
         traces = self.ethereum_client.parity.trace_transaction(tx_hash)
         logger.info('Got traces %d for tx-hash=%s', len(traces), tx_hash)
         logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
-        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
+        # ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
+        ethereum_tx = self.cached_ethereum_txs[tx_hash]
+        del self.cached_ethereum_txs[tx_hash]
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
         return [self._process_trace(trace, ethereum_tx) for trace in traces]
 
