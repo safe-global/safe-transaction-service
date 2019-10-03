@@ -67,6 +67,10 @@ class InternalTxIndexer(TransactionIndexer):
         log_fn('Found %d relevant txs with %d internal txs between block-number=%d and block-number=%d. Addresses=%s',
                len(to_traces + from_traces), len(transaction_hashes), from_block_number, to_block_number, addresses)
 
+        # TODO Remove from here. Prefetch txs
+        if transaction_hashes:
+            EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes)
+
         return transaction_hashes
 
     @transaction.atomic
