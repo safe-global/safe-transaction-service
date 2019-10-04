@@ -1,7 +1,7 @@
 import concurrent
 from collections import OrderedDict
 from logging import getLogger
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Tuple
 
 from django.db import transaction
 
@@ -84,8 +84,8 @@ class InternalTxIndexer(TransactionIndexer):
         return tx_hashes
 
     @transaction.atomic
-    def process_all(self) -> int:
-        return super().process_all()
+    def process_addresses(self, addresses: List[str]) -> Tuple[List[Any], bool]:
+        return super().process_addresses(addresses)
 
     def process_element(self, tx_hash: str) -> List[InternalTx]:
         """
@@ -121,7 +121,7 @@ class InternalTxIndexer(TransactionIndexer):
             if internal_tx.can_be_decoded:
                 try:
                     function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                    print(internal_tx)
+                    # TODO How is internal_tx None??
                     internal_txs_decoded.append(InternalTxDecoded(internal_tx=internal_tx,
                                                                   function_name=function_name,
                                                                   arguments=arguments))
