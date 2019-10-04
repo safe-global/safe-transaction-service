@@ -213,6 +213,28 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(models.Manager):
+    def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
+        tx_type = EthereumTxType.parse(trace['type'])
+        call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
+        trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
+        return InternalTx(
+            ethereum_tx=ethereum_tx,
+            trace_address=trace_address_str,
+            _from=trace['action'].get('from'),
+            gas=trace['action'].get('gas', 0),
+            data=trace['action'].get('input') or trace['action'].get('init'),
+            to=trace['action'].get('to') or trace['action'].get('address'),
+            value=trace['action'].get('value') or trace['action'].get('balance', 0),
+            gas_used=(trace.get('result') or {}).get('gasUsed', 0),
+            contract_address=(trace.get('result') or {}).get('address'),
+            code=(trace.get('result') or {}).get('code'),
+            output=(trace.get('result') or {}).get('output'),
+            refund_address=trace['action'].get('refundAddress'),
+            tx_type=tx_type.value,
+            call_type=call_type.value if call_type else None,
+            error=trace.get('error')
+        )
+
     def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))

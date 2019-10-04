@@ -99,7 +99,8 @@ class InternalTxIndexer(TransactionIndexer):
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
 
-        return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        return self._process_traces(traces, ethereum_tx)
+        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
         # Use multiprocessing to process traces in parallel
         # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         #     future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
@@ -108,7 +109,22 @@ class InternalTxIndexer(TransactionIndexer):
         #     return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
     def _process_traces(self, traces: List[Dict[str, Any]], ethereum_tx: EthereumTx) -> InternalTx:
-        pass
+        internal_txs = InternalTx.objects.bulk_create([InternalTx.objects.build_from_trace(trace, ethereum_tx)
+                                                       for trace in traces],
+                                                      ignore_conflicts=True)
+        internal_txs_decoded = []
+        for internal_tx in internal_txs:
+            if internal_tx.can_be_decoded:
+                try:
+                    function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
+                    internal_txs_decoded.append(InternalTxDecoded(internal_tx=internal_tx,
+                                                                  function_name=function_name,
+                                                                  arguments=arguments))
+                except CannotDecode:
+                    pass
+        if internal_txs_decoded:
+            InternalTxDecoded.objects.bulk_create(internal_txs_decoded, ignore_conflicts=True)
+        return internal_txs
 
     def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
         logger.info('Processing trace')
