@@ -107,6 +107,9 @@ class InternalTxIndexer(TransactionIndexer):
         #
         #     return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
+    def _process_traces(self, traces: List[Dict[str, Any]], ethereum_tx: EthereumTx) -> InternalTx:
+        pass
+
     def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
         logger.info('Processing trace')
         internal_tx, created = InternalTx.objects.get_or_create_from_trace(trace, ethereum_tx)
@@ -116,11 +119,9 @@ class InternalTxIndexer(TransactionIndexer):
         if created and internal_tx.can_be_decoded:
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                internal_tx_decoded, _ = InternalTxDecoded.objects.get_or_create(internal_tx=internal_tx,
-                                                                                 defaults={
-                                                                                     'function_name': function_name,
-                                                                                     'arguments': arguments,
-                                                                                 })
+                internal_tx_decoded, _ = InternalTxDecoded.objects.create(internal_tx=internal_tx,
+                                                                          function_name=function_name,
+                                                                          arguments=arguments)
             except CannotDecode:
                 pass
 
