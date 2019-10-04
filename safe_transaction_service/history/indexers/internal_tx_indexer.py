@@ -102,8 +102,8 @@ class InternalTxIndexer(TransactionIndexer):
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
 
-        # return self._process_traces(traces, ethereum_tx)
-        return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        return self._process_traces(traces, ethereum_tx)
+        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
         # Use multiprocessing to process traces in parallel
         # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         #     future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
@@ -119,9 +119,11 @@ class InternalTxIndexer(TransactionIndexer):
         internal_txs_decoded = []
         for internal_tx in internal_txs:
             if internal_tx.can_be_decoded:
+                if internal_tx.pk is None:  # No created, already exists
+                    internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
+                                                         trace_address=internal_tx.trace_address)
                 try:
                     function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                    # TODO How is internal_tx None??
                     internal_txs_decoded.append(InternalTxDecoded(internal_tx=internal_tx,
                                                                   function_name=function_name,
                                                                   arguments=arguments))
