@@ -112,6 +112,7 @@ class InternalTxIndexer(TransactionIndexer):
         internal_txs = InternalTx.objects.bulk_create([InternalTx.objects.build_from_trace(trace, ethereum_tx)
                                                        for trace in traces],
                                                       ignore_conflicts=True)
+        print(internal_txs)
         internal_txs_decoded = []
         for internal_tx in internal_txs:
             if internal_tx.can_be_decoded:
