@@ -93,14 +93,15 @@ class InternalTxIndexer(TransactionIndexer):
         :param tx_hash:
         :return: List of `InternalTx` already stored in database
         """
-        logger.info('Fetching traces for tx-hash=%s', tx_hash)
-        # traces = self.ethereum_client.parity.trace_transaction(tx_hash)
-        traces = self.cached_ethereum_traces.pop(tx_hash)
-        logger.info('Got traces %d for tx-hash=%s', len(traces), tx_hash)
-        logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
+        logger.info('Fetching ethereum tx with tx-hash=%s %s', tx_hash, self.cached_ethereum_txs.keys())
         # ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
+
+        logger.info('Fetching traces for tx-hash=%s', tx_hash)
+        # traces = self.ethereum_client.parity.trace_transaction(tx_hash)
+        traces = self.cached_ethereum_traces.pop(tx_hash)
+        logger.info('Got %d traces for tx-hash=%s', len(traces), tx_hash)
 
         return self._process_traces(traces, ethereum_tx)
         # return [self._process_trace(trace, ethereum_tx) for trace in traces]
