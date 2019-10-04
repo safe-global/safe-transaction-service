@@ -95,8 +95,8 @@ def index_internal_txs_task(self) -> Optional[int]:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
-            redis.lpush(blockchain_running_tasks_key, task_id)
             logger.info('Start indexing of internal txs')
+            redis.lpush(blockchain_running_tasks_key, task_id)
             number_addresses = InternalTxIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_addresses:

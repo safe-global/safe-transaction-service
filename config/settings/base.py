@@ -258,6 +258,9 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'INFO',
         },
+        'safe_transaction_service.history.indexers.internal_tx_indexer': {
+            'level': 'WARNING',
+        },
         'celery': {
             'handlers': ['celery_console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
