@@ -84,6 +84,9 @@ class InternalTxIndexer(TransactionIndexer):
         return tx_hashes
 
     @transaction.atomic
+    def process_all(self) -> int:
+        return super().process_all()
+
     def process_element(self, tx_hash: str) -> List[InternalTx]:
         """
         Search on Ethereum and store internal txs for provided `tx_hash`
@@ -99,8 +102,8 @@ class InternalTxIndexer(TransactionIndexer):
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
 
-        return self._process_traces(traces, ethereum_tx)
-        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        # return self._process_traces(traces, ethereum_tx)
+        return [self._process_trace(trace, ethereum_tx) for trace in traces]
         # Use multiprocessing to process traces in parallel
         # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         #     future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
@@ -109,6 +112,7 @@ class InternalTxIndexer(TransactionIndexer):
         #     return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
     def _process_traces(self, traces: List[Dict[str, Any]], ethereum_tx: EthereumTx) -> InternalTx:
+        #FIXME Test it more, not working
         internal_txs = InternalTx.objects.bulk_create([InternalTx.objects.build_from_trace(trace, ethereum_tx)
                                                        for trace in traces],
                                                       ignore_conflicts=True)

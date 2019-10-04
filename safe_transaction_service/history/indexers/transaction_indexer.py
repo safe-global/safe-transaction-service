@@ -156,7 +156,7 @@ class TransactionIndexer(ABC):
         self.update_monitored_address(addresses, to_block_number)
         return flatten_processed_objects, updated
 
-    def process_all(self):
+    def process_all(self) -> int:
         """
         Find and process relevant data for existing addresses
         :return: Number of addresses processed

@@ -259,7 +259,7 @@ LOGGING = {
             'level': 'INFO',
         },
         'safe_transaction_service.history.indexers.internal_tx_indexer': {
-            'level': 'WARNING',
+            'level': 'INFO',
         },
         'celery': {
             'handlers': ['celery_console'],
