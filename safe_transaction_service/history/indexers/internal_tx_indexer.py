@@ -72,6 +72,7 @@ class InternalTxIndexer(TransactionIndexer):
         # TODO Remove from here. Prefetch txs
         if transaction_hashes:
             logger.info('Prefetching txs')
+            self.cached_ethereum_txs = {}
             for ethereum_tx in EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes):
                 self.cached_ethereum_txs[ethereum_tx.tx_hash] = ethereum_tx
             logger.info('End prefetching of txs')
@@ -91,10 +92,10 @@ class InternalTxIndexer(TransactionIndexer):
         logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
         # ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
         ethereum_tx = self.cached_ethereum_txs[tx_hash]
-        del self.cached_ethereum_txs[tx_hash]
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
 
         # return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        # Use multiprocessing to process traces in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
                                    for trace in traces]
