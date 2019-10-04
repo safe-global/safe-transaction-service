@@ -1,3 +1,4 @@
+import concurrent
 from collections import OrderedDict
 from logging import getLogger
 from typing import Any, Dict, List, Set
@@ -92,7 +93,13 @@ class InternalTxIndexer(TransactionIndexer):
         ethereum_tx = self.cached_ethereum_txs[tx_hash]
         del self.cached_ethereum_txs[tx_hash]
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
-        return [self._process_trace(trace, ethereum_tx) for trace in traces]
+
+        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
+                                   for trace in traces]
+
+            return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
     def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
         logger.info('Processing trace')
