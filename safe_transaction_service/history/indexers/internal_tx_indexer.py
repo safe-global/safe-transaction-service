@@ -119,9 +119,9 @@ class InternalTxIndexer(TransactionIndexer):
         if created and internal_tx.can_be_decoded:
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                internal_tx_decoded, _ = InternalTxDecoded.objects.create(internal_tx=internal_tx,
-                                                                          function_name=function_name,
-                                                                          arguments=arguments)
+                internal_tx_decoded = InternalTxDecoded.objects.create(internal_tx=internal_tx,
+                                                                       function_name=function_name,
+                                                                       arguments=arguments)
             except CannotDecode:
                 pass
 
