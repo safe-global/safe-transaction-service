@@ -33,6 +33,7 @@ class InternalTxIndexer(TransactionIndexer):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
         self.cached_ethereum_txs = {}
+        self.cached_ethereum_traces = {}
 
     @property
     def database_field(self):
@@ -63,20 +64,24 @@ class InternalTxIndexer(TransactionIndexer):
                                                                from_address=addresses)
 
         # Log INFO if traces found, DEBUG if not
-        transaction_hashes = OrderedDict.fromkeys([trace['transactionHash']
-                                                   for trace in (to_traces + from_traces)]).keys()
-        log_fn = logger.info if len(transaction_hashes) else logger.debug
+        tx_hashes = OrderedDict.fromkeys([trace['transactionHash']
+                                          for trace in (to_traces + from_traces)]).keys()
+        log_fn = logger.info if len(tx_hashes) else logger.debug
         log_fn('Found %d relevant txs with %d internal txs between block-number=%d and block-number=%d. Addresses=%s',
-               len(to_traces + from_traces), len(transaction_hashes), from_block_number, to_block_number, addresses)
+               len(to_traces + from_traces), len(tx_hashes), from_block_number, to_block_number, addresses)
 
-        # TODO Remove from here. Prefetch txs
-        if transaction_hashes:
+        # TODO Remove from here. Prefetch txs and traces. Multiple batch perform better
+        if tx_hashes:
             logger.info('Prefetching txs')
-            for ethereum_tx in EthereumTx.objects.create_or_update_from_tx_hashes(transaction_hashes):
+            for ethereum_tx in EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes):
                 self.cached_ethereum_txs[ethereum_tx.tx_hash] = ethereum_tx
             logger.info('End prefetching of txs')
 
-        return transaction_hashes
+            logger.info('Prefetching traces')
+            self.cached_ethereum_traces = dict(zip(tx_hashes, self.ethereum_client.parity.trace_transactions(tx_hashes)))
+            logger.info('End prefetching of traces')
+
+        return tx_hashes
 
     @transaction.atomic
     def process_element(self, tx_hash: str) -> List[InternalTx]:
@@ -86,20 +91,21 @@ class InternalTxIndexer(TransactionIndexer):
         :return: List of `InternalTx` already stored in database
         """
         logger.info('Fetching traces for tx-hash=%s', tx_hash)
-        traces = self.ethereum_client.parity.trace_transaction(tx_hash)
+        # traces = self.ethereum_client.parity.trace_transaction(tx_hash)
+        traces = self.cached_ethereum_traces.pop(tx_hash)
         logger.info('Got traces %d for tx-hash=%s', len(traces), tx_hash)
         logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
         # ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)
 
-        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        return [self._process_trace(trace, ethereum_tx) for trace in traces]
         # Use multiprocessing to process traces in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-            future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
-                                   for trace in traces]
-
-            return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        #     future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
+        #                            for trace in traces]
+        #
+        #     return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
     def _process_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> InternalTx:
         logger.info('Processing trace')
