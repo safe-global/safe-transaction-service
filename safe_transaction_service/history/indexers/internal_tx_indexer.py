@@ -73,6 +73,7 @@ class InternalTxIndexer(TransactionIndexer):
         # TODO Remove from here. Prefetch txs and traces. Multiple batch perform better
         if tx_hashes:
             logger.info('Prefetching txs')
+            # TODO Search first existing in DB
             for ethereum_tx in EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes):
                 self.cached_ethereum_txs[ethereum_tx.tx_hash] = ethereum_tx
             logger.info('End prefetching of txs')
@@ -103,8 +104,8 @@ class InternalTxIndexer(TransactionIndexer):
         traces = self.cached_ethereum_traces.pop(tx_hash)
         logger.info('Got %d traces for tx-hash=%s', len(traces), tx_hash)
 
-        return self._process_traces(traces, ethereum_tx)
-        # return [self._process_trace(trace, ethereum_tx) for trace in traces]
+        # return self._process_traces(traces, ethereum_tx)
+        return [self._process_trace(trace, ethereum_tx) for trace in traces]
         # Use multiprocessing to process traces in parallel
         # with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         #     future_internal_txs = [executor.submit(self._process_trace, trace, ethereum_tx)
@@ -113,7 +114,7 @@ class InternalTxIndexer(TransactionIndexer):
         #     return [future.result() for future in concurrent.futures.as_completed(future_internal_txs)]
 
     def _process_traces(self, traces: List[Dict[str, Any]], ethereum_tx: EthereumTx) -> InternalTx:
-        #FIXME Test it more, not working
+        #FIXME Working but not giving the expected performance
         internal_txs = InternalTx.objects.bulk_create([InternalTx.objects.build_from_trace(trace, ethereum_tx)
                                                        for trace in traces],
                                                       ignore_conflicts=True)
