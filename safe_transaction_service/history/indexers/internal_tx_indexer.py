@@ -93,7 +93,7 @@ class InternalTxIndexer(TransactionIndexer):
         :param tx_hash:
         :return: List of `InternalTx` already stored in database
         """
-        logger.info('Fetching ethereum tx with tx-hash=%s %s', tx_hash, self.cached_ethereum_txs.keys())
+        logger.info('Fetching ethereum tx with tx-hash=%s', tx_hash)
         # ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
         ethereum_tx = self.cached_ethereum_txs.pop(tx_hash)
         logger.info('Got ethereum tx with tx-hash=%s', tx_hash)

@@ -158,7 +158,7 @@ class EthereumTxManager(models.Manager):
                        ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
         return super().create(
             block=ethereum_block,
-            tx_hash=tx['hash'],
+            tx_hash=HexBytes(tx['hash']).hex(),
             _from=tx['from'],
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
