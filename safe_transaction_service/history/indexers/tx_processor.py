@@ -22,7 +22,7 @@ class TxProcessor(ABC):
 
 class SafeTxProcessor(TxProcessor):
     """
-    Processor for txs on Safe Contracts v1.0.0
+    Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
     @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
@@ -82,7 +82,7 @@ class SafeTxProcessor(TxProcessor):
         elif function_name == 'execTransaction':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             nonce = safe_status.nonce
-            if 'baseGas' in arguments:
+            if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
                 base_gas = arguments['baseGas']
                 safe_version = '1.0.0'
             else:
@@ -136,6 +136,9 @@ class SafeTxProcessor(TxProcessor):
                                                            'multisig_transaction': multisig_transaction,
                                                            'ethereum_tx': ethereum_tx,
                                                        })
+        elif function_name == 'execTransactionFromModule':
+            # No side effects or nonce increasing, but trace will be set as processed
+            pass
         else:
             processed = False
         if processed:

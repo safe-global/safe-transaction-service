@@ -8,7 +8,7 @@ from django.db import transaction
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumTx, InternalTx, InternalTxDecoded, SafeMasterCopy
-from .transaction_indexer import TransactionIndexer
+from .ethereum_indexer import EthereumIndexer
 from .tx_decoder import CannotDecode, TxDecoder
 
 logger = getLogger(__name__)
@@ -28,7 +28,7 @@ class InternalTxIndexerProvider:
             del cls.instance
 
 
-class InternalTxIndexer(TransactionIndexer):
+class InternalTxIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()

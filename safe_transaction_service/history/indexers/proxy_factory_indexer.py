@@ -10,7 +10,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
 from ..models import EthereumTx, ProxyFactory, SafeContract
-from .transaction_indexer import TransactionIndexer
+from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
 
@@ -29,7 +29,7 @@ class ProxyIndexerServiceProvider:
             del cls.instance
 
 
-class ProxyIndexerService(TransactionIndexer):
+class ProxyIndexerService(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)

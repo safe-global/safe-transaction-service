@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Any, Collection, List, Optional, Tuple
+from typing import Any, Collection, List, Optional, Tuple, Iterable
 
 from django.db.models import Min
 
@@ -14,7 +14,7 @@ from ..utils import chunks
 logger = getLogger(__name__)
 
 
-class TransactionIndexer(ABC):
+class EthereumIndexer(ABC):
     """
     This service allows indexing of Ethereum blockchain.
     `database_field` should be defined with the field used to store the current block number for a monitored address
@@ -78,6 +78,14 @@ class TransactionIndexer(ABC):
         :return:
         """
         pass
+
+    def process_elements(self, elements: Iterable[Any]):
+        processed_objects = []
+        for i, element in enumerate(elements):
+            logger.info('Processing element %d/%d', i + 1, len(elements))
+            processed_objects.append(self.process_element(element))
+        # processed_objects = [self.process_element(element) for element in elements]
+        return [item for sublist in processed_objects for item in sublist]
 
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
@@ -146,15 +154,10 @@ class TransactionIndexer(ABC):
 
         updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
         elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
-        processed_objects = []
-        for i, element in enumerate(elements):
-            logger.info('Processing element %d/%d', i + 1, len(elements))
-            processed_objects.append(self.process_element(element))
-        # processed_objects = [self.process_element(element) for element in elements]
-        flatten_processed_objects = [item for sublist in processed_objects for item in sublist]
+        processed_elements = self.process_elements(elements)
 
         self.update_monitored_address(addresses, to_block_number)
-        return flatten_processed_objects, updated
+        return processed_elements, updated
 
     def process_all(self) -> int:
         """

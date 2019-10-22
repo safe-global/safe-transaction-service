@@ -5,7 +5,7 @@ from typing import List, Set
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumEvent, EthereumTx
-from .transaction_indexer import TransactionIndexer
+from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
 
@@ -23,7 +23,7 @@ class Erc20EventsServiceProvider:
             del cls.instance
 
 
-class Erc20EventsService(TransactionIndexer):
+class Erc20EventsService(EthereumIndexer):
     """
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
