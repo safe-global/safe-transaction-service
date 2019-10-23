@@ -19,8 +19,9 @@ class EthereumIndexer(ABC):
     This service allows indexing of Ethereum blockchain.
     `database_field` should be defined with the field used to store the current block number for a monitored address
     `find_relevant_elements` elements should be defined with the query to get the relevant txs/events/etc.
-    `process_element` defines what happens with elements found
-    So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_element`
+    `process_elements` defines what happens with elements found
+    So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_elements` ->
+    `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
                  block_process_limit: int = 200, updated_blocks_behind: int = 20,

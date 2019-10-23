@@ -2,11 +2,13 @@
 
 import django.contrib.postgres.fields
 import django.contrib.postgres.fields.jsonb
-from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
-import gnosis.eth.django.models
+from django.db import migrations, models
+
 import model_utils.fields
+
+import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
