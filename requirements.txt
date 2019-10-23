@@ -8,10 +8,10 @@ django-environ==0.4.5
 django-filter==2.2.0
 django-model-utils==3.2.0
 django-redis==4.10.0
-djangorestframework-camel-case==1.1.1
+djangorestframework-camel-case==1.1.2
 djangorestframework==3.10.3
 docutils==0.14
-drf-yasg[validation]==1.16.1
+drf-yasg[validation]==1.17.0
 ethereum==2.3.2
 factory-boy==2.12.0
 faker==1.0.7
@@ -22,6 +22,6 @@ hexbytes==0.2.0
 jsonschema==3.0.1
 kombu==4.6.3
 psycopg2-binary==2.8.3
-redis==3.3.8
+redis==3.3.11
 requests==2.22.0
 web3==4.9.2
