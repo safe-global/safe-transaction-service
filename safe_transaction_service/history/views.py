@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import ListAPIView
@@ -25,7 +27,16 @@ class AboutView(APIView):
             'name': 'Safe Transaction Service',
             'version': __version__,
             'api_version': self.request.version,
-            'secure': self.request.is_secure()
+            'secure': self.request.is_secure(),
+            'settings': {
+                'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
+                'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
+                'INTERNAL_TXS_BLOCK_PROCESS_LIMIT ': settings.INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
+                'SAFE_CONTRACT_ADDRESS': settings.SAFE_CONTRACT_ADDRESS,
+                'SAFE_VALID_CONTRACT_ADDRESSES': settings.SAFE_VALID_CONTRACT_ADDRESSES,
+                'SAFE_REORG_BLOCKS': settings.SAFE_REORG_BLOCKS,
+                'SAFE_PROXY_FACTORY_ADDRESS': settings.SAFE_PROXY_FACTORY_ADDRESS,
+            }
         }
         return Response(content)
 
