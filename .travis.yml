@@ -27,8 +27,17 @@ script:
   - coverage run --source=$SOURCE_FOLDER -m py.test -W ignore::DeprecationWarning
 deploy:
   - provider: script
+    script: bash scripts/deploy_docker.sh staging
+    on:
+      branch: master
+  - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
-      branch: issue-19
+      branch: develop
+  - provider: script
+    script: bash scripts/deploy_docker.sh $TRAVIS_TAG
+    on:
+      tags: true
+      branch: master
 after_success:
   - coveralls
