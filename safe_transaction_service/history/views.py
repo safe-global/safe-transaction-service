@@ -1,10 +1,10 @@
-import ethereum.utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from web3 import Web3
 
 from safe_transaction_service.history.models import MultisigTransaction
 from safe_transaction_service.version import __version__
@@ -12,7 +12,6 @@ from safe_transaction_service.version import __version__
 from .filters import DefaultPagination
 from .serializers import (SafeMultisigHistoryResponseSerializer,
                           SafeMultisigTransactionHistorySerializer)
-from .tasks import check_approve_transaction_task
 
 
 class AboutView(APIView):
@@ -49,32 +48,29 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         Returns the history of a multisig tx (safe)
         """
-        try:
-            if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+        if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         multisig_transactions = MultisigTransaction.objects.filter(
             safe=address
         ).prefetch_related(
             'confirmations'
+        ).select_related(
+            'ethereum_tx'
         ).order_by(
             '-nonce'
         )
 
-        if multisig_transactions.count() == 0:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         # Check if the 'owners' query parameter was passed in input
-        owners = None
         query_owners = self.request.query_params.get('owners', None)
-        if query_owners:
-            owners = [owner for owner in query_owners.split(',') if owner != '']
+        owners = [owner for owner in query_owners.split(',') if owner != ''] if query_owners else None
 
         serializer = self.get_serializer(multisig_transactions, many=True, owners=owners)
         # Paginate results
         page = self.paginate_queryset(serializer.data)
+        if not page:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         pagination = self.get_paginated_response(page)
         return Response(status=status.HTTP_200_OK, data=pagination.data)
 
@@ -85,10 +81,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
-        try:
-            if not ethereum.utils.check_checksum(address):
-                raise ValueError
-        except ValueError:
+        if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
@@ -100,12 +93,12 @@ class SafeMultisigTransactionListView(ListAPIView):
             serializer.save()
 
             # Create task if transaction hash
-            data = serializer.validated_data
-            transaction_hash = data.get('transaction_hash')
-            if transaction_hash:
-                check_approve_transaction_task.delay(safe_address=address,
-                                                     safe_tx_hash=data['contract_transaction_hash'].hex(),
-                                                     transaction_hash=transaction_hash.hex(),
-                                                     owner=data['sender'])
+            # data = serializer.validated_data
+            # transaction_hash = data.get('transaction_hash')
+            # if transaction_hash:
+            #     check_approve_transaction_task.delay(safe_address=address,
+            #                                          safe_tx_hash=data['contract_transaction_hash'].hex(),
+            #                                          transaction_hash=transaction_hash.hex(),
+            #                                          owner=data['sender'])
 
             return Response(status=status.HTTP_202_ACCEPTED)

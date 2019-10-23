@@ -220,12 +220,20 @@ LOGGING = {
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
-        }
+        },
+        'ignore_succeeded_none': {
+            '()': 'safe_transaction_service.taskapp.celery.IgnoreSucceededNone'
+        },
     },
     'formatters': {
         'verbose': {
-            'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s',
+            'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s'
         },
+        'celery_verbose': {
+            'class': 'safe_transaction_service.taskapp.celery.PatchedCeleryFormatter',
+            'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
+        },
+
     },
     'handlers': {
         'mail_admins': {
@@ -238,15 +246,30 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'celery_console': {
+            'level': 'DEBUG',
+            'filters': ['ignore_succeeded_none'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'celery_verbose',
+        },
     },
     'loggers': {
         '': {
             'handlers': ['console'],
             'level': 'INFO',
         },
-        'celery.worker.strategy': {
+        'safe_transaction_service.history.indexers.internal_tx_indexer': {
+            'level': 'INFO',
+        },
+        'celery': {
+            'handlers': ['celery_console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,  # If not it will be out for the root logger too
+        },
+        'celery.worker.strategy': {  # All the "Received task..."
             'handlers': ['console'],
             'level': 'INFO' if DEBUG else 'WARNING',
+            'propagate': False,  # If not it will be out for the root logger too
         },
         'django.request': {
             'handlers': ['mail_admins'],
@@ -267,11 +290,14 @@ REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 # ------------------------------------------------------------------------------
 ETH_HASH_PREFIX = env('ETH_HASH_PREFIX', default='GNO')
 ETHEREUM_NODE_URL = env('ETHEREUM_NODE_URL', default=None)
-
+ETHEREUM_TRACING_NODE_URL = env('ETHEREUM_TRACING_NODE_URL', default=None)
+INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env('INTERNAL_TXS_BLOCK_PROCESS_LIMIT', default=100000)
 
 # Safe
 # ------------------------------------------------------------------------------
 # Master Copy Address of Safe Contract
 SAFE_CONTRACT_ADDRESS = env('SAFE_CONTRACT_ADDRESS', default='0x' + '0' * 39 + '1')
+SAFE_VALID_CONTRACT_ADDRESSES = set(env.list('SAFE_VALID_CONTRACT_ADDRESSES', default=[])) | {SAFE_CONTRACT_ADDRESS}
 # Number of blocks from the current block number needed to consider a transaction valid/stable
 SAFE_REORG_BLOCKS = env.int('SAFE_REORG_BLOCKS', default=10)
+SAFE_PROXY_FACTORY_ADDRESS = env('SAFE_PROXY_FACTORY_ADDRESS', default='0x' + '0' * 39 + '2')

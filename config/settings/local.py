@@ -73,6 +73,5 @@ if env.bool('USE_DOCKER', default=False):
         }
     }
 
-    CELERY_ALWAYS_EAGER = True
 
 SAFE_CONTRACT_ADDRESS = '0x2727D69C0BD14B1dDd28371B8D97e808aDc1C2f7'
