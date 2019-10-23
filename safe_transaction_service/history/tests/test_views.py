@@ -16,6 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def test_get_multisig_transaction(self):
+        safe_tx_hash = Web3.sha3(text='gnosis').hex()
+        response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        multisig_tx = MultisigTransactionFactory()
+        safe_tx_hash = multisig_tx.safe_tx_hash
+        response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['confirmations']), 0)
+        self.assertTrue(Web3.isChecksumAddress(response.data['executor']))
+        self.assertEqual(response.data['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
+        # Test camelCase
+        self.assertEqual(response.json()['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
+
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')

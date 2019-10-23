@@ -17,7 +17,7 @@ from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 
 
 # ================================================ #
-#                   Serializers
+#            Request Serializers
 # ================================================ #
 class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
@@ -71,7 +71,7 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
                 if not safe.retrieve_is_owner(data['sender'],
                                               block_identifier=max(0, ethereum_client.current_block_number - 20)):
                     raise ValidationError('User is not an owner')
-            except BadFunctionCallOutput:  # If it didn't exist 100 blocks ago
+            except BadFunctionCallOutput:  # If it didn't exist 20 blocks ago
                 raise ValidationError('User is not an owner')
 
         #  TODO Support contract signatures
@@ -115,7 +115,9 @@ class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
         return multisig_transaction
 
 
-# Responses ------------------------------------------------------------------
+# ================================================ #
+#            Response Serializers
+# ================================================ #
 class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     submission_date = serializers.DateTimeField(source='created')
     confirmation_type = serializers.SerializerMethodField()

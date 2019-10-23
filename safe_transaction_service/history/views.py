@@ -2,7 +2,7 @@ from django.conf import settings
 
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,6 +41,21 @@ class AboutView(APIView):
         return Response(content)
 
 
+@swagger_auto_schema(responses={200: 'Ok',
+                                404: 'Not found'})
+class SafeMultisigTransactionDetailView(RetrieveAPIView):
+    serializer_class = SafeMultisigHistoryResponseSerializer
+    lookup_field = 'safe_tx_hash'
+    lookup_url_kwarg = 'tx_hash'
+
+    def get_queryset(self):
+        return MultisigTransaction.objects.prefetch_related(
+            'confirmations'
+        ).select_related(
+            'ethereum_tx'
+        )
+
+
 class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = DefaultPagination
 
@@ -54,6 +69,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return SafeMultisigTransactionHistorySerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
                                     422: 'Invalid ethereum address'})
     def get(self, request, address, format=None):
         """
