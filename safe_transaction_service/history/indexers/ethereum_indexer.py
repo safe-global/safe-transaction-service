@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Any, Collection, List, Optional, Tuple, Iterable
+from typing import Any, Collection, Iterable, List, Optional, Tuple
 
 from django.db.models import Min
 

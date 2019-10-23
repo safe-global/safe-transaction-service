@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple, Union
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth.contracts import get_safe_contract, get_old_safe_contract
+from gnosis.eth.contracts import get_old_safe_contract, get_safe_contract
 
 logger = getLogger(__name__)
 

@@ -3,6 +3,7 @@ import logging
 from django.test import TestCase
 
 from eth_account import Account
+
 from gnosis.safe import SafeTx
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
