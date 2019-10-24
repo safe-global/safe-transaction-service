@@ -118,7 +118,7 @@ class SafeTxProcessor(TxProcessor):
                 })
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
-                multisig_tx.signatures = arguments['signatures']
+                multisig_tx.signatures = HexBytes(arguments['signatures'])
                 multisig_tx.save(update_fields=['ethereum_tx', 'signatures'])
 
             safe_status.nonce = nonce + 1
