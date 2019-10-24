@@ -113,7 +113,8 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             tx_processor: TxProcessor = SafeTxProcessor()
             number_processed = 0
-            for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes():
+            # Use the queryset iterator for memory issues
+            for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes().iterator(chunk_size=200):
                 processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
                 if processed:
                     number_processed += 1
