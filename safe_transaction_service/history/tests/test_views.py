@@ -52,6 +52,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
 
+    def test_get_multisig_transactions_filters(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=0, ethereum_tx=None)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=0',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=1',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?executed=true',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?executed=false',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
         safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])

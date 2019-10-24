@@ -379,7 +379,20 @@ class InternalTxDecoded(models.Model):
         return self.save(update_fields=['processed'])
 
 
+class MultisigTransactionQuerySet(models.QuerySet):
+    def executed(self):
+        return self.exclude(
+            ethereum_tx__block=None
+        )
+
+    def not_executed(self):
+        return self.filter(
+            ethereum_tx__block=None
+        )
+
+
 class MultisigTransaction(TimeStampedModel):
+    objects = MultisigTransactionQuerySet.as_manager()
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField()
     ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,

@@ -19,7 +19,7 @@ from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 # ================================================ #
 #            Request Serializers
 # ================================================ #
-class SafeMultisigTransactionHistorySerializer(SafeMultisigTxSerializerV1):
+class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     signature = HexadecimalField(required=False)
@@ -136,7 +136,7 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
         return obj.ethereum_tx_id
 
 
-class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
+class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     safe_tx_hash = Sha3HashField()
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
     submission_date = serializers.DateTimeField(source='created')  # First seen by this service
@@ -144,13 +144,6 @@ class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
     execution_date = serializers.DateTimeField()
     executor = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
-
-    def __init__(self, *args, **kwargs):
-        self.owners = kwargs.get('owners', None)
-        if 'owners' in kwargs:
-            del kwargs['owners']
-
-        super().__init__(*args, **kwargs)
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
@@ -162,7 +155,7 @@ class SafeMultisigHistoryResponseSerializer(SafeMultisigTxSerializerV1):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        if self.owners:
+        if self.context.get('owners'):
             confirmations = obj.confirmations.filter(owner__in=self.owners, multisig_transaction=obj)
         else:
             confirmations = obj.confirmations

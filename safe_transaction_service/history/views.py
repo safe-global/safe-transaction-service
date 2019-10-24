@@ -1,5 +1,6 @@
 from django.conf import settings
 
+import django_filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -11,9 +12,9 @@ from web3 import Web3
 from safe_transaction_service.history.models import MultisigTransaction
 from safe_transaction_service.version import __version__
 
-from .filters import DefaultPagination
-from .serializers import (SafeMultisigHistoryResponseSerializer,
-                          SafeMultisigTransactionHistorySerializer)
+from .filters import DefaultPagination, MultisigTransactionFilter
+from .serializers import (SafeMultisigTransactionResponseSerializer,
+                          SafeMultisigTransactionSerializer)
 
 
 class AboutView(APIView):
@@ -44,7 +45,7 @@ class AboutView(APIView):
 @swagger_auto_schema(responses={200: 'Ok',
                                 404: 'Not found'})
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
-    serializer_class = SafeMultisigHistoryResponseSerializer
+    serializer_class = SafeMultisigTransactionResponseSerializer
     lookup_field = 'safe_tx_hash'
     lookup_url_kwarg = 'tx_hash'
 
@@ -58,15 +59,37 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
 
 class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = DefaultPagination
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, )
+    filterset_class = MultisigTransactionFilter
+
+    def get_queryset(self):
+        return MultisigTransaction.objects.filter(
+            safe=self.kwargs['address']
+        ).prefetch_related(
+            'confirmations'
+        ).select_related(
+            'ethereum_tx'
+        ).order_by(
+            '-nonce'
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # TODO I think this is not useful anymore
+        # Check if the 'owners' query parameter was passed in input
+        query_owners = self.request.query_params.get('owners', None)
+        if query_owners:
+            context['owners'] = [owner for owner in query_owners.split(',') if owner != '']
+        return context
 
     def get_serializer_class(self):
         """
         Proxy returning a serializer class according to the request's verb.
         """
         if self.request.method == 'GET':
-            return SafeMultisigHistoryResponseSerializer
+            return SafeMultisigTransactionResponseSerializer
         elif self.request.method == 'POST':
-            return SafeMultisigTransactionHistorySerializer
+            return SafeMultisigTransactionSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
@@ -78,28 +101,11 @@ class SafeMultisigTransactionListView(ListAPIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        multisig_transactions = MultisigTransaction.objects.filter(
-            safe=address
-        ).prefetch_related(
-            'confirmations'
-        ).select_related(
-            'ethereum_tx'
-        ).order_by(
-            '-nonce'
-        )
+        response = super().get(request, address)
+        if response.data['count'] == 0:
+            response.status_code = status.HTTP_404_NOT_FOUND
 
-        # Check if the 'owners' query parameter was passed in input
-        query_owners = self.request.query_params.get('owners', None)
-        owners = [owner for owner in query_owners.split(',') if owner != ''] if query_owners else None
-
-        serializer = self.get_serializer(multisig_transactions, many=True, owners=owners)
-        # Paginate results
-        page = self.paginate_queryset(serializer.data)
-        if not page:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        pagination = self.get_paginated_response(page)
-        return Response(status=status.HTTP_200_OK, data=pagination.data)
+        return response
 
     @swagger_auto_schema(responses={202: 'Accepted',
                                     400: 'Invalid data',
