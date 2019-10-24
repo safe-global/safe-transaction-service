@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from ...models import (InternalTxDecoded, MultisigConfirmation,
-                       MultisigTransaction, SafeStatus)
+from ...models import InternalTxDecoded, MultisigConfirmation, SafeStatus
 
 
 class Command(BaseCommand):
@@ -15,6 +14,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         SafeStatus.objects.all().delete()
         MultisigConfirmation.objects.all().delete()
-        MultisigTransaction.objects.all().delete()  # TODO Remove this, just for testing
+        # MultisigTransaction.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
         self.stdout.write(self.style.SUCCESS(f'All prepared to process again'))

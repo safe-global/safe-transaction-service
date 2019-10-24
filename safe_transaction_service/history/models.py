@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -340,7 +340,8 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return self.not_processed(
         ).filter(
-            internal_tx___from__in=SafeContract.objects.values('address')  #TODO Maybe not here?
+            Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
+            | Q(function_name='setup')  # This way we can index new Safes without events
         ).select_related(
             'internal_tx',
             'internal_tx__ethereum_tx',

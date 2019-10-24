@@ -9,7 +9,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import SafeTx
 
 from ..models import (InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeStatus)
+                      MultisigTransaction, SafeContract, SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -46,6 +46,10 @@ class SafeTxProcessor(TxProcessor):
             #    master_copy = NULL_ADDRESS
             owners = arguments['_owners']
             threshold = arguments['_threshold']
+            _, created = SafeContract.objects.get_or_create(address=contract_address,
+                                                            defaults={'ethereum_tx': internal_tx.ethereum_tx})
+            if created:
+                logger.info('Found new Safe=%s', contract_address)
             SafeStatus.objects.create(internal_tx=internal_tx,
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=0, master_copy=master_copy)
