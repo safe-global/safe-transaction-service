@@ -144,6 +144,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     execution_date = serializers.DateTimeField()
     executor = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
+    signatures = HexadecimalField()
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
