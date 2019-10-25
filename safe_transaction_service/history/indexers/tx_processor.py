@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 
 from django.db import transaction
+from gnosis.safe.safe_signature import SafeSignature
 
 from hexbytes import HexBytes
 
@@ -114,12 +115,26 @@ class SafeTxProcessor(TxProcessor):
                     'gas_token': safe_tx.gas_token,
                     'refund_receiver': safe_tx.refund_receiver,
                     'nonce': safe_tx.safe_nonce,
-                    'signatures': HexBytes(arguments['signatures']),
+                    'signatures': safe_tx.signatures,
                 })
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
                 multisig_tx.save(update_fields=['ethereum_tx', 'signatures'])
+
+            try:
+                for safe_signature in SafeSignature.parse_signatures(safe_tx.signatures, safe_tx_hash):
+                    MultisigConfirmation.objects.get_or_create(
+                        multisig_transaction_hash=safe_tx_hash,
+                        owner=safe_signature.owner,
+                        defaults={
+                            'ethereum_tx': None,
+                            'multisig_transaction': multisig_tx,
+                            'signature': safe_signature.signature,
+                        }
+                    )
+            except NotImplemented:  # Still in progress
+                pass
 
             safe_status.nonce = nonce + 1
             safe_status.store_new(internal_tx)
