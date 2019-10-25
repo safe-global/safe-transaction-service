@@ -124,7 +124,7 @@ class SafeTxProcessor(TxProcessor):
 
             try:
                 for safe_signature in SafeSignature.parse_signatures(safe_tx.signatures, safe_tx_hash):
-                    MultisigConfirmation.objects.get_or_create(
+                    multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
                         multisig_transaction_hash=safe_tx_hash,
                         owner=safe_signature.owner,
                         defaults={
@@ -133,6 +133,9 @@ class SafeTxProcessor(TxProcessor):
                             'signature': safe_signature.signature,
                         }
                     )
+                    if multisig_confirmation.signature != safe_signature.signature:
+                        multisig_confirmation.signature = safe_signature.signature
+                        multisig_confirmation.save(update_fields=['signature'])
             except NotImplemented:  # Still in progress
                 pass
 
