@@ -142,17 +142,9 @@ class SafeTxProcessor(TxProcessor):
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
             owner = internal_tx.get_previous_trace()._from
-            try:
-                multisig_transaction = MultisigTransaction.objects.get(
-                    safe_tx_hash=multisig_transaction_hash
-                )
-            except MultisigTransaction.DoesNotExist:
-                multisig_transaction = None
-
             MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
                                                        owner=owner,
                                                        defaults={
-                                                           'multisig_transaction': multisig_transaction,
                                                            'ethereum_tx': ethereum_tx,
                                                        })
         elif function_name == 'execTransactionFromModule':

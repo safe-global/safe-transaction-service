@@ -106,9 +106,10 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
         if self.validated_data.get('signature'):
             MultisigConfirmation.objects.get_or_create(
-                multisig_transaction=multisig_transaction,
+                multisig_transaction_hash=multisig_transaction.safe_tx_hash,
                 owner=self.validated_data['sender'],
                 defaults={
+                    'multisig_transaction': multisig_transaction,
                     'signature': self.validated_data.get('signature'),
                 }
             )
