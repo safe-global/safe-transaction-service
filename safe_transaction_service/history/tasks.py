@@ -114,7 +114,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             tx_processor: TxProcessor = SafeTxProcessor()
             number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 300
+            batch = 1000
             if count:
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
             # Use slicing for memory issues
@@ -123,7 +123,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
                 if processed:
                     number_processed += 1
             if number_processed:
-                logger.info('%d decoded internal txs processed', number_processed)
+                logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed
     except LockError:
         pass

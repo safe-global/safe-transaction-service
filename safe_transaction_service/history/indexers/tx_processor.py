@@ -37,7 +37,7 @@ class SafeTxProcessor(TxProcessor):
         internal_tx = internal_tx_decoded.internal_tx
         contract_address = internal_tx._from
         master_copy = internal_tx.to
-        processed = True
+        processed_successfully = True
         if function_name == 'setup':
             # We need to get the master_copy from the next trace `DELEGATE_CALL`
             #next_trace = internal_tx.get_next_trace()
@@ -151,7 +151,6 @@ class SafeTxProcessor(TxProcessor):
             # No side effects or nonce increasing, but trace will be set as processed
             pass
         else:
-            processed = False
-        if processed:
-            internal_tx_decoded.set_processed()
-        return processed
+            processed_successfully = False
+        internal_tx_decoded.set_processed()
+        return processed_successfully
