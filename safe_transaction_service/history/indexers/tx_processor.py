@@ -126,7 +126,7 @@ class SafeTxProcessor(TxProcessor):
         elif function_name == 'approveHash':
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
-            owner = internal_tx._from
+            owner = internal_tx.get_previous_trace()._from
             try:
                 multisig_transaction = MultisigTransaction.objects.get(
                     safe_tx_hash=multisig_transaction_hash

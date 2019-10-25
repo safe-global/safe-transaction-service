@@ -329,6 +329,15 @@ class InternalTx(models.Model):
         except IndexError:
             return None
 
+    def get_previous_trace(self) -> Optional['InternalTx']:
+        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
+        traces = [it.trace_address for it in internal_txs]
+        index = traces.index(self.trace_address)
+        try:
+            return internal_txs[index - 1]
+        except IndexError:
+            return None
+
 
 class InternalTxDecodedQuerySet(models.QuerySet):
     def not_processed(self):
