@@ -122,22 +122,19 @@ class SafeTxProcessor(TxProcessor):
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
                 multisig_tx.save(update_fields=['ethereum_tx', 'signatures'])
 
-            try:
-                for safe_signature in SafeSignature.parse_signatures(safe_tx.signatures, safe_tx_hash):
-                    multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
-                        multisig_transaction_hash=safe_tx_hash,
-                        owner=safe_signature.owner,
-                        defaults={
-                            'ethereum_tx': None,
-                            'multisig_transaction': multisig_tx,
-                            'signature': safe_signature.signature,
-                        }
-                    )
-                    if multisig_confirmation.signature != safe_signature.signature:
-                        multisig_confirmation.signature = safe_signature.signature
-                        multisig_confirmation.save(update_fields=['signature'])
-            except NotImplemented:  # Still in progress
-                pass
+            for safe_signature in SafeSignature.parse_signatures(safe_tx.signatures, safe_tx_hash):
+                multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
+                    multisig_transaction_hash=safe_tx_hash,
+                    owner=safe_signature.owner,
+                    defaults={
+                        'ethereum_tx': None,
+                        'multisig_transaction': multisig_tx,
+                        'signature': safe_signature.signature,
+                    }
+                )
+                if multisig_confirmation.signature != safe_signature.signature:
+                    multisig_confirmation.signature = safe_signature.signature
+                    multisig_confirmation.save(update_fields=['signature'])
 
             safe_status.nonce = nonce + 1
             safe_status.store_new(internal_tx)
