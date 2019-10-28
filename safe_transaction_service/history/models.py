@@ -519,14 +519,6 @@ class MonitoredAddressQuerySet(models.QuerySet):
             **{database_field + '__lt': current_block_number - confirmations}
         )
 
-    def reset_block_number(self, block_number: Optional[int] = None) -> int:
-        if block_number is not None:
-            value = block_number
-        else:
-            value = F('initial_block_number')
-        return self.update(tx_block_number=value,
-                           events_block_number=value)
-
 
 class MonitoredAddress(models.Model):
     class Meta:
@@ -576,10 +568,15 @@ class SafeStatusQuerySet(models.QuerySet):
 class SafeContract(models.Model):
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
-    # erc20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
+    erc_20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
 
     def __str__(self):
         return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
+
+    @property
+    def created_block_number(self) -> Optional[int]:
+        if self.ethereum_tx:
+            return self.ethereum_tx.block_id
 
 
 class SafeStatus(models.Model):

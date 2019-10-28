@@ -18,7 +18,7 @@ from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
 from .models import (EthereumBlock, InternalTxDecoded, MonitoredAddress,
-                     ProxyFactory)
+                     ProxyFactory, SafeMasterCopy)
 
 logger = get_task_logger(__name__)
 
@@ -151,16 +151,17 @@ def check_reorgs() -> Optional[int]:
         # Check concurrency problems
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
 
+        safe_block_number = first_reorg_block_number - 1
         ProxyFactory.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
-            tx_block_number=first_reorg_block_number - 1
+            tx_block_number=safe_block_number
         )
 
-        MonitoredAddress.objects.filter(
+        SafeMasterCopy.objects.filter(
             tx_block_number__gte=first_reorg_block_number
-        ).reset_block_number(
-            block_number=first_reorg_block_number - 1
+        ).update(
+            tx_block_number=safe_block_number
         )
 
         logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)

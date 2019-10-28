@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 
 from django.db import transaction
-from gnosis.safe.safe_signature import SafeSignature
 
 from hexbytes import HexBytes
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import SafeTx
+from gnosis.safe.safe_signature import SafeSignature
 
 from ..models import (InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContract, SafeStatus)

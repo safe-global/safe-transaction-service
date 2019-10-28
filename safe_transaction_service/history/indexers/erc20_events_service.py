@@ -1,10 +1,10 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import List, Set
+from typing import Any, Dict, List, Set
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumEvent, EthereumTx
+from ..models import EthereumEvent, EthereumTx, SafeContract
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
@@ -14,7 +14,7 @@ class Erc20EventsServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = Erc20EventsService(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL))
+            cls.instance = Erc20EventsService(EthereumClient(settings.ETHEREUM_NODE_URL))
         return cls.instance
 
     @classmethod
@@ -27,12 +27,16 @@ class Erc20EventsService(EthereumIndexer):
     """
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
+
+    def database_model(self):
+        return SafeContract
+
     @property
     def database_field(self):
         return 'erc_20_block_number'
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int) -> Set[str]:
+                               to_block_number: int) -> List[Dict[str, Any]]:
         """
         Search for tx hashes with erc20 transfer events (`from` and `to`) of a `safe_address`
         :param addresses:
@@ -52,15 +56,13 @@ class Erc20EventsService(EthereumIndexer):
         logger_fn('Found %d relevant erc20 txs between block-number=%d and block-number=%d. Safes=%s',
                   len(erc20_transfer_events), from_block_number, to_block_number, addresses)
 
-        return OrderedDict.fromkeys([event['transactionHash'] for event in erc20_transfer_events]).keys()
+        return erc20_transfer_events
 
-    def process_element(self, tx_hash: str) -> List[EthereumEvent]:
+    def process_element(self, event: Dict[str, Any]) -> List[EthereumEvent]:
         """
         Search on Ethereum and store erc20 transfer events for provided `tx_hash`
         :param tx_hash:
         :return: List of `Erc20TransferEvent` already stored in database
         """
-        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(tx_hash)
-        tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-        decoded_logs = self.ethereum_client.erc20.decode_logs(tx_receipt.logs)
-        return [EthereumEvent.objects.get_or_create_erc20_or_721_event(event) for event in decoded_logs]
+        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(event['transactionHash'])
+        return EthereumEvent.objects.get_or_create_erc20_or_721_event(event)
