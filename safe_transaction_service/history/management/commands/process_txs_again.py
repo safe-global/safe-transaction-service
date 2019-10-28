@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from ...models import InternalTxDecoded, MultisigConfirmation, SafeStatus
+from ...tasks import process_decoded_internal_txs_task
 
 
 class Command(BaseCommand):
@@ -16,4 +17,5 @@ class Command(BaseCommand):
         MultisigConfirmation.objects.all().delete()
         # MultisigTransaction.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
-        self.stdout.write(self.style.SUCCESS(f'All prepared to process again'))
+        process_decoded_internal_txs_task.delay()
+        self.stdout.write(self.style.SUCCESS('All prepared to process again'))

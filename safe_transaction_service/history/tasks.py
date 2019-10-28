@@ -101,6 +101,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_addresses:
                 logger.info('Find internal txs task processed %d addresses', number_addresses)
+                process_decoded_internal_txs_task.delay()
                 return number_addresses
     except LockError:
         pass
@@ -114,14 +115,15 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             tx_processor: TxProcessor = SafeTxProcessor()
             number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 1000
+            batch = 500
             if count:
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
             # Use slicing for memory issues
-            for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[:batch]:
-                processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
-                if processed:
-                    number_processed += 1
+            for i in range(0, count, batch):
+                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
+                    processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
+                    if processed:
+                        number_processed += 1
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed
