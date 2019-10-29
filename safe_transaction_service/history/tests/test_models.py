@@ -6,7 +6,7 @@ from eth_account import Account
 from web3 import Web3
 
 from ..models import (InternalTx, InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeStatus)
+                      MultisigTransaction, SafeContract, SafeStatus)
 from .factories import EthereumTxFactory, InternalTxFactory, SafeStatusFactory
 
 logger = logging.getLogger(__name__)
@@ -70,3 +70,23 @@ class TestModels(TestCase):
         internal_tx = InternalTxFactory()
         safe_status.store_new(internal_tx)
         self.assertEqual(SafeStatus.objects.all().count(), 2)
+
+    def test_safe_contract_receiver(self):
+        ethereum_tx = EthereumTxFactory()
+        safe_contract = SafeContract.objects.create(address=Account.create().address, ethereum_tx=ethereum_tx)
+        self.assertEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)
+
+        # Test creation with save
+        safe_contract = SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx)
+        self.assertEqual(safe_contract.erc_20_block_number, 0)
+        safe_contract.save()
+        self.assertEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)
+
+        # Test batch creation
+        safe_contracts = [
+            SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx),
+            SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx)
+        ]
+        SafeContract.objects.bulk_create(safe_contracts)
+        for safe_contract in safe_contracts:
+            self.assertEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)

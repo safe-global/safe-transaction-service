@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, Iterable, List
 
 from gnosis.eth import EthereumClient
 
@@ -58,11 +58,13 @@ class Erc20EventsService(EthereumIndexer):
 
         return erc20_transfer_events
 
-    def process_element(self, event: Dict[str, Any]) -> List[EthereumEvent]:
+    def process_elements(self, events: Iterable[Dict[str, Any]]) -> List[EthereumEvent]:
         """
-        Search on Ethereum and store erc20 transfer events for provided `tx_hash`
-        :param tx_hash:
-        :return: List of `Erc20TransferEvent` already stored in database
+        Process all events found by `find_relevant_elements`
+        :param events: Events to store in database
+        :return: List of `EthereumEvent` already stored in database
         """
-        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(event['transactionHash'])
-        return EthereumEvent.objects.get_or_create_erc20_or_721_event(event)
+        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in events]).keys()
+        ethereum_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
+        ethereum_events = [EthereumEvent.objects.from_decoded_event(event) for event in events]
+        return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)

@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import Case, Q, Sum
+from django.db.models.expressions import RawSQL, When
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -13,6 +14,7 @@ from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
@@ -197,6 +199,74 @@ class EthereumTx(TimeStampedModel):
             return self.status == 1
 
 
+class EthereumEventQuerySet(models.QuerySet):
+    def not_erc_20_721_events(self):
+        return self.exclude(topic=ERC20_721_TRANSFER_TOPIC)
+
+    def erc20_and_721_events(self, token_address: Optional[str] = None, address: Optional[str] = None):
+        queryset = self.filter(topic=ERC20_721_TRANSFER_TOPIC)
+        if token_address:
+            queryset = queryset.filter(token_address=token_address)
+        if address:
+            queryset = queryset.filter(Q(arguments__to=address) | Q(arguments__from=address))
+        return queryset
+
+    def erc20_events(self, token_address: Optional[str] = None, address: Optional[str] = None):
+        return self.erc20_and_721_events(token_address=token_address,
+                                         address=address).filter(arguments__has_key='value')
+
+    def erc721_events(self, token_address: Optional[str] = None, address: Optional[str] = None):
+        return self.erc20_and_721_events(token_address=token_address,
+                                         address=address).filter(arguments__has_key='tokenId')
+
+
+class EthereumEventManager(models.Manager):
+    def from_decoded_event(self, decoded_event: Dict[str, Any]) -> 'EthereumEvent':
+        """
+        Does not create the model. Requires that `ethereum_tx` exists
+        :param decoded_event:
+        :return: `EthereumEvent` instance (not stored in database)
+        """
+        return EthereumEvent(ethereum_tx_id=decoded_event['transactionHash'],
+                             log_index=decoded_event['logIndex'],
+                             token_address=decoded_event['address'],
+                             topic=decoded_event['topics'][0],
+                             arguments=decoded_event['args'])
+
+    def erc20_tokens_used_by_address(self, address: str) -> List[str]:
+        """
+        :param address:
+        :return: List of token addresses used by an address
+        """
+        return self.erc20_events(address=address).values_list('token_address', flat=True).distinct()
+
+    def erc20_tokens_with_balance(self, address: str) -> List[Dict[str, Any]]:
+        """
+        :return: List of dictionaries {'token_address': str, 'balance': int}
+        """
+        arguments_value_field = RawSQL("(arguments->>'value')::numeric", ())
+        return self.erc20_events(
+            address=address
+        ).values('token_address').annotate(
+            balance=Sum(Case(
+                When(arguments__from=address, then=-arguments_value_field),
+                default=arguments_value_field,
+            ))
+        ).order_by('-balance').values('token_address', 'balance')
+
+    def get_or_create_erc20_or_721_event(self, decoded_event: Dict[str, Any]):
+        if 'value' not in decoded_event['args'] or 'tokenId' not in decoded_event['args']:
+            raise ValueError('Invalid ERC20 or ERC721 event %s' % decoded_event)
+        else:
+            return self.get_or_create(ethereum_tx_id=decoded_event['transactionHash'],
+                                      log_index=decoded_event['logIndex'],
+                                      defaults={
+                                          'token_address': decoded_event['address'],
+                                          'topic': decoded_event['topics'][0],
+                                          'arguments': decoded_event['args'],
+                                      })
+
+
 class EthereumEvent(models.Model):
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='events')
     log_index = models.PositiveIntegerField()
@@ -213,7 +283,7 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(models.Manager):
-    def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
+    def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
         trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
@@ -308,8 +378,7 @@ class InternalTx(models.Model):
     @property
     def is_decoded(self):
         try:
-            self.decoded_tx
-            return True
+            return bool(self.decoded_tx)
         except InternalTxDecoded.DoesNotExist:
             return False
 
@@ -566,6 +635,7 @@ class SafeStatusQuerySet(models.QuerySet):
 
 
 class SafeContract(models.Model):
+    objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
     erc_20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
@@ -577,6 +647,25 @@ class SafeContract(models.Model):
     def created_block_number(self) -> Optional[int]:
         if self.ethereum_tx:
             return self.ethereum_tx.block_id
+
+
+@receiver(post_save, sender=MultisigTransaction)
+def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, created: bool, **kwargs) -> None:
+    """
+    When a `SafeContract` is saved, sets the `erc_20_block_number` if not set
+    :param sender: SafeContract
+    :param instance: Instance of SafeContract
+    :param created: True if model has just been created, `False` otherwise
+    :param kwargs:
+    :return:
+    """
+    if not created:
+        return
+    if sender == SafeContract:
+        if instance.erc_20_block_number == 0:
+            if instance.ethereum_tx and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
+                instance.erc_20_block_number = instance.ethereum_tx.block_id
+                instance.save()
 
 
 class SafeStatus(models.Model):

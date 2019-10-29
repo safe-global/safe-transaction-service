@@ -1,24 +1,22 @@
 import signal
-from typing import List, NoReturn, Optional
+from typing import NoReturn, Optional
 
 from django.conf import settings
 
 from celery import app
-from celery.app.task import Context
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
-from redis.lock import Lock
 
 from gnosis.eth import EthereumClientProvider
 
 from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import (EthereumBlock, InternalTxDecoded, MonitoredAddress,
-                     ProxyFactory, SafeMasterCopy)
+from .models import (EthereumBlock, InternalTxDecoded, ProxyFactory,
+                     SafeContract, SafeMasterCopy)
 
 logger = get_task_logger(__name__)
 
@@ -151,17 +149,23 @@ def check_reorgs() -> Optional[int]:
         # Check concurrency problems
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
 
-        safe_block_number = first_reorg_block_number - 1
+        safe_reorg_block_number = first_reorg_block_number - 1
         ProxyFactory.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
-            tx_block_number=safe_block_number
+            tx_block_number=safe_reorg_block_number
         )
 
         SafeMasterCopy.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
-            tx_block_number=safe_block_number
+            tx_block_number=safe_reorg_block_number
+        )
+
+        SafeContract.objects.filter(
+            erc_20_block_number__gte=first_reorg_block_number
+        ).update(
+            erc_20_block_number=safe_reorg_block_number
         )
 
         logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)
