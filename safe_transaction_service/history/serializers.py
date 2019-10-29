@@ -52,8 +52,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         # We allow duplicated if existing tx is not executed
         try:
             multisig_transaction: MultisigTransaction = MultisigTransaction.objects.exclude(
-                ethereum_tx=None,
-                safe_tx_hash=contract_transaction_hash,
+                ethereum_tx=None
+            ).exclude(
+                safe_tx_hash=contract_transaction_hash
             ).get(
                 safe=safe.address,
                 nonce=data['nonce']
