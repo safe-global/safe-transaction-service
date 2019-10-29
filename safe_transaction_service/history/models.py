@@ -649,7 +649,7 @@ class SafeContract(models.Model):
             return self.ethereum_tx.block_id
 
 
-@receiver(post_save, sender=MultisigTransaction)
+@receiver(post_save, sender=SafeContract)
 def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, created: bool, **kwargs) -> None:
     """
     When a `SafeContract` is saved, sets the `erc_20_block_number` if not set
