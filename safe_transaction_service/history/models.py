@@ -268,6 +268,7 @@ class EthereumEventManager(models.Manager):
 
 
 class EthereumEvent(models.Model):
+    objects = EthereumEventManager.from_queryset(EthereumEventQuerySet)()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='events')
     log_index = models.PositiveIntegerField()
     address = EthereumAddressField(db_index=True)
