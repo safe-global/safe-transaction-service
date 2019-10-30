@@ -28,6 +28,13 @@ class Erc20EventsIndexer(EthereumIndexer):
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
 
+    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 10000,
+                 updated_blocks_behind: int = 100, query_chunk_size: int = 100):
+        super().__init__(ethereum_client,
+                         block_process_limit=block_process_limit,
+                         updated_blocks_behind=updated_blocks_behind,
+                         query_chunk_size=query_chunk_size)
+
     @property
     def database_model(self):
         return SafeContract
