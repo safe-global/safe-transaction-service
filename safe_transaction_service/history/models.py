@@ -587,7 +587,7 @@ class MonitoredAddressManager(models.Manager):
 
 class MonitoredAddressQuerySet(models.QuerySet):
     def almost_updated(self, database_field: str, current_block_number: int,
-                       confirmations: int, updated_blocks_behind: int):
+                       updated_blocks_behind: int, confirmations: int):
         return self.filter(
             **{database_field + '__lt': current_block_number - confirmations,
                database_field + '__gt': current_block_number - updated_blocks_behind})
