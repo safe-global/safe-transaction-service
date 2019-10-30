@@ -204,6 +204,7 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
+            #TODO Fix concurrency issues
             first_reorg_block_number = check_reorgs()
             if first_reorg_block_number:
                 celery_app.control.revoke([task_id.decode()  # Redis returns `bytes`
