@@ -206,7 +206,7 @@ class EthereumEventQuerySet(models.QuerySet):
     def erc20_and_721_events(self, token_address: Optional[str] = None, address: Optional[str] = None):
         queryset = self.filter(topic=ERC20_721_TRANSFER_TOPIC)
         if token_address:
-            queryset = queryset.filter(token_address=token_address)
+            queryset = queryset.filter(address=token_address)
         if address:
             queryset = queryset.filter(Q(arguments__to=address) | Q(arguments__from=address))
         return queryset
@@ -229,7 +229,7 @@ class EthereumEventManager(models.Manager):
         """
         return EthereumEvent(ethereum_tx_id=decoded_event['transactionHash'],
                              log_index=decoded_event['logIndex'],
-                             token_address=decoded_event['address'],
+                             address=decoded_event['address'],
                              topic=decoded_event['topics'][0],
                              arguments=decoded_event['args'])
 
@@ -238,7 +238,7 @@ class EthereumEventManager(models.Manager):
         :param address:
         :return: List of token addresses used by an address
         """
-        return self.erc20_events(address=address).values_list('token_address', flat=True).distinct()
+        return self.erc20_events(address=address).values_list('address', flat=True).distinct()
 
     def erc20_tokens_with_balance(self, address: str) -> List[Dict[str, Any]]:
         """
@@ -247,12 +247,12 @@ class EthereumEventManager(models.Manager):
         arguments_value_field = RawSQL("(arguments->>'value')::numeric", ())
         return self.erc20_events(
             address=address
-        ).values('token_address').annotate(
+        ).values('address').annotate(
             balance=Sum(Case(
                 When(arguments__from=address, then=-arguments_value_field),
                 default=arguments_value_field,
             ))
-        ).order_by('-balance').values('token_address', 'balance')
+        ).order_by('-balance').values('address', 'balance')
 
     def get_or_create_erc20_or_721_event(self, decoded_event: Dict[str, Any]):
         if 'value' not in decoded_event['args'] or 'tokenId' not in decoded_event['args']:
@@ -261,7 +261,7 @@ class EthereumEventManager(models.Manager):
             return self.get_or_create(ethereum_tx_id=decoded_event['transactionHash'],
                                       log_index=decoded_event['logIndex'],
                                       defaults={
-                                          'token_address': decoded_event['address'],
+                                          'address': decoded_event['address'],
                                           'topic': decoded_event['topics'][0],
                                           'arguments': decoded_event['args'],
                                       })
