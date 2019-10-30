@@ -12,6 +12,7 @@ from redis.exceptions import LockError
 
 from gnosis.eth import EthereumClientProvider
 
+from safe_transaction_service.history.indexers.erc20_events_indexer import Erc20EventsIndexer
 from ..taskapp.celery import app as celery_app
 from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
@@ -100,6 +101,29 @@ def index_internal_txs_task(self) -> Optional[int]:
             if number_addresses:
                 logger.info('Find internal txs task processed %d addresses', number_addresses)
                 process_decoded_internal_txs_task.delay()
+                return number_addresses
+    except LockError:
+        pass
+
+
+@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+def index_erc20_events_task(self) -> Optional[int]:
+    """
+    Find and process internal txs for monitored addresses
+    :return: Number of addresses processed
+    """
+
+    redis = get_redis()
+    try:
+        with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            task_id = self.request.id
+            signal.signal(signal.SIGTERM, generate_handler(task_id))
+            logger.info('Start indexing of internal txs')
+            redis.lpush(blockchain_running_tasks_key, task_id)
+            number_addresses = Erc20EventsIndexer().process_all()
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
+            if number_addresses:
+                logger.info('Find internal txs task processed %d addresses', number_addresses)
                 return number_addresses
     except LockError:
         pass

@@ -634,8 +634,12 @@ class SafeStatusQuerySet(models.QuerySet):
         return safe_status
 
 
+class SafeContractManager(MonitoredAddressManager):
+    pass
+
+
 class SafeContract(models.Model):
-    objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
+    objects = SafeContractManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
     erc_20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20

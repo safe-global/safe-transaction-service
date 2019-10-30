@@ -10,11 +10,11 @@ from .ethereum_indexer import EthereumIndexer
 logger = getLogger(__name__)
 
 
-class Erc20EventsServiceProvider:
+class Erc20EventsIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = Erc20EventsService(EthereumClient(settings.ETHEREUM_NODE_URL))
+            cls.instance = Erc20EventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
         return cls.instance
 
     @classmethod
@@ -23,7 +23,7 @@ class Erc20EventsServiceProvider:
             del cls.instance
 
 
-class Erc20EventsService(EthereumIndexer):
+class Erc20EventsIndexer(EthereumIndexer):
     """
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """

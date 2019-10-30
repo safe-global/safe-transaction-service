@@ -82,11 +82,12 @@ class TestModels(TestCase):
         safe_contract.save()
         self.assertEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)
 
-        # Test batch creation
+        # Test batch creation (signals not working)
         safe_contracts = [
             SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx),
             SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx)
         ]
         SafeContract.objects.bulk_create(safe_contracts)
         for safe_contract in safe_contracts:
-            self.assertEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)
+            self.assertNotEqual(safe_contract.erc_20_block_number, ethereum_tx.block.number)
+            self.assertEqual(safe_contract.erc_20_block_number, 0)
