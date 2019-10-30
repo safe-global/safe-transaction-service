@@ -284,6 +284,12 @@ class EthereumEvent(models.Model):
     def __str__(self):
         return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'
 
+    def is_erc20(self) -> bool:
+        return self.topic == ERC20_721_TRANSFER_TOPIC and 'value' in self.arguments
+
+    def is_erc721(self) -> bool:
+        return self.topic == ERC20_721_TRANSFER_TOPIC and 'tokenId' in self.arguments
+
 
 class InternalTxManager(models.Manager):
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
