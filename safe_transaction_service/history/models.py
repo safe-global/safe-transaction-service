@@ -273,7 +273,7 @@ class EthereumEvent(models.Model):
     log_index = models.PositiveIntegerField()
     address = EthereumAddressField(db_index=True)
     data = HexField(null=True, max_length=2048)
-    first_topic = Sha3HashField(db_index=True)
+    topic = Sha3HashField(db_index=True)
     topics = ArrayField(Sha3HashField())
 
     class Meta:
