@@ -16,9 +16,52 @@ class EthereumBlockAdmin(admin.ModelAdmin):
     ordering = ['-number']
 
 
+class EthereumEventListFilter(admin.SimpleListFilter):
+    # Human-readable title which will be displayed in the
+    # right admin sidebar just above the filter options.
+    title = 'Event type'
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = 'event_type'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('ERC20', 'ERC20 Transfer'),
+            ('ERC721', 'ERC721 Transfer'),
+            ('OTHER', 'Other events'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'ERC20':
+            return queryset.erc20_events()
+        elif self.value() == 'ERC721':
+            return queryset.erc721_events()
+        elif self.value() == 'OTHER':
+            return queryset.not_erc_20_721_events()
+
+
 @admin.register(EthereumEvent)
 class EthereumEventAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', 'log_index', 'data')
+    list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'from_', 'to', 'arguments')
+    list_display_links = ('log_index', 'arguments')
+    list_filter = (EthereumEventListFilter, )
+    search_fields = ['arguments']
+
+    def from_(self, obj: EthereumEvent):
+        return obj.arguments.get('from')
+
+    def to(self, obj: EthereumEvent):
+        return obj.arguments.get('to')
+
+    def erc20(self, obj: EthereumEvent):
+        return obj.is_erc20()
+
+    def erc721(self, obj: EthereumEvent):
+        return obj.is_erc721()
+
+    # Fancy icons
+    erc20.boolean = True
+    erc721.boolean = True
 
 
 @admin.register(EthereumTx)

@@ -231,6 +231,7 @@ class EthereumEventManager(models.Manager):
                              log_index=decoded_event['logIndex'],
                              address=decoded_event['address'],
                              topic=decoded_event['topics'][0],
+                             topics=decoded_event['topics'],
                              arguments=decoded_event['args'])
 
     def erc20_tokens_used_by_address(self, address: str) -> List[str]:
@@ -263,6 +264,7 @@ class EthereumEventManager(models.Manager):
                                       defaults={
                                           'address': decoded_event['address'],
                                           'topic': decoded_event['topics'][0],
+                                          'topics': decoded_event['topics'],
                                           'arguments': decoded_event['args'],
                                       })
 
@@ -272,15 +274,15 @@ class EthereumEvent(models.Model):
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='events')
     log_index = models.PositiveIntegerField()
     address = EthereumAddressField(db_index=True)
-    data = HexField(null=True, max_length=2048)
     topic = Sha3HashField(db_index=True)
     topics = ArrayField(Sha3HashField())
+    arguments = JSONField()
 
     class Meta:
         unique_together = (('ethereum_tx', 'log_index'),)
 
     def __str__(self):
-        return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topics={self.topics} Data={self.data}'
+        return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'
 
 
 class InternalTxManager(models.Manager):
