@@ -68,3 +68,6 @@ class Erc20EventsIndexer(EthereumIndexer):
         ethereum_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
         ethereum_events = [EthereumEvent.objects.from_decoded_event(event) for event in events]
         return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)
+
+    def process_element(self, element: Any) -> List[Any]:
+        pass
