@@ -12,9 +12,9 @@ from redis.exceptions import LockError
 
 from gnosis.eth import EthereumClientProvider
 
-from safe_transaction_service.history.indexers.erc20_events_indexer import Erc20EventsIndexer
 from ..taskapp.celery import app as celery_app
-from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
+from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
+                       ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
 from .models import (EthereumBlock, InternalTxDecoded, ProxyFactory,
                      SafeContract, SafeMasterCopy)
@@ -120,7 +120,7 @@ def index_erc20_events_task(self) -> Optional[int]:
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of internal txs')
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_addresses = Erc20EventsIndexer().process_all()
+            number_addresses = Erc20EventsIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_addresses:
                 logger.info('Find internal txs task processed %d addresses', number_addresses)
