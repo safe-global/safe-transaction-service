@@ -1,6 +1,7 @@
 from typing import Optional
 
 from django.contrib import admin
+from gnosis.eth import EthereumClientProvider
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MultisigConfirmation,
@@ -125,9 +126,34 @@ class ProxyFactoryAdmin(MonitoredAddressAdmin):
     pass
 
 
+class SafeContractERC20ListFilter(admin.SimpleListFilter):
+    # Human-readable title which will be displayed in the
+    # right admin sidebar just above the filter options.
+    title = 'ERC20 Indexation'
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = 'erc20_indexation'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'ERC20 Indexation updated'),
+            ('NO', 'ERC20 Indexation not updated'),
+        )
+
+    def queryset(self, request, queryset):
+        #TODO Move to model
+        current_block_number = EthereumClientProvider().current_block_number
+        condition = {'erc_20_block_number__gte': current_block_number - 100}
+        if self.value() == 'YES':
+            return queryset.filter(**condition)
+        elif self.value() == 'NO':
+            return queryset.exclude(**condition)
+
+
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
     list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc_20_block_number')
+    list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
     ordering = ['-ethereum_tx__block_id']
     search_fields = ['address']
