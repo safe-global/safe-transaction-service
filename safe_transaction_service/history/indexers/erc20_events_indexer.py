@@ -32,7 +32,7 @@ class Erc20EventsIndexer(EthereumIndexer):
     """
 
     def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 10000,
-                 updated_blocks_behind: int = 500, query_chunk_size: int = 1000):
+                 updated_blocks_behind: int = 300, query_chunk_size: int = 500):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
                          updated_blocks_behind=updated_blocks_behind,
@@ -55,8 +55,8 @@ class Erc20EventsIndexer(EthereumIndexer):
         :param to_block_number: Ending block number
         :return: Tx hashes of txs with relevant erc20 transfer events for the `addresses`
         """
-        logger.info('Searching for erc20 txs from block-number=%d to block-number=%d - Safes=%s',
-                    from_block_number, to_block_number, addresses)
+        logger.debug('Searching for erc20 txs from block-number=%d to block-number=%d - Safes=%s',
+                     from_block_number, to_block_number, addresses)
 
         # Optimize block process limit
         # Check that we are processing the `block_process_limit`, if not, measures are not valid
@@ -90,8 +90,7 @@ class Erc20EventsIndexer(EthereumIndexer):
                 logger.info('ERC20 block_process_limit increased to %d', self.block_process_limit)
 
         # Log INFO if erc events found, DEBUG otherwise
-        # logger_fn = logger.info if erc20_transfer_events else logger.debug
-        logger_fn = logger.info
+        logger_fn = logger.info if erc20_transfer_events else logger.debug
         logger_fn('Found %d relevant erc20 txs between block-number=%d and block-number=%d. Safes=%s',
                   len(erc20_transfer_events), from_block_number, to_block_number, addresses)
 
