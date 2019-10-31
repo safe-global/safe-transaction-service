@@ -3,7 +3,7 @@ from collections import OrderedDict
 from logging import getLogger
 from typing import Any, Dict, Iterable, List
 
-from requests import HTTPError
+from requests import HTTPError, ConnectionError
 
 from gnosis.eth import EthereumClient
 
@@ -70,7 +70,7 @@ class Erc20EventsIndexer(EthereumIndexer):
             erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(addresses,
                                                                                           from_block=from_block_number,
                                                                                           to_block=to_block_number)
-        except HTTPError:
+        except (HTTPError, ConnectionError):
             self.block_process_limit = self.initial_block_process_limit  # Set back to default
 
         if start:
