@@ -1,24 +1,23 @@
 import signal
-from typing import List, NoReturn, Optional
+from typing import NoReturn, Optional
 
 from django.conf import settings
 
 from celery import app
-from celery.app.task import Context
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
-from redis.lock import Lock
 
 from gnosis.eth import EthereumClientProvider
 
 from ..taskapp.celery import app as celery_app
-from .indexers import InternalTxIndexerProvider, ProxyIndexerServiceProvider
+from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
+                       ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import (EthereumBlock, InternalTxDecoded, MonitoredAddress,
-                     ProxyFactory)
+from .models import (EthereumBlock, InternalTxDecoded, ProxyFactory,
+                     SafeContract, SafeMasterCopy)
 
 logger = get_task_logger(__name__)
 
@@ -107,6 +106,29 @@ def index_internal_txs_task(self) -> Optional[int]:
         pass
 
 
+@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+def index_erc20_events_task(self) -> Optional[int]:
+    """
+    Find and process internal txs for monitored addresses
+    :return: Number of addresses processed
+    """
+
+    redis = get_redis()
+    try:
+        with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            task_id = self.request.id
+            signal.signal(signal.SIGTERM, generate_handler(task_id))
+            logger.info('Start indexing of internal txs')
+            redis.lpush(blockchain_running_tasks_key, task_id)
+            number_addresses = Erc20EventsIndexerProvider().process_all()
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
+            if number_addresses:
+                logger.info('Find internal txs task processed %d addresses', number_addresses)
+                return number_addresses
+    except LockError:
+        pass
+
+
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task() -> Optional[int]:
     redis = get_redis()
@@ -151,16 +173,23 @@ def check_reorgs() -> Optional[int]:
         # Check concurrency problems
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
 
+        safe_reorg_block_number = first_reorg_block_number - 1
         ProxyFactory.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
-            tx_block_number=first_reorg_block_number - 1
+            tx_block_number=safe_reorg_block_number
         )
 
-        MonitoredAddress.objects.filter(
+        SafeMasterCopy.objects.filter(
             tx_block_number__gte=first_reorg_block_number
-        ).reset_block_number(
-            block_number=first_reorg_block_number - 1
+        ).update(
+            tx_block_number=safe_reorg_block_number
+        )
+
+        SafeContract.objects.filter(
+            erc20_block_number__gte=first_reorg_block_number
+        ).update(
+            erc20_block_number=safe_reorg_block_number
         )
 
         logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)
@@ -175,6 +204,7 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
+            #TODO Fix concurrency issues
             first_reorg_block_number = check_reorgs()
             if first_reorg_block_number:
                 celery_app.control.revoke([task_id.decode()  # Redis returns `bytes`

@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 
 from django.db import transaction
-from gnosis.safe.safe_signature import SafeSignature
 
 from hexbytes import HexBytes
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import SafeTx
+from gnosis.safe.safe_signature import SafeSignature
 
 from ..models import (InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContract, SafeStatus)
@@ -39,16 +39,13 @@ class SafeTxProcessor(TxProcessor):
         master_copy = internal_tx.to
         processed_successfully = True
         if function_name == 'setup':
-            # We need to get the master_copy from the next trace `DELEGATE_CALL`
-            #next_trace = internal_tx.get_next_trace()
-            #if next_trace:
-            #    master_copy = next_trace.to
-            #else:
-            #    master_copy = NULL_ADDRESS
             owners = arguments['_owners']
             threshold = arguments['_threshold']
             _, created = SafeContract.objects.get_or_create(address=contract_address,
-                                                            defaults={'ethereum_tx': internal_tx.ethereum_tx})
+                                                            defaults={
+                                                                'ethereum_tx': internal_tx.ethereum_tx,
+                                                                'erc20_block_number': internal_tx.ethereum_tx.block_id,
+                                                            })
             if created:
                 logger.info('Found new Safe=%s', contract_address)
             SafeStatus.objects.create(internal_tx=internal_tx,

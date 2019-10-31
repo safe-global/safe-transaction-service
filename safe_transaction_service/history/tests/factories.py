@@ -17,7 +17,7 @@ class EthereumBlockFactory(factory.DjangoModelFactory):
     class Meta:
         model = EthereumBlock
 
-    number = factory.Sequence(lambda n: n)
+    number = factory.Sequence(lambda n: n + 1)
     gas_limit = factory.fuzzy.FuzzyInteger(100000000, 200000000)
     gas_used = factory.fuzzy.FuzzyInteger(100000, 500000)
     timestamp = factory.LazyFunction(timezone.now)

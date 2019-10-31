@@ -2,6 +2,8 @@ from typing import Optional
 
 from django.contrib import admin
 
+from gnosis.eth import EthereumClientProvider
+
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MultisigConfirmation,
                      MultisigTransaction, ProxyFactory, SafeContract,
@@ -16,9 +18,52 @@ class EthereumBlockAdmin(admin.ModelAdmin):
     ordering = ['-number']
 
 
+class EthereumEventListFilter(admin.SimpleListFilter):
+    # Human-readable title which will be displayed in the
+    # right admin sidebar just above the filter options.
+    title = 'Event type'
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = 'event_type'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('ERC20', 'ERC20 Transfer'),
+            ('ERC721', 'ERC721 Transfer'),
+            ('OTHER', 'Other events'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'ERC20':
+            return queryset.erc20_events()
+        elif self.value() == 'ERC721':
+            return queryset.erc721_events()
+        elif self.value() == 'OTHER':
+            return queryset.not_erc_20_721_events()
+
+
 @admin.register(EthereumEvent)
 class EthereumEventAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', 'log_index', 'data')
+    list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'from_', 'to', 'arguments')
+    list_display_links = ('log_index', 'arguments')
+    list_filter = (EthereumEventListFilter, )
+    search_fields = ['arguments']
+
+    def from_(self, obj: EthereumEvent):
+        return obj.arguments.get('from')
+
+    def to(self, obj: EthereumEvent):
+        return obj.arguments.get('to')
+
+    def erc20(self, obj: EthereumEvent):
+        return obj.is_erc20()
+
+    def erc721(self, obj: EthereumEvent):
+        return obj.is_erc721()
+
+    # Fancy icons
+    erc20.boolean = True
+    erc721.boolean = True
 
 
 @admin.register(EthereumTx)
@@ -82,16 +127,36 @@ class ProxyFactoryAdmin(MonitoredAddressAdmin):
     pass
 
 
+class SafeContractERC20ListFilter(admin.SimpleListFilter):
+    # Human-readable title which will be displayed in the
+    # right admin sidebar just above the filter options.
+    title = 'ERC20 Indexation'
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = 'erc20_indexation'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'ERC20 Indexation updated'),
+            ('NO', 'ERC20 Indexation not updated'),
+        )
+
+    def queryset(self, request, queryset):
+        current_block_number = EthereumClientProvider().current_block_number
+        condition = {'erc20_block_number__gte': current_block_number - 200}
+        if self.value() == 'YES':
+            return queryset.filter(**condition)
+        elif self.value() == 'NO':
+            return queryset.exclude(**condition)
+
+
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
-    list_display = ('created_block_number', 'address', 'ethereum_tx_id')
+    list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc20_block_number')
+    list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
     ordering = ['-ethereum_tx__block_id']
     search_fields = ['address']
-
-    def created_block_number(self, obj: SafeContract) -> Optional[int]:
-        if obj.ethereum_tx:
-            return obj.ethereum_tx.block_id
 
 
 @admin.register(SafeStatus)

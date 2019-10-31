@@ -19,6 +19,12 @@ class Command(BaseCommand):
                                                  'initial_block_number': 6766257,
                                                  'tx_block_number': 6766257,
                                              })
+        SafeMasterCopy.objects.get_or_create(address='0xAC6072986E985aaBE7804695EC2d8970Cf7541A2',
+                                             defaults={
+                                                 'initial_block_number': 6569433,
+                                                 'tx_block_number': 6569433,
+                                             })
+
         ProxyFactory.objects.get_or_create(address='0x12302fE9c02ff50939BaAaaf415fc226C078613C',
                                            defaults={
                                                'initial_block_number': 7450116,
