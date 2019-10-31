@@ -2,7 +2,6 @@ import signal
 from typing import NoReturn, Optional
 
 from django.conf import settings
-from django.db import transaction
 
 from celery import app
 from celery.signals import worker_shutting_down
@@ -134,11 +133,10 @@ def process_decoded_internal_txs_task() -> Optional[int]:
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
             # Use slicing for memory issues
             for i in range(0, count, batch):
-                with transaction.atomic():
-                    for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
-                        processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
-                        if processed:
-                            number_processed += 1
+                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
+                    processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
+                    if processed:
+                        number_processed += 1
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed

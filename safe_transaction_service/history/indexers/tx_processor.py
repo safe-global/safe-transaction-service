@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
 
+from django.db import transaction
 from hexbytes import HexBytes
 
 from gnosis.safe import SafeTx
@@ -22,6 +23,7 @@ class SafeTxProcessor(TxProcessor):
     """
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
+    @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """
         Decode internal tx and creates needed models
