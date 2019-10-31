@@ -69,14 +69,20 @@ class Erc20EventsIndexer(EthereumIndexer):
         except HTTPError:
             self.block_process_limit = 10000  # Set back to a low default
 
-        if (to_block_number - from_block_number) == self.block_process_limit:  # If we process less blocks, is not valid
+        if (to_block_number - from_block_number) == self.block_process_limit:  # If we process less blocks is not valid
             end = time.time()
             time_diff = end - start
+            if time_diff > 30:
+                self.block_process_limit //= 2
+                logger.info('ERC20 block_process_limit halved to %d', self.block_process_limit)
             if time_diff > 10:
-                self.block_process_limit -= 1000
+                self.block_process_limit -= 10000
                 logger.info('ERC20 block_process_limit decreased to %d', self.block_process_limit)
+            elif time_diff < 2:
+                self.block_process_limit *= 2
+                logger.info('ERC20 block_process_limit duplicated to %d', self.block_process_limit)
             elif time_diff < 5:
-                self.block_process_limit += 1000
+                self.block_process_limit += 10000
                 logger.info('ERC20 block_process_limit increased to %d', self.block_process_limit)
 
         # Log INFO if erc events found, DEBUG otherwise
