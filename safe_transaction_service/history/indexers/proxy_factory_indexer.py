@@ -7,7 +7,6 @@ from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
 from gnosis.eth import EthereumClient
-from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
 from ..models import EthereumTx, ProxyFactory, SafeContract

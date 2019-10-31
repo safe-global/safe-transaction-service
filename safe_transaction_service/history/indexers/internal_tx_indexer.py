@@ -1,7 +1,6 @@
-import concurrent
 from collections import OrderedDict
 from logging import getLogger
-from typing import Any, Dict, Iterable, List, Set, Tuple
+from typing import Iterable, List, Set
 
 from django.db import transaction
 
