@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Dict, List, Set, Iterable, Any
+from typing import Any, Dict, Iterable, List, Set
 
 from hexbytes import HexBytes
 from web3 import Web3

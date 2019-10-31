@@ -2,11 +2,11 @@ import signal
 from typing import NoReturn, Optional
 
 from django.conf import settings
+from django.db import transaction
 
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
-from django.db import transaction
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
