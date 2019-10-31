@@ -132,8 +132,8 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             if count:
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
             # Use slicing for memory issues
-            for i in range(0, count, batch):
-                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
+            for _ in range(0, count, batch):
+                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[:batch]:
                     processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
                     if processed:
                         number_processed += 1
