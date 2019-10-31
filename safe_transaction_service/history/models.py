@@ -616,11 +616,13 @@ class MonitoredAddress(models.Model):
 class ProxyFactory(MonitoredAddress):
     class Meta:
         verbose_name_plural = "Proxy factories"
+        ordering = ['initial_block_number']
 
 
 class SafeMasterCopy(MonitoredAddress):
     class Meta:
         verbose_name_plural = "Safe master copies"
+        ordering = ['initial_block_number']
 
 
 class SafeStatusManager(models.Manager):

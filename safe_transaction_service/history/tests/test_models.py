@@ -6,7 +6,8 @@ from eth_account import Account
 from web3 import Web3
 
 from ..models import (InternalTx, InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeStatus)
+                      MultisigTransaction, SafeContract, SafeMasterCopy,
+                      SafeStatus)
 from .factories import EthereumTxFactory, InternalTxFactory, SafeStatusFactory
 
 logger = logging.getLogger(__name__)
@@ -91,3 +92,21 @@ class TestModels(TestCase):
         for safe_contract in safe_contracts:
             self.assertNotEqual(safe_contract.erc20_block_number, ethereum_tx.block.number)
             self.assertEqual(safe_contract.erc20_block_number, 0)
+
+    def test_safe_master_copy_sorting(self):
+        SafeMasterCopy.objects.create(address=Account.create().address,
+                                      initial_block_number=5,
+                                      tx_block_number=0)
+
+        SafeMasterCopy.objects.create(address=Account.create().address,
+                                      initial_block_number=2,
+                                      tx_block_number=0)
+
+        SafeMasterCopy.objects.create(address=Account.create().address,
+                                      initial_block_number=6,
+                                      tx_block_number=0)
+
+        initial_block_numbers = [safe_master_copy.initial_block_number
+                                 for safe_master_copy in SafeMasterCopy.objects.all()]
+
+        self.assertEqual(initial_block_numbers, [2, 5, 6])
