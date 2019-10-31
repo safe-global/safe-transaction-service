@@ -131,7 +131,7 @@ class EthereumIndexer(ABC):
             return  # We don't want problems with reorgs
 
         if block_process_limit:
-            to_block_number = min(common_minimum_block_number + block_process_limit,
+            to_block_number = min(common_minimum_block_number + block_process_limit + 1,
                                   current_block_number - confirmations)
         else:
             to_block_number = current_block_number - confirmations
