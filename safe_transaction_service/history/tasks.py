@@ -6,6 +6,7 @@ from django.conf import settings
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
+from django.db import transaction
 from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
@@ -128,15 +129,16 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             tx_processor: TxProcessor = SafeTxProcessor()
             number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 500
+            batch = 100
             if count:
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
             # Use slicing for memory issues
             for i in range(0, count, batch):
-                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
-                    processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
-                    if processed:
-                        number_processed += 1
+                with transaction.atomic:
+                    for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[i:i + batch]:
+                        processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
+                        if processed:
+                            number_processed += 1
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed

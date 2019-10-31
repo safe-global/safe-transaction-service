@@ -25,7 +25,6 @@ class SafeTxProcessor(TxProcessor):
     """
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
-    @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """
         Decode internal tx and creates needed models
