@@ -141,9 +141,8 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
         )
 
     def queryset(self, request, queryset):
-        #TODO Move to model
         current_block_number = EthereumClientProvider().current_block_number
-        condition = {'erc_20_block_number__gte': current_block_number - 100}
+        condition = {'erc_20_block_number__gte': current_block_number - 200}
         if self.value() == 'YES':
             return queryset.filter(**condition)
         elif self.value() == 'NO':
