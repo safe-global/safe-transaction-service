@@ -1,6 +1,9 @@
+import time
 from collections import OrderedDict
 from logging import getLogger
 from typing import Any, Dict, Iterable, List
+
+from requests import HTTPError
 
 from gnosis.eth import EthereumClient
 
@@ -55,10 +58,27 @@ class Erc20EventsIndexer(EthereumIndexer):
         logger.info('Searching for erc20 txs from block-number=%d to block-number=%d - Safes=%s',
                     from_block_number, to_block_number, addresses)
 
+        # Optimize block process limit
+        start = time.time()
+
         # It will get erc721 events, as `topic` is the same
-        erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(addresses,
-                                                                                      from_block=from_block_number,
-                                                                                      to_block=to_block_number)
+        try:
+            erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(addresses,
+                                                                                          from_block=from_block_number,
+                                                                                          to_block=to_block_number)
+        except HTTPError:
+            self.block_process_limit = 10000  # Set back to a low default
+
+        if (to_block_number - from_block_number) == self.block_process_limit:  # If we process less blocks, is not valid
+            end = time.time()
+            time_diff = end - start
+            if time_diff > 10:
+                self.block_process_limit -= 1000
+                logger.info('ERC20 block_process_limit decreased to %d', self.block_process_limit)
+            elif time_diff < 5:
+                self.block_process_limit += 1000
+                logger.info('ERC20 block_process_limit increased to %d', self.block_process_limit)
+
         # Log INFO if erc events found, DEBUG otherwise
         # logger_fn = logger.info if erc20_transfer_events else logger.debug
         logger_fn = logger.info

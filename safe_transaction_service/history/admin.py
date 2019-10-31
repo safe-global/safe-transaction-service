@@ -1,6 +1,7 @@
 from typing import Optional
 
 from django.contrib import admin
+
 from gnosis.eth import EthereumClientProvider
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
