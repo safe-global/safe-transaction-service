@@ -41,6 +41,7 @@ class EthereumIndexer(ABC):
         """
         self.ethereum_client = ethereum_client
         self.confirmations = confirmations
+        self.initial_block_process_limit = block_process_limit
         self.block_process_limit = block_process_limit
         self.updated_blocks_behind = updated_blocks_behind
         self.query_chunk_size = query_chunk_size

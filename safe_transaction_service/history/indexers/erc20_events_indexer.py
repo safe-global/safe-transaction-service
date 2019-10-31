@@ -31,7 +31,7 @@ class Erc20EventsIndexer(EthereumIndexer):
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
 
-    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 1000000,
+    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 10000,
                  updated_blocks_behind: int = 500, query_chunk_size: int = 1000):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
@@ -59,7 +59,11 @@ class Erc20EventsIndexer(EthereumIndexer):
                     from_block_number, to_block_number, addresses)
 
         # Optimize block process limit
-        start = time.time()
+        # Check that we are processing the `block_process_limit`, if not, measures are not valid
+        if (to_block_number - from_block_number) == self.block_process_limit:
+            start = time.time()
+        else:
+            start = None
 
         # It will get erc721 events, as `topic` is the same
         try:
@@ -67,9 +71,9 @@ class Erc20EventsIndexer(EthereumIndexer):
                                                                                           from_block=from_block_number,
                                                                                           to_block=to_block_number)
         except HTTPError:
-            self.block_process_limit = 10000  # Set back to a low default
+            self.block_process_limit = self.initial_block_process_limit  # Set back to default
 
-        if (to_block_number - from_block_number) == self.block_process_limit:  # If we process less blocks is not valid
+        if start:
             end = time.time()
             time_diff = end - start
             if time_diff > 30:
