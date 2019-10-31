@@ -44,7 +44,7 @@ class SafeTxProcessor(TxProcessor):
             _, created = SafeContract.objects.get_or_create(address=contract_address,
                                                             defaults={
                                                                 'ethereum_tx': internal_tx.ethereum_tx,
-                                                                'erc_20_block_number': internal_tx.ethereum_tx.block_id,
+                                                                'erc20_block_number': internal_tx.ethereum_tx.block_id,
                                                             })
             if created:
                 logger.info('Found new Safe=%s', contract_address)

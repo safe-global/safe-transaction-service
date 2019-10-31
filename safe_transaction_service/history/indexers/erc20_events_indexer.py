@@ -44,7 +44,7 @@ class Erc20EventsIndexer(EthereumIndexer):
 
     @property
     def database_field(self):
-        return 'erc_20_block_number'
+        return 'erc20_block_number'
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int) -> List[Dict[str, Any]]:

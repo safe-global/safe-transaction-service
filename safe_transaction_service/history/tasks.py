@@ -187,9 +187,9 @@ def check_reorgs() -> Optional[int]:
         )
 
         SafeContract.objects.filter(
-            erc_20_block_number__gte=first_reorg_block_number
+            erc20_block_number__gte=first_reorg_block_number
         ).update(
-            erc_20_block_number=safe_reorg_block_number
+            erc20_block_number=safe_reorg_block_number
         )
 
         logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)

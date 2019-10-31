@@ -651,7 +651,7 @@ class SafeContract(models.Model):
     objects = SafeContractManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
-    erc_20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
+    erc20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
 
     def __str__(self):
         return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
@@ -665,7 +665,7 @@ class SafeContract(models.Model):
 @receiver(post_save, sender=SafeContract)
 def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, created: bool, **kwargs) -> None:
     """
-    When a `SafeContract` is saved, sets the `erc_20_block_number` if not set
+    When a `SafeContract` is saved, sets the `erc20_block_number` if not set
     :param sender: SafeContract
     :param instance: Instance of SafeContract
     :param created: True if model has just been created, `False` otherwise
@@ -675,9 +675,9 @@ def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, c
     if not created:
         return
     if sender == SafeContract:
-        if instance.erc_20_block_number == 0:
+        if instance.erc20_block_number == 0:
             if instance.ethereum_tx and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
-                instance.erc_20_block_number = instance.ethereum_tx.block_id
+                instance.erc20_block_number = instance.ethereum_tx.block_id
                 instance.save()
 
 

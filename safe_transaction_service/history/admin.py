@@ -143,7 +143,7 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         current_block_number = EthereumClientProvider().current_block_number
-        condition = {'erc_20_block_number__gte': current_block_number - 200}
+        condition = {'erc20_block_number__gte': current_block_number - 200}
         if self.value() == 'YES':
             return queryset.filter(**condition)
         elif self.value() == 'NO':
@@ -152,7 +152,7 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
 
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
-    list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc_20_block_number')
+    list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc20_block_number')
     list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
     ordering = ['-ethereum_tx__block_id']

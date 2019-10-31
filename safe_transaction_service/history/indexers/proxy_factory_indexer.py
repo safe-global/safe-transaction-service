@@ -103,5 +103,5 @@ class ProxyIndexerService(EthereumIndexer):
             return [SafeContract.objects.get_or_create(address=address,
                                                        defaults={
                                                            'ethereum_tx': ethereum_tx,
-                                                           'erc_20_block_number': log['blockNumber'],
+                                                           'erc20_block_number': log['blockNumber'],
                                                        })[0]]
