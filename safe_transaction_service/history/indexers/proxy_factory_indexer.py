@@ -1,5 +1,6 @@
+from collections import OrderedDict
 from logging import getLogger
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Iterable, Any
 
 from hexbytes import HexBytes
 from web3 import Web3
@@ -86,22 +87,21 @@ class ProxyIndexerService(EthereumIndexer):
                   len(logs), from_block_number, to_block_number)
         return logs
 
-    def process_element(self, log: Dict[str, any]) -> List[SafeContract]:
+    def process_elements(self, events: Iterable[Dict[str, Any]]):
         """
-        Process every log
-        :param log: Log fetched using `web3.eth.getLogs`
+        Process all logs
+        :param events: Iterable of Events fetched using `web3.eth.getLogs`
         :return: List of `SafeContract` already stored in database
         """
-        ethereum_tx = EthereumTx.objects.create_or_update_from_tx_hash(log['transactionHash'])
-        int_address = int.from_bytes(HexBytes(log['data']), byteorder='big')
-        address = Web3.toChecksumAddress('{:#042x}'.format(int_address))
-
-        # TODO Check `master_copy` address
-        if address == NULL_ADDRESS:
-            return []
-        else:
-            return [SafeContract.objects.get_or_create(address=address,
-                                                       defaults={
-                                                           'ethereum_tx': ethereum_tx,
-                                                           'erc20_block_number': log['blockNumber'],
-                                                       })[0]]
+        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in events]).keys()
+        ethereum_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
+        safe_contracts = []
+        for event in events:
+            int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')
+            contract_address = Web3.toChecksumAddress('{:#042x}'.format(int_contract_address))
+            safe_contracts.append(SafeContract(address=contract_address,
+                                               ethereum_tx_id=event['transactionHash'],
+                                               erc20_block_number=event['blockNumber']))
+        if safe_contracts:
+            SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
+        return safe_contracts

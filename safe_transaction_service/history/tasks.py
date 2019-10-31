@@ -64,20 +64,11 @@ def index_new_proxies_task(self) -> Optional[int]:
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             redis.lpush(blockchain_running_tasks_key, task_id)
-            proxy_factory_addresses = ['0x12302fE9c02ff50939BaAaaf415fc226C078613C']
-            proxy_indexer_service = ProxyIndexerServiceProvider()
-
-            new_monitored_addresses = 0
-            updated = False
-
-            while not updated:
-                created_objects, updated = proxy_indexer_service.process_addresses(proxy_factory_addresses)
-                new_monitored_addresses += len(created_objects)
-
+            number_proxies = ProxyIndexerServiceProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
-            if new_monitored_addresses:
-                logger.info('Indexed new %d proxies', new_monitored_addresses)
-                return new_monitored_addresses
+            if number_proxies:
+                logger.info('Indexed new %d proxies', number_proxies)
+                return number_proxies
     except LockError:
         pass
 
@@ -96,12 +87,12 @@ def index_internal_txs_task(self) -> Optional[int]:
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of internal txs')
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_addresses = InternalTxIndexerProvider().process_all()
+            number_traces = InternalTxIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
-            if number_addresses:
-                logger.info('Find internal txs task processed %d addresses', number_addresses)
+            if number_traces:
+                logger.info('Find internal txs task processed %d traces', number_traces)
                 process_decoded_internal_txs_task.delay()
-                return number_addresses
+                return number_traces
     except LockError:
         pass
 
@@ -118,13 +109,13 @@ def index_erc20_events_task(self) -> Optional[int]:
         with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
-            logger.info('Start indexing of erc20 events')
+            logger.info('Start indexing of erc20/721 events')
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_addresses = Erc20EventsIndexerProvider().process_all()
+            number_events = Erc20EventsIndexerProvider().process_all()
             redis.lrem(blockchain_running_tasks_key, 0, task_id)
-            if number_addresses:
-                logger.info('Find internal txs task processed %d addresses', number_addresses)
-                return number_addresses
+            if number_events:
+                logger.info('Indexing of erc20/721 events task processed %d events', number_events)
+                return number_events
     except LockError:
         pass
 

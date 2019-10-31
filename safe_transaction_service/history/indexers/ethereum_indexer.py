@@ -72,14 +72,13 @@ class EthereumIndexer(ABC):
         """
         pass
 
-    @abstractmethod
     def process_element(self, element: Any) -> List[Any]:
         """
         Process provided `element` to retrieve relevant data (internal txs, events...)
         :param element:
         :return:
         """
-        pass
+        raise NotImplemented
 
     def process_elements(self, elements: Iterable[Any]):
         processed_objects = []
@@ -164,10 +163,10 @@ class EthereumIndexer(ABC):
     def process_all(self) -> int:
         """
         Find and process relevant data for existing addresses
-        :return: Number of addresses processed
+        :return: Number of elements processed
         """
         current_block_number = self.ethereum_client.current_block_number
-        processed_addresses = 0
+        number_processed_elements = 0
 
         # We need to cast the `iterable` to `list`, if not chunks will not work well when models are updated
         almost_updated_monitored_addresses = list(self.get_almost_updated_addresses(current_block_number))
@@ -175,12 +174,12 @@ class EthereumIndexer(ABC):
         for almost_updated_addresses_chunk in almost_updated_monitored_addresses_chunks:
             almost_updated_addresses = [monitored_contract.address
                                         for monitored_contract in almost_updated_addresses_chunk]
-            self.process_addresses(almost_updated_addresses)
-            processed_addresses += len(almost_updated_addresses)
+            processed_elements, _ = self.process_addresses(almost_updated_addresses)
+            number_processed_elements += len(processed_elements)
 
         for monitored_contract in self.get_not_updated_addresses(current_block_number):
             updated = False
             while not updated:
-                _, updated = self.process_addresses([monitored_contract.address])
-            processed_addresses += 1
-        return processed_addresses
+                processed_elements, updated = self.process_addresses([monitored_contract.address])
+            number_processed_elements += len(processed_elements)
+        return number_processed_elements

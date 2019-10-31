@@ -109,6 +109,3 @@ class InternalTxIndexer(EthereumIndexer):
             InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
         logger.info('End decoding of traces')
         return internal_txs
-
-    def process_element(self, element: Any) -> List[Any]:
-        pass
