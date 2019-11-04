@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 
 from django.db import transaction
+
 from hexbytes import HexBytes
 
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature
 
@@ -36,7 +38,7 @@ class SafeTxProcessor(TxProcessor):
         contract_address = internal_tx._from
         master_copy = internal_tx.to
         processed_successfully = True
-        if function_name == 'setup':
+        if function_name == 'setup' and contract_address != NULL_ADDRESS:
             owners = arguments['_owners']
             threshold = arguments['_threshold']
             _, created = SafeContract.objects.get_or_create(address=contract_address,
