@@ -128,7 +128,7 @@ class EthereumTxManager(models.Manager):
                 if ethereum_tx.block is None:
                     ethereum_tx.block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
                     ethereum_tx.gas_used = tx_receipt['gasUsed']
-                    ethereum_tx.status = tx_receipt['status']
+                    ethereum_tx.status = tx_receipt.get('status')
                     ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                     ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
                 ethereum_txs.append(ethereum_tx)
@@ -146,7 +146,7 @@ class EthereumTxManager(models.Manager):
                 tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
                 ethereum_tx.block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
                 ethereum_tx.gas_used = tx_receipt['gasUsed']
-                ethereum_tx.status = tx_receipt['status']
+                ethereum_tx.status = tx_receipt.get('status')
                 ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                 ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
             return ethereum_tx
@@ -165,7 +165,7 @@ class EthereumTxManager(models.Manager):
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
             gas_used=tx_receipt and tx_receipt['gasUsed'],
-            status=tx_receipt and tx_receipt['status'],
+            status=tx_receipt and tx_receipt.get('status'),
             transaction_index=tx_receipt and tx_receipt['transactionIndex'],
             data=HexBytes(tx.get('data') or tx.get('input')),
             nonce=tx['nonce'],
@@ -180,7 +180,7 @@ class EthereumTx(TimeStampedModel):
                               related_name='txs')  # If mined
     tx_hash = Sha3HashField(unique=True, primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
-    status = models.IntegerField(null=True, default=None)  # If mined
+    status = models.IntegerField(null=True, default=None)  # If mined. Old txs don't have `status`
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
     _from = EthereumAddressField(null=True, db_index=True)
     gas = Uint256Field()
