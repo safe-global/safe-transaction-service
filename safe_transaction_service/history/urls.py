@@ -11,6 +11,8 @@ urlpatterns = [
     url(r'^about/$', views.AboutView.as_view(), name='about'),
     path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
          name='multisig-transactions'),
+    path('safes/<str:address>/balances/', views.SafeBalanceView.as_view(),
+         name='safe-balances'),
     path('transactions/<str:tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction'),
 ]

@@ -6,11 +6,12 @@ from factory.fuzzy import FuzzyDateTime, FuzzyInteger
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth.constants import NULL_ADDRESS
+from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 
-from ..models import (ConfirmationType, EthereumBlock, EthereumTx,
-                      EthereumTxCallType, EthereumTxType, InternalTx,
-                      MultisigConfirmation, MultisigTransaction, SafeStatus)
+from ..models import (ConfirmationType, EthereumBlock, EthereumEvent,
+                      EthereumTx, EthereumTxCallType, EthereumTxType,
+                      InternalTx, MultisigConfirmation, MultisigTransaction,
+                      SafeContract, SafeStatus)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -38,6 +39,27 @@ class EthereumTxFactory(factory.DjangoModelFactory):
     nonce = factory.Sequence(lambda n: n)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
+
+
+class EthereumEventFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = EthereumEvent
+
+    class Params:
+        to = None
+        from_ = None
+        erc721 = False
+        value = 1200
+
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
+    log_index = factory.Sequence(lambda n: n)
+    address = factory.LazyFunction(lambda: Account.create().address)
+    topic = ERC20_721_TRANSFER_TOPIC
+    topics = [ERC20_721_TRANSFER_TOPIC]
+    arguments = factory.LazyAttribute(lambda o: {'to': o.to if o.to else Account.create().address,
+                                                 'from': o.from_ if o.from_ else Account.create().address,
+                                                 'tokenId' if o.erc721 else 'value': o.value}
+                                      )
 
 
 class InternalTxFactory(factory.DjangoModelFactory):
@@ -89,6 +111,15 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
     multisig_transaction = factory.SubFactory(MultisigTransaction)
     multisig_transaction_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
+
+
+class SafeContractFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = SafeContract
+
+    address = factory.LazyFunction(lambda: Account.create().address)
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
+    erc20_block_number = FuzzyInteger(low=0, high=2)
 
 
 class SafeStatusFactory(factory.DjangoModelFactory):

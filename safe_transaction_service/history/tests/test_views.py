@@ -10,7 +10,10 @@ from web3 import Web3
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from .factories import MultisigConfirmationFactory, MultisigTransactionFactory
+from safe_transaction_service.history.models import SafeContract
+
+from .factories import (EthereumEventFactory, MultisigConfirmationFactory,
+                        MultisigTransactionFactory, SafeContractFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -134,3 +137,29 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertIn('User is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_safe_balances(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        value = 7
+        self.send_ether(safe_address, 7)
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 1)
+        self.assertIsNone(response.json()[0]['tokenAddress'])
+        self.assertEqual(response.json()[0]['balance'], str(value))
+
+        tokens_value = 12
+        erc20 = self.deploy_example_erc20(tokens_value, safe_address)
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 1)
+
+        EthereumEventFactory(address=erc20.address, to=safe_address)
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
+                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])

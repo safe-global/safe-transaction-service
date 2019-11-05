@@ -164,3 +164,8 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             confirmations = obj.confirmations
 
         return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data
+
+
+class SafeBalanceResponseSerializer(serializers.Serializer):
+    token_address = serializers.CharField()
+    balance = serializers.CharField()

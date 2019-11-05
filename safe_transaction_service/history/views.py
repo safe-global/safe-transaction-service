@@ -9,12 +9,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
 
-from safe_transaction_service.history.models import MultisigTransaction
 from safe_transaction_service.version import __version__
 
 from .filters import DefaultPagination, MultisigTransactionFilter
-from .serializers import (SafeMultisigTransactionResponseSerializer,
+from .models import MultisigTransaction, SafeContract
+from .serializers import (SafeBalanceResponseSerializer,
+                          SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
+from .services import BalanceServiceProvider
 
 
 class AboutView(APIView):
@@ -135,3 +137,27 @@ class SafeMultisigTransactionListView(ListAPIView):
             #                                          owner=data['sender'])
 
             return Response(status=status.HTTP_202_ACCEPTED)
+
+
+class SafeBalanceView(APIView):
+    serializer_class = SafeBalanceResponseSerializer
+
+    @swagger_auto_schema(responses={200: SafeBalanceResponseSerializer(many=True),
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            safe_balances = BalanceServiceProvider().get_balances(address)
+            serializer = self.serializer_class(data=safe_balances, many=True)
+            serializer.is_valid()
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
