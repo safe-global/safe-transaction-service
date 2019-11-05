@@ -142,11 +142,11 @@ class EthereumTxManager(models.Manager):
                     ethereum_tx.status = tx_receipt.get('status')
                     ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                     ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
-                ethereum_txs_dict[HexBytes(ethereum_tx.db_ethereum_tx.tx_hash).hex()] = ethereum_tx
+                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
                 ethereum_tx = self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
-                ethereum_txs_dict[HexBytes(ethereum_tx.db_ethereum_tx.tx_hash).hex()] = ethereum_tx
+                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
         return list(ethereum_txs_dict.values())
 
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
