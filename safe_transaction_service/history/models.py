@@ -117,15 +117,15 @@ class EthereumBlock(models.Model):
 class EthereumTxManager(models.Manager):
     def create_or_update_from_tx_hashes(self, tx_hashes: List[Union[str, bytes]]) -> List['EthereumTx']:
         # Search first in database
-        ethereum_txs_dict = OrderedDict.fromkeys([HexBytes(tx_hash).hex() for tx_hash in tx_hashes]).keys()
+        ethereum_txs_dict = OrderedDict.fromkeys([HexBytes(tx_hash).hex() for tx_hash in tx_hashes])
         db_ethereum_txs = self.filter(tx_hash__in=tx_hashes).exclude(block=None)
         for db_ethereum_tx in db_ethereum_txs:
             ethereum_txs_dict[db_ethereum_tx.tx_hash] = db_ethereum_tx
 
         # Retrieve from the node the txs missing from database
-        tx_hashes_not_in_db = [tx_hash for tx_hash, ethereum_tx in ethereum_txs_dict.items() if ethereum_tx]
+        tx_hashes_not_in_db = [tx_hash for tx_hash, ethereum_tx in ethereum_txs_dict.items() if not ethereum_tx]
         if not tx_hashes_not_in_db:
-            return ethereum_txs_dict.values()
+            return list(ethereum_txs_dict.values())
 
         ethereum_client = EthereumClientProvider()
         current_block_number = ethereum_client.current_block_number
@@ -147,7 +147,7 @@ class EthereumTxManager(models.Manager):
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
                 ethereum_tx = self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
                 ethereum_txs_dict[HexBytes(ethereum_tx.db_ethereum_tx.tx_hash).hex()] = ethereum_tx
-        return ethereum_txs_dict.values()
+        return list(ethereum_txs_dict.values())
 
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
         ethereum_client = EthereumClientProvider()

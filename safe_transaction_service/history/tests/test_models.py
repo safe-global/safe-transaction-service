@@ -5,16 +5,15 @@ from django.test import TestCase
 from eth_account import Account
 from web3 import Web3
 
-from ..models import (InternalTx, InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeMasterCopy,
-                      SafeStatus)
+from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
+                      MultisigConfirmation, MultisigTransaction, SafeContract,
+                      SafeMasterCopy, SafeStatus)
 from .factories import EthereumTxFactory, InternalTxFactory, SafeStatusFactory
 
 logger = logging.getLogger(__name__)
 
 
 class TestModels(TestCase):
-
     def test_bind_confirmations(self):
         safe_tx_hash = Web3.sha3(text='prueba')
         ethereum_tx = EthereumTxFactory()
@@ -110,3 +109,18 @@ class TestModels(TestCase):
                                  for safe_master_copy in SafeMasterCopy.objects.all()]
 
         self.assertEqual(initial_block_numbers, [2, 5, 6])
+
+
+class TestEthereumTxManager(TestCase):
+    def test_create_or_update_from_tx_hashes_existing(self):
+        self.assertListEqual(EthereumTx.objects.create_or_update_from_tx_hashes([]), [])
+        tx_hashes = ['0x52fcb05f2ad209d53d84b0a9a7ce6474ab415db88bc364c088758d70c8b5b0ef']
+        with self.assertRaises(TypeError):
+            EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
+
+        ethereum_txs = [EthereumTxFactory() for _ in range(5)]
+        tx_hashes = [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
+        db_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
+        self.assertEqual(len(db_txs), len(ethereum_txs))
+        for db_tx in db_txs:
+            self.assertIsNotNone(db_tx)
