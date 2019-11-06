@@ -96,21 +96,21 @@ class TestModels(TestCase):
 
     def test_safe_master_copy_sorting(self):
         SafeMasterCopy.objects.create(address=Account.create().address,
-                                      initial_block_number=5,
-                                      tx_block_number=0)
+                                      initial_block_number=3,
+                                      tx_block_number=5)
 
         SafeMasterCopy.objects.create(address=Account.create().address,
                                       initial_block_number=2,
-                                      tx_block_number=0)
+                                      tx_block_number=1)
 
         SafeMasterCopy.objects.create(address=Account.create().address,
                                       initial_block_number=6,
-                                      tx_block_number=0)
+                                      tx_block_number=3)
 
         initial_block_numbers = [safe_master_copy.initial_block_number
                                  for safe_master_copy in SafeMasterCopy.objects.all()]
 
-        self.assertEqual(initial_block_numbers, [2, 5, 6])
+        self.assertEqual(initial_block_numbers, [2, 6, 3])
 
 
 class TestEthereumTxManager(EthereumTestCaseMixin, TestCase):
