@@ -108,6 +108,9 @@ class EthereumBlock(models.Model):
     confirmed = models.BooleanField(default=False,
                                     db_index=True)  # For reorgs, True if `current_block_number` - `number` >= 6
 
+    def __str__(self):
+        return f'Block number={self.number} on {self.timestamp}'
+
     def set_confirmed(self, current_block_number: int):
         if (current_block_number - self.number) >= 6:
             self.confirmed = True
