@@ -90,7 +90,8 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
                 '-internal_tx__ethereum_tx__transaction_index',
                 '-internal_tx_id']
     list_select_related = ('internal_tx__ethereum_tx',)
-    search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from']
+    search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
+                     '=internal_tx__ethereum_tx__tx_hash']
 
 
 @admin.register(MultisigConfirmation)
