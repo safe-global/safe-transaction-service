@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Any, Collection, Iterable, List, Optional, Tuple
@@ -25,7 +26,8 @@ class EthereumIndexer(ABC):
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
                  block_process_limit: int = 200, updated_blocks_behind: int = 20,
-                 query_chunk_size: int = 100, first_block_threshold: int = 150000):
+                 query_chunk_size: int = 100, first_block_threshold: int = 150000,
+                 block_auto_process_limit: bool = True):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
@@ -38,6 +40,8 @@ class EthereumIndexer(ABC):
         it seems that `200` can be a good value
         :param first_block_threshold: First block to start scanning for address. For example, maybe a contract
         we are listening to was created in block 2000, but there's a tx sending funds to it in block 1500
+        :param block_auto_process_limit: Auto increase or decrease the `block_process_limit`
+        based on congestion algorithm
         """
         self.ethereum_client = ethereum_client
         self.confirmations = confirmations
@@ -46,6 +50,10 @@ class EthereumIndexer(ABC):
         self.updated_blocks_behind = updated_blocks_behind
         self.query_chunk_size = query_chunk_size
         self.first_block_threshold = first_block_threshold
+        self.block_auto_process_limit = block_auto_process_limit
+
+    class FindRelevantElementsException(Exception):
+        pass
 
     @property
     @abstractmethod
@@ -83,7 +91,7 @@ class EthereumIndexer(ABC):
     def process_elements(self, elements: Iterable[Any]):
         processed_objects = []
         for i, element in enumerate(elements):
-            logger.info('Processing element %d/%d', i + 1, len(elements))
+            logger.info('Processing element %d/%d', i + 1, len(list(elements)))
             processed_objects.append(self.process_element(element))
         # processed_objects = [self.process_element(element) for element in elements]
         return [item for sublist in processed_objects for item in sublist]
@@ -154,7 +162,36 @@ class EthereumIndexer(ABC):
         from_block_number, to_block_number = parameters
 
         updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
-        elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
+
+        # Optimize number of elements processed every time (block process limit)
+        # Check that we are processing the `block_process_limit`, if not, measures are not valid
+        if self.block_auto_process_limit and (to_block_number - from_block_number) == self.block_process_limit:
+            start = time.time()
+        else:
+            start = None
+
+        try:
+            elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
+        except self.FindRelevantElementsException as e:
+            self.block_process_limit = self.initial_block_process_limit  # Set back to default
+            raise e
+
+        if start:
+            end = time.time()
+            time_diff = end - start
+            if time_diff > 30:
+                self.block_process_limit //= 2
+                logger.info('block_process_limit halved to %d', self.block_process_limit)
+            if time_diff > 10:
+                self.block_process_limit -= 10000
+                logger.info('block_process_limit decreased to %d', self.block_process_limit)
+            elif time_diff < 2:
+                self.block_process_limit *= 2
+                logger.info('block_process_limit duplicated to %d', self.block_process_limit)
+            elif time_diff < 5:
+                self.block_process_limit += 10000
+                logger.info('block_process_limit increased to %d', self.block_process_limit)
+
         processed_elements = self.process_elements(elements)
 
         self.update_monitored_address(addresses, to_block_number)
