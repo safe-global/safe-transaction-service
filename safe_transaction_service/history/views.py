@@ -34,7 +34,7 @@ class AboutView(APIView):
             'settings': {
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
-                'INTERNAL_TXS_BLOCK_PROCESS_LIMIT ': settings.INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
+                'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT ': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
                 'SAFE_CONTRACT_ADDRESS': settings.SAFE_CONTRACT_ADDRESS,
                 'SAFE_VALID_CONTRACT_ADDRESSES': settings.SAFE_VALID_CONTRACT_ADDRESSES,
                 'SAFE_REORG_BLOCKS': settings.SAFE_REORG_BLOCKS,

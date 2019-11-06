@@ -18,7 +18,7 @@ class InternalTxIndexerProvider:
         if not hasattr(cls, 'instance'):
             from django.conf import settings
             cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                                             block_process_limit=settings.INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+                                             block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
         return cls.instance
 
     @classmethod
