@@ -97,6 +97,24 @@ class SafeTxProcessor(TxProcessor):
             safe_tx_hash = safe_tx.safe_tx_hash
 
             ethereum_tx = internal_tx.ethereum_tx
+
+            # Remove existing transaction with same nonce in case of bad indexing (one of the master copies can be
+            # outdated and a tx with a wrong nonce could be indexed)
+            MultisigTransaction.objects.filter(
+                ethereum_tx=ethereum_tx,
+                nonce=safe_tx.safe_nonce,
+                safe=contract_address
+            ).exclude(
+                safe_tx_hash=safe_tx_hash
+            ).delete()
+
+            # Remove old txs not used
+            MultisigTransaction.objects.filter(
+                ethereum_tx=None,
+                nonce__lt=safe_tx.safe_nonce,
+                safe=contract_address
+            )
+
             multisig_tx, created = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={

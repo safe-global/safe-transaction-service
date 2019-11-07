@@ -9,6 +9,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         call_command('setup_service')
+        SafeMasterCopy.objects.get_or_create(address='0xacF5Efe28B6a2A48459e7970B8754Cf26FB265C5',
+                                             defaults={
+                                                 'initial_block_number': 5395874,
+                                                 'tx_block_number': 5395874,
+                                             })
         SafeMasterCopy.objects.get_or_create(address='0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A',
                                              defaults={
                                                  'initial_block_number': 4110083,

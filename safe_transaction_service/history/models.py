@@ -432,6 +432,10 @@ class InternalTx(models.Model):
             return None
 
 
+class InternalTxDecodedManager(models.Manager):
+    pass
+
+
 class InternalTxDecodedQuerySet(models.QuerySet):
     def not_processed(self):
         return self.filter(processed=False)
@@ -455,7 +459,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
 
 
 class InternalTxDecoded(models.Model):
-    objects = InternalTxDecodedQuerySet.as_manager()
+    objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
                                        primary_key=True)
     function_name = models.CharField(max_length=256)
@@ -553,7 +557,7 @@ class MultisigConfirmation(TimeStampedModel):
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
-    signature = HexField(null=True, default=None, max_length=500)
+    signature = HexField(null=True, default=None, max_length=500)  # Off chain signatures
 
     class Meta:
         unique_together = (('multisig_transaction_hash', 'owner'),)
