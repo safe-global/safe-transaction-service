@@ -14,7 +14,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         SafeStatus.objects.all().delete()
-        MultisigConfirmation.objects.all().delete()
+        MultisigConfirmation.objects.filter(signature=None).delete()
         # MultisigTransaction.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
         process_decoded_internal_txs_task.delay()

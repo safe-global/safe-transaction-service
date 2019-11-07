@@ -4,6 +4,8 @@ from typing import Iterable, List, Set
 
 from django.db import transaction
 
+from requests import RequestException
+
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumTx, InternalTx, InternalTxDecoded, SafeMasterCopy
@@ -18,7 +20,7 @@ class InternalTxIndexerProvider:
         if not hasattr(cls, 'instance'):
             from django.conf import settings
             cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                                             block_process_limit=settings.INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+                                             block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
         return cls.instance
 
     @classmethod
@@ -52,13 +54,16 @@ class InternalTxIndexer(EthereumIndexer):
         logger.debug('Searching for internal txs from block-number=%d to block-number=%d - Addresses=%s',
                      from_block_number, to_block_number, addresses)
 
-        to_traces = self.ethereum_client.parity.trace_filter(from_block=from_block_number,
-                                                             to_block=to_block_number,
-                                                             to_address=addresses)
+        try:
+            to_traces = self.ethereum_client.parity.trace_filter(from_block=from_block_number,
+                                                                 to_block=to_block_number,
+                                                                 to_address=addresses)
 
-        from_traces = self.ethereum_client.parity.trace_filter(from_block=from_block_number,
-                                                               to_block=to_block_number,
-                                                               from_address=addresses)
+            from_traces = self.ethereum_client.parity.trace_filter(from_block=from_block_number,
+                                                                   to_block=to_block_number,
+                                                                   from_address=addresses)
+        except RequestException as e:
+            raise self.FindRelevantElementsException from e
 
         # Log INFO if traces found, DEBUG if not
         tx_hashes = OrderedDict.fromkeys([trace['transactionHash']
@@ -76,7 +81,6 @@ class InternalTxIndexer(EthereumIndexer):
             return []
 
         logger.info('Prefetching and storing ethereum txs')
-        # TODO Search first existing in DB and use Bulk insert
         ethereum_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
         logger.info('End prefetching and storing of ethereum txs')
 

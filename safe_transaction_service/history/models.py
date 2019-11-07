@@ -1,4 +1,5 @@
 import datetime
+from collections import OrderedDict
 from enum import Enum
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
@@ -107,6 +108,9 @@ class EthereumBlock(models.Model):
     confirmed = models.BooleanField(default=False,
                                     db_index=True)  # For reorgs, True if `current_block_number` - `number` >= 6
 
+    def __str__(self):
+        return f'Block number={self.number} on {self.timestamp}'
+
     def set_confirmed(self, current_block_number: int):
         if (current_block_number - self.number) >= 6:
             self.confirmed = True
@@ -114,13 +118,23 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
-    def create_or_update_from_tx_hashes(self, tx_hashes: List[str]) -> List['EthereumTx']:
+    def create_or_update_from_tx_hashes(self, tx_hashes: List[Union[str, bytes]]) -> List['EthereumTx']:
+        # Search first in database
+        ethereum_txs_dict = OrderedDict.fromkeys([HexBytes(tx_hash).hex() for tx_hash in tx_hashes])
+        db_ethereum_txs = self.filter(tx_hash__in=tx_hashes).exclude(block=None)
+        for db_ethereum_tx in db_ethereum_txs:
+            ethereum_txs_dict[db_ethereum_tx.tx_hash] = db_ethereum_tx
+
+        # Retrieve from the node the txs missing from database
+        tx_hashes_not_in_db = [tx_hash for tx_hash, ethereum_tx in ethereum_txs_dict.items() if not ethereum_tx]
+        if not tx_hashes_not_in_db:
+            return list(ethereum_txs_dict.values())
+
         ethereum_client = EthereumClientProvider()
         current_block_number = ethereum_client.current_block_number
-        txs = ethereum_client.get_transactions(tx_hashes)
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes)
+        txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
+        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
         blocks = ethereum_client.get_blocks([tx['blockNumber'] for tx in txs])
-        ethereum_txs = []
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
@@ -131,11 +145,12 @@ class EthereumTxManager(models.Manager):
                     ethereum_tx.status = tx_receipt.get('status')
                     ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                     ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
-                ethereum_txs.append(ethereum_tx)
+                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
-                ethereum_txs.append(self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block))
-        return ethereum_txs
+                ethereum_tx = self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
+                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
+        return list(ethereum_txs_dict.values())
 
     def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
         ethereum_client = EthereumClientProvider()
@@ -417,6 +432,10 @@ class InternalTx(models.Model):
             return None
 
 
+class InternalTxDecodedManager(models.Manager):
+    pass
+
+
 class InternalTxDecodedQuerySet(models.QuerySet):
     def not_processed(self):
         return self.filter(processed=False)
@@ -440,7 +459,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
 
 
 class InternalTxDecoded(models.Model):
-    objects = InternalTxDecodedQuerySet.as_manager()
+    objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
                                        primary_key=True)
     function_name = models.CharField(max_length=256)
@@ -538,7 +557,7 @@ class MultisigConfirmation(TimeStampedModel):
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
-    signature = HexField(null=True, default=None, max_length=500)
+    signature = HexField(null=True, default=None, max_length=500)  # Off chain signatures
 
     class Meta:
         unique_together = (('multisig_transaction_hash', 'owner'),)
@@ -616,13 +635,13 @@ class MonitoredAddress(models.Model):
 class ProxyFactory(MonitoredAddress):
     class Meta:
         verbose_name_plural = "Proxy factories"
-        ordering = ['initial_block_number']
+        ordering = ['tx_block_number']
 
 
 class SafeMasterCopy(MonitoredAddress):
     class Meta:
         verbose_name_plural = "Safe master copies"
-        ordering = ['initial_block_number']
+        ordering = ['tx_block_number']
 
 
 class SafeStatusManager(models.Manager):
