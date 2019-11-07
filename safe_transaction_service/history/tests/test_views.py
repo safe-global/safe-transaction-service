@@ -10,9 +10,11 @@ from web3 import Web3
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from safe_transaction_service.history.models import SafeContract
+from safe_transaction_service.history.models import (EthereumTxCallType,
+                                                     InternalTx, SafeContract)
 
-from .factories import (EthereumEventFactory, MultisigConfirmationFactory,
+from .factories import (EthereumEventFactory, InternalTxFactory,
+                        MultisigConfirmationFactory,
                         MultisigTransactionFactory, SafeContractFactory)
 
 logger = logging.getLogger(__name__)
@@ -138,7 +140,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIn('User is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-    def test_safe_balances(self):
+    def test_safe_balances_view(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -163,3 +165,42 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])
+
+    def test_incoming_txs_view(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 0)
+
+        value = 2
+        InternalTxFactory(to=safe_address, value=0)
+        internal_tx = InternalTxFactory(to=safe_address, value=value)
+        InternalTxFactory(to=Account.create().address, value=value)
+        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['value'], value)
+
+        token_value = 6
+        ethereum_event = EthereumEventFactory(to=safe_address, value=token_value)
+        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 2)
+        self.assertCountEqual(response.json(), [
+            {'transactionHash': internal_tx.ethereum_tx_id,
+             'to': safe_address,
+             'value': value,
+             'tokenAddress': None,
+             'from': internal_tx._from,
+             },
+            {'transactionHash': ethereum_event.ethereum_tx_id,
+             'to': safe_address,
+             'value': token_value,
+             'tokenAddress': ethereum_event.address,
+             'from': ethereum_event.arguments['from']
+             }
+        ])

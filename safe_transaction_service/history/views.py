@@ -12,8 +12,10 @@ from web3 import Web3
 from safe_transaction_service.version import __version__
 
 from .filters import DefaultPagination, MultisigTransactionFilter
-from .models import MultisigTransaction, SafeContract
-from .serializers import (SafeBalanceResponseSerializer,
+from .models import (EthereumEvent, EthereumTxCallType, InternalTx,
+                     MultisigTransaction, SafeContract)
+from .serializers import (IncomingTransactionResponseSerializer,
+                          SafeBalanceResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
@@ -156,5 +158,49 @@ class SafeBalanceView(APIView):
 
             safe_balances = BalanceServiceProvider().get_balances(address)
             serializer = self.serializer_class(data=safe_balances, many=True)
+            serializer.is_valid()
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeIncomingTxListView(APIView):
+    serializer_class = IncomingTransactionResponseSerializer
+
+    @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            incoming_txs = []
+            for internal_tx in InternalTx.objects.filter(to=address,
+                                                         call_type=EthereumTxCallType.CALL.value,
+                                                         value__gt=0):
+                incoming_txs.append({
+                    'transaction_hash': internal_tx.ethereum_tx_id,
+                    'to': internal_tx.to,
+                    'from': internal_tx._from,
+                    'value': internal_tx.value,
+                    'token_address': None,
+                })
+
+            for ethereum_event in EthereumEvent.objects.erc20_events().filter(arguments__to=address):
+                incoming_txs.append({
+                    'transaction_hash': ethereum_event.ethereum_tx_id,
+                    'to': ethereum_event.arguments['to'],
+                    'from': ethereum_event.arguments['from'],
+                    'value': ethereum_event.arguments['value'],
+                    'token_address': ethereum_event.address,
+                })
+
+            serializer = self.serializer_class(data=incoming_txs, many=True)
             serializer.is_valid()
             return Response(status=status.HTTP_200_OK, data=serializer.data)
