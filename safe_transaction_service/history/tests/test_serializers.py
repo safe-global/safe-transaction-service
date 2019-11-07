@@ -1,7 +1,7 @@
 # from rest_framework.test import APITestCase
 #
 # from safe_transaction_service.ether.tests.factories import get_eth_address_with_key, get_transaction_with_info
-# from ..serializers import BaseSafeMultisigTransactionSerializer, SafeMultisigHistorySerializer
+# from ..serializers import BaseSafeMultisigTransactionSerializer, SafeMultisigTransactionSerializer
 #
 #
 # class TestViews(APITestCase):

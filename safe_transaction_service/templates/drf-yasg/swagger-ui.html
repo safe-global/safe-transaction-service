@@ -10,8 +10,16 @@
     <link rel="stylesheet" type="text/css" href="{% static 'drf-yasg/swagger-ui-dist/swagger-ui.css' %}">
     <style>
         .swagger-ui .topbar {background-color: black;}
-        .swagger-ui .topbar .download-url-wrapper .download-url-button {background-color: #27b3fa;}
-        .swagger-ui .topbar .download-url-wrapper input[type=text] {border: 2px solid #27b3fa;}
-        .topbar-wrapper img {content:url("{% static 'safe/logo.svg' %}");}
+        .swagger-ui .topbar .download-url-wrapper .download-url-button {background-color: #008c73;}
+        .swagger-ui .topbar .download-url-wrapper input[type=text] {border: 2px solid #008c73;}
+
+	.topbar-wrapper img[alt="Swagger UI"], .topbar-wrapper span {
+	   visibility: collapse;
+	}
+
+	.topbar-wrapper .link:before {
+	   content: url("{% static 'safe/gnosis_safe_rgb_sticke_geen.png' %}");
+	}
+
     </style>
 {% endblock %}
