@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models import Case, Q, Sum
-from django.db.models.expressions import RawSQL, When
+from django.db.models.expressions import F, RawSQL, Value, When
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -354,8 +354,36 @@ class InternalTxManager(models.Manager):
         )
 
 
+class InternalTxQuerySet(models.QuerySet):
+    def incoming_txs(self, address: str):
+        return self.filter(to=address,
+                           call_type=EthereumTxCallType.CALL.value,
+                           value__gt=0
+                           ).annotate(
+            transaction_hash=F('ethereum_tx_id'),
+            block_number=F('ethereum_tx__block_id'),
+            token_address=Value(None, output_field=EthereumAddressField())
+        ).order_by('-ethereum_tx__block_id')
+
+    def incoming_txs_with_events(self, address: str):
+        values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'token_address')
+        ether_queryset = self.incoming_txs(address).values(*values)
+        events_queryset = EthereumEvent.objects.erc20_events().filter(
+            arguments__to=address
+        ).annotate(
+            to=RawSQL("arguments->>%s", ('to',)),  # Order is really important!
+            _from=RawSQL("arguments->>%s", ('from',)),
+            value=RawSQL("(arguments->>%s)::numeric", ('value',)),
+            transaction_hash=F('ethereum_tx_id'),
+            block_number=F('ethereum_tx__block_id'),
+            token_address=F('address')
+        ).order_by('-ethereum_tx__block_id').values(*values)
+
+        return ether_queryset.union(events_queryset).order_by('-block_number')
+
+
 class InternalTx(models.Model):
-    objects = InternalTxManager()
+    objects = InternalTxManager.from_queryset(InternalTxQuerySet)()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='internal_txs')
     _from = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()

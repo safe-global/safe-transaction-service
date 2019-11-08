@@ -169,3 +169,19 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
 class SafeBalanceResponseSerializer(serializers.Serializer):
     token_address = serializers.CharField()
     balance = serializers.CharField()
+
+
+class IncomingTransactionResponseSerializer(serializers.Serializer):
+    block_number = serializers.IntegerField()
+    transaction_hash = Sha3HashField()
+    to = EthereumAddressField()
+    from_ = EthereumAddressField(source='_from')
+    value = serializers.IntegerField()
+    token_address = EthereumAddressField(allow_null=True, default=None)
+
+    def get_fields(self):
+        result = super().get_fields()
+        # Rename `from_` to `from`
+        from_ = result.pop('from_')
+        result['from'] = from_
+        return result
