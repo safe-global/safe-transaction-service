@@ -172,6 +172,7 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 
 class IncomingTransactionResponseSerializer(serializers.Serializer):
+    block_number = serializers.IntegerField()
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
     from_ = EthereumAddressField(source='_from')
