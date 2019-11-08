@@ -162,45 +162,24 @@ class SafeBalanceView(APIView):
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeIncomingTxListView(APIView):
+class SafeIncomingTxListView(ListAPIView):
     serializer_class = IncomingTransactionResponseSerializer
 
+    def get_queryset(self):
+        return InternalTx.objects.incoming_txs_with_events(self.kwargs['address'])
+
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
-                                    404: 'Safe not found',
+                                    404: 'Txs not found',
                                     422: 'Safe address checksum not valid'})
     def get(self, request, address, format=None):
         """
-        Get status of the safe
+        Returns the history of a multisig tx (safe)
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-            incoming_txs = []
-            for internal_tx in InternalTx.objects.filter(to=address,
-                                                         call_type=EthereumTxCallType.CALL.value,
-                                                         value__gt=0):
-                incoming_txs.append({
-                    'transaction_hash': internal_tx.ethereum_tx_id,
-                    'to': internal_tx.to,
-                    'from': internal_tx._from,
-                    'value': internal_tx.value,
-                    'token_address': None,
-                })
+        response = super().get(request, address)
+        if response.data['count'] == 0:
+            response.status_code = status.HTTP_404_NOT_FOUND
 
-            for ethereum_event in EthereumEvent.objects.erc20_events().filter(arguments__to=address):
-                incoming_txs.append({
-                    'transaction_hash': ethereum_event.ethereum_tx_id,
-                    'to': ethereum_event.arguments['to'],
-                    'from': ethereum_event.arguments['from'],
-                    'value': ethereum_event.arguments['value'],
-                    'token_address': ethereum_event.address,
-                })
-
-            serializer = self.serializer_class(data=incoming_txs, many=True)
-            serializer.is_valid()
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
+        return response

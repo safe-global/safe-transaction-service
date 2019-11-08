@@ -170,11 +170,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-        SafeContractFactory(address=safe_address)
-        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 0)
+        self.assertEqual(len(response.data['results']), 0)
 
         value = 2
         InternalTxFactory(to=safe_address, value=0)
@@ -182,15 +178,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['value'], value)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['value'], value)
 
         token_value = 6
         ethereum_event = EthereumEventFactory(to=safe_address, value=token_value)
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 2)
-        self.assertCountEqual(response.json(), [
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertCountEqual(response.json()['results'], [
             {'transactionHash': internal_tx.ethereum_tx_id,
              'to': safe_address,
              'value': value,

@@ -174,9 +174,9 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 class IncomingTransactionResponseSerializer(serializers.Serializer):
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
-    from_ = EthereumAddressField()
+    from_ = EthereumAddressField(source='_from')
     value = serializers.IntegerField()
-    token_address = EthereumAddressField()
+    token_address = EthereumAddressField(allow_null=True, default=None)
 
     def get_fields(self):
         result = super().get_fields()
