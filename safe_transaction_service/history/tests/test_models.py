@@ -10,7 +10,9 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeMasterCopy, SafeStatus)
-from .factories import EthereumTxFactory, InternalTxFactory, SafeStatusFactory
+from .factories import (EthereumBlockFactory, EthereumEventFactory,
+                        EthereumTxFactory, InternalTxFactory,
+                        SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -148,3 +150,30 @@ class TestEthereumTxManager(EthereumTestCaseMixin, TestCase):
         self.assertEqual(len(mixed_txs), len(tx_hashes))
         for mixed_tx in mixed_txs:
             self.assertIsNotNone(mixed_tx)
+
+
+class TestInternalTxManager(TestCase):
+    def test_incoming_txs_with_events(self):
+        ethereum_address = Account.create().address
+        incoming_txs = InternalTx.objects.incoming_txs_with_events(ethereum_address)
+        self.assertFalse(incoming_txs)
+
+        ether_value = 5
+        internal_tx = InternalTxFactory(to=ethereum_address, value=ether_value)
+        InternalTxFactory(value=ether_value)  # Create tx with a random address too
+        incoming_txs = InternalTx.objects.incoming_txs_with_events(ethereum_address)
+        self.assertEqual(incoming_txs.count(), 1)
+
+        token_value = 10
+        ethereum_event = EthereumEventFactory(to=ethereum_address, value=token_value)
+        EthereumEventFactory(value=token_value)  # Create tx with a random address too
+        incoming_txs = InternalTx.objects.incoming_txs_with_events(ethereum_address)
+        self.assertEqual(incoming_txs.count(), 2)
+
+        # Make internal_tx more recent than ethereum_event
+        internal_tx.ethereum_tx.block = EthereumBlockFactory()  # As factory has a sequence, it will always be the last
+        internal_tx.ethereum_tx.save()
+
+        incoming_tx = InternalTx.objects.incoming_txs_with_events(ethereum_address).first()
+        self.assertEqual(incoming_tx['value'], ether_value)
+        self.assertIsNone(incoming_tx['token_address'])

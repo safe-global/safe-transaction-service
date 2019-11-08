@@ -12,8 +12,10 @@ from web3 import Web3
 from safe_transaction_service.version import __version__
 
 from .filters import DefaultPagination, MultisigTransactionFilter
-from .models import MultisigTransaction, SafeContract
-from .serializers import (SafeBalanceResponseSerializer,
+from .models import (EthereumEvent, EthereumTxCallType, InternalTx,
+                     MultisigTransaction, SafeContract)
+from .serializers import (IncomingTransactionResponseSerializer,
+                          SafeBalanceResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
@@ -158,3 +160,26 @@ class SafeBalanceView(APIView):
             serializer = self.serializer_class(data=safe_balances, many=True)
             serializer.is_valid()
             return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeIncomingTxListView(ListAPIView):
+    serializer_class = IncomingTransactionResponseSerializer
+
+    def get_queryset(self):
+        return InternalTx.objects.incoming_txs_with_events(self.kwargs['address'])
+
+    @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
+                                    404: 'Txs not found',
+                                    422: 'Safe address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Returns the history of a multisig tx (safe)
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        response = super().get(request, address)
+        if response.data['count'] == 0:
+            response.status_code = status.HTTP_404_NOT_FOUND
+
+        return response
