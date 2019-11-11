@@ -12,8 +12,7 @@ from web3 import Web3
 from safe_transaction_service.version import __version__
 
 from .filters import DefaultPagination, MultisigTransactionFilter
-from .models import (EthereumEvent, EthereumTxCallType, InternalTx,
-                     MultisigTransaction, SafeContract)
+from .models import InternalTx, MultisigTransaction, SafeContract
 from .serializers import (IncomingTransactionResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,

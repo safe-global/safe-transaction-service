@@ -7,6 +7,7 @@ from web3 import Web3
 from web3.utils.events import construct_event_topic_set
 
 from gnosis.eth import EthereumClient
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
 from ..models import EthereumTx, ProxyFactory, SafeContract
@@ -98,9 +99,10 @@ class ProxyIndexerService(EthereumIndexer):
         for event in events:
             int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')
             contract_address = Web3.toChecksumAddress('{:#042x}'.format(int_contract_address))
-            safe_contracts.append(SafeContract(address=contract_address,
-                                               ethereum_tx_id=event['transactionHash'],
-                                               erc20_block_number=event['blockNumber']))
+            if contract_address != NULL_ADDRESS:
+                safe_contracts.append(SafeContract(address=contract_address,
+                                                   ethereum_tx_id=event['transactionHash'],
+                                                   erc20_block_number=event['blockNumber']))
         if safe_contracts:
             SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
         return safe_contracts
