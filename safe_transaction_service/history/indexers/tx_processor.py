@@ -122,7 +122,7 @@ class SafeTxProcessor(TxProcessor):
                     'ethereum_tx': ethereum_tx,
                     'to': safe_tx.to,
                     'value': safe_tx.value,
-                    'data': safe_tx.data,
+                    'data': safe_tx.data if safe_tx.data else None,
                     'operation': safe_tx.operation,
                     'safe_tx_gas': safe_tx.safe_tx_gas,
                     'base_gas': safe_tx.base_gas,
