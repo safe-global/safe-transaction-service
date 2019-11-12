@@ -97,13 +97,13 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
     list_display = ('multisig_transaction_hash', 'multisig_transaction_id', 'ethereum_tx_id', 'owner')
-    search_fields = ['=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
+    search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 
 
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'executed', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
+    list_display = ('created', 'safe', 'executed', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
     list_select_related = ('ethereum_tx',)
     ordering = ['-created']
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
