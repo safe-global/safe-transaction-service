@@ -7,9 +7,9 @@ from web3 import Web3
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
-                      MultisigConfirmation, MultisigTransaction, SafeContract,
-                      SafeMasterCopy, SafeStatus)
+from ..models import (EthereumTx, InternalTx, MultisigConfirmation,
+                      MultisigTransaction, SafeContract, SafeMasterCopy,
+                      SafeStatus, TransactionNotFoundException)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
                         SafeStatusFactory)
@@ -119,7 +119,7 @@ class TestEthereumTxManager(EthereumTestCaseMixin, TestCase):
     def test_create_or_update_from_tx_hashes_existing(self):
         self.assertListEqual(EthereumTx.objects.create_or_update_from_tx_hashes([]), [])
         tx_hashes = ['0x52fcb05f2ad209d53d84b0a9a7ce6474ab415db88bc364c088758d70c8b5b0ef']
-        with self.assertRaises(TypeError):
+        with self.assertRaisesMessage(TransactionNotFoundException, tx_hashes[0]):
             EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
 
         # Test with database txs

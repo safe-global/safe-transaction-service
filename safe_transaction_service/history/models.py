@@ -62,6 +62,16 @@ class EthereumTxType(Enum):
             raise ValueError(f'{tx_type} is not a valid EthereumTxType')
 
 
+class TransactionNotFoundException(Exception):
+    def __init__(self, tx_hash: Union[str, bytes]):
+        super().__init__(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
+
+
+class TransactionWithoutBlockException(Exception):
+    def __init__(self, tx_hash: Union[str, bytes]):
+        super().__init__(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+
+
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block_number(self, block_number: int):
         try:
@@ -134,7 +144,16 @@ class EthereumTxManager(models.Manager):
         current_block_number = ethereum_client.current_block_number
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
-        blocks = ethereum_client.get_blocks([tx['blockNumber'] for tx in txs])
+        block_numbers = []
+        for tx_hash, tx in zip(tx_hashes, txs):
+            if not tx:
+                raise TransactionNotFoundException(tx_hash)
+            elif tx.get('blockNumber') is None:
+                raise TransactionWithoutBlockException(tx_hash)
+            else:
+                block_numbers.append(tx['blockNumber'])
+
+        blocks = ethereum_client.get_blocks(block_numbers)
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
