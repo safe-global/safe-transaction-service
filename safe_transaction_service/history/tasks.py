@@ -59,18 +59,21 @@ def index_new_proxies_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
+    got_lock = True
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             redis.lpush(blockchain_running_tasks_key, task_id)
             number_proxies = ProxyIndexerServiceProvider().process_all()
-            redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_proxies:
                 logger.info('Indexed new %d proxies', number_proxies)
                 return number_proxies
     except LockError:
-        pass
+        got_lock = False
+    finally:
+        if got_lock:
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -81,6 +84,7 @@ def index_internal_txs_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
+    got_lock = True
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
@@ -88,13 +92,15 @@ def index_internal_txs_task(self) -> Optional[int]:
             logger.info('Start indexing of internal txs')
             redis.lpush(blockchain_running_tasks_key, task_id)
             number_traces = InternalTxIndexerProvider().process_all()
-            redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_traces:
                 logger.info('Find internal txs task processed %d traces', number_traces)
                 process_decoded_internal_txs_task.delay()
                 return number_traces
     except LockError:
-        pass
+        got_lock = False
+    finally:
+        if got_lock:
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -105,6 +111,7 @@ def index_erc20_events_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
+    got_lock = True
     try:
         with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
@@ -112,12 +119,14 @@ def index_erc20_events_task(self) -> Optional[int]:
             logger.info('Start indexing of erc20/721 events')
             redis.lpush(blockchain_running_tasks_key, task_id)
             number_events = Erc20EventsIndexerProvider().process_all()
-            redis.lrem(blockchain_running_tasks_key, 0, task_id)
             if number_events:
                 logger.info('Indexing of erc20/721 events task processed %d events', number_events)
                 return number_events
     except LockError:
-        pass
+        got_lock = False
+    finally:
+        if got_lock:
+            redis.lrem(blockchain_running_tasks_key, 0, task_id)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
