@@ -403,6 +403,14 @@ class InternalTxQuerySet(models.QuerySet):
 
         return ether_queryset.union(events_queryset).order_by('-block_number')
 
+    def can_be_decoded(self):
+        return self.filter(
+            call_type=EthereumTxCallType.DELEGATE_CALL.value,
+            error=None,
+            ethereum_tx__status=1,
+            decoded_tx=None,
+        ).exclude(data=None)
+
 
 class InternalTx(models.Model):
     objects = InternalTxManager.from_queryset(InternalTxQuerySet)()
@@ -439,8 +447,7 @@ class InternalTx(models.Model):
 
     @property
     def can_be_decoded(self):
-        return (self.is_call
-                and self.is_delegate_call
+        return (self.is_delegate_call
                 and not self.error
                 and self.data
                 and self.ethereum_tx.success)

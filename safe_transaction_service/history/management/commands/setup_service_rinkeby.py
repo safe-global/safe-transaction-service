@@ -9,10 +9,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         call_command('setup_service')
-        SafeMasterCopy.objects.get_or_create(address='0xacF5Efe28B6a2A48459e7970B8754Cf26FB265C5',
+        SafeMasterCopy.objects.get_or_create(address='0xaE32496491b53841efb51829d6f886387708F99B',
                                              defaults={
-                                                 'initial_block_number': 5395874,
-                                                 'tx_block_number': 5395874,
+                                                 'initial_block_number': 5423491,
+                                                 'tx_block_number': 5423491,
                                              })
         SafeMasterCopy.objects.get_or_create(address='0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A',
                                              defaults={
@@ -30,6 +30,11 @@ class Command(BaseCommand):
                                                  'tx_block_number': 3055781,
                                              })
 
+        ProxyFactory.objects.get_or_create(address='0x50e55Af101C777bA7A1d560a774A82eF002ced9F',
+                                           defaults={
+                                               'initial_block_number': 5423494,
+                                               'tx_block_number': 5423494,
+                                           })
         ProxyFactory.objects.get_or_create(address='0x12302fE9c02ff50939BaAaaf415fc226C078613C',
                                            defaults={
                                                'initial_block_number': 4110083,
