@@ -86,18 +86,45 @@ class InternalTxAdmin(admin.ModelAdmin):
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
+    list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',
                 '-internal_tx_id']
-    list_select_related = ('internal_tx__ethereum_tx',)
     search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
                      '=internal_tx__ethereum_tx__tx_hash']
 
 
+class MultisigConfirmationListFilter(admin.SimpleListFilter):
+    title = 'Has multisig transaction'
+    parameter_name = 'has_multisig_tx'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'Yes'),
+            ('NO', 'No'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'YES':
+            return queryset.exclude(multisig_transaction=None)
+        elif self.value() == 'NO':
+            return queryset.filter(multisig_transaction=None)
+
+
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
-    list_display = ('multisig_transaction_hash', 'multisig_transaction_id', 'ethereum_tx_id', 'owner')
+    list_display = ('block_number', 'multisig_transaction_hash', 'has_multisig_tx', 'ethereum_tx_id', 'owner')
+    list_filter = (MultisigConfirmationListFilter, )
+    list_select_related = ('ethereum_tx',)
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
+
+    def has_multisig_tx(self, obj: MultisigConfirmation) -> bool:
+        return bool(obj.multisig_transaction_id)
+    has_multisig_tx.boolean = True
+
+    def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
+        if obj.ethereum_tx:
+            return obj.ethereum_tx.block_id
 
 
 @admin.register(MultisigTransaction)
