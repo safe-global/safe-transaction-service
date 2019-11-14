@@ -65,7 +65,7 @@ def index_new_proxies_task(self) -> Optional[int]:
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_proxies = ProxyIndexerServiceProvider().process_all()
+            number_proxies = ProxyIndexerServiceProvider().start()
             if number_proxies:
                 logger.info('Indexed new %d proxies', number_proxies)
                 return number_proxies
@@ -91,7 +91,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of internal txs')
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_traces = InternalTxIndexerProvider().process_all()
+            number_traces = InternalTxIndexerProvider().start()
             if number_traces:
                 logger.info('Find internal txs task processed %d traces', number_traces)
                 process_decoded_internal_txs_task.delay()
@@ -118,7 +118,7 @@ def index_erc20_events_task(self) -> Optional[int]:
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of erc20/721 events')
             redis.lpush(blockchain_running_tasks_key, task_id)
-            number_events = Erc20EventsIndexerProvider().process_all()
+            number_events = Erc20EventsIndexerProvider().start()
             if number_events:
                 logger.info('Indexing of erc20/721 events task processed %d events', number_events)
                 return number_events

@@ -22,7 +22,7 @@ class EthereumIndexer(ABC):
     `database_field` should be defined with the field used to store the current block number for a monitored address
     `find_relevant_elements` elements should be defined with the query to get the relevant txs/events/etc.
     `process_elements` defines what happens with elements found
-    So the flow would be `process_all()` -> `process_addresses` -> `find_revelant_elements` -> `process_elements` ->
+    So the flow would be `start()` -> `process_addresses` -> `find_revelant_elements` -> `process_elements` ->
     `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
@@ -118,14 +118,16 @@ class EthereumIndexer(ABC):
     def update_monitored_address(self, addresses: List[str], to_block_number: int) -> int:
         return self.database_model.objects.update_addresses(addresses, to_block_number, self.database_field)
 
-    def get_block_numbers_for_search(self, addresses: List[str]) -> Optional[Tuple[int, int]]:
+    def get_block_numbers_for_search(self, addresses: List[str],
+                                     current_block_number: Optional[int] = None) -> Optional[Tuple[int, int]]:
         """
         :param addresses:
+        :param current_block_number: To prevent fetching it again
         :return: Minimum common `from_block_number` and `to_block_number` for search of relevant `tx hashes`
         """
         block_process_limit = self.block_process_limit
         confirmations = self.confirmations
-        current_block_number = self.ethereum_client.current_block_number
+        current_block_number = current_block_number or self.ethereum_client.current_block_number
 
         monitored_contract_queryset = self.database_model.objects.filter(address__in=addresses)
         common_minimum_block_number = monitored_contract_queryset.aggregate(**{
@@ -147,22 +149,25 @@ class EthereumIndexer(ABC):
 
         return from_block_number, to_block_number
 
-    def process_addresses(self, addresses: List[str]) -> Tuple[List[Any], bool]:
+    def process_addresses(self, addresses: List[str],
+                          current_block_number: Optional[int] = None) -> Tuple[List[Any], bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
         :param addresses: Addresses to process
+        :param current_block_number: To prevent fetching it again
         :return: List of processed data and a boolean (`True` if no more blocks to scan, `False` otherwise)
         """
         assert addresses, 'Addresses cannot be empty!'
         assert all([Web3.isChecksumAddress(address) for address in addresses]), \
             f'An address has invalid checksum: {addresses}'
 
-        parameters = self.get_block_numbers_for_search(addresses)
+        current_block_number = current_block_number or self.ethereum_client.current_block_number
+        parameters = self.get_block_numbers_for_search(addresses, current_block_number)
         if parameters is None:
             return [], True
         from_block_number, to_block_number = parameters
 
-        updated = to_block_number == (self.ethereum_client.current_block_number - self.confirmations)
+        updated = to_block_number == (current_block_number - self.confirmations)
 
         # Optimize number of elements processed every time (block process limit)
         # Check that we are processing the `block_process_limit`, if not, measures are not valid
@@ -204,9 +209,9 @@ class EthereumIndexer(ABC):
         self.update_monitored_address(addresses, to_block_number)
         return processed_elements, updated
 
-    def process_all(self) -> int:
+    def start(self) -> int:
         """
-        Find and process relevant data for existing addresses
+        Find and process relevant data for existing database addresses
         :return: Number of elements processed
         """
         current_block_number = self.ethereum_client.current_block_number
@@ -218,12 +223,12 @@ class EthereumIndexer(ABC):
         for almost_updated_addresses_chunk in almost_updated_monitored_addresses_chunks:
             almost_updated_addresses = [monitored_contract.address
                                         for monitored_contract in almost_updated_addresses_chunk]
-            processed_elements, _ = self.process_addresses(almost_updated_addresses)
+            processed_elements, _ = self.process_addresses(almost_updated_addresses, current_block_number)
             number_processed_elements += len(processed_elements)
 
         for monitored_contract in self.get_not_updated_addresses(current_block_number):
             updated = False
             while not updated:
-                processed_elements, updated = self.process_addresses([monitored_contract.address])
+                processed_elements, updated = self.process_addresses([monitored_contract.address], current_block_number)
             number_processed_elements += len(processed_elements)
         return number_processed_elements
