@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from ...indexers.tx_decoder import TxDecoder, CannotDecode
-from ...models import InternalTxDecoded, InternalTx
+from ...indexers.tx_decoder import CannotDecode, TxDecoder
+from ...models import InternalTx, InternalTxDecoded
 
 
 class Command(BaseCommand):

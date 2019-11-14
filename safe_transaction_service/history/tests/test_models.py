@@ -7,7 +7,8 @@ from web3 import Web3
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..models import (EthereumTx, InternalTx, MultisigConfirmation,
+from ..models import (EthereumTx, EthereumTxCallType, InternalTx,
+                      InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContract, SafeMasterCopy,
                       SafeStatus, TransactionNotFoundException)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
@@ -177,3 +178,26 @@ class TestInternalTxManager(TestCase):
         incoming_tx = InternalTx.objects.incoming_txs_with_events(ethereum_address).first()
         self.assertEqual(incoming_tx['value'], ether_value)
         self.assertIsNone(incoming_tx['token_address'])
+
+    def test_internal_txs_can_be_decoded(self):
+        InternalTxFactory(call_type=EthereumTxCallType.CALL.value)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
+
+        internal_tx = InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value,
+                                        error=None, data=b'123', ethereum_tx__status=1)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
+
+        InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value,
+                          error=None, data=None, ethereum_tx__status=1)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
+
+        InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value,
+                          error='aloha', data=b'123', ethereum_tx__status=1)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
+
+        InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value,
+                          error='aloha', data=b'123', ethereum_tx__status=0)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
+
+        InternalTxDecoded.objects.create(function_name='alo', arguments={}, internal_tx=internal_tx)
+        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
