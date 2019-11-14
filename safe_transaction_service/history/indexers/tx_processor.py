@@ -157,11 +157,16 @@ class SafeTxProcessor(TxProcessor):
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
             owner = internal_tx.get_previous_trace()._from
-            MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
-                                                       owner=owner,
-                                                       defaults={
-                                                           'ethereum_tx': ethereum_tx,
-                                                       })
+            (multisig_confirmation,
+             created) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
+                                                                   owner=owner,
+                                                                   defaults={
+                                                                       'ethereum_tx': ethereum_tx,
+                                                                   })
+            if not created and not multisig_confirmation.ethereum_tx_id:
+                multisig_confirmation.ethereum_tx = ethereum_tx
+                multisig_confirmation.save()
+
         elif function_name == 'execTransactionFromModule':
             # No side effects or nonce increasing, but trace will be set as processed
             pass
