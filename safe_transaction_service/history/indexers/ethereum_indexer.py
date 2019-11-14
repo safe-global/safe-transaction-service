@@ -5,6 +5,7 @@ from typing import Any, Collection, Iterable, List, Optional, Tuple
 
 from django.db.models import Min
 
+from billiard.exceptions import SoftTimeLimitExceeded
 from web3 import Web3
 
 from gnosis.eth import EthereumClient
@@ -25,7 +26,7 @@ class EthereumIndexer(ABC):
     `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 0,
-                 block_process_limit: int = 200, updated_blocks_behind: int = 20,
+                 block_process_limit: int = 1000, updated_blocks_behind: int = 20,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000,
                  block_auto_process_limit: bool = True):
         """
@@ -172,7 +173,7 @@ class EthereumIndexer(ABC):
 
         try:
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
-        except self.FindRelevantElementsException as e:
+        except (self.FindRelevantElementsException, SoftTimeLimitExceeded) as e:
             self.block_process_limit = self.initial_block_process_limit  # Set back to default
             raise e
 
