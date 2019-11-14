@@ -11,7 +11,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Decoding txs again'))
         tx_decoder = TxDecoder()
         found = 0
-        for internal_tx in InternalTx.objects.can_be_decoded().iterator():
+        total = InternalTx.objects.can_be_decoded().count()
+        for i, internal_tx in enumerate(InternalTx.objects.can_be_decoded().iterator()):
+            if i % 50 == 0:
+                self.stdout.write(self.style.SUCCESS(f'Processing {i}/{total}'))
             try:
                 function_name, arguments = tx_decoder.decode_transaction(bytes(internal_tx.data))
                 InternalTxDecoded.objects.create(internal_tx=internal_tx,
