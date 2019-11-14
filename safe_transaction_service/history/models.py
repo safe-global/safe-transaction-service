@@ -143,17 +143,20 @@ class EthereumTxManager(models.Manager):
         ethereum_client = EthereumClientProvider()
         current_block_number = ethereum_client.current_block_number
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
         block_numbers = []
         for tx_hash, tx in zip(tx_hashes, txs):
-            if not tx:
-                raise TransactionNotFoundException(tx_hash)
-            elif tx.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(tx_hash)
-            else:
-                block_numbers.append(tx['blockNumber'])
+            if not tx or tx.get('blockNumber') is None:
+                # Retry fetching of problematic tx
+                tx = ethereum_client.get_transaction(tx_hash)
+                if not tx:
+                    raise TransactionNotFoundException(tx_hash)
+                elif tx.get('blockNumber') is None:
+                    raise TransactionWithoutBlockException(tx_hash)
+            block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)
+        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
+
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
@@ -167,7 +170,7 @@ class EthereumTxManager(models.Manager):
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
-                ethereum_tx = self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
+                ethereum_tx = self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
         return list(ethereum_txs_dict.values())
 
@@ -188,10 +191,10 @@ class EthereumTxManager(models.Manager):
             tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
             ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
             tx = ethereum_client.get_transaction(tx_hash)
-            return self.create_from_tx(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
+            return self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
 
-    def create_from_tx(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
-                       ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
+    def create_from_tx_dict(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
+                            ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx['hash']).hex(),
@@ -707,7 +710,7 @@ class SafeStatusQuerySet(models.QuerySet):
             'internal_tx_id',
         ).last()
         if not safe_status:
-           logger.error('SafeStatus not found for address=%s', address)
+            logger.error('SafeStatus not found for address=%s', address)
         return safe_status
 
 
