@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple, Union
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth.contracts import get_old_safe_contract, get_safe_contract
+from gnosis.eth.contracts import get_safe_V1_0_0_contract, get_safe_V0_0_1_contract, get_safe_contract
 
 logger = getLogger(__name__)
 
@@ -26,7 +26,9 @@ class TxDecoder:
     Decode txs for supported contracts
     """
     def __init__(self):
-        self.supported_contracts = [get_safe_contract(Web3()), get_old_safe_contract(Web3())]
+        self.supported_contracts = [get_safe_contract(Web3()),
+                                    get_safe_V1_0_0_contract(Web3()),
+                                    get_safe_V0_0_1_contract(Web3())]
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """
