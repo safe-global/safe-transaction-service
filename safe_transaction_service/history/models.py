@@ -156,18 +156,19 @@ class EthereumTxManager(models.Manager):
         blocks = ethereum_client.get_blocks(block_numbers)
 
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
+            ethereum_block = EthereumBlock.objects.get_or_create_from_block(block,
+                                                                            current_block_number=current_block_number)
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
                 # For txs stored before being mined
                 if ethereum_tx.block is None:
-                    ethereum_tx.block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
+                    ethereum_tx.block = ethereum_block
                     ethereum_tx.gas_used = tx_receipt['gasUsed']
                     ethereum_tx.status = tx_receipt.get('status')
                     ethereum_tx.transaction_index = tx_receipt['transactionIndex']
                     ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
             except self.model.DoesNotExist:
-                ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, current_block_number=current_block_number)
                 ethereum_tx = self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
         return list(ethereum_txs_dict.values())
