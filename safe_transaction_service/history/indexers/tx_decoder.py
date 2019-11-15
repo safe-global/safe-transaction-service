@@ -1,8 +1,10 @@
 from logging import getLogger
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
+from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from web3 import Web3
+from web3.contract import Contract
 
 from gnosis.eth.contracts import (get_safe_contract, get_safe_V0_0_1_contract,
                                   get_safe_V1_0_0_contract)
@@ -31,6 +33,15 @@ class TxDecoder:
                                     get_safe_V1_0_0_contract(Web3()),
                                     get_safe_V0_0_1_contract(Web3())]
 
+        # Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
+        self.supported_fn_selectors: Dict[bytes, None] = {}
+        for supported_contract in self.supported_contracts:
+            for selector in self.generate_selectors_from_contract(supported_contract):
+                self.supported_fn_selectors[selector] = None
+
+    def generate_selectors_from_contract(self, contract: Contract) -> List[bytes]:
+        return [function_abi_to_4byte_selector(contract_fn.abi) for contract_fn in contract.all_functions()]
+
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """
         Decode tx data
@@ -40,6 +51,10 @@ class TxDecoder:
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
         data = HexBytes(data)
+        selector = data[:4]
+        if selector not in self.supported_fn_selectors:
+            raise CannotDecode(data.hex())
+
         for contract in self.supported_contracts:
             try:
                 contract_function, arguments = contract.decode_function_input(data)

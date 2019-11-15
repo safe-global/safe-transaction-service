@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestTxDecoder(SafeTestCaseMixin, TestCase):
+    def test_supported_fn_selectors(self):
+        tx_decoder = TxDecoder()
+        self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
+        self.assertIn(b'\xb6>\x80\r', tx_decoder.supported_fn_selectors)  # setup for Safe V1.1.0
+        self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
+
     def test_decode_execute_transaction(self):
         owners = [Account.create() for _ in range(2)]
         owner_addresses = [owner.address for owner in owners]
