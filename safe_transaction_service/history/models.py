@@ -143,19 +143,17 @@ class EthereumTxManager(models.Manager):
         ethereum_client = EthereumClientProvider()
         current_block_number = ethereum_client.current_block_number
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
+        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
+
         block_numbers = []
-        for tx_hash, tx in zip(tx_hashes, txs):
-            if not tx or tx.get('blockNumber') is None:
-                # Retry fetching of problematic tx
-                tx = ethereum_client.get_transaction(tx_hash)
-                if not tx:
-                    raise TransactionNotFoundException(tx_hash)
-                elif tx.get('blockNumber') is None:
-                    raise TransactionWithoutBlockException(tx_hash)
+        for tx_hash, tx, tx_receipt in zip(tx_hashes, txs, tx_receipts):
+            if not tx:
+                raise TransactionNotFoundException(tx_hash)
+            elif tx.get('blockNumber') is None or tx_receipt.get('blockNumber') is None:
+                raise TransactionWithoutBlockException(tx_hash)
             block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
 
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             try:
