@@ -63,13 +63,11 @@ class EthereumTxType(Enum):
 
 
 class TransactionNotFoundException(Exception):
-    def __init__(self, tx_hash: Union[str, bytes]):
-        super().__init__(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
+    pass
 
 
 class TransactionWithoutBlockException(Exception):
-    def __init__(self, tx_hash: Union[str, bytes]):
-        super().__init__(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+    pass
 
 
 class EthereumBlockManager(models.Manager):
@@ -148,9 +146,9 @@ class EthereumTxManager(models.Manager):
         block_numbers = []
         for tx_hash, tx, tx_receipt in zip(tx_hashes, txs, tx_receipts):
             if not tx:
-                raise TransactionNotFoundException(tx_hash)
+                raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx.get('blockNumber') is None or tx_receipt.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(tx_hash)
+                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
             block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)

@@ -10,10 +10,9 @@ class Command(BaseCommand):
     help = 'Check all stored ethereum_txs have a valid receipt and block. Fixes them if a problem is found'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS('Fixing ethereum_txs'))
         queryset = EthereumTx.objects.filter(Q(block=None) | Q(gas_used=None))
-        found = 0
         total = queryset.count()
+        self.stdout.write(self.style.SUCCESS(f'Fixing ethereum txs. {total} remaining to be fixed'))
         ethereum_client = EthereumClientProvider()
         for i, ethereum_tx in enumerate(queryset.iterator()):
             tx_receipt = ethereum_client.get_transaction_receipt(ethereum_tx.tx_hash)
@@ -24,6 +23,6 @@ class Command(BaseCommand):
             ethereum_tx.status = tx_receipt.get('status')
             ethereum_tx.transaction_index = tx_receipt['transactionIndex']
             ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
-            if i % 50 == 0:
-                self.stdout.write(self.style.SUCCESS(f'Processing {i}/{total}'))
-        self.stdout.write(self.style.SUCCESS(f'End checking txs. {found} have been fixed'))
+            self.stdout.write(self.style.SUCCESS(f'Processing {i}/{total} with tx-hash={ethereum_tx.tx_hash}'))
+
+        self.stdout.write(self.style.SUCCESS(f'End fixing txs. {total} have been fixed'))
