@@ -92,10 +92,9 @@ def index_internal_txs_task(self) -> Optional[int]:
             logger.info('Start indexing of internal txs')
             redis.lpush(blockchain_running_tasks_key, task_id)
             number_traces = InternalTxIndexerProvider().start()
-            if number_traces:
-                logger.info('Find internal txs task processed %d traces', number_traces)
-                process_decoded_internal_txs_task.delay()
-                return number_traces
+            logger.info('Find internal txs task processed %d traces', number_traces)
+            process_decoded_internal_txs_task.delay()
+            return number_traces
     except LockError:
         got_lock = False
     finally:
@@ -119,9 +118,8 @@ def index_erc20_events_task(self) -> Optional[int]:
             logger.info('Start indexing of erc20/721 events')
             redis.lpush(blockchain_running_tasks_key, task_id)
             number_events = Erc20EventsIndexerProvider().start()
-            if number_events:
-                logger.info('Indexing of erc20/721 events task processed %d events', number_events)
-                return number_events
+            logger.info('Indexing of erc20/721 events task processed %d events', number_events)
+            return number_events
     except LockError:
         got_lock = False
     finally:
@@ -192,7 +190,7 @@ def check_reorgs() -> Optional[int]:
             erc20_block_number=safe_reorg_block_number
         )
 
-        logger.info('Reorg of block-number=%d fixed', first_reorg_block_number)
+        logger.warning('Reorg of block-number=%d fixed', first_reorg_block_number)
     return first_reorg_block_number
 
 
