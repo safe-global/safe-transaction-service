@@ -139,20 +139,26 @@ class EthereumTxManager(models.Manager):
             return list(ethereum_txs_dict.values())
 
         ethereum_client = EthereumClientProvider()
-        current_block_number = ethereum_client.current_block_number
-        txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
 
+        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
+        for tx_hash, tx_receipt in zip(tx_hashes_not_in_db, tx_receipts):
+            if not tx_receipt:
+                raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
+            elif tx_receipt.get('blockNumber') is None:
+                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+
+        txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = []
-        for tx_hash, tx, tx_receipt in zip(tx_hashes, txs, tx_receipts):
+        for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
             if not tx:
                 raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
-            elif tx.get('blockNumber') is None or tx_receipt.get('blockNumber') is None:
+            elif tx.get('blockNumber') is None:
                 raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
             block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)
 
+        current_block_number = ethereum_client.current_block_number
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             ethereum_block = EthereumBlock.objects.get_or_create_from_block(block,
                                                                             current_block_number=current_block_number)

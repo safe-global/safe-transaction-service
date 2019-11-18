@@ -262,7 +262,7 @@ LOGGING = {
             'level': 'INFO',
         },
         'safe_transaction_service.history.indexers.erc20_events_indexer': {
-            'level': 'INFO',
+            'level': 'WARNING',
         },
         'celery': {
             'handlers': ['celery_console'],
