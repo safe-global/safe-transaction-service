@@ -432,8 +432,8 @@ class InternalTx(models.Model):
     call_type = models.PositiveSmallIntegerField(null=True,
                                                  choices=[(tag.value, tag.name) for tag in EthereumTxCallType],
                                                  db_index=True)  # Call
-    trace_address = models.CharField(max_length=100)  # Stringified traceAddress
-    error = models.CharField(max_length=100, null=True)
+    trace_address = models.CharField(max_length=600)  # Stringified traceAddress
+    error = models.CharField(max_length=200, null=True)
 
     class Meta:
         unique_together = (('ethereum_tx', 'trace_address'),)
