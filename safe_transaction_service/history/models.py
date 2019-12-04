@@ -140,12 +140,18 @@ class EthereumTxManager(models.Manager):
 
         ethereum_client = EthereumClientProvider()
 
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)
-        for tx_hash, tx_receipt in zip(tx_hashes_not_in_db, tx_receipts):
+        tx_receipts = []
+        for tx_hash, tx_receipt in zip(tx_hashes_not_in_db,
+                                       ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)):
+            if not tx_receipt:
+                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)  # Retry fetching
+
             if not tx_receipt:
                 raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx_receipt.get('blockNumber') is None:
                 raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+            else:
+                tx_receipts.append(tx_receipt)
 
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = []
@@ -660,8 +666,20 @@ def bind_confirmation(sender: Type[models.Model], instance: Union[MultisigConfir
 
 
 class MonitoredAddressManager(models.Manager):
-    def update_addresses(self, addresses: List[str], block_number: str, database_field: str) -> int:
-        return self.filter(address__in=addresses).update(**{database_field: block_number})
+    def update_addresses(self, addresses: List[str], from_block_number: int, block_number: int,
+                         database_field: str) -> int:
+        """
+        :param addresses: Addresses to have the block number updated
+        :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
+        :param block_number: Block number to be updated
+        :param database_field: Database field to store the block number
+        :return: Number of entities updated
+        """
+        return self.filter(
+            **{'address__in': addresses,
+               database_field + '__gte': from_block_number - 1,  # Protect in case of reorg
+               }
+        ).update(**{database_field: block_number})
 
 
 class MonitoredAddressQuerySet(models.QuerySet):

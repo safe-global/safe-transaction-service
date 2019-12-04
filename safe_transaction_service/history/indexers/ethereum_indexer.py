@@ -115,8 +115,21 @@ class EthereumIndexer(ABC):
         """
         return self.database_model.objects.not_updated(self.database_field, current_block_number, self.confirmations)
 
-    def update_monitored_address(self, addresses: List[str], to_block_number: int) -> int:
-        return self.database_model.objects.update_addresses(addresses, to_block_number, self.database_field)
+    def update_monitored_address(self, addresses: List[str], from_block_number: int, to_block_number: int) -> int:
+        """
+        :param addresses: Addresses to have the block number updated
+        :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
+        :param to_block_number: Block number to be updated
+        :return: Number of addresses updated
+        """
+        updated_addresses = self.database_model.objects.update_addresses(addresses, from_block_number, to_block_number,
+                                                                         self.database_field)
+        if updated_addresses != len(addresses):
+            logger.warning('Possible reorg - Cannot update all indexed addresses=%s '
+                           'from-block-number=%d to-block-number=%d',
+                           addresses, from_block_number, to_block_number)
+
+        return updated_addresses
 
     def get_block_numbers_for_search(self, addresses: List[str],
                                      current_block_number: Optional[int] = None) -> Optional[Tuple[int, int]]:
@@ -206,7 +219,7 @@ class EthereumIndexer(ABC):
 
         processed_elements = self.process_elements(elements)
 
-        self.update_monitored_address(addresses, to_block_number)
+        self.update_monitored_address(addresses, from_block_number, to_block_number)
         return processed_elements, updated
 
     def start(self) -> int:

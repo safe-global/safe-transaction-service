@@ -168,17 +168,18 @@ def check_reorgs() -> Optional[int]:
             database_block.set_confirmed(current_block_number)
 
     if first_reorg_block_number is not None:
-        # Check concurrency problems
+        # Concurrency problems should be fixed
         EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
 
         safe_reorg_block_number = first_reorg_block_number - 1
-        ProxyFactory.objects.filter(
+
+        SafeMasterCopy.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
             tx_block_number=safe_reorg_block_number
         )
 
-        SafeMasterCopy.objects.filter(
+        ProxyFactory.objects.filter(
             tx_block_number__gte=first_reorg_block_number
         ).update(
             tx_block_number=safe_reorg_block_number
