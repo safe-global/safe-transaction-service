@@ -1,4 +1,4 @@
-Django==2.2.7
+Django==2.2.8
 celery==4.3.0
 django-authtools==1.7.0
 django-celery-beat==1.5.0
