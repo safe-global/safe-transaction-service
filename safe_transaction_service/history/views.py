@@ -70,7 +70,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         ).select_related(
             'ethereum_tx'
         ).order_by(
-            '-nonce'
+            '-nonce',
+            '-created'
         )
 
     def get_serializer_context(self):
