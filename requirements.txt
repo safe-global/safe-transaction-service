@@ -16,8 +16,8 @@ ethereum==2.3.2
 factory-boy==2.12.0
 faker==1.0.7
 gevent==1.4.0
-gnosis-py==1.7.0
-gunicorn==19.9.0
+gnosis-py==1.7.5
+gunicorn==20.0.4
 hexbytes==0.2.0
 jsonschema==3.0.1
 kombu==4.6.3
