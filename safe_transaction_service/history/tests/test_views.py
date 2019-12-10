@@ -11,6 +11,7 @@ from web3 import Web3
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
                         MultisigConfirmationFactory,
                         MultisigTransactionFactory, SafeContractFactory)
@@ -164,36 +165,35 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])
 
-    def test_safe_balances_usd_view(self):
+    @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(BalanceService, 'get_eth_value', return_value=123.4, autospec=True)
+    def test_safe_balances_usd_view(self, get_eth_value_mock, get_token_eth_value_mock):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        with mock.patch('safe_transaction_service.history.services.BalanceService') as BalanceServiceMock:
-            BalanceServiceMock.return_value.get_eth_value.return_value = 123.4
-            SafeContractFactory(address=safe_address)
-            value = 7
-            self.send_ether(safe_address, 7)
-            response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(len(response.json()), 1)
-            self.assertIsNone(response.json()[0]['tokenAddress'])
-            self.assertEqual(response.json()[0]['balance'], str(value))
+        SafeContractFactory(address=safe_address)
+        value = 7
+        self.send_ether(safe_address, 7)
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 1)
+        self.assertIsNone(response.json()[0]['tokenAddress'])
+        self.assertEqual(response.json()[0]['balance'], str(value))
 
-            """
-            BalanceServiceMock.return_value.get_token_eth_value.return_value = 0.4
-            tokens_value = 12
-            erc20 = self.deploy_example_erc20(tokens_value, safe_address)
-            response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(len(response.json()), 1)
+        tokens_value = 12
+        erc20 = self.deploy_example_erc20(tokens_value, safe_address)
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 1)
 
-            EthereumEventFactory(address=erc20.address, to=safe_address)
-            response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
-                                                    {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])
-            """
+        EthereumEventFactory(address=erc20.address, to=safe_address)
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value),
+                                                 'balanceUsd': str(123.4)},
+                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value),
+                                                 'balanceUsd': str(123.4 * 0.4)}])
 
     def test_incoming_txs_view(self):
         safe_address = Account.create().address

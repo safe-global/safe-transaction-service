@@ -6,8 +6,7 @@ from cachetools import TTLCache, cached
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
+from gnosis.eth.oracles import OracleException, UniswapOracle
 
 from ..models import EthereumEvent
 
