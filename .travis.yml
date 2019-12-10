@@ -31,7 +31,7 @@ deploy:
     on:
       branch: master
   - provider: script
-    script: bash scripts/deploy_docker.sh develop
+    script: bash scripts/deploy_docker.sh issue-38
     on:
       branch: develop
   - provider: script

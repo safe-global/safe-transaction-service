@@ -16,7 +16,7 @@ from .models import InternalTx, MultisigTransaction, SafeContract
 from .serializers import (IncomingTransactionResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer)
+                          SafeMultisigTransactionSerializer, SafeBalanceUsdResponseSerializer)
 from .services import BalanceServiceProvider
 
 
@@ -37,6 +37,7 @@ class AboutView(APIView):
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
                 'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT ': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
                 'ETH_REORG_BLOCKS': settings.ETH_REORG_BLOCKS,
+                'ETH_UNISWAP_FACTORY_ADDRESS': settings.ETH_UNISWAP_FACTORY_ADDRESS,
             }
         }
         return Response(content)
@@ -157,6 +158,30 @@ class SafeBalanceView(APIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
             safe_balances = BalanceServiceProvider().get_balances(address)
+            serializer = self.serializer_class(data=safe_balances, many=True)
+            serializer.is_valid()
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeBalanceUsdView(APIView):
+    serializer_class = SafeBalanceUsdResponseSerializer
+
+    @swagger_auto_schema(responses={200: SafeBalanceUsdResponseSerializer(many=True),
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            safe_balances = BalanceServiceProvider().get_usd_balances(address)
             serializer = self.serializer_class(data=safe_balances, many=True)
             serializer.is_valid()
             return Response(status=status.HTTP_200_OK, data=serializer.data)
