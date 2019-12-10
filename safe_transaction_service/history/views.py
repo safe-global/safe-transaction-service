@@ -15,8 +15,9 @@ from .filters import DefaultPagination, MultisigTransactionFilter
 from .models import InternalTx, MultisigTransaction, SafeContract
 from .serializers import (IncomingTransactionResponseSerializer,
                           SafeBalanceResponseSerializer,
+                          SafeBalanceUsdResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer, SafeBalanceUsdResponseSerializer)
+                          SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
 
 

@@ -3,15 +3,13 @@ from typing import Dict, List, Union
 
 import requests
 from cachetools import TTLCache, cached
-
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.oracles import UniswapOracle, KyberOracle, OracleException
+from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
 from ..models import EthereumEvent
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +51,7 @@ class BalanceService:
         balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
 
         return [balance for balance in balances
-                if balance['balance'] > 0 or balance['token_address'] == NULL_ADDRESS]
+                if balance['balance'] > 0 or not balance['token_address']]
 
     @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
     def get_eth_value(self) -> float:
@@ -79,10 +77,13 @@ class BalanceService:
             return 0.
 
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
-        eth_value = self.get_eth_value()
         balances: Dict[str, Union[str, int, float]] = self.get_balances(safe_address)
+        eth_value = self.get_eth_value()
         for balance in balances:
             token_address = balance['token_address']
-            token_to_eth_price = self.get_token_eth_value(token_address)
-            balance['balance_usd'] = eth_value * token_to_eth_price
+            if not token_address:  # Ether
+                balance['balance_usd'] = eth_value
+            else:
+                token_to_eth_price = self.get_token_eth_value(token_address)
+                balance['balance_usd'] = eth_value * token_to_eth_price
         return balances
