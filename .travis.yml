@@ -27,7 +27,7 @@ script:
   - coverage run --source=$SOURCE_FOLDER -m py.test -W ignore::DeprecationWarning
 deploy:
   - provider: script
-    script: bash scripts/deploy_docker.sh staging
+    script: bash scripts/deploy_docker.sh issue-38
     on:
       branch: master
   - provider: script
