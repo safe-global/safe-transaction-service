@@ -29,11 +29,11 @@ deploy:
   - provider: script
     script: bash scripts/deploy_docker.sh staging
     on:
-      branch: issue-38
+      branch: master
   - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
-      branch: issue-38
+      branch: develop
   - provider: script
     script: bash scripts/deploy_docker.sh $TRAVIS_TAG
     on:
