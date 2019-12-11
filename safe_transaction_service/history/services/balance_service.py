@@ -110,11 +110,11 @@ class BalanceService:
         for balance in balances:
             token_address = balance['token_address']
             if not token_address:  # Ether
-                balance['balance_usd'] = eth_value * (balance['balance'] / 18)
+                balance['balance_usd'] = eth_value * (balance['balance'] / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
-                    balance_with_decimals = balance['balance'] / self.get_token_decimals(token_address)
+                    balance_with_decimals = balance['balance'] / 10**self.get_token_decimals(token_address)
                     balance['balance_usd'] = eth_value * token_to_eth_price * balance_with_decimals
                 else:
                     balance['balance_usd'] = 0
