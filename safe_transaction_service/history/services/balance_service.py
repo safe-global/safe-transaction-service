@@ -1,11 +1,12 @@
 import logging
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import requests
 from cachetools import TTLCache, cached
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.contracts import get_erc20_contract
 from gnosis.eth.oracles import OracleException, UniswapOracle
 
 from ..models import EthereumEvent
@@ -38,6 +39,7 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient, uniswap_factory_address: str):
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client.w3, uniswap_factory_address)
+        self.token_decimals = {}
 
     def get_balances(self, safe_address: str) -> List[Dict[str, Union[str, int]]]:
         """
@@ -78,6 +80,14 @@ class BalanceService:
             logger.warning('VM execution error getting eth value for token-address=%s', token_address, exc_info=True)
             return 0.
 
+    def get_token_decimals(self, token_address: Optional[str]) -> int:
+        if not token_address:
+            return 18  # Ether
+        if token_address not in self.token_decimals:
+            erc20_contract = get_erc20_contract(self.ethereum_client.w3, token_address)
+            self.token_decimals[token_address] = erc20_contract.functions.decimals().call()
+        return self.token_decimals[token_address]
+
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
         balances: Dict[str, Union[str, int, float]] = self.get_balances(safe_address)
         eth_value = self.get_eth_value()
@@ -87,5 +97,9 @@ class BalanceService:
                 balance['balance_usd'] = eth_value
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
-                balance['balance_usd'] = eth_value * token_to_eth_price
+                if token_to_eth_price:
+                    balance_with_decimals = balance['balance'] / self.get_token_decimals(token_address)
+                    balance['balance_usd'] = eth_value * token_to_eth_price * balance_with_decimals
+                else:
+                    balance['balance_usd'] = 0
         return balances
