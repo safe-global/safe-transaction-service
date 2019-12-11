@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Union
 import requests
 from cachetools import TTLCache, cached
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import get_erc20_contract
@@ -91,7 +92,12 @@ class BalanceService:
             return 18  # Ether
         if token_address not in self.token_decimals:
             erc20_contract = get_erc20_contract(self.ethereum_client.w3, token_address)
-            self.token_decimals[token_address] = erc20_contract.functions.decimals().call()
+            try:
+                self.token_decimals[token_address] = erc20_contract.functions.decimals().call()
+            except BadFunctionCallOutput:
+                logger.warning('Cannot get decimals for token_address=%s', token_address)
+                self.token_decimals[token_address] = 18
+
         return self.token_decimals[token_address]
 
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
