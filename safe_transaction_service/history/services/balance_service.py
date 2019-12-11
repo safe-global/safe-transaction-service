@@ -117,5 +117,6 @@ class BalanceService:
                     balance_with_decimals = balance['balance'] / 10**self.get_token_decimals(token_address)
                     balance['balance_usd'] = eth_value * token_to_eth_price * balance_with_decimals
                 else:
-                    balance['balance_usd'] = 0
+                    balance['balance_usd'] = 0.
+            balance['balance_usd'] = round(balance['balance_usd'], 4)
         return balances

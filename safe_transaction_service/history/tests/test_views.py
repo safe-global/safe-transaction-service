@@ -182,7 +182,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.json()[0]['tokenAddress'])
         self.assertEqual(response.json()[0]['balance'], str(value))
 
-        tokens_value = 12
+        tokens_value = int(12 * 1e18)
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -192,9 +192,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value),
-                                                 'balanceUsd': str(123.4 * (7 / 1e18))},
+                                                 'balanceUsd': "0.0"},  # 7 wei is rounded to 0.0
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
-                                                 'balanceUsd': str(123.4 * 0.4 * (12 / 1e18))}])
+                                                 'balanceUsd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
 
     def test_incoming_txs_view(self):
         safe_address = Account.create().address
