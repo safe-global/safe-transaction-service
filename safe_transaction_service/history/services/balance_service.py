@@ -70,7 +70,7 @@ class BalanceService:
     @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
     def get_token_eth_value(self, token_address: str) -> float:
         try:
-            self.uniswap_oracle.get_price(token_address)
+            return self.uniswap_oracle.get_price(token_address)
         except OracleException:
             logger.warning('Cannot get eth value for token-address=%s', token_address)
             return 0.
