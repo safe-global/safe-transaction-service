@@ -1,8 +1,9 @@
 import logging
+import operator
 from typing import Dict, List, Optional, Union
 
 import requests
-from cachetools import TTLCache, cached
+from cachetools import TTLCache, cached, cachedmethod
 from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput
 
@@ -40,7 +41,7 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient, uniswap_factory_address: str):
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client.w3, uniswap_factory_address)
-        self.token_decimals = {}
+        self.token_decimals_cache = {}
 
     def get_balances(self, safe_address: str) -> List[Dict[str, Union[str, int]]]:
         """
@@ -87,18 +88,17 @@ class BalanceService:
             logger.warning('VM execution error getting eth value for token-address=%s', token_address, exc_info=True)
             return 0.
 
+    @cachedmethod(cache=operator.attrgetter('token_decimals_cache'))
     def get_token_decimals(self, token_address: Optional[str]) -> int:
         if not token_address:
             return 18  # Ether
-        if token_address not in self.token_decimals:
-            erc20_contract = get_erc20_contract(self.ethereum_client.w3, token_address)
-            try:
-                self.token_decimals[token_address] = erc20_contract.functions.decimals().call()
-            except BadFunctionCallOutput:
-                logger.warning('Cannot get decimals for token_address=%s', token_address)
-                self.token_decimals[token_address] = 18
 
-        return self.token_decimals[token_address]
+        erc20_contract = get_erc20_contract(self.ethereum_client.w3, token_address)
+        try:
+            return erc20_contract.functions.decimals().call()
+        except BadFunctionCallOutput:
+            logger.warning('Cannot get decimals for token_address=%s', token_address)
+            return 18
 
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
         """
