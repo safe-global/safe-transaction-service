@@ -192,9 +192,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value),
-                                                 'balanceUsd': str(123.4 * (7 / 18))},
+                                                 'balanceUsd': str(123.4 * (7 / 1e18))},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
-                                                 'balanceUsd': str(123.4 * 0.4 * (12 / 18))}])
+                                                 'balanceUsd': str(123.4 * 0.4 * (12 / 1e18))}])
 
     def test_incoming_txs_view(self):
         safe_address = Account.create().address
