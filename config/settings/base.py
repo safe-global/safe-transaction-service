@@ -300,3 +300,7 @@ ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env('ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
 # ------------------------------------------------------------------------------
 # Number of blocks from the current block number needed to consider a transaction valid/stable
 ETH_REORG_BLOCKS = env.int('ETH_REORG_BLOCKS', default=10)
+
+
+# Oracles
+ETH_UNISWAP_FACTORY_ADDRESS = env('ETH_UNISWAP_FACTORY_ADDRESS', default='0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95')

@@ -176,6 +176,10 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
     balance = serializers.CharField()
 
 
+class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
+    balance_usd = serializers.CharField()
+
+
 class IncomingTransactionResponseSerializer(serializers.Serializer):
     block_number = serializers.IntegerField()
     transaction_hash = Sha3HashField()
