@@ -74,6 +74,9 @@ class BalanceService:
         except OracleException:
             logger.warning('Cannot get eth value for token-address=%s', token_address)
             return 0.
+        except ValueError:
+            logger.warning('Cannot get eth value for token-address=%s', token_address, exc_info=True)
+            return 0.
 
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
         balances: Dict[str, Union[str, int, float]] = self.get_balances(safe_address)
