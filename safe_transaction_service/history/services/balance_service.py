@@ -55,7 +55,10 @@ class BalanceService:
                 if balance['balance'] > 0 or not balance['token_address']]
 
     @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
-    def get_eth_value(self) -> float:
+    def get_eth_usd_price(self) -> float:
+        """
+        Return current USD price for ethereum
+        """
         # Use kraken for eth_value
         url = 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD'
         response = requests.get(url)
@@ -71,6 +74,9 @@ class BalanceService:
 
     @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
     def get_token_eth_value(self, token_address: str) -> float:
+        """
+        Return current ether value for a given `token_address`
+        """
         try:
             return self.uniswap_oracle.get_price(token_address)
         except OracleException:
@@ -89,12 +95,16 @@ class BalanceService:
         return self.token_decimals[token_address]
 
     def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
+        """
+        All this could be more optimal (e.g. batching requests), but as everything is cached
+        I think we should be alright
+        """
         balances: Dict[str, Union[str, int, float]] = self.get_balances(safe_address)
-        eth_value = self.get_eth_value()
+        eth_value = self.get_eth_usd_price()
         for balance in balances:
             token_address = balance['token_address']
             if not token_address:  # Ether
-                balance['balance_usd'] = eth_value
+                balance['balance_usd'] = eth_value * (balance['balance'] / 18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:

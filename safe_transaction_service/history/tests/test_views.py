@@ -165,9 +165,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])
 
+    @mock.patch.object(BalanceService, 'get_token_decimals', return_value=18, autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
-    @mock.patch.object(BalanceService, 'get_eth_value', return_value=123.4, autospec=True)
-    def test_safe_balances_usd_view(self, get_eth_value_mock, get_token_eth_value_mock):
+    @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    def test_safe_balances_usd_view(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_decimals_mock):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -191,9 +192,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value),
-                                                 'balanceUsd': str(123.4)},
+                                                 'balanceUsd': str(123.4 * (7 / 18))},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
-                                                 'balanceUsd': str(123.4 * 0.4)}])
+                                                 'balanceUsd': str(123.4 * 0.4 * (12 / 18))}])
 
     def test_incoming_txs_view(self):
         safe_address = Account.create().address
