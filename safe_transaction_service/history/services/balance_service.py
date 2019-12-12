@@ -1,14 +1,14 @@
 import logging
 import operator
-from typing import Dict, List, Optional, Union
+from dataclasses import asdict, dataclass
+from typing import List, Optional
 
 import requests
 from cachetools import TTLCache, cached, cachedmethod
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.contracts import get_erc20_contract
+from gnosis.eth.ethereum_client import Erc20Info, InvalidERC20Info
 from gnosis.eth.oracles import OracleException, UniswapOracle
 
 from ..models import EthereumEvent
@@ -22,6 +22,18 @@ class BalanceServiceException(Exception):
 
 class CannotGetEthereumPrice(BalanceServiceException):
     pass
+
+
+@dataclass
+class Balance:
+    token_address: Optional[str]
+    token: Optional[Erc20Info]
+    balance: int
+
+
+@dataclass
+class BalanceWithUsd(Balance):
+    balance_usd: float
 
 
 class BalanceServiceProvider:
@@ -41,9 +53,9 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient, uniswap_factory_address: str):
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client.w3, uniswap_factory_address)
-        self.token_decimals_cache = {}
+        self.token_info_cache = {}
 
-    def get_balances(self, safe_address: str) -> List[Dict[str, Union[str, int]]]:
+    def get_balances(self, safe_address: str) -> List[Balance]:
         """
         :param safe_address:
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
@@ -51,10 +63,20 @@ class BalanceService:
         assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
         erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
-        balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
+        raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
 
-        return [balance for balance in balances
-                if balance['balance'] > 0 or not balance['token_address']]
+        balances = []
+        for balance in raw_balances:
+            if not balance['token_address']:  # Ether
+                balance['token'] = None
+            elif balance['balance'] > 0:
+                balance['token'] = self.get_token_info(balance['token_address'])
+                if not balance['token']:  # Ignore ERC20 tokens that cannot be queried
+                    continue
+            else:
+                continue
+            balances.append(Balance(**balance))
+        return balances
 
     @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
     def get_eth_usd_price(self) -> float:
@@ -88,35 +110,36 @@ class BalanceService:
             logger.warning('VM execution error getting eth value for token-address=%s', token_address, exc_info=True)
             return 0.
 
-    @cachedmethod(cache=operator.attrgetter('token_decimals_cache'))
-    def get_token_decimals(self, token_address: Optional[str]) -> int:
-        if not token_address:
-            return 18  # Ether
-
-        erc20_contract = get_erc20_contract(self.ethereum_client.w3, token_address)
+    @cachedmethod(cache=operator.attrgetter('token_info_cache'))
+    def get_token_info(self, token_address: str) -> Optional[Erc20Info]:
         try:
-            return erc20_contract.functions.decimals().call()
-        except BadFunctionCallOutput:
-            logger.warning('Cannot get decimals for token_address=%s', token_address)
-            return 18
+            return self.ethereum_client.erc20.get_info(token_address)
+        except InvalidERC20Info:
+            logger.warning('Cannot get token info for token-address=%s', token_address)
+            return None
 
-    def get_usd_balances(self, safe_address: str) -> List[Dict[str, Union[str, int, float]]]:
+    def get_usd_balances(self, safe_address: str) -> List[BalanceWithUsd]:
         """
         All this could be more optimal (e.g. batching requests), but as everything is cached
         I think we should be alright
         """
-        balances: Dict[str, Union[str, int, float]] = self.get_balances(safe_address)
+        balances: List[Balance] = self.get_balances(safe_address)
         eth_value = self.get_eth_usd_price()
+        balances_with_usd = []
         for balance in balances:
-            token_address = balance['token_address']
+            token_address = balance.token_address
             if not token_address:  # Ether
-                balance['balance_usd'] = eth_value * (balance['balance'] / 10**18)
+                balance_usd = eth_value * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
-                    balance_with_decimals = balance['balance'] / 10**self.get_token_decimals(token_address)
-                    balance['balance_usd'] = eth_value * token_to_eth_price * balance_with_decimals
+                    balance_with_decimals = balance.balance / 10**balance.token.decimals
+                    balance_usd = eth_value * token_to_eth_price * balance_with_decimals
                 else:
-                    balance['balance_usd'] = 0.
-            balance['balance_usd'] = round(balance['balance_usd'], 4)
-        return balances
+                    balance_usd = 0.
+
+            balance_dict = asdict(balance)
+            balance_dict['balance_usd'] = round(balance_usd, 4)
+            balances_with_usd.append(BalanceWithUsd(**balance_dict))
+
+        return balances_with_usd

@@ -171,8 +171,15 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
         return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data
 
 
+class Erc20InfoSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    symbol = serializers.CharField()
+    decimals = serializers.IntegerField()
+
+
 class SafeBalanceResponseSerializer(serializers.Serializer):
     token_address = serializers.CharField()
+    token = Erc20InfoSerializer()
     balance = serializers.CharField()
 
 

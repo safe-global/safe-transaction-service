@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from web3 import Web3
 
+from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -162,13 +163,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         EthereumEventFactory(address=erc20.address, to=safe_address)
         response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value)},
-                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value)}])
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value), 'token': None},
+                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value),
+                                                 'token': {'name': erc20.functions.name().call(),
+                                                           'symbol': erc20.functions.symbol().call(),
+                                                           'decimals': erc20.functions.decimals().call()}}])
 
-    @mock.patch.object(BalanceService, 'get_token_decimals', return_value=18, autospec=True)
+    @mock.patch.object(BalanceService, 'get_token_info',  autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_safe_balances_usd_view(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_decimals_mock):
+    def test_safe_balances_usd_view(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_info_mock):
+        erc20_info = Erc20Info('UXIO', 'UXI', 18)
+        get_token_info_mock.return_value = erc20_info
+
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -191,9 +198,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         EthereumEventFactory(address=erc20.address, to=safe_address)
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value),
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'token': None, 'balance': str(value),
                                                  'balanceUsd': "0.0"},  # 7 wei is rounded to 0.0
-                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value),
+                                                {'tokenAddress': erc20.address,
+                                                 'token': erc20_info._asdict(),
+                                                 'balance': str(tokens_value),
                                                  'balanceUsd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
 
     def test_incoming_txs_view(self):
