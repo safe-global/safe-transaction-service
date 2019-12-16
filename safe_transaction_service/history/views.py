@@ -11,7 +11,8 @@ from web3 import Web3
 
 from safe_transaction_service.version import __version__
 
-from .filters import DefaultPagination, MultisigTransactionFilter
+from .filters import (DefaultPagination, IncomingTransactionFilter,
+                      MultisigTransactionFilter)
 from .models import InternalTx, MultisigTransaction, SafeContract
 from .serializers import (IncomingTransactionResponseSerializer,
                           SafeBalanceResponseSerializer,
@@ -189,6 +190,8 @@ class SafeBalanceUsdView(APIView):
 
 
 class SafeIncomingTxListView(ListAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
 
     def get_queryset(self):
