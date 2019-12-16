@@ -393,11 +393,12 @@ class InternalTxQuerySet(models.QuerySet):
                            ).annotate(
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
+            execution_date=F('ethereum_tx__block__timestamp'),
             token_address=Value(None, output_field=EthereumAddressField())
         ).order_by('-ethereum_tx__block_id')
 
     def incoming_txs_with_events(self, address: str):
-        values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'token_address')
+        values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_address')
         ether_queryset = self.incoming_txs(address).values(*values)
         events_queryset = EthereumEvent.objects.erc20_events().filter(
             arguments__to=address
@@ -407,6 +408,7 @@ class InternalTxQuerySet(models.QuerySet):
             value=RawSQL("(arguments->>%s)::numeric", ('value',)),
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
+            execution_date=F('ethereum_tx__block__timestamp'),
             token_address=F('address')
         ).order_by('-ethereum_tx__block_id').values(*values)
 

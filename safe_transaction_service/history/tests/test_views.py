@@ -226,14 +226,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 2)
         self.assertCountEqual(response.json()['results'], [
-            {'transactionHash': internal_tx.ethereum_tx_id,
+            {'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': internal_tx.ethereum_tx_id,
              'blockNumber': internal_tx.ethereum_tx.block_id,
              'to': safe_address,
              'value': str(value),
              'tokenAddress': None,
              'from': internal_tx._from,
              },
-            {'transactionHash': ethereum_event.ethereum_tx_id,
+            {'executionDate': ethereum_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': ethereum_event.ethereum_tx_id,
              'blockNumber': ethereum_event.ethereum_tx.block_id,
              'to': safe_address,
              'value': str(token_value),

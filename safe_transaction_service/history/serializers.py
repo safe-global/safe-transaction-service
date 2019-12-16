@@ -193,6 +193,7 @@ class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
 
 
 class IncomingTransactionResponseSerializer(serializers.Serializer):
+    execution_date = serializers.DateTimeField()
     block_number = serializers.IntegerField()
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
