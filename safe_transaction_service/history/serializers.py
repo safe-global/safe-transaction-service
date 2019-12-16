@@ -138,7 +138,12 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
         return obj.ethereum_tx_id
 
 
-class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
+class SafeMultisigCharAdapter(SafeMultisigTxSerializerV1):
+    gas_price = serializers.CharField()
+    value = serializers.CharField()
+
+
+class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
     safe_tx_hash = Sha3HashField()
     block_number = serializers.SerializerMethodField()
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
@@ -192,7 +197,7 @@ class IncomingTransactionResponseSerializer(serializers.Serializer):
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
     from_ = EthereumAddressField(source='_from')
-    value = serializers.IntegerField()
+    value = serializers.CharField()
     token_address = EthereumAddressField(allow_null=True, default=None)
 
     def get_fields(self):

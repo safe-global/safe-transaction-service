@@ -218,7 +218,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['value'], value)
+        self.assertEqual(response.data['results'][0]['value'], str(value))
 
         token_value = 6
         ethereum_event = EthereumEventFactory(to=safe_address, value=token_value)
@@ -229,14 +229,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             {'transactionHash': internal_tx.ethereum_tx_id,
              'blockNumber': internal_tx.ethereum_tx.block_id,
              'to': safe_address,
-             'value': value,
+             'value': str(value),
              'tokenAddress': None,
              'from': internal_tx._from,
              },
             {'transactionHash': ethereum_event.ethereum_tx_id,
              'blockNumber': ethereum_event.ethereum_tx.block_id,
              'to': safe_address,
-             'value': token_value,
+             'value': str(token_value),
              'tokenAddress': ethereum_event.address,
              'from': ethereum_event.arguments['from']
              }
