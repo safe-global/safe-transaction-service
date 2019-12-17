@@ -195,7 +195,10 @@ class SafeIncomingTxListView(ListAPIView):
     serializer_class = IncomingTransactionResponseSerializer
 
     def get_queryset(self):
-        return InternalTx.objects.incoming_txs_with_events(self.kwargs['address'])
+        address = self.kwargs['address']
+        tokens_queryset = self.filter_queryset(InternalTx.objects.incoming_tokens(address))
+        ether_queryset = self.filter_queryset(InternalTx.objects.incoming_txs(address))
+        return InternalTx.objects.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
 
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
                                     404: 'Txs not found',

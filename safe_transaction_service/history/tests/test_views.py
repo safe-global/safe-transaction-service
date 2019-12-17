@@ -217,14 +217,24 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['value'], str(value))
+
+        # Test filters
+        block_number = internal_tx.ethereum_tx.block_id
+        url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         token_value = 6
         ethereum_event = EthereumEventFactory(to=safe_address, value=token_value)
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['count'], 2)
         self.assertCountEqual(response.json()['results'], [
             {'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': internal_tx.ethereum_tx_id,

@@ -13,26 +13,19 @@ class DefaultPagination(LimitOffsetPagination):
 
 
 class IncomingTransactionFilter(filters.FilterSet):
-    block_number__gt = django_filters.NumberFilter(lookup_expr='gt')
-    block_number__lt = django_filters.NumberFilter(lookup_expr='gt')
-    nonce__gt = django_filters.NumberFilter(lookup_expr='gt')
-    nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
+    _from = django_filters.CharFilter()
+    block_number = django_filters.NumberFilter(field_name='block_number')
+    block_number__gt = django_filters.NumberFilter(field_name='block_number', lookup_expr='gt')
+    block_number__lt = django_filters.NumberFilter(field_name='block_number', lookup_expr='lt')
     execution_date__gte = django_filters.DateTimeFilter(lookup_expr='gte')
     execution_date__lte = django_filters.DateTimeFilter(lookup_expr='lte')
+    nonce__gt = django_filters.NumberFilter(lookup_expr='gt')
+    nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
+    to = django_filters.CharFilter()
     token_address = django_filters.CharFilter()
-
-    class Meta:
-        model = InternalTx
-        fields = {
-            '_from': ['exact'],
-            'to': ['exact'],
-            'value': ['lt', 'gt', 'exact'],
-        }
-        filter_overrides = {
-            Uint256Field: {
-                'filter_class': django_filters.NumberFilter
-            }
-        }
+    value = django_filters.NumberFilter(field_name='value')
+    value__gt = django_filters.NumberFilter(field_name='value', lookup_expr='gt')
+    value__lt = django_filters.NumberFilter(field_name='value', lookup_expr='lt')
 
 
 class MultisigTransactionFilter(filters.FilterSet):
