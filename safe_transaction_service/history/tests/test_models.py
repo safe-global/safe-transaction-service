@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class TestModels(TestCase):
     def test_bind_confirmations(self):
-        safe_tx_hash = Web3.sha3(text='prueba')
+        safe_tx_hash = Web3.keccak(text='prueba')
         ethereum_tx = EthereumTxFactory()
         MultisigConfirmation.objects.create(
             ethereum_tx=ethereum_tx,
@@ -44,7 +44,7 @@ class TestModels(TestCase):
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
     def test_bind_confirmations_reverse(self):
-        safe_tx_hash = Web3.sha3(text='prueba')
+        safe_tx_hash = Web3.keccak(text='prueba')
         ethereum_tx = EthereumTxFactory()
         multisig_tx, _ = MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
                                                                    safe=Account.create().address,

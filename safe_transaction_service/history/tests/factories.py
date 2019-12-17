@@ -22,8 +22,8 @@ class EthereumBlockFactory(factory.DjangoModelFactory):
     gas_limit = factory.fuzzy.FuzzyInteger(100000000, 200000000)
     gas_used = factory.fuzzy.FuzzyInteger(100000, 500000)
     timestamp = factory.LazyFunction(timezone.now)
-    block_hash = factory.Sequence(lambda n: Web3.sha3(text=f'block-{n}').hex())
-    parent_hash = factory.Sequence(lambda n: Web3.sha3(text=f'block{n - 1}').hex())
+    block_hash = factory.Sequence(lambda n: Web3.keccak(text=f'block-{n}').hex())
+    parent_hash = factory.Sequence(lambda n: Web3.keccak(text=f'block{n - 1}').hex())
 
 
 class EthereumTxFactory(factory.DjangoModelFactory):
@@ -31,7 +31,7 @@ class EthereumTxFactory(factory.DjangoModelFactory):
         model = EthereumTx
 
     block = factory.SubFactory(EthereumBlockFactory)
-    tx_hash = factory.Sequence(lambda n: Web3.sha3(text=f'ethereum_tx_hash-{n}').hex())
+    tx_hash = factory.Sequence(lambda n: Web3.keccak(text=f'ethereum_tx_hash-{n}').hex())
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
     gas_price = factory.fuzzy.FuzzyInteger(1, 100)
@@ -87,7 +87,7 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
     class Meta:
         model = MultisigTransaction
 
-    safe_tx_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-tx-{n}').hex())
+    safe_tx_hash = factory.Sequence(lambda n: Web3.keccak(text=f'multisig-tx-{n}').hex())
     safe = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     to = factory.LazyFunction(lambda: Account.create().address)
@@ -109,7 +109,7 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
 
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     multisig_transaction = factory.SubFactory(MultisigTransaction)
-    multisig_transaction_hash = factory.Sequence(lambda n: Web3.sha3(text=f'multisig-confirmation-tx-{n}').hex())
+    multisig_transaction_hash = factory.Sequence(lambda n: Web3.keccak(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
 
 

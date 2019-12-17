@@ -34,10 +34,10 @@ class TestTxDecoder(SafeTestCaseMixin, TestCase):
         safe_tx = SafeTx(self.ethereum_client, safe_address, to, value, b'', 0, safe_tx_gas, data_gas, self.gas_price,
                          None, None, safe_nonce=0)
 
-        safe_tx.sign(owners[0].privateKey)
+        safe_tx.sign(owners[0].key)
 
         self.assertEqual(safe_tx.call(tx_sender_address=self.ethereum_test_account.address), 1)
-        tx_hash, _ = safe_tx.execute(tx_sender_private_key=self.ethereum_test_account.privateKey)
+        tx_hash, _ = safe_tx.execute(tx_sender_private_key=self.ethereum_test_account.key)
         self.ethereum_client.get_transaction_receipt(tx_hash, timeout=60)
         self.assertEqual(self.ethereum_client.get_balance(to), value)
 

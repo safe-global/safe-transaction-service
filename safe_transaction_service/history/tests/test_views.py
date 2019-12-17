@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class TestViews(SafeTestCaseMixin, APITestCase):
     def test_get_multisig_transaction(self):
-        safe_tx_hash = Web3.sha3(text='gnosis').hex()
+        safe_tx_hash = Web3.keccak(text='gnosis').hex()
         response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 

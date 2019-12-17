@@ -17,11 +17,11 @@ ethereum==2.3.2
 factory-boy==2.12.0
 faker==1.0.7
 gevent==1.4.0
-gnosis-py==1.7.9
+gnosis-py==2.0.0
 gunicorn==20.0.4
 hexbytes==0.2.0
 jsonschema==3.0.1
 psycopg2-binary==2.8.4
 redis==3.3.11
 requests==2.22.0
-web3==4.9.2
+web3==5.4.0
