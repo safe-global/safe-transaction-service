@@ -4,11 +4,11 @@ from typing import Any, Dict, Iterable, List, Set
 
 from hexbytes import HexBytes
 from web3 import Web3
+from web3._utils.events import construct_event_topic_set
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
-from web3._utils.events import construct_event_topic_set
 
 from ..models import EthereumTx, ProxyFactory, SafeContract
 from .ethereum_indexer import EthereumIndexer
