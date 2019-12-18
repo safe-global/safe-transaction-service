@@ -9,7 +9,7 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import Erc20Info, InvalidERC20Info
-from gnosis.eth.oracles import OracleException, UniswapOracle
+from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
 from ..models import EthereumEvent
 
@@ -40,7 +40,9 @@ class BalanceServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = BalanceService(EthereumClientProvider(), settings.ETH_UNISWAP_FACTORY_ADDRESS)
+            cls.instance = BalanceService(EthereumClientProvider(), settings.ETH_UNISWAP_FACTORY_ADDRESS,
+                                          settings.ETH_KYBER_NETWORK_PROXY_ADDRESS,
+                                          settings.ETH_WETH_ADDRESS)
         return cls.instance
 
     @classmethod
@@ -50,9 +52,12 @@ class BalanceServiceProvider:
 
 
 class BalanceService:
-    def __init__(self, ethereum_client: EthereumClient, uniswap_factory_address: str):
+    def __init__(self, ethereum_client: EthereumClient,
+                 uniswap_factory_address: str, kyber_network_proxy_address: str, weth_address: str):
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
+        self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
+        self.weth_address = weth_address
         self.token_info_cache = {}
 
     def get_balances(self, safe_address: str) -> List[Balance]:
@@ -104,10 +109,12 @@ class BalanceService:
         try:
             return self.uniswap_oracle.get_price(token_address)
         except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s', token_address)
-            return 0.
-        except ValueError:
-            logger.warning('VM execution error getting eth value for token-address=%s', token_address, exc_info=True)
+            logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
+
+        try:
+            return self.kyber_oracle.get_price(token_address, self.weth_address)
+        except OracleException:
+            logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
             return 0.
 
     @cachedmethod(cache=operator.attrgetter('token_info_cache'))
