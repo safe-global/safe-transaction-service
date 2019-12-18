@@ -52,7 +52,7 @@ class BalanceServiceProvider:
 class BalanceService:
     def __init__(self, ethereum_client: EthereumClient, uniswap_factory_address: str):
         self.ethereum_client = ethereum_client
-        self.uniswap_oracle = UniswapOracle(self.ethereum_client.w3, uniswap_factory_address)
+        self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.token_info_cache = {}
 
     def get_balances(self, safe_address: str) -> List[Balance]:
