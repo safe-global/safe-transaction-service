@@ -149,6 +149,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
     submission_date = serializers.DateTimeField(source='created')  # First seen by this service
     is_executed = serializers.BooleanField(source='executed')
+    is_successful = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
     executor = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
@@ -161,6 +162,12 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
             return obj.ethereum_tx._from
+
+    def get_is_successful(self, obj: MultisigTransaction) -> Optional[bool]:
+        if obj.failed is None:
+            return None
+        else:
+            return not obj.failed
 
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """

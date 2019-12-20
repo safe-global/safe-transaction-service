@@ -130,7 +130,9 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'executed', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value', 'nonce', 'data')
+    list_display = ('created', 'safe', 'executed', 'successful', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value',
+                    'nonce', 'data')
+    list_filter = ('failed', )
     list_select_related = ('ethereum_tx',)
     ordering = ['-created']
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
@@ -138,6 +140,10 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     def executed(self, obj: MultisigTransaction):
         return obj.executed
     executed.boolean = True
+
+    def successful(self, obj: MultisigTransaction):
+        return not obj.failed
+    successful.boolean = True
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):

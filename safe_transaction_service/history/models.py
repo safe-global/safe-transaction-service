@@ -588,6 +588,7 @@ class MultisigTransaction(TimeStampedModel):
     refund_receiver = EthereumAddressField(null=True)
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field()
+    failed = models.NullBooleanField(default=None)
 
     def __str__(self):
         return f'{self.safe} - {self.nonce} - {self.safe_tx_hash}'

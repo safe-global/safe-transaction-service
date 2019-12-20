@@ -1,11 +1,15 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
+from typing import Union
 
 from django.db import transaction
 
 from hexbytes import HexBytes
+from web3 import Web3
 
+from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
+from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature
 
@@ -25,6 +29,23 @@ class SafeTxProcessor(TxProcessor):
     """
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
+
+    def __init__(self, ethereum_client: EthereumClient):
+        self.safe_tx_failure_events = [get_safe_V1_0_0_contract(Web3()).events.ExecutionFailed(),
+                                       get_safe_contract(Web3()).events.ExecutionFailure()]
+        self.ethereum_client = ethereum_client
+
+    def is_failed(self, tx_hash: Union[str, bytes], safe_tx_hash: Union[str, bytes]) -> bool:
+        # TODO Store logs when storing the receipt
+        # TODO Move this function to `Safe` in gnosis-py
+        safe_tx_hash = HexBytes(safe_tx_hash)
+        tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
+        for safe_tx_failure_event in self.safe_tx_failure_events:
+            for decoded_event in safe_tx_failure_event.processReceipt(tx_receipt):
+                if decoded_event['args']['txHash'] == safe_tx_hash:
+                    return True
+        return False
+
     @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """
@@ -115,6 +136,7 @@ class SafeTxProcessor(TxProcessor):
                 safe=contract_address
             )
 
+            failed = self.is_failed(ethereum_tx.tx_hash, safe_tx_hash)
             multisig_tx, created = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={
@@ -131,11 +153,13 @@ class SafeTxProcessor(TxProcessor):
                     'refund_receiver': safe_tx.refund_receiver,
                     'nonce': safe_tx.safe_nonce,
                     'signatures': safe_tx.signatures,
+                    'failed': failed,
                 })
             if not created and not multisig_tx.ethereum_tx:
                 multisig_tx.ethereum_tx = ethereum_tx
+                multisig_tx.failed = failed
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
-                multisig_tx.save(update_fields=['ethereum_tx', 'signatures'])
+                multisig_tx.save(update_fields=['ethereum_tx', 'failed', 'signatures'])
 
             for safe_signature in SafeSignature.parse_signatures(safe_tx.signatures, safe_tx_hash):
                 multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
