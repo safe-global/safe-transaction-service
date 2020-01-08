@@ -101,8 +101,11 @@ class EthereumBlockManager(models.Manager):
 
 
 class EthereumBlockQuerySet(models.QuerySet):
-    def not_confirmed(self):
-        return self.filter(confirmed=False).order_by('number')
+    def not_confirmed(self, current_block_number: Optional[int] = None):
+        queryset = self.filter(confirmed=False)
+        if current_block_number is not None:
+            queryset = queryset.filter(number__lte=current_block_number - 6)
+        return queryset.order_by('number')
 
 
 class EthereumBlock(models.Model):

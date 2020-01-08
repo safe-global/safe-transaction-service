@@ -6,7 +6,6 @@ from django.conf import settings
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
-from hexbytes import HexBytes
 from redis import Redis
 from redis.exceptions import LockError
 
@@ -16,8 +15,8 @@ from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import (EthereumBlock, InternalTxDecoded, ProxyFactory,
-                     SafeContract, SafeMasterCopy)
+from .models import InternalTxDecoded
+from .services import ReorgService, ReorgServiceProvider
 
 logger = get_task_logger(__name__)
 
@@ -37,7 +36,7 @@ def get_redis() -> Redis:
 def generate_handler(task_id: str) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', task_id)
-        raise OSError('Task must exit')
+        raise OSError('Received SIGTERM on task-id=%s. Probably a reorg. Task must exit' % task_id)
     return handler
 
 
@@ -151,50 +150,6 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         pass
 
 
-def check_reorgs() -> Optional[int]:
-    """
-    :return: Number of oldest block with reorg detected. `None` if not reorg found
-    """
-    ethereum_client = EthereumClientProvider()
-    current_block_number = ethereum_client.current_block_number
-    first_reorg_block_number: Optional[int] = None
-    for database_block in EthereumBlock.objects.not_confirmed():
-        blockchain_block = ethereum_client.get_block(database_block.number, full_transactions=False)
-        if HexBytes(blockchain_block['hash']) != HexBytes(database_block.block_hash):
-            logger.warning('Reorg found for block-number=%d', database_block.number)
-            first_reorg_block_number = database_block.number
-            break
-        else:
-            database_block.set_confirmed(current_block_number)
-
-    if first_reorg_block_number is not None:
-        # Concurrency problems should be fixed
-        EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
-
-        safe_reorg_block_number = first_reorg_block_number - 1
-
-        SafeMasterCopy.objects.filter(
-            tx_block_number__gte=first_reorg_block_number
-        ).update(
-            tx_block_number=safe_reorg_block_number
-        )
-
-        ProxyFactory.objects.filter(
-            tx_block_number__gte=first_reorg_block_number
-        ).update(
-            tx_block_number=safe_reorg_block_number
-        )
-
-        SafeContract.objects.filter(
-            erc20_block_number__gte=first_reorg_block_number
-        ).update(
-            erc20_block_number=safe_reorg_block_number
-        )
-
-        logger.warning('Reorg of block-number=%d fixed', first_reorg_block_number)
-    return first_reorg_block_number
-
-
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
 def check_reorgs_task() -> Optional[int]:
     """
@@ -203,13 +158,15 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT) as redis_lock:
-            #TODO Fix concurrency issues
-            first_reorg_block_number = check_reorgs()
+            reorg_service: ReorgService = ReorgServiceProvider()
+            first_reorg_block_number = reorg_service.check_reorgs()
             if first_reorg_block_number:
+                # Stop running tasks
                 celery_app.control.revoke([task_id.decode()  # Redis returns `bytes`
                                            for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
                                           terminate=True, signal=signal.SIGTERM)
                 redis.delete(blockchain_running_tasks_key)
+                reorg_service.recover_from_reorg(first_reorg_block_number)
                 return first_reorg_block_number
     except LockError:
         pass
