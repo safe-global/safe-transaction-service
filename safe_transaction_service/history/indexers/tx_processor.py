@@ -6,6 +6,7 @@ from django.db import transaction
 
 from hexbytes import HexBytes
 from web3 import Web3
+from web3._utils.events import EventLogErrorFlags
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
@@ -41,7 +42,7 @@ class SafeTxProcessor(TxProcessor):
         safe_tx_hash = HexBytes(safe_tx_hash)
         tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
         for safe_tx_failure_event in self.safe_tx_failure_events:
-            for decoded_event in safe_tx_failure_event.processReceipt(tx_receipt):
+            for decoded_event in safe_tx_failure_event.processReceipt(tx_receipt, errors=EventLogErrorFlags.Discard):
                 if decoded_event['args']['txHash'] == safe_tx_hash:
                     return True
         return False
