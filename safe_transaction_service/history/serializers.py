@@ -152,6 +152,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
     is_successful = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
     executor = serializers.SerializerMethodField()
+    gas_used = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
     signatures = HexadecimalField()
 
@@ -168,6 +169,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
             return None
         else:
             return not obj.failed
+
+    def get_gas_used(self, obj: MultisigTransaction) -> Optional[str]:
+        if obj.ethereum_tx and obj.ethereum_tx.gas_used:
+            return obj.ethereum_tx.gas_used
 
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
