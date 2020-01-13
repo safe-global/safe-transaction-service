@@ -577,7 +577,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
 class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionQuerySet.as_manager()
     safe_tx_hash = Sha3HashField(primary_key=True)
-    safe = EthereumAddressField()
+    safe = EthereumAddressField(db_index=True)
     ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,
                                     on_delete=models.SET_NULL, related_name='multisig_txs')
     to = EthereumAddressField(null=True, db_index=True)
@@ -590,7 +590,7 @@ class MultisigTransaction(TimeStampedModel):
     gas_token = EthereumAddressField(null=True)
     refund_receiver = EthereumAddressField(null=True)
     signatures = models.BinaryField(null=True)  # When tx is executed
-    nonce = Uint256Field()
+    nonce = Uint256Field(db_index=True)
     failed = models.NullBooleanField(default=None)
 
     def __str__(self):

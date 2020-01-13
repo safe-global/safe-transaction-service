@@ -131,18 +131,18 @@ def process_decoded_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            tx_processor: TxProcessor = SafeTxProcessor(EthereumClientProvider())
             number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 100
+            batch = 150
             if count:
+                tx_processor: TxProcessor = SafeTxProcessor(EthereumClientProvider())
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
-            # Use slicing for memory issues
-            for _ in range(0, count, batch):
-                for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[:batch]:
-                    processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
-                    if processed:
-                        number_processed += 1
+                # Use slicing for memory issues
+                for _ in range(0, count, batch):
+                    for internal_tx_decoded in InternalTxDecoded.objects.pending_for_safes()[:batch]:
+                        processed = tx_processor.process_decoded_transaction(internal_tx_decoded)
+                        if processed:
+                            number_processed += 1
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed
