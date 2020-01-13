@@ -44,10 +44,10 @@ class EthereumEventListFilter(admin.SimpleListFilter):
 
 @admin.register(EthereumEvent)
 class EthereumEventAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'from_', 'to', 'arguments')
+    list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'address', 'from_', 'to', 'arguments')
     list_display_links = ('log_index', 'arguments')
     list_filter = (EthereumEventListFilter, )
-    search_fields = ['arguments']
+    search_fields = ['arguments', 'address']
 
     def from_(self, obj: EthereumEvent):
         return obj.arguments.get('from')
