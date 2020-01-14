@@ -194,10 +194,14 @@ class SafeIncomingTxListView(ListAPIView):
     filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
 
+    def filter_queryset(self, queryset):
+        # Disable filter queryset, it will try to filter the Union and will fail
+        return queryset
+
     def get_queryset(self):
         address = self.kwargs['address']
-        tokens_queryset = self.filter_queryset(InternalTx.objects.incoming_tokens(address))
-        ether_queryset = self.filter_queryset(InternalTx.objects.incoming_txs(address))
+        tokens_queryset = super().filter_queryset(InternalTx.objects.incoming_tokens(address))
+        ether_queryset = super().filter_queryset(InternalTx.objects.incoming_txs(address))
         return InternalTx.objects.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
 
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
