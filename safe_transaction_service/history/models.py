@@ -146,23 +146,24 @@ class EthereumTxManager(models.Manager):
         tx_receipts = []
         for tx_hash, tx_receipt in zip(tx_hashes_not_in_db,
                                        ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)):
+            tx_receipt = tx_receipt or ethereum_client.get_transaction_receipt(tx_hash)  # Retry fetching if failed
             if not tx_receipt:
-                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)  # Retry fetching
-
-            if not tx_receipt:
-                raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionNotFoundException(f'Cannot find tx-receipt with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx_receipt.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx-receipt with '
+                                                       f'tx-hash={HexBytes(tx_hash).hex()}')
             else:
                 tx_receipts.append(tx_receipt)
 
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = []
         for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
+            tx = tx or ethereum_client.get_transaction(tx_hash)  # Retry fetching if failed
             if not tx:
                 raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx with '
+                                                       f'tx-hash={HexBytes(tx_hash).hex()}')
             block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)
