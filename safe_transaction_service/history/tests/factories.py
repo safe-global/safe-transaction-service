@@ -119,7 +119,7 @@ class SafeContractFactory(factory.DjangoModelFactory):
 
     address = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
-    erc20_block_number = FuzzyInteger(low=0, high=2)
+    erc20_block_number = factory.LazyFunction(lambda: 0)
 
 
 class SafeStatusFactory(factory.DjangoModelFactory):
