@@ -708,14 +708,14 @@ class MonitoredAddressQuerySet(models.QuerySet):
 
 
 class MonitoredAddress(models.Model):
-    class Meta:
-        abstract = True
-        verbose_name_plural = "Monitored addresses"
-
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
+
+    class Meta:
+        abstract = True
+        verbose_name_plural = "Monitored addresses"
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
@@ -806,12 +806,12 @@ class SafeStatus(models.Model):
         unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe statuses'
 
+    def __str__(self):
+        return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
+
     @property
     def block_number(self):
         return self.internal_tx.ethereum_tx.block_id
-
-    def __str__(self):
-        return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
 
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx

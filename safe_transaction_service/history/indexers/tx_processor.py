@@ -131,11 +131,11 @@ class SafeTxProcessor(TxProcessor):
             ).delete()
 
             # Remove old txs not used
-            MultisigTransaction.objects.filter(
-                ethereum_tx=None,
-                nonce__lt=safe_tx.safe_nonce,
-                safe=contract_address
-            )
+            #MultisigTransaction.objects.filter(
+            #    ethereum_tx=None,
+            #    nonce__lt=safe_tx.safe_nonce,
+            #    safe=contract_address
+            #).delete()
 
             failed = self.is_failed(ethereum_tx.tx_hash, safe_tx_hash)
             multisig_tx, created = MultisigTransaction.objects.get_or_create(
