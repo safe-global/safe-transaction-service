@@ -734,26 +734,6 @@ class SafeMasterCopy(MonitoredAddress):
         ordering = ['tx_block_number']
 
 
-class SafeStatusManager(models.Manager):
-    pass
-
-
-class SafeStatusQuerySet(models.QuerySet):
-    def last_for_address(self, address: str):
-        safe_status = self.filter(
-            address=address
-        ).select_related(
-            'internal_tx__ethereum_tx'
-        ).order_by(
-            'internal_tx__ethereum_tx__block_id',
-            'internal_tx__ethereum_tx__transaction_index',
-            'internal_tx_id',
-        ).last()
-        if not safe_status:
-            logger.error('SafeStatus not found for address=%s', address)
-        return safe_status
-
-
 class SafeContractManager(MonitoredAddressManager):
     pass
 
@@ -792,11 +772,42 @@ def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, c
                 instance.save()
 
 
+class SafeStatusManager(models.Manager):
+    pass
+
+
+class SafeStatusQuerySet(models.QuerySet):
+    def addresses_for_owner(self, owner_address: str) -> List[str]:
+        return self.filter(owners__contains=[owner_address],
+                           internal_tx__in=self.last_for_every_address().values('pk')
+                           ).values_list('address', flat=True)
+
+    def last_for_every_address(self) -> List['SafeStatus']:
+        return self.distinct(
+            'address'  # Uses PostgreSQL `DISTINCT ON`
+        ).select_related(
+            'internal_tx__ethereum_tx'
+        ).order_by(
+            'address',
+            '-internal_tx__ethereum_tx__block_id',
+            '-internal_tx__ethereum_tx__transaction_index',
+            '-internal_tx_id',
+        )
+
+    def last_for_address(self, address: str) -> Optional['SafeStatus']:
+        safe_status = self.last_for_every_address().filter(
+            address=address
+        ).first()
+        if not safe_status:
+            logger.error('SafeStatus not found for address=%s', address)
+        return safe_status
+
+
 class SafeStatus(models.Model):
     objects = SafeStatusManager.from_queryset(SafeStatusQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
                                        primary_key=True)
-    address = EthereumAddressField()
+    address = EthereumAddressField(db_index=True)
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
