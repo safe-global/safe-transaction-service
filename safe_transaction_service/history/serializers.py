@@ -212,6 +212,10 @@ class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
 
 
+class OwnerResponseSerializer(SafeBalanceResponseSerializer):
+    safes = serializers.ListField(child=EthereumAddressField())
+
+
 class IncomingTransactionResponseSerializer(serializers.Serializer):
     execution_date = serializers.DateTimeField()
     block_number = serializers.IntegerField()

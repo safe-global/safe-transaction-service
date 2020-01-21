@@ -13,8 +13,9 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
-from .models import InternalTx, MultisigTransaction, SafeContract
+from .models import InternalTx, MultisigTransaction, SafeContract, SafeStatus
 from .serializers import (IncomingTransactionResponseSerializer,
+                          OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
@@ -219,3 +220,25 @@ class SafeIncomingTxListView(ListAPIView):
             response.status_code = status.HTTP_404_NOT_FOUND
 
         return response
+
+
+class OwnersView(APIView):
+    serializer_class = OwnerResponseSerializer
+
+    @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
+                                    404: 'Safes not found for that owner',
+                                    422: 'Owner address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
+        if not safes_for_owner:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(data={'safes': safes_for_owner})
+        serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)

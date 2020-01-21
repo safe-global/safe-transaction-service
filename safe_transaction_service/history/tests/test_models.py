@@ -69,12 +69,7 @@ class TestModels(TestCase):
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
-    def test_safe_status_store_new(self):
-        safe_status = SafeStatusFactory()
-        self.assertEqual(SafeStatus.objects.all().count(), 1)
-        internal_tx = InternalTxFactory()
-        safe_status.store_new(internal_tx)
-        self.assertEqual(SafeStatus.objects.all().count(), 2)
+
 
     def test_safe_contract_receiver(self):
         ethereum_tx = EthereumTxFactory()
@@ -201,3 +196,33 @@ class TestInternalTxManager(TestCase):
 
         InternalTxDecoded.objects.create(function_name='alo', arguments={}, internal_tx=internal_tx)
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
+
+
+class TestSafeStatusManager(TestCase):
+    def test_safe_status_store_new(self):
+        safe_status = SafeStatusFactory()
+        self.assertEqual(SafeStatus.objects.all().count(), 1)
+        internal_tx = InternalTxFactory()
+        safe_status.store_new(internal_tx)
+        self.assertEqual(SafeStatus.objects.all().count(), 2)
+
+    def test_safe_status_last_for_address(self):
+        address = Account.create().address
+        SafeStatusFactory(address=address, nonce=1)
+        SafeStatusFactory(address=address, nonce=0)
+        SafeStatusFactory(address=address, nonce=2)
+        self.assertEqual(SafeStatus.objects.last_for_address(address).nonce, 2)
+        self.assertIsNone(SafeStatus.objects.last_for_address(Account.create().address))
+
+    def test_safe_status_addresses_for_owner(self):
+        owner_address = Account.create().address
+        address = Account.create().address
+        address_2 = Account.create().address
+        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [])
+        SafeStatusFactory(address=address, nonce=0, owners=[owner_address])
+        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [address])
+        SafeStatusFactory(address=address, nonce=1)
+        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [])
+        SafeStatusFactory(address=address, nonce=2, owners=[owner_address])
+        SafeStatusFactory(address=address_2, nonce=0, owners=[owner_address])
+        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [address, address_2])

@@ -15,7 +15,8 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
                         MultisigConfirmationFactory,
-                        MultisigTransactionFactory, SafeContractFactory)
+                        MultisigTransactionFactory, SafeContractFactory,
+                        SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -253,3 +254,23 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'from': ethereum_event.arguments['from']
              }
         ])
+
+    def test_owners_view(self):
+        invalid_address = '0x2A'
+        response = self.client.get(reverse('v1:owners', args=(invalid_address,)))
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        owner_address = Account.create().address
+        response = self.client.get(reverse('v1:owners', args=(owner_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        safe_status = SafeStatusFactory(owners=[owner_address])
+        response = self.client.get(reverse('v1:owners', args=(owner_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(response.json()['safes'], [safe_status.address])
+
+        safe_status_2 = SafeStatusFactory(owners=[owner_address])
+        SafeStatusFactory()  # Test that other SafeStatus don't appear
+        response = self.client.get(reverse('v1:owners', args=(owner_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(response.json()['safes'], [safe_status.address, safe_status_2.address])
