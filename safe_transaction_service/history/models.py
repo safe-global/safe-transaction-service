@@ -778,9 +778,10 @@ class SafeStatusManager(models.Manager):
 
 class SafeStatusQuerySet(models.QuerySet):
     def addresses_for_owner(self, owner_address: str) -> List[str]:
-        return self.filter(owners__contains=[owner_address],
-                           internal_tx__in=self.last_for_every_address().values('pk')
-                           ).values_list('address', flat=True)
+        return self.filter(
+            owners__contains=[owner_address],
+            internal_tx__in=self.last_for_every_address().values('pk')
+        ).values_list('address', flat=True)
 
     def last_for_every_address(self) -> List['SafeStatus']:
         return self.distinct(
