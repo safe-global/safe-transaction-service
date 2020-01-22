@@ -8,8 +8,6 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models import Case, Q, Sum
 from django.db.models.expressions import F, RawSQL, Value, When
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -647,36 +645,6 @@ class MultisigConfirmation(TimeStampedModel):
             return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
 
 
-@receiver(post_save, sender=MultisigConfirmation)
-@receiver(post_save, sender=MultisigTransaction)
-def bind_confirmation(sender: Type[models.Model], instance: Union[MultisigConfirmation, MultisigTransaction],
-                      created: bool, **kwargs) -> None:
-    """
-    When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
-    :param sender: Could be MultisigConfirmation or MultisigTransaction
-    :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
-    :param created: True if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    if not created:
-        return
-    if sender == MultisigTransaction:
-        for multisig_confirmation in MultisigConfirmation.objects.without_transaction().filter(
-                multisig_transaction_hash=instance.safe_tx_hash):
-            multisig_confirmation.multisig_transaction = instance
-            multisig_confirmation.save(update_fields=['multisig_transaction'])
-    elif sender == MultisigConfirmation:
-        if not instance.multisig_transaction_id:
-            try:
-                if instance.multisig_transaction_hash:
-                    instance.multisig_transaction = MultisigTransaction.objects.get(
-                        safe_tx_hash=instance.multisig_transaction_hash)
-                    instance.save(update_fields=['multisig_transaction'])
-            except MultisigTransaction.DoesNotExist:
-                pass
-
-
 class MonitoredAddressManager(models.Manager):
     def update_addresses(self, addresses: List[str], from_block_number: int, block_number: int,
                          database_field: str) -> int:
@@ -753,25 +721,6 @@ class SafeContract(models.Model):
             return self.ethereum_tx.block_id
 
 
-@receiver(post_save, sender=SafeContract)
-def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, created: bool, **kwargs) -> None:
-    """
-    When a `SafeContract` is saved, sets the `erc20_block_number` if not set
-    :param sender: SafeContract
-    :param instance: Instance of SafeContract
-    :param created: True if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    if not created:
-        return
-    if sender == SafeContract:
-        if instance.erc20_block_number == 0:
-            if instance.ethereum_tx and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
-                instance.erc20_block_number = instance.ethereum_tx.block_id
-                instance.save()
-
-
 class SafeStatusManager(models.Manager):
     pass
 
@@ -828,3 +777,19 @@ class SafeStatus(models.Model):
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx
         return self.save()
+
+
+class WebHook(models.Model):
+    address = EthereumAddressField(db_index=True)
+    url = models.URLField()
+    # Configurable webhook types to listen to
+    new_confirmation = models.BooleanField(default=True)
+    pending_outgoing_transaction = models.BooleanField(default=True)
+    new_executed_outgoing_transaction = models.BooleanField(default=True)
+    new_incoming_transaction = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = (('address', 'url'),)
+
+    def __str__(self):
+        return f'Webhook for safe={self.address} to url={self.url}'

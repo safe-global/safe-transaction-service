@@ -1,8 +1,10 @@
 import signal
-from typing import NoReturn, Optional
+from typing import Any, Dict, NoReturn, Optional, Type, Union
 
 from django.conf import settings
+from django.db.models import Model
 
+import requests
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
@@ -15,7 +17,8 @@ from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import InternalTxDecoded
+from .models import (InternalTxDecoded, MultisigConfirmation,
+                     MultisigTransaction, WebHook)
 from .services import ReorgService, ReorgServiceProvider
 
 logger = get_task_logger(__name__)
@@ -170,3 +173,40 @@ def check_reorgs_task() -> Optional[int]:
                 return first_reorg_block_number
     except LockError:
         pass
+
+
+@app.shared_task()
+def send_webhook_task(sender: Type[Model], instance: Union[MultisigConfirmation, MultisigTransaction]) -> bool:
+    address: Optional[str] = None
+
+    if sender == MultisigConfirmation and instance.multisig_transaction_id:
+        address = instance.multisig_transaction.safe
+    elif sender == MultisigTransaction:
+        address = instance.safe
+
+    if not address:
+        return False
+
+    try:
+        webhook = WebHook.objects.get(address=address)
+    except WebHook.DoesNotExist:
+        return False
+
+    payload: Optional[Dict[str, Any]] = None
+    if sender == MultisigConfirmation and instance.multisig_transaction_id:
+        payload = {
+            'type': 'NEW_CONFIRMATION',
+            'owner': instance.owner,
+            'safeTxHash': instance.multisig_transaction.safe_tx_hash
+        }
+    elif sender == MultisigTransaction:
+        payload = {
+            'safeTxHash': instance.multisig_transaction.safe_tx_hash
+        }
+        if instance.executed:
+            payload['type'] = 'EXECUTED_MULTISIG_TRANSACTION'
+            payload['txHash'] = instance.ethereum_tx_id
+        else:
+            payload['type'] = 'PENDING_MULTISIG_TRANSACTION'
+
+    requests.post(webhook.url, json=payload)
