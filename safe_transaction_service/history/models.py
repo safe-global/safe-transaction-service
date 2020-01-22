@@ -779,6 +779,13 @@ class SafeStatus(models.Model):
         return self.save()
 
 
+class WebHookType(Enum):
+    NEW_CONFIRMATION = 0
+    PENDING_MULTISIG_TRANSACTION = 1
+    EXECUTED_MULTISIG_TRANSACTION = 2
+    INCOMING_TRANSACTION = 3
+
+
 class WebHook(models.Model):
     address = EthereumAddressField(db_index=True)
     url = models.URLField()

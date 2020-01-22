@@ -6,7 +6,8 @@ from django.dispatch import receiver
 
 from hexbytes import HexBytes
 
-from .models import MultisigConfirmation, MultisigTransaction, SafeContract
+from .models import (MultisigConfirmation, MultisigTransaction, SafeContract,
+                     WebHookType)
 from .tasks import send_webhook_task
 
 
@@ -72,20 +73,21 @@ def send_webhook(sender: Type[Model],
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
         address = instance.multisig_transaction.safe
         payload = {
-            'type': 'NEW_CONFIRMATION',
+            'type': WebHookType.NEW_CONFIRMATION.name,
             'owner': instance.owner,
             'safeTxHash': HexBytes(instance.multisig_transaction.safe_tx_hash).hex()
         }
     elif sender == MultisigTransaction:
         address = instance.safe
         payload = {
+            'type': None,
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
         if instance.executed:
-            payload['type'] = 'EXECUTED_MULTISIG_TRANSACTION'
+            payload['type'] = WebHookType.EXECUTED_MULTISIG_TRANSACTION.name
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
-            payload['type'] = 'PENDING_MULTISIG_TRANSACTION'
+            payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
     # else:
         # INCOMING_ETHER or INCOMING_TOKEN
 

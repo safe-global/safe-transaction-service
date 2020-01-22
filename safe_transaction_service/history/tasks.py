@@ -177,7 +177,7 @@ def check_reorgs_task() -> Optional[int]:
 
 @app.shared_task()
 def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
-    if not address:
+    if not (address and payload):
         return False
 
     try:
@@ -185,4 +185,5 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
     except WebHook.DoesNotExist:
         return False
 
+    logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
     requests.post(webhook.url, json=payload)
