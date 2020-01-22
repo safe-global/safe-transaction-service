@@ -1,8 +1,10 @@
-from typing import Type, Union
+from typing import Any, Dict, Optional, Type, Union
 
 from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
+from hexbytes import HexBytes
 
 from .models import MultisigConfirmation, MultisigTransaction, SafeContract
 from .tasks import send_webhook_task
@@ -63,4 +65,29 @@ def fix_erc20_block_number(sender: Type[Model], instance: SafeContract, created:
 def send_webhook(sender: Type[Model],
                  instance: Union[MultisigConfirmation, MultisigTransaction],
                  created: bool, **kwargs) -> None:
-    send_webhook_task.delay(sender, instance)
+
+    address: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+
+    if sender == MultisigConfirmation and instance.multisig_transaction_id:
+        address = instance.multisig_transaction.safe
+        payload = {
+            'type': 'NEW_CONFIRMATION',
+            'owner': instance.owner,
+            'safeTxHash': HexBytes(instance.multisig_transaction.safe_tx_hash).hex()
+        }
+    elif sender == MultisigTransaction:
+        address = instance.safe
+        payload = {
+            'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
+        }
+        if instance.executed:
+            payload['type'] = 'EXECUTED_MULTISIG_TRANSACTION'
+            payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
+        else:
+            payload['type'] = 'PENDING_MULTISIG_TRANSACTION'
+    # else:
+        # INCOMING_ETHER or INCOMING_TOKEN
+
+    if address and payload:
+        send_webhook_task.delay(address, payload)

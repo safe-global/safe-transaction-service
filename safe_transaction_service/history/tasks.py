@@ -176,14 +176,7 @@ def check_reorgs_task() -> Optional[int]:
 
 
 @app.shared_task()
-def send_webhook_task(sender: Type[Model], instance: Union[MultisigConfirmation, MultisigTransaction]) -> bool:
-    address: Optional[str] = None
-
-    if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        address = instance.multisig_transaction.safe
-    elif sender == MultisigTransaction:
-        address = instance.safe
-
+def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
     if not address:
         return False
 
@@ -191,22 +184,5 @@ def send_webhook_task(sender: Type[Model], instance: Union[MultisigConfirmation,
         webhook = WebHook.objects.get(address=address)
     except WebHook.DoesNotExist:
         return False
-
-    payload: Optional[Dict[str, Any]] = None
-    if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        payload = {
-            'type': 'NEW_CONFIRMATION',
-            'owner': instance.owner,
-            'safeTxHash': instance.multisig_transaction.safe_tx_hash
-        }
-    elif sender == MultisigTransaction:
-        payload = {
-            'safeTxHash': instance.multisig_transaction.safe_tx_hash
-        }
-        if instance.executed:
-            payload['type'] = 'EXECUTED_MULTISIG_TRANSACTION'
-            payload['txHash'] = instance.ethereum_tx_id
-        else:
-            payload['type'] = 'PENDING_MULTISIG_TRANSACTION'
 
     requests.post(webhook.url, json=payload)
