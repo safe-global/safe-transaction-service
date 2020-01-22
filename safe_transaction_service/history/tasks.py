@@ -18,7 +18,7 @@ from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
 from .models import (InternalTxDecoded, MultisigConfirmation,
-                     MultisigTransaction, WebHook)
+                     MultisigTransaction, WebHook, WebHookType)
 from .services import ReorgService, ReorgServiceProvider
 
 logger = get_task_logger(__name__)
@@ -183,6 +183,16 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
     try:
         webhook = WebHook.objects.get(address=address)
     except WebHook.DoesNotExist:
+        return False
+
+    webhook_type = WebHookType[payload['type']]
+    if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
+        return False
+    elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
+        return False
+    elif webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not webhook.new_executed_outgoing_transaction:
+        return False
+    elif webhook_type == WebHookType.INCOMING_TRANSACTION and not webhook.new_incoming_transaction:
         return False
 
     logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
