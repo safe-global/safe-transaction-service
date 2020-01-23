@@ -97,7 +97,8 @@ def send_webhook(sender: Type[Model],
         payload = {
             'address': address,
             'type': WebHookType.INCOMING_ETHER.name,
-            'txHash': HexBytes(instance.ethereum_tx_id).hex()
+            'txHash': HexBytes(instance.ethereum_tx_id).hex(),
+            'value': instance.value,
         }
     elif sender == EthereumEvent:  # INCOMING_TOKEN
         if 'to' in instance.arguments:
