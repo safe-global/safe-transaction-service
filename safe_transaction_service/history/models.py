@@ -8,6 +8,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models import Case, Q, Sum
 from django.db.models.expressions import F, RawSQL, Value, When
+from django.db.models.signals import post_save
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -269,6 +270,12 @@ class EthereumEventQuerySet(models.QuerySet):
 
 
 class EthereumEventManager(models.Manager):
+    def bulk_create(self, objs, **kwargs):
+        result = super().bulk_create(objs, **kwargs)
+        for obj in objs:
+            post_save.send(obj.__class__, instance=obj, created=True)
+        return result
+
     def from_decoded_event(self, decoded_event: Dict[str, Any]) -> 'EthereumEvent':
         """
         Does not create the model. Requires that `ethereum_tx` exists
@@ -340,6 +347,12 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(models.Manager):
+    def bulk_create(self, objs, **kwargs):
+        result = super().bulk_create(objs, **kwargs)
+        for obj in objs:
+            post_save.send(obj.__class__, instance=obj, created=True)
+        return result
+
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
