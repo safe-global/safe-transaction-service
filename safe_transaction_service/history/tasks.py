@@ -200,3 +200,4 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
 
     logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
     requests.post(webhook.url, json=payload)
+    return True
