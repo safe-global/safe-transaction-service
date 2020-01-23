@@ -6,8 +6,8 @@ from django.dispatch import receiver
 
 from hexbytes import HexBytes
 
-from .models import (MultisigConfirmation, MultisigTransaction, SafeContract,
-                     WebHookType)
+from .models import (EthereumEvent, InternalTx, MultisigConfirmation,
+                     MultisigTransaction, SafeContract, WebHookType)
 from .tasks import send_webhook_task
 
 
@@ -63,6 +63,8 @@ def fix_erc20_block_number(sender: Type[Model], instance: SafeContract, created:
 
 @receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.send_webhook')
 @receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.send_webhook')
+@receiver(post_save, sender=EthereumEvent, dispatch_uid='multisig_transaction.ethereum_event')
+@receiver(post_save, sender=InternalTx, dispatch_uid='multisig_transaction.internal_tx')
 def send_webhook(sender: Type[Model],
                  instance: Union[MultisigConfirmation, MultisigTransaction],
                  created: bool, **kwargs) -> None:
@@ -71,8 +73,9 @@ def send_webhook(sender: Type[Model],
     payload: Optional[Dict[str, Any]] = None
 
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        address = instance.multisig_transaction.safe
+        address = instance.multisig_transaction.safe  # This is making a db call
         payload = {
+            'address': address,
             'type': WebHookType.NEW_CONFIRMATION.name,
             'owner': instance.owner,
             'safeTxHash': HexBytes(instance.multisig_transaction.safe_tx_hash).hex()
@@ -80,6 +83,7 @@ def send_webhook(sender: Type[Model],
     elif sender == MultisigTransaction:
         address = instance.safe
         payload = {
+            'address': address,
             'type': None,
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
@@ -88,8 +92,25 @@ def send_webhook(sender: Type[Model],
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
-    # else:
-        # INCOMING_ETHER or INCOMING_TOKEN
+    elif sender == InternalTx and instance.is_ether_transfer:  # INCOMING_ETHER
+        address = instance.to
+        payload = {
+            'address': address,
+            'type': WebHookType.INCOMING_ETHER.name,
+            'txHash': HexBytes(instance.ethereum_tx_id).hex()
+        }
+    elif sender == EthereumEvent:  # INCOMING_TOKEN
+        if 'to' in instance.arguments:
+            address = instance.arguments['to']
+            payload = {
+                'address': address,
+                'type': WebHookType.INCOMING_TOKEN.name,
+                'tokenAddress': instance.address,
+                'txHash': HexBytes(instance.ethereum_tx_id).hex(),
+            }
+            for element in ('tokenId', 'value'):
+                if element in instance.arguments:
+                    payload[element] = instance.arguments[element]
 
     if address and payload:
         send_webhook_task.delay(address, payload)

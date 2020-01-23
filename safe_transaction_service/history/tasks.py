@@ -192,7 +192,8 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
         return False
     elif webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not webhook.new_executed_outgoing_transaction:
         return False
-    elif webhook_type == WebHookType.INCOMING_TRANSACTION and not webhook.new_incoming_transaction:
+    elif webhook_type in (WebHookType.INCOMING_TOKEN,
+                          WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
         return False
 
     logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)

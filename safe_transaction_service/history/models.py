@@ -488,6 +488,10 @@ class InternalTx(models.Model):
         else:
             return EthereumTxCallType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
 
+    @property
+    def is_ether_transfer(self) -> bool:
+        return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
+
     def get_next_trace(self) -> Optional['InternalTx']:
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
         traces = [it.trace_address for it in internal_txs]
@@ -783,7 +787,8 @@ class WebHookType(Enum):
     NEW_CONFIRMATION = 0
     PENDING_MULTISIG_TRANSACTION = 1
     EXECUTED_MULTISIG_TRANSACTION = 2
-    INCOMING_TRANSACTION = 3
+    INCOMING_ETHER = 3
+    INCOMING_TOKEN = 4
 
 
 class WebHook(models.Model):
