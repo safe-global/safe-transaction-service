@@ -185,7 +185,6 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
     except WebHook.DoesNotExist:
         return False
 
-    """
     webhook_type = WebHookType[payload['type']]
     if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
         return False
@@ -196,7 +195,6 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
     elif webhook_type in (WebHookType.INCOMING_TOKEN,
                           WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
         return False
-    """
 
     logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
     requests.post(webhook.url, json=payload)
