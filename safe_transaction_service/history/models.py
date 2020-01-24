@@ -69,6 +69,14 @@ class TransactionWithoutBlockException(Exception):
     pass
 
 
+class BulkCreateSignalMixin:
+    def bulk_create(self, objs, **kwargs):
+        result = super().bulk_create(objs, **kwargs)
+        for obj in objs:
+            post_save.send(obj.__class__, instance=obj, created=True)
+        return result
+
+
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block_number(self, block_number: int):
         try:
@@ -269,13 +277,7 @@ class EthereumEventQuerySet(models.QuerySet):
                                          address=address).filter(arguments__has_key='tokenId')
 
 
-class EthereumEventManager(models.Manager):
-    def bulk_create(self, objs, **kwargs):
-        result = super().bulk_create(objs, **kwargs)
-        for obj in objs:
-            post_save.send(obj.__class__, instance=obj, created=True)
-        return result
-
+class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
     def from_decoded_event(self, decoded_event: Dict[str, Any]) -> 'EthereumEvent':
         """
         Does not create the model. Requires that `ethereum_tx` exists
@@ -346,13 +348,7 @@ class EthereumEvent(models.Model):
         return self.topic == ERC20_721_TRANSFER_TOPIC and 'tokenId' in self.arguments
 
 
-class InternalTxManager(models.Manager):
-    def bulk_create(self, objs, **kwargs):
-        result = super().bulk_create(objs, **kwargs)
-        for obj in objs:
-            post_save.send(obj.__class__, instance=obj, created=True)
-        return result
-
+class InternalTxManager(BulkCreateSignalMixin, models.Manager):
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
