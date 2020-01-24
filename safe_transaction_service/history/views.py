@@ -13,8 +13,9 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
-from .models import InternalTx, MultisigTransaction, SafeContract
+from .models import InternalTx, MultisigTransaction, SafeContract, SafeStatus
 from .serializers import (IncomingTransactionResponseSerializer,
+                          OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
@@ -194,10 +195,14 @@ class SafeIncomingTxListView(ListAPIView):
     filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
 
+    def filter_queryset(self, queryset):
+        # Disable filter queryset, it will try to filter the Union and will fail
+        return queryset
+
     def get_queryset(self):
         address = self.kwargs['address']
-        tokens_queryset = self.filter_queryset(InternalTx.objects.incoming_tokens(address))
-        ether_queryset = self.filter_queryset(InternalTx.objects.incoming_txs(address))
+        tokens_queryset = super().filter_queryset(InternalTx.objects.incoming_tokens(address))
+        ether_queryset = super().filter_queryset(InternalTx.objects.incoming_txs(address))
         return InternalTx.objects.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
 
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
@@ -215,3 +220,25 @@ class SafeIncomingTxListView(ListAPIView):
             response.status_code = status.HTTP_404_NOT_FOUND
 
         return response
+
+
+class OwnersView(APIView):
+    serializer_class = OwnerResponseSerializer
+
+    @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
+                                    404: 'Safes not found for that owner',
+                                    422: 'Owner address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
+        if not safes_for_owner:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(data={'safes': safes_for_owner})
+        serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)

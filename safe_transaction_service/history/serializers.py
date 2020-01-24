@@ -138,41 +138,26 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
         return obj.ethereum_tx_id
 
 
-class SafeMultisigCharAdapter(SafeMultisigTxSerializerV1):
-    gas_price = serializers.CharField()
-    value = serializers.CharField()
-
-
-class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
-    safe_tx_hash = Sha3HashField()
+class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
+    execution_date = serializers.DateTimeField()
+    submission_date = serializers.DateTimeField(source='created')  # First seen by this service
     block_number = serializers.SerializerMethodField()
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
-    submission_date = serializers.DateTimeField(source='created')  # First seen by this service
+    safe_tx_hash = Sha3HashField()
+    executor = serializers.SerializerMethodField()
+    value = serializers.CharField()
     is_executed = serializers.BooleanField(source='executed')
     is_successful = serializers.SerializerMethodField()
-    execution_date = serializers.DateTimeField()
-    executor = serializers.SerializerMethodField()
+    safe_gas_price = serializers.CharField(source='gas_price')
+    gas_price = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
+    fee = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
     signatures = HexadecimalField()
 
     def get_block_number(self, obj: MultisigTransaction) -> Optional[int]:
         if obj.ethereum_tx_id:
             return obj.ethereum_tx.block_id
-
-    def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
-        if obj.ethereum_tx_id:
-            return obj.ethereum_tx._from
-
-    def get_is_successful(self, obj: MultisigTransaction) -> Optional[bool]:
-        if obj.failed is None:
-            return None
-        else:
-            return not obj.failed
-
-    def get_gas_used(self, obj: MultisigTransaction) -> Optional[str]:
-        if obj.ethereum_tx and obj.ethereum_tx.gas_used:
-            return obj.ethereum_tx.gas_used
 
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
@@ -186,6 +171,29 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigCharAdapter):
             confirmations = obj.confirmations
 
         return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data
+
+    def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
+        if obj.ethereum_tx_id:
+            return obj.ethereum_tx._from
+
+    def get_fee(self, obj: MultisigTransaction) -> Optional[int]:
+        if obj.ethereum_tx:
+            if obj.ethereum_tx.gas_used and obj.ethereum_tx.gas_price:
+                return str(obj.ethereum_tx.gas_used * obj.ethereum_tx.gas_price)
+
+    def get_gas_price(self, obj: MultisigTransaction) -> Optional[str]:
+        if obj.ethereum_tx and obj.ethereum_tx.gas_price:
+            return str(obj.ethereum_tx.gas_price)
+
+    def get_gas_used(self, obj: MultisigTransaction) -> Optional[int]:
+        if obj.ethereum_tx and obj.ethereum_tx.gas_used:
+            return obj.ethereum_tx.gas_used
+
+    def get_is_successful(self, obj: MultisigTransaction) -> Optional[bool]:
+        if obj.failed is None:
+            return None
+        else:
+            return not obj.failed
 
 
 class Erc20InfoSerializer(serializers.Serializer):
@@ -202,6 +210,10 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
+
+
+class OwnerResponseSerializer(SafeBalanceResponseSerializer):
+    safes = serializers.ListField(child=EthereumAddressField())
 
 
 class IncomingTransactionResponseSerializer(serializers.Serializer):

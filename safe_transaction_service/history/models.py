@@ -9,7 +9,6 @@ from django.db import models
 from django.db.models import Case, Q, Sum
 from django.db.models.expressions import F, RawSQL, Value, When
 from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -68,6 +67,14 @@ class TransactionNotFoundException(Exception):
 
 class TransactionWithoutBlockException(Exception):
     pass
+
+
+class BulkCreateSignalMixin:
+    def bulk_create(self, objs, **kwargs):
+        result = super().bulk_create(objs, **kwargs)
+        for obj in objs:
+            post_save.send(obj.__class__, instance=obj, created=True)
+        return result
 
 
 class EthereumBlockManager(models.Manager):
@@ -146,23 +153,24 @@ class EthereumTxManager(models.Manager):
         tx_receipts = []
         for tx_hash, tx_receipt in zip(tx_hashes_not_in_db,
                                        ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)):
+            tx_receipt = tx_receipt or ethereum_client.get_transaction_receipt(tx_hash)  # Retry fetching if failed
             if not tx_receipt:
-                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)  # Retry fetching
-
-            if not tx_receipt:
-                raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionNotFoundException(f'Cannot find tx-receipt with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx_receipt.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx-receipt with '
+                                                       f'tx-hash={HexBytes(tx_hash).hex()}')
             else:
                 tx_receipts.append(tx_receipt)
 
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = []
         for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
+            tx = tx or ethereum_client.get_transaction(tx_hash)  # Retry fetching if failed
             if not tx:
                 raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
             elif tx.get('blockNumber') is None:
-                raise TransactionWithoutBlockException(f'Cannot find block for tx with tx-hash={HexBytes(tx_hash).hex()}')
+                raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx with '
+                                                       f'tx-hash={HexBytes(tx_hash).hex()}')
             block_numbers.append(tx['blockNumber'])
 
         blocks = ethereum_client.get_blocks(block_numbers)
@@ -269,7 +277,7 @@ class EthereumEventQuerySet(models.QuerySet):
                                          address=address).filter(arguments__has_key='tokenId')
 
 
-class EthereumEventManager(models.Manager):
+class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
     def from_decoded_event(self, decoded_event: Dict[str, Any]) -> 'EthereumEvent':
         """
         Does not create the model. Requires that `ethereum_tx` exists
@@ -340,7 +348,7 @@ class EthereumEvent(models.Model):
         return self.topic == ERC20_721_TRANSFER_TOPIC and 'tokenId' in self.arguments
 
 
-class InternalTxManager(models.Manager):
+class InternalTxManager(BulkCreateSignalMixin, models.Manager):
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
@@ -488,6 +496,10 @@ class InternalTx(models.Model):
             return False
         else:
             return EthereumTxCallType(self.call_type) == EthereumTxCallType.DELEGATE_CALL
+
+    @property
+    def is_ether_transfer(self) -> bool:
+        return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
 
     def get_next_trace(self) -> Optional['InternalTx']:
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
@@ -646,36 +658,6 @@ class MultisigConfirmation(TimeStampedModel):
             return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
 
 
-@receiver(post_save, sender=MultisigConfirmation)
-@receiver(post_save, sender=MultisigTransaction)
-def bind_confirmation(sender: Type[models.Model], instance: Union[MultisigConfirmation, MultisigTransaction],
-                      created: bool, **kwargs) -> None:
-    """
-    When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
-    :param sender: Could be MultisigConfirmation or MultisigTransaction
-    :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
-    :param created: True if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    if not created:
-        return
-    if sender == MultisigTransaction:
-        for multisig_confirmation in MultisigConfirmation.objects.without_transaction().filter(
-                multisig_transaction_hash=instance.safe_tx_hash):
-            multisig_confirmation.multisig_transaction = instance
-            multisig_confirmation.save(update_fields=['multisig_transaction'])
-    elif sender == MultisigConfirmation:
-        if not instance.multisig_transaction_id:
-            try:
-                if instance.multisig_transaction_hash:
-                    instance.multisig_transaction = MultisigTransaction.objects.get(
-                        safe_tx_hash=instance.multisig_transaction_hash)
-                    instance.save(update_fields=['multisig_transaction'])
-            except MultisigTransaction.DoesNotExist:
-                pass
-
-
 class MonitoredAddressManager(models.Manager):
     def update_addresses(self, addresses: List[str], from_block_number: int, block_number: int,
                          database_field: str) -> int:
@@ -707,14 +689,14 @@ class MonitoredAddressQuerySet(models.QuerySet):
 
 
 class MonitoredAddress(models.Model):
-    class Meta:
-        abstract = True
-        verbose_name_plural = "Monitored addresses"
-
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
+
+    class Meta:
+        abstract = True
+        verbose_name_plural = "Monitored addresses"
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
@@ -731,26 +713,6 @@ class SafeMasterCopy(MonitoredAddress):
     class Meta:
         verbose_name_plural = "Safe master copies"
         ordering = ['tx_block_number']
-
-
-class SafeStatusManager(models.Manager):
-    pass
-
-
-class SafeStatusQuerySet(models.QuerySet):
-    def last_for_address(self, address: str):
-        safe_status = self.filter(
-            address=address
-        ).select_related(
-            'internal_tx__ethereum_tx'
-        ).order_by(
-            'internal_tx__ethereum_tx__block_id',
-            'internal_tx__ethereum_tx__transaction_index',
-            'internal_tx_id',
-        ).last()
-        if not safe_status:
-            logger.error('SafeStatus not found for address=%s', address)
-        return safe_status
 
 
 class SafeContractManager(MonitoredAddressManager):
@@ -772,30 +734,43 @@ class SafeContract(models.Model):
             return self.ethereum_tx.block_id
 
 
-@receiver(post_save, sender=SafeContract)
-def safe_contract_receiver(sender: Type[models.Model], instance: SafeContract, created: bool, **kwargs) -> None:
-    """
-    When a `SafeContract` is saved, sets the `erc20_block_number` if not set
-    :param sender: SafeContract
-    :param instance: Instance of SafeContract
-    :param created: True if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    if not created:
-        return
-    if sender == SafeContract:
-        if instance.erc20_block_number == 0:
-            if instance.ethereum_tx and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
-                instance.erc20_block_number = instance.ethereum_tx.block_id
-                instance.save()
+class SafeStatusManager(models.Manager):
+    pass
+
+
+class SafeStatusQuerySet(models.QuerySet):
+    def addresses_for_owner(self, owner_address: str) -> List[str]:
+        return self.filter(
+            owners__contains=[owner_address],
+            internal_tx__in=self.last_for_every_address().values('pk')
+        ).values_list('address', flat=True)
+
+    def last_for_every_address(self) -> List['SafeStatus']:
+        return self.distinct(
+            'address'  # Uses PostgreSQL `DISTINCT ON`
+        ).select_related(
+            'internal_tx__ethereum_tx'
+        ).order_by(
+            'address',
+            '-internal_tx__ethereum_tx__block_id',
+            '-internal_tx__ethereum_tx__transaction_index',
+            '-internal_tx_id',
+        )
+
+    def last_for_address(self, address: str) -> Optional['SafeStatus']:
+        safe_status = self.last_for_every_address().filter(
+            address=address
+        ).first()
+        if not safe_status:
+            logger.error('SafeStatus not found for address=%s', address)
+        return safe_status
 
 
 class SafeStatus(models.Model):
     objects = SafeStatusManager.from_queryset(SafeStatusQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
                                        primary_key=True)
-    address = EthereumAddressField()
+    address = EthereumAddressField(db_index=True)
     owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
@@ -805,13 +780,37 @@ class SafeStatus(models.Model):
         unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe statuses'
 
+    def __str__(self):
+        return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
+
     @property
     def block_number(self):
         return self.internal_tx.ethereum_tx.block_id
 
-    def __str__(self):
-        return f'safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}'
-
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx
         return self.save()
+
+
+class WebHookType(Enum):
+    NEW_CONFIRMATION = 0
+    PENDING_MULTISIG_TRANSACTION = 1
+    EXECUTED_MULTISIG_TRANSACTION = 2
+    INCOMING_ETHER = 3
+    INCOMING_TOKEN = 4
+
+
+class WebHook(models.Model):
+    address = EthereumAddressField(db_index=True)
+    url = models.URLField()
+    # Configurable webhook types to listen to
+    new_confirmation = models.BooleanField(default=True)
+    pending_outgoing_transaction = models.BooleanField(default=True)
+    new_executed_outgoing_transaction = models.BooleanField(default=True)
+    new_incoming_transaction = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = (('address', 'url'),)
+
+    def __str__(self):
+        return f'Webhook for safe={self.address} to url={self.url}'
