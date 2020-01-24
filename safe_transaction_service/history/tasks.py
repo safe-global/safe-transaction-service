@@ -1,8 +1,10 @@
 import signal
-from typing import NoReturn, Optional
+from typing import Any, Dict, NoReturn, Optional, Type, Union
 
 from django.conf import settings
+from django.db.models import Model
 
+import requests
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
@@ -15,7 +17,8 @@ from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import InternalTxDecoded
+from .models import (InternalTxDecoded, MultisigConfirmation,
+                     MultisigTransaction, WebHook, WebHookType)
 from .services import ReorgService, ReorgServiceProvider
 
 logger = get_task_logger(__name__)
@@ -170,3 +173,29 @@ def check_reorgs_task() -> Optional[int]:
                 return first_reorg_block_number
     except LockError:
         pass
+
+
+@app.shared_task()
+def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
+    if not (address and payload):
+        return False
+
+    try:
+        webhook = WebHook.objects.get(address=address)
+    except WebHook.DoesNotExist:
+        return False
+
+    webhook_type = WebHookType[payload['type']]
+    if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
+        return False
+    elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
+        return False
+    elif webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not webhook.new_executed_outgoing_transaction:
+        return False
+    elif webhook_type in (WebHookType.INCOMING_TOKEN,
+                          WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
+        return False
+
+    logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
+    requests.post(webhook.url, json=payload)
+    return True

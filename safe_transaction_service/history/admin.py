@@ -7,7 +7,7 @@ from gnosis.eth import EthereumClientProvider
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MultisigConfirmation,
                      MultisigTransaction, ProxyFactory, SafeContract,
-                     SafeMasterCopy, SafeStatus)
+                     SafeMasterCopy, SafeStatus, WebHook)
 
 
 @admin.register(EthereumBlock)
@@ -200,3 +200,13 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     search_fields = ['address', 'owners']
+
+
+@admin.register(WebHook)
+class WebHookAdmin(admin.ModelAdmin):
+    list_display = ('address', 'url', 'pending_outgoing_transaction', 'new_confirmation',
+                    'new_executed_outgoing_transaction', 'new_incoming_transaction')
+    list_filter = ('pending_outgoing_transaction', 'new_confirmation', 'new_executed_outgoing_transaction',
+                   'new_incoming_transaction')
+    ordering = ['-pk']
+    search_fields = ['address', 'url']

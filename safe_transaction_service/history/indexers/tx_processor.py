@@ -103,6 +103,19 @@ class SafeTxProcessor(TxProcessor):
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             safe_status.master_copy = arguments['_masterCopy']
             safe_status.store_new(internal_tx)
+        elif function_name == 'approveHash':
+            multisig_transaction_hash = arguments['hashToApprove']
+            ethereum_tx = internal_tx.ethereum_tx
+            owner = internal_tx.get_previous_trace()._from
+            (multisig_confirmation,
+             created) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
+                                                                   owner=owner,
+                                                                   defaults={
+                                                                       'ethereum_tx': ethereum_tx,
+                                                                   })
+            if not created and not multisig_confirmation.ethereum_tx_id:
+                multisig_confirmation.ethereum_tx = ethereum_tx
+                multisig_confirmation.save()
         elif function_name == 'execTransaction':
             safe_status = SafeStatus.objects.last_for_address(contract_address)
             nonce = safe_status.nonce
@@ -156,7 +169,7 @@ class SafeTxProcessor(TxProcessor):
                     'signatures': safe_tx.signatures,
                     'failed': failed,
                 })
-            if not created and not multisig_tx.ethereum_tx:
+            if not created and not multisig_tx.ethereum_tx_id:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.failed = failed
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
@@ -178,20 +191,6 @@ class SafeTxProcessor(TxProcessor):
 
             safe_status.nonce = nonce + 1
             safe_status.store_new(internal_tx)
-        elif function_name == 'approveHash':
-            multisig_transaction_hash = arguments['hashToApprove']
-            ethereum_tx = internal_tx.ethereum_tx
-            owner = internal_tx.get_previous_trace()._from
-            (multisig_confirmation,
-             created) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
-                                                                   owner=owner,
-                                                                   defaults={
-                                                                       'ethereum_tx': ethereum_tx,
-                                                                   })
-            if not created and not multisig_confirmation.ethereum_tx_id:
-                multisig_confirmation.ethereum_tx = ethereum_tx
-                multisig_confirmation.save()
-
         elif function_name == 'execTransactionFromModule':
             # No side effects or nonce increasing, but trace will be set as processed
             pass
