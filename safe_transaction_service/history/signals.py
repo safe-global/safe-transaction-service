@@ -98,7 +98,7 @@ def send_webhook(sender: Type[Model],
             'address': address,
             'type': WebHookType.INCOMING_ETHER.name,
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
-            'value': instance.value,
+            'value': str(instance.value),
         }
     elif sender == EthereumEvent and 'to' in instance.arguments:  # INCOMING_TOKEN
         address = instance.arguments['to']
@@ -110,7 +110,7 @@ def send_webhook(sender: Type[Model],
         }
         for element in ('tokenId', 'value'):
             if element in instance.arguments:
-                payload[element] = instance.arguments[element]
+                payload[element] = str(instance.arguments[element])
 
     if address and payload:
         send_webhook_task.delay(address, payload)
