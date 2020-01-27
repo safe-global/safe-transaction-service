@@ -4,9 +4,9 @@ from typing import Union
 
 from django.db import transaction
 
+from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from web3 import Web3
-from web3._utils.events import EventLogErrorFlags
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
@@ -14,7 +14,7 @@ from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature
 
-from ..models import (InternalTxDecoded, MultisigConfirmation,
+from ..models import (EthereumTx, InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContract, SafeStatus)
 
 logger = getLogger(__name__)
@@ -34,17 +34,18 @@ class SafeTxProcessor(TxProcessor):
     def __init__(self, ethereum_client: EthereumClient):
         self.safe_tx_failure_events = [get_safe_V1_0_0_contract(Web3()).events.ExecutionFailed(),
                                        get_safe_contract(Web3()).events.ExecutionFailure()]
+        self.safe_tx_failure_events_topics = {event_abi_to_log_topic(event.abi) for event
+                                              in self.safe_tx_failure_events}
         self.ethereum_client = ethereum_client
 
-    def is_failed(self, tx_hash: Union[str, bytes], safe_tx_hash: Union[str, bytes]) -> bool:
-        # TODO Store logs when storing the receipt
-        # TODO Move this function to `Safe` in gnosis-py
-        safe_tx_hash = HexBytes(safe_tx_hash)
-        tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-        for safe_tx_failure_event in self.safe_tx_failure_events:
-            for decoded_event in safe_tx_failure_event.processReceipt(tx_receipt, errors=EventLogErrorFlags.Discard):
-                if decoded_event['args']['txHash'] == safe_tx_hash:
-                    return True
+    def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:
+        # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
+        safe_tx_hash = HexBytes(safe_tx_hash).hex()
+        for log in ethereum_tx.logs:
+            if (log['topics'] and log['data'] and
+                    HexBytes(log['topics'][0]) in self.safe_tx_failure_events_topics and
+                    log['data'] == safe_tx_hash):
+                return True
         return False
 
     @transaction.atomic
@@ -150,7 +151,7 @@ class SafeTxProcessor(TxProcessor):
             #    safe=contract_address
             #).delete()
 
-            failed = self.is_failed(ethereum_tx.tx_hash, safe_tx_hash)
+            failed = self.is_failed(ethereum_tx, safe_tx_hash)
             multisig_tx, created = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={

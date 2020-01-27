@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
-from django.db.models import Case, Q, Sum
+from django.db.models import Case, Q, QuerySet, Sum
 from django.db.models.expressions import F, RawSQL, Value, When
 from django.db.models.signals import post_save
 
@@ -18,6 +18,8 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
+
+from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
 
@@ -136,6 +138,17 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
+    def __update_with_receipt_and_block(self, ethereum_tx: 'EthereumTx', ethereum_block: 'EthereumBlock',
+                                        tx_receipt: Dict[str, Any]):
+        if ethereum_tx.block is None:
+            ethereum_tx.block = ethereum_block
+            ethereum_tx.gas_used = tx_receipt['gasUsed']
+            ethereum_tx.logs = [clean_receipt_log(log) for log in tx_receipt['logs']]
+            ethereum_tx.status = tx_receipt.get('status')
+            ethereum_tx.transaction_index = tx_receipt['transactionIndex']
+            ethereum_tx.save(update_fields=['block', 'gas_used', 'logs', 'status', 'transaction_index'])
+        return ethereum_tx
+
     def create_or_update_from_tx_hashes(self, tx_hashes: List[Union[str, bytes]]) -> List['EthereumTx']:
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys([HexBytes(tx_hash).hex() for tx_hash in tx_hashes])
@@ -182,12 +195,7 @@ class EthereumTxManager(models.Manager):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
                 # For txs stored before being mined
-                if ethereum_tx.block is None:
-                    ethereum_tx.block = ethereum_block
-                    ethereum_tx.gas_used = tx_receipt['gasUsed']
-                    ethereum_tx.status = tx_receipt.get('status')
-                    ethereum_tx.transaction_index = tx_receipt['transactionIndex']
-                    ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
+                ethereum_tx = self.__update_with_receipt_and_block(ethereum_tx, ethereum_block, tx_receipt)
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_tx = self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
@@ -201,11 +209,8 @@ class EthereumTxManager(models.Manager):
             # For txs stored before being mined
             if ethereum_tx.block is None:
                 tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
-                ethereum_tx.block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
-                ethereum_tx.gas_used = tx_receipt['gasUsed']
-                ethereum_tx.status = tx_receipt.get('status')
-                ethereum_tx.transaction_index = tx_receipt['transactionIndex']
-                ethereum_tx.save(update_fields=['block', 'gas_used', 'status', 'transaction_index'])
+                ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
+                ethereum_tx = self.__update_with_receipt_and_block(ethereum_tx, ethereum_block, tx_receipt)
             return ethereum_tx
         except self.model.DoesNotExist:
             tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
@@ -222,6 +227,7 @@ class EthereumTxManager(models.Manager):
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
             gas_used=tx_receipt and tx_receipt['gasUsed'],
+            logs=tx_receipt and tx_receipt['logs'],
             status=tx_receipt and tx_receipt.get('status'),
             transaction_index=tx_receipt and tx_receipt['transactionIndex'],
             data=HexBytes(tx.get('data') or tx.get('input')),
@@ -238,6 +244,7 @@ class EthereumTx(TimeStampedModel):
     tx_hash = Sha3HashField(unique=True, primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
     status = models.IntegerField(null=True, default=None)  # If mined. Old txs don't have `status`
+    logs = ArrayField(JSONField(), null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
     _from = EthereumAddressField(null=True, db_index=True)
     gas = Uint256Field()
@@ -745,7 +752,7 @@ class SafeStatusQuerySet(models.QuerySet):
             internal_tx__in=self.last_for_every_address().values('pk')
         ).values_list('address', flat=True)
 
-    def last_for_every_address(self) -> List['SafeStatus']:
+    def last_for_every_address(self) -> QuerySet:
         return self.distinct(
             'address'  # Uses PostgreSQL `DISTINCT ON`
         ).select_related(
