@@ -227,7 +227,7 @@ class EthereumTxManager(models.Manager):
             gas=tx['gas'],
             gas_price=tx['gasPrice'],
             gas_used=tx_receipt and tx_receipt['gasUsed'],
-            logs=tx_receipt and tx_receipt['logs'],
+            logs=tx_receipt and [clean_receipt_log(log) for log in tx_receipt.get('logs', list())],
             status=tx_receipt and tx_receipt.get('status'),
             transaction_index=tx_receipt and tx_receipt['transactionIndex'],
             data=HexBytes(tx.get('data') or tx.get('input')),
