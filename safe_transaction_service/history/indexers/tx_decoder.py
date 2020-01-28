@@ -24,6 +24,12 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+def get_tx_decoder() -> 'TxDecoder':
+    if not hasattr(get_tx_decoder, 'instance'):
+        get_tx_decoder.instance = TxDecoder()
+    return get_tx_decoder.instance
+
+
 class TxDecoder:
     """
     Decode txs for supported contracts
@@ -36,11 +42,26 @@ class TxDecoder:
         # Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
         self.supported_fn_selectors: Dict[bytes, None] = {}
         for supported_contract in self.supported_contracts:
-            for selector in self.generate_selectors_from_contract(supported_contract):
+            for selector in self._generate_selectors_from_contract(supported_contract):
                 self.supported_fn_selectors[selector] = None
 
-    def generate_selectors_from_contract(self, contract: Contract) -> List[bytes]:
+    def _generate_selectors_from_contract(self, contract: Contract) -> List[bytes]:
         return [function_abi_to_4byte_selector(contract_fn.abi) for contract_fn in contract.all_functions()]
+
+    def _parse_decoded_arguments(self, decoded: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse decoded arguments, like converting `bytes` to hexadecimal `str`
+        :param decoded:
+        :return: Dict[str, Any]
+        """
+        parsed = {}
+        for k, v in decoded.items():
+            if isinstance(v, bytes):
+                value = HexBytes(v).hex()
+            else:
+                value = v
+            parsed[k] = value
+        return parsed
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """
@@ -59,23 +80,8 @@ class TxDecoder:
             try:
                 contract_function, arguments = contract.decode_function_input(data)
                 function_name = contract_function.fn_name
-                return function_name, self.__parse_decoded_arguments(arguments)
+                return function_name, self._parse_decoded_arguments(arguments)
             except ValueError as exc:  # ValueError: Could not find any function with matching selector
                 if not exc.args or exc.args[0] != 'Could not find any function with matching selector':
                     raise UnexpectedProblemDecoding from exc
         raise CannotDecode(data.hex())
-
-    def __parse_decoded_arguments(self, decoded: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Parse decoded arguments, like converting `bytes` to hexadecimal `str`
-        :param decoded:
-        :return: Dict[str, Any]
-        """
-        parsed = {}
-        for k, v in decoded.items():
-            if isinstance(v, bytes):
-                value = HexBytes(v).hex()
-            else:
-                value = v
-            parsed[k] = value
-        return parsed

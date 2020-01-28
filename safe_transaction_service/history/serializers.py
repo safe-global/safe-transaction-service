@@ -14,6 +14,7 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 
 
@@ -160,6 +161,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     eth_gas_price = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
+    data_decoded = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
     signatures = HexadecimalField()
 
@@ -202,6 +204,15 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             return None
         else:
             return not obj.failed
+
+    def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
+        tx_decoder = get_tx_decoder()
+        try:
+            function_name, arguments = tx_decoder.decode_transaction(obj.data)
+            return {'function_name': function_name,
+                    'arguments': arguments}
+        except TxDecoderException:
+            return None
 
 
 class Erc20InfoSerializer(serializers.Serializer):
