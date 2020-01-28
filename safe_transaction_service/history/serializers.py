@@ -148,8 +148,8 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     value = serializers.CharField()
     is_executed = serializers.BooleanField(source='executed')
     is_successful = serializers.SerializerMethodField()
-    safe_gas_price = serializers.CharField(source='gas_price')
-    gas_price = serializers.SerializerMethodField()
+    gas_price = serializers.CharField()
+    eth_gas_price = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
@@ -181,7 +181,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             if obj.ethereum_tx.gas_used and obj.ethereum_tx.gas_price:
                 return str(obj.ethereum_tx.gas_used * obj.ethereum_tx.gas_price)
 
-    def get_gas_price(self, obj: MultisigTransaction) -> Optional[str]:
+    def get_eth_gas_price(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx and obj.ethereum_tx.gas_price:
             return str(obj.ethereum_tx.gas_price)
 
