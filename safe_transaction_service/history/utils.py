@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 from gunicorn import glogging
 
@@ -27,3 +27,14 @@ def chunks(l: List[Any], n: int):
     """
     for i in range(0, len(l), n):
         yield l[i:i + n]
+
+
+def clean_receipt_log(receipt_logs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Clean receipt logs and make them JSON compliant
+    :param receipt_logs:
+    :return:
+    """
+    parsed_logs = {'data': receipt_logs['data'],
+                   'topics': [topic.hex() for topic in receipt_logs['topics']]}
+    return parsed_logs
