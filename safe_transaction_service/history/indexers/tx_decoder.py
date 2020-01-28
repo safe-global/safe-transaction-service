@@ -71,6 +71,9 @@ class TxDecoder:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
+        if not data:
+            raise CannotDecode(data)
+
         data = HexBytes(data)
         selector = data[:4]
         if selector not in self.supported_fn_selectors:
