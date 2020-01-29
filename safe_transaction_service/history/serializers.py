@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from eth_account import Account
+from eth_keys.exceptions import BadSignature
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -78,12 +78,17 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         #  TODO Support contract signatures
         if signature is not None:
             #  TODO Support signatures with multiple owners
+            #  TODO Support eth_sign signatures
             if len(signature) != 65:
                 raise ValidationError('Signatures with more than one owner still not supported')
 
-            address = Account.recoverHash(contract_transaction_hash, signature=signature)
-            if address != data['sender']:
-                raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
+            try:
+                address = Account.recoverHash(contract_transaction_hash, signature=signature)
+                if address != data['sender']:
+                    raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
+            except BadSignature:
+                raise ValidationError(f'Failed to recover ECDSA public key from '
+                                      f'safe-tx-hash={contract_transaction_hash.hex()} and signature={signature.hex()}')
 
         return data
 
