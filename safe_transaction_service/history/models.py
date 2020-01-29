@@ -598,7 +598,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
             internal_tx__ethereum_tx=OuterRef('ethereum_tx')
         ).sorted_by_internal_tx().values('threshold')
 
-        return self.annotate(confirmations_required=Subquery(threshold_query[1:]))
+        return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
 
 
 class MultisigTransaction(TimeStampedModel):
