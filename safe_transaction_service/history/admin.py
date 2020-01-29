@@ -199,7 +199,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_filter = ('threshold', 'master_copy')
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
-    search_fields = ['address', 'owners']
+    search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash']
 
 
 @admin.register(WebHook)
