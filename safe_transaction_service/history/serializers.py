@@ -162,6 +162,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
     data_decoded = serializers.SerializerMethodField()
+    confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     signatures = HexadecimalField()
 
@@ -175,12 +176,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        if self.context.get('owners'):
-            confirmations = obj.confirmations.filter(owner__in=self.owners, multisig_transaction=obj)
-        else:
-            confirmations = obj.confirmations
-
-        return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data
+        return SafeMultisigConfirmationResponseSerializer(obj.confirmations, many=True).data
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
