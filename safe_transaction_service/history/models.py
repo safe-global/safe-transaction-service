@@ -357,10 +357,13 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(BulkCreateSignalMixin, models.Manager):
+    def _trace_address_to_str(self, trace_address) -> str:
+        return ','.join([str(address) for address in trace_address])
+
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
-        trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
+        trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return InternalTx(
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
@@ -382,7 +385,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
     def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
-        trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
+        trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return self.get_or_create(
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
@@ -596,7 +599,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def with_confirmations_required(self):
         threshold_query = SafeStatus.objects.filter(
             internal_tx__ethereum_tx=OuterRef('ethereum_tx')
-        ).sorted_by_internal_tx().values('threshold')
+        ).sorted_reverse_by_internal_tx().values('threshold')
 
         return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
 
@@ -759,7 +762,15 @@ class SafeStatusQuerySet(models.QuerySet):
             'address',
             '-internal_tx__ethereum_tx__block_id',
             '-internal_tx__ethereum_tx__transaction_index',
-            '-internal_tx_id',
+            '-internal_tx__trace_address',
+        )
+
+    def sorted_reverse_by_internal_tx(self):
+        return self.order_by(
+            'address',
+            'internal_tx__ethereum_tx__block_id',
+            'internal_tx__ethereum_tx__transaction_index',
+            'internal_tx__trace_address',
         )
 
     def addresses_for_owner(self, owner_address: str) -> List[str]:
