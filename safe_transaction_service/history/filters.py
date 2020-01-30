@@ -46,7 +46,7 @@ class MultisigTransactionFilter(filters.FilterSet):
         model = MultisigTransaction
         fields = {
             'executed': ['exact'],
-            'nonce': ['lt', 'gt', 'exact'],
+            'nonce': ['lt', 'gt', 'lte', 'gte', 'exact'],
             'safe_tx_hash': ['exact'],
             'value': ['lt', 'gt', 'exact'],
         }
