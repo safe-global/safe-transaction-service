@@ -69,7 +69,16 @@ class TxDecoder:
         return decoded_value
 
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
-        return self._decode_transaction(data)
+        """
+        Decode tx data
+        :param data: Tx data as `hex string` or `bytes`
+        :return: Tuple with the `function name` and a list of dictionaries dictionary {'name', 'type', 'value'}
+        :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
+        :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
+        """
+        fn_name, parameters = self._decode_transaction(data)
+        return fn_name, [{'name': name, 'type': argument_type, 'value': value}
+                         for name, argument_type, value in parameters]
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """

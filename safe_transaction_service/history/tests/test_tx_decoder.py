@@ -58,22 +58,30 @@ class TestTxDecoder(TestCase):
         tx_decoder = TxDecoder()
         function_name, arguments = tx_decoder.decode_transaction_with_types(tx_data)
         self.assertEqual(function_name, 'execTransaction')
-        self.assertEqual(arguments, [('to', 'address', '0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa'),
-                                     ('value', 'uint256', 0),
-                                     ('data', 'bytes', '0xa9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be'
-                                                       '5234aaa43cc0000000000000000000000000000000000000000000000000000'
-                                                       '5af3107a4000'),
-                                     ('operation', 'uint8', 0),
-                                     ('safeTxGas', 'uint256', 0),
-                                     ('baseGas', 'uint256', 0),
-                                     ('gasPrice', 'uint256', 0),
-                                     ('gasToken', 'address', '0x0000000000000000000000000000000000000000'),
-                                     ('refundReceiver', 'address', '0x0000000000000000000000000000000000000000'),
-                                     ('signatures', 'bytes', '0x0000000000000000000000000dc0dfd22c6beab74672eade5f9be52'
-                                                             '34aaa43cc000000000000000000000000000000000000000000000000'
-                                                             '000000000000000001000000000000000000000000c791cb32ddb43de'
-                                                             '8260e6a2762b3b03498b615e500000000000000000000000000000000'
-                                                             '0000000000000000000000000000000001')]
+        self.assertEqual(arguments, [{'name': 'to',
+                                      'type': 'address',
+                                      'value': '0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa'},
+                                     {'name': 'value', 'type': 'uint256', 'value': 0},
+                                     {'name': 'data',
+                                      'type': 'bytes',
+                                      'value': '0xa9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234aaa4'
+                                               '3cc00000000000000000000000000000000000000000000000000005af3107a4000'},
+                                     {'name': 'operation', 'type': 'uint8', 'value': 0},
+                                     {'name': 'safeTxGas', 'type': 'uint256', 'value': 0},
+                                     {'name': 'baseGas', 'type': 'uint256', 'value': 0},
+                                     {'name': 'gasPrice', 'type': 'uint256', 'value': 0},
+                                     {'name': 'gasToken',
+                                      'type': 'address',
+                                      'value': '0x0000000000000000000000000000000000000000'},
+                                     {'name': 'refundReceiver',
+                                      'type': 'address',
+                                      'value': '0x0000000000000000000000000000000000000000'},
+                                     {'name': 'signatures',
+                                      'type': 'bytes',
+                                      'value': '0x0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234aaa43cc00000'
+                                               '00000000000000000000000000000000000000000000000000000000000010000000000'
+                                               '00000000000000c791cb32ddb43de8260e6a2762b3b03498b615e500000000000000000'
+                                               '0000000000000000000000000000000000000000000000001'}]
                          )
 
     def test_decode_old_execute_transaction(self):
