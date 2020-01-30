@@ -11,6 +11,7 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField, Sha3HashField)
 from gnosis.safe import Safe
+from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
@@ -34,7 +35,6 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     def validate(self, data):
         super().validate(data)
 
-        signature = data.get('signature')
         ethereum_client = EthereumClientProvider()
         safe = Safe(data['safe'], ethereum_client)
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
@@ -59,7 +59,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 safe=safe.address,
                 nonce=data['nonce']
             )
-            if HexBytes(multisig_transaction.safe_tx_hash) != contract_transaction_hash:
+            if multisig_transaction.safe_tx_hash != contract_transaction_hash:
                 raise ValidationError(f'Tx with nonce={safe_tx.safe_nonce} for safe={safe.address} already executed in '
                                       f'tx-hash={multisig_transaction.ethereum_tx_id}')
         except MultisigTransaction.DoesNotExist:
@@ -75,20 +75,23 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             except BadFunctionCallOutput:  # If it didn't exist 20 blocks ago
                 raise ValidationError('User is not an owner')
 
-        #  TODO Support contract signatures
+        signature = data.get('signature')
         if signature is not None:
             #  TODO Support signatures with multiple owners
-            #  TODO Support eth_sign signatures
             if len(signature) != 65:
                 raise ValidationError('Signatures with more than one owner still not supported')
 
-            try:
-                address = Account.recoverHash(contract_transaction_hash, signature=signature)
-                if address != data['sender']:
-                    raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
-            except BadSignature:
-                raise ValidationError(f'Failed to recover ECDSA public key from '
-                                      f'safe-tx-hash={contract_transaction_hash.hex()} and signature={signature.hex()}')
+            safe_signature = SafeSignature(signature, contract_transaction_hash)
+            #  TODO Support contract signatures and approved hashes
+            if safe_signature.signature_type == SafeSignatureType.CONTRACT_SIGNATURE:
+                raise ValidationError('Contract signatures not supported')
+            elif safe_signature.signature_type == SafeSignatureType.APPROVED_HASH:
+                # Index it automatically later
+                del data['signature']
+
+            address = safe_signature.owner
+            if address != data['sender']:
+                raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
 
         return data
 
