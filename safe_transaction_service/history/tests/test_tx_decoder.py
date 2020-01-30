@@ -2,17 +2,14 @@ import logging
 
 from django.test import TestCase
 
-from eth_account import Account
-
-from gnosis.safe import SafeTx
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from hexbytes import HexBytes
 
 from ..indexers.tx_decoder import TxDecoder
 
 logger = logging.getLogger(__name__)
 
 
-class TestTxDecoder(SafeTestCaseMixin, TestCase):
+class TestTxDecoder(TestCase):
     def test_supported_fn_selectors(self):
         tx_decoder = TxDecoder()
         self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
@@ -20,43 +17,78 @@ class TestTxDecoder(SafeTestCaseMixin, TestCase):
         self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
 
     def test_decode_execute_transaction(self):
-        owners = [Account.create() for _ in range(2)]
-        owner_addresses = [owner.address for owner in owners]
-        threshold = 1
-        safe_creation = self.deploy_test_safe(owners=owner_addresses, threshold=threshold,
-                                              initial_funding_wei=self.w3.toWei(0.1, 'ether'))
-        safe_address = safe_creation.safe_address
-        to = Account().create().address
-        value = self.w3.toWei(0.01, 'ether')
-        safe_tx_gas = 200000
-        data_gas = 100000
-
-        safe_tx = SafeTx(self.ethereum_client, safe_address, to, value, b'', 0, safe_tx_gas, data_gas, self.gas_price,
-                         None, None, safe_nonce=0)
-
-        safe_tx.sign(owners[0].key)
-
-        self.assertEqual(safe_tx.call(tx_sender_address=self.ethereum_test_account.address), 1)
-        tx_hash, _ = safe_tx.execute(tx_sender_private_key=self.ethereum_test_account.key)
-        self.ethereum_client.get_transaction_receipt(tx_hash, timeout=60)
-        self.assertEqual(self.ethereum_client.get_balance(to), value)
+        tx_data = HexBytes('0x6a761202000000000000000000000000d9ab7371432d7cc74503290412618c948cddacf200000000000000000'
+                           '0000000000000000000000000000000002386f26fc1000000000000000000000000000000000000000000000000'
+                           '0000000000000000014000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000'
+                           '0000000000000000000000000186a000000000000000000000000000000000000000000000000000000004a817c'
+                           '8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '0000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '00000000000000000000041512215e7f982c8f8e8429c9008068366dcb96bb3abd9c969f3bf2f97f013da6941e1'
+                           '59f13ca524a6b449accf1ce6765ad811ee7b7151f74749e38ac8bc94fb3b1c00000000000000000000000000000'
+                           '000000000000000000000000000000000')
 
         tx_decoder = TxDecoder()
-        function_name, arguments = tx_decoder.decode_transaction(safe_tx.tx['data'])
+        function_name, arguments = tx_decoder.decode_transaction(tx_data)
         self.assertEqual(function_name, 'execTransaction')
         self.assertIn('baseGas', arguments)
+        self.assertEqual(type(arguments['data']), str)
 
-    def test_decode_old_execute_transaction(self):
-        safe_address = Account.create().address
-        to = Account().create().address
-        value = self.w3.toWei(0.01, 'ether')
-        safe_tx_gas = 200000
-        data_gas = 100000
-        safe_tx = SafeTx(self.ethereum_client, safe_address, to, value, b'', 0, safe_tx_gas, data_gas, self.gas_price,
-                         None, None, safe_nonce=0, safe_version='0.0.1')
+    def test_decode_execute_transaction_with_types(self):
+        tx_data = HexBytes('0x6a7612020000000000000000000000005592ec0cfb4dbc12d3ab100b257153436a1f0fea0000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000014000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '000000000000000000000001c00000000000000000000000000000000000000000000000000000'
+                           '000000000044a9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234a'
+                           'aa43cc00000000000000000000000000000000000000000000000000005af3107a400000000000'
+                           '000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                           '00000000000000000000000000000000820000000000000000000000000dc0dfd22c6beab74672'
+                           'eade5f9be5234aaa43cc0000000000000000000000000000000000000000000000000000000000'
+                           '00000001000000000000000000000000c791cb32ddb43de8260e6a2762b3b03498b615e5000000'
+                           '000000000000000000000000000000000000000000000000000000000001000000000000000000'
+                           '000000000000000000000000000000000000000000')
 
         tx_decoder = TxDecoder()
-        data = safe_tx.w3_tx.buildTransaction()['data']
+        function_name, arguments = tx_decoder.decode_transaction_with_types(tx_data)
+        self.assertEqual(function_name, 'execTransaction')
+        self.assertEqual(arguments, [('to', 'address', '0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa'),
+                                     ('value', 'uint256', 0),
+                                     ('data', 'bytes', '0xa9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be'
+                                                       '5234aaa43cc0000000000000000000000000000000000000000000000000000'
+                                                       '5af3107a4000'),
+                                     ('operation', 'uint8', 0),
+                                     ('safeTxGas', 'uint256', 0),
+                                     ('baseGas', 'uint256', 0),
+                                     ('gasPrice', 'uint256', 0),
+                                     ('gasToken', 'address', '0x0000000000000000000000000000000000000000'),
+                                     ('refundReceiver', 'address', '0x0000000000000000000000000000000000000000'),
+                                     ('signatures', 'bytes', '0x0000000000000000000000000dc0dfd22c6beab74672eade5f9be52'
+                                                             '34aaa43cc000000000000000000000000000000000000000000000000'
+                                                             '000000000000000001000000000000000000000000c791cb32ddb43de'
+                                                             '8260e6a2762b3b03498b615e500000000000000000000000000000000'
+                                                             '0000000000000000000000000000000001')]
+                         )
+
+    def test_decode_old_execute_transaction(self):
+        data = HexBytes('0x6a761202000000000000000000000000a8cc2fc5756f1cba332fefa093ea1d3c6faf559c00000000000000000000'
+                        '0000000000000000000000000000002386f26fc1000000000000000000000000000000000000000000000000000000'
+                        '0000000000014000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                        '000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000'
+                        '0000000000000186a000000000000000000000000000000000000000000000000000000004a817c800000000000000'
+                        '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                        '0000000000000000000000000000000000000000000000000000000000000000000000000000000000018000000000'
+                        '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                        '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                        '000000000000000000000000000000000000000000000000000000000000')
+
+        tx_decoder = TxDecoder()
         function_name, arguments = tx_decoder.decode_transaction(data)
         self.assertEqual(function_name, 'execTransaction')
         # self.assertIn('dataGas', arguments)
