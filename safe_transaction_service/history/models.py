@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.db.models import Case, Q, QuerySet, Sum
-from django.db.models.expressions import F, RawSQL, Value, When
+from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
+                                          When)
 from django.db.models.signals import post_save
 
 from hexbytes import HexBytes
@@ -356,10 +357,13 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(BulkCreateSignalMixin, models.Manager):
+    def _trace_address_to_str(self, trace_address) -> str:
+        return ','.join([str(address) for address in trace_address])
+
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
-        trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
+        trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return InternalTx(
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
@@ -381,7 +385,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
     def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
-        trace_address_str = ','.join([str(address) for address in trace['traceAddress']])
+        trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return self.get_or_create(
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
@@ -592,6 +596,13 @@ class MultisigTransactionQuerySet(models.QuerySet):
             ethereum_tx__block=None
         )
 
+    def with_confirmations_required(self):
+        threshold_query = SafeStatus.objects.filter(
+            internal_tx__ethereum_tx=OuterRef('ethereum_tx')
+        ).sorted_reverse_by_internal_tx().values('threshold')
+
+        return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
+
 
 class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionQuerySet.as_manager()
@@ -746,6 +757,22 @@ class SafeStatusManager(models.Manager):
 
 
 class SafeStatusQuerySet(models.QuerySet):
+    def sorted_by_internal_tx(self):
+        return self.order_by(
+            'address',
+            '-internal_tx__ethereum_tx__block_id',
+            '-internal_tx__ethereum_tx__transaction_index',
+            '-internal_tx__trace_address',
+        )
+
+    def sorted_reverse_by_internal_tx(self):
+        return self.order_by(
+            'address',
+            'internal_tx__ethereum_tx__block_id',
+            'internal_tx__ethereum_tx__transaction_index',
+            'internal_tx__trace_address',
+        )
+
     def addresses_for_owner(self, owner_address: str) -> List[str]:
         return self.filter(
             owners__contains=[owner_address],
@@ -757,12 +784,7 @@ class SafeStatusQuerySet(models.QuerySet):
             'address'  # Uses PostgreSQL `DISTINCT ON`
         ).select_related(
             'internal_tx__ethereum_tx'
-        ).order_by(
-            'address',
-            '-internal_tx__ethereum_tx__block_id',
-            '-internal_tx__ethereum_tx__transaction_index',
-            '-internal_tx_id',
-        )
+        ).sorted_by_internal_tx()
 
     def last_for_address(self, address: str) -> Optional['SafeStatus']:
         safe_status = self.last_for_every_address().filter(

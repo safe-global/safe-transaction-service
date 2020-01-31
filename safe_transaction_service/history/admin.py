@@ -14,7 +14,8 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
     list_display = ('number', 'timestamp', 'confirmed', 'gas_limit', 'gas_used', 'block_hash')
-    search_fields = ['=number']
+    list_filter = ('confirmed',)
+    search_fields = ['=number', '=block_hash']
     ordering = ['-number']
 
 
@@ -47,7 +48,7 @@ class EthereumEventAdmin(admin.ModelAdmin):
     list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'address', 'from_', 'to', 'arguments')
     list_display_links = ('log_index', 'arguments')
     list_filter = (EthereumEventListFilter, )
-    search_fields = ['arguments', 'address']
+    search_fields = ['arguments', 'address', '=ethereum_tx__tx_hash']
 
     def from_(self, obj: EthereumEvent):
         return obj.arguments.get('from')
@@ -199,7 +200,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_filter = ('threshold', 'master_copy')
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
-    search_fields = ['address', 'owners']
+    search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash']
 
 
 @admin.register(WebHook)

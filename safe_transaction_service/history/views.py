@@ -54,7 +54,8 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
     lookup_url_kwarg = 'tx_hash'
 
     def get_queryset(self):
-        return MultisigTransaction.objects.prefetch_related(
+        return MultisigTransaction.objects.with_confirmations_required(
+        ).prefetch_related(
             'confirmations'
         ).select_related(
             'ethereum_tx'
@@ -69,6 +70,7 @@ class SafeMultisigTransactionListView(ListAPIView):
     def get_queryset(self):
         return MultisigTransaction.objects.filter(
             safe=self.kwargs['address']
+        ).with_confirmations_required(
         ).prefetch_related(
             'confirmations'
         ).select_related(
@@ -77,15 +79,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             '-nonce',
             '-created'
         )
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        # TODO I think this is not useful anymore
-        # Check if the 'owners' query parameter was passed in input
-        query_owners = self.request.query_params.get('owners', None)
-        if query_owners:
-            context['owners'] = [owner for owner in query_owners.split(',') if owner != '']
-        return context
 
     def get_serializer_class(self):
         """

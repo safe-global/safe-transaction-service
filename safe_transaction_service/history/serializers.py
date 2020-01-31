@@ -14,6 +14,7 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
 
 
@@ -160,6 +161,8 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     eth_gas_price = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
+    data_decoded = serializers.SerializerMethodField()
+    confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     signatures = HexadecimalField()
 
@@ -173,12 +176,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        if self.context.get('owners'):
-            confirmations = obj.confirmations.filter(owner__in=self.owners, multisig_transaction=obj)
-        else:
-            confirmations = obj.confirmations
-
-        return SafeMultisigConfirmationResponseSerializer(confirmations, many=True).data
+        return SafeMultisigConfirmationResponseSerializer(obj.confirmations, many=True).data
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
@@ -202,6 +200,13 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             return None
         else:
             return not obj.failed
+
+    def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
+        tx_decoder = get_tx_decoder()
+        try:
+            return tx_decoder.decode_transaction_with_types(obj.data.tobytes() if obj.data else b'')
+        except TxDecoderException:
+            return None
 
 
 class Erc20InfoSerializer(serializers.Serializer):
