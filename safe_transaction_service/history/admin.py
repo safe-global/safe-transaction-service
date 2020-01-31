@@ -49,6 +49,7 @@ class EthereumEventAdmin(admin.ModelAdmin):
     list_display_links = ('log_index', 'arguments')
     list_filter = (EthereumEventListFilter, )
     search_fields = ['arguments', 'address', '=ethereum_tx__tx_hash']
+    raw_id_fields = ('ethereum_tx',)
 
     def from_(self, obj: EthereumEvent):
         return obj.arguments.get('from')
@@ -72,6 +73,7 @@ class EthereumTxAdmin(admin.ModelAdmin):
     list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
     search_fields = ['=tx_hash', '=_from', '=to']
     ordering = ['-block_id']
+    raw_id_fields = ('block',)
 
 
 @admin.register(InternalTx)
@@ -79,8 +81,9 @@ class InternalTxAdmin(admin.ModelAdmin):
     list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type', 'trace_address')
     list_filter = ('tx_type', 'call_type')
     list_select_related = ('ethereum_tx',)
-    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
     ordering = ['-ethereum_tx__block_id', 'trace_address']
+    raw_id_fields = ('ethereum_tx',)
+    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
 
 
 @admin.register(InternalTxDecoded)
@@ -91,6 +94,7 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',
                 '-internal_tx_id']
+    raw_id_fields = ('internal_tx',)
     search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
                      '=internal_tx__ethereum_tx__tx_hash']
 
@@ -117,6 +121,7 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
     list_display = ('block_number', 'multisig_transaction_hash', 'has_multisig_tx', 'ethereum_tx_id', 'owner')
     list_filter = (MultisigConfirmationListFilter, )
     list_select_related = ('ethereum_tx',)
+    raw_id_fields = ('ethereum_tx', 'multisig_transaction')
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 
     def has_multisig_tx(self, obj: MultisigConfirmation) -> bool:
@@ -136,6 +141,7 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     list_filter = ('failed', )
     list_select_related = ('ethereum_tx',)
     ordering = ['-created']
+    raw_id_fields = ('ethereum_tx',)
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to']
 
     def executed(self, obj: MultisigTransaction):
@@ -191,6 +197,7 @@ class SafeContractAdmin(admin.ModelAdmin):
     list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
     ordering = ['-ethereum_tx__block_id']
+    raw_id_fields = ('ethereum_tx',)
     search_fields = ['address']
 
 
@@ -200,6 +207,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
     list_filter = ('threshold', 'master_copy')
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
+    raw_id_fields = ('internal_tx',)
     search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash']
 
 
