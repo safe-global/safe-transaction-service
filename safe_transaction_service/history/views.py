@@ -3,6 +3,7 @@ from django.conf import settings
 import django_filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
+from rest_framework.filters import OrderingFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -64,8 +65,9 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
 
 class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = DefaultPagination
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, )
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
     filterset_class = MultisigTransactionFilter
+    ordering_fields = ['nonce', 'created']
 
     def get_queryset(self):
         return MultisigTransaction.objects.filter(
