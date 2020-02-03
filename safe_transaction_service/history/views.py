@@ -64,10 +64,10 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
 
 
 class SafeMultisigTransactionListView(ListAPIView):
-    pagination_class = DefaultPagination
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
     filterset_class = MultisigTransactionFilter
     ordering_fields = ['nonce', 'created']
+    pagination_class = DefaultPagination
 
     def get_queryset(self):
         return MultisigTransaction.objects.filter(
@@ -189,6 +189,7 @@ class SafeIncomingTxListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
+    pagination_class = DefaultPagination
 
     def filter_queryset(self, queryset):
         # Disable filter queryset, it will try to filter the Union and will fail

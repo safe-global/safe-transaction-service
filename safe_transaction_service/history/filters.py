@@ -4,7 +4,7 @@ from rest_framework.pagination import LimitOffsetPagination
 
 from gnosis.eth.django.models import Uint256Field
 
-from .models import InternalTx, MultisigTransaction
+from .models import MultisigTransaction
 
 
 class DefaultPagination(LimitOffsetPagination):
