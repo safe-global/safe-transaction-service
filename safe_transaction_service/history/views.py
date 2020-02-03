@@ -193,6 +193,7 @@ class SafeIncomingTxListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
+    pagination_class = DefaultPagination
 
     def get_queryset(self):
         address = self.kwargs['address']
