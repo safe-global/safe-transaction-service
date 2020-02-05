@@ -51,6 +51,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['results'][0]['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
         # Test camelCase
         self.assertEqual(response.json()['results'][0]['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
+        # Check Etag header
+        self.assertTrue(response['Etag'])
 
         MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
@@ -220,6 +222,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['value'], str(value))
+        # Check Etag header
+        self.assertTrue(response['Etag'])
 
         # Test filters
         block_number = internal_tx.ethereum_tx.block_id

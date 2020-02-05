@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from django.conf import settings
 
 import django_filters
@@ -104,6 +107,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         response = super().get(request, address)
         if response.data['count'] == 0:
             response.status_code = status.HTTP_404_NOT_FOUND
+        else:
+            response.setdefault('ETag', hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response
 
@@ -214,6 +219,8 @@ class SafeIncomingTxListView(ListAPIView):
         response = super().get(request, address)
         if response.data['count'] == 0:
             response.status_code = status.HTTP_404_NOT_FOUND
+        else:
+            response.setdefault('ETag', hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response
 
