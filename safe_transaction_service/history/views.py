@@ -108,7 +108,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         if response.data['count'] == 0:
             response.status_code = status.HTTP_404_NOT_FOUND
         else:
-            response.setdefault('ETag', hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
+            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response
 
@@ -220,7 +220,7 @@ class SafeIncomingTxListView(ListAPIView):
         if response.data['count'] == 0:
             response.status_code = status.HTTP_404_NOT_FOUND
         else:
-            response.setdefault('ETag', hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
+            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response
 
