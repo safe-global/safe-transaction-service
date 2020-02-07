@@ -57,8 +57,7 @@ services:
     command: docker/web/celery/scheduler/run.sh
 
   ganache:
-    build:
-      context: .
-      dockerfile: docker/ganache/Dockerfile
+    image: trufflesuite/ganache-cli:v6.9.0
+    command: -d --defaultBalanceEther 10000 -a 10 --noVMErrorsOnRPCResponse --gasLimit 10000000 --host 0.0.0.0
     ports:
       - "8545:8545"
