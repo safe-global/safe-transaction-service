@@ -1,36 +1,12 @@
 version: '3.5'
 
-volumes:
-  nginx-shared:
-
 services:
-  nginx:
-    image: nginx:1.13-alpine
-    hostname: nginx
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./docker/nginx:/etc/nginx/conf.d
-      - nginx-shared:/nginx
-    depends_on:
-      - web
-
-  redis:
-    image: redis:5-alpine
-    ports:
-      - "6379:6379"
-
-  db:
-    image: postgres:10-alpine
-    ports:
-      - "5432:5432"
-
   web:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
     env_file:
-      - .env
+      - .env_ganache
     depends_on:
       - db
       - redis
@@ -46,13 +22,14 @@ services:
       context: .
       dockerfile: docker/web/Dockerfile
     env_file:
-      - .env
+      - .env_ganache
     depends_on:
       - db
       - redis
     command: docker/web/celery/worker/run.sh
 
-  scheduler:
-    <<: *worker
-    command: docker/web/celery/scheduler/run.sh
-
+  ganache:
+    image: trufflesuite/ganache-cli:v6.9.0
+    command: -d --defaultBalanceEther 10000 -a 10 --noVMErrorsOnRPCResponse --gasLimit 10000000 --host 0.0.0.0
+    ports:
+      - "8545:8545"
