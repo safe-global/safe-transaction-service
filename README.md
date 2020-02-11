@@ -52,7 +52,7 @@ For example, to set up a Göerli node:
 
 Run a Parity node in your local computer:
 ```bash
-parity --chain goerli --tracing on --db-path=/media/ethereum/parity --unsafe-expos
+parity --chain goerli --tracing on --db-path=/media/ethereum/parity --unsafe-expose
 ```
 
 Edit `.env` so docker points to he host Parity:
