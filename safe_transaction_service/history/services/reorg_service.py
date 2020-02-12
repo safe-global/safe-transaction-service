@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, NoReturn, Optional
 
-from django.db import models
+from django.db import models, transaction
 
 from hexbytes import HexBytes
 
@@ -27,6 +27,8 @@ class ReorgServiceProvider:
 
 # TODO Test ReorgService
 class ReorgService:
+    SAFE_CONFIRMATIONS = 6
+
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
         # Dictionary with Django model and attribute for reorgs
@@ -41,14 +43,16 @@ class ReorgService:
         :return: Number of oldest block with reorg detected. `None` if not reorg found
         """
         current_block_number = self.ethereum_client.current_block_number
-        for database_block in EthereumBlock.objects.not_confirmed(current_block_number=current_block_number):
+        to_block = current_block_number - self.SAFE_CONFIRMATIONS
+        for database_block in EthereumBlock.objects.not_confirmed(current_block_number=to_block):
             blockchain_block = self.ethereum_client.get_block(database_block.number, full_transactions=False)
             if HexBytes(blockchain_block['hash']) == HexBytes(database_block.block_hash):
-                database_block.set_confirmed(current_block_number)
+                database_block.set_confirmed()
             else:
                 logger.warning('Reorg found for block-number=%d', database_block.number)
                 return database_block.number
 
+    @transaction.atomic
     def recover_from_reorg(self, first_reorg_block_number: int) -> int:
         """
         :param first_reorg_block_number:

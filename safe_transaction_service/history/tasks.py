@@ -1,4 +1,5 @@
 import signal
+import time
 from typing import Any, Dict, NoReturn, Optional, Type, Union
 
 from django.conf import settings
@@ -169,6 +170,7 @@ def check_reorgs_task() -> Optional[int]:
                                            for task_id in redis.lrange(blockchain_running_tasks_key, 0, -1)],
                                           terminate=True, signal=signal.SIGTERM)
                 redis.delete(blockchain_running_tasks_key)
+                time.sleep(5)
                 reorg_service.recover_from_reorg(first_reorg_block_number)
                 return first_reorg_block_number
     except LockError:

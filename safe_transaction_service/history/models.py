@@ -111,10 +111,10 @@ class EthereumBlockManager(models.Manager):
 
 
 class EthereumBlockQuerySet(models.QuerySet):
-    def not_confirmed(self, current_block_number: Optional[int] = None):
+    def not_confirmed(self, to_block_number: Optional[int] = None):
         queryset = self.filter(confirmed=False)
-        if current_block_number is not None:
-            queryset = queryset.filter(number__lte=current_block_number - 6)
+        if to_block_number is not None:
+            queryset = queryset.filter(number__lte=to_block_number)
         return queryset.order_by('number')
 
 
@@ -126,16 +126,16 @@ class EthereumBlock(models.Model):
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
     parent_hash = Sha3HashField(unique=True)
+    # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
     confirmed = models.BooleanField(default=False,
-                                    db_index=True)  # For reorgs, True if `current_block_number` - `number` >= 6
+                                    db_index=True)
 
     def __str__(self):
         return f'Block number={self.number} on {self.timestamp}'
 
-    def set_confirmed(self, current_block_number: int):
-        if (current_block_number - self.number) >= 6:
-            self.confirmed = True
-            self.save()
+    def set_confirmed(self):
+        self.confirmed = True
+        self.save()
 
 
 class EthereumTxManager(models.Manager):
