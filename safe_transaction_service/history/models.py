@@ -622,6 +622,7 @@ class MultisigTransaction(TimeStampedModel):
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
     failed = models.NullBooleanField(default=None)
+    origin = models.CharField(null=True, default=None, max_length=100)  # To store arbitrary data on the tx
 
     def __str__(self):
         return f'{self.safe} - {self.nonce} - {self.safe_tx_hash}'

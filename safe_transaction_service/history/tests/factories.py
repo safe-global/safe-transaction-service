@@ -8,10 +8,10 @@ from web3 import Web3
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 
-from ..models import (ConfirmationType, EthereumBlock, EthereumEvent,
-                      EthereumTx, EthereumTxCallType, EthereumTxType,
-                      InternalTx, MultisigConfirmation, MultisigTransaction,
-                      SafeContract, SafeStatus)
+from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
+                      EthereumTxCallType, EthereumTxType, InternalTx,
+                      MultisigConfirmation, MultisigTransaction, SafeContract,
+                      SafeStatus)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -101,6 +101,7 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
     refund_receiver = NULL_ADDRESS
     signatures = b''
     nonce = factory.Sequence(lambda n: n)
+    origin = factory.Faker('name')
 
 
 class MultisigConfirmationFactory(factory.DjangoModelFactory):

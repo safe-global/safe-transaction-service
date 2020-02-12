@@ -12,6 +12,7 @@ from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..models import MultisigTransaction
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
                         MultisigConfirmationFactory,
@@ -34,6 +35,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data['confirmations']), 0)
         self.assertTrue(Web3.isChecksumAddress(response.data['executor']))
         self.assertEqual(response.data['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
+        self.assertEqual(response.data['origin'], multisig_tx.origin)
         # Test camelCase
         self.assertEqual(response.json()['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
 
@@ -142,6 +144,41 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertIn('User is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_post_multisig_transactions_with_origin(self):
+        safe_owner_1 = Account.create()
+        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe_create2_tx.safe_address
+        safe = Safe(safe_address, self.ethereum_client)
+
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                "nonce": 0,
+                "safeTxGas": 0,
+                "baseGas": 0,
+                "gasPrice": 0,
+                "gasToken": "0x0000000000000000000000000000000000000000",
+                "refundReceiver": "0x0000000000000000000000000000000000000000",
+                # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+                "sender": safe_owner_1.address,
+                "origin": 'Testing origin field',
+                }
+
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        multisig_tx_db = MultisigTransaction.objects.get(safe_tx_hash=safe_tx.safe_tx_hash)
+        self.assertEqual(multisig_tx_db.origin, data['origin'])
 
     def test_safe_balances_view(self):
         safe_address = Account.create().address

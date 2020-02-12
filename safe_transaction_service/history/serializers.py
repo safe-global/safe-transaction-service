@@ -25,6 +25,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     signature = HexadecimalField(required=False)
+    origin = serializers.CharField(max_length=100, allow_null=True, default=None)
 
     def validate_confirmation_type(self, value: str) -> int:
         value = value.upper()
@@ -110,7 +111,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 'gas_price': self.validated_data['gas_price'],
                 'gas_token': self.validated_data['gas_token'],
                 'refund_receiver': self.validated_data['refund_receiver'],
-                'nonce': self.validated_data['nonce']
+                'nonce': self.validated_data['nonce'],
+                'origin': self.validated_data['origin'],
             }
         )
 
@@ -161,6 +163,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     eth_gas_price = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
+    origin = serializers.CharField()
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
