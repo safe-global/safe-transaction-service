@@ -108,6 +108,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         if response.data['count'] == 0:
             response.status_code = status.HTTP_404_NOT_FOUND
         else:
+            response.data['count_unique_nonce'] = MultisigTransaction.objects.filter(safe=address
+                                                                                     ).distinct('nonce').count()
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response

@@ -47,6 +47,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_tx = MultisigTransactionFactory(safe=safe_address)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['count_unique_nonce'], 1)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
         self.assertTrue(Web3.isChecksumAddress(response.data['results'][0]['executor']))
@@ -61,6 +63,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(len(response.data['results'][0]['confirmations']), 1)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=multisig_tx.nonce)
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(response.data['count_unique_nonce'], 1)
 
     def test_get_multisig_transactions_filters(self):
         safe_address = Account.create().address
