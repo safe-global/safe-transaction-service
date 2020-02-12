@@ -44,7 +44,7 @@ class ReorgService:
         """
         current_block_number = self.ethereum_client.current_block_number
         to_block = current_block_number - self.SAFE_CONFIRMATIONS
-        for database_block in EthereumBlock.objects.not_confirmed(current_block_number=to_block):
+        for database_block in EthereumBlock.objects.not_confirmed(to_block_number=to_block):
             blockchain_block = self.ethereum_client.get_block(database_block.number, full_transactions=False)
             if HexBytes(blockchain_block['hash']) == HexBytes(database_block.block_hash):
                 database_block.set_confirmed()
