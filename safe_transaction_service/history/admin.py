@@ -167,6 +167,9 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
     list_display = ('address', 'initial_block_number', 'tx_block_number')
     search_fields = ['address']
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     def reindex(self, request, queryset):
         queryset.update(tx_block_number=F('initial_block_number'))
     reindex.short_description = "Reindex from initial block"
