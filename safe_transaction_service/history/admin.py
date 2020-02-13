@@ -1,6 +1,8 @@
 from typing import Optional
 
 from django.contrib import admin
+from django.db.models import F
+from django.db.models.functions import Greatest
 
 from gnosis.eth import EthereumClientProvider
 
@@ -154,8 +156,21 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):
+    actions = ['reindex', 'reindex_last_day', 'reindex_last_month']
     list_display = ('address', 'initial_block_number', 'tx_block_number')
     search_fields = ['address']
+
+    def reindex(self, request, queryset):
+        queryset.update(tx_block_number=F('initial_block_number'))
+    reindex.short_description = "Reindex from initial block"
+
+    def reindex_last_day(self, request, queryset):
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, 0))
+    reindex.short_description = "Reindex last 24 hours"
+
+    def reindex_last_month(self, request, queryset):
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, 0))
+    reindex.short_description = "Reindex last month"
 
 
 @admin.register(SafeMasterCopy)
@@ -193,12 +208,27 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
 
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
+    actions = ['reindex', 'reindex_last_day', 'reindex_last_month']
     list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc20_block_number')
     list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
     ordering = ['-ethereum_tx__block_id']
     raw_id_fields = ('ethereum_tx',)
     search_fields = ['address']
+
+    def reindex(self, request, queryset):
+        queryset.exclude(
+            ethereum_tx=None
+        ).update(erc20_block_number=F('ethereum_tx__block_id'))
+    reindex.short_description = "Reindex from initial block"
+
+    def reindex_last_day(self, request, queryset):
+        queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 6000, 0))
+    reindex.short_description = "Reindex last 24 hours"
+
+    def reindex_last_month(self, request, queryset):
+        queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 200000, 0))
+    reindex.short_description = "Reindex last month"
 
 
 @admin.register(SafeStatus)

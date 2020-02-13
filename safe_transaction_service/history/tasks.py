@@ -16,8 +16,7 @@ from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyIndexerServiceProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
-from .models import (InternalTxDecoded,
-                     WebHook, WebHookType)
+from .models import InternalTxDecoded, WebHook, WebHookType
 from .services import ReorgService, ReorgServiceProvider
 
 logger = get_task_logger(__name__)
