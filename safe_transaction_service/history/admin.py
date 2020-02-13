@@ -83,22 +83,29 @@ class InternalTxAdmin(admin.ModelAdmin):
     list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type', 'trace_address')
     list_filter = ('tx_type', 'call_type')
     list_select_related = ('ethereum_tx',)
-    ordering = ['-ethereum_tx__block_id', 'trace_address']
+    ordering = ['-ethereum_tx__block_id',
+                '-ethereum_tx__transaction_index',
+                '-trace_address']
     raw_id_fields = ('ethereum_tx',)
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
 
 
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
+    actions = ['process_again']
     list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
     list_filter = ('function_name', 'processed')
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',
-                '-internal_tx_id']
+                '-internal_tx__trace_address']
     raw_id_fields = ('internal_tx',)
     search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
                      '=internal_tx__ethereum_tx__tx_hash']
+
+    def process_again(self, request, queryset):
+        queryset.filter(processed=True).update(processed=False)
+    process_again.short_description = "Process internal tx again"
 
 
 class MultisigConfirmationListFilter(admin.SimpleListFilter):
@@ -166,11 +173,11 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
     def reindex_last_day(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, 0))
-    reindex.short_description = "Reindex last 24 hours"
+    reindex_last_day.short_description = "Reindex last 24 hours"
 
     def reindex_last_month(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, 0))
-    reindex.short_description = "Reindex last month"
+    reindex_last_month.short_description = "Reindex last month"
 
 
 @admin.register(SafeMasterCopy)
@@ -224,21 +231,33 @@ class SafeContractAdmin(admin.ModelAdmin):
 
     def reindex_last_day(self, request, queryset):
         queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 6000, 0))
-    reindex.short_description = "Reindex last 24 hours"
+    reindex_last_day.short_description = "Reindex last 24 hours"
 
     def reindex_last_month(self, request, queryset):
         queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 200000, 0))
-    reindex.short_description = "Reindex last month"
+    reindex_last_month.short_description = "Reindex last month"
 
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
+    actions = ['remove_and_index']
     list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold', 'nonce', 'master_copy')
     list_filter = ('threshold', 'master_copy')
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     raw_id_fields = ('internal_tx',)
     search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash']
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def remove_and_index(self, request, queryset):
+        addresses = queryset.distinct().values('address')  # Delete all SafeStatus for addresses selected
+        all_queryset = SafeStatus.objects.filter(address__in=addresses)
+        internal_txs = all_queryset.values('internal_tx')
+        InternalTxDecoded.objects.filter(pk__in=internal_txs).update(processed=False)  # Mark as not processed
+        all_queryset.delete()  # Remove all SafeStatus for that Safe
+    remove_and_index.short_description = "Remove and index again"
 
 
 @admin.register(WebHook)

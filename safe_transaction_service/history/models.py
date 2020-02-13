@@ -140,7 +140,7 @@ class EthereumBlock(models.Model):
 
     def set_confirmed(self):
         self.confirmed = True
-        self.save()
+        self.save(update_fields=['confirmed'])
 
 
 class EthereumTxManager(models.Manager):
