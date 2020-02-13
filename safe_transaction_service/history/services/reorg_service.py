@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, NoReturn, Optional
+from typing import Dict, Optional
 
 from django.db import models, transaction
 
@@ -27,7 +27,7 @@ class ReorgServiceProvider:
 
 # TODO Test ReorgService
 class ReorgService:
-    SAFE_CONFIRMATIONS = 6
+    SAFE_CONFIRMATIONS = 7
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
@@ -52,14 +52,29 @@ class ReorgService:
                 logger.warning('Reorg found for block-number=%d', database_block.number)
                 return database_block.number
 
+    def reset_all_to_block(self, block_number: int) -> int:
+        """
+        Reset database fields to a block to start reindexing from that block. It's useful when you want to trigger
+        a indexation for txs that are not appearing on database but you don't want to delete anything
+        :param block_number:
+        :return: Number of updated models
+        """
+        updated = 0
+        for model, field in self.reorg_models.items():
+            updated += model.objects.filter(
+                **{field + '__gt': block_number}
+            ).update(
+                **{field: block_number}
+            )
+        return updated
+
     @transaction.atomic
     def recover_from_reorg(self, first_reorg_block_number: int) -> int:
         """
         :param first_reorg_block_number:
         :return: Return number of elements updated
         """
-        EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
-        safe_reorg_block_number = first_reorg_block_number - 1
+        safe_reorg_block_number = min(first_reorg_block_number - 250, 0)  # Reindex last hour
 
         updated = 0
         for model, field in self.reorg_models.items():
@@ -69,5 +84,6 @@ class ReorgService:
                 **{field: safe_reorg_block_number}
             )
 
+        EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
         logger.warning('Reorg of block-number=%d fixed, %d elements updated', first_reorg_block_number, updated)
         return updated

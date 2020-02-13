@@ -2,10 +2,10 @@ import datetime
 from collections import OrderedDict
 from enum import Enum
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.contrib.postgres.fields import ArrayField, JSONField
-from django.db import models
+from django.db import IntegrityError, models
 from django.db.models import Case, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
@@ -98,16 +98,21 @@ class EthereumBlockManager(models.Manager):
 
     def create_from_block(self, block: Dict[str, Any], current_block_number: Optional[int] = None) -> 'EthereumBlock':
         # If confirmed, we will not check for reorgs in the future
-        confirmed = (current_block_number - block['number']) >= 6 if current_block_number is not None else False
-        return super().create(
-            number=block['number'],
-            gas_limit=block['gasLimit'],
-            gas_used=block['gasUsed'],
-            timestamp=datetime.datetime.fromtimestamp(block['timestamp'], datetime.timezone.utc),
-            block_hash=block['hash'],
-            parent_hash=block['parentHash'],
-            confirmed=confirmed,
-        )
+        confirmed = (current_block_number - block['number']) >= 7 if current_block_number is not None else False
+        try:
+            return super().create(
+                number=block['number'],
+                gas_limit=block['gasLimit'],
+                gas_used=block['gasUsed'],
+                timestamp=datetime.datetime.fromtimestamp(block['timestamp'],
+                                                          datetime.timezone.utc),
+                block_hash=block['hash'],
+                parent_hash=block['parentHash'],
+                confirmed=confirmed,
+            )
+        except IntegrityError:
+            # The block could be created in the meantime by other task while the block was fetched from blockchain
+            return self.get(number=block['number'])
 
 
 class EthereumBlockQuerySet(models.QuerySet):
