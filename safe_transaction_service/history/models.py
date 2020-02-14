@@ -149,11 +149,45 @@ class EthereumTxManager(models.Manager):
         if ethereum_tx.block is None:
             ethereum_tx.block = ethereum_block
             ethereum_tx.gas_used = tx_receipt['gasUsed']
-            ethereum_tx.logs = [clean_receipt_log(log) for log in tx_receipt['logs']]
+            ethereum_tx.logs = [clean_receipt_log(log) for log in tx_receipt.get('logs', list())]
             ethereum_tx.status = tx_receipt.get('status')
             ethereum_tx.transaction_index = tx_receipt['transactionIndex']
             ethereum_tx.save(update_fields=['block', 'gas_used', 'logs', 'status', 'transaction_index'])
         return ethereum_tx
+
+    def create_from_tx_dict(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
+                            ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
+        return super().create(
+            block=ethereum_block,
+            tx_hash=HexBytes(tx['hash']).hex(),
+            _from=tx['from'],
+            gas=tx['gas'],
+            gas_price=tx['gasPrice'],
+            gas_used=tx_receipt and tx_receipt['gasUsed'],
+            logs=tx_receipt and [clean_receipt_log(log) for log in tx_receipt.get('logs', list())],
+            status=tx_receipt and tx_receipt.get('status'),
+            transaction_index=tx_receipt and tx_receipt['transactionIndex'],
+            data=HexBytes(tx.get('data') or tx.get('input')),
+            nonce=tx['nonce'],
+            to=tx.get('to'),
+            value=tx['value'],
+        )
+
+    def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
+        ethereum_client = EthereumClientProvider()
+        try:
+            ethereum_tx = self.get(tx_hash=tx_hash)
+            # For txs stored before being mined
+            if ethereum_tx.block is None:
+                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
+                ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
+                ethereum_tx = self.__update_with_block_and_receipt(ethereum_tx, ethereum_block, tx_receipt)
+            return ethereum_tx
+        except self.model.DoesNotExist:
+            tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
+            ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
+            tx = ethereum_client.get_transaction(tx_hash)
+            return self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
 
     def create_or_update_from_tx_hashes(self, tx_hashes: List[Union[str, bytes]]) -> List['EthereumTx']:
         # Search first in database
@@ -210,40 +244,6 @@ class EthereumTxManager(models.Manager):
                 ethereum_tx = self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
         return list(ethereum_txs_dict.values())
-
-    def create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
-        ethereum_client = EthereumClientProvider()
-        try:
-            ethereum_tx = self.get(tx_hash=tx_hash)
-            # For txs stored before being mined
-            if ethereum_tx.block is None:
-                tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
-                ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
-                ethereum_tx = self.__update_with_block_and_receipt(ethereum_tx, ethereum_block, tx_receipt)
-            return ethereum_tx
-        except self.model.DoesNotExist:
-            tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
-            ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
-            tx = ethereum_client.get_transaction(tx_hash)
-            return self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
-
-    def create_from_tx_dict(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
-                            ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
-        return super().create(
-            block=ethereum_block,
-            tx_hash=HexBytes(tx['hash']).hex(),
-            _from=tx['from'],
-            gas=tx['gas'],
-            gas_price=tx['gasPrice'],
-            gas_used=tx_receipt and tx_receipt['gasUsed'],
-            logs=tx_receipt and [clean_receipt_log(log) for log in tx_receipt.get('logs', list())],
-            status=tx_receipt and tx_receipt.get('status'),
-            transaction_index=tx_receipt and tx_receipt['transactionIndex'],
-            data=HexBytes(tx.get('data') or tx.get('input')),
-            nonce=tx['nonce'],
-            to=tx.get('to'),
-            value=tx['value'],
-        )
 
 
 class EthereumTx(TimeStampedModel):
