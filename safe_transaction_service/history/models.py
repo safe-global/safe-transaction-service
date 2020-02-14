@@ -144,7 +144,7 @@ class EthereumBlock(models.Model):
 
 
 class EthereumTxManager(models.Manager):
-    def __update_with_receipt_and_block(self, ethereum_tx: 'EthereumTx', ethereum_block: 'EthereumBlock',
+    def __update_with_block_and_receipt(self, ethereum_tx: 'EthereumTx', ethereum_block: 'EthereumBlock',
                                         tx_receipt: Dict[str, Any]):
         if ethereum_tx.block is None:
             ethereum_tx.block = ethereum_block
@@ -169,6 +169,7 @@ class EthereumTxManager(models.Manager):
 
         ethereum_client = EthereumClientProvider()
 
+        # Get receipts for hashes not in db
         tx_receipts = []
         for tx_hash, tx_receipt in zip(tx_hashes_not_in_db,
                                        ethereum_client.get_transaction_receipts(tx_hashes_not_in_db)):
@@ -181,6 +182,7 @@ class EthereumTxManager(models.Manager):
             else:
                 tx_receipts.append(tx_receipt)
 
+        # Get transactions for hashes not in db
         txs = ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = []
         for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
@@ -194,6 +196,7 @@ class EthereumTxManager(models.Manager):
 
         blocks = ethereum_client.get_blocks(block_numbers)
 
+        # Create new transactions or update them if they have no receipt
         current_block_number = ethereum_client.current_block_number
         for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
             ethereum_block = EthereumBlock.objects.get_or_create_from_block(block,
@@ -201,8 +204,8 @@ class EthereumTxManager(models.Manager):
             try:
                 ethereum_tx = self.get(tx_hash=tx['hash'])
                 # For txs stored before being mined
-                ethereum_tx = self.__update_with_receipt_and_block(ethereum_tx, ethereum_block, tx_receipt)
-                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
+                ethereum_tx = self.__update_with_block_and_receipt(ethereum_tx, ethereum_block, tx_receipt)
+                ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
             except self.model.DoesNotExist:
                 ethereum_tx = self.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
                 ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
@@ -216,7 +219,7 @@ class EthereumTxManager(models.Manager):
             if ethereum_tx.block is None:
                 tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
                 ethereum_block = EthereumBlock.objects.get_or_create_from_block_number(tx_receipt['blockNumber'])
-                ethereum_tx = self.__update_with_receipt_and_block(ethereum_tx, ethereum_block, tx_receipt)
+                ethereum_tx = self.__update_with_block_and_receipt(ethereum_tx, ethereum_block, tx_receipt)
             return ethereum_tx
         except self.model.DoesNotExist:
             tx_receipt = ethereum_client.get_transaction_receipt(tx_hash)
