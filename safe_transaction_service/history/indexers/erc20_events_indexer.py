@@ -64,7 +64,7 @@ class Erc20EventsIndexer(EthereumIndexer):
                                                                                           from_block=from_block_number,
                                                                                           to_block=to_block_number)
         except RequestException as e:
-            raise self.FindRelevantElementsException from e
+            raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
 
         # Log INFO if erc events found, DEBUG otherwise
         logger_fn = logger.info if erc20_transfer_events else logger.debug

@@ -63,7 +63,7 @@ class InternalTxIndexer(EthereumIndexer):
                                                                    to_block=to_block_number,
                                                                    from_address=addresses)
         except RequestException as e:
-            raise self.FindRelevantElementsException from e
+            raise self.FindRelevantElementsException('Request error calling `trace_filter`') from e
 
         # Log INFO if traces found, DEBUG if not
         tx_hashes = OrderedDict.fromkeys([trace['transactionHash']
@@ -74,7 +74,6 @@ class InternalTxIndexer(EthereumIndexer):
 
         return tx_hashes
 
-    @transaction.atomic
     def process_elements(self, tx_hashes: Iterable[str]) -> List[InternalTx]:
         # Prefetch ethereum txs
         if not tx_hashes:
@@ -92,23 +91,25 @@ class InternalTxIndexer(EthereumIndexer):
         logger.info('End prefetching of traces(internal txs)')
 
         logger.info('Storing traces')
-        internal_txs = InternalTx.objects.bulk_create(internal_txs_batch, ignore_conflicts=True)
-        logger.info('End storing of traces')
-        logger.info('Decoding of traces')
-        internal_txs_decoded_batch = []
-        for internal_tx in internal_txs:
-            if internal_tx.can_be_decoded:
-                if internal_tx.pk is None:  # Internal tx not created, already exists
-                    internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
-                                                         trace_address=internal_tx.trace_address)
-                try:
-                    function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                    internal_txs_decoded_batch.append(InternalTxDecoded(internal_tx=internal_tx,
-                                                                        function_name=function_name,
-                                                                        arguments=arguments))
-                except CannotDecode:
-                    pass
-        if internal_txs_decoded_batch:
-            InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
-        logger.info('End decoding of traces')
-        return internal_txs
+
+        with transaction.atomic():
+            internal_txs = InternalTx.objects.bulk_create(internal_txs_batch, ignore_conflicts=True)
+            logger.info('End storing of traces')
+            logger.info('Decoding of traces')
+            internal_txs_decoded_batch = []
+            for internal_tx in internal_txs:
+                if internal_tx.can_be_decoded:
+                    if internal_tx.pk is None:  # Internal tx not created, already exists
+                        internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
+                                                             trace_address=internal_tx.trace_address)
+                    try:
+                        function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
+                        internal_txs_decoded_batch.append(InternalTxDecoded(internal_tx=internal_tx,
+                                                                            function_name=function_name,
+                                                                            arguments=arguments))
+                    except CannotDecode:
+                        pass
+            if internal_txs_decoded_batch:
+                InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
+            logger.info('End decoding of traces')
+            return internal_txs
