@@ -27,13 +27,6 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     signature = HexadecimalField(required=False)
     origin = serializers.CharField(max_length=100, allow_null=True, default=None)
 
-    def validate_confirmation_type(self, value: str) -> int:
-        value = value.upper()
-        try:
-            return ConfirmationType[value].name
-        except KeyError:
-            raise ValidationError(f'Confirmation Type {value} not recognized')
-
     def validate(self, data):
         super().validate(data)
 
