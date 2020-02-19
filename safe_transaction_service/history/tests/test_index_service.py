@@ -1,12 +1,14 @@
 from django.test import TestCase
 
 from eth_account import Account
+from web3 import Web3
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..models import EthereumTx
 from ..services import IndexService
-from ..services.index_service import TransactionNotFoundException
+from ..services.index_service import (EthereumBlockHashMismatch,
+                                      TransactionNotFoundException)
 from .factories import EthereumTxFactory
 
 
@@ -46,3 +48,17 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(len(mixed_txs), len(tx_hashes))
         for mixed_tx in mixed_txs:
             self.assertIsNotNone(mixed_tx)
+
+        # Test block hash changes
+        ethereum_tx = ethereum_txs[0]
+        ethereum_tx.block.block_hash = Web3.keccak(text='aloha')
+        ethereum_tx.block.save(update_fields=['block_hash'])
+        tx_hash = ethereum_tx.tx_hash
+
+        # Uses database
+        index_service.txs_create_or_update_from_tx_hashes([tx_hash])
+        ethereum_tx.delete()
+
+        # Try to fetch again
+        with self.assertRaises(EthereumBlockHashMismatch):
+            index_service.txs_create_or_update_from_tx_hashes([tx_hash])

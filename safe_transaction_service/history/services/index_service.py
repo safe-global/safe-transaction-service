@@ -21,6 +21,10 @@ class TransactionWithoutBlockException(Exception):
     pass
 
 
+class EthereumBlockHashMismatch(Exception):
+    pass
+
+
 class IndexServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
@@ -94,7 +98,7 @@ class IndexService:
 
         # Get transactions for hashes not in db
         txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
-        block_numbers = []
+        block_numbers = set()
         for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
             tx = tx or self.ethereum_client.get_transaction(tx_hash)  # Retry fetching if failed
             if not tx:
@@ -102,15 +106,20 @@ class IndexService:
             elif tx.get('blockNumber') is None:
                 raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx with '
                                                        f'tx-hash={HexBytes(tx_hash).hex()}')
-            block_numbers.append(tx['blockNumber'])
+            block_numbers.add(tx['blockNumber'])
 
         blocks = self.ethereum_client.get_blocks(block_numbers)
+        block_dict = {block['number']: block for block in blocks}
 
         # Create new transactions or update them if they have no receipt
         current_block_number = self.ethereum_client.current_block_number
-        for tx, tx_receipt, block in zip(txs, tx_receipts, blocks):
+        for tx, tx_receipt in zip(txs, tx_receipts):
+            block = block_dict.get(tx['blockNumber'])
             confirmed = (current_block_number - block['number']) >= self.SAFE_CONFIRMATIONS
-            ethereum_block = EthereumBlock.objects.get_or_create_from_block(block, confirmed=confirmed)
+            ethereum_block: EthereumBlock = EthereumBlock.objects.get_or_create_from_block(block, confirmed=confirmed)
+            if HexBytes(ethereum_block.block_hash) != block['hash']:
+                raise EthereumBlockHashMismatch(f'Stored block with hash={ethereum_block.block_hash} '
+                                                f'is not marching retrieved hash={block["hash"].hex()}')
             try:
                 ethereum_tx = EthereumTx.objects.get(tx_hash=tx['hash'])
                 # For txs stored before being mined
