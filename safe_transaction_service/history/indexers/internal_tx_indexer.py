@@ -80,7 +80,7 @@ class InternalTxIndexer(EthereumIndexer):
             return []
 
         logger.info('Prefetching and storing ethereum txs')
-        ethereum_txs = EthereumTx.objects.create_or_update_from_tx_hashes(tx_hashes)
+        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.info('End prefetching and storing of ethereum txs')
 
         logger.info('Prefetching of traces(internal txs)')

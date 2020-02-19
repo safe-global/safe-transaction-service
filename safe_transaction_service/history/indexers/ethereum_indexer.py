@@ -11,6 +11,7 @@ from web3 import Web3
 from gnosis.eth import EthereumClient
 
 from ..models import MonitoredAddress
+from ..services import IndexService
 from ..utils import chunks
 
 logger = getLogger(__name__)
@@ -45,6 +46,7 @@ class EthereumIndexer(ABC):
         based on congestion algorithm
         """
         self.ethereum_client = ethereum_client
+        self.index_service = IndexService(ethereum_client)
         self.confirmations = confirmations
         self.initial_block_process_limit = block_process_limit
         self.block_process_limit = block_process_limit

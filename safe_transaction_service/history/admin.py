@@ -10,6 +10,7 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, MultisigConfirmation,
                      MultisigTransaction, ProxyFactory, SafeContract,
                      SafeMasterCopy, SafeStatus, WebHook)
+from .services import IndexServiceProvider
 
 
 @admin.register(EthereumBlock)
@@ -255,11 +256,8 @@ class SafeStatusAdmin(admin.ModelAdmin):
         return False
 
     def remove_and_index(self, request, queryset):
-        addresses = queryset.distinct().values('address')  # Delete all SafeStatus for addresses selected
-        all_queryset = SafeStatus.objects.filter(address__in=addresses)
-        internal_txs = all_queryset.values('internal_tx')
-        InternalTxDecoded.objects.filter(pk__in=internal_txs).update(processed=False)  # Mark as not processed
-        all_queryset.delete()  # Remove all SafeStatus for that Safe
+        safe_addresses = queryset.distinct().values('address')
+        IndexServiceProvider().reindex_addresses(safe_addresses)
     remove_and_index.short_description = "Remove and index again"
 
 

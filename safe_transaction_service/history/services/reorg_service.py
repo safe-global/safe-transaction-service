@@ -27,7 +27,7 @@ class ReorgServiceProvider:
 
 # TODO Test ReorgService
 class ReorgService:
-    SAFE_CONFIRMATIONS = 7
+    SAFE_CONFIRMATIONS = 10
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
