@@ -118,7 +118,8 @@ class IndexService:
             confirmed = (current_block_number - block['number']) >= self.SAFE_CONFIRMATIONS
             ethereum_block: EthereumBlock = EthereumBlock.objects.get_or_create_from_block(block, confirmed=confirmed)
             if HexBytes(ethereum_block.block_hash) != block['hash']:
-                raise EthereumBlockHashMismatch(f'Stored block with hash={ethereum_block.block_hash} '
+                raise EthereumBlockHashMismatch(f'Stored block={ethereum_block.number} '
+                                                f'with hash={ethereum_block.block_hash} '
                                                 f'is not marching retrieved hash={block["hash"].hex()}')
             try:
                 ethereum_tx = EthereumTx.objects.get(tx_hash=tx['hash'])

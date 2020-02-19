@@ -20,8 +20,10 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         with self.assertRaisesMessage(TransactionNotFoundException, tx_hashes[0]):
             index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
 
-        # Test with database txs
-        ethereum_txs = [EthereumTxFactory() for _ in range(4)]
+        # Test with database txs. Use block_number > current_block_number to prevent storing blocks with wrong
+        # hashes that will be indexed by next tests
+        current_block_number = self.ethereum_client.current_block_number
+        ethereum_txs = [EthereumTxFactory(block__number=current_block_number + 100 + i) for i in range(4)]
         tx_hashes = [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
         db_txs = index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         self.assertEqual(len(db_txs), len(tx_hashes))
