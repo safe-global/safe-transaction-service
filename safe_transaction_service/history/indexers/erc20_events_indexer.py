@@ -6,7 +6,7 @@ from requests import RequestException
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumEvent, EthereumTx, SafeContract
+from ..models import EthereumEvent, SafeContract
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)

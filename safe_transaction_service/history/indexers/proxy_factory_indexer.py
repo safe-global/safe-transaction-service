@@ -10,7 +10,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import EthereumTx, ProxyFactory, SafeContract
+from ..models import ProxyFactory, SafeContract
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)

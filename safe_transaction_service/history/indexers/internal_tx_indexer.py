@@ -8,7 +8,7 @@ from requests import RequestException
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumTx, InternalTx, InternalTxDecoded, SafeMasterCopy
+from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer
 from .tx_decoder import CannotDecode, TxDecoder
 

@@ -4,6 +4,7 @@ from unittest import mock
 from django.urls import reverse
 
 from eth_account import Account
+from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 from web3 import Web3
@@ -28,7 +29,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        multisig_tx = MultisigTransactionFactory()
+        add_owner_with_threshold_data = HexBytes('0x0d582f130000000000000000000000001b9a0da11a5cace4e7035993cbb2e4'
+                                                 'b1b3b164cf000000000000000000000000000000000000000000000000000000'
+                                                 '0000000001')
+        multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
         safe_tx_hash = multisig_tx.safe_tx_hash
         response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -36,6 +40,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertTrue(Web3.isChecksumAddress(response.data['executor']))
         self.assertEqual(response.data['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
         self.assertEqual(response.data['origin'], multisig_tx.origin)
+        self.assertEqual(response.data['data_decoded'], {'addOwnerWithThreshold': [{'name': 'owner',
+                                                                                    'type': 'address',
+                                                                                    'value': '0x1b9a0DA11a5caCE4e703599'
+                                                                                             '3Cbb2E4B1B3b164Cf'},
+                                                                                   {'name': '_threshold',
+                                                                                    'type': 'uint256',
+                                                                                    'value': 1}]
+                                                         })
         # Test camelCase
         self.assertEqual(response.json()['transactionHash'], multisig_tx.ethereum_tx.tx_hash)
 
