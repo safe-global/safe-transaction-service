@@ -96,7 +96,7 @@ class SafeTxProcessor(TxProcessor):
         master_copy = internal_tx.to
         processed_successfully = True
         if function_name == 'setup' and contract_address != NULL_ADDRESS:
-            logger.info('Processing Safe setup')
+            logger.debug('Processing Safe setup')
             owners = arguments['_owners']
             threshold = arguments['_threshold']
             _, created = SafeContract.objects.get_or_create(address=contract_address,
@@ -110,7 +110,7 @@ class SafeTxProcessor(TxProcessor):
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=0, master_copy=master_copy)
         elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
-            logger.info('Processing owner/threshold modification')
+            logger.debug('Processing owner/threshold modification')
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
             owner = arguments['owner']
@@ -125,7 +125,7 @@ class SafeTxProcessor(TxProcessor):
                              internal_tx.ethereum_tx_id)
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'swapOwner':
-            logger.info('Processing owner swap')
+            logger.debug('Processing owner swap')
             old_owner = arguments['oldOwner']
             new_owner = arguments['newOwner']
             safe_status = self.get_last_safe_status_for_address(contract_address)
@@ -133,18 +133,18 @@ class SafeTxProcessor(TxProcessor):
             safe_status.owners.append(new_owner)
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'changeThreshold':
-            logger.info('Processing threshold change')
+            logger.debug('Processing threshold change')
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'changeMasterCopy':
-            logger.info('Processing master copy change')
+            logger.debug('Processing master copy change')
             # TODO Ban address if it doesn't have a valid master copy
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.master_copy = arguments['_masterCopy']
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'approveHash':
-            logger.info('Processing hash approval')
+            logger.debug('Processing hash approval')
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
             # TODO Check previous trace is not a delegate call
@@ -159,7 +159,7 @@ class SafeTxProcessor(TxProcessor):
                 multisig_confirmation.ethereum_tx = ethereum_tx
                 multisig_confirmation.save(update_fields=['ethereum_tx'])
         elif function_name == 'execTransaction':
-            logger.info('Processing transaction execution')
+            logger.debug('Processing transaction execution')
             safe_status = self.get_last_safe_status_for_address(contract_address)
             nonce = safe_status.nonce
             if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
@@ -235,9 +235,9 @@ class SafeTxProcessor(TxProcessor):
             safe_status.nonce = nonce + 1
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'execTransactionFromModule':
-            logger.info('Not processing execTransactionFromModule')
+            logger.debug('Not processing execTransactionFromModule')
             # No side effects or nonce increasing, but trace will be set as processed
         else:
             processed_successfully = False
-        logger.info('End decoding')
+        logger.debug('End processing')
         return processed_successfully

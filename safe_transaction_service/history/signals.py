@@ -27,10 +27,11 @@ def bind_confirmation(sender: Type[Model],
     if not created:
         return
     if sender == MultisigTransaction:
-        for multisig_confirmation in MultisigConfirmation.objects.without_transaction().filter(
-                multisig_transaction_hash=instance.safe_tx_hash):
-            multisig_confirmation.multisig_transaction = instance
-            multisig_confirmation.save(update_fields=['multisig_transaction'])
+        MultisigConfirmation.objects.without_transaction().filter(
+            multisig_transaction_hash=instance.safe_tx_hash
+        ).update(
+            multisig_transaction=instance
+        )
     elif sender == MultisigConfirmation:
         if not instance.multisig_transaction_id:
             try:
@@ -56,7 +57,7 @@ def fix_erc20_block_number(sender: Type[Model], instance: SafeContract, created:
         return
     if sender == SafeContract:
         if instance.erc20_block_number == 0:
-            if instance.ethereum_tx and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
+            if instance.ethereum_tx_id and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
                 instance.erc20_block_number = instance.ethereum_tx.block_id
                 instance.save()
 
