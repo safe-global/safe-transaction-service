@@ -14,8 +14,9 @@ from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature
 
-from ..models import (EthereumTx, InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeStatus)
+from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
+                      MultisigConfirmation, MultisigTransaction, SafeContract,
+                      SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -39,6 +40,8 @@ class SafeTxProcessor(TxProcessor):
                                               in self.safe_tx_failure_events}
         self.ethereum_client = ethereum_client
 
+        self.safe_status_cache = {}
+
     def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:
         # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
         safe_tx_hash = HexBytes(safe_tx_hash).hex()
@@ -48,6 +51,14 @@ class SafeTxProcessor(TxProcessor):
                     log['data'] == safe_tx_hash):
                 return True
         return False
+
+    def get_last_safe_status_for_address(self, address: str) -> SafeStatus:
+        return self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
+
+    def store_new_safe_status(self, safe_status: SafeStatus, internal_tx: InternalTx) -> SafeStatus:
+        safe_status.store_new(internal_tx)
+        self.safe_status_cache[safe_status.address] = safe_status
+        return self.safe_status_cache[safe_status.address]
 
     @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
@@ -63,6 +74,7 @@ class SafeTxProcessor(TxProcessor):
         master_copy = internal_tx.to
         processed_successfully = True
         if function_name == 'setup' and contract_address != NULL_ADDRESS:
+            logger.info('Processing Safe setup')
             owners = arguments['_owners']
             threshold = arguments['_threshold']
             _, created = SafeContract.objects.get_or_create(address=contract_address,
@@ -76,7 +88,8 @@ class SafeTxProcessor(TxProcessor):
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=0, master_copy=master_copy)
         elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
-            safe_status = SafeStatus.objects.last_for_address(contract_address)
+            logger.info('Processing owner/threshold modification')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
             owner = arguments['owner']
             try:
@@ -88,39 +101,44 @@ class SafeTxProcessor(TxProcessor):
                 logger.error('Error processing trace=%s for contract=%s with tx-hash=%s',
                              internal_tx.trace_address, contract_address,
                              internal_tx.ethereum_tx_id)
-            safe_status.store_new(internal_tx)
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'swapOwner':
+            logger.info('Processing owner swap')
             old_owner = arguments['oldOwner']
             new_owner = arguments['newOwner']
-            safe_status = SafeStatus.objects.last_for_address(contract_address)
+            safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.owners.remove(old_owner)
             safe_status.owners.append(new_owner)
-            safe_status.store_new(internal_tx)
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'changeThreshold':
-            safe_status = SafeStatus.objects.last_for_address(contract_address)
+            logger.info('Processing threshold change')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
-            safe_status.store_new(internal_tx)
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'changeMasterCopy':
+            logger.info('Processing master copy change')
             # TODO Ban address if it doesn't have a valid master copy
-            safe_status = SafeStatus.objects.last_for_address(contract_address)
+            safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.master_copy = arguments['_masterCopy']
-            safe_status.store_new(internal_tx)
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'approveHash':
+            logger.info('Processing hash approval')
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
             # TODO Check previous trace is not a delegate call
             owner = internal_tx.get_previous_trace()._from
             (multisig_confirmation,
              _) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
-                                                                   owner=owner,
-                                                                   defaults={
-                                                                       'ethereum_tx': ethereum_tx,
-                                                                   })
+                                                             owner=owner,
+                                                             defaults={
+                                                                 'ethereum_tx': ethereum_tx,
+                                                             })
             if not multisig_confirmation.ethereum_tx_id:
                 multisig_confirmation.ethereum_tx = ethereum_tx
-                multisig_confirmation.save()
+                multisig_confirmation.save(update_fields=['ethereum_tx'])
         elif function_name == 'execTransaction':
-            safe_status = SafeStatus.objects.last_for_address(contract_address)
+            logger.info('Processing transaction execution')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
             nonce = safe_status.nonce
             if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
                 base_gas = arguments['baseGas']
@@ -193,11 +211,13 @@ class SafeTxProcessor(TxProcessor):
                     multisig_confirmation.save(update_fields=['signature'])
 
             safe_status.nonce = nonce + 1
-            safe_status.store_new(internal_tx)
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'execTransactionFromModule':
+            logger.info('Not processing execTransactionFromModule')
             # No side effects or nonce increasing, but trace will be set as processed
-            pass
         else:
             processed_successfully = False
+        logger.info('Setting internal tx processed')
         internal_tx_decoded.set_processed()
+        logger.info('End decoding')
         return processed_successfully

@@ -154,7 +154,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 5000
+            batch = 300
             if count:
                 tx_processor: TxProcessor = SafeTxProcessor(EthereumClientProvider())
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
