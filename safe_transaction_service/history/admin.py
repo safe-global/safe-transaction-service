@@ -1,7 +1,7 @@
 from typing import Optional
 
 from django.contrib import admin
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.functions import Greatest
 
 from gnosis.eth import EthereumClientProvider
@@ -91,11 +91,28 @@ class InternalTxAdmin(admin.ModelAdmin):
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
 
 
+class InternalTxDecodedListFilter(admin.SimpleListFilter):
+    title = 'Gnosis official Safes'
+    parameter_name = 'official_safes'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'Yes'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'YES':
+            return queryset.filter(
+                Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
+                | Q(function_name='setup')  # This way we can index new Safes without events
+            )
+
+
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     actions = ['process_again']
     list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
-    list_filter = ('function_name', 'processed')
+    list_filter = ('function_name', 'processed', InternalTxDecodedListFilter)
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',

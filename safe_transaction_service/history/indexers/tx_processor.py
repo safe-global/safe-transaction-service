@@ -3,7 +3,6 @@ from logging import getLogger
 from typing import Dict, List, Union
 
 from django.db import transaction
-from django.db.models import QuerySet
 
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -23,6 +22,10 @@ logger = getLogger(__name__)
 
 
 class TxProcessor(ABC):
+    @abstractmethod
+    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
+        pass
+
     @abstractmethod
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         pass
