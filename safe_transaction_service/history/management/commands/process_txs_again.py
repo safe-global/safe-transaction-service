@@ -20,8 +20,11 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             self.stdout.write(self.style.SUCCESS('Removing models'))
-            MultisigConfirmation.objects.filter(signature=None).delete()  # Remove not offchain confirmations
-            MultisigTransaction.objects.exclude(ethereum_tx=None).delete()  # Remove not indexed transactions
+
+            # Remove mined transactions. This is important, as if `nonce` gets wrong due to a problem of indexing
+            # we could be indexing existing txs with wrong SafeTxHash, so they will be duplicated. Deleting this
+            # we will retrieve then again from blockchain
+            MultisigTransaction.objects.exclude(ethereum_tx=None).delete()
             SafeStatus.objects.all().delete()
 
             self.stdout.write(self.style.SUCCESS('Set all InternalTxDecoded as not Processed'))

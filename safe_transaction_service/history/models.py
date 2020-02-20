@@ -737,7 +737,7 @@ class SafeStatus(models.Model):
 
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx
-        return self.save()
+        return self.save(update_fields=['internal_tx'])
 
 
 class WebHookType(Enum):

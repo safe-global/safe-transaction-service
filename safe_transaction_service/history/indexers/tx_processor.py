@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Union
+from typing import Dict, List, Union
 
 from django.db import transaction
+from django.db.models import QuerySet
 
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -40,7 +41,7 @@ class SafeTxProcessor(TxProcessor):
                                               in self.safe_tx_failure_events}
         self.ethereum_client = ethereum_client
 
-        self.safe_status_cache = {}
+        self.safe_status_cache: Dict[str, SafeStatus] = {}
 
     def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:
         # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
@@ -61,7 +62,26 @@ class SafeTxProcessor(TxProcessor):
         return self.safe_status_cache[safe_status.address]
 
     @transaction.atomic
+    def process_decoded_transactions(self, internal_txs_decoded: QuerySet) -> List[bool]:
+        """
+        Optimize to process multiple transactions in a batch
+        :param internal_txs_decoded:
+        :return:
+        """
+        results = [self.__process_decoded_transaction(internal_tx_decoded)
+                   for internal_tx_decoded in internal_txs_decoded]
+
+        # Set all as decoded in the same batch
+        internal_txs_decoded.update(processed=True)
+        return results
+
+    @transaction.atomic
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
+        processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
+        internal_tx_decoded.set_processed()
+        return processed_successfully
+
+    def __process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """
         Decode internal tx and creates needed models
         :param internal_tx_decoded: InternalTxDecoded to process. It will be set as `processed`
@@ -156,13 +176,13 @@ class SafeTxProcessor(TxProcessor):
 
             # Remove existing transaction with same nonce in case of bad indexing (one of the master copies can be
             # outdated and a tx with a wrong nonce could be indexed)
-            MultisigTransaction.objects.filter(
-                ethereum_tx=ethereum_tx,
-                nonce=safe_tx.safe_nonce,
-                safe=contract_address
-            ).exclude(
-                safe_tx_hash=safe_tx_hash
-            ).delete()
+            # MultisigTransaction.objects.filter(
+            #    ethereum_tx=ethereum_tx,
+            #    nonce=safe_tx.safe_nonce,
+            #    safe=contract_address
+            # ).exclude(
+            #     safe_tx_hash=safe_tx_hash
+            # ).delete()
 
             # Remove old txs not used
             # MultisigTransaction.objects.filter(
@@ -217,7 +237,5 @@ class SafeTxProcessor(TxProcessor):
             # No side effects or nonce increasing, but trace will be set as processed
         else:
             processed_successfully = False
-        logger.info('Setting internal tx processed')
-        internal_tx_decoded.set_processed()
         logger.info('End decoding')
         return processed_successfully
