@@ -62,7 +62,7 @@ class SafeTxProcessor(TxProcessor):
         return self.safe_status_cache[safe_status.address]
 
     @transaction.atomic
-    def process_decoded_transactions(self, internal_txs_decoded: QuerySet) -> List[bool]:
+    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
         """
         Optimize to process multiple transactions in a batch
         :param internal_txs_decoded:
@@ -72,7 +72,9 @@ class SafeTxProcessor(TxProcessor):
                    for internal_tx_decoded in internal_txs_decoded]
 
         # Set all as decoded in the same batch
-        internal_txs_decoded.update(processed=True)
+        internal_tx_ids = [internal_tx_decoded.internal_tx_id
+                           for internal_tx_decoded in internal_txs_decoded]
+        InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(processed=True)
         return results
 
     @transaction.atomic

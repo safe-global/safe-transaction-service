@@ -158,13 +158,12 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             if count:
                 tx_processor: TxProcessor = SafeTxProcessor(EthereumClientProvider())
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
-                processed = 0
                 # Use slicing for memory issues
                 for _ in range(0, count, batch):
                     logger.info('Processed %d/%d decoded transactions', number_processed, count)
                     internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()[:batch]
                     tx_processor.process_decoded_transactions(internal_txs_decoded)
-                    processed += count
+                    number_processed += batch
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed', number_processed)
                 return number_processed
