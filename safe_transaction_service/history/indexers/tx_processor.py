@@ -32,6 +32,7 @@ class SafeTxProcessor(TxProcessor):
     """
 
     def __init__(self, ethereum_client: EthereumClient):
+        # This safe_tx_failure events allow us to detect a failed safe transaction
         self.safe_tx_failure_events = [get_safe_V1_0_0_contract(Web3()).events.ExecutionFailed(),
                                        get_safe_contract(Web3()).events.ExecutionFailure()]
         self.safe_tx_failure_events_topics = {event_abi_to_log_topic(event.abi) for event
@@ -107,14 +108,15 @@ class SafeTxProcessor(TxProcessor):
         elif function_name == 'approveHash':
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
+            # TODO Check previous trace is not a delegate call
             owner = internal_tx.get_previous_trace()._from
             (multisig_confirmation,
-             created) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
+             _) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
                                                                    owner=owner,
                                                                    defaults={
                                                                        'ethereum_tx': ethereum_tx,
                                                                    })
-            if not created and not multisig_confirmation.ethereum_tx_id:
+            if not multisig_confirmation.ethereum_tx_id:
                 multisig_confirmation.ethereum_tx = ethereum_tx
                 multisig_confirmation.save()
         elif function_name == 'execTransaction':
@@ -145,14 +147,14 @@ class SafeTxProcessor(TxProcessor):
             ).delete()
 
             # Remove old txs not used
-            #MultisigTransaction.objects.filter(
-            #    ethereum_tx=None,
-            #    nonce__lt=safe_tx.safe_nonce,
-            #    safe=contract_address
-            #).delete()
+            # MultisigTransaction.objects.filter(
+            #     ethereum_tx=None,
+            #     nonce__lt=safe_tx.safe_nonce,
+            #     safe=contract_address
+            # ).delete()
 
             failed = self.is_failed(ethereum_tx, safe_tx_hash)
-            multisig_tx, created = MultisigTransaction.objects.get_or_create(
+            multisig_tx, _ = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={
                     'safe': contract_address,
@@ -170,7 +172,7 @@ class SafeTxProcessor(TxProcessor):
                     'signatures': safe_tx.signatures,
                     'failed': failed,
                 })
-            if not created and not multisig_tx.ethereum_tx_id:
+            if not multisig_tx.ethereum_tx_id:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.failed = failed
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
