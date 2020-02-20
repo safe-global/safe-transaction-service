@@ -59,7 +59,7 @@ def fix_erc20_block_number(sender: Type[Model], instance: SafeContract, created:
         if instance.erc20_block_number == 0:
             if instance.ethereum_tx_id and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
                 instance.erc20_block_number = instance.ethereum_tx.block_id
-                instance.save()
+                instance.save(update_fields=['erc20_block_number'])
 
 
 @receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.send_webhook')
