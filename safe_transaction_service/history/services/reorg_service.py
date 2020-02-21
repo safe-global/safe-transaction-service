@@ -16,7 +16,7 @@ class ReorgServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = ReorgService(EthereumClientProvider())
+            cls.instance = ReorgService(EthereumClientProvider(), settings.ETH_REORG_BLOCKS)
         return cls.instance
 
     @classmethod
@@ -27,10 +27,9 @@ class ReorgServiceProvider:
 
 # TODO Test ReorgService
 class ReorgService:
-    SAFE_CONFIRMATIONS = 10
-
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int):
         self.ethereum_client = ethereum_client
+        self.eth_reorg_blocks = eth_reorg_blocks
         # Dictionary with Django model and attribute for reorgs
         self.reorg_models: Dict[models.Model, str] = {
             SafeMasterCopy: 'tx_block_number',
@@ -43,7 +42,7 @@ class ReorgService:
         :return: Number of oldest block with reorg detected. `None` if not reorg found
         """
         current_block_number = self.ethereum_client.current_block_number
-        to_block = current_block_number - self.SAFE_CONFIRMATIONS
+        to_block = current_block_number - self.eth_reorg_blocks
         for database_block in EthereumBlock.objects.not_confirmed(to_block_number=to_block):
             blockchain_block = self.ethereum_client.get_block(database_block.number, full_transactions=False)
             if HexBytes(blockchain_block['hash']) == HexBytes(database_block.block_hash):

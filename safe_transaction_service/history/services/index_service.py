@@ -21,6 +21,10 @@ class TransactionWithoutBlockException(Exception):
     pass
 
 
+class BlockNotFoundException(Exception):
+    pass
+
+
 class EthereumBlockHashMismatch(Exception):
     pass
 
@@ -29,7 +33,7 @@ class IndexServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = IndexService(EthereumClientProvider())
+            cls.instance = IndexService(EthereumClientProvider(), settings.ETH_REORG_BLOCKS)
         return cls.instance
 
     @classmethod
@@ -40,10 +44,9 @@ class IndexServiceProvider:
 
 # TODO Test IndexService
 class IndexService:
-    SAFE_CONFIRMATIONS = 10
-
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int):
         self.ethereum_client = ethereum_client
+        self.eth_reorg_blocks = eth_reorg_blocks
 
     def block_get_or_create_from_block_number(self, block_number: int):
         try:
@@ -51,7 +54,7 @@ class IndexService:
         except EthereumBlock.DoesNotExist:
             current_block_number = self.ethereum_client.current_block_number  # For reorgs
             block = self.ethereum_client.get_block(block_number)
-            confirmed = (current_block_number - block['number']) >= self.SAFE_CONFIRMATIONS
+            confirmed = (current_block_number - block['number']) >= self.eth_reorg_blocks
             return EthereumBlock.objects.create_from_block(block, cofirmed=confirmed)
 
     def tx_create_or_update_from_tx_hash(self, tx_hash: str) -> 'EthereumTx':
@@ -109,13 +112,19 @@ class IndexService:
             block_numbers.add(tx['blockNumber'])
 
         blocks = self.ethereum_client.get_blocks(block_numbers)
-        block_dict = {block['number']: block for block in blocks}
+        block_dict = {}
+        for block_number, block in zip(block_numbers, blocks):
+            block = block or self.ethereum_client.get_block(block_number)  # Retry fetching if failed
+            if not block:
+                raise BlockNotFoundException(f'Block with number={block_number} was not found')
+            assert block_number == block['number']
+            block_dict[block['number']] = block
 
         # Create new transactions or update them if they have no receipt
         current_block_number = self.ethereum_client.current_block_number
         for tx, tx_receipt in zip(txs, tx_receipts):
             block = block_dict.get(tx['blockNumber'])
-            confirmed = (current_block_number - block['number']) >= self.SAFE_CONFIRMATIONS
+            confirmed = (current_block_number - block['number']) >= self.eth_reorg_blocks
             ethereum_block: EthereumBlock = EthereumBlock.objects.get_or_create_from_block(block, confirmed=confirmed)
             if HexBytes(ethereum_block.block_hash) != block['hash']:
                 raise EthereumBlockHashMismatch(f'Stored block={ethereum_block.number} '

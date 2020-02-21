@@ -6,15 +6,15 @@ from web3 import Web3
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..models import EthereumTx
-from ..services import IndexService
-from ..services.index_service import (EthereumBlockHashMismatch,
+from ..services.index_service import (EthereumBlockHashMismatch, IndexService,
+                                      IndexServiceProvider,
                                       TransactionNotFoundException)
 from .factories import EthereumTxFactory
 
 
 class TestIndexService(EthereumTestCaseMixin, TestCase):
     def test_create_or_update_from_tx_hashes_existing(self):
-        index_service = IndexService(self.ethereum_client)
+        index_service: IndexService = IndexServiceProvider()
         self.assertListEqual(index_service.txs_create_or_update_from_tx_hashes([]), [])
         tx_hashes = ['0x52fcb05f2ad209d53d84b0a9a7ce6474ab415db88bc364c088758d70c8b5b0ef']
         with self.assertRaisesMessage(TransactionNotFoundException, tx_hashes[0]):
