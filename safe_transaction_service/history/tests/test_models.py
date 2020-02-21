@@ -69,8 +69,6 @@ class TestModels(TestCase):
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
-
-
     def test_safe_contract_receiver(self):
         ethereum_tx = EthereumTxFactory()
         safe_contract = SafeContract.objects.create(address=Account.create().address, ethereum_tx=ethereum_tx)

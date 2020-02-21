@@ -102,13 +102,18 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Processing Safe setup')
             owners = arguments['_owners']
             threshold = arguments['_threshold']
-            _, created = SafeContract.objects.get_or_create(address=contract_address,
-                                                            defaults={
-                                                                'ethereum_tx': internal_tx.ethereum_tx,
-                                                                'erc20_block_number': internal_tx.ethereum_tx.block_id,
-                                                            })
-            if created:
+            try:
+                safe_contract: SafeContract = SafeContract.objects.get(address=contract_address)
+                if not safe_contract.ethereum_tx_id or not safe_contract.erc20_block_number:
+                    safe_contract.ethereum_tx = internal_tx.ethereum_tx
+                    safe_contract.erc20_block_number = internal_tx.ethereum_tx.block_id
+                    safe_contract.save(update_fields=['ethereum_tx', 'erc20_block_number'])
+            except SafeContract.DoesNotExist:
+                SafeContract.objects.create(address=contract_address,
+                                            ethereum_tx=internal_tx.ethereum_tx,
+                                            erc20_block_number=internal_tx.ethereum_tx.block_id)
                 logger.info('Found new Safe=%s', contract_address)
+
             SafeStatus.objects.create(internal_tx=internal_tx,
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=0, master_copy=master_copy)

@@ -10,7 +10,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_proxy_factory_contract
 
-from ..models import ProxyFactory, SafeContract
+from ..models import ProxyFactory, SafeContract, EthereumTx
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
@@ -100,9 +100,15 @@ class ProxyIndexerService(EthereumIndexer):
             int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')
             contract_address = Web3.toChecksumAddress('{:#042x}'.format(int_contract_address))
             if contract_address != NULL_ADDRESS:
+                if event['blockNumber'] == 0:
+                    logger.error('Events are reporting blockNumber=0 for tx-hash=%s', event['transactionHash'].hex())
+                    ethereum_tx = EthereumTx.objects.get(event['transactionHash'])
+                    block_number = ethereum_tx.block_id
+                else:
+                    block_number = event['blockNumber']
                 safe_contracts.append(SafeContract(address=contract_address,
                                                    ethereum_tx_id=event['transactionHash'],
-                                                   erc20_block_number=event['blockNumber']))
+                                                   erc20_block_number=block_number))
         if safe_contracts:
             SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
         return safe_contracts
