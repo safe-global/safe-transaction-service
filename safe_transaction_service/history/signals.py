@@ -70,7 +70,6 @@ def send_webhook(sender: Type[Model],
                  instance: Union[MultisigConfirmation, MultisigTransaction],
                  created: bool, **kwargs) -> None:
 
-    address: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
 
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
@@ -113,5 +112,5 @@ def send_webhook(sender: Type[Model],
             if element in instance.arguments:
                 payload[element] = str(instance.arguments[element])
 
-    if address and payload:
-        send_webhook_task.delay(address, payload)
+    if payload:
+        send_webhook_task.delay(payload)

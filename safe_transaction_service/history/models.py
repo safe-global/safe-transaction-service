@@ -749,16 +749,12 @@ class WebHookType(Enum):
 
 
 class WebHook(models.Model):
-    address = EthereumAddressField(db_index=True)
-    url = models.URLField()
+    url = models.URLField(unique=True)
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)
     pending_outgoing_transaction = models.BooleanField(default=True)
     new_executed_outgoing_transaction = models.BooleanField(default=True)
     new_incoming_transaction = models.BooleanField(default=True)
 
-    class Meta:
-        unique_together = (('address', 'url'),)
-
     def __str__(self):
-        return f'Webhook for safe={self.address} to url={self.url}'
+        return f'Webhook to url={self.url}'

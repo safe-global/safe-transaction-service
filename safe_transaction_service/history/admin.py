@@ -280,9 +280,9 @@ class SafeStatusAdmin(admin.ModelAdmin):
 
 @admin.register(WebHook)
 class WebHookAdmin(admin.ModelAdmin):
-    list_display = ('address', 'url', 'pending_outgoing_transaction', 'new_confirmation',
+    list_display = ('url', 'pending_outgoing_transaction', 'new_confirmation',
                     'new_executed_outgoing_transaction', 'new_incoming_transaction')
     list_filter = ('pending_outgoing_transaction', 'new_confirmation', 'new_executed_outgoing_transaction',
                    'new_incoming_transaction')
     ordering = ['-pk']
-    search_fields = ['address', 'url']
+    search_fields = ['url']
