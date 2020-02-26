@@ -748,8 +748,14 @@ class WebHookType(Enum):
     INCOMING_TOKEN = 4
 
 
+class WebHookQuerySet(models.QuerySet):
+    def matching_for_address(self, address: str):
+        return self.filter(Q(address=address) | Q(address=''))
+
+
 class WebHook(models.Model):
-    address = EthereumAddressField(db_index=True)
+    objects = WebHookQuerySet.as_manager()
+    address = EthereumAddressField(db_index=True, blank=True)
     url = models.URLField()
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)
@@ -761,4 +767,7 @@ class WebHook(models.Model):
         unique_together = (('address', 'url'),)
 
     def __str__(self):
-        return f'Webhook for safe={self.address} to url={self.url}'
+        if self.address:
+            return f'Webhook for safe={self.address} to url={self.url}'
+        else:
+            return f'Webhook to every address to url={self.url}'

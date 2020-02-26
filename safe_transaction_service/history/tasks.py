@@ -2,6 +2,7 @@ import signal
 from typing import Any, Dict, NoReturn, Optional
 
 from django.conf import settings
+from django.db.models import Q
 
 import requests
 from celery import app
@@ -197,7 +198,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
         return False
 
-    webhooks = WebHook.objects.filter(address=address)
+    webhooks = WebHook.objects.matching_for_address(address)
     if not webhooks:
         return 0
 
@@ -214,7 +215,10 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
                               WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
             continue
 
-        logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
+        if webhook.address:
+            logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
+        else:  # Generic WebHook
+            logger.info('Sending webhook for url=%s and payload=%s', address, webhook.url, payload)
         requests.post(webhook.url, json=payload)
         sent_requests += 1
     return sent_requests
