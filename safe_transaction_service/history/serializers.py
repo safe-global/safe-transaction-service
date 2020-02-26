@@ -222,6 +222,12 @@ class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
 
 
+class SafeCreationInfoResponseSerializer(serializers.Serializer):
+    created = serializers.DateTimeField()
+    transaction_hash = Sha3HashField()
+    creator = EthereumAddressField()
+
+
 class OwnerResponseSerializer(SafeBalanceResponseSerializer):
     safes = serializers.ListField(child=EthereumAddressField())
 

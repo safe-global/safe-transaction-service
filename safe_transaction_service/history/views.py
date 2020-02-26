@@ -22,6 +22,7 @@ from .serializers import (IncomingTransactionResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
+                          SafeCreationInfoResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
@@ -225,6 +226,34 @@ class SafeIncomingTxListView(ListAPIView):
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
 
         return response
+
+
+class SafeCreationView(APIView):
+    serializer_class = SafeCreationInfoResponseSerializer
+
+    @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
+                                    404: 'Safes not found for that owner',
+                                    422: 'Owner address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        try:
+            creation_internal_tx = InternalTx.objects.select_related('ethereum_tx__block').get(contract_address=address)
+            previous_internal_tx = creation_internal_tx.get_previous_trace()
+            creator = (previous_internal_tx or creation_internal_tx)._from
+            created = creation_internal_tx.ethereum_tx.block.timestamp
+        except InternalTx.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(data={'creator': creator,
+                                                 'created': created,
+                                                 'transaction_hash': creation_internal_tx.ethereum_tx_id})
+        serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class OwnersView(APIView):

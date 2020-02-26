@@ -443,9 +443,9 @@ class InternalTx(models.Model):
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
-        try:
+        if (index - 1) >= 0:
             return internal_txs[index - 1]
-        except IndexError:
+        else:
             return None
 
 

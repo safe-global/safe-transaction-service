@@ -329,6 +329,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              }
         ])
 
+    def test_safe_creation_view(self):
+        invalid_address = '0x2A'
+        response = self.client.get(reverse('v1:safe-creation', args=(invalid_address,)))
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        owner_address = Account.create().address
+        response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        internal_tx = InternalTxFactory(contract_address=owner_address, trace_address='0,0')
+        response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z')
+        expected = {'created': created_iso,
+                    'creator': internal_tx._from,
+                    'transaction_hash': internal_tx.ethereum_tx_id}
+        self.assertEqual(response.data, expected)
+
+        # Next internal_tx should not alter the result
+        next_internal_tx = InternalTxFactory(trace_address='0,0,0', ethereum_tx=internal_tx.ethereum_tx)
+        response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, expected)
+
+        # Previous internal_tx should change the `creator`
+        previous_internal_tx = InternalTxFactory(trace_address='0', ethereum_tx=internal_tx.ethereum_tx)
+        response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z')
+        self.assertEqual(response.data, {'created': created_iso,
+                                         'creator': previous_internal_tx._from,
+                                         'transaction_hash': internal_tx.ethereum_tx_id})
+
     def test_owners_view(self):
         invalid_address = '0x2A'
         response = self.client.get(reverse('v1:owners', args=(invalid_address,)))
