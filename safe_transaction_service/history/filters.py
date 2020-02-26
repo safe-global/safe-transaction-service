@@ -2,7 +2,8 @@ import django_filters
 from django_filters import rest_framework as filters
 from rest_framework.pagination import LimitOffsetPagination
 
-from gnosis.eth.django.models import Uint256Field
+from gnosis.eth.django.filters import EthereumAddressFilter
+from gnosis.eth.django.models import EthereumAddressField, Uint256Field
 
 from .models import MultisigTransaction
 
@@ -55,5 +56,8 @@ class MultisigTransactionFilter(filters.FilterSet):
         filter_overrides = {
             Uint256Field: {
                 'filter_class': django_filters.NumberFilter
+            },
+            EthereumAddressField: {
+                'filter_class': EthereumAddressFilter
             }
         }

@@ -87,11 +87,24 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        MultisigTransactionFactory(safe=safe_address, nonce=0, ethereum_tx=None)
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, nonce=0, ethereum_tx=None)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=0',
                                    format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
+
+        response = self.client.get(reverse('v1:multisig-transactions',
+                                           args=(safe_address,)) + f'?to=0x2a',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['to'][0], 'Enter a valid checksummed Ethereum Address.')
+
+        response = self.client.get(reverse('v1:multisig-transactions',
+                                           args=(safe_address,)) + f'?to={multisig_transaction.to}',
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=1',
                                    format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
