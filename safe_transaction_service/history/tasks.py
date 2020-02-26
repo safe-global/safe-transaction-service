@@ -193,26 +193,28 @@ def check_reorgs_task() -> Optional[int]:
 
 
 @app.shared_task()
-def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> bool:
+def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
         return False
 
-    try:
-        webhook = WebHook.objects.get(address=address)
-    except WebHook.DoesNotExist:
-        return False
+    webhooks = WebHook.objects.filter(address=address)
+    if not webhooks:
+        return 0
 
-    webhook_type = WebHookType[payload['type']]
-    if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
-        return False
-    elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
-        return False
-    elif webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not webhook.new_executed_outgoing_transaction:
-        return False
-    elif webhook_type in (WebHookType.INCOMING_TOKEN,
-                          WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
-        return False
+    sent_requests = 0
+    for webhook in webhooks:
+        webhook_type = WebHookType[payload['type']]
+        if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
+            continue
+        elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
+            continue
+        elif webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not webhook.new_executed_outgoing_transaction:
+            continue
+        elif webhook_type in (WebHookType.INCOMING_TOKEN,
+                              WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
+            continue
 
-    logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
-    requests.post(webhook.url, json=payload)
-    return True
+        logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
+        requests.post(webhook.url, json=payload)
+        sent_requests += 1
+    return sent_requests
