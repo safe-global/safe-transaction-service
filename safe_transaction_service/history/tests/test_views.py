@@ -215,26 +215,26 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_safe_balances_view(self):
         safe_address = Account.create().address
-        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )))
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         SafeContractFactory(address=safe_address)
         value = 7
         self.send_ether(safe_address, 7)
-        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )))
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 1)
-        self.assertIsNone(response.json()[0]['tokenAddress'])
-        self.assertEqual(response.json()[0]['balance'], str(value))
+        self.assertEqual(len(response.data), 1)
+        self.assertIsNone(response.data[0]['token_address'])
+        self.assertEqual(response.data[0]['balance'], str(value))
 
         tokens_value = 12
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
-        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)))
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.data), 1)
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
-        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)))
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value), 'token': None},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
@@ -250,26 +250,26 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         get_token_info_mock.return_value = erc20_info
 
         safe_address = Account.create().address
-        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         SafeContractFactory(address=safe_address)
         value = 7
         self.send_ether(safe_address, 7)
-        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )))
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 1)
-        self.assertIsNone(response.json()[0]['tokenAddress'])
-        self.assertEqual(response.json()[0]['balance'], str(value))
+        self.assertEqual(len(response.data), 1)
+        self.assertIsNone(response.data[0]['token_address'])
+        self.assertEqual(response.data[0]['balance'], str(value))
 
         tokens_value = int(12 * 1e18)
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
-        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.data), 1)
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
-        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)))
+        response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'token': None, 'balance': str(value),
                                                  'balanceUsd': "0.0"},  # 7 wei is rounded to 0.0
@@ -372,12 +372,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         safe_status = SafeStatusFactory(owners=[owner_address])
-        response = self.client.get(reverse('v1:owners', args=(owner_address,)))
+        response = self.client.get(reverse('v1:owners', args=(owner_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.json()['safes'], [safe_status.address])
+        self.assertCountEqual(response.data['safes'], [safe_status.address])
 
         safe_status_2 = SafeStatusFactory(owners=[owner_address])
         SafeStatusFactory()  # Test that other SafeStatus don't appear
-        response = self.client.get(reverse('v1:owners', args=(owner_address,)))
+        response = self.client.get(reverse('v1:owners', args=(owner_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.json()['safes'], [safe_status.address, safe_status_2.address])
+        self.assertCountEqual(response.data['safes'], [safe_status.address, safe_status_2.address])
