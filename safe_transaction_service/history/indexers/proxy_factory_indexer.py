@@ -108,7 +108,7 @@ class ProxyIndexerService(EthereumIndexer):
                     block_number = event['blockNumber']
                 safe_contracts.append(SafeContract(address=contract_address,
                                                    ethereum_tx_id=event['transactionHash'],
-                                                   erc20_block_number=block_number))
+                                                   erc20_block_number=max(block_number - 5760, 0)))
         if safe_contracts:
             SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
         return safe_contracts
