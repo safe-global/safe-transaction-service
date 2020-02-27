@@ -50,6 +50,7 @@ class MultisigTransactionFilter(filters.FilterSet):
         fields = {
             'executed': ['exact'],
             'failed': ['exact'],
+            'modified': ['lt', 'gt', 'lte', 'gte'],
             'nonce': ['lt', 'gt', 'lte', 'gte', 'exact'],
             'safe_tx_hash': ['exact'],
             'to': ['exact'],
