@@ -69,27 +69,6 @@ class TestModels(TestCase):
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
-    def test_safe_contract_receiver(self):
-        ethereum_tx = EthereumTxFactory()
-        safe_contract = SafeContract.objects.create(address=Account.create().address, ethereum_tx=ethereum_tx)
-        self.assertEqual(safe_contract.erc20_block_number, ethereum_tx.block.number)
-
-        # Test creation with save
-        safe_contract = SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx)
-        self.assertEqual(safe_contract.erc20_block_number, 0)
-        safe_contract.save()
-        self.assertEqual(safe_contract.erc20_block_number, ethereum_tx.block.number)
-
-        # Test batch creation (signals not working)
-        safe_contracts = [
-            SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx),
-            SafeContract(address=Account.create().address, ethereum_tx=ethereum_tx)
-        ]
-        SafeContract.objects.bulk_create(safe_contracts)
-        for safe_contract in safe_contracts:
-            self.assertNotEqual(safe_contract.erc20_block_number, ethereum_tx.block.number)
-            self.assertEqual(safe_contract.erc20_block_number, 0)
-
     def test_safe_master_copy_sorting(self):
         SafeMasterCopy.objects.create(address=Account.create().address,
                                       initial_block_number=3,

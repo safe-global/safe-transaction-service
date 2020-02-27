@@ -268,10 +268,10 @@ class EthereumEvent(models.Model):
         return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'
 
     def is_erc20(self) -> bool:
-        return self.topic == ERC20_721_TRANSFER_TOPIC and 'value' in self.arguments
+        return self.topic == ERC20_721_TRANSFER_TOPIC and 'value' in self.arguments and 'to' in self.arguments
 
     def is_erc721(self) -> bool:
-        return self.topic == ERC20_721_TRANSFER_TOPIC and 'tokenId' in self.arguments
+        return self.topic == ERC20_721_TRANSFER_TOPIC and 'tokenId' in self.arguments and 'to' in self.arguments
 
 
 class InternalTxManager(BulkCreateSignalMixin, models.Manager):

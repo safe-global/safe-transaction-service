@@ -3,11 +3,12 @@ from typing import Any, Dict, Optional, Type, Union
 from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from hexbytes import HexBytes
 
 from .models import (EthereumEvent, InternalTx, MultisigConfirmation,
-                     MultisigTransaction, SafeContract, WebHookType)
+                     MultisigTransaction, WebHookType)
 from .tasks import send_webhook_task
 
 
@@ -26,40 +27,30 @@ def bind_confirmation(sender: Type[Model],
     """
     if not created:
         return
+
     if sender == MultisigTransaction:
-        MultisigConfirmation.objects.without_transaction().filter(
+        updated = MultisigConfirmation.objects.without_transaction().filter(
             multisig_transaction_hash=instance.safe_tx_hash
         ).update(
             multisig_transaction=instance
         )
+        if updated:
+            # Update modified on MultisigTransaction if at least one confirmation is added
+            instance.modified = timezone.now()
+            instance.save(update_fields=['modified'])
     elif sender == MultisigConfirmation:
         if not instance.multisig_transaction_id:
             try:
                 if instance.multisig_transaction_hash:
-                    instance.multisig_transaction = MultisigTransaction.objects.get(
+                    multisig_transaction = MultisigTransaction.objects.get(
                         safe_tx_hash=instance.multisig_transaction_hash)
+                    multisig_transaction.modified = timezone.now()
+                    instance.save(update_fields=['modified'])
+
+                    instance.multisig_transaction = multisig_transaction
                     instance.save(update_fields=['multisig_transaction'])
             except MultisigTransaction.DoesNotExist:
                 pass
-
-
-@receiver(post_save, sender=SafeContract, dispatch_uid='safe_contract.fix_erc20_block_number')
-def fix_erc20_block_number(sender: Type[Model], instance: SafeContract, created: bool, **kwargs) -> None:
-    """
-    When a `SafeContract` is saved, sets the `erc20_block_number` if not set
-    :param sender: SafeContract
-    :param instance: Instance of SafeContract
-    :param created: True if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    if not created:
-        return
-    if sender == SafeContract:
-        if instance.erc20_block_number == 0:
-            if instance.ethereum_tx_id and instance.ethereum_tx.block_id:  # EthereumTx is mandatory, block is not
-                instance.erc20_block_number = instance.ethereum_tx.block_id
-                instance.save(update_fields=['erc20_block_number'])
 
 
 @receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.send_webhook')
@@ -72,6 +63,9 @@ def send_webhook(sender: Type[Model],
 
     address: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
+
+    if not created:
+        return
 
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
         address = instance.multisig_transaction.safe  # This is making a db call
