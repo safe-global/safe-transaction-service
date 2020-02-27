@@ -18,11 +18,16 @@ class CeleryTaskConfiguration(NamedTuple):
 
     def create_task(self) -> Tuple[PeriodicTask, bool]:
         interval, _ = IntervalSchedule.objects.get_or_create(every=self.interval, period=self.period)
-        return PeriodicTask.objects.get_or_create(task=self.name,
-                                                  defaults={
-                                                      'name': self.description,
-                                                      'interval': interval
-                                                  })
+        periodic_task, created = PeriodicTask.objects.get_or_create(task=self.name,
+                                                                    defaults={
+                                                                        'name': self.description,
+                                                                        'interval': interval
+                                                                    })
+        if periodic_task.interval != interval:
+            periodic_task.interval = interval
+            periodic_task.save(update_fields=['interval'])
+
+        return periodic_task, created
 
 
 class Command(BaseCommand):
@@ -37,7 +42,7 @@ class Command(BaseCommand):
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
                                 'Process Internal Txs', 2, IntervalSchedule.MINUTES),
         CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
-                                'Check Reorgs', 90, IntervalSchedule.SECONDS),
+                                'Check Reorgs', 3, IntervalSchedule.MINUTES),
     ]
 
     def handle(self, *args, **options):
@@ -48,6 +53,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS('Task %s was already created' % task.name))
 
+        self.stdout.write(self.style.SUCCESS('Setting up Safe Contract Addresses'))
         ethereum_client = EthereumClientProvider()
         ethereum_network = ethereum_client.get_network()
         if ethereum_network == EthereumNetwork.MAINNET:
