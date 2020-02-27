@@ -92,7 +92,7 @@ class EthereumIndexer(ABC):
         """
         raise NotImplemented
 
-    def process_elements(self, elements: Iterable[Any]):
+    def process_elements(self, elements: Iterable[Any]) -> Iterable[Any]:
         processed_objects = []
         for i, element in enumerate(elements):
             logger.info('Processing element %d/%d', i + 1, len(list(elements)))
