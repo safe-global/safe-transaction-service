@@ -18,8 +18,8 @@ class IncomingTransactionFilter(filters.FilterSet):
     block_number = django_filters.NumberFilter(field_name='block_number')
     block_number__gt = django_filters.NumberFilter(field_name='block_number', lookup_expr='gt')
     block_number__lt = django_filters.NumberFilter(field_name='block_number', lookup_expr='lt')
-    execution_date__gte = django_filters.DateTimeFilter(field_name='execution_date', lookup_expr='gte')
-    execution_date__lte = django_filters.DateTimeFilter(field_name='execution_date', lookup_expr='lte')
+    execution_date__gte = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='gte')
+    execution_date__lte = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='lte')
     nonce__gt = django_filters.NumberFilter(lookup_expr='gt')
     nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
     to = django_filters.CharFilter()
@@ -31,10 +31,12 @@ class IncomingTransactionFilter(filters.FilterSet):
 
 class MultisigTransactionFilter(filters.FilterSet):
     executed = django_filters.BooleanFilter(method='filter_executed')
-    execution_date__gte = django_filters.DateTimeFilter(field_name='ethereum_tx__block__timestamp', lookup_expr='gte')
-    execution_date__lte = django_filters.DateTimeFilter(field_name='ethereum_tx__block__timestamp', lookup_expr='lte')
-    submission_date__gte = django_filters.DateTimeFilter(field_name='created', lookup_expr='gte')
-    submission_date__lte = django_filters.DateTimeFilter(field_name='created', lookup_expr='lte')
+    execution_date__gte = django_filters.IsoDateTimeFilter(field_name='ethereum_tx__block__timestamp',
+                                                           lookup_expr='gte')
+    execution_date__lte = django_filters.IsoDateTimeFilter(field_name='ethereum_tx__block__timestamp',
+                                                           lookup_expr='lte')
+    submission_date__gte = django_filters.IsoDateTimeFilter(field_name='created', lookup_expr='gte')
+    submission_date__lte = django_filters.IsoDateTimeFilter(field_name='created', lookup_expr='lte')
     transaction_hash = django_filters.CharFilter(field_name='ethereum_tx_id')
 
     def filter_executed(self, queryset, name: str, value: bool):
