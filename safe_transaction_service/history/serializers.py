@@ -145,6 +145,7 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     execution_date = serializers.DateTimeField()
     submission_date = serializers.DateTimeField(source='created')  # First seen by this service
+    modified = serializers.DateTimeField()
     block_number = serializers.SerializerMethodField()
     transaction_hash = Sha3HashField(source='ethereum_tx_id')
     safe_tx_hash = Sha3HashField()

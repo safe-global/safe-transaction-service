@@ -20,6 +20,8 @@ class IncomingTransactionFilter(filters.FilterSet):
     block_number__lt = django_filters.NumberFilter(field_name='block_number', lookup_expr='lt')
     execution_date__gte = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='gte')
     execution_date__lte = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='lte')
+    execution_date__gt = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='gt')
+    execution_date__lt = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='lt')
     nonce__gt = django_filters.NumberFilter(lookup_expr='gt')
     nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
     to = django_filters.CharFilter()
