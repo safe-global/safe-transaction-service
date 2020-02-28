@@ -10,8 +10,8 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
-                      MultisigConfirmation, MultisigTransaction, SafeContract,
-                      SafeStatus, WebHook)
+                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
+                      SafeContract, SafeMasterCopy, SafeStatus, WebHook)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -121,6 +121,22 @@ class SafeContractFactory(factory.DjangoModelFactory):
     address = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     erc20_block_number = factory.LazyFunction(lambda: 0)
+
+
+class MonitoredAddressFactory(factory.DjangoModelFactory):
+    address = factory.LazyFunction(lambda: Account.create().address)
+    initial_block_number = factory.LazyFunction(lambda: 0)
+    tx_block_number = factory.LazyFunction(lambda: 0)
+
+
+class ProxyFactoryFactory(MonitoredAddressFactory):
+    class Meta:
+        model = ProxyFactory
+
+
+class SafeMasterCopyFactory(MonitoredAddressFactory):
+    class Meta:
+        model = SafeMasterCopy
 
 
 class SafeStatusFactory(factory.DjangoModelFactory):
