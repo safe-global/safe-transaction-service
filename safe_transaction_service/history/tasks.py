@@ -218,7 +218,11 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
         if webhook.address:
             logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
         else:  # Generic WebHook
-            logger.info('Sending webhook for url=%s and payload=%s', address, webhook.url, payload)
-        requests.post(webhook.url, json=payload)
+            logger.info('Sending webhook for url=%s and payload=%s', webhook.url, payload)
+
+        r = requests.post(webhook.url, json=payload)
+        if not r.ok:
+            logger.warning('Error posting to url=%s', webhook.url)
+
         sent_requests += 1
     return sent_requests

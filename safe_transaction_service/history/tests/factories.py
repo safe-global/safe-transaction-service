@@ -11,7 +11,7 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
-                      SafeStatus)
+                      SafeStatus, WebHook)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -133,3 +133,16 @@ class SafeStatusFactory(factory.DjangoModelFactory):
     threshold = FuzzyInteger(low=1, high=2)
     nonce = factory.Sequence(lambda n: n)
     master_copy = factory.LazyFunction(lambda: Account.create().address)
+
+
+class WebHookFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = WebHook
+
+    address = factory.LazyFunction(lambda: Account.create().address)
+    url = 'http://localhost/test'
+    # Configurable webhook types to listen to
+    new_confirmation = True
+    pending_outgoing_transaction = True
+    new_executed_outgoing_transaction = True
+    new_incoming_transaction = True
