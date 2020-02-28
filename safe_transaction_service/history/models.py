@@ -413,6 +413,10 @@ class InternalTx(models.Model):
         return EthereumTxType(self.tx_type) == EthereumTxType.CALL
 
     @property
+    def is_create(self):
+        return EthereumTxType(self.tx_type) == EthereumTxType.CREATE
+
+    @property
     def is_decoded(self):
         try:
             return bool(self.decoded_tx)

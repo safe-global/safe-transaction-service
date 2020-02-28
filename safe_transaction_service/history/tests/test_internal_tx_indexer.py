@@ -1,161 +1,33 @@
 from unittest import mock
-from unittest.mock import PropertyMock
+from unittest.mock import MagicMock, PropertyMock
 
 from django.test import TestCase
-
-from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
 
 from ..indexers import InternalTxIndexerProvider
-from ..models import SafeMasterCopy
+from ..models import EthereumBlock, EthereumTx, InternalTx, SafeMasterCopy
 from .factories import SafeMasterCopyFactory
-
-# Only thing important for the trace filter are the `transactionHash` that will use to call `trace_transaction`
-trace_filter_result = [
-    {'action': {'from': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
-                'gas': 470747,
-                'value': 0,
-                'init': HexBytes('0x608060405234801561001057600080fd5b506040516101e73803806101e78339818101604052602081101561003357600080fd5b8101908080519060200190929190505050600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614156100ca576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260248152602001806101c36024913960400191505060405180910390fd5b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505060aa806101196000396000f3fe608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea265627a7a72315820d8a00dc4fe6bf675a9d7416fc2d00bb3433362aa8186b750f76c4027269667ff64736f6c634300050e0032496e76616c6964206d617374657220636f707920616464726573732070726f766964656400000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f')},
-     'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-     'blockNumber': 6045252,
-     'result': {'gasUsed': 55109,
-                'code': HexBytes('0x608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea265627a7a72315820d8a00dc4fe6bf675a9d7416fc2d00bb3433362aa8186b750f76c4027269667ff64736f6c634300050e0032'),
-                'address': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-     'subtraces': 0,
-     'traceAddress': [0],
-     'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-     'transactionPosition': 0,
-     'type': 'create'},
-    {'action': {'from': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
-                'gas': 415719,
-                'value': 0,
-                'callType': 'call',
-                'input': HexBytes('0xb63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000198c09f30dba1494c741c510400cfe93b82875130000000000000000000000000000000000000000000000000000000000000000'),
-                'to': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-     'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-     'blockNumber': 6045252,
-     'result': {'gasUsed': 150098, 'output': HexBytes('0x')},
-     'subtraces': 1,
-     'traceAddress': [1],
-     'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-     'transactionPosition': 0,
-     'type': 'call'},
-    {'action': {'from': '0x198C09f30dBa1494C741c510400cFE93B8287513',
-                'gas': 13077,
-                'value': 133700000000000000,
-                'callType': 'call',
-                'input': HexBytes('0x'),
-                'to': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-     'blockHash': '0x08df561efd3d242263d8a117e32c1beb08454c87df0a287cf93fa39f0675cf04',
-     'blockNumber': 6045275,
-     'result': {'gasUsed': 1718, 'output': HexBytes('0x')},
-     'subtraces': 1,
-     'traceAddress': [],
-     'transactionHash': '0xf554b52dcb336b83bf31e7e2e7aa94853a456f01a139a6b7dec71329460dfb61',
-     'transactionPosition': 2,
-     'type': 'call'}]
-
-trace_transactions_result = [
-    [
-        {'action': {'from': '0x198C09f30dBa1494C741c510400cFE93B8287513',
-                    'gas': 511126,
-                    'value': 0,
-                    'callType': 'call',
-                    'input': HexBytes('0x61b69abd00000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000164b63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000198c09f30dba1494c741c510400cfe93b8287513000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'),
-                    'to': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B'},
-         'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-         'blockNumber': 6045252,
-         'result': {'gasUsed': 240081,
-                    'output': HexBytes('0x000000000000000000000000673fd582fed2cd8201d58552b912f0d1daa37bb2')},
-         'subtraces': 2,
-         'traceAddress': [],
-         'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-         'transactionPosition': 0,
-         'type': 'call'},
-        {'action': {'from': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
-                    'gas': 470747,
-                    'value': 0,
-                    'init': HexBytes('0x608060405234801561001057600080fd5b506040516101e73803806101e78339818101604052602081101561003357600080fd5b8101908080519060200190929190505050600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614156100ca576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260248152602001806101c36024913960400191505060405180910390fd5b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505060aa806101196000396000f3fe608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea265627a7a72315820d8a00dc4fe6bf675a9d7416fc2d00bb3433362aa8186b750f76c4027269667ff64736f6c634300050e0032496e76616c6964206d617374657220636f707920616464726573732070726f766964656400000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f')},
-         'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-         'blockNumber': 6045252,
-         'result': {'gasUsed': 55109,
-                    'code': HexBytes('0x608060405273ffffffffffffffffffffffffffffffffffffffff600054167fa619486e0000000000000000000000000000000000000000000000000000000060003514156050578060005260206000f35b3660008037600080366000845af43d6000803e60008114156070573d6000fd5b3d6000f3fea265627a7a72315820d8a00dc4fe6bf675a9d7416fc2d00bb3433362aa8186b750f76c4027269667ff64736f6c634300050e0032'),
-                    'address': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-         'subtraces': 0,
-         'traceAddress': [0],
-         'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-         'transactionPosition': 0,
-         'type': 'create'},
-        {'action': {'from': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
-                    'gas': 415719,
-                    'value': 0,
-                    'callType': 'call',
-                    'input': HexBytes('0xb63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000198c09f30dba1494c741c510400cfe93b82875130000000000000000000000000000000000000000000000000000000000000000'),
-                    'to': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-         'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-         'blockNumber': 6045252,
-         'result': {'gasUsed': 150098, 'output': HexBytes('0x')},
-         'subtraces': 1,
-         'traceAddress': [1],
-         'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-         'transactionPosition': 0,
-         'type': 'call'},
-        {'action': {'from': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2',
-                    'gas': 407604,
-                    'value': 0,
-                    'callType': 'delegatecall',
-                    'input': HexBytes('0xb63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000198c09f30dba1494c741c510400cfe93b82875130000000000000000000000000000000000000000000000000000000000000000'),
-                    'to': '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'},
-         'blockHash': '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923',
-         'blockNumber': 6045252,
-         'result': {'gasUsed': 148410, 'output': HexBytes('0x')},
-         'subtraces': 0,
-         'traceAddress': [1, 0],
-         'transactionHash': '0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea',
-         'transactionPosition': 0,
-         'type': 'call'}],
-    [{'action': {'from': '0x198C09f30dBa1494C741c510400cFE93B8287513',
-                 'gas': 13077,
-                 'value': 133700000000000000,
-                 'callType': 'call',
-                 'input': HexBytes('0x'),
-                 'to': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2'},
-      'blockHash': '0x08df561efd3d242263d8a117e32c1beb08454c87df0a287cf93fa39f0675cf04',
-      'blockNumber': 6045275,
-      'result': {'gasUsed': 1718, 'output': HexBytes('0x')},
-      'subtraces': 1,
-      'traceAddress': [],
-      'transactionHash': '0xf554b52dcb336b83bf31e7e2e7aa94853a456f01a139a6b7dec71329460dfb61',
-      'transactionPosition': 2,
-      'type': 'call'},
-     {'action': {'from': '0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2',
-                 'gas': 11315,
-                 'value': 133700000000000000,
-                 'callType': 'delegatecall',
-                 'input': HexBytes('0x'),
-                 'to': '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'},
-      'blockHash': '0x08df561efd3d242263d8a117e32c1beb08454c87df0a287cf93fa39f0675cf04',
-      'blockNumber': 6045275,
-      'result': {'gasUsed': 93, 'output': HexBytes('0x')},
-      'subtraces': 0,
-      'traceAddress': [0],
-      'transactionHash': '0xf554b52dcb336b83bf31e7e2e7aa94853a456f01a139a6b7dec71329460dfb61',
-      'transactionPosition': 2,
-      'type': 'call'}]
-]
+from .mocks_internal_tx_indexer import (block_result, trace_filter_result,
+                                        trace_transactions_result,
+                                        transaction_receipts_result,
+                                        transactions_result)
 
 
 class TestInternalTxIndexer(TestCase):
-    @mock.patch.object(ParityManager, 'trace_transactions', autospec=True)
-    @mock.patch.object(ParityManager, 'trace_filter', autospec=True)
+    @mock.patch.object(ParityManager, 'trace_transactions', autospec=True, return_value=trace_transactions_result)
+    @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
+    @mock.patch.object(EthereumClient, 'get_blocks', autospec=True, return_value=block_result)
+    @mock.patch.object(EthereumClient, 'get_transaction_receipts', autospec=True,
+                       return_value=transaction_receipts_result)
+    @mock.patch.object(EthereumClient, 'get_transactions', autospec=True, return_value=transactions_result)
     @mock.patch.object(EthereumClient, 'current_block_number', new_callable=PropertyMock)
-    def test_internal_tx_indexer(self, current_block_number_mock, trace_filter_mock, trace_transactions_mock):
+    def test_internal_tx_indexer(self, current_block_number_mock: MagicMock, transactions_mock: MagicMock,
+                                 transaction_receipts_mock: MagicMock, blocks_mock: MagicMock,
+                                 trace_filter_mock: MagicMock, trace_transactions_mock: MagicMock):
         current_block_number = 2000
         current_block_number_mock.return_value = current_block_number
-        trace_filter_mock.return_value = trace_filter_result
-        trace_transactions_mock.return_value = trace_transactions_result
 
         internal_tx_indexer = InternalTxIndexerProvider()
         self.assertEqual(internal_tx_indexer.ethereum_client.current_block_number, current_block_number)
@@ -166,3 +38,25 @@ class TestInternalTxIndexer(TestCase):
         safe_master_copy: SafeMasterCopy = SafeMasterCopyFactory()
         self.assertEqual(safe_master_copy.tx_block_number, 0)
         internal_tx_indexer.start()
+
+        self.assertEqual(EthereumTx.objects.count(), len(transactions_result))
+        self.assertEqual(EthereumBlock.objects.count(), len(block_result))
+        self.assertEqual(InternalTx.objects.count(), len([y for x in trace_transactions_result for y in x]))
+        create_internal_tx = InternalTx.objects.get(contract_address='0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2')
+        self.assertFalse(create_internal_tx.is_call)
+        self.assertFalse(create_internal_tx.is_delegate_call)
+        self.assertTrue(create_internal_tx.is_create)
+
+        ethereum_tx = EthereumTx.objects.get(
+            tx_hash='0x18f8eb25336203d4e561229c08a3a0ef88db1dd9767b641301d9ea3121dfeaea')
+        self.assertEqual(ethereum_tx.block.number, 6045252)
+        self.assertEqual(ethereum_tx.block.block_hash,
+                         '0x39ba45ad930dece3aec537c8c5cd615daf7ee39a2513475e7680ec226e90b923')
+        self.assertEqual(len(ethereum_tx.logs), 1)
+
+        ethereum_tx = EthereumTx.objects.get(
+            tx_hash='0xf554b52dcb336b83bf31e7e2e7aa94853a456f01a139a6b7dec71329460dfb61')
+        self.assertEqual(ethereum_tx.block.number, 6045275)
+        self.assertEqual(ethereum_tx.block.block_hash,
+                         '0x08df561efd3d242263d8a117e32c1beb08454c87df0a287cf93fa39f0675cf04')
+        self.assertEqual(ethereum_tx.logs, [])
