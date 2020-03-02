@@ -99,6 +99,8 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Processing Safe setup')
             owners = arguments['_owners']
             threshold = arguments['_threshold']
+            fallback_handler = arguments.get('fallbackHandler', NULL_ADDRESS)
+            nonce = 0
             try:
                 safe_contract: SafeContract = SafeContract.objects.get(address=contract_address)
                 if not safe_contract.ethereum_tx_id or not safe_contract.erc20_block_number:
@@ -113,7 +115,7 @@ class SafeTxProcessor(TxProcessor):
 
             SafeStatus.objects.create(internal_tx=internal_tx,
                                       address=contract_address, owners=owners, threshold=threshold,
-                                      nonce=0, master_copy=master_copy)
+                                      nonce=nonce, master_copy=master_copy, fallback_handler=fallback_handler)
         elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
             logger.debug('Processing owner/threshold modification')
             safe_status = self.get_last_safe_status_for_address(contract_address)
@@ -147,6 +149,21 @@ class SafeTxProcessor(TxProcessor):
             # TODO Ban address if it doesn't have a valid master copy
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.master_copy = arguments['_masterCopy']
+            self.store_new_safe_status(safe_status, internal_tx)
+        elif function_name == 'setFallbackHandler':
+            logger.debug('Setting FallbackHandler')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
+            safe_status.fallback_handler = arguments['handler']
+            self.store_new_safe_status(safe_status, internal_tx)
+        elif function_name == 'enableModule':
+            logger.debug('Enabling Module')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
+            safe_status.enabled_modules.append(arguments['module'])
+            self.store_new_safe_status(safe_status, internal_tx)
+        elif function_name == 'disableModule':
+            logger.debug('Disabling Module')
+            safe_status = self.get_last_safe_status_for_address(contract_address)
+            safe_status.enabled_modules.remove(arguments['module'])
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'approveHash':
             logger.debug('Processing hash approval')

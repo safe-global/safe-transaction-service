@@ -727,6 +727,8 @@ class SafeStatus(models.Model):
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
     master_copy = EthereumAddressField()
+    fallback_handler = EthereumAddressField()
+    enabled_modules = ArrayField(EthereumAddressField(), default=list)
 
     class Meta:
         unique_together = (('internal_tx', 'address'),)

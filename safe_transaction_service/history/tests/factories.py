@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 from django.utils import timezone
 
 import factory
@@ -10,8 +12,9 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
-                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                      SafeContract, SafeMasterCopy, SafeStatus, WebHook)
+                      InternalTxDecoded, MultisigConfirmation,
+                      MultisigTransaction, ProxyFactory, SafeContract,
+                      SafeMasterCopy, SafeStatus, WebHook)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -39,6 +42,7 @@ class EthereumTxFactory(factory.DjangoModelFactory):
     nonce = factory.Sequence(lambda n: n)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
+    logs = factory.LazyFunction(lambda: [])
 
 
 class EthereumEventFactory(factory.DjangoModelFactory):
@@ -81,6 +85,73 @@ class InternalTxFactory(factory.DjangoModelFactory):
     call_type = EthereumTxCallType.CALL.value
     trace_address = factory.Sequence(lambda n: n)
     error = None
+
+
+class InternalTxDecodedFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = InternalTxDecoded
+
+    class Params:
+        fallback_handler = '0xd5D82B6aDDc9027B22dCA772Aa68D5d74cdBdF44'
+        hash_to_approve = '0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41'
+        master_copy = '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'
+        module = '0x32E2301B40f8CBE0da4683A60cfB6d3544afec8F'
+        old_owner = '0x32E2301B40f8CBE0da4683A60cfB6d3544afec8F'
+        owner = '0xbee99d1d38A3FBc03F3EB9339F2E119Ae8E513bA'
+        threshold = 1
+        transaction = {'to': '0xe5738C4cF66f7d288Ef4fe3CaBd678FfB39CFF8A',
+                       'data': '0x',
+                       'value': 2345000000000000,
+                       'baseGas': 0,
+                       'gasPrice': 0,
+                       'gasToken': '0x0000000000000000000000000000000000000000',
+                       'operation': 0,
+                       'safeTxGas': 0,
+                       'signatures': '0x0000000000000000000000002d8d6cafa6b8b7eed96c3711734d24df40c121e70000000000000'
+                                     '00000000000000000000000000000000000000000000000000001',
+                       'refundReceiver': '0x0000000000000000000000000000000000000000'}
+
+    internal_tx = factory.SubFactory(InternalTxFactory)
+    function_name = factory.fuzzy.FuzzyText(prefix='safe-', suffix='fn')
+    processed = False
+
+    @factory.lazy_attribute
+    def arguments(self) -> Dict[str, Any]:
+        if self.function_name == 'addOwnerWithThreshold':
+            return {'owner': self.owner, '_threshold': self.threshold}
+        elif self.function_name == 'approveHash':
+            return {'hashToApprove': self.hash_to_approve}
+        elif self.function_name == 'changeMasterCopy':
+            return {'_masterCopy': self.master_copy}
+        elif self.function_name == 'changeThreshold':
+            return {'_threshold': self.threshold}
+        elif self.function_name == 'disableModule':
+            return {'module': self.module, 'prevModule': '0x0000000000000000000000000000000000000001'}
+        elif self.function_name == 'enableModule':
+            return {'module': self.module}
+        elif self.function_name == 'execTransaction':
+            return self.transaction
+        elif self.function_name == 'removeOwner':
+            return {'owner': self.old_owner,
+                    'prevOwner': '0x0000000000000000000000000000000000000001',
+                    '_threshold': self.threshold}
+        elif self.function_name == 'setFallbackHandler':
+            return {'handler': self.fallback_handler}
+        elif self.function_name == 'setup':
+            return {'to': '0x0000000000000000000000000000000000000000',
+                    'data': '0x',
+                    '_owners': [self.owner],
+                    'payment': 0,
+                    '_threshold': self.threshold,
+                    'paymentToken': '0x0000000000000000000000000000000000000000',
+                    'fallbackHandler': self.fallback_handler,
+                    'paymentReceiver': '0x0000000000000000000000000000000000000000'}
+        elif self.function_name == 'swapOwner':
+            return {'newOwner': self.owner,
+                    'oldOwner': self.old_owner,
+                    'prevOwner': '0x0000000000000000000000000000000000000001'}
+        else:
+            return {}
 
 
 class MultisigTransactionFactory(factory.DjangoModelFactory):

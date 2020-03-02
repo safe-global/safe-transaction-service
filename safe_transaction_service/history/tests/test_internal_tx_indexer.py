@@ -7,9 +7,8 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
 
 from ..indexers import InternalTxIndexerProvider
-from ..indexers.tx_processor import SafeTxProcessor, TxProcessor
 from ..models import (EthereumBlock, EthereumTx, InternalTx, InternalTxDecoded,
-                      SafeContract, SafeMasterCopy, SafeStatus)
+                      SafeMasterCopy)
 from .factories import SafeMasterCopyFactory
 from .mocks_internal_tx_indexer import (block_result, trace_filter_result,
                                         trace_transactions_result,
@@ -63,27 +62,3 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(ethereum_tx.block.block_hash,
                          '0x08df561efd3d242263d8a117e32c1beb08454c87df0a287cf93fa39f0675cf04')
         self.assertEqual(ethereum_tx.logs, [])
-
-    def test_tx_processor(self):
-        self.test_internal_tx_indexer()
-        tx_processor: TxProcessor = SafeTxProcessor()
-        self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
-        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)  # Index using `setup` trace
-        self.assertEqual(len(number_processed), 1)  # Setup trace
-        self.assertEqual(SafeContract.objects.count(), 1)
-
-        safe_status = SafeStatus.objects.first()
-        self.assertEqual(len(safe_status.owners), 1)
-        self.assertEqual(safe_status.nonce, 0)
-        self.assertEqual(safe_status.threshold, 1)
-
-        # Decode again now that Safe is indexed (with `setup` call)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(len(internal_txs_decoded), 1)  # Safe indexed, execute tx can be decoded now
-        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)
-        self.assertEqual(len(number_processed), 1)  # Setup trace
-        safe_status = SafeStatus.objects.get(nonce=1)
-        self.assertEqual(len(safe_status.owners), 1)
-        self.assertEqual(safe_status.threshold, 1)
