@@ -8,7 +8,6 @@ from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
@@ -36,14 +35,12 @@ class SafeTxProcessor(TxProcessor):
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
 
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self):
         # This safe_tx_failure events allow us to detect a failed safe transaction
         self.safe_tx_failure_events = [get_safe_V1_0_0_contract(Web3()).events.ExecutionFailed(),
                                        get_safe_contract(Web3()).events.ExecutionFailure()]
         self.safe_tx_failure_events_topics = {event_abi_to_log_topic(event.abi) for event
                                               in self.safe_tx_failure_events}
-        self.ethereum_client = ethereum_client
-
         self.safe_status_cache: Dict[str, SafeStatus] = {}
 
     def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:

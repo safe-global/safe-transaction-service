@@ -2,7 +2,6 @@ import signal
 from typing import Any, Dict, NoReturn, Optional
 
 from django.conf import settings
-from django.db.models import Q
 
 import requests
 from celery import app
@@ -10,8 +9,6 @@ from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis import Redis
 from redis.exceptions import LockError
-
-from gnosis.eth import EthereumClientProvider
 
 from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
@@ -157,7 +154,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             count = InternalTxDecoded.objects.pending_for_safes().count()
             batch = 500
             if count:
-                tx_processor: TxProcessor = SafeTxProcessor(EthereumClientProvider())
+                tx_processor: TxProcessor = SafeTxProcessor()
                 logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
                 # Use slicing for memory issues
                 for _ in range(0, count, batch):

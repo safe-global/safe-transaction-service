@@ -11,7 +11,7 @@ from safe_transaction_service.history.indexers.tx_processor import \
 def set_failed_for_multisig_txs(apps, schema_editor):
     # We can't import the Person model directly as it may be a newer
     # version than this migration expects. We use the historical version.
-    safe_tx_processor = SafeTxProcessor(EthereumClientProvider())
+    safe_tx_processor = SafeTxProcessor()
     MultisigTransaction = apps.get_model('history', 'MultisigTransaction')
     for multisig_tx in MultisigTransaction.objects.filter(failed=None).exclude(ethereum_tx=None):
         multisig_tx.failed = safe_tx_processor.is_failed(multisig_tx.ethereum_tx_id, multisig_tx.safe_tx_hash)
