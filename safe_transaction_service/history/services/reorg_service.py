@@ -27,9 +27,17 @@ class ReorgServiceProvider:
 
 # TODO Test ReorgService
 class ReorgService:
-    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int):
+    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int,
+                 eth_reorg_rewind_blocks: Optional[int] = 250):
+        """
+        :param ethereum_client:
+        :param eth_reorg_blocks: Minimum number of blocks to consider a block confirmed and safe to rely on. By default
+        250 blocks (1 hour)
+        :param eth_reorg_back_blocks: Number of blocks to rewind when a reorg is found
+        """
         self.ethereum_client = ethereum_client
-        self.eth_reorg_blocks = eth_reorg_blocks
+        self.eth_reorg_blocks = eth_reorg_blocks  #
+        self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
         # Dictionary with Django model and attribute for reorgs
         self.reorg_models: Dict[models.Model, str] = {
             SafeMasterCopy: 'tx_block_number',
@@ -73,7 +81,7 @@ class ReorgService:
         :param first_reorg_block_number:
         :return: Return number of elements updated
         """
-        safe_reorg_block_number = min(first_reorg_block_number - 250, 0)  # Reindex last hour
+        safe_reorg_block_number = max(first_reorg_block_number - self.eth_reorg_rewind_blocks, 0)
 
         updated = 0
         for model, field in self.reorg_models.items():
