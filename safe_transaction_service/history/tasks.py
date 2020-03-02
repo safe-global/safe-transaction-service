@@ -15,7 +15,7 @@ from gnosis.eth import EthereumClientProvider
 
 from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
-                       ProxyIndexerServiceProvider)
+                       ProxyFactoryIndexerProvider)
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
 from .models import InternalTxDecoded, WebHook, WebHookType
 from .services import ReorgService, ReorgServiceProvider
@@ -86,7 +86,7 @@ def index_new_proxies_task(self) -> Optional[int]:
             task_id = self.request.id
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             blockchain_running_tasks.add_task(task_id)
-            number_proxies = ProxyIndexerServiceProvider().start()
+            number_proxies = ProxyFactoryIndexerProvider().start()
             if number_proxies:
                 logger.info('Indexed new %d proxies', number_proxies)
                 return number_proxies

@@ -16,11 +16,11 @@ from .ethereum_indexer import EthereumIndexer
 logger = getLogger(__name__)
 
 
-class ProxyIndexerServiceProvider:
+class ProxyFactoryIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = ProxyIndexerService(EthereumClient(settings.ETHEREUM_NODE_URL))
+            cls.instance = ProxyFactoryIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
         return cls.instance
 
@@ -30,7 +30,7 @@ class ProxyIndexerServiceProvider:
             del cls.instance
 
 
-class ProxyIndexerService(EthereumIndexer):
+class ProxyFactoryIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)
