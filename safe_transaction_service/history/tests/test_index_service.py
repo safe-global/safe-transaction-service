@@ -5,11 +5,12 @@ from web3 import Web3
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..models import EthereumTx
+from ..models import EthereumTx, MultisigTransaction, SafeStatus
 from ..services.index_service import (EthereumBlockHashMismatch, IndexService,
                                       IndexServiceProvider,
                                       TransactionNotFoundException)
-from .factories import EthereumTxFactory
+from .factories import (EthereumTxFactory, MultisigTransactionFactory,
+                        SafeStatusFactory)
 
 
 class TestIndexService(EthereumTestCaseMixin, TestCase):
@@ -64,3 +65,27 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         # Try to fetch again
         with self.assertRaises(EthereumBlockHashMismatch):
             index_service.txs_create_or_update_from_tx_hashes([tx_hash])
+
+    def test_reindex_addresses(self):
+        index_service: IndexService = IndexServiceProvider()
+        self.assertIsNone(index_service.reindex_addresses([]))
+
+        safe_status = SafeStatusFactory()
+        MultisigTransactionFactory()  # It shouldn't be deleted
+        MultisigTransactionFactory(safe=safe_status.address)  # It should be deleted
+        MultisigTransactionFactory(safe=safe_status.address, ethereum_tx=None)  # It shouldn't be deleted
+        self.assertIsNone(index_service.reindex_addresses([safe_status.address]))
+        self.assertEqual(SafeStatus.objects.count(), 0)
+        print(MultisigTransaction.objects.all())
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
+
+    def test_reindex_all(self):
+        index_service: IndexService = IndexServiceProvider()
+        for _ in range(5):
+            safe_status = SafeStatusFactory()
+            MultisigTransactionFactory(safe=safe_status.address)
+        MultisigTransactionFactory(ethereum_tx=None)  # It should be deleted
+
+        self.assertIsNone(index_service.reindex_all())
+        self.assertEqual(SafeStatus.objects.count(), 0)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)

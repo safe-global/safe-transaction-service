@@ -151,11 +151,15 @@ class IndexService:
         :return: Number of `SafeStatus` deleted
         """
         if not addresses:
-            return 0
+            return
 
         safe_status_queryset = SafeStatus.objects.filter(address__in=addresses)
         internal_txs = safe_status_queryset.values('internal_tx')  # Get dangling internal txs
-        MultisigTransaction.objects.exclude(ethereum_tx=None).delete()  # Remove not indexed transactions
+        MultisigTransaction.objects.exclude(
+            ethereum_tx=None
+        ).filter(
+            safe__in=addresses
+        ).delete()  # Remove not indexed transactions
         safe_status_queryset.delete()  # Remove all SafeStatus for that Safe
         InternalTxDecoded.objects.filter(pk__in=internal_txs).update(processed=False)  # Mark as not processed
 
