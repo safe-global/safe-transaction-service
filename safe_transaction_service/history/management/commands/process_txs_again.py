@@ -3,8 +3,7 @@ import logging
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from ...models import (InternalTxDecoded, MultisigConfirmation,
-                       MultisigTransaction, SafeStatus)
+from ...models import InternalTxDecoded, MultisigTransaction, SafeStatus
 from ...tasks import process_decoded_internal_txs_task
 
 

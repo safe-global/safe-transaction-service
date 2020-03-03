@@ -55,19 +55,24 @@ blockchain_running_tasks = BlockchainRunningTasks()
 def generate_handler(task_id: str) -> NoReturn:
     def handler(signum, frame):
         logger.warning('Received SIGTERM on task-id=%s', task_id)
-        raise OSError('Received SIGTERM on task-id=%s. Probably a reorg. Task must exit' % task_id)
+        raise OSError(f'Received SIGTERM on task-id={task_id}. Probably a reorg. Task must exit')
     return handler
 
 
-@worker_shutting_down.connect
-def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
-    logger.warning('Worker shutting down')
+def stop_all_tasks() -> int:
     tasks_to_kill = [task_id.decode() for task_id in blockchain_running_tasks.get_running_tasks()]
     # Not working, as the worker cannot answer anymore
     if tasks_to_kill:
         logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
         celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
         blockchain_running_tasks.delete_all_tasks()
+    return len(tasks_to_kill)
+
+
+@worker_shutting_down.connect
+def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
+    logger.warning('Worker shutting down')
+    return stop_all_tasks()
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
