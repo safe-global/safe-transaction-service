@@ -22,12 +22,11 @@ logger = getLogger(__name__)
 
 class TxProcessor(ABC):
     @abstractmethod
-    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
-        pass
-
-    @abstractmethod
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         pass
+
+    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
+        return [self.process_decoded_transaction(decoded_transaction) for decoded_transaction in internal_txs_decoded]
 
 
 class SafeTxProcessor(TxProcessor):
@@ -62,6 +61,12 @@ class SafeTxProcessor(TxProcessor):
         return self.safe_status_cache[safe_status.address]
 
     @transaction.atomic
+    def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
+        processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
+        internal_tx_decoded.set_processed()
+        return processed_successfully
+
+    @transaction.atomic
     def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
         """
         Optimize to process multiple transactions in a batch
@@ -76,12 +81,6 @@ class SafeTxProcessor(TxProcessor):
                            for internal_tx_decoded in internal_txs_decoded]
         InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(processed=True)
         return results
-
-    @transaction.atomic
-    def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
-        processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
-        internal_tx_decoded.set_processed()
-        return processed_successfully
 
     def __process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         """

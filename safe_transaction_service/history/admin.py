@@ -91,7 +91,25 @@ class InternalTxAdmin(admin.ModelAdmin):
     search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
 
 
-class InternalTxDecodedListFilter(admin.SimpleListFilter):
+class InternalTxDecodedModulesListFilter(admin.SimpleListFilter):
+    title = 'Modules enabled in Safe'
+    parameter_name = 'enabled_modules'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'Yes'),
+            ('NO', 'No'),
+        )
+
+    def queryset(self, request, queryset):
+        parameters = {'enabled_modules__len__gt': 0}
+        if self.value() == 'YES':
+            return queryset.filter(**parameters)
+        elif self.value() == 'NO':
+            return queryset.exclude(**parameters)
+
+
+class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
     title = 'Gnosis official Safes'
     parameter_name = 'official_safes'
 
@@ -104,7 +122,7 @@ class InternalTxDecodedListFilter(admin.SimpleListFilter):
         if self.value() == 'YES':
             return queryset.filter(
                 Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
-                | Q(function_name='setup')  # This way we can index new Safes without events
+                | Q(function_name='setup')  # Safes pending to be indexed
             )
 
 
@@ -112,7 +130,8 @@ class InternalTxDecodedListFilter(admin.SimpleListFilter):
 class InternalTxDecodedAdmin(admin.ModelAdmin):
     actions = ['process_again']
     list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
-    list_filter = ('function_name', 'processed', InternalTxDecodedListFilter)
+    list_filter = ('function_name', 'processed',
+                   InternalTxDecodedModulesListFilter, InternalTxDecodedOfficialListFilter)
     list_select_related = ('internal_tx__ethereum_tx',)
     ordering = ['-internal_tx__ethereum_tx__block_id',
                 '-internal_tx__ethereum_tx__transaction_index',
@@ -262,14 +281,23 @@ class SafeContractAdmin(admin.ModelAdmin):
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
     actions = ['remove_and_index']
-    list_display = ('block_number', 'internal_tx_id', 'address', 'owners', 'threshold', 'nonce', 'master_copy',
+    fields = ('__all__', 'function_name', 'arguments')
+    readonly_fields = ('function_name', 'arguments')
+    list_display = ('block_number', 'internal_tx_id', 'function_name',
+                    'address', 'owners', 'threshold', 'nonce', 'master_copy',
                     'fallback_handler', 'enabled_modules')
     list_filter = ('threshold', 'master_copy', 'fallback_handler')
-    list_select_related = ('internal_tx__ethereum_tx',)
+    list_select_related = ('internal_tx__ethereum_tx', 'internal_tx__decoded_tx')
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     raw_id_fields = ('internal_tx',)
     search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash',
                      'enabled_modules']
+
+    def function_name(self, obj: SafeStatus) -> str:
+        return obj.internal_tx.decoded_tx.function_name
+
+    def arguments(self, obj: SafeStatus) -> str:
+        return obj.internal_tx.decoded_tx.arguments
 
     def has_delete_permission(self, request, obj=None):
         return False
