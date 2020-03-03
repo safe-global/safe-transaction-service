@@ -434,8 +434,10 @@ class InternalTx(models.Model):
     def is_ether_transfer(self) -> bool:
         return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
 
-    def get_next_trace(self) -> Optional['InternalTx']:
+    def get_next_trace(self, no_delegate_calls=False) -> Optional['InternalTx']:
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
+        if no_delegate_calls:
+            internal_txs.filter(call_type=EthereumTxCallType.CALL.value)
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
         try:
@@ -443,8 +445,14 @@ class InternalTx(models.Model):
         except IndexError:
             return None
 
-    def get_previous_trace(self) -> Optional['InternalTx']:
+    def get_previous_trace(self, no_delegate_calls=False) -> Optional['InternalTx']:
+        """
+        :param no_delegate_calls: If True filter out delegate calls
+        :return:
+        """
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
+        if no_delegate_calls:
+            internal_txs.filter(call_type=EthereumTxCallType.CALL.value)
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
         if (index - 1) >= 0:
