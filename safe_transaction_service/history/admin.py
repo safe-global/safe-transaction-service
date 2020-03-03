@@ -280,7 +280,8 @@ class SafeStatusModulesListFilter(admin.SimpleListFilter):
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
     actions = ['remove_and_index']
-    fields = ('__all__', 'function_name', 'arguments')
+    fields = ('internal_tx', 'address', 'owners', 'threshold', 'nonce', 'master_copy', 'fallback_handler',
+              'enabled_modules', 'function_name', 'arguments')
     readonly_fields = ('function_name', 'arguments')
     list_display = ('block_number', 'internal_tx_id', 'function_name',
                     'address', 'owners', 'threshold', 'nonce', 'master_copy',
