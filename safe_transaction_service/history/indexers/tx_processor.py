@@ -14,8 +14,8 @@ from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature
 
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
-                      MultisigConfirmation, MultisigTransaction, SafeContract,
-                      SafeStatus)
+                      ModuleTransaction, MultisigConfirmation,
+                      MultisigTransaction, SafeContract, SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -164,6 +164,22 @@ class SafeTxProcessor(TxProcessor):
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.enabled_modules.remove(arguments['module'])
             self.store_new_safe_status(safe_status, internal_tx)
+        elif function_name == 'execTransactionFromModule':
+            logger.debug('Executing Tx from Module')
+            module_internal_tx = internal_tx.get_previous_module_trace()
+            module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
+            ModuleTransaction.objects.get_or_create(
+                internal_tx=internal_tx,
+                defaults={
+                    'safe': contract_address,
+                    'module': module_address,
+                    'to': arguments['to'],
+                    'value': arguments['value'],
+                    'data': HexBytes(arguments['data']),
+                    'operation': arguments['operation']
+                }
+            )
+
         elif function_name == 'approveHash':
             logger.debug('Processing hash approval')
             multisig_transaction_hash = arguments['hashToApprove']

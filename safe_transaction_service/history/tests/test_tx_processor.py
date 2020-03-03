@@ -3,8 +3,8 @@ import logging
 from eth_account import Account
 
 from ..indexers.tx_processor import SafeTxProcessor
-from ..models import (InternalTxDecoded, MultisigTransaction, SafeContract,
-                      SafeStatus)
+from ..models import (InternalTxDecoded, ModuleTransaction,
+                      MultisigTransaction, SafeContract, SafeStatus)
 from .factories import InternalTxDecodedFactory
 from .test_internal_tx_indexer import TestInternalTxIndexer
 
@@ -165,6 +165,15 @@ class TestSafeTxProcessor(TestInternalTxIndexer):
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         self.assertEqual(safe_status.enabled_modules, [])
         self.assertEqual(safe_status.nonce, 7)
+
+        tx_processor.process_decoded_transactions(
+            [
+                InternalTxDecodedFactory(function_name='execTransactionFromModule',
+                                         internal_tx___from=safe_address),
+            ])
+        safe_status = SafeStatus.objects.last_for_address(safe_address)
+        self.assertEqual(safe_status.nonce, 7)  # Nonce not incrementing
+        self.assertEqual(ModuleTransaction.objects.count(), 1)
 
         self.assertEqual(MultisigTransaction.objects.count(),
                          InternalTxDecoded.objects.filter(function_name='execTransaction').count())

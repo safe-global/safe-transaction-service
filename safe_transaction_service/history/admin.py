@@ -4,12 +4,14 @@ from django.contrib import admin
 from django.db.models import F, Q
 from django.db.models.functions import Greatest
 
+from hexbytes import HexBytes
+
 from gnosis.eth import EthereumClientProvider
 
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
-                     InternalTxDecoded, MultisigConfirmation,
-                     MultisigTransaction, ProxyFactory, SafeContract,
-                     SafeMasterCopy, SafeStatus, WebHook)
+                     InternalTxDecoded, ModuleTransaction,
+                     MultisigConfirmation, MultisigTransaction, ProxyFactory,
+                     SafeContract, SafeMasterCopy, SafeStatus, WebHook)
 from .services import IndexServiceProvider
 
 
@@ -178,6 +180,19 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     def successful(self, obj: MultisigTransaction):
         return not obj.failed
     successful.boolean = True
+
+
+@admin.register(ModuleTransaction)
+class ModuleTransactionAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created'
+    list_display = ('created', 'safe', 'module', 'to', 'operation', 'value', 'data_hex')
+    list_filter = ('module', 'operation')
+    ordering = ['-created']
+    raw_id_fields = ('internal_tx',)
+    search_fields = ['safe', 'module', 'to']
+
+    def data_hex(self, o: ModuleTransaction):
+        return HexBytes(o.data.tobytes()).hex()
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):

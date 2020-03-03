@@ -434,10 +434,8 @@ class InternalTx(models.Model):
     def is_ether_transfer(self) -> bool:
         return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
 
-    def get_next_trace(self, no_delegate_calls=False) -> Optional['InternalTx']:
+    def get_next_trace(self) -> Optional['InternalTx']:
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
-        if no_delegate_calls:
-            internal_txs.filter(call_type=EthereumTxCallType.CALL.value)
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
         try:
@@ -451,14 +449,29 @@ class InternalTx(models.Model):
         :return:
         """
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
-        if no_delegate_calls:
-            internal_txs.filter(call_type=EthereumTxCallType.CALL.value)
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
         if (index - 1) >= 0:
             return internal_txs[index - 1]
         else:
             return None
+
+    def get_previous_module_trace(self) -> Optional['InternalTx']:
+        """
+        Current trace should be `delegate call` to the proxy contract. We skip previous one and search for the previous
+        call trace
+        :return:
+        """
+        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
+        traces = [it.trace_address for it in internal_txs]
+        index = traces.index(self.trace_address) - 2
+        while index >= 0:
+            internal_tx = internal_txs[index]
+            if not internal_tx.is_delegate_call():
+                return internal_tx
+            else:
+                index -= 1
+        return None
 
 
 class InternalTxDecodedManager(models.Manager):
@@ -573,6 +586,23 @@ class MultisigTransaction(TimeStampedModel):
         else:
             # TODO Get owners from signatures. Not very trivial
             return []
+
+
+class ModuleTransaction(TimeStampedModel):
+    internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='module_tx',
+                                       primary_key=True)
+    safe = EthereumAddressField(db_index=True)  # Just for convenience, it could be retrieved from `internal_tx`
+    module = EthereumAddressField(db_index=True)  # Just for convenience, it could be retrieved from `internal_tx`
+    to = EthereumAddressField(db_index=True)
+    value = Uint256Field()
+    data = models.BinaryField(null=True)
+    operation = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in SafeOperation])
+
+    def __str__(self):
+        if self.value:
+            return f'{self.safe} - {self.to} - {self.value}'
+        else:
+            return f'{self.safe} - {self.to} - {HexBytes(self.data.tobytes()).hex()[:8]}'
 
 
 class MultisigConfirmationQuerySet(models.QuerySet):

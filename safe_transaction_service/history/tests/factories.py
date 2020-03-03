@@ -83,7 +83,7 @@ class InternalTxFactory(factory.DjangoModelFactory):
     refund_address = NULL_ADDRESS
     tx_type = EthereumTxType.CALL.value
     call_type = EthereumTxCallType.CALL.value
-    trace_address = factory.Sequence(lambda n: n)
+    trace_address = factory.Sequence(lambda n: str(n))
     error = None
 
 
@@ -110,6 +110,9 @@ class InternalTxDecodedFactory(factory.DjangoModelFactory):
                        'signatures': '0x0000000000000000000000002d8d6cafa6b8b7eed96c3711734d24df40c121e70000000000000'
                                      '00000000000000000000000000000000000000000000000000001',
                        'refundReceiver': '0x0000000000000000000000000000000000000000'}
+        module_transaction = {'to': '0x14Eac0051a9DcD04D1AaCfDc3606397F3d3ab94C',
+                              'data': '0xe318b52b000000000000', 'value': 0, 'operation': 0
+                              }
 
     internal_tx = factory.SubFactory(InternalTxFactory)
     function_name = factory.fuzzy.FuzzyText(prefix='safe-', suffix='fn')
@@ -129,6 +132,8 @@ class InternalTxDecodedFactory(factory.DjangoModelFactory):
             return {'module': self.module, 'prevModule': '0x0000000000000000000000000000000000000001'}
         elif self.function_name == 'enableModule':
             return {'module': self.module}
+        elif self.function_name == 'execTransactionFromModule':
+            return self.module_transaction
         elif self.function_name == 'execTransaction':
             return self.transaction
         elif self.function_name == 'removeOwner':
