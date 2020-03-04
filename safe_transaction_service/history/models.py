@@ -467,7 +467,7 @@ class InternalTx(models.Model):
         index = traces.index(self.trace_address) - 2
         while index >= 0:
             internal_tx = internal_txs[index]
-            if not internal_tx.is_delegate_call():
+            if not internal_tx.is_delegate_call:
                 return internal_tx
             else:
                 index -= 1
