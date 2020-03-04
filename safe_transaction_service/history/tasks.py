@@ -82,10 +82,11 @@ def index_new_proxies_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = True
+    got_lock = False
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
+            got_lock = True
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             blockchain_running_tasks.add_task(task_id)
             number_proxies = ProxyFactoryIndexerProvider().start()
@@ -93,7 +94,7 @@ def index_new_proxies_task(self) -> Optional[int]:
                 logger.info('Indexed new %d proxies', number_proxies)
                 return number_proxies
     except LockError:
-        got_lock = False
+        pass
     finally:
         if got_lock:
             blockchain_running_tasks.remove_task(task_id)
@@ -107,10 +108,11 @@ def index_internal_txs_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = True
+    got_lock = False
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
+            got_lock = True
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of internal txs')
             blockchain_running_tasks.add_task(task_id)
@@ -119,7 +121,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             process_decoded_internal_txs_task.delay()
             return number_traces
     except LockError:
-        got_lock = False
+        pass
     finally:
         if got_lock:
             blockchain_running_tasks.remove_task(task_id)
@@ -133,10 +135,11 @@ def index_erc20_events_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = True
+    got_lock = False
     try:
         with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             task_id = self.request.id
+            got_lock = True
             signal.signal(signal.SIGTERM, generate_handler(task_id))
             logger.info('Start indexing of erc20/721 events')
             blockchain_running_tasks.add_task(task_id)
@@ -144,7 +147,7 @@ def index_erc20_events_task(self) -> Optional[int]:
             logger.info('Indexing of erc20/721 events task processed %d events', number_events)
             return number_events
     except LockError:
-        got_lock = False
+        pass
     finally:
         if got_lock:
             blockchain_running_tasks.remove_task(task_id)
