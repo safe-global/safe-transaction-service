@@ -76,7 +76,6 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         MultisigTransactionFactory(safe=safe_status.address, ethereum_tx=None)  # It shouldn't be deleted
         self.assertIsNone(index_service.reindex_addresses([safe_status.address]))
         self.assertEqual(SafeStatus.objects.count(), 0)
-        print(MultisigTransaction.objects.all())
         self.assertEqual(MultisigTransaction.objects.count(), 2)
 
     def test_reindex_all(self):

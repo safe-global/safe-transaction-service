@@ -13,16 +13,46 @@ from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..services import BalanceService, BalanceServiceProvider
-from ..services.balance_service import BalanceWithUsd
+from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 
 MAINNET_NODE = os.environ.get('ETHEREUM_MAINNET_NODE')
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
-    def test_get_eth_usd_price(self):
+    @mock.patch.object(BalanceService, 'get_eth_usd_price_kraken', return_value=0.4)
+    @mock.patch.object(BalanceService, 'get_eth_usd_price_binance', return_value=0.5)
+    def test_get_eth_usd_price(self, binance_mock, kraken_mock):
         balance_service = BalanceServiceProvider()
         eth_usd_price = balance_service.get_eth_usd_price()
+        self.assertEqual(eth_usd_price, kraken_mock.return_value)
+        binance_mock.assert_not_called()
+
+        kraken_mock.side_effect = CannotGetEthereumPrice
+
+        # Cache is still working
+        eth_usd_price = balance_service.get_eth_usd_price()
+        self.assertEqual(eth_usd_price, kraken_mock.return_value)
+
+        # Remove cache and test binance is called
+        balance_service.cache_eth_usd_price.clear()
+        eth_usd_price = balance_service.get_eth_usd_price()
+        binance_mock.called_once()
+        self.assertEqual(eth_usd_price, binance_mock.return_value)
+
+    def test_get_eth_usd_price_binance(self):
+        balance_service = BalanceServiceProvider()
+
+        # Binance is used
+        eth_usd_price = balance_service.get_eth_usd_price_binance()
+        self.assertIsInstance(eth_usd_price, float)
+        self.assertGreater(eth_usd_price, 0)
+
+    def test_get_eth_usd_price_kraken(self):
+        balance_service = BalanceServiceProvider()
+
+        # Kraken is used
+        eth_usd_price = balance_service.get_eth_usd_price_kraken()
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 

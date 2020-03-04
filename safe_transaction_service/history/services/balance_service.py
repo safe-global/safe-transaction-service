@@ -56,7 +56,9 @@ class BalanceService:
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
-        self.token_info_cache = {}
+        self.cache_eth_usd_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_token_info = {}
 
     def get_balances(self, safe_address: str) -> List[Balance]:
         """
@@ -81,10 +83,30 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
-    def get_eth_usd_price(self) -> float:
+    def get_eth_usd_price_binance(self) -> float:
         """
-        Return current USD price for ethereum
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
+        """
+        url = 'https://api.binance.com/api/v3/avgPrice?symbol=ETHUSDT'
+        response = requests.get(url)
+        api_json = response.json()
+        if not response.ok:
+            logger.warning('Cannot get price from url=%s', url)
+            raise CannotGetEthereumPrice(api_json.get('msg'))
+
+        try:
+            price = float(api_json['price'])
+            if not price:
+                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+            return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
+
+    def get_eth_usd_price_kraken(self) -> float:
+        """
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
         """
         # Use kraken for eth_value
         url = 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD'
@@ -95,11 +117,24 @@ class BalanceService:
             logger.warning('Cannot get price from url=%s', url)
             raise CannotGetEthereumPrice(str(api_json['error']))
 
-        result = api_json['result']
-        for new_ticker in result:
-            return float(result[new_ticker]['c'][0])
+        try:
+            result = api_json['result']
+            for new_ticker in result:
+                price = float(result[new_ticker]['c'][0])
+                if not price:
+                    raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+                return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=60 * 30))  # 30 minutes of caching
+    @cachedmethod(cache=operator.attrgetter('cache_eth_usd_price'))
+    def get_eth_usd_price(self) -> float:
+        try:
+            return self.get_eth_usd_price_kraken()
+        except CannotGetEthereumPrice:
+            return self.get_eth_usd_price_binance()
+
+    @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     def get_token_eth_value(self, token_address: str) -> float:
         """
         Return current ether value for a given `token_address`
@@ -115,7 +150,7 @@ class BalanceService:
             logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
             return 0.
 
-    @cachedmethod(cache=operator.attrgetter('token_info_cache'))
+    @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     def get_token_info(self, token_address: str) -> Optional[Erc20Info]:
         try:
             return self.ethereum_client.erc20.get_info(token_address)
