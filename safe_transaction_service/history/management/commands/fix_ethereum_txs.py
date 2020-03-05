@@ -1,10 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 
-from gnosis.eth import EthereumClientProvider
-
-from ...models import EthereumBlock, EthereumTx
-from ...services import IndexService, IndexServiceProvider
+from ...models import EthereumTx
+from ...services import IndexServiceProvider
 
 
 class Command(BaseCommand):
