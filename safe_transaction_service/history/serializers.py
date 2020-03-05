@@ -15,7 +15,7 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
-from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction
+from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction, ModuleTransaction
 
 
 # ================================================ #
@@ -140,6 +140,23 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 
     def get_transaction_hash(self, obj: MultisigConfirmation):
         return obj.ethereum_tx_id
+
+
+class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
+    data = HexadecimalField(allow_null=True, allow_blank=True)
+    transaction_hash = serializers.SerializerMethodField()
+    block_number = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ModuleTransaction
+        fields = ('created', 'block_number', 'transaction_hash', 'safe',
+                  'module', 'to', 'value', 'data', 'operation')
+
+    def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
+        return obj.internal_tx.ethereum_tx.block_id
+
+    def get_transaction_hash(self, obj: ModuleTransaction):
+        return obj.internal_tx.ethereum_tx_id
 
 
 class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):

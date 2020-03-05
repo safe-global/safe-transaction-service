@@ -14,7 +14,7 @@ from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
                       InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, ProxyFactory, SafeContract,
-                      SafeMasterCopy, SafeStatus, WebHook)
+                      SafeMasterCopy, SafeStatus, WebHook, ModuleTransaction)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -157,6 +157,19 @@ class InternalTxDecodedFactory(factory.DjangoModelFactory):
                     'prevOwner': '0x0000000000000000000000000000000000000001'}
         else:
             return {}
+
+
+class ModuleTransactionFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = ModuleTransaction
+
+    internal_tx = factory.SubFactory(InternalTxFactory)
+    safe = factory.LazyFunction(lambda: Account.create().address)
+    module = factory.LazyFunction(lambda: Account.create().address)
+    to = factory.LazyFunction(lambda: Account.create().address)
+    value = FuzzyInteger(low=0, high=10)
+    data = factory.Sequence(lambda n: Web3.keccak(text=f'module-tx-{n}'))
+    operation = FuzzyInteger(low=0, high=1)
 
 
 class MultisigTransactionFactory(factory.DjangoModelFactory):

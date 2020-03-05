@@ -13,17 +13,29 @@ from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..models import MultisigTransaction
+from ..models import MultisigTransaction, ModuleTransaction
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
                         MultisigConfirmationFactory,
                         MultisigTransactionFactory, SafeContractFactory,
-                        SafeStatusFactory)
+                        SafeStatusFactory, ModuleTransactionFactory)
 
 logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def test_get_module_transactions(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        module_transaction = ModuleTransactionFactory(safe=safe_address)
+        response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['safe'], module_transaction.safe)
+        self.assertEqual(response.data['results'][0]['module'], module_transaction.module)
+
     def test_get_multisig_transaction(self):
         safe_tx_hash = Web3.keccak(text='gnosis').hex()
         response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')

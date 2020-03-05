@@ -17,14 +17,14 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
-from .models import InternalTx, MultisigTransaction, SafeContract, SafeStatus
+from .models import InternalTx, MultisigTransaction, SafeContract, SafeStatus, ModuleTransaction
 from .serializers import (IncomingTransactionResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCreationInfoResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer)
+                          SafeMultisigTransactionSerializer, SafeModuleTransactionResponseSerializer)
 from .services import BalanceServiceProvider
 
 
@@ -49,6 +49,40 @@ class AboutView(APIView):
             }
         }
         return Response(content)
+
+
+class SafeModuleTransactionListView(ListAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
+    ordering_fields = ['created']
+    pagination_class = DefaultPagination
+    serializer_class = SafeModuleTransactionResponseSerializer
+
+    def get_queryset(self):
+        return ModuleTransaction.objects.filter(
+            safe=self.kwargs['address']
+        ).select_related(
+            'internal_tx__ethereum_tx'
+        ).order_by(
+            '-created'
+        )
+
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
+                                    422: 'Invalid ethereum address'})
+    def get(self, request, address, format=None):
+        """
+        Returns the module transaction of a Safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        response = super().get(request, address)
+        if response.data['count'] == 0:
+            response.status_code = status.HTTP_404_NOT_FOUND
+        else:
+            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
+
+        return response
 
 
 @swagger_auto_schema(responses={200: 'Ok',
@@ -132,16 +166,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
         else:
             serializer.save()
-
-            # Create task if transaction hash
-            # data = serializer.validated_data
-            # transaction_hash = data.get('transaction_hash')
-            # if transaction_hash:
-            #     check_approve_transaction_task.delay(safe_address=address,
-            #                                          safe_tx_hash=data['contract_transaction_hash'].hex(),
-            #                                          transaction_hash=transaction_hash.hex(),
-            #                                          owner=data['sender'])
-
             return Response(status=status.HTTP_202_ACCEPTED)
 
 

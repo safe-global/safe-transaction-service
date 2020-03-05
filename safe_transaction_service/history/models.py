@@ -493,6 +493,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         ).select_related(
             'internal_tx',
             'internal_tx__ethereum_tx',
+            'internal_tx__ethereum_tx__block',
         ).order_by(
             'internal_tx__ethereum_tx__block_id',
             'internal_tx__ethereum_tx__transaction_index',
@@ -510,6 +511,10 @@ class InternalTxDecoded(models.Model):
 
     class Meta:
         verbose_name_plural = "Internal txs decoded"
+
+    def __str__(self):
+        return f'{"Processed" if self.processed else "Not Processed"} ' \
+               f'fn-name={self.function_name} with arguments={self.arguments}'
 
     @property
     def address(self) -> str:

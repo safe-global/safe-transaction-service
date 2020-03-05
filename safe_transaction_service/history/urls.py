@@ -13,6 +13,8 @@ urlpatterns = [
          name='multisig-transactions'),
     path('safes/<str:address>/incoming-transactions/', views.SafeIncomingTxListView.as_view(),
          name='incoming-transactions'),
+    path('safes/<str:address>/module-transactions/', views.SafeModuleTransactionListView.as_view(),
+         name='module-transactions'),
     path('safes/<str:address>/creation/', views.SafeCreationView.as_view(),
          name='safe-creation'),
     path('safes/<str:address>/balances/', views.SafeBalanceView.as_view(),
