@@ -171,6 +171,7 @@ class SafeTxProcessor(TxProcessor):
             ModuleTransaction.objects.get_or_create(
                 internal_tx=internal_tx,
                 defaults={
+                    'created': internal_tx.ethereum_tx.block.timestamp,
                     'safe': contract_address,
                     'module': module_address,
                     'to': arguments['to'],
@@ -234,6 +235,7 @@ class SafeTxProcessor(TxProcessor):
             multisig_tx, _ = MultisigTransaction.objects.get_or_create(
                 safe_tx_hash=safe_tx_hash,
                 defaults={
+                    'created': internal_tx.ethereum_tx.block.timestamp,
                     'safe': contract_address,
                     'ethereum_tx': ethereum_tx,
                     'to': safe_tx.to,
