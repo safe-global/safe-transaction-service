@@ -309,3 +309,6 @@ ETH_UNISWAP_FACTORY_ADDRESS = env('ETH_UNISWAP_FACTORY_ADDRESS',
                                   default='0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95')
 ETH_KYBER_NETWORK_PROXY_ADDRESS = env('ETH_KYBER_NETWORK_PROXY_ADDRESS',
                                       default='0x818E6FECD516Ecc3849DAf6845e3EC868087B755')
+
+# Notifications
+SLACK_API_WEBHOOK = env('SLACK_API_WEBHOOK', default=None)
