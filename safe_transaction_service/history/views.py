@@ -17,14 +17,16 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
-from .models import InternalTx, MultisigTransaction, SafeContract, SafeStatus, ModuleTransaction
+from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
+                     SafeContract, SafeStatus)
 from .serializers import (IncomingTransactionResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCreationInfoResponseSerializer,
+                          SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer, SafeModuleTransactionResponseSerializer)
+                          SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
 
 

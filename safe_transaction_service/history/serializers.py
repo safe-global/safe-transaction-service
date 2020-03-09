@@ -15,7 +15,8 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
-from .models import ConfirmationType, MultisigConfirmation, MultisigTransaction, ModuleTransaction
+from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
+                     MultisigTransaction)
 
 
 # ================================================ #

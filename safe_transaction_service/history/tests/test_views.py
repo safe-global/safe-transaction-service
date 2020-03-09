@@ -13,12 +13,12 @@ from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..models import MultisigTransaction, ModuleTransaction
+from ..models import ModuleTransaction, MultisigTransaction
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
-                        MultisigConfirmationFactory,
+                        ModuleTransactionFactory, MultisigConfirmationFactory,
                         MultisigTransactionFactory, SafeContractFactory,
-                        SafeStatusFactory, ModuleTransactionFactory)
+                        SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 

@@ -12,9 +12,9 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
-                      InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, ProxyFactory, SafeContract,
-                      SafeMasterCopy, SafeStatus, WebHook, ModuleTransaction)
+                      InternalTxDecoded, ModuleTransaction,
+                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
+                      SafeContract, SafeMasterCopy, SafeStatus, WebHook)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):

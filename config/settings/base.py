@@ -3,6 +3,7 @@ Base settings to build other settings files upon.
 """
 
 import environ
+from corsheaders.defaults import default_headers as default_cors_headers
 
 ROOT_DIR = environ.Path(__file__) - 3  # (safe_transaction_service/config/settings/base.py - 3 = safe-transaction-service/)
 APPS_DIR = ROOT_DIR.path('safe_transaction_service')
@@ -65,6 +66,7 @@ DJANGO_APPS = [
 
 ]
 THIRD_PARTY_APPS = [
+    'corsheaders',
     'rest_framework',
     'drf_yasg',
 ]
@@ -146,7 +148,11 @@ TEMPLATES = [
     },
 ]
 
+# CORS
 CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_HEADERS = list(default_cors_headers) + [
+    'etag',
+]
 
 # FIXTURES
 # ------------------------------------------------------------------------------
