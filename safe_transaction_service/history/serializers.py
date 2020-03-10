@@ -61,15 +61,13 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         except MultisigTransaction.DoesNotExist:
             pass
 
-        # Check owners and old owners, owner might be removed but that tx can still be signed by that owner
+        # Check owners and pending owners
         if not safe.retrieve_is_owner(data['sender']):
             try:
-                # TODO Fix this, we can use SafeStatus now
-                if not safe.retrieve_is_owner(data['sender'],
-                                              block_identifier=max(0, ethereum_client.current_block_number - 20)):
+                if not safe.retrieve_is_owner(data['sender'], block_identifier='pending'):
                     raise ValidationError('User is not an owner')
             except BadFunctionCallOutput:  # If it didn't exist 20 blocks ago
-                raise ValidationError('User is not an owner')
+                raise ValidationError('User is not an owner (error querying `pending` block)')
 
         signature = data.get('signature')
         if signature is not None:
