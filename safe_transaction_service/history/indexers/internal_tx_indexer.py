@@ -106,7 +106,8 @@ class InternalTxIndexer(EthereumIndexer):
                         function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
                         internal_txs_decoded_batch.append(InternalTxDecoded(internal_tx=internal_tx,
                                                                             function_name=function_name,
-                                                                            arguments=arguments))
+                                                                            arguments=arguments,
+                                                                            processed=False))
                     except CannotDecode:
                         pass
             if internal_txs_decoded_batch:
