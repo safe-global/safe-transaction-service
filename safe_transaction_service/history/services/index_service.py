@@ -153,15 +153,13 @@ class IndexService:
         if not addresses:
             return
 
-        safe_status_queryset = SafeStatus.objects.filter(address__in=addresses)
-        internal_txs = safe_status_queryset.values('internal_tx')  # Get dangling internal txs
+        SafeStatus.objects.filter(address__in=addresses).delete()
         MultisigTransaction.objects.exclude(
             ethereum_tx=None
         ).filter(
             safe__in=addresses
         ).delete()  # Remove not indexed transactions
-        safe_status_queryset.delete()  # Remove all SafeStatus for that Safe
-        InternalTxDecoded.objects.filter(pk__in=internal_txs).update(processed=False)  # Mark as not processed
+        InternalTxDecoded.objects.filter(internal_tx___from__in=addresses).update(processed=False)
 
     @transaction.atomic
     def reindex_all(self) -> NoReturn:
