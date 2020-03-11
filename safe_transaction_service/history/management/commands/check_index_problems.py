@@ -1,6 +1,9 @@
+from typing import Any, Dict, Iterable
+
 from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import Safe
 
 from ...models import SafeStatus
@@ -10,9 +13,34 @@ from ...services import IndexServiceProvider
 class Command(BaseCommand):
     help = 'Check nonce calculated by the indexer is the same that blockchain nonce'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nonce_fn = Safe(NULL_ADDRESS, EthereumClientProvider()).get_contract().functions.nonce()
+
     def add_arguments(self, parser):
         parser.add_argument('--fix', help="Fix nonce problems", action='store_true',
                             default=False)
+
+    def build_nonce_payload(self, addresses: Iterable[str]) -> Iterable[Dict[str, Any]]:
+        """
+        It looks like web3 takes time generating contract functions, so I do it this way
+        :param addresses:
+        :return:
+        """
+        contract_function = self.nonce_fn
+
+        payloads = []
+        data = contract_function.buildTransaction({'gas': 0, 'gasPrice': 0})['data']
+        output_type = [output['type'] for output in contract_function.abi['outputs']]
+        fn_name = contract_function.fn_name,  # For debugging purposes
+        for address in addresses:
+            payload = {'to': address,
+                       'data': data,
+                       'output_type': output_type,
+                       'fn_name':  fn_name,
+                       }
+            payloads.append(payload)
+        return payloads
 
     def handle(self, *args, **options):
         fix = options['fix']
@@ -32,9 +60,8 @@ class Command(BaseCommand):
                 addresses.append(result['address'])
                 nonces.append(result['nonce'])
 
-            blockchain_nonce_fns = [Safe(address, ethereum_client).get_contract().functions.nonce()
-                                    for address in addresses]
-            blockchain_nonces = ethereum_client.batch_call(blockchain_nonce_fns)
+            blockchain_nonce_payloads = self.build_nonce_payload(addresses)
+            blockchain_nonces = ethereum_client.batch_call_custom(blockchain_nonce_payloads)
 
             addresses_to_reindex = []
             for address, nonce, blockchain_nonce in zip(addresses, nonces, blockchain_nonces):
