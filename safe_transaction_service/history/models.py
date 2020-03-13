@@ -360,11 +360,24 @@ class InternalTxQuerySet(models.QuerySet):
         return ether_queryset.values(*values).union(tokens_queryset.values(*values)).order_by('-block_number')
 
     def can_be_decoded(self):
-        return self.filter(
+        parent_errored_query = InternalTx.objects.annotate(
+            child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
+            #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
+        ).filter(
+            child_trace_address__startswith=F('trace_address'),
+            ethereum_tx=OuterRef('ethereum_tx'),
+        ).exclude(
+            error=None
+        )
+
+        return self.annotate(
+            parent_errored=Subquery(parent_errored_query.values('pk')[:1])
+        ).filter(
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
             error=None,
             ethereum_tx__status=1,
             decoded_tx=None,
+            parent_errored=None,
         ).exclude(data=None)
 
 
@@ -402,11 +415,12 @@ class InternalTx(models.Model):
         return self.ethereum_tx.block_id
 
     @property
-    def can_be_decoded(self):
-        return (self.is_delegate_call
-                and not self.error
-                and self.data
-                and self.ethereum_tx.success)
+    def can_be_decoded(self) -> bool:
+        return bool(self.is_delegate_call
+                    and not self.error
+                    and self.data
+                    and self.ethereum_tx.success
+                    and not self.parent_is_errored())
 
     @property
     def is_call(self):
@@ -433,6 +447,20 @@ class InternalTx(models.Model):
     @property
     def is_ether_transfer(self) -> bool:
         return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
+
+    def parent_is_errored(self) -> bool:
+        """
+        Check if parent trace has been errored (`trace_address` is contained in children `trace_address`)
+        :return:
+        """
+        count = self.__class__.objects.annotate(
+            child_trace_address=Value(self.trace_address, output_field=models.CharField())
+        ).filter(
+            ethereum_tx=self.ethereum_tx, child_trace_address__startswith=F('trace_address')
+        ).exclude(
+            error=None
+        ).count()
+        return bool(count)
 
     def get_next_trace(self) -> Optional['InternalTx']:
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
