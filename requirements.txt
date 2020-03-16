@@ -16,7 +16,7 @@ docutils==0.16
 drf-yasg[validation]==1.17.1
 ethereum==2.3.2
 gevent==1.4.0
-gnosis-py==2.2.2
+gnosis-py==2.2.3
 gunicorn==20.0.4
 hexbytes==0.2.0
 psycopg2-binary==2.8.4

@@ -1,11 +1,12 @@
 import logging
 
 from eth_account import Account
+from web3 import Web3
 
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigTransaction, SafeContract, SafeStatus)
-from .factories import InternalTxDecodedFactory
+from .factories import EthereumTxFactory, InternalTxDecodedFactory
 from .test_internal_tx_indexer import TestInternalTxIndexer
 
 logger = logging.getLogger(__name__)
@@ -177,3 +178,21 @@ class TestSafeTxProcessor(TestInternalTxIndexer):
 
         self.assertEqual(MultisigTransaction.objects.count(),
                          InternalTxDecoded.objects.filter(function_name='execTransaction').count())
+
+    def test_tx_processor_failed(self):
+        tx_processor = SafeTxProcessor()
+        # Event for Safes < 1.1.1
+        logs = [{'data': '0x0034bff0dedc4c75f43df64a179ff26d56b99fa742fcfaeeee51e2da4e279b67',
+                 'topics': ['0xabfd711ecdd15ae3a6b3ad16ff2e9d81aec026a39d16725ee164be4fbf857a7c']}]
+        ethereum_tx = EthereumTxFactory(logs=logs)
+        self.assertTrue(tx_processor.is_failed(ethereum_tx, logs[0]['data']))
+        self.assertFalse(tx_processor.is_failed(ethereum_tx, Web3.keccak(text='hola').hex()))
+
+        # Event for Safes >= 1.1.1
+        safe_tx_hash = '0x4c15b21b9c3b57aebba3c274bf0a437950bd0eea46bc7a7b2df892f91f720311'
+        logs = [{'data': '0x4c15b21b9c3b57aebba3c274bf0a437950bd0eea46bc7a7b2df892f91f720311'
+                         '0000000000000000000000000000000000000000000000000000000000000000',
+                 'topics': ['0x23428b18acfb3ea64b08dc0c1d296ea9c09702c09083ca5272e64d115b687d23']}]
+        ethereum_tx = EthereumTxFactory(logs=logs)
+        self.assertTrue(tx_processor.is_failed(ethereum_tx, safe_tx_hash))
+        self.assertFalse(tx_processor.is_failed(ethereum_tx, Web3.keccak(text='hola').hex()))

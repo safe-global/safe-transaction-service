@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import List, Optional
 
 import requests
-from cachetools import TTLCache, cached, cachedmethod
+from cachetools import TTLCache, cachedmethod
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
