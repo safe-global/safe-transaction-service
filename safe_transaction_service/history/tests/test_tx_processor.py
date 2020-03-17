@@ -48,7 +48,10 @@ class TestSafeTxProcessor(TestInternalTxIndexer):
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
-        tx_processor.process_decoded_transactions(InternalTxDecoded.objects.pending_for_safes())
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        self.assertEqual(internal_txs_decoded.count(), 2)
+        self.assertEqual(internal_txs_decoded[0].function_name, 'setup')
+        tx_processor.process_decoded_transactions(internal_txs_decoded)
         safe_contract.refresh_from_db()
         self.assertGreater(safe_contract.erc20_block_number, 0)
 

@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 from requests import RequestException
 
@@ -46,7 +46,8 @@ class Erc20EventsIndexer(EthereumIndexer):
         return 'erc20_block_number'
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int) -> List[Dict[str, Any]]:
+                               to_block_number: int,
+                               current_block_number: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Search for tx hashes with erc20 transfer events (`from` and `to`) of a `safe_address`
         :param addresses:

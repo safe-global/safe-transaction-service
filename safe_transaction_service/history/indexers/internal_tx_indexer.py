@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterable, List, Set
+from typing import Iterable, List, Optional, Set
 
 from django.db import transaction
 
@@ -43,7 +43,43 @@ class InternalTxIndexer(EthereumIndexer):
         return SafeMasterCopy
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int) -> Set[str]:
+                               to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:
+        current_block_number = current_block_number or self.ethereum_client.current_block_number
+        # Use `trace_block` for last 4 blocks and `trace_filter` for the others
+        trace_block_number = max(current_block_number - 4, 0)
+        if from_block_number > trace_block_number:  # Just trace_block
+            return self._find_relevant_elements_using_trace_block(addresses, from_block_number, to_block_number)
+        elif to_block_number < trace_block_number:  # Just trace_filter
+            return self._find_relevant_elements_using_trace_filter(addresses, from_block_number, to_block_number)
+        else:  # trace_filter for old blocks and trace_filter for the most recent ones
+            return OrderedDict.fromkeys(list(self._find_relevant_elements_using_trace_filter(addresses,
+                                                                                             from_block_number,
+                                                                                             trace_block_number)) +
+                                        list(self._find_relevant_elements_using_trace_block(addresses,
+                                                                                            trace_block_number,
+                                                                                            to_block_number))
+                                        ).keys()
+
+    def _find_relevant_elements_using_trace_block(self, addresses: List[str], from_block_number: int,
+                                                  to_block_number: int) -> Set[str]:
+        try:
+            # TODO Use batching
+            traces = [self.ethereum_client.w3.parity.traceBlock(block_number)
+                      for block_number in range(from_block_number, to_block_number + 1)]
+            tx_hashes = []
+            for trace_list in traces:
+                if not trace_list:
+                    raise RequestException('Empty `trace_block`')
+
+                tx_hashes.extend([trace['transactionHash'] for trace in trace_list
+                                  if trace.get('action', {}).get('from') in addresses
+                                  or trace.get('action', {}).get('to') in addresses])
+            return OrderedDict.fromkeys(tx_hashes).keys()
+        except RequestException as e:
+            raise self.FindRelevantElementsException('Request error calling `trace_block`') from e
+
+    def _find_relevant_elements_using_trace_filter(self, addresses: List[str], from_block_number: int,
+                                                   to_block_number: int) -> Set[str]:
         """
         Search for tx hashes with internal txs (in and out) of a `address`
         :param addresses:

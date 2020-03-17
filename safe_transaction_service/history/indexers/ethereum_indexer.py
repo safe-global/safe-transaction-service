@@ -74,12 +74,14 @@ class EthereumIndexer(ABC):
 
     @abstractmethod
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int) -> Collection[Any]:
+                               to_block_number: int,
+                               current_block_number: Optional[int] = None) -> Collection[Any]:
         """
         Find blockchain relevant elements for the `addresses`
         :param addresses:
         :param from_block_number
         :param to_block_number
+        :param current_block_number:
         :return: Set of relevant elements
         """
         pass
@@ -193,7 +195,8 @@ class EthereumIndexer(ABC):
             start = None
 
         try:
-            elements = self.find_relevant_elements(addresses, from_block_number, to_block_number)
+            elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
+                                                   current_block_number=current_block_number)
         except (self.FindRelevantElementsException, SoftTimeLimitExceeded) as e:
             self.block_process_limit = self.initial_block_process_limit  # Set back to default
             raise e

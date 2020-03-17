@@ -44,6 +44,9 @@ trace_filter_result = [
      'transactionHash': '0xf554b52dcb336b83bf31e7e2e7aa94853a456f01a139a6b7dec71329460dfb61',
      'transactionPosition': 2,
      'type': 'call'},
+]
+
+trace_block_result = [
     {'action': {'from': '0x5aC255889882aCd3da2aA939679E3f3d4cea221e',
                 'gas': 976392,
                 'value': 0,

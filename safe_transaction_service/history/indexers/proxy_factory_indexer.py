@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Any, Dict, Iterable, List, Set
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 from hexbytes import HexBytes
 from web3 import Web3
@@ -46,12 +46,14 @@ class ProxyFactoryIndexer(EthereumIndexer):
         return ProxyFactory
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int) -> Set[str]:
+                               to_block_number: int,
+                               current_block_number: Optional[int] = None) -> Set[str]:
         """
         Search for tx hashes with erc20 transfer events (`from` and `to`) of a `safe_address`
         :param addresses:
         :param from_block_number: Starting block number
         :param to_block_number: Ending block number
+        :param current_block_number:
         :return: List of events
         [{'address': '0x12302fE9c02ff50939BaAaaf415fc226C078613C',
           'topics': [HexBytes('0xa38789425dbeee0239e16ff2d2567e31720127fbc6430758c1a4efc6aef29f80')],
