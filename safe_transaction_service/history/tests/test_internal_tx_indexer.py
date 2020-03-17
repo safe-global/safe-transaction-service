@@ -3,9 +3,6 @@ from unittest.mock import MagicMock, PropertyMock
 
 from django.test import TestCase
 
-from eth_account import Account
-from web3.parity import Parity
-
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
 
@@ -13,7 +10,7 @@ from ..indexers import InternalTxIndexerProvider
 from ..models import (EthereumBlock, EthereumTx, InternalTx, InternalTxDecoded,
                       SafeMasterCopy)
 from .factories import SafeMasterCopyFactory
-from .mocks_internal_tx_indexer import (block_result, trace_block_result,
+from .mocks_internal_tx_indexer import (block_result, trace_blocks_result,
                                         trace_filter_result,
                                         trace_transactions_result,
                                         transaction_receipts_result,
@@ -21,7 +18,7 @@ from .mocks_internal_tx_indexer import (block_result, trace_block_result,
 
 
 class TestInternalTxIndexer(TestCase):
-    @mock.patch.object(Parity, 'traceBlock', autospec=True, return_value=trace_block_result)
+    @mock.patch.object(ParityManager, 'trace_blocks', autospec=True, return_value=trace_blocks_result)
     @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
     @mock.patch.object(ParityManager, 'trace_transactions', autospec=True, return_value=trace_transactions_result)
     @mock.patch.object(EthereumClient, 'get_blocks', autospec=True, return_value=block_result)
@@ -69,12 +66,16 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(ethereum_tx.logs, [])
 
         trace_filter_mock.assert_called_with(internal_tx_indexer.ethereum_client.parity,
-                                             from_block=1, to_block=current_block_number - 4,
+                                             from_block=1,
+                                             to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
                                              from_address=[safe_master_copy.address])
-        for i in range(current_block_number - 4, current_block_number + 1 - internal_tx_indexer.confirmations):
-            trace_block_mock.assert_any_call(internal_tx_indexer.ethereum_client.w3.parity, i)
+        trace_block_mock.assert_called_with(internal_tx_indexer.ethereum_client.parity,
+                                            list(range(
+                                                current_block_number - internal_tx_indexer.number_trace_blocks,
+                                                current_block_number + 1 - internal_tx_indexer.confirmations))
+                                            )
 
-    @mock.patch.object(Parity, 'traceBlock', autospec=True, return_value=trace_block_result)
+    @mock.patch.object(ParityManager, 'trace_blocks', autospec=True, return_value=trace_blocks_result)
     @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
     @mock.patch.object(EthereumClient, 'current_block_number', new_callable=PropertyMock, return_value=2000)
     def test_find_relevant_elements(self, current_block_number_mock: MagicMock,
@@ -84,7 +85,8 @@ class TestInternalTxIndexer(TestCase):
         internal_tx_indexer = InternalTxIndexerProvider()
         addresses = ['0x5aC255889882aCd3da2aA939679E3f3d4cea221e']
         trace_filter_transactions = [trace['transactionHash'] for trace in trace_filter_mock.return_value]
-        trace_block_transactions = [trace['transactionHash'] for trace in trace_block_mock.return_value]
+        trace_block_transactions = [trace['transactionHash'] for sublist in trace_block_mock.return_value
+                                    for trace in sublist]
 
         # Just trace filter
         elements = internal_tx_indexer.find_relevant_elements(addresses, 1, current_block_number - 10)
@@ -103,10 +105,15 @@ class TestInternalTxIndexer(TestCase):
                                                               current_block_number)
         self.assertCountEqual(set(trace_filter_transactions).union(trace_block_transactions), elements)
         trace_filter_mock.assert_any_call(internal_tx_indexer.ethereum_client.parity,
-                                          from_block=current_block_number - 10, to_block=current_block_number - 4,
+                                          from_block=current_block_number - 10,
+                                          to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
                                           from_address=addresses)
-        for i in range(current_block_number - 4, current_block_number + 1):
-            trace_block_mock.assert_any_call(internal_tx_indexer.ethereum_client.w3.parity, i)
+
+        trace_block_mock.assert_called_with(internal_tx_indexer.ethereum_client.parity,
+                                            list(range(
+                                                current_block_number - internal_tx_indexer.number_trace_blocks,
+                                                current_block_number + 1)),
+                                            )
 
         trace_filter_mock.reset_mock()
         trace_block_mock.reset_mock()
@@ -115,5 +122,9 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(addresses, current_block_number - 3, current_block_number)
         self.assertCountEqual(set(trace_block_transactions), elements)
         trace_filter_mock.assert_not_called()
-        for i in range(current_block_number - 3, current_block_number + 1):
-            trace_block_mock.assert_any_call(internal_tx_indexer.ethereum_client.w3.parity, i)
+
+        trace_block_mock.assert_called_with(internal_tx_indexer.ethereum_client.parity,
+                                            list(range(
+                                                current_block_number - 3,
+                                                current_block_number + 1)),
+                                            )
