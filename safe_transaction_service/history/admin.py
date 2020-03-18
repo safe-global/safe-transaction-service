@@ -196,7 +196,7 @@ class ModuleTransactionAdmin(admin.ModelAdmin):
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):
-    actions = ['reindex', 'reindex_last_day', 'reindex_last_month']
+    actions = ['reindex', 'reindex_last_day', 'reindex_last_week', 'reindex_last_month']
     list_display = ('address', 'initial_block_number', 'tx_block_number')
     search_fields = ['address']
 
@@ -210,6 +210,10 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
     def reindex_last_day(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, 0))
     reindex_last_day.short_description = "Reindex last 24 hours"
+
+    def reindex_last_week(self, request, queryset):
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, 0))
+    reindex_last_day.short_description = "Reindex last week"
 
     def reindex_last_month(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, 0))
