@@ -213,7 +213,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
     def reindex_last_week(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, 0))
-    reindex_last_day.short_description = "Reindex last week"
+    reindex_last_week.short_description = "Reindex last week"
 
     def reindex_last_month(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, 0))
