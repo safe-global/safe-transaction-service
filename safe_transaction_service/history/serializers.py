@@ -1,8 +1,5 @@
 from typing import Any, Dict, Optional
 
-from eth_account import Account
-from eth_keys.exceptions import BadSignature
-from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from web3.exceptions import BadFunctionCallOutput
@@ -241,8 +238,11 @@ class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
 
 class SafeCreationInfoResponseSerializer(serializers.Serializer):
     created = serializers.DateTimeField()
-    transaction_hash = Sha3HashField()
     creator = EthereumAddressField()
+    factory_address = EthereumAddressField()
+    master_copy = EthereumAddressField(allow_null=True)
+    setup_data = HexadecimalField(allow_null=True)
+    transaction_hash = Sha3HashField()
 
 
 class OwnerResponseSerializer(SafeBalanceResponseSerializer):

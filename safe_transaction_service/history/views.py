@@ -28,6 +28,7 @@ from .serializers import (IncomingTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
 from .services import BalanceServiceProvider
+from .services.safe_service import SafeServiceProvider
 
 
 class AboutView(APIView):
@@ -267,18 +268,11 @@ class SafeCreationView(APIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        try:
-            creation_internal_tx = InternalTx.objects.select_related('ethereum_tx__block').get(contract_address=address)
-            previous_internal_tx = creation_internal_tx.get_previous_trace()
-            creator = (previous_internal_tx or creation_internal_tx)._from
-            created = creation_internal_tx.ethereum_tx.block.timestamp
-        except InternalTx.DoesNotExist:
+        safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
+        if not safe_creation_info:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.serializer_class(data={'creator': creator,
-                                                 'created': created,
-                                                 'transaction_hash': creation_internal_tx.ethereum_tx_id})
-        serializer.is_valid()
+        serializer = self.serializer_class(safe_creation_info)
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
