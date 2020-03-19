@@ -2,6 +2,8 @@ import hashlib
 import json
 
 from django.conf import settings
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 import django_filters
 from drf_yasg.utils import swagger_auto_schema
@@ -135,6 +137,7 @@ class SafeMultisigTransactionListView(ListAPIView):
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
                                     422: 'Invalid ethereum address'})
+    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
@@ -240,6 +243,7 @@ class SafeIncomingTxListView(ListAPIView):
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
                                     404: 'Txs not found',
                                     422: 'Safe address checksum not valid'})
+    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
