@@ -17,4 +17,4 @@ echo "==> Send via Slack info about service version and network"
 python manage.py send_slack_notification
 
 echo "==> Running Gunicorn ... "
-exec gunicorn --worker-class gevent --pythonpath "$PWD" config.wsgi:application --log-file=- --error-logfile=- --access-logfile=- --log-level info --logger-class='safe_transaction_service.history.utils.CustomGunicornLogger' -b unix:$DOCKER_SHARED_DIR/gunicorn.socket -b 0.0.0.0:8888
+exec gunicorn --worker-class gevent --pythonpath "$PWD" config.wsgi:application --timeout 120 --graceful-timeout 120 --log-file=- --error-logfile=- --access-logfile=- --log-level info --logger-class='safe_transaction_service.history.utils.CustomGunicornLogger' -b unix:$DOCKER_SHARED_DIR/gunicorn.socket -b 0.0.0.0:8888
