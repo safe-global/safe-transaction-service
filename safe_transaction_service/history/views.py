@@ -149,6 +149,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             response.data['count_unique_nonce'] = MultisigTransaction.objects.filter(safe=address
                                                                                      ).distinct('nonce').count()
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
+            response['Cache-Control'] = 'max-age=15'
 
         return response
 
@@ -251,6 +252,7 @@ class SafeIncomingTxListView(ListAPIView):
             response.status_code = status.HTTP_404_NOT_FOUND
         else:
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
+            response['Cache-Control'] = 'max-age=15'
 
         return response
 
