@@ -150,7 +150,7 @@ TEMPLATES = [
 
 # CORS
 CORS_ORIGIN_ALLOW_ALL = True
-CORS_ALLOW_HEADERS = list(default_cors_headers)
+CORS_ALLOW_HEADERS = list(default_cors_headers) + ['if-match', 'if-modified-since', 'if-none-match']
 CORS_EXPOSE_HEADERS = ['etag']
 
 # FIXTURES
