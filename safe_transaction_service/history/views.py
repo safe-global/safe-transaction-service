@@ -182,6 +182,7 @@ class SafeBalanceView(APIView):
     @swagger_auto_schema(responses={200: SafeBalanceResponseSerializer(many=True),
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid'})
+    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Get status of the safe
@@ -206,6 +207,7 @@ class SafeBalanceUsdView(APIView):
     @swagger_auto_schema(responses={200: SafeBalanceUsdResponseSerializer(many=True),
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid'})
+    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Get status of the safe
@@ -267,6 +269,7 @@ class SafeCreationView(APIView):
     @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
                                     404: 'Safes not found for that owner',
                                     422: 'Owner address checksum not valid'})
+    @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, format=None):
         """
         Get status of the safe
