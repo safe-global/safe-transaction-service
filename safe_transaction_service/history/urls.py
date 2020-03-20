@@ -21,7 +21,7 @@ urlpatterns = [
          name='safe-balances'),
     path('safes/<str:address>/balances/usd/', views.SafeBalanceUsdView.as_view(),
          name='safe-balances-usd'),
-    path('transactions/<str:tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
+    path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),

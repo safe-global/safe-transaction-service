@@ -95,14 +95,14 @@ class SafeModuleTransactionListView(ListAPIView):
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
     serializer_class = SafeMultisigTransactionResponseSerializer
     lookup_field = 'safe_tx_hash'
-    lookup_url_kwarg = 'tx_hash'
+    lookup_url_kwarg = 'safe_tx_hash'
 
     def get_queryset(self):
         return MultisigTransaction.objects.with_confirmations_required(
         ).prefetch_related(
             'confirmations'
         ).select_related(
-            'ethereum_tx'
+            'ethereum_tx__block'
         )
 
 
@@ -119,7 +119,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         ).prefetch_related(
             'confirmations'
         ).select_related(
-            'ethereum_tx'
+            'ethereum_tx__block'
         ).order_by(
             '-nonce',
             '-created'
