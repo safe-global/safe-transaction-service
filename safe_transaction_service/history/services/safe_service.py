@@ -1,13 +1,13 @@
 import logging
-import operator
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.contracts import get_proxy_factory_contract
+from gnosis.eth.contracts import (get_cpk_factory_contract,
+                                  get_proxy_factory_contract)
 
 from ..models import InternalTx
 
@@ -47,6 +47,9 @@ class SafeServiceProvider:
 class SafeService:
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
+        dummy_w3 = Web3()  # Not needed, just used to decode contracts
+        self.proxy_factory_contract = get_proxy_factory_contract(dummy_w3)
+        self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
         try:
@@ -60,15 +63,30 @@ class SafeService:
             master_copy = None
             setup_data = None
             if previous_internal_tx:
-                try:
-                    data = previous_internal_tx.data.tobytes()
-                    _, decoded_data = get_proxy_factory_contract(Web3()).decode_function_input(data)
-                    master_copy = decoded_data.get('masterCopy', decoded_data.get('_mastercopy'))
-                    setup_data = decoded_data.get('data', decoded_data.get('initializer'))
-                except ValueError:
-                    pass
+                data = previous_internal_tx.data.tobytes()
+                result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
+                if result:
+                    master_copy, setup_data = result
         except InternalTx.DoesNotExist:
             return None
 
         return SafeCreationInfo(created, creator, proxy_factory, master_copy, setup_data,
                                 creation_internal_tx.ethereum_tx_id)
+
+    def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
+        try:
+            _, decoded_data = get_proxy_factory_contract(Web3()).decode_function_input(data)
+            master_copy = decoded_data.get('masterCopy', decoded_data.get('_mastercopy'))
+            setup_data = decoded_data.get('data', decoded_data.get('initializer'))
+            return master_copy, setup_data
+        except ValueError:
+            return None
+
+    def _decode_cpk_proxy_factory(self, data) -> Optional[Tuple[str, bytes]]:
+        try:
+            _, decoded_data = self.cpk_proxy_factory_contract.decode_function_input(data)
+            master_copy = decoded_data.get('masterCopy')
+            setup_data = decoded_data.get('data')
+            return master_copy, setup_data
+        except ValueError:
+            return None
