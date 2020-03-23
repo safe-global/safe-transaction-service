@@ -75,7 +75,7 @@ class SafeService:
 
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
-            _, decoded_data = get_proxy_factory_contract(Web3()).decode_function_input(data)
+            _, decoded_data = self.proxy_factory_contract.decode_function_input(data)
             master_copy = decoded_data.get('masterCopy', decoded_data.get('_mastercopy'))
             setup_data = decoded_data.get('data', decoded_data.get('initializer'))
             return master_copy, setup_data
