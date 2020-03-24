@@ -196,8 +196,7 @@ class SafeBalanceView(APIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
             safe_balances = BalanceServiceProvider().get_balances(address)
-            serializer = self.serializer_class(data=safe_balances, many=True)
-            serializer.is_valid()
+            serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
@@ -221,8 +220,7 @@ class SafeBalanceUsdView(APIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
             safe_balances = BalanceServiceProvider().get_usd_balances(address)
-            serializer = self.serializer_class(data=safe_balances, many=True)
-            serializer.is_valid()
+            serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
@@ -303,5 +301,5 @@ class OwnersView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.serializer_class(data={'safes': safes_for_owner})
-        serializer.is_valid()
+        assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

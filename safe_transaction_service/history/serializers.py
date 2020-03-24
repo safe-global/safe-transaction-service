@@ -246,7 +246,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     transaction_hash = Sha3HashField()
 
 
-class OwnerResponseSerializer(SafeBalanceResponseSerializer):
+class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
 
