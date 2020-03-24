@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Dict, Optional
 
 from rest_framework import serializers
@@ -249,13 +250,22 @@ class OwnerResponseSerializer(SafeBalanceResponseSerializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
 
+class IncomingTransactionType(Enum):
+    ETHER_TRANSFER = 0
+    ERC20_TRANSFER = 1
+    ERC721_TRANSFER = 2
+    UNKNOWN = 3
+
+
 class IncomingTransactionResponseSerializer(serializers.Serializer):
+    type = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
     block_number = serializers.IntegerField()
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
     from_ = EthereumAddressField(source='_from')
     value = serializers.CharField()
+    token_id = serializers.CharField()
     token_address = EthereumAddressField(allow_null=True, default=None)
 
     def get_fields(self):
@@ -264,3 +274,14 @@ class IncomingTransactionResponseSerializer(serializers.Serializer):
         from_ = result.pop('from_')
         result['from'] = from_
         return result
+
+    def get_type(self, obj: Dict[str, Any]) -> str:
+        if not obj.get('token_address'):
+            return IncomingTransactionType.ETHER_TRANSFER.name
+        else:
+            if obj.get('value') is not None:
+                return IncomingTransactionType.ERC20_TRANSFER.name
+            elif obj.get('token_id') is not None:
+                return IncomingTransactionType.ERC721_TRANSFER.name
+
+        return IncomingTransactionType.UNKNOWN

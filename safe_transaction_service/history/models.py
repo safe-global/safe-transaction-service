@@ -334,11 +334,12 @@ class InternalTxQuerySet(models.QuerySet):
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
             execution_date=F('ethereum_tx__block__timestamp'),
-            token_address=Value(None, output_field=EthereumAddressField())
+            token_id=Value(None, output_field=Uint256Field()),
+            token_address=Value(None, output_field=EthereumAddressField()),
         ).order_by('-ethereum_tx__block_id')
 
     def incoming_tokens(self, address: str):
-        return EthereumEvent.objects.erc20_events().filter(
+        return EthereumEvent.objects.erc20_and_721_events().filter(
             arguments__to=address
         ).annotate(
             to=RawSQL("arguments->>%s", ('to',)),  # Order is really important!
@@ -347,6 +348,7 @@ class InternalTxQuerySet(models.QuerySet):
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
             execution_date=F('ethereum_tx__block__timestamp'),
+            token_id=RawSQL("(arguments->>%s)::numeric", ('tokenId',)),
             token_address=F('address')
         ).order_by('-ethereum_tx__block_id')
 
@@ -356,7 +358,8 @@ class InternalTxQuerySet(models.QuerySet):
         return self.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
 
     def union_incoming_txs_with_tokens(self, tokens_queryset, ether_queryset):
-        values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_address')
+        values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_id',
+                  'token_address')
         return ether_queryset.values(*values).union(tokens_queryset.values(*values)).order_by('-block_number')
 
     def can_be_decoded(self):

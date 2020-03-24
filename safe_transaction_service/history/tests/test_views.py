@@ -14,6 +14,7 @@ from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import MultisigTransaction
+from ..serializers import IncomingTransactionType
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, InternalTxFactory,
                         ModuleTransactionFactory, MultisigConfirmationFactory,
@@ -318,27 +319,69 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         token_value = 6
-        ethereum_event = EthereumEventFactory(to=safe_address, value=token_value)
+        ethereum_erc_20_event = EthereumEventFactory(to=safe_address, value=token_value)
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
-        self.assertCountEqual(response.json()['results'], [
-            {'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+        self.assertEqual(response.json()['results'], [
+            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+             'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
+             'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
+             'to': safe_address,
+             'value': str(token_value),
+             'tokenId': None,
+             'tokenAddress': ethereum_erc_20_event.address,
+             'from': ethereum_erc_20_event.arguments['from']
+             },
+            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+             'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': internal_tx.ethereum_tx_id,
              'blockNumber': internal_tx.ethereum_tx.block_id,
              'to': safe_address,
              'value': str(value),
+             'tokenId': None,
              'tokenAddress': None,
              'from': internal_tx._from,
              },
-            {'executionDate': ethereum_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
-             'transactionHash': ethereum_event.ethereum_tx_id,
-             'blockNumber': ethereum_event.ethereum_tx.block_id,
+        ])
+
+        token_id = 17
+        ethereum_erc_721_event = EthereumEventFactory(to=safe_address, value=token_id, erc721=True)
+        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 3)
+        self.assertEqual(response.json()['results'], [
+            {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+             'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
+             'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
+             'to': safe_address,
+             'value': None,
+             'tokenId': str(token_id),
+             'tokenAddress': ethereum_erc_721_event.address,
+             'from': ethereum_erc_721_event.arguments['from']
+             },
+            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+             'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
+             'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
              'to': safe_address,
              'value': str(token_value),
-             'tokenAddress': ethereum_event.address,
-             'from': ethereum_event.arguments['from']
-             }
+             'tokenId': None,
+             'tokenAddress': ethereum_erc_20_event.address,
+             'from': ethereum_erc_20_event.arguments['from']
+             },
+            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+             'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': internal_tx.ethereum_tx_id,
+             'blockNumber': internal_tx.ethereum_tx.block_id,
+             'to': safe_address,
+             'value': str(value),
+             'tokenId': None,
+             'tokenAddress': None,
+             'from': internal_tx._from,
+             },
         ])
 
     def test_safe_creation_view(self):

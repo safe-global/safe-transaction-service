@@ -88,8 +88,24 @@ class TestModels(TestCase):
         self.assertEqual(initial_block_numbers, [2, 6, 3])
 
 
-class TestEthereumTxManager(EthereumTestCaseMixin, TestCase):
+class TestEthereumTxManager(TestCase):
     pass
+
+
+class TestEthereumEventManager(TestCase):
+    def test_incoming_tokens(self):
+        address = Account.create().address
+        self.assertFalse(InternalTx.objects.incoming_tokens(address))
+        EthereumEventFactory(to=address)
+        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 1)
+        EthereumEventFactory(to=address, erc721=True)
+        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 2)
+        incoming_token_0 = InternalTx.objects.incoming_tokens(address)[0]  # Erc721 token
+        incoming_token_1 = InternalTx.objects.incoming_tokens(address)[1]  # Erc20 token
+        self.assertIsNone(incoming_token_0.value)
+        self.assertIsNotNone(incoming_token_0.token_id)
+        self.assertIsNone(incoming_token_1.token_id)
+        self.assertIsNotNone(incoming_token_1.value)
 
 
 class TestInternalTxManager(TestCase):
