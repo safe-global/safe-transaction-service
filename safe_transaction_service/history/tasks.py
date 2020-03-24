@@ -118,7 +118,8 @@ def index_internal_txs_task(self) -> Optional[int]:
             blockchain_running_tasks.add_task(task_id)
             number_traces = InternalTxIndexerProvider().start()
             logger.info('Find internal txs task processed %d traces', number_traces)
-            process_decoded_internal_txs_task.delay()
+            if number_traces:
+                process_decoded_internal_txs_task.delay()
             return number_traces
     except LockError:
         pass
