@@ -119,6 +119,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             number_traces = InternalTxIndexerProvider().start()
             logger.info('Find internal txs task processed %d traces', number_traces)
             if number_traces:
+                logger.info('Calling task to process decoded traces')
                 process_decoded_internal_txs_task.delay()
             return number_traces
     except LockError:
