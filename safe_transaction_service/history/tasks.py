@@ -1,5 +1,5 @@
 import signal
-from typing import Any, Dict, NoReturn, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from django.conf import settings
 
@@ -7,6 +7,7 @@ import requests
 from celery import app
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
+from celery.worker.request import Request as CeleryRequest
 from redis import Redis
 from redis.exceptions import LockError
 
@@ -30,14 +31,29 @@ def get_redis() -> Redis:
     return get_redis.redis
 
 
-class BlockchainRunningTasks:
+def generate_handler(task_id: str) -> NoReturn:
+    def handler(signum, frame):
+        logger.warning('Received SIGTERM on task-id=%s', task_id)
+        raise OSError(f'Received SIGTERM on task-id={task_id}. Probably a reorg. Task must exit')
+    return handler
+
+
+class BlockchainRunningTaskManager:
     blockchain_running_tasks_key = 'blockchain_running_tasks'
 
     def __init__(self):
         self.redis = get_redis()
 
-    def get_running_tasks(self):
-        return self.redis.lrange(self.blockchain_running_tasks_key, 0, -1)
+    def stop_running_tasks(self):
+        tasks_to_kill = self.get_running_tasks()
+        if tasks_to_kill:
+            logger.warning('Stopping running tasks. Sending SIGTERM to task_ids=%s', tasks_to_kill)
+            celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
+            self.delete_all_tasks()
+        return tasks_to_kill
+
+    def get_running_tasks(self) -> List[str]:
+        return [task_id.decode() for task_id in self.redis.lrange(self.blockchain_running_tasks_key, 0, -1)]
 
     def add_task(self, task_id: str):
         return self.redis.lpush(self.blockchain_running_tasks_key, task_id)
@@ -49,30 +65,29 @@ class BlockchainRunningTasks:
         return self.redis.delete(self.blockchain_running_tasks_key)
 
 
-blockchain_running_tasks = BlockchainRunningTasks()
+class BlockchainRunningTask:
+    """
+    Context Manager to store blockchain related task ids. That way we can terminate all blockchain related task at
+    once, e.g. reorg is detected
+    """
+    def __init__(self, celery_request: CeleryRequest):
+        self.blockchain_running_task_manager = BlockchainRunningTaskManager()
+        self.celery_request = celery_request
+        self.task_id: str = celery_request.id
 
+    def __enter__(self):
+        signal.signal(signal.SIGTERM, generate_handler(self.task_id))
+        self.blockchain_running_task_manager.add_task(self.task_id)
+        return self
 
-def generate_handler(task_id: str) -> NoReturn:
-    def handler(signum, frame):
-        logger.warning('Received SIGTERM on task-id=%s', task_id)
-        raise OSError(f'Received SIGTERM on task-id={task_id}. Probably a reorg. Task must exit')
-    return handler
-
-
-def stop_all_tasks() -> int:
-    tasks_to_kill = [task_id.decode() for task_id in blockchain_running_tasks.get_running_tasks()]
-    # Not working, as the worker cannot answer anymore
-    if tasks_to_kill:
-        logger.warning('Sending SIGTERM to task_ids=%s', tasks_to_kill)
-        celery_app.control.revoke(tasks_to_kill, terminate=True, signal=signal.SIGTERM)
-        blockchain_running_tasks.delete_all_tasks()
-    return len(tasks_to_kill)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.blockchain_running_task_manager.remove_task(self.task_id)
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning('Worker shutting down')
-    return stop_all_tasks()
+    return len(BlockchainRunningTaskManager().stop_running_tasks())
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -82,22 +97,16 @@ def index_new_proxies_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = False
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            task_id = self.request.id
-            got_lock = True
-            signal.signal(signal.SIGTERM, generate_handler(task_id))
-            blockchain_running_tasks.add_task(task_id)
-            number_proxies = ProxyFactoryIndexerProvider().start()
-            if number_proxies:
-                logger.info('Indexed new %d proxies', number_proxies)
-                return number_proxies
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of new proxies')
+                number_proxies = ProxyFactoryIndexerProvider().start()
+                if number_proxies:
+                    logger.info('Indexed new %d proxies', number_proxies)
+                    return number_proxies
     except LockError:
         pass
-    finally:
-        if got_lock:
-            blockchain_running_tasks.remove_task(task_id)
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -108,25 +117,18 @@ def index_internal_txs_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = False
     try:
         with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            task_id = self.request.id
-            got_lock = True
-            signal.signal(signal.SIGTERM, generate_handler(task_id))
-            logger.info('Start indexing of internal txs')
-            blockchain_running_tasks.add_task(task_id)
-            number_traces = InternalTxIndexerProvider().start()
-            logger.info('Find internal txs task processed %d traces', number_traces)
-            if number_traces:
-                logger.info('Calling task to process decoded traces')
-                process_decoded_internal_txs_task.delay()
-            return number_traces
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of internal txs')
+                number_traces = InternalTxIndexerProvider().start()
+                logger.info('Find internal txs task processed %d traces', number_traces)
+                if number_traces:
+                    logger.info('Calling task to process decoded traces')
+                    process_decoded_internal_txs_task.delay()
+                return number_traces
     except LockError:
         pass
-    finally:
-        if got_lock:
-            blockchain_running_tasks.remove_task(task_id)
 
 
 @app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
@@ -137,22 +139,15 @@ def index_erc20_events_task(self) -> Optional[int]:
     """
 
     redis = get_redis()
-    got_lock = False
     try:
         with redis.lock('tasks:index_erc20_events_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            task_id = self.request.id
-            got_lock = True
-            signal.signal(signal.SIGTERM, generate_handler(task_id))
-            logger.info('Start indexing of erc20/721 events')
-            blockchain_running_tasks.add_task(task_id)
-            number_events = Erc20EventsIndexerProvider().start()
-            logger.info('Indexing of erc20/721 events task processed %d events', number_events)
-            return number_events
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of erc20/721 events')
+                number_events = Erc20EventsIndexerProvider().start()
+                logger.info('Indexing of erc20/721 events task processed %d events', number_events)
+                return number_events
     except LockError:
         pass
-    finally:
-        if got_lock:
-            blockchain_running_tasks.remove_task(task_id)
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
@@ -186,14 +181,13 @@ def check_reorgs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:check_reorgs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            logger.info('Start checking of reorgs')
             reorg_service: ReorgService = ReorgServiceProvider()
             first_reorg_block_number = reorg_service.check_reorgs()
             if first_reorg_block_number:
+                logger.warning('Reorg found for block-number=%d', first_reorg_block_number)
                 # Stop running tasks
-                celery_app.control.revoke([task_id.decode()  # Redis returns `bytes`
-                                           for task_id in blockchain_running_tasks.get_running_tasks()],
-                                          terminate=True, signal=signal.SIGTERM)
-                blockchain_running_tasks.delete_all_tasks()
+                BlockchainRunningTaskManager().stop_running_tasks()
                 reorg_service.recover_from_reorg(first_reorg_block_number)
                 return first_reorg_block_number
     except LockError:
