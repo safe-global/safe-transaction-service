@@ -89,23 +89,23 @@ class TestInternalTxIndexer(TestCase):
                                     for trace in sublist]
 
         # Just trace filter
-        elements = internal_tx_indexer.find_relevant_elements(addresses, 1, current_block_number - 10)
+        elements = internal_tx_indexer.find_relevant_elements(addresses, 1, current_block_number - 50)
         self.assertCountEqual(set(trace_filter_transactions), elements)
         trace_filter_mock.assert_any_call(internal_tx_indexer.ethereum_client.parity,
-                                          from_block=1, to_block=current_block_number - 10,
+                                          from_block=1, to_block=current_block_number - 50,
                                           from_address=addresses)
         trace_filter_mock.assert_any_call(internal_tx_indexer.ethereum_client.parity,
-                                          from_block=1, to_block=current_block_number - 10,
+                                          from_block=1, to_block=current_block_number - 50,
                                           to_address=addresses)
         trace_block_mock.assert_not_called()
         trace_filter_mock.reset_mock()
 
         # Mixed trace_block and trace_filter
-        elements = internal_tx_indexer.find_relevant_elements(addresses, current_block_number - 10,
+        elements = internal_tx_indexer.find_relevant_elements(addresses, current_block_number - 50,
                                                               current_block_number)
         self.assertCountEqual(set(trace_filter_transactions).union(trace_block_transactions), elements)
         trace_filter_mock.assert_any_call(internal_tx_indexer.ethereum_client.parity,
-                                          from_block=current_block_number - 10,
+                                          from_block=current_block_number - 50,
                                           to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
                                           from_address=addresses)
 

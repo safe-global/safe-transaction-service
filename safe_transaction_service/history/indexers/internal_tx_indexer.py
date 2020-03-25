@@ -33,7 +33,7 @@ class InternalTxIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tx_decoder = TxDecoder()
-        self.number_trace_blocks = 4  # Use `trace_block` for last `number_trace_blocks` blocks indexing
+        self.number_trace_blocks = 10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
 
     @property
     def database_field(self):
