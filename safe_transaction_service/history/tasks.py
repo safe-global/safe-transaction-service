@@ -157,14 +157,19 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             logger.info('Start processing decoded internal txs')
             number_processed = 0
-            count = InternalTxDecoded.objects.pending_for_safes().count()
+            count = InternalTxDecoded.objects.not_processed().count()  # Just get a rough estimate, faster for DB
             batch = 500
-            if count:
+            if not count:
+                logger.info('No decoded internal txs to process')
+            else:
+                logger.info('%d as much decoded internal txs to process. Starting with first %d', count, min(batch,
+                                                                                                             count))
                 tx_processor: TxProcessor = SafeTxProcessor()
-                logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
                 # Use slicing for memory issues
                 for _ in range(0, count, batch):
                     internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()[:batch]
+                    if not internal_txs_decoded:
+                        break
                     number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
                     logger.info('Processed %d/%d decoded transactions', number_processed, count)
             if number_processed:
