@@ -537,9 +537,14 @@ class InternalTxDecoded(models.Model):
                                        primary_key=True)
     function_name = models.CharField(max_length=256, db_index=True)
     arguments = JSONField()
-    processed = models.BooleanField(default=False, db_index=True)
+    processed = models.BooleanField(default=False)
 
     class Meta:
+        indexes = [
+            models.Index(name='history_decoded_processed_idx',
+                         fields=['processed'],
+                         condition=Q(processed=False))
+        ]
         verbose_name_plural = "Internal txs decoded"
 
     def __str__(self):
@@ -706,7 +711,8 @@ class MonitoredAddress(models.Model):
     objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
-    tx_block_number = models.IntegerField(null=True, default=None)  # Block number when last internal tx scan ended
+    tx_block_number = models.IntegerField(null=True, default=None,
+                                          db_index=True)  # Block number when last internal tx scan ended
 
     class Meta:
         abstract = True
@@ -737,7 +743,7 @@ class SafeContract(models.Model):
     objects = SafeContractManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
-    erc20_block_number = models.IntegerField(default=0)  # Block number of last scan of erc20
+    erc20_block_number = models.IntegerField(default=0, db_index=True)  # Block number of last scan of erc20
 
     def __str__(self):
         return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
