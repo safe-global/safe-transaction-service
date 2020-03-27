@@ -109,15 +109,14 @@ class EthereumBlockQuerySet(models.QuerySet):
 
 class EthereumBlock(models.Model):
     objects = EthereumBlockManager.from_queryset(EthereumBlockQuerySet)()
-    number = models.PositiveIntegerField(primary_key=True, unique=True)
+    number = models.PositiveIntegerField(primary_key=True)
     gas_limit = models.PositiveIntegerField()
     gas_used = models.PositiveIntegerField()
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
     parent_hash = Sha3HashField(unique=True)
     # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
-    confirmed = models.BooleanField(default=False,
-                                    db_index=True)
+    confirmed = models.BooleanField(default=False, db_index=True)
 
     def __str__(self):
         return f'Block number={self.number} on {self.timestamp}'
@@ -151,9 +150,9 @@ class EthereumTx(TimeStampedModel):
     objects = EthereumTxManager()
     block = models.ForeignKey(EthereumBlock, on_delete=models.CASCADE, null=True, default=None,
                               related_name='txs')  # If mined
-    tx_hash = Sha3HashField(unique=True, primary_key=True)
+    tx_hash = Sha3HashField(primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
-    status = models.IntegerField(null=True, default=None)  # If mined. Old txs don't have `status`
+    status = models.IntegerField(null=True, default=None, db_index=True)  # If mined. Old txs don't have `status`
     logs = ArrayField(JSONField(), null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
     _from = EthereumAddressField(null=True, db_index=True)
@@ -533,9 +532,9 @@ class InternalTxDecoded(models.Model):
     objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='decoded_tx',
                                        primary_key=True)
-    function_name = models.CharField(max_length=256)
+    function_name = models.CharField(max_length=256, db_index=True)
     arguments = JSONField()
-    processed = models.BooleanField(default=False)
+    processed = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         verbose_name_plural = "Internal txs decoded"
@@ -597,7 +596,7 @@ class MultisigTransaction(TimeStampedModel):
     refund_receiver = EthereumAddressField(null=True)
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
-    failed = models.NullBooleanField(default=None)
+    failed = models.NullBooleanField(default=None, db_index=True)
     origin = models.CharField(null=True, default=None, max_length=100)  # To store arbitrary data on the tx
 
     def __str__(self):
