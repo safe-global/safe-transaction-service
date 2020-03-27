@@ -9,6 +9,6 @@ else
     log_level="info"
 fi
 
-sleep 5
+sleep 10
 echo "==> Running Celery beat <=="
 exec celery beat -A safe_transaction_service.taskapp -S django_celery_beat.schedulers:DatabaseScheduler --loglevel $log_level

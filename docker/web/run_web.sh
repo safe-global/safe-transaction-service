@@ -2,9 +2,7 @@
 
 set -euo pipefail
 
-echo "==> Migrating Django models ... "
-python manage.py migrate --noinput
-
+sleep 10  # Wait for migrations
 echo "==> Setting up service... "
 python manage.py setup_service &
 
