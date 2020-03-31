@@ -42,6 +42,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
                                   f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
 
+        #TODO Check tx already executed
+
         # Check there's not duplicated tx with same `nonce` for the same Safe.
         # We allow duplicated if existing tx is not executed
         try:
@@ -60,36 +62,35 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             pass
 
         # Check owners and pending owners
-        if not safe.retrieve_is_owner(data['sender']):
-            try:
-                if not safe.retrieve_is_owner(data['sender'], block_identifier='pending'):
-                    raise ValidationError('User is not an owner')
-            except BadFunctionCallOutput:  # If it didn't exist 20 blocks ago
-                raise ValidationError('User is not an owner (error querying `pending` block)')
+        try:
+            safe_owners = safe.retrieve_owners(block_identifier='pending')
+        except BadFunctionCallOutput:  # Error using pending block identifier
+            safe_owners = safe.retrieve_owners(block_identifier='latest')
 
+        if not data['sender'] in safe_owners:
+            raise ValidationError(f'Sender={data["sender"]} is not an owner. Current owners={safe_owners}')
+
+        signature_owners = []
         signature = data.get('signature')
         if signature is not None:
-            #  TODO Support signatures with multiple owners
-            if len(signature) != 65:
-                raise ValidationError('Signatures with more than one owner still not supported')
+            for safe_signature in SafeSignature.parse_signature(signature, contract_transaction_hash):
+                if not safe_signature.is_valid(ethereum_client, safe.address):
+                    raise ValidationError(f'Signature={safe_signature.signature.hex()} is not valid')
+                owner = safe_signature.owner
+                if owner not in safe_owners:
+                    raise ValidationError(f'User={owner} is not an owner. Current owners={safe_owners}')
+                signature_owners.append(owner)
 
-            safe_signature = SafeSignature(signature, contract_transaction_hash)
-            #  TODO Support contract signatures and approved hashes
-            if safe_signature.signature_type == SafeSignatureType.CONTRACT_SIGNATURE:
-                raise ValidationError('Contract signatures not supported')
-            elif safe_signature.signature_type == SafeSignatureType.APPROVED_HASH:
-                # Index it automatically later
-                del data['signature']
-
-            address = safe_signature.owner
-            if address != data['sender']:
-                raise ValidationError(f'Signature does not match sender={data["sender"]}. Calculated owner={address}')
+        if signature_owners and data['sender'] not in signature_owners:
+            raise ValidationError(f'Signature does not match sender={data["sender"]}. '
+                                  f'Calculated owners={signature_owners}')
 
         return data
 
     def save(self, **kwargs):
+        safe_tx_hash = self.validated_data['contract_transaction_hash']
         multisig_transaction, _ = MultisigTransaction.objects.get_or_create(
-            safe_tx_hash=self.validated_data['contract_transaction_hash'],
+            safe_tx_hash=safe_tx_hash,
             defaults={
                 'safe': self.validated_data['safe'],
                 'to': self.validated_data['to'],
@@ -106,15 +107,17 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             }
         )
 
-        if self.validated_data.get('signature'):
-            MultisigConfirmation.objects.get_or_create(
-                multisig_transaction_hash=multisig_transaction.safe_tx_hash,
-                owner=self.validated_data['sender'],
-                defaults={
-                    'multisig_transaction': multisig_transaction,
-                    'signature': self.validated_data.get('signature'),
-                }
-            )
+        if not multisig_transaction.executed:
+            for safe_signature in SafeSignature.parse_signature(self.validated_data.get('signature', b''),
+                                                                 safe_tx_hash):
+                multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
+                    multisig_transaction_hash=safe_tx_hash,
+                    owner=safe_signature.owner,
+                    defaults={
+                        'multisig_transaction': multisig_transaction,
+                        'signature': safe_signature.export_signature(),
+                    }
+                )
         return multisig_transaction
 
 
