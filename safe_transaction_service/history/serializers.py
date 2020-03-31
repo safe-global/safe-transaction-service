@@ -42,24 +42,21 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             raise ValidationError(f'Contract-transaction-hash={contract_transaction_hash.hex()} '
                                   f'does not match provided contract-tx-hash={data["contract_transaction_hash"].hex()}')
 
-        #TODO Check tx already executed
-
-        # Check there's not duplicated tx with same `nonce` for the same Safe.
+        # Check there's not duplicated tx with same `nonce` or same `safeTxHash` for the same Safe.
         # We allow duplicated if existing tx is not executed
-        try:
-            multisig_transaction: MultisigTransaction = MultisigTransaction.objects.exclude(
-                ethereum_tx=None
-            ).exclude(
-                safe_tx_hash=contract_transaction_hash
-            ).get(
-                safe=safe.address,
-                nonce=data['nonce']
-            )
-            if multisig_transaction.safe_tx_hash != contract_transaction_hash:
-                raise ValidationError(f'Tx with nonce={safe_tx.safe_nonce} for safe={safe.address} already executed in '
-                                      f'tx-hash={multisig_transaction.ethereum_tx_id}')
-        except MultisigTransaction.DoesNotExist:
-            pass
+        multisig_transactions = MultisigTransaction.objects.filter(
+            safe=safe.address,
+            nonce=data['nonce']
+        ).executed()
+        if multisig_transactions:
+            for multisig_transaction in multisig_transactions:
+                if multisig_transaction.safe_tx_hash == contract_transaction_hash.hex():
+                    raise ValidationError(f'Tx with safe-tx-hash={contract_transaction_hash.hex()} '
+                                          f'for safe={safe.address} was already executed in '
+                                          f'tx-hash={multisig_transaction.ethereum_tx_id}')
+
+            raise ValidationError(f'Tx with nonce={safe_tx.safe_nonce} for safe={safe.address} '
+                                  f'already executed in tx-hash={multisig_transactions[0].ethereum_tx_id}')
 
         # Check owners and pending owners
         try:
@@ -107,17 +104,16 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             }
         )
 
-        if not multisig_transaction.executed:
-            for safe_signature in SafeSignature.parse_signature(self.validated_data.get('signature', b''),
-                                                                 safe_tx_hash):
-                multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
-                    multisig_transaction_hash=safe_tx_hash,
-                    owner=safe_signature.owner,
-                    defaults={
-                        'multisig_transaction': multisig_transaction,
-                        'signature': safe_signature.export_signature(),
-                    }
-                )
+        for safe_signature in SafeSignature.parse_signature(self.validated_data.get('signature', b''),
+                                                            safe_tx_hash):
+            multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
+                multisig_transaction_hash=safe_tx_hash,
+                owner=safe_signature.owner,
+                defaults={
+                    'multisig_transaction': multisig_transaction,
+                    'signature': safe_signature.export_signature(),
+                }
+            )
         return multisig_transaction
 
 
@@ -135,7 +131,7 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
         fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature')
 
     def get_confirmation_type(self, obj: MultisigConfirmation):
-        #TODO Remove this field
+        # TODO Remove this field
         return ConfirmationType.CONFIRMATION.name
 
     def get_transaction_hash(self, obj: MultisigConfirmation):

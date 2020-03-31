@@ -17,8 +17,9 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from ..models import MultisigConfirmation, MultisigTransaction
 from ..serializers import IncomingTransactionType
 from ..services import BalanceService
-from .factories import (EthereumEventFactory, InternalTxFactory,
-                        ModuleTransactionFactory, MultisigConfirmationFactory,
+from .factories import (EthereumEventFactory, EthereumTxFactory,
+                        InternalTxFactory, ModuleTransactionFactory,
+                        MultisigConfirmationFactory,
                         MultisigTransactionFactory, SafeContractFactory,
                         SafeStatusFactory)
 
@@ -192,6 +193,73 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertIn(f'Sender={random_user_account.address} is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_post_executed_transaction(self):
+        safe_owner_1 = Account.create()
+        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe_create2_tx.safe_address
+        safe = Safe(safe_address, self.ethereum_client)
+
+        response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                "nonce": 0,
+                "safeTxGas": 0,
+                "baseGas": 0,
+                "gasPrice": 0,
+                "gasToken": "0x0000000000000000000000000000000000000000",
+                "refundReceiver": "0x0000000000000000000000000000000000000000",
+                # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+                "sender": safe_owner_1.address,
+                }
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        multisig_transaction = MultisigTransaction.objects.first()
+        multisig_transaction.ethereum_tx = EthereumTxFactory()
+        multisig_transaction.save(update_fields=['ethereum_tx'])
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(f'Tx with safe-tx-hash={data["contractTransactionHash"]} '
+                      f'for safe={safe.address} was already executed in '
+                      f'tx-hash={multisig_transaction.ethereum_tx_id}',
+                      response.data['non_field_errors'])
+
+        # Check another tx with same nonce
+        data['to'] = Account.create().address
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(f'Tx with nonce={safe_tx.safe_nonce} for safe={safe.address} '
+                      f'already executed in tx-hash={multisig_transaction.ethereum_tx_id}',
+                      response.data['non_field_errors'])
+
+        # Successfully insert tx with nonce=1
+        data['nonce'] = 1
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
 
     def test_post_multisig_transactions_with_origin(self):
         safe_owner_1 = Account.create()
