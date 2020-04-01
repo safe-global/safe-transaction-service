@@ -137,7 +137,6 @@ class SafeMultisigTransactionListView(ListAPIView):
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
                                     422: 'Invalid ethereum address'})
-    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
@@ -152,7 +151,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             response.data['count_unique_nonce'] = MultisigTransaction.objects.filter(safe=address
                                                                                      ).distinct('nonce').count()
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
-            response['Cache-Control'] = 'max-age=15'
 
         return response
 
@@ -243,7 +241,6 @@ class SafeIncomingTxListView(ListAPIView):
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
                                     404: 'Txs not found',
                                     422: 'Safe address checksum not valid'})
-    @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
@@ -256,7 +253,6 @@ class SafeIncomingTxListView(ListAPIView):
             response.status_code = status.HTTP_404_NOT_FOUND
         else:
             response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
-            response['Cache-Control'] = 'max-age=15'
 
         return response
 
