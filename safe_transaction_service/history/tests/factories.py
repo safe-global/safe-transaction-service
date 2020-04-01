@@ -9,6 +9,7 @@ from hexbytes import HexBytes
 from web3 import Web3
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
+from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
@@ -201,6 +202,8 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
     multisig_transaction = factory.SubFactory(MultisigTransaction)
     multisig_transaction_hash = factory.Sequence(lambda n: Web3.keccak(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
+    signature = None
+    signature_type = SafeSignatureType.APPROVED_HASH.value
 
 
 class SafeContractFactory(factory.DjangoModelFactory):

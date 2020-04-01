@@ -11,7 +11,9 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
-from gnosis.safe.safe_signature import SafeSignature
+from gnosis.safe.safe_signature import (SafeSignature,
+                                        SafeSignatureApprovedHash,
+                                        SafeSignatureType)
 
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       ModuleTransaction, MultisigConfirmation,
@@ -187,11 +189,14 @@ class SafeTxProcessor(TxProcessor):
             ethereum_tx = internal_tx.ethereum_tx
             # TODO Check previous trace is not a delegate call
             owner = internal_tx.get_previous_trace()._from
+            safe_signature = SafeSignatureApprovedHash.build_for_owner(owner, multisig_transaction_hash)
             (multisig_confirmation,
              _) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
                                                              owner=owner,
                                                              defaults={
                                                                  'ethereum_tx': ethereum_tx,
+                                                                 'signature': safe_signature.export_signature(),
+                                                                 'signature_type': safe_signature.signature_type.value,
                                                              })
             if not multisig_confirmation.ethereum_tx_id:
                 multisig_confirmation.ethereum_tx = ethereum_tx
@@ -265,11 +270,13 @@ class SafeTxProcessor(TxProcessor):
                         'ethereum_tx': None,
                         'multisig_transaction': multisig_tx,
                         'signature': safe_signature.export_signature(),
+                        'signature_type': safe_signature.signature_type.value,
                     }
                 )
                 if multisig_confirmation.signature != safe_signature.signature:
-                    multisig_confirmation.signature = safe_signature.signature
-                    multisig_confirmation.save(update_fields=['signature'])
+                    multisig_confirmation.signature = safe_signature.export_signature()
+                    multisig_confirmation.signature_type = safe_signature.signature_type.value
+                    multisig_confirmation.save(update_fields=['signature', 'signature_type'])
 
             safe_status.nonce = nonce + 1
             self.store_new_safe_status(safe_status, internal_tx)

@@ -3,9 +3,12 @@ import logging
 from eth_account import Account
 from web3 import Web3
 
+from gnosis.safe.safe_signature import SafeSignatureType
+
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (InternalTxDecoded, ModuleTransaction,
-                      MultisigTransaction, SafeContract, SafeStatus)
+                      MultisigConfirmation, MultisigTransaction, SafeContract,
+                      SafeStatus)
 from .factories import EthereumTxFactory, InternalTxDecodedFactory
 from .test_internal_tx_indexer import TestInternalTxIndexer
 
@@ -181,6 +184,30 @@ class TestSafeTxProcessor(TestInternalTxIndexer):
 
         self.assertEqual(MultisigTransaction.objects.count(),
                          InternalTxDecoded.objects.filter(function_name='execTransaction').count())
+
+        # Test ApproveHash. For that we need the `previous_trace` to get the owner
+        hash_to_approve = Web3.sha3(text='HariSeldon').hex()
+        owner_approving = Account.create().address
+        approve_hash_decoded_tx = InternalTxDecodedFactory(function_name='approveHash',
+                                                           hash_to_approve=hash_to_approve,
+                                                           internal_tx___from=safe_address,
+                                                           internal_tx__trace_address='0,1,0')
+        previous_approve_hash_internal_tx = InternalTxDecodedFactory(
+            internal_tx__ethereum_tx=approve_hash_decoded_tx.internal_tx.ethereum_tx,
+            internal_tx__trace_address='0,1',
+            internal_tx___from=owner_approving,
+        )
+
+        tx_processor.process_decoded_transactions(
+            [
+                InternalTxDecodedFactory(function_name='execTransaction',
+                                         internal_tx___from=safe_address),
+                approve_hash_decoded_tx,
+            ])
+        safe_status = SafeStatus.objects.last_for_address(safe_address)
+        self.assertEqual(safe_status.nonce, 8)
+        multisig_confirmation = MultisigConfirmation.objects.get(multisig_transaction_hash=hash_to_approve)
+        self.assertEqual(multisig_confirmation.signature_type, SafeSignatureType.APPROVED_HASH.value)
 
     def test_tx_processor_failed(self):
         tx_processor = SafeTxProcessor()

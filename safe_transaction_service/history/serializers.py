@@ -112,6 +112,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 defaults={
                     'multisig_transaction': multisig_transaction,
                     'signature': safe_signature.export_signature(),
+                    'signature_type': safe_signature.signature_type.value,
                 }
             )
         return multisig_transaction
@@ -125,10 +126,11 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     confirmation_type = serializers.SerializerMethodField()
     transaction_hash = serializers.SerializerMethodField()
     signature = HexadecimalField()
+    signature_type = serializers.SerializerMethodField()
 
     class Meta:
         model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature')
+        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature', 'signature_type')
 
     def get_confirmation_type(self, obj: MultisigConfirmation):
         # TODO Remove this field
@@ -136,6 +138,9 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 
     def get_transaction_hash(self, obj: MultisigConfirmation):
         return obj.ethereum_tx_id
+
+    def get_signature_type(self, obj: MultisigConfirmation):
+        return SafeSignatureType(obj.signature_type).name
 
 
 class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):

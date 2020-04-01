@@ -17,6 +17,7 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
+from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from .utils import clean_receipt_log
 
@@ -665,7 +666,9 @@ class MultisigConfirmation(TimeStampedModel):
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
-    signature = HexField(null=True, default=None, max_length=500)  # Off chain signatures
+    signature = HexField(null=True, default=None, max_length=500)
+    signature_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in SafeSignatureType],
+                                                      db_index=True)
 
     class Meta:
         unique_together = (('multisig_transaction_hash', 'owner'),)

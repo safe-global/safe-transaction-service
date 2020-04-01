@@ -5,12 +5,11 @@ from django.test import TestCase
 from eth_account import Account
 from web3 import Web3
 
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from gnosis.safe.safe_signature import SafeSignatureType
 
-from ..models import (EthereumTx, EthereumTxCallType, InternalTx,
-                      InternalTxDecoded, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeMasterCopy,
-                      SafeStatus)
+from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
+                      MultisigConfirmation, MultisigTransaction,
+                      SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
                         SafeStatusFactory)
@@ -25,7 +24,8 @@ class TestModels(TestCase):
         MultisigConfirmation.objects.create(
             ethereum_tx=ethereum_tx,
             multisig_transaction_hash=safe_tx_hash,
-            owner=Account.create().address
+            owner=Account.create().address,
+            signature_type=SafeSignatureType.EOA.value,
         )
         multisig_tx, _ = MultisigTransaction.objects.get_or_create(safe_tx_hash=safe_tx_hash,
                                                                    safe=Account.create().address,
@@ -65,7 +65,8 @@ class TestModels(TestCase):
         MultisigConfirmation.objects.create(
             ethereum_tx=ethereum_tx,
             multisig_transaction_hash=safe_tx_hash,
-            owner=Account.create().address
+            owner=Account.create().address,
+            signature_type = SafeSignatureType.EOA.value,
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 

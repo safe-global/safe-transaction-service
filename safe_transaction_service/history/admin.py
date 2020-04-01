@@ -147,8 +147,9 @@ class MultisigConfirmationListFilter(admin.SimpleListFilter):
 
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
-    list_display = ('block_number', 'multisig_transaction_hash', 'has_multisig_tx', 'ethereum_tx_id', 'owner')
-    list_filter = (MultisigConfirmationListFilter, )
+    list_display = ('block_number', 'multisig_transaction_hash', 'has_multisig_tx', 'ethereum_tx_id',
+                    'signature_type', 'owner')
+    list_filter = (MultisigConfirmationListFilter, 'signature_type')
     list_select_related = ('ethereum_tx',)
     raw_id_fields = ('ethereum_tx', 'multisig_transaction')
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
