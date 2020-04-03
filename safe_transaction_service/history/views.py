@@ -144,7 +144,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
-        response.data['count_unique_nonce'] = self.get_unique_nonce(address)
+        response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
         response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
