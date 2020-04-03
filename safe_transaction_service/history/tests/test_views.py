@@ -30,7 +30,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_get_module_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         module_transaction = ModuleTransactionFactory(safe=safe_address)
         response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')
@@ -69,7 +70,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         multisig_tx = MultisigTransactionFactory(safe=safe_address)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
@@ -100,7 +102,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_get_multisig_transactions_filters(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, nonce=0, ethereum_tx=None)
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=0',
@@ -122,10 +125,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?nonce=1',
                                    format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?executed=true',
                                    format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)) + '?executed=false',
                                    format='json')
@@ -139,7 +145,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe = Safe(safe_address, self.ethereum_client)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         to = Account.create().address
         data = {"to": to,
@@ -161,7 +168,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                          data['refundReceiver'], safe_nonce=data['nonce'])
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -172,7 +179,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Test confirmation with signature
         data['signature'] = safe_owner_1.signHash(safe_tx.safe_tx_hash)['signature'].hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -201,7 +208,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe = Safe(safe_address, self.ethereum_client)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         to = Account.create().address
         data = {"to": to,
@@ -223,10 +231,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                          data['refundReceiver'], safe_nonce=data['nonce'])
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         multisig_transaction = MultisigTransaction.objects.first()
         multisig_transaction.ethereum_tx = EthereumTxFactory()
@@ -259,7 +267,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                          data['refundReceiver'], safe_nonce=data['nonce'])
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_post_multisig_transactions_with_origin(self):
         safe_owner_1 = Account.create()
@@ -268,7 +276,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe = Safe(safe_address, self.ethereum_client)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         to = Account.create().address
         data = {"to": to,
@@ -292,7 +301,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                          data['refundReceiver'], safe_nonce=data['nonce'])
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         multisig_tx_db = MultisigTransaction.objects.get(safe_tx_hash=safe_tx.safe_tx_hash)
         self.assertEqual(multisig_tx_db.origin, data['origin'])
 
@@ -304,7 +313,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe = Safe(safe_address, self.ethereum_client)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         to = Account.create().address
         data = {"to": to,
@@ -331,7 +341,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         data['signature'] = b''.join([safe_owner.signHash(safe_tx_hash)['signature']
                                       for safe_owner in safe_owners]).hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         multisig_tx_db = MultisigTransaction.objects.get(safe_tx_hash=safe_tx.safe_tx_hash)
         self.assertEqual(multisig_tx_db.origin, data['origin'])
 
@@ -385,6 +395,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+
         SafeContractFactory(address=safe_address)
         value = 7
         self.send_ether(safe_address, 7)
@@ -413,7 +424,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_incoming_txs_view(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
         self.assertEqual(len(response.data['results']), 0)
 
         value = 2
@@ -431,7 +443,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         block_number = internal_tx.ethereum_tx.block_id
         url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number}'
         response = self.client.get(url, format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
         response = self.client.get(url, format='json')

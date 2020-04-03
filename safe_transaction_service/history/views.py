@@ -82,11 +82,7 @@ class SafeModuleTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
-        if response.data['count'] == 0:
-            response.status_code = status.HTTP_404_NOT_FOUND
-        else:
-            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
-
+        response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
 
@@ -125,6 +121,9 @@ class SafeMultisigTransactionListView(ListAPIView):
             '-created'
         )
 
+    def get_unique_nonce(self, address: str):
+        return MultisigTransaction.objects.filter(safe=address).distinct('nonce').count()
+
     def get_serializer_class(self):
         """
         Proxy returning a serializer class according to the request's verb.
@@ -145,13 +144,8 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
-        if response.data['count'] == 0:
-            response.status_code = status.HTTP_404_NOT_FOUND
-        else:
-            response.data['count_unique_nonce'] = MultisigTransaction.objects.filter(safe=address
-                                                                                     ).distinct('nonce').count()
-            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
-
+        response.data['count_unique_nonce'] = self.get_unique_nonce(address)
+        response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
     @swagger_auto_schema(responses={202: 'Accepted',
@@ -171,7 +165,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
         else:
             serializer.save()
-            return Response(status=status.HTTP_202_ACCEPTED)
+            return Response(status=status.HTTP_201_CREATED)
 
 
 class SafeBalanceView(APIView):
@@ -249,11 +243,7 @@ class SafeIncomingTxListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
-        if response.data['count'] == 0:
-            response.status_code = status.HTTP_404_NOT_FOUND
-        else:
-            response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
-
+        response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
 
