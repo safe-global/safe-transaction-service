@@ -72,6 +72,8 @@ class InternalTxIndexer(EthereumIndexer):
             traces = self.ethereum_client.parity.trace_blocks(block_numbers)
             tx_hashes = []
             for block_number, trace_list in zip(block_numbers, traces):
+                if not trace_list:
+                    logger.warning('Empty `trace_block` for block=%d', block_number)
                 tx_hashes.extend([trace['transactionHash'] for trace in trace_list
                                   if trace.get('action', {}).get('from') in addresses
                                   or trace.get('action', {}).get('to') in addresses])
