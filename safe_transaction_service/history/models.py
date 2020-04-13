@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import IntegrityError, models
@@ -17,7 +17,7 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
+from gnosis.safe.safe_signature import SafeSignatureType
 
 from .utils import clean_receipt_log
 
@@ -557,11 +557,11 @@ class InternalTxDecoded(models.Model):
         return self.internal_tx._from
 
     @property
-    def block_number(self) -> int:
+    def block_number(self) -> Type[int]:
         return self.internal_tx.ethereum_tx.block_id
 
     @property
-    def tx_hash(self) -> str:
+    def tx_hash(self) -> Type[int]:
         return self.internal_tx.ethereum_tx_id
 
     def set_processed(self):
@@ -752,9 +752,25 @@ class SafeContract(models.Model):
         return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
 
     @property
-    def created_block_number(self) -> Optional[int]:
+    def created_block_number(self) -> Optional[Type[int]]:
         if self.ethereum_tx:
             return self.ethereum_tx.block_id
+
+
+class SafeContractDelegate(models.Model):
+    safe = models.ForeignKey(SafeContract, primary_key=True, on_delete=models.CASCADE,
+                             related_name='safe_contract_delegates')
+    address = EthereumAddressField()
+    creator = EthereumAddressField()  # Owner who created the delegate
+    label = models.CharField(max_length=50)
+    read = models.BooleanField(default=True)  # For permissions in the future
+    write = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = (('safe', 'address'),)
+
+    def __str__(self):
+        return f'Delegate={self.address} for Safe={self.safe_id} - Label={self.label}'
 
 
 class SafeStatusManager(models.Manager):
