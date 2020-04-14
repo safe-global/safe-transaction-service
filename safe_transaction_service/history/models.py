@@ -758,19 +758,19 @@ class SafeContract(models.Model):
 
 
 class SafeContractDelegate(models.Model):
-    safe = models.ForeignKey(SafeContract, primary_key=True, on_delete=models.CASCADE,
-                             related_name='safe_contract_delegates')
-    address = EthereumAddressField()
-    creator = EthereumAddressField()  # Owner who created the delegate
+    safe_contract = models.ForeignKey(SafeContract, primary_key=True, on_delete=models.CASCADE,
+                                      related_name='safe_contract_delegates')
+    delegate = EthereumAddressField()
+    delegator = EthereumAddressField()  # Owner who created the delegate
     label = models.CharField(max_length=50)
     read = models.BooleanField(default=True)  # For permissions in the future
     write = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = (('safe', 'address'),)
+        unique_together = (('safe_contract', 'delegate'),)
 
     def __str__(self):
-        return f'Delegate={self.address} for Safe={self.safe_id} - Label={self.label}'
+        return f'Delegate={self.delegate} for Safe={self.safe_contract_id} - Label={self.label}'
 
 
 class SafeStatusManager(models.Manager):

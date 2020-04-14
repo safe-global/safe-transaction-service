@@ -1,6 +1,8 @@
+import time
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from eth_utils import keccak
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from web3.exceptions import BadFunctionCallOutput
@@ -14,7 +16,7 @@ from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
-                     MultisigTransaction)
+                     MultisigTransaction, SafeContractDelegate)
 
 
 # ================================================ #
@@ -118,9 +120,99 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         return multisig_transaction
 
 
+class SafeDelegateSerializer(serializers.Serializer):
+    delegate = EthereumAddressField()
+    label = serializers.CharField(max_length=50)
+    signature = HexadecimalField()  # Delegator is taken from signature
+
+    def calculate_topt(self, topt_tx: int = 3600, topt_t0: int = 0) -> int:
+        """
+        https://en.wikipedia.org/wiki/Time-based_One-time_Password_algorithm
+        :param topt_tx:
+        :param topt_t0:
+        :return:
+        """
+        return int((time.time() - topt_t0) // topt_tx)
+
+    def calculate_hash(self, address: str, eth_sign: bool = False) -> bytes:
+        topt = self.calculate_topt()
+        message = address + str(topt)
+        if eth_sign:
+            return keccak(text="\x19Ethereum Signed Message:\n" + len(message) + message)
+        else:
+            return keccak(text=message)
+
+    def validate(self, data):
+        super().validate(data)
+
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(data['safe'], ethereum_client)
+
+        # Check owners and pending owners
+        try:
+            safe_owners = safe.retrieve_owners(block_identifier='pending')
+        except BadFunctionCallOutput:  # Error using pending block identifier
+            safe_owners = safe.retrieve_owners(block_identifier='latest')
+
+        signature = data['signature']
+        delegate = data['delegate']
+        operation_hash = self.calculate_hash(delegate)
+        safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
+        if not safe_signatures:
+            raise ValidationError('Cannot a valid signature')
+        elif len(safe_signatures) > 1:
+            raise ValidationError('More than one signatures detected, just one is expected')
+
+        safe_signature = safe_signatures[0]
+        delegator = safe_signature.owner
+        if delegator not in safe_owners:
+            if safe_signature.signature_type == SafeSignatureType.EOA:
+                # Maybe it's an `eth_sign` signature without Gnosis Safe `v + 4`, let's try
+                safe_signatures = SafeSignature.parse_signature(signature, self.calculate_hash(delegate, eth_sign=True))
+                delegator = safe_signatures[0].owner
+            if delegator not in safe_owners:
+                raise ValidationError('Signing owner is not an owner of the Safe')
+
+        data['delegator'] = delegator
+
+        return data
+
+    def save(self, **kwargs):
+        safe_address = self.validated_data['safe']
+        delegate = self.validated_data['delegate']
+        delegator = self.validated_data['delegator']
+        label = self.validated_data['label']
+        obj, _ = SafeContractDelegate.objects.update_or_create(
+            safe_id=safe_address,
+            delegate=delegate,
+            defaults={
+                'label': label,
+                'delegator': delegator,
+            }
+        )
+        return obj
+
+
 # ================================================ #
 #            Response Serializers
 # ================================================ #
+class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
+    data = HexadecimalField(allow_null=True, allow_blank=True)
+    transaction_hash = serializers.SerializerMethodField()
+    block_number = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ModuleTransaction
+        fields = ('created', 'block_number', 'transaction_hash', 'safe',
+                  'module', 'to', 'value', 'data', 'operation')
+
+    def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
+        return obj.internal_tx.ethereum_tx.block_id
+
+    def get_transaction_hash(self, obj: ModuleTransaction):
+        return obj.internal_tx.ethereum_tx_id
+
+
 class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     submission_date = serializers.DateTimeField(source='created')
     confirmation_type = serializers.SerializerMethodField()
@@ -141,23 +233,6 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
 
     def get_signature_type(self, obj: MultisigConfirmation):
         return SafeSignatureType(obj.signature_type).name
-
-
-class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
-    data = HexadecimalField(allow_null=True, allow_blank=True)
-    transaction_hash = serializers.SerializerMethodField()
-    block_number = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ModuleTransaction
-        fields = ('created', 'block_number', 'transaction_hash', 'safe',
-                  'module', 'to', 'value', 'data', 'operation')
-
-    def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
-        return obj.internal_tx.ethereum_tx.block_id
-
-    def get_transaction_hash(self, obj: ModuleTransaction):
-        return obj.internal_tx.ethereum_tx_id
 
 
 class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
@@ -239,6 +314,13 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
+
+
+class SafeDelegateResponseSerializer(serializers.Serializer):
+    delegate = EthereumAddressField()
+    delegator = EthereumAddressField()
+    label = serializers.CharField(max_length=50)
+    signature = HexadecimalField()
 
 
 class SafeCreationInfoResponseSerializer(serializers.Serializer):

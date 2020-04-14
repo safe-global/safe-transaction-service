@@ -9,7 +9,8 @@ import django_filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import (ListAPIView, ListCreateAPIView,
+                                     RetrieveAPIView)
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,12 +21,14 @@ from safe_transaction_service.version import __version__
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
-                     SafeContract, SafeStatus)
+                     SafeContract, SafeContractDelegate, SafeStatus)
 from .serializers import (IncomingTransactionResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCreationInfoResponseSerializer,
+                          SafeDelegateResponseSerializer,
+                          SafeDelegateSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
@@ -148,7 +151,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(responses={201: 'Created or signature updated',
                                     400: 'Invalid data',
                                     422: 'Invalid ethereum address/User is not an owner or tx not approved/executed'})
     def post(self, request, address, format=None):
@@ -214,6 +217,53 @@ class SafeBalanceUsdView(APIView):
             safe_balances = BalanceServiceProvider().get_usd_balances(address)
             serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeDelegatesListView(ListCreateAPIView):
+    pagination_class = DefaultPagination
+
+    def get_queryset(self):
+        return SafeContractDelegate.objects.filter(
+            safe_id=self.kwargs['address']
+        )
+
+    def get_serializer_class(self):
+        """
+        Proxy returning a serializer class according to the request's verb.
+        """
+        if self.request.method == 'GET':
+            return SafeDelegateResponseSerializer
+        elif self.request.method == 'POST':
+            return SafeDelegateSerializer
+
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
+                                    422: 'Invalid Ethereum address'})
+    def get(self, request, address, **kwargs):
+        """
+        Returns the history of a multisig tx (safe)
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        return super().get(request, address, **kwargs)
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data',
+                                    422: 'Invalid Ethereum address/Error processing data'})
+    def post(self, request, address, **kwargs):
+        """
+        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        request.data['safe'] = address
+        return super().post(request, address, **kwargs)
+
+
+class SafeDelegatesDetailView(APIView):
+    pass
 
 
 class SafeIncomingTxListView(ListAPIView):
