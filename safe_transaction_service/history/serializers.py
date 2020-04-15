@@ -1,8 +1,6 @@
-import time
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from eth_utils import keccak
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from web3.exceptions import BadFunctionCallOutput
@@ -14,9 +12,10 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from .helpers import DelegateSignatureHelper
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
-                     MultisigTransaction, SafeContractDelegate)
+                     MultisigTransaction, SafeContract, SafeContractDelegate)
 
 
 # ================================================ #
@@ -25,7 +24,7 @@ from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
-    signature = HexadecimalField(required=False)
+    signature = HexadecimalField(required=False, min_length=130)  # Signatures must be at least 65 bytes
     origin = serializers.CharField(max_length=100, allow_null=True, default=None)
 
     def validate(self, data):
@@ -120,30 +119,16 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         return multisig_transaction
 
 
-class SafeDelegateSerializer(serializers.Serializer):
+class SafeDelegateDeleteSerializer(serializers.Serializer):
+    safe = EthereumAddressField()
     delegate = EthereumAddressField()
-    label = serializers.CharField(max_length=50)
-    signature = HexadecimalField()  # Delegator is taken from signature
-
-    def calculate_topt(self, topt_tx: int = 3600, topt_t0: int = 0) -> int:
-        """
-        https://en.wikipedia.org/wiki/Time-based_One-time_Password_algorithm
-        :param topt_tx:
-        :param topt_t0:
-        :return:
-        """
-        return int((time.time() - topt_t0) // topt_tx)
-
-    def calculate_hash(self, address: str, eth_sign: bool = False) -> bytes:
-        topt = self.calculate_topt()
-        message = address + str(topt)
-        if eth_sign:
-            return keccak(text="\x19Ethereum Signed Message:\n" + len(message) + message)
-        else:
-            return keccak(text=message)
+    signature = HexadecimalField(min_length=130)
 
     def validate(self, data):
         super().validate(data)
+
+        if not SafeContract.objects.filter(address=data['safe']).exists():
+            raise ValidationError(f"Safe={data['safe']} does not exist or it's still not indexed")
 
         ethereum_client = EthereumClientProvider()
         safe = Safe(data['safe'], ethereum_client)
@@ -156,7 +141,7 @@ class SafeDelegateSerializer(serializers.Serializer):
 
         signature = data['signature']
         delegate = data['delegate']
-        operation_hash = self.calculate_hash(delegate)
+        operation_hash = DelegateSignatureHelper.calculate_hash(delegate)
         safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
         if not safe_signatures:
             raise ValidationError('Cannot a valid signature')
@@ -168,14 +153,24 @@ class SafeDelegateSerializer(serializers.Serializer):
         if delegator not in safe_owners:
             if safe_signature.signature_type == SafeSignatureType.EOA:
                 # Maybe it's an `eth_sign` signature without Gnosis Safe `v + 4`, let's try
-                safe_signatures = SafeSignature.parse_signature(signature, self.calculate_hash(delegate, eth_sign=True))
-                delegator = safe_signatures[0].owner
+                safe_signatures = SafeSignature.parse_signature(signature,
+                                                                DelegateSignatureHelper.calculate_hash(delegate,
+                                                                                                       eth_sign=True))
+                safe_signature = safe_signatures[0]
+                delegator = safe_signature.owner
             if delegator not in safe_owners:
                 raise ValidationError('Signing owner is not an owner of the Safe')
 
-        data['delegator'] = delegator
+        if not safe_signature.is_valid():
+            raise ValidationError(f'Signature of type={safe_signature.signature_type.name} for delegator={delegator} '
+                                  f'is not valid')
 
+        data['delegator'] = delegator
         return data
+
+
+class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
+    label = serializers.CharField(max_length=50)
 
     def save(self, **kwargs):
         safe_address = self.validated_data['safe']
@@ -183,7 +178,7 @@ class SafeDelegateSerializer(serializers.Serializer):
         delegator = self.validated_data['delegator']
         label = self.validated_data['label']
         obj, _ = SafeContractDelegate.objects.update_or_create(
-            safe_id=safe_address,
+            safe_contract_id=safe_address,
             delegate=delegate,
             defaults={
                 'label': label,
@@ -209,7 +204,7 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
         return obj.internal_tx.ethereum_tx.block_id
 
-    def get_transaction_hash(self, obj: ModuleTransaction):
+    def get_transaction_hash(self, obj: ModuleTransaction) -> str:
         return obj.internal_tx.ethereum_tx_id
 
 
@@ -224,14 +219,14 @@ class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
         model = MultisigConfirmation
         fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature', 'signature_type')
 
-    def get_confirmation_type(self, obj: MultisigConfirmation):
+    def get_confirmation_type(self, obj: MultisigConfirmation) -> str:
         # TODO Remove this field
         return ConfirmationType.CONFIRMATION.name
 
-    def get_transaction_hash(self, obj: MultisigConfirmation):
+    def get_transaction_hash(self, obj: MultisigConfirmation) -> str:
         return obj.ethereum_tx_id
 
-    def get_signature_type(self, obj: MultisigConfirmation):
+    def get_signature_type(self, obj: MultisigConfirmation) -> str:
         return SafeSignatureType(obj.signature_type).name
 
 
@@ -320,7 +315,6 @@ class SafeDelegateResponseSerializer(serializers.Serializer):
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     label = serializers.CharField(max_length=50)
-    signature = HexadecimalField()
 
 
 class SafeCreationInfoResponseSerializer(serializers.Serializer):

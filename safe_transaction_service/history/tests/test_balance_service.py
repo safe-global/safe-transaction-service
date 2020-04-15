@@ -16,7 +16,14 @@ from ..services import BalanceService, BalanceServiceProvider
 from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 
-MAINNET_NODE = os.environ.get('ETHEREUM_MAINNET_NODE')
+
+def just_test_if_mainnet_node():
+    MAINNET_NODE = os.environ.get('ETHEREUM_MAINNET_NODE')
+    if not MAINNET_NODE:
+        pytest.skip("Mainnet node not defined, cannot test oracles", allow_module_level=True)
+    elif requests.get(MAINNET_NODE).status_code == 404:
+        pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
+    return MAINNET_NODE
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
@@ -41,6 +48,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
     def test_get_eth_usd_price_binance(self):
+        just_test_if_mainnet_node()
         balance_service = BalanceServiceProvider()
 
         # Binance is used
@@ -49,6 +57,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertGreater(eth_usd_price, 0)
 
     def test_get_eth_usd_price_kraken(self):
+        just_test_if_mainnet_node()
         balance_service = BalanceServiceProvider()
 
         # Kraken is used
@@ -57,11 +66,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertGreater(eth_usd_price, 0)
 
     def test_token_eth_value(self):
-        if not MAINNET_NODE:
-            pytest.skip("Mainnet node not defined, cannot test oracles", allow_module_level=True)
-        elif requests.get(MAINNET_NODE).status_code == 404:
-            pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
-        balance_service = BalanceService(EthereumClient(MAINNET_NODE),
+        mainnet_node = just_test_if_mainnet_node()
+        balance_service = BalanceService(EthereumClient(mainnet_node),
                                          settings.ETH_UNISWAP_FACTORY_ADDRESS,
                                          settings.ETH_KYBER_NETWORK_PROXY_ADDRESS)
         gno_token_address = '0x6810e776880C02933D47DB1b9fc05908e5386b96'

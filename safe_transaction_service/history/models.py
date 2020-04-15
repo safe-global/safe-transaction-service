@@ -758,8 +758,7 @@ class SafeContract(models.Model):
 
 
 class SafeContractDelegate(models.Model):
-    safe_contract = models.ForeignKey(SafeContract, primary_key=True, on_delete=models.CASCADE,
-                                      related_name='safe_contract_delegates')
+    safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates')
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()  # Owner who created the delegate
     label = models.CharField(max_length=50)
