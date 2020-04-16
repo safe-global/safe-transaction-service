@@ -763,6 +763,9 @@ class SafeContractDelegateManager(models.Manager):
 
 
 class SafeContractDelegate(models.Model):
+    """
+    The owners of the Safe can add users so they can propose/retrieve txs as if they were the owners of the Safe
+    """
     objects = SafeContractDelegateManager()
     safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates')
     delegate = EthereumAddressField()
