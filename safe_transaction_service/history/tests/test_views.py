@@ -194,7 +194,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         random_user_account = Account.create()
         data['signature'] = random_user_account.signHash(safe_tx.safe_tx_hash)['signature'].hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
-        self.assertIn(f'User={random_user_account.address} is not an owner', response.data['non_field_errors'][0])
+        self.assertIn(f'Signer={random_user_account.address} is not an owner', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # Use random user as sender (not owner)
@@ -357,6 +357,63 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(safe_signature.signature_type, SafeSignatureType.EOA)
             self.assertIn(safe_signature.owner, safe_owner_addresses)
             safe_owner_addresses.remove(safe_signature.owner)
+
+    def test_post_mulisig_transactions_with_delegate(self):
+        safe_owners = [Account.create() for _ in range(4)]
+        safe_owner_addresses = [s.address for s in safe_owners]
+        safe_delegate = Account.create()
+        safe_create2_tx = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe_create2_tx.safe_address
+        safe = Safe(safe_address, self.ethereum_client)
+
+        self.assertEqual(MultisigTransaction.objects.count(), 0)
+
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                "nonce": 0,
+                "safeTxGas": 0,
+                "baseGas": 0,
+                "gasPrice": 0,
+                "gasToken": "0x0000000000000000000000000000000000000000",
+                "refundReceiver": "0x0000000000000000000000000000000000000000",
+                # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+                "sender": safe_owners[0].address,
+                "origin": 'Testing origin field',
+                }
+
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        safe_tx_hash = safe_tx.safe_tx_hash
+        data['contractTransactionHash'] = safe_tx_hash.hex()
+        data['signature'] = safe_delegate.signHash(safe_tx_hash)['signature'].hex()
+
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(f'Signer={safe_delegate.address} is not an owner or delegate',
+                      response.data['non_field_errors'][0])
+
+        data['sender'] = safe_delegate.address
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(f'Sender={safe_delegate.address} is not an owner or delegate',
+                      response.data['non_field_errors'][0])
+
+        # Add delegate
+        SafeContractDelegateFactory(safe_contract__address=safe_address, delegate=safe_delegate.address)
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(MultisigConfirmation.objects.count(), 0)
+
+        data['signature'] = data['signature'] + data['signature'][2:]
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn('Just one signature is expected if using delegates', response.data['non_field_errors'][0])
 
     def test_safe_balances_view(self):
         safe_address = Account.create().address
@@ -522,6 +579,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                               ])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
+        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
+                              [delegate_address, another_delegate_address])
 
     def test_delete_safe_delegate(self):
         safe_address = Account.create().address

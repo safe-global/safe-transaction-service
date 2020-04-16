@@ -757,7 +757,13 @@ class SafeContract(models.Model):
             return self.ethereum_tx.block_id
 
 
+class SafeContractDelegateManager(models.Manager):
+    def get_delegates_for_safe(self, address: str) -> List[str]:
+        return list(self.filter(safe_contract_id=address).values_list('delegate', flat=True))
+
+
 class SafeContractDelegate(models.Model):
+    objects = SafeContractDelegateManager()
     safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates')
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()  # Owner who created the delegate
