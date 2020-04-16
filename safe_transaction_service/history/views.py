@@ -9,7 +9,9 @@ import django_filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import (DestroyAPIView, ListAPIView,
+                                     ListCreateAPIView, RetrieveAPIView,
+                                     get_object_or_404)
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,12 +22,15 @@ from safe_transaction_service.version import __version__
 from .filters import (DefaultPagination, IncomingTransactionFilter,
                       MultisigTransactionFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
-                     SafeContract, SafeStatus)
+                     SafeContract, SafeContractDelegate, SafeStatus)
 from .serializers import (IncomingTransactionResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCreationInfoResponseSerializer,
+                          SafeDelegateDeleteSerializer,
+                          SafeDelegateResponseSerializer,
+                          SafeDelegateSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer)
@@ -148,7 +153,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(responses={201: 'Created or signature updated',
                                     400: 'Invalid data',
                                     422: 'Invalid ethereum address/User is not an owner or tx not approved/executed'})
     def post(self, request, address, format=None):
@@ -214,6 +219,79 @@ class SafeBalanceUsdView(APIView):
             safe_balances = BalanceServiceProvider().get_usd_balances(address)
             serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeDelegateListView(ListCreateAPIView):
+    pagination_class = DefaultPagination
+
+    def get_queryset(self):
+        return SafeContractDelegate.objects.filter(
+            safe_contract_id=self.kwargs['address']
+        )
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return SafeDelegateResponseSerializer
+        elif self.request.method == 'POST':
+            return SafeDelegateSerializer
+
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
+                                    422: 'Invalid Ethereum address'})
+    def get(self, request, address, **kwargs):
+        """
+        Get the list of delegates for a Safe address
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        return super().get(request, address, **kwargs)
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data',
+                                    422: 'Invalid Ethereum address/Error processing data'})
+    def post(self, request, address, **kwargs):
+        """
+        Create a delegate for a Safe address with a custom label. Calls with same delegate but different label or
+        signer will update the label or delegator if different.
+        For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
+        Unix epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
+        For example:
+             - we want to add the owner `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
+             - TOTP = epoch // 3600 = 1586779140 // 3600 = 440771
+             - The hash to sign would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        request.data['safe'] = address
+        return super().post(request, address, **kwargs)
+
+
+class SafeDelegateDestroyView(DestroyAPIView):
+    serializer_class = SafeDelegateDeleteSerializer
+
+    def get_object(self):
+        return get_object_or_404(SafeContractDelegate,
+                                 safe_contract_id=self.kwargs['address'],
+                                 delegate=self.kwargs['delegate_address'])
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data',
+                                    422: 'Invalid Ethereum address/Error processing data'})
+    def delete(self, request, address, delegate_address, *args, **kwargs):
+        """
+        Delete a delegate for a Safe. Signature is built the same way that for adding a delegate.
+        """
+        if not Web3.isChecksumAddress(address) or not Web3.isChecksumAddress(delegate_address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        request.data['safe'] = address
+        request.data['delegate_address'] = delegate_address
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return super().delete(request, address, delegate_address, *args, **kwargs)
 
 
 class SafeIncomingTxListView(ListAPIView):

@@ -12,9 +12,10 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from .helpers import DelegateSignatureHelper
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
-                     MultisigTransaction)
+                     MultisigTransaction, SafeContract, SafeContractDelegate)
 
 
 # ================================================ #
@@ -23,7 +24,8 @@ from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
-    signature = HexadecimalField(required=False)
+    # TODO Make signature mandatory
+    signature = HexadecimalField(required=False, min_length=130)  # Signatures must be at least 65 bytes
     origin = serializers.CharField(max_length=100, allow_null=True, default=None)
 
     def validate(self, data):
@@ -64,20 +66,35 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         except BadFunctionCallOutput:  # Error using pending block identifier
             safe_owners = safe.retrieve_owners(block_identifier='latest')
 
-        if not data['sender'] in safe_owners:
-            raise ValidationError(f'Sender={data["sender"]} is not an owner. Current owners={safe_owners}')
+        data['safe_owners'] = safe_owners
+
+        delegates = SafeContractDelegate.objects.get_delegates_for_safe(safe.address)
+        allowed_senders = safe_owners + delegates
+        if not data['sender'] in allowed_senders:
+            raise ValidationError(f'Sender={data["sender"]} is not an owner or delegate. '
+                                  f'Current owners={safe_owners}. Delegates={delegates}')
 
         signature_owners = []
-        signature = data.get('signature')
-        if signature is not None:
-            for safe_signature in SafeSignature.parse_signature(signature, contract_transaction_hash):
-                if not safe_signature.is_valid(ethereum_client, safe.address):
-                    raise ValidationError(f'Signature={safe_signature.signature.hex()} is not valid')
-                owner = safe_signature.owner
-                if owner not in safe_owners:
-                    raise ValidationError(f'User={owner} is not an owner. Current owners={safe_owners}')
-                signature_owners.append(owner)
+        # TODO Make signature mandatory
+        signature = data.get('signature', b'')
+        parsed_signatures = SafeSignature.parse_signature(signature, contract_transaction_hash)
+        data['parsed_signatures'] = parsed_signatures
+        for safe_signature in parsed_signatures:
+            owner = safe_signature.owner
+            if not safe_signature.is_valid(ethereum_client, safe.address):
+                raise ValidationError(f'Signature={safe_signature.signature.hex()} for owner={owner} is not valid')
 
+            if owner in delegates and len(parsed_signatures) > 1:
+                raise ValidationError(f'Just one signature is expected if using delegates')
+            if owner not in allowed_senders:
+                raise ValidationError(f'Signer={owner} is not an owner or delegate. '
+                                      f'Current owners={safe_owners}. Delegates={delegates}')
+            if owner in signature_owners:
+                raise ValidationError(f'Signature for owner={owner} is duplicated')
+
+            signature_owners.append(owner)
+
+        # TODO Make signature mandatory. len(signature_owners) must be >= 1
         if signature_owners and data['sender'] not in signature_owners:
             raise ValidationError(f'Signature does not match sender={data["sender"]}. '
                                   f'Calculated owners={signature_owners}')
@@ -104,45 +121,93 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             }
         )
 
-        for safe_signature in SafeSignature.parse_signature(self.validated_data.get('signature', b''),
-                                                            safe_tx_hash):
-            multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
-                multisig_transaction_hash=safe_tx_hash,
-                owner=safe_signature.owner,
-                defaults={
-                    'multisig_transaction': multisig_transaction,
-                    'signature': safe_signature.export_signature(),
-                    'signature_type': safe_signature.signature_type.value,
-                }
-            )
+        for safe_signature in self.validated_data.get('parsed_signatures'):
+            owner = safe_signature.owner
+            if safe_signature.owner in self.validated_data['safe_owners']:
+                multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
+                    multisig_transaction_hash=safe_tx_hash,
+                    owner=owner,
+                    defaults={
+                        'multisig_transaction': multisig_transaction,
+                        'signature': safe_signature.export_signature(),
+                        'signature_type': safe_signature.signature_type.value,
+                    }
+                )
         return multisig_transaction
+
+
+class SafeDelegateDeleteSerializer(serializers.Serializer):
+    safe = EthereumAddressField()
+    delegate = EthereumAddressField()
+    signature = HexadecimalField(min_length=130)
+
+    def validate(self, data):
+        super().validate(data)
+
+        if not SafeContract.objects.filter(address=data['safe']).exists():
+            raise ValidationError(f"Safe={data['safe']} does not exist or it's still not indexed")
+
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(data['safe'], ethereum_client)
+
+        # Check owners and pending owners
+        try:
+            safe_owners = safe.retrieve_owners(block_identifier='pending')
+        except BadFunctionCallOutput:  # Error using pending block identifier
+            safe_owners = safe.retrieve_owners(block_identifier='latest')
+
+        signature = data['signature']
+        delegate = data['delegate']
+        operation_hash = DelegateSignatureHelper.calculate_hash(delegate)
+        safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
+        if not safe_signatures:
+            raise ValidationError('Cannot a valid signature')
+        elif len(safe_signatures) > 1:
+            raise ValidationError('More than one signatures detected, just one is expected')
+
+        safe_signature = safe_signatures[0]
+        delegator = safe_signature.owner
+        if delegator not in safe_owners:
+            if safe_signature.signature_type == SafeSignatureType.EOA:
+                # Maybe it's an `eth_sign` signature without Gnosis Safe `v + 4`, let's try
+                safe_signatures = SafeSignature.parse_signature(signature,
+                                                                DelegateSignatureHelper.calculate_hash(delegate,
+                                                                                                       eth_sign=True))
+                safe_signature = safe_signatures[0]
+                delegator = safe_signature.owner
+            if delegator not in safe_owners:
+                raise ValidationError('Signing owner is not an owner of the Safe')
+
+        if not safe_signature.is_valid():
+            raise ValidationError(f'Signature of type={safe_signature.signature_type.name} for delegator={delegator} '
+                                  f'is not valid')
+
+        data['delegator'] = delegator
+        return data
+
+
+class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
+    label = serializers.CharField(max_length=50)
+
+    def save(self, **kwargs):
+        safe_address = self.validated_data['safe']
+        delegate = self.validated_data['delegate']
+        delegator = self.validated_data['delegator']
+        label = self.validated_data['label']
+        obj, _ = SafeContractDelegate.objects.update_or_create(
+            safe_contract_id=safe_address,
+            delegate=delegate,
+            defaults={
+                'label': label,
+                'delegator': delegator,
+            }
+        )
+        return obj
 
 
 # ================================================ #
 #            Response Serializers
 # ================================================ #
-class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
-    submission_date = serializers.DateTimeField(source='created')
-    confirmation_type = serializers.SerializerMethodField()
-    transaction_hash = serializers.SerializerMethodField()
-    signature = HexadecimalField()
-    signature_type = serializers.SerializerMethodField()
-
-    class Meta:
-        model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature', 'signature_type')
-
-    def get_confirmation_type(self, obj: MultisigConfirmation):
-        # TODO Remove this field
-        return ConfirmationType.CONFIRMATION.name
-
-    def get_transaction_hash(self, obj: MultisigConfirmation):
-        return obj.ethereum_tx_id
-
-    def get_signature_type(self, obj: MultisigConfirmation):
-        return SafeSignatureType(obj.signature_type).name
-
-
 class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
     data = HexadecimalField(allow_null=True, allow_blank=True)
     transaction_hash = serializers.SerializerMethodField()
@@ -156,8 +221,30 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
         return obj.internal_tx.ethereum_tx.block_id
 
-    def get_transaction_hash(self, obj: ModuleTransaction):
+    def get_transaction_hash(self, obj: ModuleTransaction) -> str:
         return obj.internal_tx.ethereum_tx_id
+
+
+class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
+    submission_date = serializers.DateTimeField(source='created')
+    confirmation_type = serializers.SerializerMethodField()
+    transaction_hash = serializers.SerializerMethodField()
+    signature = HexadecimalField()
+    signature_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MultisigConfirmation
+        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature', 'signature_type')
+
+    def get_confirmation_type(self, obj: MultisigConfirmation) -> str:
+        # TODO Remove this field
+        return ConfirmationType.CONFIRMATION.name
+
+    def get_transaction_hash(self, obj: MultisigConfirmation) -> str:
+        return obj.ethereum_tx_id
+
+    def get_signature_type(self, obj: MultisigConfirmation) -> str:
+        return SafeSignatureType(obj.signature_type).name
 
 
 class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
@@ -239,6 +326,12 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
+
+
+class SafeDelegateResponseSerializer(serializers.Serializer):
+    delegate = EthereumAddressField()
+    delegator = EthereumAddressField()
+    label = serializers.CharField(max_length=50)
 
 
 class SafeCreationInfoResponseSerializer(serializers.Serializer):

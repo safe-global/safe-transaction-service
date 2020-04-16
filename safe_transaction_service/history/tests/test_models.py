@@ -9,15 +9,15 @@ from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       MultisigConfirmation, MultisigTransaction,
-                      SafeMasterCopy, SafeStatus)
+                      SafeMasterCopy, SafeStatus, SafeContractDelegate)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
-                        SafeStatusFactory)
+                        SafeStatusFactory, SafeContractDelegateFactory)
 
 logger = logging.getLogger(__name__)
 
 
-class TestModels(TestCase):
+class TestModelSignals(TestCase):
     def test_bind_confirmations(self):
         safe_tx_hash = Web3.keccak(text='prueba')
         ethereum_tx = EthereumTxFactory()
@@ -70,6 +70,8 @@ class TestModels(TestCase):
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
+
+class TestSafeMasterCopy(TestCase):
     def test_safe_master_copy_sorting(self):
         SafeMasterCopy.objects.create(address=Account.create().address,
                                       initial_block_number=3,
@@ -89,11 +91,11 @@ class TestModels(TestCase):
         self.assertEqual(initial_block_numbers, [2, 6, 3])
 
 
-class TestEthereumTxManager(TestCase):
+class TestEthereumTx(TestCase):
     pass
 
 
-class TestEthereumEventManager(TestCase):
+class TestEthereumEvent(TestCase):
     def test_incoming_tokens(self):
         address = Account.create().address
         self.assertFalse(InternalTx.objects.incoming_tokens(address))
@@ -109,7 +111,7 @@ class TestEthereumEventManager(TestCase):
         self.assertIsNotNone(incoming_token_1.value)
 
 
-class TestInternalTxManager(TestCase):
+class TestInternalTx(TestCase):
     def test_incoming_txs_with_events(self):
         ethereum_address = Account.create().address
         incoming_txs = InternalTx.objects.incoming_txs_with_tokens(ethereum_address)
@@ -195,7 +197,7 @@ class TestInternalTxManager(TestCase):
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
 
 
-class TestSafeStatusManager(TestCase):
+class TestSafeStatus(TestCase):
     def test_safe_status_store_new(self):
         safe_status = SafeStatusFactory()
         self.assertEqual(SafeStatus.objects.all().count(), 1)
@@ -223,3 +225,20 @@ class TestSafeStatusManager(TestCase):
         SafeStatusFactory(address=address, nonce=2, owners=[owner_address])
         SafeStatusFactory(address=address_2, nonce=0, owners=[owner_address])
         self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [address, address_2])
+
+
+class TestSafeContract(TestCase):
+    def test_get_delegates_for_safe(self):
+        random_safe = Account.create().address
+        self.assertEqual(SafeContractDelegate.objects.get_delegates_for_safe(random_safe), [])
+
+        safe_contract_delegate = SafeContractDelegateFactory()
+        safe_contract_delegate_2 = SafeContractDelegateFactory(safe_contract=safe_contract_delegate.safe_contract)
+        safe_contract_delegate_another_safe = SafeContractDelegateFactory()
+        safe_address = safe_contract_delegate.safe_contract.address
+        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
+                              [safe_contract_delegate.delegate, safe_contract_delegate_2.delegate])
+
+        another_safe_address = safe_contract_delegate_another_safe.safe_contract.address
+        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(another_safe_address),
+                              [safe_contract_delegate_another_safe.delegate])

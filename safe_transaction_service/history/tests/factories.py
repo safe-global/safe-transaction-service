@@ -15,7 +15,8 @@ from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, EthereumTxType, InternalTx,
                       InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                      SafeContract, SafeMasterCopy, SafeStatus, WebHook)
+                      SafeContract, SafeContractDelegate, SafeMasterCopy,
+                      SafeStatus, WebHook)
 
 
 class EthereumBlockFactory(factory.DjangoModelFactory):
@@ -213,6 +214,18 @@ class SafeContractFactory(factory.DjangoModelFactory):
     address = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     erc20_block_number = factory.LazyFunction(lambda: 0)
+
+
+class SafeContractDelegateFactory(factory.DjangoModelFactory):
+    class Meta:
+        model = SafeContractDelegate
+
+    safe_contract = factory.SubFactory(SafeContractFactory)
+    delegate = factory.LazyFunction(lambda: Account.create().address)
+    delegator = factory.LazyFunction(lambda: Account.create().address)
+    label = factory.Faker('name')
+    read = True
+    write = True
 
 
 class MonitoredAddressFactory(factory.DjangoModelFactory):

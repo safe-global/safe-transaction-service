@@ -11,7 +11,8 @@ from gnosis.eth import EthereumClientProvider
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                     SafeContract, SafeMasterCopy, SafeStatus, WebHook)
+                     SafeContract, SafeContractDelegate, SafeMasterCopy,
+                     SafeStatus, WebHook)
 from .services import IndexServiceProvider
 
 
@@ -277,6 +278,15 @@ class SafeContractAdmin(admin.ModelAdmin):
     def reindex_last_month(self, request, queryset):
         queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 200000, 0))
     reindex_last_month.short_description = "Reindex last month"
+
+
+@admin.register(SafeContractDelegate)
+class SafeContractDelegateAdmin(admin.ModelAdmin):
+    list_display = ('safe_contract', 'read', 'write', 'delegate', 'delegator')
+    list_filter = ('read', 'write')
+    ordering = ['safe_contract_id']
+    raw_id_fields = ('safe_contract',)
+    search_fields = ['safe_contract', 'delegate', 'delegator']
 
 
 class SafeStatusModulesListFilter(admin.SimpleListFilter):

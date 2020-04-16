@@ -1,6 +1,7 @@
 import logging
 
 from eth_account import Account
+from eth_utils import keccak
 from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
@@ -186,7 +187,7 @@ class TestSafeTxProcessor(TestInternalTxIndexer):
                          InternalTxDecoded.objects.filter(function_name='execTransaction').count())
 
         # Test ApproveHash. For that we need the `previous_trace` to get the owner
-        hash_to_approve = Web3.sha3(text='HariSeldon').hex()
+        hash_to_approve = keccak(text='HariSeldon').hex()
         owner_approving = Account.create().address
         approve_hash_decoded_tx = InternalTxDecodedFactory(function_name='approveHash',
                                                            hash_to_approve=hash_to_approve,
