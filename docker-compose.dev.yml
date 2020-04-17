@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: docker/web/Dockerfile
     env_file:
-      - .env_ganache
+      - .env
     depends_on:
       - db
       - redis
@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: docker/web/Dockerfile
     env_file:
-      - .env_ganache
+      - .env
     depends_on:
       - db
       - redis
