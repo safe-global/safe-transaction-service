@@ -326,11 +326,11 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
 
 class InternalTxQuerySet(models.QuerySet):
-    def incoming_txs(self, address: str):
-        return self.filter(to=address,
-                           call_type=EthereumTxCallType.CALL.value,
-                           value__gt=0
-                           ).annotate(
+    def ether_txs(self):
+        return self.filter(
+            call_type=EthereumTxCallType.CALL.value,
+            value__gt=0
+        ).annotate(
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
             execution_date=F('ethereum_tx__block__timestamp'),
@@ -338,10 +338,14 @@ class InternalTxQuerySet(models.QuerySet):
             token_address=Value(None, output_field=EthereumAddressField()),
         ).order_by('-ethereum_tx__block_id')
 
-    def incoming_tokens(self, address: str):
-        return EthereumEvent.objects.erc20_and_721_events().filter(
-            arguments__to=address
-        ).annotate(
+    def ether_txs_for_address(self, address: str):
+        return self.ether_txs().filter(Q(to=address) | Q(_from=address))
+
+    def ether_incoming_txs_for_address(self, address: str):
+        return self.ether_txs().filter(to=address)
+
+    def token_txs(self):
+        return EthereumEvent.objects.erc20_and_721_events().annotate(
             to=RawSQL("arguments->>%s", ('to',)),  # Order is really important!
             _from=RawSQL("arguments->>%s", ('from',)),
             value=RawSQL("(arguments->>%s)::numeric", ('value',)),
@@ -352,9 +356,15 @@ class InternalTxQuerySet(models.QuerySet):
             token_address=F('address')
         ).order_by('-ethereum_tx__block_id')
 
+    def token_txs_for_address(self, address: str):
+        return self.token_txs().filter(Q(arguments__to=address) | Q(arguments__from=address))
+
+    def token_incoming_txs_for_address(self, address: str):
+        return self.token_txs().filter(arguments__to=address)
+
     def incoming_txs_with_tokens(self, address: str):
-        tokens_queryset = self.incoming_tokens(address)
-        ether_queryset = self.incoming_txs(address)
+        tokens_queryset = self.token_incoming_txs_for_address(address)
+        ether_queryset = self.ether_incoming_txs_for_address(address)
         return self.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
 
     def union_incoming_txs_with_tokens(self, tokens_queryset, ether_queryset):

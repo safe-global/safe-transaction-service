@@ -295,7 +295,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
         return super().delete(request, address, delegate_address, *args, **kwargs)
 
 
-class SafeIncomingTxListView(ListAPIView):
+class SafeTransfersListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = IncomingTransactionFilter
     serializer_class = IncomingTransactionResponseSerializer
@@ -305,11 +305,14 @@ class SafeIncomingTxListView(ListAPIView):
         # Disable filter queryset, it will try to filter the Union and will fail
         return queryset
 
+    def get_transfers(self, address: str):
+        tokens_queryset = super().filter_queryset(InternalTx.objects.token_incoming_txs_for_address(address))
+        ether_queryset = super().filter_queryset(InternalTx.objects.ether_incoming_txs_for_address(address))
+        return InternalTx.objects.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
+
     def get_queryset(self):
         address = self.kwargs['address']
-        tokens_queryset = super().filter_queryset(InternalTx.objects.incoming_tokens(address))
-        ether_queryset = super().filter_queryset(InternalTx.objects.incoming_txs(address))
-        return InternalTx.objects.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
+        return self.get_transfers(address)
 
     @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
                                     404: 'Txs not found',
@@ -324,6 +327,11 @@ class SafeIncomingTxListView(ListAPIView):
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(json.dumps(response.data['results']).encode()).hexdigest())
         return response
+
+
+class SafeIncomingTxListView(SafeTransfersListView):
+    def get_transfers(self, address: str):
+        return super().get_transfers(address)
 
 
 class SafeCreationView(APIView):

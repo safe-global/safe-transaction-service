@@ -98,13 +98,13 @@ class TestEthereumTx(TestCase):
 class TestEthereumEvent(TestCase):
     def test_incoming_tokens(self):
         address = Account.create().address
-        self.assertFalse(InternalTx.objects.incoming_tokens(address))
+        self.assertFalse(InternalTx.objects.token_incoming_txs_for_address(address))
         EthereumEventFactory(to=address)
-        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 1)
+        self.assertEqual(InternalTx.objects.token_incoming_txs_for_address(address).count(), 1)
         EthereumEventFactory(to=address, erc721=True)
-        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 2)
-        incoming_token_0 = InternalTx.objects.incoming_tokens(address)[0]  # Erc721 token
-        incoming_token_1 = InternalTx.objects.incoming_tokens(address)[1]  # Erc20 token
+        self.assertEqual(InternalTx.objects.token_incoming_txs_for_address(address).count(), 2)
+        incoming_token_0 = InternalTx.objects.token_incoming_txs_for_address(address)[0]  # Erc721 token
+        incoming_token_1 = InternalTx.objects.token_incoming_txs_for_address(address)[1]  # Erc20 token
         self.assertIsNone(incoming_token_0.value)
         self.assertIsNotNone(incoming_token_0.token_id)
         self.assertIsNone(incoming_token_1.token_id)
