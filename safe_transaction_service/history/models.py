@@ -362,17 +362,34 @@ class InternalTxQuerySet(models.QuerySet):
     def token_incoming_txs_for_address(self, address: str):
         return self.token_txs().filter(arguments__to=address)
 
-    def incoming_txs_with_tokens(self, address: str):
+    def ether_and_token_txs(self, address: str):
+        tokens_queryset = self.token_txs_for_address(address)
+        ether_queryset = self.ether_txs_for_address(address)
+        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
+
+    def ether_and_token_incoming_txs(self, address: str):
         tokens_queryset = self.token_incoming_txs_for_address(address)
         ether_queryset = self.ether_incoming_txs_for_address(address)
-        return self.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
+        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
 
-    def union_incoming_txs_with_tokens(self, tokens_queryset, ether_queryset):
+    def union_ether_and_token_txs(self, tokens_queryset, ether_queryset):
         values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_id',
                   'token_address')
         return ether_queryset.values(*values).union(tokens_queryset.values(*values)).order_by('-block_number')
 
     def can_be_decoded(self):
+        """
+        Every InternalTx can be decoded if:
+            - Has data
+            - Parent InternalTx is not errored
+            - InternalTx is not errored
+            - EthereumTx is successful (not reverted or out of gas)
+            - CallType is a DELEGATE_CALL (to the master copy contract)
+            - Not already decoded
+        :return: Txs that can be decoded
+        """
+        # Get errored parents for every InternalTx. We check every InternalTx whose trace_address starts the same as
+        # our InternalTx and is errored
         parent_errored_query = InternalTx.objects.annotate(
             child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
             #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
@@ -383,7 +400,7 @@ class InternalTxQuerySet(models.QuerySet):
             error=None
         )
 
-        return self.annotate(
+        return self.exclude(data=None).annotate(
             parent_errored=Subquery(parent_errored_query.values('pk')[:1])
         ).filter(
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
@@ -391,7 +408,7 @@ class InternalTxQuerySet(models.QuerySet):
             ethereum_tx__status=1,
             decoded_tx=None,
             parent_errored=None,
-        ).exclude(data=None)
+        )
 
 
 class InternalTx(models.Model):

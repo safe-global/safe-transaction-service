@@ -625,9 +625,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(SafeContractDelegate.objects.count(), 1)
 
-    def test_incoming_txs_view(self):
+    def test_incoming_transfers_view(self):
         safe_address = Account.create().address
-        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address, )))
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address, )))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
         self.assertEqual(len(response.data['results']), 0)
@@ -636,7 +636,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         InternalTxFactory(to=safe_address, value=0)
         internal_tx = InternalTxFactory(to=safe_address, value=value)
         InternalTxFactory(to=Account.create().address, value=value)
-        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['value'], str(value))
@@ -645,18 +645,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Test filters
         block_number = internal_tx.ethereum_tx.block_id
-        url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number}'
+        url = reverse('v1:incoming-transfers', args=(safe_address,)) + f'?block_number__gt={block_number}'
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
 
-        url = reverse('v1:incoming-transactions', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
+        # Add from tx. Result should be the same
+        InternalTxFactory(_from=safe_address, value=value)
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['value'], str(value))
+
+        url = reverse('v1:incoming-transfers', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         token_value = 6
         ethereum_erc_20_event = EthereumEventFactory(to=safe_address, value=token_value)
-        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
         self.assertEqual(response.json()['results'], [
@@ -684,7 +691,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         token_id = 17
         ethereum_erc_721_event = EthereumEventFactory(to=safe_address, value=token_id, erc721=True)
-        response = self.client.get(reverse('v1:incoming-transactions', args=(safe_address,)), format='json')
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 3)
         self.assertEqual(response.json()['results'], [
@@ -719,6 +726,124 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'from': internal_tx._from,
              },
         ])
+
+    def test_transfers_view(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:transfers', args=(safe_address, )))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+        self.assertEqual(len(response.data['results']), 0)
+
+        value = 2
+        InternalTxFactory(to=safe_address, value=0)
+        internal_tx = InternalTxFactory(to=safe_address, value=value)
+        InternalTxFactory(to=Account.create().address, value=value)
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['value'], str(value))
+        # Check Etag header
+        self.assertTrue(response['Etag'])
+
+        # Test filters
+        block_number = internal_tx.ethereum_tx.block_id
+        url = reverse('v1:transfers', args=(safe_address,)) + f'?block_number__gt={block_number}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
+        url = reverse('v1:transfers', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Add from tx
+        internal_tx_2 = InternalTxFactory(_from=safe_address, value=value)
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(response.data['results'][0]['value'], str(value))
+        self.assertEqual(response.data['results'][1]['value'], str(value))
+
+        token_value = 6
+        ethereum_erc_20_event = EthereumEventFactory(to=safe_address, value=token_value)
+        ethereum_erc_20_event_2 = EthereumEventFactory(from_=safe_address, value=token_value)
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 4)
+        expected_results = [
+            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+             'executionDate': ethereum_erc_20_event_2.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'blockNumber': ethereum_erc_20_event_2.ethereum_tx.block_id,
+             'transactionHash': ethereum_erc_20_event_2.ethereum_tx_id,
+             'to': ethereum_erc_20_event_2.arguments['to'],
+             'value': str(token_value),
+             'tokenId': None,
+             'tokenAddress': ethereum_erc_20_event_2.address,
+             'from': safe_address,
+             },
+            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+             'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
+             'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
+             'to': safe_address,
+             'value': str(token_value),
+             'tokenId': None,
+             'tokenAddress': ethereum_erc_20_event.address,
+             'from': ethereum_erc_20_event.arguments['from']
+             },
+            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+             'executionDate': internal_tx_2.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'blockNumber': internal_tx_2.ethereum_tx.block_id,
+             'transactionHash': internal_tx_2.ethereum_tx_id,
+             'to': internal_tx_2.to,
+             'value': str(value),
+             'tokenId': None,
+             'tokenAddress': None,
+             'from': safe_address,
+             },
+            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+             'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'blockNumber': internal_tx.ethereum_tx.block_id,
+             'transactionHash': internal_tx.ethereum_tx_id,
+             'to': safe_address,
+             'value': str(value),
+             'tokenId': None,
+             'tokenAddress': None,
+             'from': internal_tx._from,
+             },
+        ]
+        self.assertEqual(response.json()['results'], expected_results)
+
+        token_id = 17
+        ethereum_erc_721_event = EthereumEventFactory(to=safe_address, value=token_id, erc721=True)
+        ethereum_erc_721_event_2 = EthereumEventFactory(from_=safe_address, value=token_id, erc721=True)
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 6)
+        expected_results = [
+           {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+            'executionDate': ethereum_erc_721_event_2.ethereum_tx.block.timestamp.isoformat().replace(
+                '+00:00', 'Z'),
+            'transactionHash': ethereum_erc_721_event_2.ethereum_tx_id,
+            'blockNumber': ethereum_erc_721_event_2.ethereum_tx.block_id,
+            'to': ethereum_erc_721_event_2.arguments['to'],
+            'value': None,
+            'tokenId': str(token_id),
+            'tokenAddress': ethereum_erc_721_event_2.address,
+            'from': safe_address,
+            },
+            {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+             'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
+             'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
+             'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
+             'to': safe_address,
+             'value': None,
+             'tokenId': str(token_id),
+             'tokenAddress': ethereum_erc_721_event.address,
+             'from': ethereum_erc_721_event.arguments['from']
+             },
+        ] + expected_results
+        self.assertEqual(response.json()['results'], expected_results)
 
     def test_safe_creation_view(self):
         invalid_address = '0x2A'
