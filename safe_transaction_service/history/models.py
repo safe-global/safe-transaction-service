@@ -326,11 +326,11 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
 
 class InternalTxQuerySet(models.QuerySet):
-    def incoming_txs(self, address: str):
-        return self.filter(to=address,
-                           call_type=EthereumTxCallType.CALL.value,
-                           value__gt=0
-                           ).annotate(
+    def ether_txs(self):
+        return self.filter(
+            call_type=EthereumTxCallType.CALL.value,
+            value__gt=0
+        ).annotate(
             transaction_hash=F('ethereum_tx_id'),
             block_number=F('ethereum_tx__block_id'),
             execution_date=F('ethereum_tx__block__timestamp'),
@@ -338,10 +338,14 @@ class InternalTxQuerySet(models.QuerySet):
             token_address=Value(None, output_field=EthereumAddressField()),
         ).order_by('-ethereum_tx__block_id')
 
-    def incoming_tokens(self, address: str):
-        return EthereumEvent.objects.erc20_and_721_events().filter(
-            arguments__to=address
-        ).annotate(
+    def ether_txs_for_address(self, address: str):
+        return self.ether_txs().filter(Q(to=address) | Q(_from=address))
+
+    def ether_incoming_txs_for_address(self, address: str):
+        return self.ether_txs().filter(to=address)
+
+    def token_txs(self):
+        return EthereumEvent.objects.erc20_and_721_events().annotate(
             to=RawSQL("arguments->>%s", ('to',)),  # Order is really important!
             _from=RawSQL("arguments->>%s", ('from',)),
             value=RawSQL("(arguments->>%s)::numeric", ('value',)),
@@ -352,17 +356,40 @@ class InternalTxQuerySet(models.QuerySet):
             token_address=F('address')
         ).order_by('-ethereum_tx__block_id')
 
-    def incoming_txs_with_tokens(self, address: str):
-        tokens_queryset = self.incoming_tokens(address)
-        ether_queryset = self.incoming_txs(address)
-        return self.union_incoming_txs_with_tokens(tokens_queryset, ether_queryset)
+    def token_txs_for_address(self, address: str):
+        return self.token_txs().filter(Q(arguments__to=address) | Q(arguments__from=address))
 
-    def union_incoming_txs_with_tokens(self, tokens_queryset, ether_queryset):
+    def token_incoming_txs_for_address(self, address: str):
+        return self.token_txs().filter(arguments__to=address)
+
+    def ether_and_token_txs(self, address: str):
+        tokens_queryset = self.token_txs_for_address(address)
+        ether_queryset = self.ether_txs_for_address(address)
+        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
+
+    def ether_and_token_incoming_txs(self, address: str):
+        tokens_queryset = self.token_incoming_txs_for_address(address)
+        ether_queryset = self.ether_incoming_txs_for_address(address)
+        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
+
+    def union_ether_and_token_txs(self, tokens_queryset, ether_queryset):
         values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_id',
                   'token_address')
         return ether_queryset.values(*values).union(tokens_queryset.values(*values)).order_by('-block_number')
 
     def can_be_decoded(self):
+        """
+        Every InternalTx can be decoded if:
+            - Has data
+            - Parent InternalTx is not errored
+            - InternalTx is not errored
+            - EthereumTx is successful (not reverted or out of gas)
+            - CallType is a DELEGATE_CALL (to the master copy contract)
+            - Not already decoded
+        :return: Txs that can be decoded
+        """
+        # Get errored parents for every InternalTx. We check every InternalTx whose trace_address starts the same as
+        # our InternalTx and is errored
         parent_errored_query = InternalTx.objects.annotate(
             child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
             #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
@@ -373,7 +400,7 @@ class InternalTxQuerySet(models.QuerySet):
             error=None
         )
 
-        return self.annotate(
+        return self.exclude(data=None).annotate(
             parent_errored=Subquery(parent_errored_query.values('pk')[:1])
         ).filter(
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
@@ -381,7 +408,7 @@ class InternalTxQuerySet(models.QuerySet):
             ethereum_tx__status=1,
             decoded_tx=None,
             parent_errored=None,
-        ).exclude(data=None)
+        )
 
 
 class InternalTx(models.Model):

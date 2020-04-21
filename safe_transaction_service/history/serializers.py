@@ -347,14 +347,14 @@ class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
 
-class IncomingTransactionType(Enum):
+class TransferType(Enum):
     ETHER_TRANSFER = 0
     ERC20_TRANSFER = 1
     ERC721_TRANSFER = 2
     UNKNOWN = 3
 
 
-class IncomingTransactionResponseSerializer(serializers.Serializer):
+class TransferResponseSerializer(serializers.Serializer):
     type = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
     block_number = serializers.IntegerField()
@@ -374,11 +374,11 @@ class IncomingTransactionResponseSerializer(serializers.Serializer):
 
     def get_type(self, obj: Dict[str, Any]) -> str:
         if not obj.get('token_address'):
-            return IncomingTransactionType.ETHER_TRANSFER.name
+            return TransferType.ETHER_TRANSFER.name
         else:
             if obj.get('value') is not None:
-                return IncomingTransactionType.ERC20_TRANSFER.name
+                return TransferType.ERC20_TRANSFER.name
             elif obj.get('token_id') is not None:
-                return IncomingTransactionType.ERC721_TRANSFER.name
+                return TransferType.ERC721_TRANSFER.name
 
-        return IncomingTransactionType.UNKNOWN
+        return TransferType.UNKNOWN

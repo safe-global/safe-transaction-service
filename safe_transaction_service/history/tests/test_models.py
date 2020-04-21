@@ -9,10 +9,10 @@ from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       MultisigConfirmation, MultisigTransaction,
-                      SafeMasterCopy, SafeStatus, SafeContractDelegate)
+                      SafeContractDelegate, SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
-                        SafeStatusFactory, SafeContractDelegateFactory)
+                        SafeContractDelegateFactory, SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +98,13 @@ class TestEthereumTx(TestCase):
 class TestEthereumEvent(TestCase):
     def test_incoming_tokens(self):
         address = Account.create().address
-        self.assertFalse(InternalTx.objects.incoming_tokens(address))
+        self.assertFalse(InternalTx.objects.token_incoming_txs_for_address(address))
         EthereumEventFactory(to=address)
-        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 1)
+        self.assertEqual(InternalTx.objects.token_incoming_txs_for_address(address).count(), 1)
         EthereumEventFactory(to=address, erc721=True)
-        self.assertEqual(InternalTx.objects.incoming_tokens(address).count(), 2)
-        incoming_token_0 = InternalTx.objects.incoming_tokens(address)[0]  # Erc721 token
-        incoming_token_1 = InternalTx.objects.incoming_tokens(address)[1]  # Erc20 token
+        self.assertEqual(InternalTx.objects.token_incoming_txs_for_address(address).count(), 2)
+        incoming_token_0 = InternalTx.objects.token_incoming_txs_for_address(address)[0]  # Erc721 token
+        incoming_token_1 = InternalTx.objects.token_incoming_txs_for_address(address)[1]  # Erc20 token
         self.assertIsNone(incoming_token_0.value)
         self.assertIsNotNone(incoming_token_0.token_id)
         self.assertIsNone(incoming_token_1.token_id)
@@ -112,28 +112,59 @@ class TestEthereumEvent(TestCase):
 
 
 class TestInternalTx(TestCase):
-    def test_incoming_txs_with_events(self):
+    def test_ether_and_token_txs(self):
         ethereum_address = Account.create().address
-        incoming_txs = InternalTx.objects.incoming_txs_with_tokens(ethereum_address)
+        txs = InternalTx.objects.ether_and_token_txs(ethereum_address)
+        self.assertFalse(txs)
+
+        ether_value = 5
+        internal_tx = InternalTxFactory(to=ethereum_address, value=ether_value)
+        InternalTxFactory(value=ether_value)  # Create tx with a random address too
+        txs = InternalTx.objects.ether_and_token_txs(ethereum_address)
+        self.assertEqual(txs.count(), 1)
+        internal_tx = InternalTxFactory(_from=ethereum_address, value=ether_value)
+        self.assertEqual(txs.count(), 2)
+
+        token_value = 10
+        ethereum_event = EthereumEventFactory(to=ethereum_address, value=token_value)
+        EthereumEventFactory(value=token_value)  # Create tx with a random address too
+        txs = InternalTx.objects.ether_and_token_txs(ethereum_address)
+        self.assertEqual(txs.count(), 3)
+        EthereumEventFactory(from_=ethereum_address, value=token_value)
+        self.assertEqual(txs.count(), 4)
+
+        for i, tx in enumerate(txs):
+            if tx['token_address']:
+                self.assertEqual(tx['value'], token_value)
+            else:
+                self.assertEqual(tx['value'], ether_value)
+        self.assertEqual(i, 3)
+
+        self.assertEqual(InternalTx.objects.ether_txs().count(), 3)
+        self.assertEqual(InternalTx.objects.token_txs().count(), 3)
+
+    def test_ether_and_token_incoming_txs(self):
+        ethereum_address = Account.create().address
+        incoming_txs = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address)
         self.assertFalse(incoming_txs)
 
         ether_value = 5
         internal_tx = InternalTxFactory(to=ethereum_address, value=ether_value)
         InternalTxFactory(value=ether_value)  # Create tx with a random address too
-        incoming_txs = InternalTx.objects.incoming_txs_with_tokens(ethereum_address)
+        incoming_txs = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address)
         self.assertEqual(incoming_txs.count(), 1)
 
         token_value = 10
         ethereum_event = EthereumEventFactory(to=ethereum_address, value=token_value)
         EthereumEventFactory(value=token_value)  # Create tx with a random address too
-        incoming_txs = InternalTx.objects.incoming_txs_with_tokens(ethereum_address)
+        incoming_txs = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address)
         self.assertEqual(incoming_txs.count(), 2)
 
         # Make internal_tx more recent than ethereum_event
         internal_tx.ethereum_tx.block = EthereumBlockFactory()  # As factory has a sequence, it will always be the last
         internal_tx.ethereum_tx.save()
 
-        incoming_tx = InternalTx.objects.incoming_txs_with_tokens(ethereum_address).first()
+        incoming_tx = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address).first()
         self.assertEqual(incoming_tx['value'], ether_value)
         self.assertIsNone(incoming_tx['token_address'])
 
