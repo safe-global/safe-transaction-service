@@ -12,6 +12,8 @@ from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       SafeContractDelegate, SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
+                        MultisigConfirmationFactory,
+                        MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
@@ -273,3 +275,19 @@ class TestSafeContract(TestCase):
         another_safe_address = safe_contract_delegate_another_safe.safe_contract.address
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(another_safe_address),
                               [safe_contract_delegate_another_safe.delegate])
+
+
+class TestMultisigTransactions(TestCase):
+    def test_with_confirmations(self):
+        multisig_transaction = MultisigTransactionFactory()
+        self.assertEqual(MultisigTransaction.objects.with_confirmations().count(), 0)
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        self.assertEqual(MultisigTransaction.objects.with_confirmations().count(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+
+    def test_without_confirmations(self):
+        multisig_transaction = MultisigTransactionFactory()
+        self.assertEqual(MultisigTransaction.objects.without_confirmations().count(), 1)
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        self.assertEqual(MultisigTransaction.objects.without_confirmations().count(), 0)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)

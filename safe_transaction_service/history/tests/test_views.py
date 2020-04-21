@@ -141,6 +141,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
 
+        response = self.client.get(reverse('v1:multisig-transactions',
+                                           args=(safe_address,)) + '?has_confirmations=True', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 0)
+
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        response = self.client.get(reverse('v1:multisig-transactions',
+                                           args=(safe_address,)) + '?has_confirmations=True', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
         safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])

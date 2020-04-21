@@ -607,6 +607,16 @@ class MultisigTransactionQuerySet(models.QuerySet):
             ethereum_tx__block=None
         )
 
+    def with_confirmations(self):
+        return self.exclude(
+            confirmations__isnull=True
+        )
+
+    def without_confirmations(self):
+        return self.filter(
+            confirmations__isnull=True
+        )
+
     def with_confirmations_required(self):
         threshold_query = SafeStatus.objects.filter(
             internal_tx__ethereum_tx=OuterRef('ethereum_tx')
