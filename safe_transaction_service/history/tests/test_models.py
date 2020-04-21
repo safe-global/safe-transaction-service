@@ -9,10 +9,10 @@ from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       MultisigConfirmation, MultisigTransaction,
-                      SafeMasterCopy, SafeStatus, SafeContractDelegate)
+                      SafeContractDelegate, SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
-                        SafeStatusFactory, SafeContractDelegateFactory)
+                        SafeContractDelegateFactory, SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ class DefaultPagination(LimitOffsetPagination):
     default_limit = 100
 
 
-class IncomingTransactionFilter(filters.FilterSet):
+class TransferListFilter(filters.FilterSet):
     _from = django_filters.CharFilter()
     block_number = django_filters.NumberFilter(field_name='block_number')
     block_number__gt = django_filters.NumberFilter(field_name='block_number', lookup_expr='gt')

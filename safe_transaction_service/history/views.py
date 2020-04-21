@@ -19,12 +19,11 @@ from web3 import Web3
 
 from safe_transaction_service.version import __version__
 
-from .filters import (DefaultPagination, IncomingTransactionFilter,
-                      MultisigTransactionFilter)
+from .filters import (DefaultPagination, MultisigTransactionFilter,
+                      TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeStatus)
-from .serializers import (IncomingTransactionResponseSerializer,
-                          OwnerResponseSerializer,
+from .serializers import (OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCreationInfoResponseSerializer,
@@ -33,7 +32,8 @@ from .serializers import (IncomingTransactionResponseSerializer,
                           SafeDelegateSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer)
+                          SafeMultisigTransactionSerializer,
+                          TransferResponseSerializer)
 from .services import BalanceServiceProvider
 from .services.safe_service import SafeServiceProvider
 
@@ -297,8 +297,8 @@ class SafeDelegateDestroyView(DestroyAPIView):
 
 class SafeTransferListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = IncomingTransactionFilter
-    serializer_class = IncomingTransactionResponseSerializer
+    filterset_class = TransferListFilter
+    serializer_class = TransferResponseSerializer
     pagination_class = DefaultPagination
 
     def list(self, request, *args, **kwargs):
@@ -323,7 +323,7 @@ class SafeTransferListView(ListAPIView):
         address = self.kwargs['address']
         return self.get_transfers(address)
 
-    @swagger_auto_schema(responses={200: IncomingTransactionResponseSerializer(many=True),
+    @swagger_auto_schema(responses={200: TransferResponseSerializer(many=True),
                                     404: 'Txs not found',
                                     422: 'Safe address checksum not valid'})
     def get(self, request, address, format=None):

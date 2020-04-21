@@ -17,7 +17,7 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
-from ..serializers import IncomingTransactionType
+from ..serializers import TransferType
 from ..services import BalanceService
 from .factories import (EthereumEventFactory, EthereumTxFactory,
                         InternalTxFactory, ModuleTransactionFactory,
@@ -652,7 +652,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Add from tx. Result should be the same
         InternalTxFactory(_from=safe_address, value=value)
-        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
+        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['value'], str(value))
@@ -667,7 +667,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
         self.assertEqual(response.json()['results'], [
-            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+            {'type': TransferType.ERC20_TRANSFER.name,
              'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
              'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
@@ -677,7 +677,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': ethereum_erc_20_event.address,
              'from': ethereum_erc_20_event.arguments['from']
              },
-            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+            {'type': TransferType.ETHER_TRANSFER.name,
              'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': internal_tx.ethereum_tx_id,
              'blockNumber': internal_tx.ethereum_tx.block_id,
@@ -695,7 +695,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 3)
         self.assertEqual(response.json()['results'], [
-            {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+            {'type': TransferType.ERC721_TRANSFER.name,
              'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
              'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
@@ -705,7 +705,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': ethereum_erc_721_event.address,
              'from': ethereum_erc_721_event.arguments['from']
              },
-            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+            {'type': TransferType.ERC20_TRANSFER.name,
              'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
              'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
@@ -715,7 +715,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': ethereum_erc_20_event.address,
              'from': ethereum_erc_20_event.arguments['from']
              },
-            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+            {'type': TransferType.ETHER_TRANSFER.name,
              'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': internal_tx.ethereum_tx_id,
              'blockNumber': internal_tx.ethereum_tx.block_id,
@@ -771,7 +771,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 4)
         expected_results = [
-            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+            {'type': TransferType.ERC20_TRANSFER.name,
              'executionDate': ethereum_erc_20_event_2.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'blockNumber': ethereum_erc_20_event_2.ethereum_tx.block_id,
              'transactionHash': ethereum_erc_20_event_2.ethereum_tx_id,
@@ -781,7 +781,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': ethereum_erc_20_event_2.address,
              'from': safe_address,
              },
-            {'type': IncomingTransactionType.ERC20_TRANSFER.name,
+            {'type': TransferType.ERC20_TRANSFER.name,
              'executionDate': ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'blockNumber': ethereum_erc_20_event.ethereum_tx.block_id,
              'transactionHash': ethereum_erc_20_event.ethereum_tx_id,
@@ -791,7 +791,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': ethereum_erc_20_event.address,
              'from': ethereum_erc_20_event.arguments['from']
              },
-            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+            {'type': TransferType.ETHER_TRANSFER.name,
              'executionDate': internal_tx_2.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'blockNumber': internal_tx_2.ethereum_tx.block_id,
              'transactionHash': internal_tx_2.ethereum_tx_id,
@@ -801,7 +801,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'tokenAddress': None,
              'from': safe_address,
              },
-            {'type': IncomingTransactionType.ETHER_TRANSFER.name,
+            {'type': TransferType.ETHER_TRANSFER.name,
              'executionDate': internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'blockNumber': internal_tx.ethereum_tx.block_id,
              'transactionHash': internal_tx.ethereum_tx_id,
@@ -821,7 +821,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 6)
         expected_results = [
-           {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+           {'type': TransferType.ERC721_TRANSFER.name,
             'executionDate': ethereum_erc_721_event_2.ethereum_tx.block.timestamp.isoformat().replace(
                 '+00:00', 'Z'),
             'transactionHash': ethereum_erc_721_event_2.ethereum_tx_id,
@@ -832,7 +832,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'tokenAddress': ethereum_erc_721_event_2.address,
             'from': safe_address,
             },
-            {'type': IncomingTransactionType.ERC721_TRANSFER.name,
+            {'type': TransferType.ERC721_TRANSFER.name,
              'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
              'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
              'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
