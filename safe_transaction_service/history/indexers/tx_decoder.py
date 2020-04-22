@@ -10,8 +10,10 @@ from web3._utils.abi import (get_abi_input_names, get_abi_input_types,
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.contract import Contract, ContractFunction
 
-from gnosis.eth.contracts import (get_safe_contract, get_safe_V0_0_1_contract,
-                                  get_safe_V1_0_0_contract)
+from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
+                                  get_safe_contract, get_safe_V0_0_1_contract,
+                                  get_safe_V1_0_0_contract,
+                                  get_uniswap_exchange_contract)
 
 logger = getLogger(__name__)
 
@@ -48,15 +50,18 @@ class TxDecoder:
     """
     def __init__(self):
         self.dummy_w3 = Web3()
+
+        exchanges = [get_uniswap_exchange_contract(self.dummy_w3)]
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
                                                                            market_maker_factory_abi)]
+        erc_contracts = [get_erc20_contract(self.dummy_w3), get_erc721_contract(self.dummy_w3)]
+        safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
+                          get_safe_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = sight_contracts + [get_safe_V0_0_1_contract(self.dummy_w3),
-                                                      get_safe_V1_0_0_contract(self.dummy_w3),
-                                                      get_safe_contract(self.dummy_w3)]
+        self.supported_contracts = exchanges + sight_contracts + erc_contracts + safe_contracts
 
         # Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
         # Store selectors with abi
