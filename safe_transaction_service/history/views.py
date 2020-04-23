@@ -150,7 +150,6 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         response = super().get(request, address, *args, **kwargs)
         response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
-        print(response.data['results'])
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
         return response
 
