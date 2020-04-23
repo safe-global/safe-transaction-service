@@ -20,8 +20,9 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, MultisigTransactionFilter,
                       TransferListFilter)
-from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
-                     SafeContract, SafeContractDelegate, SafeStatus)
+from .models import (EthereumEvent, EthereumTxCallType, InternalTx,
+                     ModuleTransaction, MultisigTransaction, SafeContract,
+                     SafeContractDelegate, SafeStatus)
 from .serializers import (OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
@@ -58,6 +59,68 @@ class AboutView(APIView):
             }
         }
         return Response(content)
+
+
+class AllTransactionsListView(ListAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
+    filterset_class = MultisigTransactionFilter
+    ordering_fields = ['nonce', 'created']
+    pagination_class = DefaultPagination
+    serializer_class = SafeMultisigTransactionResponseSerializer
+
+    def get_queryset(self):
+        # - The endpoint should only show outgoing transactions where the nonce < currentSafe nonce
+        # - The endpoint should only show incoming transactions that have been mined (ERC20/721 and Ether)
+        # - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
+        # date the execution date of the transaction with the same nonce that has been executed should be taken.
+
+        safe = self.kwargs['address']
+        last_nonce = MultisigTransaction.objects.last_nonce(safe)
+        if last_nonce is None:
+            # No multisig txs
+            pass
+        else:
+            current_nonce = last_nonce + 1
+
+        # Get incoming tokens
+        EthereumEvent.objects.erc20_and_721_events().filter(arguments__to=safe)
+
+        # Get incoming txs
+        InternalTx.objects.filter(
+            call_type=EthereumTxCallType.CALL.value,
+            value__gt=0
+        )
+
+        # Get multisig transactions
+        MultisigTransaction.objects.filter(safe=safe, nonce__lt=current_nonce)
+
+        return MultisigTransaction.objects.filter(
+            safe=self.kwargs['address']
+        ).with_confirmations_required(
+        ).prefetch_related(
+            'confirmations'
+        ).select_related(
+            'ethereum_tx__block'
+        ).order_by(
+            '-nonce',
+            '-created'
+        )
+
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
+                                    422: 'Invalid ethereum address'})
+    def get(self, request, *args, **kwargs):
+        """
+        Returns the history of a multisig tx (safe)
+        """
+        address = kwargs['address']
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        response = super().get(request, *args, **kwargs)
+        response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
+        response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
+        return response
 
 
 class SafeModuleTransactionListView(ListAPIView):
@@ -148,7 +211,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        response = super().get(request, address, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
         response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
         return response

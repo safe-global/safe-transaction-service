@@ -80,7 +80,7 @@ class SafeTxDecoder:
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
         Parse decoded arguments, like converting `bytes` to hexadecimal `str`
-        :param decoded:
+        :param decoded_value:
         :return: Dict[str, Any]
         """
         if isinstance(decoded_value, bytes):

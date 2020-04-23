@@ -596,6 +596,13 @@ class InternalTxDecoded(models.Model):
         return self.save(update_fields=['processed'])
 
 
+class MultisigTransactionManager(models.Manager):
+    def last_nonce(self, safe: str) -> Optional[int]:
+        nonce_query = self.filter(safe=safe).exclude(ethereum_tx=None).order_by('-nonce').values('nonce').first()
+        if nonce_query:
+            return nonce_query['nonce']
+
+
 class MultisigTransactionQuerySet(models.QuerySet):
     def executed(self):
         return self.exclude(
@@ -626,7 +633,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
 
 class MultisigTransaction(TimeStampedModel):
-    objects = MultisigTransactionQuerySet.as_manager()
+    objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField(db_index=True)
     ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,

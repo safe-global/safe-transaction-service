@@ -12,9 +12,13 @@ urlpatterns = [
     path('safes/<str:address>/', views.SafeInfoView.as_view(),
          name='safe-info'),
     path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
-         name='multisig-transactions'),
+         name='multisig-transactions'),  # DEPRECATED, use `multisig-transactions`
+    path('safes/<str:address>/multisig-transactions/', views.SafeMultisigTransactionListView.as_view(),
+         name='multisig-transactions-alias'),
+    path('safes/<str:address>/all-transactions/', views.AllTransactionsListView.as_view(),
+         name='all-transactions'),
     path('safes/<str:address>/incoming-transactions/', views.SafeIncomingTransferListView.as_view(),
-         name='incoming-transactions'),
+         name='incoming-transactions'),  # DEPRECATED, use `incoming-transfers`
     path('safes/<str:address>/incoming-transfers/', views.SafeIncomingTransferListView.as_view(),
          name='incoming-transfers'),
     path('safes/<str:address>/transfers/', views.SafeTransferListView.as_view(),
