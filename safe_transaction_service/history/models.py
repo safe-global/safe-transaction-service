@@ -625,6 +625,10 @@ class MultisigTransactionQuerySet(models.QuerySet):
         )
 
     def with_confirmations_required(self):
+        """
+        Add confirmations required for execution when the tx was mined (threshold of the Safe at that point)
+        :return: queryset with `confirmations_required: int` field
+        """
         threshold_query = SafeStatus.objects.filter(
             internal_tx__ethereum_tx=OuterRef('ethereum_tx')
         ).sorted_reverse_by_internal_tx().values('threshold')

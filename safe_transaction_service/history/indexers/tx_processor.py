@@ -11,9 +11,7 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
-from gnosis.safe.safe_signature import (SafeSignature,
-                                        SafeSignatureApprovedHash,
-                                        SafeSignatureType)
+from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       ModuleTransaction, MultisigConfirmation,

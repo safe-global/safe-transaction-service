@@ -1,6 +1,8 @@
 import hashlib
+from typing import Dict
 
 from django.conf import settings
+from django.db.models import F
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -20,7 +22,7 @@ from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, MultisigTransactionFilter,
                       TransferListFilter)
-from .models import (EthereumEvent, EthereumTxCallType, InternalTx,
+from .models import (EthereumEvent, EthereumTx, EthereumTxCallType, InternalTx,
                      ModuleTransaction, MultisigTransaction, SafeContract,
                      SafeContractDelegate, SafeStatus)
 from .serializers import (OwnerResponseSerializer,
@@ -82,20 +84,57 @@ class AllTransactionsListView(ListAPIView):
         else:
             current_nonce = last_nonce + 1
 
+        multisig_safe_tx_ids = MultisigTransaction.objects.filter(
+            safe=safe
+        ).annotate(
+            execution_date=F('ethereum_tx__block__timestamp')
+        ).values('safe_tx_hash', 'execution_date')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
+
         # Get incoming tokens
-        EthereumEvent.objects.erc20_and_721_events().filter(arguments__to=safe)
+        event_tx_ids = EthereumEvent.objects.erc20_and_721_events().filter(
+            arguments__to=safe
+        ).annotate(
+            execution_date=F('ethereum_tx__block__timestamp')
+        ).distinct().values('ethereum_tx_id', 'execution_date')
 
         # Get incoming txs
-        InternalTx.objects.filter(
+        internal_tx_ids = InternalTx.objects.filter(
             call_type=EthereumTxCallType.CALL.value,
-            value__gt=0
-        )
+            value__gt=0,
+            to=safe,
+        ).annotate(
+            execution_date=F('ethereum_tx__block__timestamp')
+        ).distinct().values('ethereum_tx_id', 'execution_date')
 
-        # Get multisig transactions
-        MultisigTransaction.objects.filter(safe=safe, nonce__lt=current_nonce)
+        # Get module txs
+        module_tx_ids = ModuleTransaction.objects.filter(
+            safe=safe
+        ).annotate(
+            execution_date=F('internal_tx__ethereum_tx__block__timestamp')
+        ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date')
 
-        return MultisigTransaction.objects.filter(
-            safe=self.kwargs['address']
+        # Tricky, we merge SafeTx hashes with EthereumTx hashes
+        queryset = multisig_safe_tx_ids.union(
+            event_tx_ids
+        ).union(
+            internal_tx_ids
+        ).union(
+            internal_tx_ids
+        ).union(
+            module_tx_ids
+        ).order_by('-execution_date')
+
+        page = self.paginate_queryset(queryset)
+        if page is None:
+            return page
+
+        # Now that we know how to paginate, we retrieve the real transactions
+        # -------------------------------------------------------------------
+        hashes_to_search = queryset.values('safe_tx_hash')  # It uses the field name of the first model in the union
+        multisig_txs = MultisigTransaction.objects.filter(
+            safe=safe,
+            nonce__lt=current_nonce,
+            safe_tx_hash__in=hashes_to_search
         ).with_confirmations_required(
         ).prefetch_related(
             'confirmations'
@@ -105,6 +144,42 @@ class AllTransactionsListView(ListAPIView):
             '-nonce',
             '-created'
         )
+
+        tokens_queryset = InternalTx.objects.token_incoming_txs_for_address(safe).filter(ethereum_tx__in=hashes_to_search)
+        ether_queryset = InternalTx.objects.ether_incoming_txs_for_address(safe).filter(ethereum_tx__in=hashes_to_search)
+        transfers = list(InternalTx.objects.union_ether_and_token_txs(tokens_queryset, ether_queryset))
+        module_txs = list(ModuleTransaction.objects.filter(safe=safe, internal_tx__ethereum_tx__in=hashes_to_search).select_related('internal_tx'))
+        plain_ethereum_txs = list(EthereumTx.objects.filter(tx_hash__in=hashes_to_search))
+
+        # Build the list
+        def get_the_transaction(h: str):
+            multisig_tx: MultisigTransaction
+            result = None
+            for multisig_tx in multisig_txs:
+                if h == multisig_tx.safe_tx_hash:
+                    result = multisig_tx
+
+            module_tx: ModuleTransaction
+            for module_tx in module_txs:
+                if h == module_tx.internal_tx.ethereum_tx_id:
+                    result = module_tx
+
+            plain_ethereum_tx: EthereumTx
+            for plain_ethereum_tx in plain_ethereum_txs:
+                if h == plain_ethereum_tx.tx_hash:
+                    result = plain_ethereum_tx
+
+            # This cannot happen if logic is ok
+            if not result:
+                raise ValueError('Tx not found, problem merging all transactions together')
+
+            # Populate transfers
+            result.transfers = [transfer for transfer in transfers if h == transfer['transaction_hash']]
+
+            return result
+
+        return [get_the_transaction(hash_to_search['safe_tx_hash'])
+                for hash_to_search in hashes_to_search]  # Sorted already by execution_date
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
