@@ -165,7 +165,7 @@ class EthereumTx(TimeStampedModel):
     value = Uint256Field()
 
     def __str__(self):
-        return '{} from={} to={}'.format(self.tx_hash, self._from, self.to)
+        return '{} status={} from={} to={}'.format(self.tx_hash, self.status, self._from, self.to)
 
     @property
     def success(self) -> Optional[bool]:
