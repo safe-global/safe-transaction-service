@@ -14,8 +14,9 @@ from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
 from .helpers import DelegateSignatureHelper
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
-from .models import (ConfirmationType, ModuleTransaction, MultisigConfirmation,
-                     MultisigTransaction, SafeContract, SafeContractDelegate)
+from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
+                     MultisigConfirmation, MultisigTransaction, SafeContract,
+                     SafeContractDelegate)
 
 
 # ================================================ #
@@ -393,3 +394,45 @@ class TransferResponseSerializer(serializers.Serializer):
                 return TransferType.ERC721_TRANSFER.name
 
         return TransferType.UNKNOWN
+
+
+# All txs serializers
+class SafeModuleTransactionWithTransfersResponseSerializer(SafeModuleTransactionResponseSerializer):
+    class Meta:
+        model = SafeModuleTransactionResponseSerializer.Meta.model
+        fields = SafeModuleTransactionResponseSerializer.Meta.fields + ('transfers', )
+
+    transfers = TransferResponseSerializer(many=True)
+
+
+class SafeMultisigTransactionWithTransfersResponseSerializer(SafeMultisigTransactionResponseSerializer):
+    transfers = TransferResponseSerializer(many=True)
+
+
+class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
+    class Meta:
+        model = EthereumTx
+        exclude = ('block',)
+
+    _from = EthereumAddressField(allow_null=False, allow_zero_address=True, source='_from')
+    to = EthereumAddressField(allow_null=True, allow_zero_address=True)
+    data = HexadecimalField()
+    tx_hash = HexadecimalField()
+    block_number = serializers.SerializerMethodField()
+    block_timestamp = serializers.SerializerMethodField()
+    transfers = TransferResponseSerializer(many=True)
+
+    def get_fields(self):
+        result = super().get_fields()
+        # Rename `_from` to `from`
+        _from = result.pop('_from')
+        result['from'] = _from
+        return result
+
+    def get_block_number(self, obj: EthereumTx):
+        if obj.block:
+            return obj.block.number
+
+    def get_block_timestamp(self, obj: EthereumTx):
+        if obj.block:
+            return obj.block.timestamp

@@ -33,8 +33,8 @@ from .serializers import (OwnerResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer,
                           TransferResponseSerializer)
-from .services import BalanceServiceProvider
-from .services.safe_service import SafeServiceProvider
+from .services import (BalanceServiceProvider, SafeServiceProvider,
+                       TransactionServiceProvider)
 
 
 class AboutView(APIView):
@@ -62,26 +62,22 @@ class AboutView(APIView):
 
 class AllTransactionsListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
-    filterset_class = MultisigTransactionFilter
-    ordering_fields = ['nonce', 'created']
     pagination_class = DefaultPagination
-    serializer_class = SafeMultisigTransactionResponseSerializer
 
-    def get_queryset(self):
-        # - The endpoint should only show outgoing transactions where the nonce < currentSafe nonce
-        # - The endpoint should only show incoming transactions that have been mined (ERC20/721 and Ether)
-        # - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
-        # date the execution date of the transaction with the same nonce that has been executed should be taken.
-
+    def list(self, request, *args, **kwargs):
+        transaction_service = TransactionServiceProvider()
         safe = self.kwargs['address']
-        safe_service = SafeServiceProvider()
-        queryset = safe_service.get_all_tx_hashes(safe)
+        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe))
 
         page = self.paginate_queryset(queryset)
-        if page is None:
-            return page
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-        return safe_service.get_all_txs_from_hashes(safe, page)
+        all_tx_hashes = list(queryset.values_list('safe_tx_hash', flat=True))
+        all_txs = transaction_service.get_all_txs_from_hashes(safe, all_tx_hashes)
+        all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
+        return Response(all_txs_serialized)
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
@@ -95,7 +91,6 @@ class AllTransactionsListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, *args, **kwargs)
-        response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
         return response
 

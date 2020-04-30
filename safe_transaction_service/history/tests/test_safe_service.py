@@ -22,3 +22,4 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_info.address, safe_create_tx.safe_address)
         self.assertEqual(safe_info.owners, safe_create_tx.owners)
         self.assertEqual(safe_info.threshold, safe_create_tx.threshold)
+
