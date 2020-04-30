@@ -4,17 +4,22 @@ from django.test import TestCase
 
 from hexbytes import HexBytes
 
-from ..indexers.tx_decoder import TxDecoder
+from ..indexers.tx_decoder import (SafeTxDecoder, TxDecoder,
+                                   get_safe_tx_decoder, get_tx_decoder)
 
 logger = logging.getLogger(__name__)
 
 
 class TestTxDecoder(TestCase):
+    def test_singleton(self):
+        self.assertTrue(isinstance(get_tx_decoder(), TxDecoder))
+        self.assertTrue(isinstance(get_safe_tx_decoder(), SafeTxDecoder))
+
     def test_supported_fn_selectors(self):
-        tx_decoder = TxDecoder()
-        self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
-        self.assertIn(b'\xb6>\x80\r', tx_decoder.supported_fn_selectors)  # setup for Safe V1.1.0
-        self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
+        for tx_decoder in (TxDecoder(), get_tx_decoder(), get_safe_tx_decoder()):
+            self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
+            self.assertIn(b'\xb6>\x80\r', tx_decoder.supported_fn_selectors)  # setup for Safe V1.1.0
+            self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
 
     def test_decode_execute_transaction(self):
         tx_data = HexBytes('0x6a761202000000000000000000000000d9ab7371432d7cc74503290412618c948cddacf200000000000000000'

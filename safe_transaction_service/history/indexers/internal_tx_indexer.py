@@ -10,7 +10,7 @@ from gnosis.eth import EthereumClient
 
 from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer
-from .tx_decoder import CannotDecode, TxDecoder
+from .tx_decoder import CannotDecode, TxDecoder, get_safe_tx_decoder
 
 logger = getLogger(__name__)
 
@@ -32,7 +32,7 @@ class InternalTxIndexerProvider:
 class InternalTxIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.tx_decoder = TxDecoder()
+        self.tx_decoder = get_safe_tx_decoder()
         self.number_trace_blocks = 10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
 
     @property

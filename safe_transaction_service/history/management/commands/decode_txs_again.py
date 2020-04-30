@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from ...indexers.tx_decoder import CannotDecode, TxDecoder
+from ...indexers.tx_decoder import CannotDecode, get_safe_tx_decoder
 from ...models import InternalTx, InternalTxDecoded
 
 
@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Decoding txs again'))
-        tx_decoder = TxDecoder()
+        tx_decoder = get_safe_tx_decoder()
         found = 0
         total = InternalTx.objects.can_be_decoded().count()
         for i, internal_tx in enumerate(InternalTx.objects.can_be_decoded().iterator()):
