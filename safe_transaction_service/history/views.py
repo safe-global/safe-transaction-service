@@ -28,7 +28,7 @@ from .serializers import (OwnerResponseSerializer,
                           SafeCreationInfoResponseSerializer,
                           SafeDelegateDeleteSerializer,
                           SafeDelegateResponseSerializer,
-                          SafeDelegateSerializer,
+                          SafeDelegateSerializer, SafeInfoResponseSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer,
@@ -348,7 +348,7 @@ class SafeIncomingTransferListView(SafeTransferListView):
 class SafeCreationView(APIView):
     serializer_class = SafeCreationInfoResponseSerializer
 
-    @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
+    @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safes not found for that owner',
                                     422: 'Owner address checksum not valid'})
     @method_decorator(cache_page(60 * 60))  # 1 hour
@@ -364,6 +364,27 @@ class SafeCreationView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.serializer_class(safe_creation_info)
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeInfoView(APIView):
+    serializer_class = SafeInfoResponseSerializer
+
+    @swagger_auto_schema(responses={200: serializer_class(),
+                                    404: 'Safes not found for that owner',
+                                    422: 'Owner address checksum not valid'})
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        if not SafeContract.objects.filter(address=address).exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        safe_info = SafeServiceProvider().get_safe_info(address)
+        serializer = self.serializer_class(safe_info)
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 

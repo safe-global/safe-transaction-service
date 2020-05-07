@@ -343,6 +343,17 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     transaction_hash = Sha3HashField()
 
 
+class SafeInfoResponseSerializer(serializers.Serializer):
+    address = EthereumAddressField()
+    nonce = serializers.IntegerField()
+    threshold = serializers.IntegerField()
+    owners = serializers.ListField(child=EthereumAddressField())
+    master_copy = EthereumAddressField()
+    modules = serializers.ListField(child=EthereumAddressField())
+    fallback_handler = EthereumAddressField()
+    version = serializers.CharField()
+
+
 class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 

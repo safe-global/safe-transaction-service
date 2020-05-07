@@ -1,13 +1,15 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import (get_cpk_factory_contract,
                                   get_proxy_factory_contract)
+from gnosis.safe import Safe
+from gnosis.safe.safe import SafeInfo
 
 from ..models import InternalTx
 
@@ -72,6 +74,10 @@ class SafeService:
 
         return SafeCreationInfo(created, creator, proxy_factory, master_copy, setup_data,
                                 creation_internal_tx.ethereum_tx_id)
+
+    def get_safe_info(self, safe_address: str) -> SafeInfo:
+        safe = Safe(safe_address, self.ethereum_client)
+        return safe.retrieve_all_info()
 
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:

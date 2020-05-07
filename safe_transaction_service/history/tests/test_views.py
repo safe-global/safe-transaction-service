@@ -916,6 +916,29 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                              'setup_data': test_data['setup_data'],
                                              'transaction_hash': internal_tx.ethereum_tx_id})
 
+    def test_safe_info_view(self):
+        invalid_address = '0x2A'
+        response = self.client.get(reverse('v1:safe-info', args=(invalid_address,)))
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        safe_create_tx = self.deploy_test_safe()
+        safe_address = safe_create_tx.safe_address
+        response = self.client.get(reverse('v1:safe-info', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        response = self.client.get(reverse('v1:safe-info', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {
+            'address': safe_address,
+            'nonce': 0,
+            'threshold': safe_create_tx.threshold,
+            'owners': safe_create_tx.owners,
+            'master_copy': safe_create_tx.master_copy_address,
+            'modules': [],
+            'fallback_handler': safe_create_tx.fallback_handler,
+            'version': '1.1.1'})
+
     def test_owners_view(self):
         invalid_address = '0x2A'
         response = self.client.get(reverse('v1:owners', args=(invalid_address,)))
