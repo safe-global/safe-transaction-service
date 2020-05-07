@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.db import models
-from django.db.models import F, QuerySet
+from django.db.models import Case, F, OuterRef, QuerySet, When
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
@@ -43,10 +43,25 @@ class TransactionService:
         Multisig Transactions, as some of them are not mined, we use the SafeTxHash
         :return: List with tx hashes sorted by date (newest first)
         """
+
+        last_nonce = MultisigTransaction.objects.last_nonce(safe_address)  # None if no Multisig Txs executed
+        current_nonce = 0 if last_nonce is None else last_nonce + 1
+
+        # If tx is not mined, get the execution date of a tx mined with the same nonce
+        case = Case(
+            When(ethereum_tx__block=None,
+                 then=MultisigTransaction.objects.filter(
+                     safe=OuterRef('safe'),
+                     nonce=OuterRef('nonce')
+                 ).exclude(
+                     ethereum_tx__block=None
+                 ).values('ethereum_tx__block__timestamp')),
+            default=F('ethereum_tx__block__timestamp')
+        )
         multisig_safe_tx_ids = MultisigTransaction.objects.filter(
-            safe=safe_address
+            safe=safe_address, nonce__lt=current_nonce
         ).annotate(
-            execution_date=F('ethereum_tx__block__timestamp')  # TODO execution_date for txs not executed
+            execution_date=case
         ).values('safe_tx_hash', 'execution_date')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
 
         # Get incoming tokens
@@ -93,16 +108,8 @@ class TransactionService:
         :param hashes_to_search:
         :return:
         """
-        last_nonce = MultisigTransaction.objects.last_nonce(safe_address)
-        if last_nonce is None:
-            # No multisig txs
-            pass
-        else:
-            current_nonce = last_nonce + 1
-
         multisig_txs = MultisigTransaction.objects.filter(
             safe=safe_address,
-            nonce__lt=current_nonce,
             safe_tx_hash__in=hashes_to_search
         ).with_confirmations_required(
         ).prefetch_related(

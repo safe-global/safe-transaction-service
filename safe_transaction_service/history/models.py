@@ -598,6 +598,11 @@ class InternalTxDecoded(models.Model):
 
 class MultisigTransactionManager(models.Manager):
     def last_nonce(self, safe: str) -> Optional[int]:
+        """
+        :param safe:
+        :return: nonce of the last executed and mined transaction. It will be None if there's no transactions or none
+        of them is mined
+        """
         nonce_query = self.filter(safe=safe).exclude(ethereum_tx=None).order_by('-nonce').values('nonce').first()
         if nonce_query:
             return nonce_query['nonce']

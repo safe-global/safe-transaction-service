@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Tuple, Union
+
 from django.db.models import F, QuerySet
 
 from web3 import Web3

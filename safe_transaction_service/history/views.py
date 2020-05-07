@@ -22,17 +22,16 @@ from .filters import (DefaultPagination, MultisigTransactionFilter,
                       TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeStatus)
-from .serializers import (OwnerResponseSerializer,
-                          SafeBalanceResponseSerializer,
-                          SafeBalanceUsdResponseSerializer,
-                          SafeCreationInfoResponseSerializer,
-                          SafeDelegateDeleteSerializer,
-                          SafeDelegateResponseSerializer,
-                          SafeDelegateSerializer, SafeInfoResponseSerializer,
-                          SafeModuleTransactionResponseSerializer,
-                          SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer,
-                          TransferResponseSerializer)
+from .serializers import (
+    OwnerResponseSerializer, SafeBalanceResponseSerializer,
+    SafeBalanceUsdResponseSerializer, SafeCreationInfoResponseSerializer,
+    SafeDelegateDeleteSerializer, SafeDelegateResponseSerializer,
+    SafeDelegateSerializer, SafeInfoResponseSerializer,
+    SafeModuleTransactionResponseSerializer,
+    SafeMultisigTransactionResponseSerializer,
+    SafeMultisigTransactionSerializer,
+    SafeMultisigTransactionWithTransfersResponseSerializer,
+    TransferResponseSerializer)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 
@@ -68,16 +67,15 @@ class AllTransactionsListView(ListAPIView):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs['address']
         queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe))
-
         page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
 
-        all_tx_hashes = list(queryset.values_list('safe_tx_hash', flat=True))
+        if not page:
+            return self.get_paginated_response({})
+
+        all_tx_hashes = [element['safe_tx_hash'] for element in page]
         all_txs = transaction_service.get_all_txs_from_hashes(safe, all_tx_hashes)
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
-        return Response(all_txs_serialized)
+        return self.get_paginated_response(all_txs_serialized)
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     404: 'Not found',
