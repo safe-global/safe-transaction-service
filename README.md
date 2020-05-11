@@ -18,7 +18,7 @@ a transaction that is pending to be sent to the blockchain.
 
 ## Index of contents
 
-- [Docs](https://gnosis-safe.readthedocs.io/en/latest/services/transactions.html)
+- [Docs](https://docs.gnosis.io/safe/docs/services_transactions/)
 
 
 ## Setup for production
