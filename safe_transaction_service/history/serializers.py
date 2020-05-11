@@ -403,10 +403,12 @@ class SafeModuleTransactionWithTransfersResponseSerializer(SafeModuleTransaction
         fields = SafeModuleTransactionResponseSerializer.Meta.fields + ('transfers', )
 
     transfers = TransferResponseSerializer(many=True)
+    tx_type = 'MODULE_TRANSACTION'  # TODO Use Enum
 
 
 class SafeMultisigTransactionWithTransfersResponseSerializer(SafeMultisigTransactionResponseSerializer):
     transfers = TransferResponseSerializer(many=True)
+    tx_type = 'MULTISIG_TRANSACTION'
 
 
 class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
@@ -421,6 +423,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     block_number = serializers.SerializerMethodField()
     block_timestamp = serializers.SerializerMethodField()
     transfers = TransferResponseSerializer(many=True)
+    tx_type = 'ETHEREUM_TX'
 
     def get_fields(self):
         result = super().get_fields()
