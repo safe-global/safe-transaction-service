@@ -51,6 +51,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 5)
+        transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer in
+                               True,  # internal tx in
+                               False,  # Module transaction
+                               False,  # Multisig transaction
+                               ]
+        for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
+            self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
+
+        # Test pagination
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 3)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3&offset=3')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 2)
+
+        # Add transfer out for the module transaction and transfer in for the multisig transaction
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address,
+                                                  ethereum_tx=module_transaction.internal_tx.ethereum_tx)
+        internal_tx_in = InternalTxFactory(to=safe_address, value=8,
+                                           ethereum_tx=multisig_transaction.ethereum_tx)
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 6)  # FIXME
+        self.assertEqual(len(response.data['results']), 5)
+        transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer in
+                               True,  # internal tx in
+                               True,  # Module transaction
+                               True,  # Multisig transaction
+                               ]
+        for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
+            self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
 
     def test_get_module_transactions(self):
         safe_address = Account.create().address

@@ -18,6 +18,8 @@ class TestTransactionService(TestCase):
         # Factories create the models using current datetime, so as the txs are returned sorted they should be
         # in the reverse order that they were created
         multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        multisig_transaction_not_mined = MultisigTransactionFactory(safe=safe_address, nonce=multisig_transaction.nonce,
+                                                                    ethereum_tx=None)
         module_transaction = ModuleTransactionFactory(safe=safe_address)
         internal_tx_in = InternalTxFactory(to=safe_address, value=4)
         internal_tx_out = InternalTxFactory(_from=safe_address, value=5)  # Should not appear
@@ -26,13 +28,26 @@ class TestTransactionService(TestCase):
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
-        all_tx_hashes = list(transaction_service.get_all_tx_hashes(safe_address).values_list('safe_tx_hash', flat=True))
-        expected = [another_multisig_transaction.safe_tx_hash,
-                    erc20_transfer_in.ethereum_tx_id,
-                    internal_tx_in.ethereum_tx_id,
-                    module_transaction.internal_tx.ethereum_tx_id,
-                    multisig_transaction.safe_tx_hash]
-        self.assertEqual(all_tx_hashes, expected)
+        queryset = transaction_service.get_all_tx_hashes(safe_address)
+        all_executed_time = [element['execution_date'] for element in queryset]
+        expected_times = [
+            another_multisig_transaction.ethereum_tx.block.timestamp,
+            erc20_transfer_in.ethereum_tx.block.timestamp,
+            internal_tx_in.ethereum_tx.block.timestamp,
+            module_transaction.internal_tx.ethereum_tx.block.timestamp,
+            multisig_transaction.ethereum_tx.block.timestamp,  # Should take timestamp from tx with same nonce and mined
+            multisig_transaction.ethereum_tx.block.timestamp,
+        ]
+        self.assertEqual(all_executed_time, expected_times)
+
+        all_tx_hashes = list(queryset.values_list('safe_tx_hash', flat=True))
+        expected_hashes = [another_multisig_transaction.safe_tx_hash,
+                           erc20_transfer_in.ethereum_tx_id,
+                           internal_tx_in.ethereum_tx_id,
+                           module_transaction.internal_tx.ethereum_tx_id,
+                           multisig_transaction.safe_tx_hash,  # First the mined tx
+                           multisig_transaction_not_mined.safe_tx_hash]
+        self.assertEqual(all_tx_hashes, expected_hashes)
 
     def test_get_all_txs_from_hashes(self):
         transaction_service: TransactionService = TransactionServiceProvider()
