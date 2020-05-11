@@ -59,6 +59,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                ]
         for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
             self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
+            self.assertTrue(transaction['tx_type'])
 
         # Test pagination
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3')

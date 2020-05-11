@@ -400,12 +400,12 @@ class TransferResponseSerializer(serializers.Serializer):
 class SafeModuleTransactionWithTransfersResponseSerializer(SafeModuleTransactionResponseSerializer):
     class Meta:
         model = SafeModuleTransactionResponseSerializer.Meta.model
-        fields = SafeModuleTransactionResponseSerializer.Meta.fields + ('transfers', )
+        fields = SafeModuleTransactionResponseSerializer.Meta.fields + ('transfers', 'tx_type')
 
     transfers = TransferResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
-    def get_tx_type(self):
+    def get_tx_type(self, obj):
         return 'MODULE_TRANSACTION'  # TODO Use Enum
 
 
@@ -413,7 +413,7 @@ class SafeMultisigTransactionWithTransfersResponseSerializer(SafeMultisigTransac
     transfers = TransferResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
-    def get_tx_type(self):
+    def get_tx_type(self, obj):
         return 'MULTISIG_TRANSACTION'  # TODO Use Enum
 
 
@@ -431,7 +431,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     transfers = TransferResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
-    def get_tx_type(self):
+    def get_tx_type(self, obj):
         return 'ETHEREUM_TRANSACTION'  # TODO Use Enum
 
     def get_fields(self):
