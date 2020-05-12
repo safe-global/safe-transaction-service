@@ -28,6 +28,10 @@ class TestTransactionService(TestCase):
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
+        # Should not appear, nonce > last mined transaction
+        higher_nonce_safe_multisig_transaction = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        higher_nonce_safe_multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+
         queryset = transaction_service.get_all_tx_hashes(safe_address)
         all_executed_time = [element['execution_date'] for element in queryset]
         expected_times = [
