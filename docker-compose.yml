@@ -5,12 +5,12 @@ volumes:
 
 services:
   nginx:
-    image: nginx:1.13-alpine
+    image: nginx:1.17-alpine
     hostname: nginx
     ports:
       - "8000:8000"
     volumes:
-      - ./docker/nginx:/etc/nginx/conf.d
+      - ./docker/nginx/safe_service.conf:/etc/nginx/nginx.conf:ro
       - nginx-shared:/nginx
     depends_on:
       - web
