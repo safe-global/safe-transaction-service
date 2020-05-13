@@ -278,6 +278,18 @@ class TestSafeContract(TestCase):
 
 
 class TestMultisigTransactions(TestCase):
+    def test_last_nonce(self):
+        safe_address = Account.create().address
+        self.assertIsNone(MultisigTransaction.objects.last_nonce(safe_address))
+        MultisigTransactionFactory(safe=safe_address, nonce=0)
+        self.assertEqual(MultisigTransaction.objects.last_nonce(safe_address), 0)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=25)
+        self.assertEqual(MultisigTransaction.objects.last_nonce(safe_address), 25)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=13)
+        self.assertEqual(MultisigTransaction.objects.last_nonce(safe_address), 25)
+
     def test_with_confirmations(self):
         multisig_transaction = MultisigTransactionFactory()
         self.assertEqual(MultisigTransaction.objects.with_confirmations().count(), 0)

@@ -22,19 +22,18 @@ from .filters import (DefaultPagination, MultisigTransactionFilter,
                       TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeStatus)
-from .serializers import (OwnerResponseSerializer,
-                          SafeBalanceResponseSerializer,
-                          SafeBalanceUsdResponseSerializer,
-                          SafeCreationInfoResponseSerializer,
-                          SafeDelegateDeleteSerializer,
-                          SafeDelegateResponseSerializer,
-                          SafeDelegateSerializer, SafeInfoResponseSerializer,
-                          SafeModuleTransactionResponseSerializer,
-                          SafeMultisigTransactionResponseSerializer,
-                          SafeMultisigTransactionSerializer,
-                          TransferResponseSerializer)
-from .services import BalanceServiceProvider
-from .services.safe_service import SafeServiceProvider
+from .serializers import (
+    OwnerResponseSerializer, SafeBalanceResponseSerializer,
+    SafeBalanceUsdResponseSerializer, SafeCreationInfoResponseSerializer,
+    SafeDelegateDeleteSerializer, SafeDelegateResponseSerializer,
+    SafeDelegateSerializer, SafeInfoResponseSerializer,
+    SafeModuleTransactionResponseSerializer,
+    SafeMultisigTransactionResponseSerializer,
+    SafeMultisigTransactionSerializer,
+    SafeMultisigTransactionWithTransfersResponseSerializer,
+    TransferResponseSerializer)
+from .services import (BalanceServiceProvider, SafeServiceProvider,
+                       TransactionServiceProvider)
 
 
 class AboutView(APIView):
@@ -58,6 +57,40 @@ class AboutView(APIView):
             }
         }
         return Response(content)
+
+
+class AllTransactionsListView(ListAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
+    pagination_class = DefaultPagination
+
+    def list(self, request, *args, **kwargs):
+        transaction_service = TransactionServiceProvider()
+        safe = self.kwargs['address']
+        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe))
+        page = self.paginate_queryset(queryset)
+
+        if not page:
+            return self.get_paginated_response({})
+
+        all_tx_hashes = [element['safe_tx_hash'] for element in page]
+        all_txs = transaction_service.get_all_txs_from_hashes(safe, all_tx_hashes)
+        all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
+        return self.get_paginated_response(all_txs_serialized)
+
+    @swagger_auto_schema(responses={400: 'Invalid data',
+                                    404: 'Not found',
+                                    422: 'Invalid ethereum address'})
+    def get(self, request, *args, **kwargs):
+        """
+        Returns the history of a multisig tx (safe)
+        """
+        address = kwargs['address']
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+
+        response = super().get(request, *args, **kwargs)
+        response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
+        return response
 
 
 class SafeModuleTransactionListView(ListAPIView):
@@ -148,7 +181,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        response = super().get(request, address, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
         response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
         return response

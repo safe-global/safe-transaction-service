@@ -30,6 +30,66 @@ logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def test_all_transactions_view(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+        self.assertEqual(len(response.data['results']), 0)
+
+        # Factories create the models using current datetime, so as the txs are returned sorted they should be
+        # in the reverse order that they were created
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        module_transaction = ModuleTransactionFactory(safe=safe_address)
+        internal_tx_in = InternalTxFactory(to=safe_address, value=4)
+        internal_tx_out = InternalTxFactory(_from=safe_address, value=5)  # Should not appear
+        erc20_transfer_in = EthereumEventFactory(to=safe_address)
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address)  # Should not appear
+        another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 5)
+        transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer in
+                               True,  # internal tx in
+                               False,  # Module transaction
+                               False,  # Multisig transaction
+                               ]
+        for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
+            self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
+            self.assertTrue(transaction['tx_type'])
+
+        # Test pagination
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 3)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3&offset=3')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 2)
+
+        # Add transfer out for the module transaction and transfer in for the multisig transaction
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address,
+                                                  ethereum_tx=module_transaction.internal_tx.ethereum_tx)
+        internal_tx_in = InternalTxFactory(to=safe_address, value=8,
+                                           ethereum_tx=multisig_transaction.ethereum_tx)
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(len(response.data['results']), 5)
+        transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer in
+                               True,  # internal tx in
+                               True,  # Module transaction
+                               True,  # Multisig transaction
+                               ]
+        for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
+            self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
+
     def test_get_module_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')

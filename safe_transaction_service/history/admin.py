@@ -77,6 +77,7 @@ class EthereumEventAdmin(admin.ModelAdmin):
 @admin.register(EthereumTx)
 class EthereumTxAdmin(admin.ModelAdmin):
     list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
+    list_filter = ('status',)
     search_fields = ['=tx_hash', '=_from', '=to']
     ordering = ['-block_id']
     raw_id_fields = ('block',)

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Tuple, Union
 
+from django.db.models import F, QuerySet
+
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -11,7 +13,8 @@ from gnosis.eth.contracts import (get_cpk_factory_contract,
 from gnosis.safe import Safe
 from gnosis.safe.safe import SafeInfo
 
-from ..models import InternalTx
+from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
+                      InternalTx, ModuleTransaction, MultisigTransaction)
 
 logger = logging.getLogger(__name__)
 

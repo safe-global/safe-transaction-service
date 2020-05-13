@@ -80,7 +80,7 @@ class SafeTxDecoder:
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
         Parse decoded arguments, like converting `bytes` to hexadecimal `str`
-        :param decoded:
+        :param decoded_value:
         :return: Dict[str, Any]
         """
         if isinstance(decoded_value, bytes):
@@ -150,7 +150,7 @@ class TxDecoder(SafeTxDecoder):
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
                                                                            market_maker_factory_abi)]
-        erc_contracts = [get_erc20_contract(self.dummy_w3), get_erc721_contract(self.dummy_w3)]
+        erc_contracts = [get_erc721_contract(self.dummy_w3), get_erc20_contract(self.dummy_w3)]
         safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
                           get_safe_contract(self.dummy_w3)]
 

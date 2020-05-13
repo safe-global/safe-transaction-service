@@ -165,7 +165,7 @@ class EthereumTx(TimeStampedModel):
     value = Uint256Field()
 
     def __str__(self):
-        return '{} from={} to={}'.format(self.tx_hash, self._from, self.to)
+        return '{} status={} from={} to={}'.format(self.tx_hash, self.status, self._from, self.to)
 
     @property
     def success(self) -> Optional[bool]:
@@ -596,6 +596,18 @@ class InternalTxDecoded(models.Model):
         return self.save(update_fields=['processed'])
 
 
+class MultisigTransactionManager(models.Manager):
+    def last_nonce(self, safe: str) -> Optional[int]:
+        """
+        :param safe:
+        :return: nonce of the last executed and mined transaction. It will be None if there's no transactions or none
+        of them is mined
+        """
+        nonce_query = self.filter(safe=safe).exclude(ethereum_tx=None).order_by('-nonce').values('nonce').first()
+        if nonce_query:
+            return nonce_query['nonce']
+
+
 class MultisigTransactionQuerySet(models.QuerySet):
     def executed(self):
         return self.exclude(
@@ -618,6 +630,10 @@ class MultisigTransactionQuerySet(models.QuerySet):
         )
 
     def with_confirmations_required(self):
+        """
+        Add confirmations required for execution when the tx was mined (threshold of the Safe at that point)
+        :return: queryset with `confirmations_required: int` field
+        """
         threshold_query = SafeStatus.objects.filter(
             internal_tx__ethereum_tx=OuterRef('ethereum_tx')
         ).sorted_reverse_by_internal_tx().values('threshold')
@@ -626,7 +642,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
 
 class MultisigTransaction(TimeStampedModel):
-    objects = MultisigTransactionQuerySet.as_manager()
+    objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Sha3HashField(primary_key=True)
     safe = EthereumAddressField(db_index=True)
     ethereum_tx = models.ForeignKey(EthereumTx, null=True, default=None, blank=True,
