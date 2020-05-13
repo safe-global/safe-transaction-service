@@ -40,12 +40,12 @@ class TestTransactionService(TestCase):
             erc20_transfer_in.ethereum_tx.block.timestamp,
             internal_tx_in.ethereum_tx.block.timestamp,
             module_transaction.internal_tx.ethereum_tx.block.timestamp,
-            multisig_transaction.ethereum_tx.block.timestamp,  # Should take timestamp from tx with same nonce and mined
             multisig_transaction.ethereum_tx.block.timestamp,
+            multisig_transaction.ethereum_tx.block.timestamp,  # Should take timestamp from tx with same nonce and mined
         ]
         self.assertEqual(all_executed_time, expected_times)
 
-        all_tx_hashes = list(queryset.values_list('safe_tx_hash', flat=True))
+        all_tx_hashes = [element['safe_tx_hash'] for element in queryset]
         expected_hashes = [another_multisig_transaction.safe_tx_hash,
                            erc20_transfer_in.ethereum_tx_id,
                            internal_tx_in.ethereum_tx_id,

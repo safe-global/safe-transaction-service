@@ -73,7 +73,8 @@ class TransactionService:
         ).annotate(
             execution_date=case,
             block=F('ethereum_tx__block_id'),
-        ).values('safe_tx_hash', 'execution_date', 'block')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
+        ).values('safe_tx_hash', 'execution_date',
+                 'block', 'created')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
         # Block is needed to get stable ordering
 
         # Get module txs
@@ -82,7 +83,7 @@ class TransactionService:
         ).annotate(
             execution_date=F('internal_tx__ethereum_tx__block__timestamp'),
             block=F('internal_tx__ethereum_tx__block_id'),
-        ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'block')
+        ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'block', 'created')
 
         mulsitig_hashes = MultisigTransaction.objects.filter(safe=safe_address).exclude(ethereum_tx=None).values('ethereum_tx_id')
         module_hashes = ModuleTransaction.objects.filter(safe=safe_address).values('internal_tx__ethereum_tx_id')
@@ -95,8 +96,9 @@ class TransactionService:
             ethereum_tx__in=multisig_and_module_hashes
         ).annotate(
             execution_date=F('ethereum_tx__block__timestamp'),
+            created=F('ethereum_tx__block__timestamp'),
             block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'block', 'created')
 
         # Get incoming txs not included on Multisig or Module txs
         internal_tx_ids = InternalTx.objects.filter(
@@ -107,8 +109,9 @@ class TransactionService:
             ethereum_tx__in=multisig_and_module_hashes
         ).annotate(
             execution_date=F('ethereum_tx__block__timestamp'),
+            created=F('ethereum_tx__block__timestamp'),
             block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'block', 'created')
 
         # Tricky, we merge SafeTx hashes with EthereumTx hashes
         queryset = multisig_safe_tx_ids.distinct().union(
@@ -119,8 +122,10 @@ class TransactionService:
             internal_tx_ids
         ).union(
             module_tx_ids
-        ).order_by('-execution_date', 'block', 'safe_tx_hash')
-        # Order by safe_tx_hash to get always the same ordering with not executed transactions
+        ).order_by('-execution_date', 'block', '-created')
+        # Order by block because `block_number < NULL`, so txs mined will have preference,
+        # and `created` to get always the same ordering with not executed transactions, as they will share
+        # the same `execution_date` that the mined tx
 
         return queryset
 
