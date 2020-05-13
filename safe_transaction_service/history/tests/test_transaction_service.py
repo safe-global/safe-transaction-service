@@ -33,6 +33,7 @@ class TestTransactionService(TestCase):
         higher_nonce_safe_multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
 
         queryset = transaction_service.get_all_tx_hashes(safe_address)
+        self.assertEqual(queryset.count(), 6)
         all_executed_time = [element['execution_date'] for element in queryset]
         expected_times = [
             another_multisig_transaction.ethereum_tx.block.timestamp,
@@ -52,6 +53,19 @@ class TestTransactionService(TestCase):
                            multisig_transaction.safe_tx_hash,  # First the mined tx
                            multisig_transaction_not_mined.safe_tx_hash]
         self.assertEqual(all_tx_hashes, expected_hashes)
+
+    def test_get_all_tx_hashes_nonce(self):
+        transaction_service: TransactionService = TransactionServiceProvider()
+        safe_address = Account.create().address
+
+        # No mined tx, so nothing is returned
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address).count(), 0)
+
+        # Mine tx with higher nonce, all should appear
+        MultisigTransactionFactory(safe=safe_address)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address).count(), 3)
 
     def test_get_all_txs_from_hashes(self):
         transaction_service: TransactionService = TransactionServiceProvider()

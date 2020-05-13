@@ -1,8 +1,7 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Union
 
-from django.db import models
-from django.db.models import Case, F, OuterRef, QuerySet, When
+from django.db.models import Case, F, OuterRef, QuerySet, When, Subquery
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
@@ -44,8 +43,11 @@ class TransactionService:
         :return: List with tx hashes sorted by date (newest first)
         """
 
-        last_nonce = MultisigTransaction.objects.last_nonce(safe_address)  # None if no Multisig Txs executed
-        current_nonce = 0 if last_nonce is None else last_nonce + 1
+        # last_nonce = MultisigTransaction.objects.last_nonce(safe_address)  # None if no Multisig Txs executed
+        # current_nonce = 0 if last_nonce is None else last_nonce + 1
+        last_nonce_query = MultisigTransaction.objects.filter(
+            safe=safe_address
+        ).exclude(ethereum_tx=None).order_by('-nonce').values('nonce')
 
         # If tx is not mined, get the execution date of a tx mined with the same nonce
         case = Case(
@@ -58,8 +60,9 @@ class TransactionService:
                  ).values('ethereum_tx__block__timestamp')),
             default=F('ethereum_tx__block__timestamp')
         )
-        multisig_safe_tx_ids = MultisigTransaction.objects.filter(
-            safe=safe_address, nonce__lt=current_nonce
+        multisig_safe_tx_ids = MultisigTransaction.objects.annotate(
+        ).filter(
+            safe=safe_address, nonce__lte=Subquery(last_nonce_query[:1]),
         ).annotate(
             execution_date=case,
             block=F('ethereum_tx__block_id'),
