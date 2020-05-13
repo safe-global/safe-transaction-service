@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List, Union
 
-from django.db.models import Case, F, OuterRef, QuerySet, When, Subquery
+from django.db.models import Case, F, OuterRef, QuerySet, Subquery, When
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
@@ -155,7 +155,7 @@ class TransactionService:
             safe=safe_address,
             internal_tx__ethereum_tx__in=hashes_to_search
         ).select_related('internal_tx'))
-        plain_ethereum_txs = list(EthereumTx.objects.filter(tx_hash__in=hashes_to_search))
+        plain_ethereum_txs = list(EthereumTx.objects.filter(tx_hash__in=hashes_to_search).select_related('block'))
 
         # We also need the out transfers for the MultisigTxs
         all_hashes = hashes_to_search + [multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs]
