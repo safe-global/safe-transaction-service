@@ -79,7 +79,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                            ethereum_tx=multisig_transaction.ethereum_tx)
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 6)  # FIXME
+        self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 5)
         transfers_not_empty = [False,  # Multisig transaction, no transfer
                                True,  # Erc transfer in

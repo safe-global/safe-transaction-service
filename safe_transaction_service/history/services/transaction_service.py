@@ -40,6 +40,13 @@ class TransactionService:
         """
         Build a queryset with hashes for every tx for a Safe for pagination filtering. In the case of
         Multisig Transactions, as some of them are not mined, we use the SafeTxHash
+        Criteria for building this list:
+          - Return only multisig txs with nonce < current Safe Nonce
+          - The endpoint should only show incoming transactions that have been mined
+          - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
+          date the execution date of the transaction with the same nonce that has been executed should be taken.
+          - Incoming and outgoing transfers or Eth/tokens must be under a multisig/module tx if triggered by one.
+          Otherwise they should have their own entry in the list using a EthereumTx
         :return: List with tx hashes sorted by date (newest first)
         """
 
@@ -69,24 +76,6 @@ class TransactionService:
         ).values('safe_tx_hash', 'execution_date', 'block')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
         # Block is needed to get stable ordering
 
-        # Get incoming tokens
-        event_tx_ids = EthereumEvent.objects.erc20_and_721_events().filter(
-            arguments__to=safe_address
-        ).annotate(
-            execution_date=F('ethereum_tx__block__timestamp'),
-            block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
-
-        # Get incoming txs
-        internal_tx_ids = InternalTx.objects.filter(
-            call_type=EthereumTxCallType.CALL.value,
-            value__gt=0,
-            to=safe_address,
-        ).annotate(
-            execution_date=F('ethereum_tx__block__timestamp'),
-            block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
-
         # Get module txs
         module_tx_ids = ModuleTransaction.objects.filter(
             safe=safe_address
@@ -94,6 +83,32 @@ class TransactionService:
             execution_date=F('internal_tx__ethereum_tx__block__timestamp'),
             block=F('internal_tx__ethereum_tx__block_id'),
         ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'block')
+
+        mulsitig_hashes = MultisigTransaction.objects.filter(safe=safe_address).exclude(ethereum_tx=None).values('ethereum_tx_id')
+        module_hashes = ModuleTransaction.objects.filter(safe=safe_address).values('internal_tx__ethereum_tx_id')
+        multisig_and_module_hashes = mulsitig_hashes.union(mulsitig_hashes)
+
+        # Get incoming tokens not included on Multisig or Module txs
+        event_tx_ids = EthereumEvent.objects.erc20_and_721_events().filter(
+            arguments__to=safe_address
+        ).exclude(
+            ethereum_tx__in=multisig_and_module_hashes
+        ).annotate(
+            execution_date=F('ethereum_tx__block__timestamp'),
+            block=F('ethereum_tx__block_id'),
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
+
+        # Get incoming txs not included on Multisig or Module txs
+        internal_tx_ids = InternalTx.objects.filter(
+            call_type=EthereumTxCallType.CALL.value,
+            value__gt=0,
+            to=safe_address,
+        ).exclude(
+            ethereum_tx__in=multisig_and_module_hashes
+        ).annotate(
+            execution_date=F('ethereum_tx__block__timestamp'),
+            block=F('ethereum_tx__block_id'),
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'block')
 
         # Tricky, we merge SafeTx hashes with EthereumTx hashes
         queryset = multisig_safe_tx_ids.distinct().union(
