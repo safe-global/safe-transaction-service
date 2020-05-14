@@ -317,6 +317,7 @@ class Erc20InfoSerializer(serializers.Serializer):
     name = serializers.CharField()
     symbol = serializers.CharField()
     decimals = serializers.IntegerField()
+    logo_uri = serializers.CharField()
 
 
 class SafeBalanceResponseSerializer(serializers.Serializer):

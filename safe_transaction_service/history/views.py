@@ -22,16 +22,17 @@ from .filters import (DefaultPagination, MultisigTransactionFilter,
                       TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeStatus)
-from .serializers import (
-    OwnerResponseSerializer, SafeBalanceResponseSerializer,
-    SafeBalanceUsdResponseSerializer, SafeCreationInfoResponseSerializer,
-    SafeDelegateDeleteSerializer, SafeDelegateResponseSerializer,
-    SafeDelegateSerializer, SafeInfoResponseSerializer,
-    SafeModuleTransactionResponseSerializer,
-    SafeMultisigTransactionResponseSerializer,
-    SafeMultisigTransactionSerializer,
-    SafeMultisigTransactionWithTransfersResponseSerializer,
-    TransferResponseSerializer)
+from .serializers import (OwnerResponseSerializer,
+                          SafeBalanceResponseSerializer,
+                          SafeBalanceUsdResponseSerializer,
+                          SafeCreationInfoResponseSerializer,
+                          SafeDelegateDeleteSerializer,
+                          SafeDelegateResponseSerializer,
+                          SafeDelegateSerializer, SafeInfoResponseSerializer,
+                          SafeModuleTransactionResponseSerializer,
+                          SafeMultisigTransactionResponseSerializer,
+                          SafeMultisigTransactionSerializer,
+                          TransferResponseSerializer)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 

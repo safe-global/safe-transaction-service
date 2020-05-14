@@ -1,6 +1,6 @@
 import logging
 import operator
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 import requests
@@ -24,10 +24,26 @@ class CannotGetEthereumPrice(BalanceServiceException):
     pass
 
 
+def get_erc20_logo_uri(address: str) -> str:
+    return f'https://gnosis-safe-token-logos.s3.amazonaws.com/{address}.png'
+
+
+@dataclass
+class Erc20InfoWithLogo:
+    address: str
+    name: str
+    symbol: str
+    decimals: int
+    logo_uri: str = field(init=False)
+
+    def __post_init__(self):
+        self.logo_uri = get_erc20_logo_uri(self.address)  # TODO Improve after implementing whitelisting
+
+
 @dataclass
 class Balance:
     token_address: Optional[str]
-    token: Optional[Erc20Info]
+    token: Optional[Erc20InfoWithLogo]
     balance: int
 
 
@@ -151,9 +167,10 @@ class BalanceService:
             return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    def get_token_info(self, token_address: str) -> Optional[Erc20Info]:
+    def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
         try:
-            return self.ethereum_client.erc20.get_info(token_address)
+            erc20_info = self.ethereum_client.erc20.get_info(token_address)
+            return Erc20InfoWithLogo(token_address, erc20_info.name, erc20_info.symbol, erc20_info.decimals)
         except InvalidERC20Info:
             logger.warning('Cannot get token info for token-address=%s', token_address)
             return None
@@ -178,8 +195,9 @@ class BalanceService:
                 else:
                     balance_usd = 0.
 
-            balance_dict = asdict(balance)
-            balance_dict['balance_usd'] = round(balance_usd, 4)
-            balances_with_usd.append(BalanceWithUsd(**balance_dict))
+            balances_with_usd.append(BalanceWithUsd(balance.token_address,
+                                                    balance.token,
+                                                    balance.balance,
+                                                    round(balance_usd, 4)))
 
         return balances_with_usd

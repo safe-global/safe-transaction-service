@@ -1,4 +1,5 @@
 import logging
+from dataclasses import asdict
 from unittest import mock
 
 from django.urls import reverse
@@ -19,6 +20,7 @@ from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
 from ..serializers import TransferType
 from ..services import BalanceService
+from ..services.balance_service import Erc20InfoWithLogo, get_erc20_logo_uri
 from .factories import (EthereumEventFactory, EthereumTxFactory,
                         InternalTxFactory, ModuleTransactionFactory,
                         MultisigConfirmationFactory,
@@ -513,15 +515,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
                                                  'token': {'name': erc20.functions.name().call(),
                                                            'symbol': erc20.functions.symbol().call(),
-                                                           'decimals': erc20.functions.decimals().call()}}])
+                                                           'decimals': erc20.functions.decimals().call(),
+                                                           'logoUri': get_erc20_logo_uri(erc20.address)}}])
 
     @mock.patch.object(BalanceService, 'get_token_info',  autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
     def test_safe_balances_usd_view(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_info_mock):
-        erc20_info = Erc20Info('UXIO', 'UXI', 18)
-        get_token_info_mock.return_value = erc20_info
-
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -541,15 +541,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
+        erc20_info = Erc20InfoWithLogo(erc20.address, 'UXIO', 'UXI', 18)
+        get_token_info_mock.return_value = erc20_info
+
         EthereumEventFactory(address=erc20.address, to=safe_address)
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'token': None, 'balance': str(value),
-                                                 'balanceUsd': "0.0"},  # 7 wei is rounded to 0.0
-                                                {'tokenAddress': erc20.address,
-                                                 'token': erc20_info._asdict(),
-                                                 'balance': str(tokens_value),
-                                                 'balanceUsd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
+        token_dict = asdict(erc20_info)
+        del token_dict['address']
+        self.assertCountEqual(response.data, [{'token_address': None, 'token': None, 'balance': str(value),
+                                               'balance_usd': "0.0"},  # 7 wei is rounded to 0.0
+                                              {'token_address': erc20.address,
+                                               'token': token_dict,
+                                               'balance': str(tokens_value),
+                                               'balance_usd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
 
     def test_get_safe_delegate_list(self):
         safe_address = Account.create().address
