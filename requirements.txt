@@ -22,4 +22,4 @@ hexbytes==0.2.0
 psycopg2-binary==2.8.5
 redis==3.5.1
 requests==2.23.0
-web3==5.8.0
+web3==5.9.0
