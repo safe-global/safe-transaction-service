@@ -8,7 +8,7 @@ from cachetools import TTLCache, cachedmethod
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.ethereum_client import Erc20Info, InvalidERC20Info
+from gnosis.eth.ethereum_client import InvalidERC20Info
 from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
 from ..models import EthereumEvent
