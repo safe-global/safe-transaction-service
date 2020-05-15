@@ -19,7 +19,7 @@ from web3 import Web3
 from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, MultisigTransactionFilter,
-                      TransferListFilter)
+                      SmallPagination, TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeStatus)
 from .serializers import (OwnerResponseSerializer,
@@ -62,7 +62,7 @@ class AboutView(APIView):
 
 class AllTransactionsListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
-    pagination_class = DefaultPagination
+    pagination_class = SmallPagination
 
     def list(self, request, *args, **kwargs):
         transaction_service = TransactionServiceProvider()

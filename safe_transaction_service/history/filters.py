@@ -13,6 +13,11 @@ class DefaultPagination(LimitOffsetPagination):
     default_limit = 100
 
 
+class SmallPagination(LimitOffsetPagination):
+    max_limit = 100
+    default_limit = 20
+
+
 class TransferListFilter(filters.FilterSet):
     _from = django_filters.CharFilter()
     block_number = django_filters.NumberFilter(field_name='block_number')
