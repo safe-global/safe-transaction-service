@@ -349,6 +349,13 @@ class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
 
 
+class SafeCollectibleResponseSerializer(serializers.Serializer):
+    address = serializers.CharField()
+    id = serializers.IntegerField()
+    uri = serializers.CharField()
+    metadata = serializers.DictField()
+
+
 class SafeDelegateResponseSerializer(serializers.Serializer):
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()

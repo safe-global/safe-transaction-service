@@ -224,6 +224,13 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
         """
         return self.erc20_events(address=address).values_list('address', flat=True).distinct()
 
+    def erc721_tokens_used_by_address(self, address: str) -> List[str]:
+        """
+        :param address:
+        :return: List of token addresses used by an address
+        """
+        return self.erc721_events(address=address).values_list('address', flat=True).distinct()
+
     def erc20_tokens_with_balance(self, address: str) -> List[Dict[str, Any]]:
         """
         :return: List of dictionaries {'token_address': str, 'balance': int}

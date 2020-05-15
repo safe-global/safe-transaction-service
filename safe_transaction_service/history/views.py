@@ -25,6 +25,7 @@ from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
 from .serializers import (OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
+                          SafeCollectibleResponseSerializer,
                           SafeCreationInfoResponseSerializer,
                           SafeDelegateDeleteSerializer,
                           SafeDelegateResponseSerializer,
@@ -35,6 +36,7 @@ from .serializers import (OwnerResponseSerializer,
                           TransferResponseSerializer)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
+from .services.collectibles_service import CollectiblesServiceProvider
 
 
 class AboutView(APIView):
@@ -210,7 +212,7 @@ class SafeMultisigTransactionListView(ListAPIView):
 class SafeBalanceView(APIView):
     serializer_class = SafeBalanceResponseSerializer
 
-    @swagger_auto_schema(responses={200: SafeBalanceResponseSerializer(many=True),
+    @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid'})
     @method_decorator(cache_page(15))
@@ -231,10 +233,34 @@ class SafeBalanceView(APIView):
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+class SafeCollectiblesView(APIView):
+    serializer_class = SafeCollectibleResponseSerializer
+
+    @swagger_auto_schema(responses={200: serializer_class(many=True),
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid'})
+    @method_decorator(cache_page(15))
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            collectibles_with_metadata = CollectiblesServiceProvider().get_collectibles_with_metadata(address)
+            serializer = self.serializer_class(collectibles_with_metadata, many=True)
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
 class SafeBalanceUsdView(APIView):
     serializer_class = SafeBalanceUsdResponseSerializer
 
-    @swagger_auto_schema(responses={200: SafeBalanceUsdResponseSerializer(many=True),
+    @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid'})
     @method_decorator(cache_page(15))

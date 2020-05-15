@@ -31,6 +31,8 @@ urlpatterns = [
          name='safe-balances'),
     path('safes/<str:address>/balances/usd/', views.SafeBalanceUsdView.as_view(),
          name='safe-balances-usd'),
+    path('safes/<str:address>/collectibles/', views.SafeCollectiblesView.as_view(),
+         name='safe-collectibles'),
     path('safes/<str:address>/delegates/', views.SafeDelegateListView.as_view(),
          name='safe-delegates'),
     path('safes/<str:address>/delegates/<str:delegate_address>/', views.SafeDelegateDestroyView.as_view(),
