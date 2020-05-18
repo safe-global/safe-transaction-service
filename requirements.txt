@@ -20,6 +20,6 @@ gnosis-py==2.4.7
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.0
 psycopg2-binary==2.8.5
-redis==3.5.1
+redis==3.5.2
 requests==2.23.0
 web3==5.10.0
