@@ -572,7 +572,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 0)
 
         with mock.patch.object(CollectiblesService, 'get_collectibles_with_metadata', autospec=True) as function:
-            function.return_value = [CollectibleWithMetadata(Account.create().address,
+            function.return_value = [CollectibleWithMetadata('TokenName', 'SYMBOL',
+                                                             Account.create().address,
                                                              1,
                                                              'http://token.org/token-id/1',
                                                              {'image': 'http://token.org/token-id/1/image',

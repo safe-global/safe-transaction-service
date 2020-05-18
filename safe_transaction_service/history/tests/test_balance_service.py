@@ -1,30 +1,19 @@
-import os
 from unittest import mock
 
 from django.conf import settings
 from django.test import TestCase
 
-import pytest
-import requests
 from eth_account import Account
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from .utils import just_test_if_mainnet_node
 from ..services import BalanceService, BalanceServiceProvider
 from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
-
-
-def just_test_if_mainnet_node():
-    MAINNET_NODE = os.environ.get('ETHEREUM_MAINNET_NODE')
-    if not MAINNET_NODE:
-        pytest.skip("Mainnet node not defined, cannot test oracles", allow_module_level=True)
-    elif requests.get(MAINNET_NODE).status_code == 404:
-        pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
-    return MAINNET_NODE
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
