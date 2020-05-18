@@ -61,11 +61,11 @@ class CollectiblesService:
         for erc721_address in erc721_addresses:
             erc_721_contract = get_erc721_contract(self.ethereum_client.w3, erc721_address)
             try:
-                balance = erc_721_contract.functions.balanceOf('0x1ca57CBf18Ab08119ACb4CA2517650fFc3BA6D40').call()
+                balance = erc_721_contract.functions.balanceOf(safe_address).call()
                 for i in range(balance):
-                    id = erc_721_contract.functions.tokenOfOwnerByIndex(safe_address, 0).call()
-                    uri = erc_721_contract.functions.tokenURI(id).call()
-                    collectibles.append(Collectible(erc721_address, id, uri))
+                    token_id = erc_721_contract.functions.tokenOfOwnerByIndex(safe_address, 0).call()
+                    uri = erc_721_contract.functions.tokenURI(token_id).call()
+                    collectibles.append(Collectible(erc721_address, token_id, uri))
             except ValueError:
                 logger.warning('Cannot get ERC721 info token=%s with owner=%s',
                                erc721_address, safe_address, exc_info=True)
