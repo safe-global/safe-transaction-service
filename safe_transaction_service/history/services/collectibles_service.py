@@ -78,7 +78,17 @@ class CollectiblesService:
         assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting collectibles'
 
         erc721_addresses = list(EthereumEvent.objects.erc721_tokens_used_by_address(safe_address))
+        if not erc721_addresses:
+            return []
+
         collectibles = []
+
+        # TODO: Manage errors for one collectible
+        # erc721_contracts = [get_erc721_contract(self.ethereum_client.w3, erc721_address)
+        #                     for erc721_address in erc721_addresses]
+        # balances = self.ethereum_client.batch_call(
+        #            [erc_721_contract.functions.balanceOf(safe_address) for erc_721_contract in erc721_contracts]
+        #        )
         for erc721_address in erc721_addresses:
             erc_721_contract = get_erc721_contract(self.ethereum_client.w3, erc721_address)
             token_info = self.get_token_info(erc721_address)
