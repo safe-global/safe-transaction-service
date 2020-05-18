@@ -27,9 +27,9 @@ script:
   - coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
 deploy:
   - provider: script
-    script: bash scripts/deploy_docker.sh 90-collectibles
+    script: bash scripts/deploy_docker.sh staging
     on:
-      branch: master
+      branch: 90-collectibles
   - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
