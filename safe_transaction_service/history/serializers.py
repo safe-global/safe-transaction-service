@@ -353,6 +353,7 @@ class SafeCollectibleResponseSerializer(serializers.Serializer):
     address = serializers.CharField()
     id = serializers.IntegerField()
     uri = serializers.CharField()
+    image_uri = serializers.CharField()
     metadata = serializers.DictField()
 
 
