@@ -31,7 +31,21 @@ class Collectible:
 @dataclass
 class CollectibleWithMetadata(Collectible):
     metadata: Dict[str, Any]
+    name: Optional[str] = field(init=False)
+    description: Optional[str] = field(init=False)
     image_uri: Optional[str] = field(init=False)
+
+    def get_name(self) -> Optional[str]:
+        if self.metadata:
+            for key in ('name',):
+                if key in self.metadata:
+                    return self.metadata[key]
+
+    def get_description(self) -> Optional[str]:
+        if self.metadata:
+            for key in ('description',):
+                if key in self.metadata:
+                    return self.metadata[key]
 
     def get_metadata_image(self) -> Optional[str]:
         if not self.metadata:
@@ -48,6 +62,8 @@ class CollectibleWithMetadata(Collectible):
                 return self.metadata[key]
 
     def __post_init__(self):
+        self.name = self.get_name()
+        self.description = self.get_description()
         self.image_uri = self.get_metadata_image()
 
 
