@@ -21,8 +21,8 @@ class CollectiblesServiceException(Exception):
 
 @dataclass
 class Collectible:
-    name: str
-    symbol: str
+    token_name: str
+    token_symbol: str
     address: str
     id: str
     uri: str
@@ -108,12 +108,12 @@ class CollectiblesService:
         for erc721_address in erc721_addresses:
             erc_721_contract = get_erc721_contract(self.ethereum_client.w3, erc721_address)
             token_info = self.get_token_info(erc721_address)
-            if token_info:  # Swap name and symbol if symbol is bigger
-                name, symbol = token_info
-                if (len(name) - len(symbol)) < -5:  # If symbol is bigger than name, swap them (e.g. POAP)
-                    name, symbol = symbol, name
-            else:
+            if not token_info:
                 name, symbol = ('', '')
+            else:
+                name, symbol = token_info
+                if (len(name) - len(symbol)) < -5:  # If symbol is way bigger than name, swap them (e.g. POAP)
+                    name, symbol = symbol, name
             try:
                 balance = erc_721_contract.functions.balanceOf(safe_address).call()
                 token_ids = self.ethereum_client.batch_call(
@@ -140,7 +140,7 @@ class CollectiblesService:
             else:
                 metadata = response.json()
             collectibles_with_metadata.append(
-                CollectibleWithMetadata(collectible.name, collectible.symbol,
+                CollectibleWithMetadata(collectible.token_name, collectible.token_symbol,
                                         collectible.address, collectible.id, collectible.uri, metadata)
             )
 
