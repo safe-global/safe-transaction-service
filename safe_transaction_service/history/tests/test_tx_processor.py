@@ -1,5 +1,7 @@
 import logging
 
+from django.test import TestCase
+
 from eth_account import Account
 from eth_utils import keccak
 from web3 import Web3
@@ -11,54 +13,11 @@ from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeStatus)
 from .factories import EthereumTxFactory, InternalTxDecodedFactory
-from .test_internal_tx_indexer import TestInternalTxIndexer
 
 logger = logging.getLogger(__name__)
 
 
-class TestSafeTxProcessor(TestInternalTxIndexer):
-    def test_tx_processor_using_internal_tx_indexer(self):
-        self.test_internal_tx_indexer()
-        tx_processor = SafeTxProcessor()
-        self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
-        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)  # Index using `setup` trace
-        self.assertEqual(len(number_processed), 1)  # Setup trace
-        self.assertEqual(SafeContract.objects.count(), 1)
-
-        safe_status = SafeStatus.objects.first()
-        self.assertEqual(len(safe_status.owners), 1)
-        self.assertEqual(safe_status.nonce, 0)
-        self.assertEqual(safe_status.threshold, 1)
-
-        # Decode again now that Safe is indexed (with `setup` call)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(len(internal_txs_decoded), 1)  # Safe indexed, execute tx can be decoded now
-        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)
-        self.assertEqual(len(number_processed), 1)  # Setup trace
-        safe_status = SafeStatus.objects.get(nonce=1)
-        self.assertEqual(len(safe_status.owners), 1)
-        self.assertEqual(safe_status.threshold, 1)
-
-    def test_tx_processor_using_internal_tx_indexer_with_existing_safe(self):
-        self.test_internal_tx_indexer()
-        tx_processor = SafeTxProcessor()
-        tx_processor.process_decoded_transactions(InternalTxDecoded.objects.pending_for_safes())
-        safe_contract: SafeContract = SafeContract.objects.first()
-        self.assertGreater(safe_contract.erc20_block_number, 0)
-        safe_contract.erc20_block_number = 0
-        safe_contract.save(update_fields=['erc20_block_number'])
-
-        SafeStatus.objects.all().delete()
-        InternalTxDecoded.objects.update(processed=False)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(internal_txs_decoded.count(), 2)
-        self.assertEqual(internal_txs_decoded[0].function_name, 'setup')
-        tx_processor.process_decoded_transactions(internal_txs_decoded)
-        safe_contract.refresh_from_db()
-        self.assertGreater(safe_contract.erc20_block_number, 0)
-
+class TestSafeTxProcessor(TestCase):
     def test_tx_processor_with_factory(self):
         tx_processor = SafeTxProcessor()
         owner = Account.create().address

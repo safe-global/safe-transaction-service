@@ -6,9 +6,11 @@ from django.test import TestCase
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
 
-from ..indexers import InternalTxIndexerProvider
+from ..indexers import InternalTxIndexer, InternalTxIndexerProvider
+from ..indexers.internal_tx_indexer import InternalTxIndexerWithTraceBlock
+from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (EthereumBlock, EthereumTx, InternalTx, InternalTxDecoded,
-                      SafeMasterCopy)
+                      SafeContract, SafeMasterCopy, SafeStatus)
 from .factories import SafeMasterCopyFactory
 from .mocks_internal_tx_indexer import (block_result, trace_blocks_result,
                                         trace_filter_result,
@@ -18,6 +20,17 @@ from .mocks_internal_tx_indexer import (block_result, trace_blocks_result,
 
 
 class TestInternalTxIndexer(TestCase):
+    def test_internal_tx_indexer_provider(self):
+        InternalTxIndexerProvider.del_singleton()
+        internal_tx_indexer = InternalTxIndexerProvider()
+        self.assertIsInstance(internal_tx_indexer, InternalTxIndexer)
+        self.assertNotIsInstance(internal_tx_indexer, InternalTxIndexerWithTraceBlock)
+        InternalTxIndexerProvider.del_singleton()
+        with self.settings(ETH_INTERNAL_NO_FILTER=True):
+            internal_tx_indexer = InternalTxIndexerProvider()
+            self.assertIsInstance(internal_tx_indexer, (InternalTxIndexer, InternalTxIndexerWithTraceBlock))
+        InternalTxIndexerProvider.del_singleton()
+
     @mock.patch.object(ParityManager, 'trace_blocks', autospec=True, return_value=trace_blocks_result)
     @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
     @mock.patch.object(ParityManager, 'trace_transactions', autospec=True, return_value=trace_transactions_result)
@@ -26,10 +39,10 @@ class TestInternalTxIndexer(TestCase):
                        return_value=transaction_receipts_result)
     @mock.patch.object(EthereumClient, 'get_transactions', autospec=True, return_value=transactions_result)
     @mock.patch.object(EthereumClient, 'current_block_number', new_callable=PropertyMock, return_value=2000)
-    def test_internal_tx_indexer(self, current_block_number_mock: MagicMock, transactions_mock: MagicMock,
-                                 transaction_receipts_mock: MagicMock, blocks_mock: MagicMock,
-                                 trace_transactions_mock: MagicMock, trace_filter_mock: MagicMock,
-                                 trace_block_mock: MagicMock):
+    def _test_internal_tx_indexer(self, current_block_number_mock: MagicMock, transactions_mock: MagicMock,
+                                  transaction_receipts_mock: MagicMock, blocks_mock: MagicMock,
+                                  trace_transactions_mock: MagicMock, trace_filter_mock: MagicMock,
+                                  trace_block_mock: MagicMock):
         current_block_number = current_block_number_mock.return_value
 
         internal_tx_indexer = InternalTxIndexerProvider()
@@ -74,6 +87,9 @@ class TestInternalTxIndexer(TestCase):
                                                 current_block_number - internal_tx_indexer.number_trace_blocks,
                                                 current_block_number + 1 - internal_tx_indexer.confirmations))
                                             )
+
+    def test_internal_tx_indexer(self):
+        self._test_internal_tx_indexer()
 
     @mock.patch.object(ParityManager, 'trace_blocks', autospec=True, return_value=trace_blocks_result)
     @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
@@ -128,3 +144,45 @@ class TestInternalTxIndexer(TestCase):
                                                 current_block_number - 3,
                                                 current_block_number + 1)),
                                             )
+
+    def test_tx_processor_using_internal_tx_indexer(self):
+        self._test_internal_tx_indexer()
+        tx_processor = SafeTxProcessor()
+        self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
+        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)  # Index using `setup` trace
+        self.assertEqual(len(number_processed), 1)  # Setup trace
+        self.assertEqual(SafeContract.objects.count(), 1)
+
+        safe_status = SafeStatus.objects.first()
+        self.assertEqual(len(safe_status.owners), 1)
+        self.assertEqual(safe_status.nonce, 0)
+        self.assertEqual(safe_status.threshold, 1)
+
+        # Decode again now that Safe is indexed (with `setup` call)
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        self.assertEqual(len(internal_txs_decoded), 1)  # Safe indexed, execute tx can be decoded now
+        number_processed = tx_processor.process_decoded_transactions(internal_txs_decoded)
+        self.assertEqual(len(number_processed), 1)  # Setup trace
+        safe_status = SafeStatus.objects.get(nonce=1)
+        self.assertEqual(len(safe_status.owners), 1)
+        self.assertEqual(safe_status.threshold, 1)
+
+    def test_tx_processor_using_internal_tx_indexer_with_existing_safe(self):
+        self._test_internal_tx_indexer()
+        tx_processor = SafeTxProcessor()
+        tx_processor.process_decoded_transactions(InternalTxDecoded.objects.pending_for_safes())
+        safe_contract: SafeContract = SafeContract.objects.first()
+        self.assertGreater(safe_contract.erc20_block_number, 0)
+        safe_contract.erc20_block_number = 0
+        safe_contract.save(update_fields=['erc20_block_number'])
+
+        SafeStatus.objects.all().delete()
+        InternalTxDecoded.objects.update(processed=False)
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        self.assertEqual(internal_txs_decoded.count(), 2)
+        self.assertEqual(internal_txs_decoded[0].function_name, 'setup')
+        tx_processor.process_decoded_transactions(internal_txs_decoded)
+        safe_contract.refresh_from_db()
+        self.assertGreater(safe_contract.erc20_block_number, 0)

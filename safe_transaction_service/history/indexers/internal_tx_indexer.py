@@ -10,7 +10,7 @@ from gnosis.eth import EthereumClient
 
 from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer
-from .tx_decoder import CannotDecode, TxDecoder, get_safe_tx_decoder
+from .tx_decoder import CannotDecode, get_safe_tx_decoder
 
 logger = getLogger(__name__)
 
@@ -19,8 +19,12 @@ class InternalTxIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                                             block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+            if settings.ETH_INTERNAL_NO_FILTER:
+                cls.instance = InternalTxIndexerWithTraceBlock(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+                                                               block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+            else:
+                cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+                                                 block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
         return cls.instance
 
     @classmethod
@@ -153,3 +157,20 @@ class InternalTxIndexer(EthereumIndexer):
                 InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
             logger.info('End decoding of traces')
             return internal_txs
+
+
+class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
+    """
+    Optimize receiving all the addresses
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.updated_blocks_behind: int = 5000000  # Hack to process all the addresses together
+
+    def find_relevant_elements(self, addresses: List[str], from_block_number: int,
+                               to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:
+        current_block_number = current_block_number or self.ethereum_client.current_block_number
+        # Use `trace_block` for last `number_trace_blocks` blocks and `trace_filter` for the others
+        trace_block_number = max(current_block_number - self.number_trace_blocks, 0)
+        logger.info('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
+        return self._find_relevant_elements_using_trace_block(addresses, from_block_number, to_block_number)

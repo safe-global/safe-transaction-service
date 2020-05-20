@@ -34,6 +34,9 @@ If you need the Usd conversion for tokens don't forget to configure:
 - `ETH_UNISWAP_FACTORY_ADDRESS`: Checksummed address of Uniswap Factory contract.
 - `ETH_KYBER_NETWORK_PROXY_ADDRESS`: Checksummed address of Kyber Network Proxy contract.
 
+If you don't want to use `trace_filter` for the internal tx indexing and just rely on `trace_block`, set:
+- `ETH_INTERNAL_NO_FILTER=1`
+
 For more parameters check `base.py` file.
 
 Then:

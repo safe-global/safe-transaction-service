@@ -2,7 +2,7 @@ cachetools==4.1.0
 celery==4.4.2
 django-authtools==1.7.0
 django-celery-beat==2.0.0
-django-cors-headers==3.2.1
+django-cors-headers==3.3.0
 django-debug-toolbar
 django-debug-toolbar-force
 django-environ==0.4.5
@@ -22,4 +22,4 @@ hexbytes==0.2.0
 psycopg2-binary==2.8.5
 redis==3.5.1
 requests==2.23.0
-web3==5.9.0
+web3==5.10.0
