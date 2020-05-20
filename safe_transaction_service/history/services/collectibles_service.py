@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from cachetools import cachedmethod
+from requests.exceptions import MissingSchema
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class CollectiblesServiceException(Exception):
+    pass
+
+
+class MetadataRetrievalException(CollectiblesServiceException):
     pass
 
 
@@ -129,21 +134,39 @@ class CollectiblesService:
                                erc721_address, safe_address, exc_info=True)
         return collectibles
 
+    def _get_metadata(self, uri: str) -> Dict[Any, Any]:
+        """
+        Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
+        supported
+        :param uri: Uri starting with the protocol, like http://example.org/token/3
+        :return: Metadata as a decoded json
+        """
+        if not uri or not uri.startswith('http'):
+            raise MetadataRetrievalException(uri)
+
+        try:
+            response = requests.get(uri)
+            if not response.ok:
+                raise MetadataRetrievalException(uri)
+            else:
+                return response.json()
+        except requests.RequestException as e:
+            raise MetadataRetrievalException(uri) from e
+
     def get_collectibles_with_metadata(self, safe_address: str) -> List[CollectibleWithMetadata]:
         collectibles_with_metadata = []
         for collectible in self.get_collectibles(safe_address):
-            response = requests.get(collectible.uri)
-            if not response.ok:
+            try:
+                metadata = self._get_metadata(collectible.uri)
+            except MetadataRetrievalException:
+                metadata = {}
                 logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
                                f'for token-address={collectible.address}')
-                metadata = {}
-            else:
-                metadata = response.json()
+
             collectibles_with_metadata.append(
                 CollectibleWithMetadata(collectible.token_name, collectible.token_symbol,
                                         collectible.address, collectible.id, collectible.uri, metadata)
             )
-
         return collectibles_with_metadata
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
