@@ -18,12 +18,12 @@ class TestCollectiblesService(TestCase):
         safe_address = '0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7'
         self.assertEqual(collectibles_service.get_collectibles(safe_address), [])
 
-        erc721_addresses = ['0x202d2f33449Bf46d6d32Ae7644aDA130876461a4',
-                            '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85',  # ENS
+        erc721_addresses = [('0x202d2f33449Bf46d6d32Ae7644aDA130876461a4', 13),
+                            ('0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85', 93288724337340885726942883352789513739931149355867373088241393067029827792979),  # ENS
                             ]
 
-        for erc721_address in erc721_addresses:
-            EthereumEventFactory(erc721=True, to=safe_address, address=erc721_address)
+        for erc721_address, token_id in erc721_addresses:
+            EthereumEventFactory(erc721=True, to=safe_address, address=erc721_address, value=token_id)
 
         expected = [Collectible(token_name='DappCon2020', token_symbol='D20',
                                 address='0x202d2f33449Bf46d6d32Ae7644aDA130876461a4',

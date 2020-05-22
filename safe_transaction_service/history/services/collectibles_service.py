@@ -91,8 +91,9 @@ class CollectiblesService:
         self.ethereum_client = ethereum_client
         self.cache_token_info = {}
 
-    def get_collectibles(self, safe_address: str) -> List[Collectible]:
+    def get_collectibles_from_erc71_addresses(self, safe_address: str) -> List[Collectible]:
         """
+        Gets collectibles without knowing the tokenIds, tries to retrieve them
         :param safe_address:
         :return:
         """
@@ -132,6 +133,39 @@ class CollectiblesService:
             except ValueError:
                 logger.warning('Cannot get ERC721 info token=%s with owner=%s',
                                erc721_address, safe_address, exc_info=True)
+        return collectibles
+
+    def get_collectibles(self, safe_address: str) -> List[Collectible]:
+        # Get all the token history
+        erc721_events = EthereumEvent.objects.erc721_events(address=safe_address)
+        # Check ownership of the tokens
+        collectibles = []
+
+        for erc721_event in erc721_events:
+            token_id = erc721_event.arguments.get('tokenId')
+            if token_id is None:
+                logger.error('TokenId for ERC721 info token=%s with owner=%s can never be None',
+                             erc721_address, safe_address)
+                continue
+            erc721_address = erc721_event.address
+            erc_721_contract = get_erc721_contract(self.ethereum_client.w3, erc721_event.address)
+            token_info = self.get_token_info(erc721_address)
+            if not token_info:
+                name, symbol = ('', '')
+            else:
+                name, symbol = token_info
+                if (len(name) - len(symbol)) < -5:  # If symbol is way bigger than name, swap them (e.g. POAP)
+                    name, symbol = symbol, name
+            try:
+                if not erc_721_contract.functions.ownerOf(token_id).call() == safe_address:
+                    continue
+
+                token_uri = erc_721_contract.functions.tokenURI(token_id).call()
+                collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
+            except ValueError:
+                logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
+                               erc721_address, token_id, safe_address, exc_info=True)
+
         return collectibles
 
     def _get_metadata(self, uri: str) -> Dict[Any, Any]:
