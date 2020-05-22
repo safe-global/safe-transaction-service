@@ -93,7 +93,7 @@ class CollectiblesService:
         self.cache_token_info = {}
         self.crypto_kitties_contract_addresses = {
             '0x06012c8cf97BEaD5deAe237070F9587f8E7A266d',  # Mainnet
-            '0x16baf0de678e52367adc69fd067e5edd1d33e3bf'  # Rinkeby
+            '0x16baF0dE678E52367adC69fD067E5eDd1D33e3bF'  # Rinkeby
         }
 
     def get_collectibles_from_erc71_addresses(self, safe_address: str) -> List[Collectible]:
