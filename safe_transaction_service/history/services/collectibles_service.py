@@ -10,6 +10,7 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import get_erc721_contract
+from web3.exceptions import BadFunctionCallOutput
 
 from ..models import EthereumEvent
 
@@ -162,7 +163,7 @@ class CollectiblesService:
 
                 token_uri = erc_721_contract.functions.tokenURI(token_id).call()
                 collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
-            except ValueError:
+            except BadFunctionCallOutput:
                 logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
                                erc721_address, token_id, safe_address, exc_info=True)
 
