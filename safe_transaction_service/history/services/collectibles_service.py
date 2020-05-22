@@ -1,16 +1,16 @@
 import logging
 import operator
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 import requests
 from cachetools import cachedmethod
-from requests.exceptions import MissingSchema
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import get_erc721_contract
-from web3.exceptions import BadFunctionCallOutput
 
 from ..models import EthereumEvent
 
@@ -91,6 +91,10 @@ class CollectiblesService:
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
         self.cache_token_info = {}
+        self.crypto_kitties_contract_addresses = {
+            '0x06012c8cf97BEaD5deAe237070F9587f8E7A266d',  # Mainnet
+            '0x16baf0de678e52367adc69fd067e5edd1d33e3bf'  # Rinkeby
+        }
 
     def get_collectibles_from_erc71_addresses(self, safe_address: str) -> List[Collectible]:
         """
@@ -161,14 +165,18 @@ class CollectiblesService:
                 if not erc_721_contract.functions.ownerOf(token_id).call() == safe_address:
                     continue
 
-                token_uri = erc_721_contract.functions.tokenURI(token_id).call()
+                if erc721_address in self.crypto_kitties_contract_addresses:
+                    token_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
+                else:
+                    token_uri = erc_721_contract.functions.tokenURI(token_id).call()
                 collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
-            except BadFunctionCallOutput:
+            except (ValueError, BadFunctionCallOutput):
                 logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
                                erc721_address, token_id, safe_address, exc_info=True)
 
         return collectibles
 
+    @lru_cache
     def _get_metadata(self, uri: str) -> Dict[Any, Any]:
         """
         Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is

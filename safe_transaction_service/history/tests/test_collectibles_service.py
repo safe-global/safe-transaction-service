@@ -1,12 +1,12 @@
 from django.test import TestCase
 
-
 from gnosis.eth import EthereumClient
 
-from .utils import just_test_if_mainnet_node
 from ..services import CollectiblesService
+from ..services.collectibles_service import (Collectible,
+                                             CollectibleWithMetadata)
 from .factories import EthereumEventFactory
-from ..services.collectibles_service import Collectible, CollectibleWithMetadata
+from .utils import just_test_if_mainnet_node
 
 
 class TestCollectiblesService(TestCase):
