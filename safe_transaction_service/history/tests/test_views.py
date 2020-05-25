@@ -665,7 +665,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)  # Data is missing
 
         data = {
-            'delegate': delegate_address,
+            # 'delegate': delegate_address,
             'signature': '0x' + '1' * 130,
         }
         response = self.client.delete(reverse('v1:safe-delegate', args=(safe_address, delegate_address)),

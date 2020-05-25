@@ -311,7 +311,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
                                  safe_contract_id=self.kwargs['address'],
                                  delegate=self.kwargs['delegate_address'])
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(responses={204: 'Deleted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
     def delete(self, request, address, delegate_address, *args, **kwargs):
@@ -323,7 +323,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
-        request.data['delegate_address'] = delegate_address
+        request.data['delegate'] = delegate_address
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return super().delete(request, address, delegate_address, *args, **kwargs)
