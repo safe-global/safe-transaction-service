@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -142,6 +142,28 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
     delegate = EthereumAddressField()
     signature = HexadecimalField(min_length=130)
 
+    def check_signature(self, signature: bytes, operation_hash: bytes, safe_owners: List[str]) -> Optional[str]:
+        """
+        Checks signature and returns a valid owner if found, None otherwise
+        :param signature:
+        :param operation_hash:
+        :param safe_owners:
+        :return: Valid delegator address if found, None otherwise
+        """
+        safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
+        if not safe_signatures:
+            raise ValidationError('Signature is not valid')
+        elif len(safe_signatures) > 1:
+            raise ValidationError('More than one signatures detected, just one is expected')
+
+        safe_signature = safe_signatures[0]
+        delegator = safe_signature.owner
+        if delegator in safe_owners:
+            if not safe_signature.is_valid():
+                raise ValidationError(f'Signature of type={safe_signature.signature_type.name} for delegator={delegator} '
+                                      f'is not valid')
+            return delegator
+
     def validate(self, data):
         super().validate(data)
 
@@ -158,30 +180,19 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
             safe_owners = safe.retrieve_owners(block_identifier='latest')
 
         signature = data['signature']
-        delegate = data['delegate']
-        operation_hash = DelegateSignatureHelper.calculate_hash(delegate)
-        safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
-        if not safe_signatures:
-            raise ValidationError('Cannot a valid signature')
-        elif len(safe_signatures) > 1:
-            raise ValidationError('More than one signatures detected, just one is expected')
+        delegate = data['delegate']  # Delegate address to be added
 
-        safe_signature = safe_signatures[0]
-        delegator = safe_signature.owner
-        if delegator not in safe_owners:
-            if safe_signature.signature_type == SafeSignatureType.EOA:
-                # Maybe it's an `eth_sign` signature without Gnosis Safe `v + 4`, let's try
-                safe_signatures = SafeSignature.parse_signature(signature,
-                                                                DelegateSignatureHelper.calculate_hash(delegate,
-                                                                                                       eth_sign=True))
-                safe_signature = safe_signatures[0]
-                delegator = safe_signature.owner
-            if delegator not in safe_owners:
-                raise ValidationError('Signing owner is not an owner of the Safe')
+        # Tries to find a valid delegator using multiple strategies
+        for operation_hash in (DelegateSignatureHelper.calculate_hash(delegate),
+                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
+                               DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
+                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
+            delegator = self.check_signature(signature, operation_hash, safe_owners)
+            if delegator:
+                break
 
-        if not safe_signature.is_valid():
-            raise ValidationError(f'Signature of type={safe_signature.signature_type.name} for delegator={delegator} '
-                                  f'is not valid')
+        if not delegator:
+            raise ValidationError('Signing owner is not an owner of the Safe')
 
         data['delegator'] = delegator
         return data

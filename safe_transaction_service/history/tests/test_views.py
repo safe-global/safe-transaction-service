@@ -10,7 +10,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from web3 import Web3
 
-from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -686,12 +685,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIn('Signing owner is not an owner of the Safe', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+        # Test eth_sign first
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address, eth_sign=True)
+        data['signature'] = owner_account.signHash(hash_to_sign)['signature'].hex()
+        response = self.client.delete(reverse('v1:safe-delegate', args=(safe_address, delegate_address)),
+                                      format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('Not found', response.data['detail'])
+
+        # Test previous otp
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address, previous_topt=True)
+        data['signature'] = owner_account.signHash(hash_to_sign)['signature'].hex()
+        response = self.client.delete(reverse('v1:safe-delegate', args=(safe_address, delegate_address)),
+                                      format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('Not found', response.data['detail'])
+
         hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address)
         data['signature'] = owner_account.signHash(hash_to_sign)['signature'].hex()
         response = self.client.delete(reverse('v1:safe-delegate', args=(safe_address, delegate_address)),
                                       format='json', data=data)
-        self.assertIn('Not found', response.data['detail'])
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('Not found', response.data['detail'])
 
         SafeContractDelegateFactory(safe_contract=safe_contract, delegate=delegate_address)
         SafeContractDelegateFactory(safe_contract=safe_contract, delegate=Account.create().address)

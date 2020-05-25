@@ -11,4 +11,3 @@ def just_test_if_mainnet_node() -> str:
     elif requests.get(mainnet_node_url).status_code == 404:
         pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
     return mainnet_node_url
-
