@@ -80,6 +80,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         signature = data.get('signature', b'')
         parsed_signatures = SafeSignature.parse_signature(signature, contract_transaction_hash)
         data['parsed_signatures'] = parsed_signatures
+        data['trusted'] = bool(parsed_signatures)  # If signatures, transaction is trusted (until signatures are mandatory)
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
             if not safe_signature.is_valid(ethereum_client, safe.address):
@@ -104,7 +105,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
     def save(self, **kwargs):
         safe_tx_hash = self.validated_data['contract_transaction_hash']
-        multisig_transaction, _ = MultisigTransaction.objects.get_or_create(
+        origin = self.validated_data['origin']
+        trusted = self.validated_data['trusted']
+        multisig_transaction, created = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,
             defaults={
                 'safe': self.validated_data['safe'],
@@ -118,16 +121,21 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 'gas_token': self.validated_data['gas_token'],
                 'refund_receiver': self.validated_data['refund_receiver'],
                 'nonce': self.validated_data['nonce'],
-                'origin': self.validated_data['origin'],
+                'origin': origin,
+                'trusted': trusted,
             }
         )
 
+        if not created and trusted and not multisig_transaction.trusted:
+            multisig_transaction.origin = origin
+            multisig_transaction.trusted = trusted
+            multisig_transaction.save(update_fields=['origin', 'trusted'])
+
         for safe_signature in self.validated_data.get('parsed_signatures'):
-            owner = safe_signature.owner
             if safe_signature.owner in self.validated_data['safe_owners']:
                 multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
                     multisig_transaction_hash=safe_tx_hash,
-                    owner=owner,
+                    owner=safe_signature.owner,
                     defaults={
                         'multisig_transaction': multisig_transaction,
                         'signature': safe_signature.export_signature(),

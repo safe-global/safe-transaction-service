@@ -170,7 +170,7 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
     list_display = ('created', 'safe', 'executed', 'successful', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value',
                     'nonce', 'data')
-    list_filter = ('failed', )
+    list_filter = ('failed', 'trusted', )
     list_select_related = ('ethereum_tx',)
     ordering = ['-created']
     raw_id_fields = ('ethereum_tx',)

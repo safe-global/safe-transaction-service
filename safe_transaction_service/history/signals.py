@@ -36,8 +36,10 @@ def bind_confirmation(sender: Type[Model],
         )
         if updated:
             # Update modified on MultisigTransaction if at least one confirmation is added
+            # Tx will now be trusted
             instance.modified = timezone.now()
-            instance.save(update_fields=['modified'])
+            instance.trusted = True
+            instance.save(update_fields=['modified', 'trusted'])
     elif sender == MultisigConfirmation:
         if not instance.multisig_transaction_id:
             try:
@@ -45,7 +47,8 @@ def bind_confirmation(sender: Type[Model],
                     multisig_transaction = MultisigTransaction.objects.get(
                         safe_tx_hash=instance.multisig_transaction_hash)
                     multisig_transaction.modified = timezone.now()
-                    instance.save(update_fields=['modified'])
+                    multisig_transaction.trusted = True
+                    multisig_transaction.save(update_fields=['modified', 'trusted'])
 
                     instance.multisig_transaction = multisig_transaction
                     instance.save(update_fields=['multisig_transaction'])

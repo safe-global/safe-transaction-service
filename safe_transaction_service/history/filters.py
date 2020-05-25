@@ -39,6 +39,7 @@ class TransferListFilter(filters.FilterSet):
 class MultisigTransactionFilter(filters.FilterSet):
     executed = django_filters.BooleanFilter(method='filter_executed')
     has_confirmations = django_filters.BooleanFilter(method='filter_confirmations')
+    trusted = django_filters.BooleanFilter(method='filter_trusted')
     execution_date__gte = django_filters.IsoDateTimeFilter(field_name='ethereum_tx__block__timestamp',
                                                            lookup_expr='gte')
     execution_date__lte = django_filters.IsoDateTimeFilter(field_name='ethereum_tx__block__timestamp',
@@ -58,6 +59,9 @@ class MultisigTransactionFilter(filters.FilterSet):
             return queryset.executed()
         else:
             return queryset.not_executed()
+
+    def filter_trusted(self, queryset, name: str, value: bool):
+        return queryset.filter(trusted=value)
 
     class Meta:
         model = MultisigTransaction
