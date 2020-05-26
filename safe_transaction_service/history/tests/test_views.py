@@ -591,18 +591,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response = self.client.get(reverse('v1:safe-collectibles', args=(safe_address,)), format='json')
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data, [{'address': token_address,
-                                             'token_name': token_name,
-                                             'token_symbol': token_symbol,
-                                             'id': token_id,
-                                             'uri': token_uri,
-                                             'name': name,
-                                             'description': description,
-                                             'image_uri': image,
-                                             'metadata': {
-                                                 'image': image,
-                                                 'name': name,
-                                                 'description': description,
-                                             }}])
+                                              'token_name': token_name,
+                                              'token_symbol': token_symbol,
+                                              'id': str(token_id),
+                                              'uri': token_uri,
+                                              'name': name,
+                                              'description': description,
+                                              'image_uri': image,
+                                              'metadata': {
+                                                  'image': image,
+                                                  'name': name,
+                                                  'description': description,
+                                              }}])
 
     def test_get_safe_delegate_list(self):
         safe_address = Account.create().address

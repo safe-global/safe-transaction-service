@@ -2,12 +2,11 @@ import logging
 import operator
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from cachetools import cachedmethod
 from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import get_erc721_contract
@@ -94,6 +93,10 @@ class CollectiblesService:
         self.crypto_kitties_contract_addresses = {
             '0x06012c8cf97BEaD5deAe237070F9587f8E7A266d',  # Mainnet
             '0x16baF0dE678E52367adC69fD067E5eDd1D33e3bF'  # Rinkeby
+
+        }
+        self.ens_contract_address = {
+            '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85',  # ENS Mainnet and Rinkeby
         }
 
     def get_collectibles_from_erc71_addresses(self, safe_address: str) -> List[Collectible]:
@@ -227,7 +230,14 @@ class CollectiblesService:
         return collectibles_with_metadata
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    def get_token_info(self, token_address: str):
+    def get_token_info(self, token_address: str) -> Tuple[str, str]:
+        """
+        :param token_address: address for a erc721 token
+        :return: tuple with name and symbol of the erc721 token
+        """
+        if token_address in self.ens_contract_address:  # TODO Refactor custom cases
+            return 'Ethereum Name Service', 'ENS'
+
         try:
             erc_721_contract = get_erc721_contract(self.ethereum_client.w3, token_address)
             name, symbol = self.ethereum_client.batch_call([erc_721_contract.functions.name(),
