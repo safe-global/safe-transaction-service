@@ -244,6 +244,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertFalse(multisig_transaction_db.trusted)
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -255,6 +257,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         data['signature'] = safe_owner_1.signHash(safe_tx.safe_tx_hash)['signature'].hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db.refresh_from_db()
+        self.assertTrue(multisig_transaction_db.trusted)  # Now it should be trusted
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -481,6 +485,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigTransaction.objects.count(), 1)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
+        self.assertTrue(MultisigTransaction.objects.first().trusted)
 
         data['signature'] = data['signature'] + data['signature'][2:]
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
