@@ -146,14 +146,34 @@ class CollectiblesService:
         # Check ownership of the tokens
         collectibles = []
 
+        ownership_queries = []
+        token_uri_queries = []
         for erc721_event in erc721_events:
             token_id = erc721_event.arguments.get('tokenId')
             if token_id is None:
                 logger.error('TokenId for ERC721 info token=%s with owner=%s can never be None',
                              erc721_address, safe_address)
-                continue
+                token_id = 0
             erc721_address = erc721_event.address
-            erc_721_contract = get_erc721_contract(self.ethereum_client.w3, erc721_event.address)
+            contract = get_erc721_contract(self.ethereum_client.w3, erc721_address)
+            ownership_queries.append(contract.functions.ownerOf(token_id))
+            token_uri_queries.append(contract.functions.tokenURI(token_id))  # More optimal to do it here
+
+        token_uri_filtered_queries = []
+        filtered_events = []
+        for erc721_event, token_uri_query, owner in zip(erc721_events,
+                                                        token_uri_queries,
+                                                        self.ethereum_client.batch_call(ownership_queries,
+                                                                                        raise_exception=False)):
+            if owner != safe_address:  # Leave out tokens the user does not have already
+                continue
+            token_uri_filtered_queries.append(token_uri_query)
+            filtered_events.append(erc721_event)
+
+        for erc721_event, token_uri in zip(filtered_events, self.ethereum_client.batch_call(token_uri_queries,
+                                                                                            raise_exception=False)):
+            token_id = erc721_event.arguments.get('tokenId')
+            erc721_address = erc721_event.address
             token_info = self.get_token_info(erc721_address)
             if not token_info:
                 name, symbol = ('', '')
@@ -161,19 +181,13 @@ class CollectiblesService:
                 name, symbol = token_info
                 if (len(name) - len(symbol)) < -5:  # If symbol is way bigger than name, swap them (e.g. POAP)
                     name, symbol = symbol, name
-            try:
-                if not erc_721_contract.functions.ownerOf(token_id).call() == safe_address:
-                    continue
-
+            if not token_uri:
                 if erc721_address in self.crypto_kitties_contract_addresses:
                     token_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
                 else:
-                    token_uri = erc_721_contract.functions.tokenURI(token_id).call()
-                collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
-            except (ValueError, BadFunctionCallOutput):
-                logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
-                               erc721_address, token_id, safe_address, exc_info=True)
-
+                    logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
+                                   erc721_address, token_id, safe_address, exc_info=True)
+            collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
         return collectibles
 
     @lru_cache
