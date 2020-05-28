@@ -71,6 +71,14 @@ class BulkCreateSignalMixin:
         return result
 
 
+# class EnsLabel(models.Model):
+#    label_hash = Sha3HashField(unique=True)  # Keccak of the label
+#    label = models.CharField(max_length=20, blank=True)
+
+#    def __str__(self):
+#        return f'Label={self.label} with hash={self.label_hash}'
+
+
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
         try:

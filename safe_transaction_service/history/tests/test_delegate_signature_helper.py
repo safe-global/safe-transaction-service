@@ -1,6 +1,6 @@
 from django.test import TestCase
-from eth_account import Account
 
+from eth_account import Account
 from eth_account.messages import defunct_hash_message
 
 from ..helpers import DelegateSignatureHelper
