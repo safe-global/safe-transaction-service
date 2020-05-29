@@ -191,7 +191,7 @@ class CollectiblesService:
                 else:
                     logger.warning('Cannot get ERC721 info token=%s with token-id=%d and owner=%s',
                                    erc721_address, token_id, safe_address, exc_info=True)
-                collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
+            collectibles.append(Collectible(name, symbol, erc721_address, token_id, token_uri))
         return collectibles
 
     def _get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
