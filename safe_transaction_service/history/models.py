@@ -210,6 +210,34 @@ class EthereumEventQuerySet(models.QuerySet):
         return self.erc20_and_721_events(token_address=token_address,
                                          address=address).filter(arguments__has_key='tokenId')
 
+    def erc721_owned_by(self, address: str) -> List[Tuple[str, int]]:
+        """
+        Returns erc721 owned by address, removing the ones sent
+        :return: List of tuples(token_address: str, token_id: int)
+        """
+        # Get all the token history
+        erc721_events = self.erc721_events(address=address)
+        # Get tokens received and remove tokens transferred
+        tokens_in: Tuple[str, int] = []
+        tokens_out: Tuple[str, int] = []
+        for erc721_event in erc721_events:
+            token_address = erc721_event.address
+            token_id = erc721_event.arguments.get('tokenId')
+            if token_id is None:
+                logger.error('TokenId for ERC721 info token=%s with owner=%s can never be None', token_address,
+                             address)
+                continue
+            if erc721_event.arguments.get('to') == address:
+                list_to_append = tokens_in
+            else:
+                list_to_append = tokens_out
+            list_to_append.append((token_address, token_id))
+
+        for token_out in tokens_out:  # Remove tokens sent from list
+            if token_out in tokens_in:
+                tokens_in.remove(token_out)
+        return tokens_in
+
 
 class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
     def from_decoded_event(self, decoded_event: Dict[str, Any]) -> 'EthereumEvent':

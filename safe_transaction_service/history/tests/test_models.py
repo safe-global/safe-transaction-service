@@ -7,9 +7,10 @@ from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
 
-from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
-                      MultisigConfirmation, MultisigTransaction,
-                      SafeContractDelegate, SafeMasterCopy, SafeStatus)
+from ..models import (EthereumEvent, EthereumTxCallType, InternalTx,
+                      InternalTxDecoded, MultisigConfirmation,
+                      MultisigTransaction, SafeContractDelegate,
+                      SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         EthereumTxFactory, InternalTxFactory,
                         MultisigConfirmationFactory,
@@ -111,6 +112,19 @@ class TestEthereumEvent(TestCase):
         self.assertIsNotNone(incoming_token_0.token_id)
         self.assertIsNone(incoming_token_1.token_id)
         self.assertIsNotNone(incoming_token_1.value)
+
+    def test_erc721_owned_by(self):
+        random_address = Account.create().address
+        self.assertEqual(EthereumEvent.objects.erc721_owned_by(address=random_address), [])
+        ethereum_event = EthereumEventFactory(to=random_address, erc721=True)
+        EthereumEventFactory(from_=random_address, erc721=True, value=6)  # Not appearing as owner it's not the receiver
+        EthereumEventFactory(to=Account.create().address, erc721=True)  # Not appearing as it's not the owner
+        EthereumEventFactory(to=random_address)  # Not appearing as it's not an erc721
+        self.assertEqual(len(EthereumEvent.objects.erc721_owned_by(address=random_address)), 1)
+        EthereumEventFactory(from_=random_address, erc721=True,
+                             address=ethereum_event.address,
+                             value=ethereum_event.arguments['tokenId'])  # Send the token out
+        self.assertEqual(len(EthereumEvent.objects.erc721_owned_by(address=random_address)), 0)
 
 
 class TestInternalTx(TestCase):

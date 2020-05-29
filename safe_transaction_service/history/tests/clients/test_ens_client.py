@@ -1,4 +1,5 @@
 from django.test import TestCase
+
 from eth_utils import keccak
 
 from ...clients import EnsClient

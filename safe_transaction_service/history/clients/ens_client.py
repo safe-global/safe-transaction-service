@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Union, Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 from hexbytes import HexBytes

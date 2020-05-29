@@ -1,6 +1,13 @@
+from unittest import mock
+from unittest.mock import MagicMock
+
 from django.test import TestCase
 
+from eth_account import Account
+
 from gnosis.eth import EthereumClient
+from gnosis.eth.ethereum_client import Erc721Info
+from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
@@ -9,7 +16,7 @@ from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
 
-class TestCollectiblesService(TestCase):
+class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
     def test_get_collectibles(self):
         mainnet_node = just_test_if_mainnet_node()
         ethereum_client = EthereumClient(mainnet_node)
@@ -50,3 +57,20 @@ class TestCollectiblesService(TestCase):
                                             )]
         collectibles_with_metadata = collectibles_service.get_collectibles_with_metadata(safe_address)
         self.assertEqual(collectibles_with_metadata, expected)
+
+    @mock.patch.object(CollectiblesService, 'query_token_info', autospec=True)
+    def test_get_token_info(self, query_token_info_mock: MagicMock):
+        collectibles_service = CollectiblesService(self.ethereum_client)
+        random_address = Account.create().address
+
+        query_token_info_mock.return_value = Erc721Info('POAP', 'The Proof of Attendance Protocol')
+        self.assertEqual(collectibles_service.get_token_info(random_address),
+                         Erc721Info('The Proof of Attendance Protocol', 'POAP'))
+
+        query_token_info_mock.return_value = Erc721Info('Uxio Collectible Card', 'UCC')
+        self.assertEqual(collectibles_service.get_token_info(random_address),
+                         Erc721Info('Uxio Collectible Card', 'UCC'))
+
+        query_token_info_mock.return_value = None
+        self.assertEqual(collectibles_service.get_token_info(random_address),
+                         Erc721Info('', ''))
