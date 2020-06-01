@@ -22,6 +22,10 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         ethereum_client = EthereumClient(mainnet_node)
         collectibles_service = CollectiblesService(ethereum_client)
 
+        # Caches empty
+        self.assertFalse(collectibles_service.cache_token_info)
+        self.assertFalse(collectibles_service.cache_uri_metadata)
+
         safe_address = '0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7'
         self.assertEqual(collectibles_service.get_collectibles(safe_address), [])
 
@@ -57,6 +61,10 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                                             )]
         collectibles_with_metadata = collectibles_service.get_collectibles_with_metadata(safe_address)
         self.assertEqual(collectibles_with_metadata, expected)
+
+        # Caches not empty
+        self.assertTrue(collectibles_service.cache_token_info)
+        self.assertTrue(collectibles_service.cache_uri_metadata)
 
     @mock.patch.object(CollectiblesService, 'retrieve_token_info', autospec=True)
     def test_get_token_info(self, retrieve_token_info_mock: MagicMock):

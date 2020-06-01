@@ -1,7 +1,6 @@
 import logging
 import operator
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -99,9 +98,10 @@ class CollectiblesService:
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
         self.cache_token_info: Dict[str, Tuple[str, str]] = {}
+        self.cache_uri_metadata: Dict[str, Dict[Any, Any]] = {}
         self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
 
-    @lru_cache
+    @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     def _retrieve_metadata_from_uri(self, uri: str) -> Dict[Any, Any]:
         """
         Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
