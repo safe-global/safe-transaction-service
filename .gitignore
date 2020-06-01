@@ -102,4 +102,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# Django
+staticfiles/
+
+
 .idea/
