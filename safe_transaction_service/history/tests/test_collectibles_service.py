@@ -58,19 +58,19 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         collectibles_with_metadata = collectibles_service.get_collectibles_with_metadata(safe_address)
         self.assertEqual(collectibles_with_metadata, expected)
 
-    @mock.patch.object(CollectiblesService, 'query_token_info', autospec=True)
-    def test_get_token_info(self, query_token_info_mock: MagicMock):
+    @mock.patch.object(CollectiblesService, 'retrieve_token_info', autospec=True)
+    def test_get_token_info(self, retrieve_token_info_mock: MagicMock):
         collectibles_service = CollectiblesService(self.ethereum_client)
         random_address = Account.create().address
 
-        query_token_info_mock.return_value = Erc721Info('POAP', 'The Proof of Attendance Protocol')
+        retrieve_token_info_mock.return_value = Erc721Info('POAP', 'The Proof of Attendance Protocol')
         self.assertEqual(collectibles_service.get_token_info(random_address),
                          Erc721Info('The Proof of Attendance Protocol', 'POAP'))
 
-        query_token_info_mock.return_value = Erc721Info('Uxio Collectible Card', 'UCC')
+        retrieve_token_info_mock.return_value = Erc721Info('Uxio Collectible Card', 'UCC')
         self.assertEqual(collectibles_service.get_token_info(random_address),
                          Erc721Info('Uxio Collectible Card', 'UCC'))
 
-        query_token_info_mock.return_value = None
+        retrieve_token_info_mock.return_value = None
         self.assertEqual(collectibles_service.get_token_info(random_address),
                          Erc721Info('', ''))
