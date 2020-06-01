@@ -153,6 +153,8 @@ class CollectiblesService:
         :return:
         """
         addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(address=safe_address)
+        if not addresses_with_token_ids:
+            return []
 
         logger.debug('Getting token_uris for %s', addresses_with_token_ids)
         token_uris = self.ethereum_client.erc721.get_token_uris(addresses_with_token_ids)

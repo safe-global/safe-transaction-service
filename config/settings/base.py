@@ -271,6 +271,9 @@ LOGGING = {
         'safe_transaction_service.history.indexers.erc20_events_indexer': {
             'level': 'INFO',
         },
+        'safe_transaction_service.history.services.collectibles_service': {
+            'level': 'DEBUG',
+        },
         'celery': {
             'handlers': ['celery_console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
