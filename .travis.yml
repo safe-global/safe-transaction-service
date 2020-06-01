@@ -29,7 +29,7 @@ deploy:
   - provider: script
     script: bash scripts/deploy_docker.sh staging
     on:
-      branch: 90-collectibles
+      branch: master
   - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
