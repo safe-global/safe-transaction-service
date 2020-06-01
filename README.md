@@ -4,7 +4,7 @@
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
 
 # Gnosis Transaction Service
-Keeps track of transactions sent via Gnosis Safe contracts. It uses events and 
+Keeps track of transactions sent via Gnosis Safe contracts. It uses events and
 [tracing](https://wiki.parity.io/JSONRPC-trace-module) to index the txs.
 
 Transactions are detected in an automatic way, so there is no need of informing the service about the transactions as in
@@ -19,7 +19,6 @@ a transaction that is pending to be sent to the blockchain.
 ## Index of contents
 
 - [Docs](https://docs.gnosis.io/safe/docs/services_transactions/)
-
 
 ## Setup for production
 This is the recommended configuration for running a production Transaction service. `docker-compose` is required
@@ -68,6 +67,43 @@ Then:
 ```bash
 docker-compose build --force-rm
 docker-compose up
+```
+
+## Setup for private network
+Instructions for production still apply, but some additional steps are required:
+- Deploy the last version of the [Safe Contracts](https://github.com/gnosis/safe-contracts) on your private network.
+- Add their addresses and the number of the block they were deployed (to optimize initial indexing) to
+`safe_transaction_service/history/management/commands/setup_service.py`. Service is currently configured to support
+_Mainnet_, _Rinkeby_, _Goerli_ and _Kovan_. Only contracts that need to be configured are the **ProxyFactory** that will be used to deploy the contracts and the **GnosisSafe**.
+
+
+Add a new method using the addresses and block numbers for your network.
+```python
+def setup_my_network(self):
+    SafeMasterCopy.objects.get_or_create(address='0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F',
+                                             defaults={
+                                                 'initial_block_number': 9084503,
+                                                 'tx_block_number': 9084503,
+                                             })
+    ProxyFactory.objects.get_or_create(address='0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
+                                           defaults={
+                                               'initial_block_number': 9084508,
+                                               'tx_block_number': 9084508,
+                                           })
+```
+
+Replace `handle` method for:
+```python
+    def handle(self, *args, **options):
+        for task in self.tasks:
+            _, created = task.create_task()
+            if created:
+                self.stdout.write(self.style.SUCCESS('Created Periodic Task %s' % task.name))
+            else:
+                self.stdout.write(self.style.SUCCESS('Task %s was already created' % task.name))
+
+        self.stdout.write(self.style.SUCCESS('Setting up Safe Contract Addresses'))
+        self.setup_my_network()
 ```
 
 ## Contributors
