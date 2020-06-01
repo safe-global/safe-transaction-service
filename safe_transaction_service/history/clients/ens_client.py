@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Union
 
 import requests
+from cache_memoize import cache_memoize
 from hexbytes import HexBytes
 
 
@@ -29,6 +30,7 @@ class EnsClient:
         return '0x' + HexBytes(domain_hash).hex()[2:].rjust(64, '0')
 
     @lru_cache
+    @cache_memoize(60 * 60 * 24, prefix='ens-_query_by_domain_hash')  # 1 day
     def _query_by_domain_hash(self, domain_hash_str: str) -> Optional[str]:
         query = """
                 {

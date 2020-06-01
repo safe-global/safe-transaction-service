@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from cache_memoize import cache_memoize
-from cachetools import cachedmethod
+from cachetools import TTLCache, cachedmethod
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import Erc721Info, InvalidERC721Info
@@ -97,12 +97,12 @@ class CollectiblesService:
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
-        self.cache_token_info: Dict[str, Tuple[str, str]] = {}
-        self.cache_uri_metadata: Dict[str, Dict[Any, Any]] = {}
+        self.cache_token_info: Dict[str, Tuple[str, str]] = {}  # Cache forever
+        self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
         self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
-    @cache_memoize(60 * 60 * 24)  # 1 day
+    @cache_memoize(60 * 60 * 24, prefix='collectibles-_retrieve_metadata_from_uri')  # 1 day
     def _retrieve_metadata_from_uri(self, uri: str) -> Dict[Any, Any]:
         """
         Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
@@ -203,7 +203,7 @@ class CollectiblesService:
         return token_info
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    @cache_memoize(60 * 60 * 24)  # 1 day
+    @cache_memoize(60 * 60 * 24, prefix='collectibles-retrieve_token_info')  # 1 day
     def retrieve_token_info(self, token_address: str) -> Optional[Erc721Info]:
         """
         Queries blockchain for the token name and symbol

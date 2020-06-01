@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import requests
+from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from web3 import Web3
 
@@ -144,6 +145,7 @@ class BalanceService:
             raise CannotGetEthereumPrice from e
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_usd_price'))
+    @cache_memoize(60 * 30, prefix='balances-get_eth_usd_price')  # 30 minutes
     def get_eth_usd_price(self) -> float:
         try:
             return self.get_eth_usd_price_kraken()
@@ -151,6 +153,7 @@ class BalanceService:
             return self.get_eth_usd_price_binance()
 
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
+    @cache_memoize(60 * 30, prefix='balances-get_token_eth_value')  # 30 minutes
     def get_token_eth_value(self, token_address: str) -> float:
         """
         Return current ether value for a given `token_address`
@@ -167,6 +170,7 @@ class BalanceService:
             return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
+    @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
     def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
         try:
             erc20_info = self.ethereum_client.erc20.get_info(token_address)
