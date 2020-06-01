@@ -13,7 +13,7 @@ rm -rf $DOCKER_SHARED_DIR/*
 cp -r staticfiles/ $DOCKER_SHARED_DIR/
 
 echo "==> $(date +%H:%M:%S) ==> Send via Slack info about service version and network"
-python manage.py send_slack_notification
+python manage.py send_slack_notification &
 
 echo "==> $(date +%H:%M:%S) ==> Running Gunicorn... "
 exec gunicorn --worker-class gevent --pythonpath "$PWD" config.wsgi:application --timeout 60 --graceful-timeout 60 --log-file=- --error-logfile=- --access-logfile=- --log-level info --logger-class='safe_transaction_service.history.utils.CustomGunicornLogger' -b unix:$DOCKER_SHARED_DIR/gunicorn.socket -b 0.0.0.0:8888
