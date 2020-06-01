@@ -8,7 +8,7 @@ from cachetools import TTLCache, cachedmethod
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.ethereum_client import Erc20Info, InvalidERC20Info
+from gnosis.eth.ethereum_client import InvalidERC20Info
 from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
 from ..models import EthereumEvent
@@ -172,7 +172,7 @@ class BalanceService:
             erc20_info = self.ethereum_client.erc20.get_info(token_address)
             return Erc20InfoWithLogo(token_address, erc20_info.name, erc20_info.symbol, erc20_info.decimals)
         except InvalidERC20Info:
-            logger.warning('Cannot get token info for token-address=%s', token_address)
+            logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
             return None
 
     def get_usd_balances(self, safe_address: str) -> List[BalanceWithUsd]:

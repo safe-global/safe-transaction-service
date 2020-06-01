@@ -18,8 +18,9 @@ from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
 from ..serializers import TransferType
-from ..services import BalanceService
+from ..services import BalanceService, CollectiblesService
 from ..services.balance_service import Erc20InfoWithLogo, get_erc20_logo_uri
+from ..services.collectibles_service import CollectibleWithMetadata
 from .factories import (EthereumEventFactory, EthereumTxFactory,
                         InternalTxFactory, ModuleTransactionFactory,
                         MultisigConfirmationFactory,
@@ -559,6 +560,49 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                'token': token_dict,
                                                'balance': str(tokens_value),
                                                'balance_usd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
+
+    def test_safe_collectibles(self):
+        safe_address = Account.create().address
+        response = self.client.get(reverse('v1:safe-collectibles', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        response = self.client.get(reverse('v1:safe-collectibles', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+        with mock.patch.object(CollectiblesService, 'get_collectibles_with_metadata', autospec=True) as function:
+            token_name = 'TokenName'
+            token_symbol = 'SYMBOL'
+            token_address = Account.create().address
+            token_id = 54
+            token_uri = f'http://token.org/token-id/{token_id}'
+            image = 'http://token.org/token-id/1/image'
+            name = 'Test token name'
+            description = 'Test token description'
+            function.return_value = [CollectibleWithMetadata(token_name,
+                                                             token_symbol,
+                                                             token_address,
+                                                             token_id,
+                                                             token_uri,
+                                                             {'image': image,
+                                                              'name': name,
+                                                              'description': description})]
+            response = self.client.get(reverse('v1:safe-collectibles', args=(safe_address,)), format='json')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data, [{'address': token_address,
+                                              'token_name': token_name,
+                                              'token_symbol': token_symbol,
+                                              'id': str(token_id),
+                                              'uri': token_uri,
+                                              'name': name,
+                                              'description': description,
+                                              'image_uri': image,
+                                              'metadata': {
+                                                  'image': image,
+                                                  'name': name,
+                                                  'description': description,
+                                              }}])
 
     def test_get_safe_delegate_list(self):
         safe_address = Account.create().address
