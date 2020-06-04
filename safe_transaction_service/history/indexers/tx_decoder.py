@@ -222,7 +222,7 @@ class TxDecoder(SafeTxDecoder):
         :param decoded_value:
         :return:
         """
-        # TODO Decode on serializer
+        # TODO Decode on serializer, but it's tricky as it has a nested decoding
         decoded_value = super()._parse_decoded_arguments(decoded_value)
         if isinstance(decoded_value, (int, float)):
             decoded_value = str(decoded_value)
