@@ -127,7 +127,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                                                              '3Cbb2E4B1B3b164Cf'},
                                                                                    {'name': '_threshold',
                                                                                     'type': 'uint256',
-                                                                                    'value': 1}]
+                                                                                    'value': '1'}]
                                                          })
         # Test camelCase
         self.assertEqual(response.json()['transactionHash'], multisig_tx.ethereum_tx.tx_hash)

@@ -1,6 +1,7 @@
 import json
+from functools import cached_property
 from logging import getLogger
-from typing import Any, Dict, List, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Tuple, Union, cast
 
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
@@ -11,9 +12,11 @@ from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.contract import Contract, ContractFunction
 
 from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
-                                  get_safe_contract, get_safe_V0_0_1_contract,
+                                  get_multi_send_contract, get_safe_contract,
+                                  get_safe_V0_0_1_contract,
                                   get_safe_V1_0_0_contract,
                                   get_uniswap_exchange_contract)
+from gnosis.safe.multi_send import MultiSend
 
 logger = getLogger(__name__)
 
@@ -28,6 +31,9 @@ market_maker_factory_abi = json.loads('[{"constant":true,"inputs":[],"name":"imp
 
 # Gnosis Protocol
 gnosis_protocol_abi = json.loads('[{"constant":true,"inputs":[],"name":"IMPROVEMENT_DENOMINATOR","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"getSecondsRemainingInBatch","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"getEncodedOrders","outputs":[{"name":"elements","type":"bytes"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"buyToken","type":"uint16"},{"name":"sellToken","type":"uint16"},{"name":"validUntil","type":"uint32"},{"name":"buyAmount","type":"uint128"},{"name":"sellAmount","type":"uint128"}],"name":"placeOrder","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"batchId","type":"uint32"},{"name":"claimedObjectiveValue","type":"uint256"},{"name":"owners","type":"address[]"},{"name":"orderIds","type":"uint16[]"},{"name":"buyVolumes","type":"uint128[]"},{"name":"prices","type":"uint128[]"},{"name":"tokenIdsForPrice","type":"uint16[]"}],"name":"submitSolution","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"id","type":"uint16"}],"name":"tokenIdToAddressMap","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"token","type":"address"},{"name":"amount","type":"uint256"}],"name":"requestWithdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"FEE_FOR_LISTING_TOKEN_IN_OWL","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"previousPageUser","type":"address"},{"name":"pageSize","type":"uint16"}],"name":"getUsersPaginated","outputs":[{"name":"users","type":"bytes"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"token","type":"address"},{"name":"amount","type":"uint256"}],"name":"deposit","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"orderIds","type":"uint16[]"}],"name":"cancelOrders","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"AMOUNT_MINIMUM","outputs":[{"name":"","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"feeToken","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"buyTokens","type":"uint16[]"},{"name":"sellTokens","type":"uint16[]"},{"name":"validFroms","type":"uint32[]"},{"name":"validUntils","type":"uint32[]"},{"name":"buyAmounts","type":"uint128[]"},{"name":"sellAmounts","type":"uint128[]"}],"name":"placeValidFromOrders","outputs":[{"name":"orderIds","type":"uint16[]"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint16"}],"name":"currentPrices","outputs":[{"name":"","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"}],"name":"getEncodedUserOrders","outputs":[{"name":"elements","type":"bytes"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"},{"name":"","type":"uint256"}],"name":"orders","outputs":[{"name":"buyToken","type":"uint16"},{"name":"sellToken","type":"uint16"},{"name":"validFrom","type":"uint32"},{"name":"validUntil","type":"uint32"},{"name":"priceNumerator","type":"uint128"},{"name":"priceDenominator","type":"uint128"},{"name":"usedAmount","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"UNLIMITED_ORDER_AMOUNT","outputs":[{"name":"","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"numTokens","outputs":[{"name":"","type":"uint16"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"},{"name":"","type":"address"}],"name":"lastCreditBatchId","outputs":[{"name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"previousPageUser","type":"address"},{"name":"previousPageUserOffset","type":"uint16"},{"name":"pageSize","type":"uint16"}],"name":"getEncodedUsersPaginated","outputs":[{"name":"elements","type":"bytes"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"addr","type":"address"}],"name":"hasToken","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"latestSolution","outputs":[{"name":"batchId","type":"uint32"},{"name":"solutionSubmitter","type":"address"},{"name":"feeReward","type":"uint256"},{"name":"objectiveValue","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"},{"name":"token","type":"address"}],"name":"getPendingDeposit","outputs":[{"name":"","type":"uint256"},{"name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"cancellations","type":"uint16[]"},{"name":"buyTokens","type":"uint16[]"},{"name":"sellTokens","type":"uint16[]"},{"name":"validFroms","type":"uint32[]"},{"name":"validUntils","type":"uint32[]"},{"name":"buyAmounts","type":"uint128[]"},{"name":"sellAmounts","type":"uint128[]"}],"name":"replaceOrders","outputs":[{"name":"","type":"uint16[]"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"},{"name":"token","type":"address"}],"name":"getPendingWithdraw","outputs":[{"name":"","type":"uint256"},{"name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"batchId","type":"uint32"}],"name":"acceptingSolutions","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"token","type":"address"}],"name":"addToken","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"},{"name":"token","type":"address"}],"name":"getBalance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"FEE_DENOMINATOR","outputs":[{"name":"","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"ENCODED_AUCTION_ELEMENT_WIDTH","outputs":[{"name":"","type":"uint128"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"BATCH_TIME","outputs":[{"name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"getCurrentBatchId","outputs":[{"name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"},{"name":"offset","type":"uint16"},{"name":"pageSize","type":"uint16"}],"name":"getEncodedUserOrdersPaginated","outputs":[{"name":"elements","type":"bytes"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"addr","type":"address"}],"name":"tokenAddressToIdMap","outputs":[{"name":"","type":"uint16"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"token","type":"address"},{"name":"amount","type":"uint256"},{"name":"batchId","type":"uint32"}],"name":"requestFutureWithdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"user","type":"address"},{"name":"token","type":"address"}],"name":"hasValidWithdrawRequest","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"MAX_TOKENS","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"user","type":"address"},{"name":"token","type":"address"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"MAX_TOUCHED_ORDERS","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"getCurrentObjectiveValue","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"maxTokens","type":"uint256"},{"name":"_feeToken","type":"address"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":false,"name":"index","type":"uint16"},{"indexed":true,"name":"buyToken","type":"uint16"},{"indexed":true,"name":"sellToken","type":"uint16"},{"indexed":false,"name":"validFrom","type":"uint32"},{"indexed":false,"name":"validUntil","type":"uint32"},{"indexed":false,"name":"priceNumerator","type":"uint128"},{"indexed":false,"name":"priceDenominator","type":"uint128"}],"name":"OrderPlacement","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"token","type":"address"},{"indexed":false,"name":"id","type":"uint16"}],"name":"TokenListing","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":false,"name":"id","type":"uint16"}],"name":"OrderCancellation","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":false,"name":"id","type":"uint16"}],"name":"OrderDeletion","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"orderId","type":"uint16"},{"indexed":true,"name":"sellToken","type":"uint16"},{"indexed":false,"name":"buyToken","type":"uint16"},{"indexed":false,"name":"executedSellAmount","type":"uint128"},{"indexed":false,"name":"executedBuyAmount","type":"uint128"}],"name":"Trade","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"orderId","type":"uint16"},{"indexed":true,"name":"sellToken","type":"uint16"},{"indexed":false,"name":"buyToken","type":"uint16"},{"indexed":false,"name":"executedSellAmount","type":"uint128"},{"indexed":false,"name":"executedBuyAmount","type":"uint128"}],"name":"TradeReversion","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"submitter","type":"address"},{"indexed":false,"name":"utility","type":"uint256"},{"indexed":false,"name":"disregardedUtility","type":"uint256"},{"indexed":false,"name":"burntFees","type":"uint256"},{"indexed":false,"name":"lastAuctionBurntFees","type":"uint256"},{"indexed":false,"name":"prices","type":"uint128[]"},{"indexed":false,"name":"tokenIdsForPrice","type":"uint16[]"}],"name":"SolutionSubmission","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"user","type":"address"},{"indexed":true,"name":"token","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"batchId","type":"uint32"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"user","type":"address"},{"indexed":true,"name":"token","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"batchId","type":"uint32"}],"name":"WithdrawRequest","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"user","type":"address"},{"indexed":true,"name":"token","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Withdraw","type":"event"}]')
+
+# Gnosis multisend
+gnosis_multisend_abi = json.loads('[{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"constant":false,"inputs":[{"internalType":"bytes","name":"transactions","type":"bytes"}],"name":"multiSend","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]')
 
 
 class TxDecoderException(Exception):
@@ -67,19 +73,31 @@ class SafeTxDecoder:
         # will take preference
         self.supported_contracts = self.safe_contracts
 
-        # Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
-        # Store selectors with abi
-        self.supported_fn_selectors: Dict[bytes, ContractFunction] = {}
-        for supported_contract in self.supported_contracts:
-            self.supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
-
     def _generate_selectors_with_abis_from_contract(self, contract: Contract) -> Dict[bytes, ContractFunction]:
+        """
+        :param contract: Web3 Contract
+        :return: Dictionary with function selector as bytes and the ContractFunction
+        """
         return {function_abi_to_4byte_selector(contract_fn.abi): contract_fn
                 for contract_fn in contract.all_functions()}
 
+    def _generate_selectors_with_abis_from_contracts(self, contracts: Iterable[Contract]) -> Dict[bytes,
+                                                                                                  ContractFunction]:
+        """
+        :param contracts: Web3 Contracts. Last contracts on the Iterable have preference if there's a collision on the
+        selector
+        :return: Dictionary with function selector as bytes and the ContractFunction.
+        """
+        # TODO Use comprehension
+        supported_fn_selectors: Dict[bytes, ContractFunction] = {}
+        for supported_contract in contracts:
+            supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
+        return supported_fn_selectors
+
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
-        Parse decoded arguments, like converting `bytes` to hexadecimal `str`
+        Parse decoded arguments, like converting `bytes` to hexadecimal `str` or `int` and `float` to `str` (to
+        prevent problems when deserializing in another languages like JavaScript
         :param decoded_value:
         :return: Dict[str, Any]
         """
@@ -87,11 +105,50 @@ class SafeTxDecoder:
             decoded_value = HexBytes(decoded_value).hex()
         return decoded_value
 
+    @cached_property
+    def supported_fn_selectors(self) -> Dict[bytes, ContractFunction]:
+        """
+        Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
+        Store function selectors with abi
+        :return: A dictionary with the selectors and the contract function
+        """
+        return self._generate_selectors_with_abis_from_contracts(self.supported_contracts)
+
+    def get_data_decoded(self, data: Union[str, bytes]):
+        """
+        Return data prepared for serializing
+        :param data:
+        :return:
+        """
+        try:
+            fn_name, parameters = self.decode_transaction_with_types(data)
+            return {fn_name: parameters}
+        except TxDecoderException:
+            return None
+
+    def decode_multisend_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
+        """
+        Return a multisend
+        :param data:
+        :return:
+        """
+        try:
+            multisend_txs = MultiSend.from_transaction_data(data)
+            return [{'operation': multisend_tx.operation.name,
+                     'to': multisend_tx.to,
+                     'value': multisend_tx.value,
+                     'data': multisend_tx.data.hex(),
+                     'decoded_data': self.get_data_decoded(multisend_tx.data),
+                     } for multisend_tx in multisend_txs]
+        except ValueError:
+            logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)
+
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
         """
         Decode tx data
         :param data: Tx data as `hex string` or `bytes`
-        :return: Tuple with the `function name` and a list of dictionaries dictionary {'name', 'type', 'value'}
+        :return: Tuple with the `function name` and a list of dictionaries
+        [{'name': str, 'type': str, 'value': `depending on type`}...]
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
@@ -107,8 +164,9 @@ class SafeTxDecoder:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
-        fn_name, parameters = self._decode_transaction(data)
-        return fn_name, {name: value for name, argument_type, value in parameters}
+        fn_name, decoded_transactions_with_types = self.decode_transaction_with_types(data)
+        decoded_transactions = {d['name']: d['value'] for d in decoded_transactions_with_types}
+        return fn_name, decoded_transactions
 
     def _decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
         """
@@ -143,23 +201,43 @@ class SafeTxDecoder:
 
 class TxDecoder(SafeTxDecoder):
     def __init__(self):
-        #TODO  Refactor this using inheritance
-        self.dummy_w3 = Web3()
+        super().__init__()
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
                      self.dummy_w3.eth.contract(abi=gnosis_protocol_abi)]
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
                                                                            market_maker_factory_abi)]
         erc_contracts = [get_erc721_contract(self.dummy_w3), get_erc20_contract(self.dummy_w3)]
-        safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
-                          get_safe_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = exchanges + sight_contracts + erc_contracts + safe_contracts
+        self.supported_contracts = exchanges + sight_contracts + erc_contracts + self.supported_contracts
 
-        # Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
-        # Store selectors with abi
-        self.supported_fn_selectors: Dict[bytes, ContractFunction] = {}
-        for supported_contract in self.supported_contracts:
-            self.supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
+        # Special case for multisend
+        self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
+
+    def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
+        """
+        Decode integers also
+        :param decoded_value:
+        :return:
+        """
+        # TODO Decode on serializer
+        decoded_value = super()._parse_decoded_arguments(decoded_value)
+        if isinstance(decoded_value, (int, float)):
+            decoded_value = str(decoded_value)
+        return decoded_value
+
+    @cached_property
+    def multisend_fn_selectors(self) -> Dict[bytes, ContractFunction]:
+        return self._generate_selectors_with_abis_from_contracts(self.multisend_contracts)
+
+    def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
+        """
+        Add support for multisend
+        """
+        fn_name, parameters = super().decode_transaction_with_types(data)
+        if data[:4] in self.multisend_fn_selectors:
+            parameters[0]['multisend'] = self.decode_multisend_with_types(data)
+
+        return fn_name, parameters
