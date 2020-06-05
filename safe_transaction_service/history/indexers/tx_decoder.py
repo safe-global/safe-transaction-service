@@ -238,6 +238,6 @@ class TxDecoder(SafeTxDecoder):
         """
         fn_name, parameters = super().decode_transaction_with_types(data)
         if data[:4] in self.multisend_fn_selectors:
-            parameters[0]['transactions'] = self.decode_multisend_with_types(data)
+            parameters[0]['decoded_value'] = self.decode_multisend_with_types(data)
 
         return fn_name, parameters
