@@ -326,8 +326,8 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
         tx_decoder = get_tx_decoder()
         try:
-            fn_name, types = tx_decoder.decode_transaction_with_types(obj.data.tobytes() if obj.data else b'')
-            return {fn_name: types}
+            data = obj.data.tobytes() if obj.data else b''
+            return tx_decoder.get_data_decoded(data)
         except TxDecoderException:
             return None
 
