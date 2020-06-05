@@ -126,23 +126,6 @@ class SafeTxDecoder:
         except TxDecoderException:
             return None
 
-    def decode_multisend_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
-        """
-        Return a multisend
-        :param data:
-        :return:
-        """
-        try:
-            multisend_txs = MultiSend.from_transaction_data(data)
-            return [{'operation': multisend_tx.operation.name,
-                     'to': multisend_tx.to,
-                     'value': multisend_tx.value,
-                     'data': multisend_tx.data.hex(),
-                     'decoded_data': self.get_data_decoded(multisend_tx.data),
-                     } for multisend_tx in multisend_txs]
-        except ValueError:
-            logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)
-
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
         """
         Decode tx data
@@ -209,12 +192,12 @@ class TxDecoder(SafeTxDecoder):
                                                                            market_maker_factory_abi)]
         erc_contracts = [get_erc721_contract(self.dummy_w3), get_erc20_contract(self.dummy_w3)]
 
+        self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
+
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = exchanges + sight_contracts + erc_contracts + self.supported_contracts
-
-        # Special case for multisend
-        self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
+        self.supported_contracts = (exchanges + sight_contracts + erc_contracts +
+                                    self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
@@ -231,6 +214,23 @@ class TxDecoder(SafeTxDecoder):
     @cached_property
     def multisend_fn_selectors(self) -> Dict[bytes, ContractFunction]:
         return self._generate_selectors_with_abis_from_contracts(self.multisend_contracts)
+
+    def decode_multisend_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
+        """
+        Return a multisend
+        :param data:
+        :return:
+        """
+        try:
+            multisend_txs = MultiSend.from_transaction_data(data)
+            return [{'operation': multisend_tx.operation.name,
+                     'to': multisend_tx.to,
+                     'value': multisend_tx.value,
+                     'data': multisend_tx.data.hex(),
+                     'decoded_data': self.get_data_decoded(multisend_tx.data),
+                     } for multisend_tx in multisend_txs]
+        except ValueError:
+            logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)
 
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
         """

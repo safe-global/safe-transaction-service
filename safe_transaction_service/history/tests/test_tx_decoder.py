@@ -6,7 +6,7 @@ from hexbytes import HexBytes
 
 from gnosis.safe.multi_send import MultiSend, MultiSendOperation
 
-from ..indexers.tx_decoder import (SafeTxDecoder, TxDecoder,
+from ..indexers.tx_decoder import (CannotDecode, SafeTxDecoder, TxDecoder,
                                    get_safe_tx_decoder, get_tx_decoder)
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ class TestTxDecoder(TestCase):
         change_fallback_manager_data = HexBytes(
             '0xf08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cd'
             'bdf44')
-        safe_tx_decoder = get_safe_tx_decoder()
+        tx_decoder = get_tx_decoder()
         expected = [
             {'operation': operation,
              'to': safe_contract_address,
@@ -158,7 +158,63 @@ class TestTxDecoder(TestCase):
              }
              }
         ]
-        self.assertEqual(safe_tx_decoder.decode_multisend_with_types(data), expected)
+        # Get just the multisend object
+        self.assertEqual(tx_decoder.decode_multisend_with_types(data), expected)
+
+        # Now decode all the data
+        expected = ('multiSend',
+                    [{'name': 'transactions',
+                      'type': 'bytes',
+                      'value': '0x005b9ea52aaa931d4eef74c8aeaf0fe759434fed74000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000247de7edef00000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f005b9ea52aaa931d4eef74c8aeaf0fe759434fed7400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf44',
+                      'multisend': [
+                          {'operation': operation,
+                           'to': safe_contract_address,
+                           'value': value,
+                           'data': change_master_copy_data.hex(),
+                           'decoded_data': {
+                               'changeMasterCopy': [
+                                   {'name': '_masterCopy',
+                                    'type': 'address',
+                                    'value': '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'
+                                    }
+                               ]
+                           }
+                           },
+                          {'operation': operation,
+                           'to': safe_contract_address,
+                           'value': value,
+                           'data': change_fallback_manager_data.hex(),
+                           'decoded_data': {
+                               'setFallbackHandler': [
+                                   {'name': 'handler',
+                                    'type': 'address',
+                                    'value': '0xd5D82B6aDDc9027B22dCA772Aa68D5d74cdBdF44'
+                                    }
+                               ]
+                           }
+                           }
+                      ]
+                      }])
+        self.assertEqual(tx_decoder.decode_transaction_with_types(data), expected)
+
+        # Safe tx decoder cannot decode it. It would be problematic for the internal tx indexer
+        safe_tx_decoder = get_safe_tx_decoder()
+        with self.assertRaises(CannotDecode):
+            safe_tx_decoder.decode_transaction_with_types(data)
+
+    def test_decode_multisend_not_valid(self):
+        # Same data with some stuff deleted
+        data = HexBytes('0x8d80ff0a0000000000000000000000000000000000000000000000000000000000000020000000000000000000'
+                        '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+                        '000000000000000000000000000000247de7edef00000000000000000000000034cfac646f301356faa8b21e9422'
+                        '7e3583fe3f5f005b9ea52aaa931d4eef74c8aeaf0fe759434fed7400000000000000000000000000000000000000'
+                        '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f0'
+                        '8a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000'
+                        '000000')
+        tx_decoder = get_tx_decoder()
+        self.assertEqual(tx_decoder.decode_multisend_with_types(data), [])
+        self.assertEqual(tx_decoder.decode_transaction_with_types(data),
+                         ('multiSend', [{'name': 'transactions', 'type': 'bytes', 'value': '0x', 'multisend': []}]))
 
     def test_supported_fn_selectors(self):
         for tx_decoder in (TxDecoder(), get_tx_decoder(), get_safe_tx_decoder()):
