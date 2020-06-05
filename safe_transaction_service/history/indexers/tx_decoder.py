@@ -122,7 +122,8 @@ class SafeTxDecoder:
         """
         try:
             fn_name, parameters = self.decode_transaction_with_types(data)
-            return {fn_name: parameters}
+            return {'method': fn_name,
+                    'parameters': parameters}
         except TxDecoderException:
             return None
 

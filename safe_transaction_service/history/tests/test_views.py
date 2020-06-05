@@ -121,13 +121,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertTrue(Web3.isChecksumAddress(response.data['executor']))
         self.assertEqual(response.data['transaction_hash'], multisig_tx.ethereum_tx.tx_hash)
         self.assertEqual(response.data['origin'], multisig_tx.origin)
-        self.assertEqual(response.data['data_decoded'], {'addOwnerWithThreshold': [{'name': 'owner',
-                                                                                    'type': 'address',
-                                                                                    'value': '0x1b9a0DA11a5caCE4e703599'
-                                                                                             '3Cbb2E4B1B3b164Cf'},
-                                                                                   {'name': '_threshold',
-                                                                                    'type': 'uint256',
-                                                                                    'value': '1'}]
+        self.assertEqual(response.data['data_decoded'], {'method': 'addOwnerWithThreshold',
+                                                         'parameters': [{'name': 'owner',
+                                                                         'type': 'address',
+                                                                         'value': '0x1b9a0DA11a5caCE4e703599'
+                                                                                  '3Cbb2E4B1B3b164Cf'},
+                                                                        {'name': '_threshold',
+                                                                         'type': 'uint256',
+                                                                         'value': '1'}]
                                                          })
         # Test camelCase
         self.assertEqual(response.json()['transactionHash'], multisig_tx.ethereum_tx.tx_hash)

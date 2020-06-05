@@ -136,7 +136,8 @@ class TestTxDecoder(TestCase):
              'value': value,
              'data': change_master_copy_data.hex(),
              'decoded_data': {
-                 'changeMasterCopy': [
+                 'method': 'changeMasterCopy',
+                 'parameters': [
                      {'name': '_masterCopy',
                       'type': 'address',
                       'value': '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'
@@ -149,7 +150,8 @@ class TestTxDecoder(TestCase):
              'value': value,
              'data': change_fallback_manager_data.hex(),
              'decoded_data': {
-                 'setFallbackHandler': [
+                 'method': 'setFallbackHandler',
+                 'parameters': [
                      {'name': 'handler',
                       'type': 'address',
                       'value': '0xd5D82B6aDDc9027B22dCA772Aa68D5d74cdBdF44'
@@ -172,7 +174,8 @@ class TestTxDecoder(TestCase):
                            'value': value,
                            'data': change_master_copy_data.hex(),
                            'decoded_data': {
-                               'changeMasterCopy': [
+                               'method': 'changeMasterCopy',
+                               'parameters': [
                                    {'name': '_masterCopy',
                                     'type': 'address',
                                     'value': '0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F'
@@ -185,7 +188,8 @@ class TestTxDecoder(TestCase):
                            'value': value,
                            'data': change_fallback_manager_data.hex(),
                            'decoded_data': {
-                               'setFallbackHandler': [
+                               'method': 'setFallbackHandler',
+                               'parameters': [
                                    {'name': 'handler',
                                     'type': 'address',
                                     'value': '0xd5D82B6aDDc9027B22dCA772Aa68D5d74cdBdF44'
