@@ -166,7 +166,7 @@ class TestTxDecoder(TestCase):
                     [{'name': 'transactions',
                       'type': 'bytes',
                       'value': '0x005b9ea52aaa931d4eef74c8aeaf0fe759434fed74000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000247de7edef00000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f005b9ea52aaa931d4eef74c8aeaf0fe759434fed7400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf44',
-                      'multisend': [
+                      'transactions': [
                           {'operation': operation,
                            'to': safe_contract_address,
                            'value': value,
@@ -214,7 +214,7 @@ class TestTxDecoder(TestCase):
         tx_decoder = get_tx_decoder()
         self.assertEqual(tx_decoder.decode_multisend_with_types(data), [])
         self.assertEqual(tx_decoder.decode_transaction_with_types(data),
-                         ('multiSend', [{'name': 'transactions', 'type': 'bytes', 'value': '0x', 'multisend': []}]))
+                         ('multiSend', [{'name': 'transactions', 'type': 'bytes', 'value': '0x', 'transactions': []}]))
 
     def test_supported_fn_selectors(self):
         for tx_decoder in (TxDecoder(), get_tx_decoder(), get_safe_tx_decoder()):
