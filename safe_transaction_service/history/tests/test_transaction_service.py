@@ -28,12 +28,25 @@ class TestTransactionService(TestCase):
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
-        # Should not appear, nonce > last mined transaction
+        # Should not appear unless queued=True, nonce > last mined transaction
         higher_nonce_safe_multisig_transaction = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         higher_nonce_safe_multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
 
-        queryset = transaction_service.get_all_tx_hashes(safe_address)
+        # As there is no multisig tx trusted, just module txs and transfers are returned
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=True).count(), 3)
+
+        # We change a queued tx, a change was not expected unless we set queued=True
+        higher_nonce_safe_multisig_transaction.trusted = True
+        higher_nonce_safe_multisig_transaction.save()
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=True).count(), 3)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=True).count(), 4)
+
+        queryset = transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=False)
+        self.assertEqual(queryset.count(), 8)
+
+        queryset = transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False)
         self.assertEqual(queryset.count(), 6)
+
         all_executed_time = [element['execution_date'] for element in queryset]
         expected_times = [
             another_multisig_transaction.ethereum_tx.block.timestamp,
@@ -54,6 +67,9 @@ class TestTransactionService(TestCase):
                            multisig_transaction_not_mined.safe_tx_hash]
         self.assertEqual(all_tx_hashes, expected_hashes)
 
+        queryset = transaction_service.get_all_tx_hashes(safe_address, trusted=True, queued=False)
+        self.assertEqual(queryset.count(), 3)
+
     def test_get_all_tx_hashes_nonce(self):
         transaction_service: TransactionService = TransactionServiceProvider()
         safe_address = Account.create().address
@@ -61,11 +77,11 @@ class TestTransactionService(TestCase):
         # No mined tx, so nothing is returned
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
-        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address).count(), 0)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 0)
 
         # Mine tx with higher nonce, all should appear
         MultisigTransactionFactory(safe=safe_address)
-        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address).count(), 3)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 3)
 
     def test_get_all_txs_from_hashes(self):
         transaction_service: TransactionService = TransactionServiceProvider()
@@ -83,8 +99,10 @@ class TestTransactionService(TestCase):
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
-        all_tx_hashes = list(transaction_service.get_all_tx_hashes(safe_address).values_list('safe_tx_hash',
-                                                                                             flat=True))
+        all_tx_hashes = list(transaction_service.get_all_tx_hashes(
+            safe_address, queued=False, trusted=False
+        ).values_list('safe_tx_hash', flat=True))
+
         all_txs = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes)
         self.assertEqual(len(all_txs), 5)
         tx_types = [MultisigTransaction, EthereumTx, EthereumTx, ModuleTransaction, MultisigTransaction]
@@ -101,8 +119,10 @@ class TestTransactionService(TestCase):
         internal_tx_in_2 = InternalTxFactory(to=safe_address, value=4,
                                              ethereum_tx=module_transaction.internal_tx.ethereum_tx)
 
-        all_tx_hashes_2 = list(transaction_service.get_all_tx_hashes(safe_address).values_list('safe_tx_hash',
-                                                                                               flat=True))
+        all_tx_hashes_2 = list(transaction_service.get_all_tx_hashes(
+            safe_address, queued=False, trusted=False
+        ).values_list('safe_tx_hash', flat=True))
+
         all_txs_2 = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes_2)
         self.assertEqual(len(all_txs_2), 5)
         tx_types = [MultisigTransaction, EthereumTx, EthereumTx, ModuleTransaction, MultisigTransaction]

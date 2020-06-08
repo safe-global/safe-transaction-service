@@ -36,25 +36,24 @@ class TransactionService:
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
 
-    def get_all_tx_hashes(self, safe_address: str) -> QuerySet:
+    def get_all_tx_hashes(self, safe_address: str, queued: bool = True, trusted: bool = True) -> QuerySet:
         """
         Build a queryset with hashes for every tx for a Safe for pagination filtering. In the case of
         Multisig Transactions, as some of them are not mined, we use the SafeTxHash
         Criteria for building this list:
-          - Return only multisig txs with nonce < current Safe Nonce
+          - Return only multisig txs with `nonce < current Safe Nonce`
           - The endpoint should only show incoming transactions that have been mined
           - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
           date the execution date of the transaction with the same nonce that has been executed should be taken.
           - Incoming and outgoing transfers or Eth/tokens must be under a multisig/module tx if triggered by one.
           Otherwise they should have their own entry in the list using a EthereumTx
+        :param safe_address:
+        :param queued: By default `True`, all transactions are returned. With `False`, just txs wih
+        `nonce < current Safe Nonce` are returned.
+        :param trusted: By default `True`, just txs that are trusted are returned (with at least one confirmation, sent by a
+        delegate or indexed). With `False` all txs are returned
         :return: List with tx hashes sorted by date (newest first)
         """
-
-        # last_nonce = MultisigTransaction.objects.last_nonce(safe_address)  # None if no Multisig Txs executed
-        # current_nonce = 0 if last_nonce is None else last_nonce + 1
-        last_nonce_query = MultisigTransaction.objects.filter(
-            safe=safe_address
-        ).exclude(ethereum_tx=None).order_by('-nonce').values('nonce')
 
         # If tx is not mined, get the execution date of a tx mined with the same nonce
         case = Case(
@@ -67,15 +66,23 @@ class TransactionService:
                  ).values('ethereum_tx__block__timestamp')),
             default=F('ethereum_tx__block__timestamp')
         )
-        multisig_safe_tx_ids = MultisigTransaction.objects.annotate(
-        ).filter(
-            safe=safe_address, nonce__lte=Subquery(last_nonce_query[:1]),
+        multisig_safe_tx_ids = MultisigTransaction.objects.filter(
+            safe=safe_address
         ).annotate(
             execution_date=case,
             block=F('ethereum_tx__block_id'),
         ).values('safe_tx_hash', 'execution_date',
                  'block', 'created')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
         # Block is needed to get stable ordering
+
+        if not queued:  # Filter out txs with nonce >= Safe nonce
+            last_nonce_query = MultisigTransaction.objects.filter(
+                safe=safe_address
+            ).exclude(ethereum_tx=None).order_by('-nonce').values('nonce')
+            multisig_safe_tx_ids = multisig_safe_tx_ids.filter(nonce__lte=Subquery(last_nonce_query[:1]))
+
+        if trusted:  # Just show trusted transactions
+            multisig_safe_tx_ids = multisig_safe_tx_ids.filter(trusted=True)
 
         # Get module txs
         module_tx_ids = ModuleTransaction.objects.filter(

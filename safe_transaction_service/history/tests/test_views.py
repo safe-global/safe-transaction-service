@@ -49,7 +49,24 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         erc20_transfer_out = EthereumEventFactory(from_=safe_address)  # Should not appear
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+
+        # Should not appear unless queued=True, nonce > last mined transaction
+        higher_nonce_safe_multisig_transaction = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        higher_nonce_safe_multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 3)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=True&trusted=True')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 3)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=True&trusted=False')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 7)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 5)
@@ -64,12 +81,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertTrue(transaction['tx_type'])
 
         # Test pagination
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3')
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) +
+                                   '?limit=3&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 3)
 
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?limit=3&offset=3')
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) +
+                                   '?limit=3&offset=3&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 2)
@@ -79,7 +98,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                   ethereum_tx=module_transaction.internal_tx.ethereum_tx)
         internal_tx_in = InternalTxFactory(to=safe_address, value=8,
                                            ethereum_tx=multisig_transaction.ethereum_tx)
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 5)

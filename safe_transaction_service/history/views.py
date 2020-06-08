@@ -1,10 +1,12 @@
 import hashlib
+from typing import Tuple, Union
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters
+from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
@@ -33,7 +35,7 @@ from .serializers import (OwnerResponseSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer,
-                          TransferResponseSerializer)
+                          TransferResponseSerializer, _AllTransactionsSchemaSerializer)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -65,11 +67,40 @@ class AboutView(APIView):
 class AllTransactionsListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
     pagination_class = SmallPagination
+    serializer_class = _AllTransactionsSchemaSerializer  # Just for docs, not used
+
+    _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
+                                             description='If `True` transactions with `nonce >= Safe current nonce` are '
+                                                  'also shown')
+    _schema_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
+                                              description='If `True` just trusted transactions are shown (indexed, added by a '
+                                                   'delegate or with at least one confirmation)')
+    _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
+                                            'types', _AllTransactionsSchemaSerializer)
+
+    def _parse_boolean(self, value: Union[bool, str]) -> bool:
+        if value in (True, 'True', 'true', '1'):
+            return True
+        else:
+            return False
+
+    def get_parameters(self) -> Tuple[bool, bool]:
+        """
+        Parse query parameters:
+        - queued: Default, True. If `queued=True` transactions with `nonce >= Safe current nonce` are also shown
+        - trusted: Default, True. If `trusted=True` just trusted transactions are shown (indexed, added by a delegate
+        or with at least one confirmation)
+        :return: Tuple with queued, trusted
+        """
+        queued = self._parse_boolean(self.request.query_params.get('queued', True))
+        trusted = self._parse_boolean(self.request.query_params.get('trusted', True))
+        return queued, trusted
 
     def list(self, request, *args, **kwargs):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs['address']
-        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe))
+        queued, trusted = self.get_parameters()
+        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe, queued=queued, trusted=trusted))
         page = self.paginate_queryset(queryset)
 
         if not page:
@@ -80,12 +111,21 @@ class AllTransactionsListView(ListAPIView):
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
         return self.get_paginated_response(all_txs_serialized)
 
-    @swagger_auto_schema(responses={400: 'Invalid data',
+    @swagger_auto_schema(responses={200: _schema_200_response,
+                                    400: 'Invalid data',
                                     404: 'Not found',
-                                    422: 'Invalid ethereum address'})
+                                    422: 'Invalid ethereum address'},
+                         manual_parameters=[_schema_queued_param, _schema_trusted_param])
     def get(self, request, *args, **kwargs):
         """
-        Returns the history of a multisig tx (safe)
+        Returns a paginated list of transactions for a Safe. The list has different structures depending on the
+        transaction type:
+        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`. If the query parameter `queued=False` is
+        set only the transactions with `safe nonce < current Safe nonce` will be displayed. By default, only the
+        `trusted` transactions will be displayed (transactions indexed, with at least one confirmation or proposed
+        by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
+        - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
+        - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
         """
         address = kwargs['address']
         if not Web3.isChecksumAddress(address):

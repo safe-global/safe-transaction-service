@@ -193,6 +193,7 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
     signatures = b''
     nonce = factory.Sequence(lambda n: n)
     origin = factory.Faker('name')
+    trusted = False
 
 
 class MultisigConfirmationFactory(factory.DjangoModelFactory):

@@ -486,3 +486,12 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     def get_block_timestamp(self, obj: EthereumTx):
         if obj.block:
             return obj.block.timestamp
+
+
+class _AllTransactionsSchemaSerializer(serializers.Serializer):
+    """
+    Just for the purpose of documenting, don't use it
+    """
+    tx_type_1 = SafeModuleTransactionWithTransfersResponseSerializer()
+    tx_type_2 = SafeMultisigTransactionWithTransfersResponseSerializer()
+    tx_type_3 = EthereumTxWithTransfersResponseSerializer()
