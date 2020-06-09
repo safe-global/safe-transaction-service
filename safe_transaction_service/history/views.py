@@ -35,7 +35,8 @@ from .serializers import (OwnerResponseSerializer,
                           SafeModuleTransactionResponseSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer,
-                          TransferResponseSerializer, _AllTransactionsSchemaSerializer)
+                          TransferResponseSerializer,
+                          _AllTransactionsSchemaSerializer)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -71,10 +72,10 @@ class AllTransactionsListView(ListAPIView):
 
     _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
                                              description='If `True` transactions with `nonce >= Safe current nonce` are '
-                                                  'also shown')
+                                                         'also shown')
     _schema_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
                                               description='If `True` just trusted transactions are shown (indexed, added by a '
-                                                   'delegate or with at least one confirmation)')
+                                                          'delegate or with at least one confirmation)')
     _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
                                             'types', _AllTransactionsSchemaSerializer)
 

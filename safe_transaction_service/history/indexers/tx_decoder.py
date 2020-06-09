@@ -210,6 +210,8 @@ class TxDecoder(SafeTxDecoder):
         decoded_value = super()._parse_decoded_arguments(decoded_value)
         if isinstance(decoded_value, (int, float)):
             decoded_value = str(decoded_value)
+        elif isinstance(decoded_value, (list, tuple)):
+            decoded_value = list([self._parse_decoded_arguments(e) for e in decoded_value])
         return decoded_value
 
     @cached_property
