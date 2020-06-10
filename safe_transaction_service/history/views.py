@@ -147,7 +147,7 @@ class SafeModuleTransactionListView(ListAPIView):
         return ModuleTransaction.objects.filter(
             safe=self.kwargs['address']
         ).select_related(
-            'internal_tx__ethereum_tx'
+            'internal_tx__ethereum_tx__block'
         ).order_by(
             '-created'
         )

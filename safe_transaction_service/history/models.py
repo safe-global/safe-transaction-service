@@ -176,6 +176,12 @@ class EthereumTx(TimeStampedModel):
         return '{} status={} from={} to={}'.format(self.tx_hash, self.status, self._from, self.to)
 
     @property
+    def execution_date(self) -> Optional[datetime.datetime]:
+        if self.block_id is not None:
+            return self.block.timestamp
+        return None
+
+    @property
     def success(self) -> Optional[bool]:
         if self.status is not None:
             return self.status == 1
@@ -710,7 +716,7 @@ class MultisigTransaction(TimeStampedModel):
 
     @property
     def execution_date(self) -> Optional[datetime.datetime]:
-        if self.ethereum_tx_id and self.ethereum_tx.block:
+        if self.ethereum_tx_id and self.ethereum_tx.block_id is not None:
             return self.ethereum_tx.block.timestamp
         return None
 
@@ -741,6 +747,12 @@ class ModuleTransaction(TimeStampedModel):
             return f'{self.safe} - {self.to} - {self.value}'
         else:
             return f'{self.safe} - {self.to} - {HexBytes(self.data.tobytes()).hex()[:8]}'
+
+    @property
+    def execution_date(self) -> Optional[datetime.datetime]:
+        if self.internal_tx.ethereum_tx_id and self.internal_tx.ethereum_tx.block_id is not None:
+            return self.internal_tx.ethereum_tx.block.timestamp
+        return None
 
 
 class MultisigConfirmationQuerySet(models.QuerySet):

@@ -229,13 +229,14 @@ class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
 #            Response Serializers
 # ================================================ #
 class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
+    execution_date = serializers.DateTimeField()
     data = HexadecimalField(allow_null=True, allow_blank=True)
     transaction_hash = serializers.SerializerMethodField()
     block_number = serializers.SerializerMethodField()
 
     class Meta:
         model = ModuleTransaction
-        fields = ('created', 'block_number', 'transaction_hash', 'safe',
+        fields = ('created', 'execution_date', 'block_number', 'transaction_hash', 'safe',
                   'module', 'to', 'value', 'data', 'operation')
 
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
@@ -460,12 +461,12 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
         model = EthereumTx
         exclude = ('block',)
 
+    execution_date = serializers.DateTimeField()
     _from = EthereumAddressField(allow_null=False, allow_zero_address=True, source='_from')
     to = EthereumAddressField(allow_null=True, allow_zero_address=True)
     data = HexadecimalField()
     tx_hash = HexadecimalField()
     block_number = serializers.SerializerMethodField()
-    block_timestamp = serializers.SerializerMethodField()
     transfers = TransferResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
@@ -480,12 +481,8 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
         return result
 
     def get_block_number(self, obj: EthereumTx):
-        if obj.block:
-            return obj.block.number
-
-    def get_block_timestamp(self, obj: EthereumTx):
-        if obj.block:
-            return obj.block.timestamp
+        if obj.block_id:
+            return obj.block_id
 
 
 class _AllTransactionsSchemaSerializer(serializers.Serializer):
