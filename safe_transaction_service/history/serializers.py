@@ -17,11 +17,12 @@ from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
                      SafeContractDelegate)
-
-
 # ================================================ #
 #            Request Serializers
 # ================================================ #
+from .services.safe_service import SafeCreationInfo
+
+
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
@@ -374,7 +375,16 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     factory_address = EthereumAddressField()
     master_copy = EthereumAddressField(allow_null=True)
     setup_data = HexadecimalField(allow_null=True)
+    data_decoded = serializers.SerializerMethodField()
     transaction_hash = Sha3HashField()
+
+    def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
+        tx_decoder = get_tx_decoder()
+        try:
+            data = obj.setup_data or b''
+            return tx_decoder.get_data_decoded(data)
+        except TxDecoderException:
+            return None
 
 
 class SafeInfoResponseSerializer(serializers.Serializer):
