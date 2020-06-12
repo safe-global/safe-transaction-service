@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.ethereum_client import InvalidERC20Info
 
 from ...models import Token
 
@@ -32,12 +33,19 @@ class Command(BaseCommand):
             except Token.DoesNotExist:
                 pass
 
-            info = ethereum_client.erc20.get_info(token_address)
+            try:
+                info = ethereum_client.erc20.get_info(token_address)
+                decimals = info.decimals
+            except InvalidERC20Info:  # Try with a ERC721
+                info = ethereum_client.erc721.get_info(token_address)
+                self.stdout.write(self.style.SUCCESS(f'Detected ERC721 token'))
+                decimals = 0
+
             if no_prompt:
                 response = 'y'
             else:
                 response = input(f'Do you want to create a token {info} (y/n) ').strip().lower()
             if response == 'y':
-                Token.objects.create(address=token_address, name=info.name, symbol=info.symbol, decimals=info.decimals,
+                Token.objects.create(address=token_address, name=info.name, symbol=info.symbol, decimals=decimals,
                                      trusted=True)
                 self.stdout.write(self.style.SUCCESS(f'Created token {info.name} on address {token_address}'))

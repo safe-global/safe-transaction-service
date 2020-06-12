@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class TokenQuerySet(models.QuerySet):
-    pass
+    def erc20(self):
+        return self.exclude(decimals=0)
+
+    def erc721(self):
+        return self.filter(decimals=0)
 
 
 class Token(models.Model):
@@ -18,7 +22,7 @@ class Token(models.Model):
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
-    decimals = models.PositiveSmallIntegerField()  # For ERC721 tokens decimals=0
+    decimals = models.PositiveSmallIntegerField(db_index=True)  # For ERC721 tokens decimals=0
     logo_uri = models.CharField(blank=True, max_length=300)
     trusted = models.BooleanField(default=False)
 
