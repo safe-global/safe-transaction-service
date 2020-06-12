@@ -372,11 +372,11 @@ class SafeDelegateResponseSerializer(serializers.Serializer):
 class SafeCreationInfoResponseSerializer(serializers.Serializer):
     created = serializers.DateTimeField()
     creator = EthereumAddressField()
+    transaction_hash = Sha3HashField()
     factory_address = EthereumAddressField()
     master_copy = EthereumAddressField(allow_null=True)
     setup_data = HexadecimalField(allow_null=True)
     data_decoded = serializers.SerializerMethodField()
-    transaction_hash = Sha3HashField()
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
         tx_decoder = get_tx_decoder()
