@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Sequence, List, Literal, ClassVar
 
-import cfscrape
 from eth_utils import to_checksum_address
 from lxml import html
 
@@ -18,6 +17,7 @@ class EtherscanClient:
 
     def get_tokens_page(self, page: int = 1,
                         elements: Literal[10, 25, 50, 100] = 100) -> Sequence[EtherscanToken]:
+        import cfscrape
         scraper = cfscrape.create_scraper()  # Bypass cloudfare
         response = scraper.get(f'{self.tokens_url}?ps={elements}&p={page}')
         tree = html.fromstring(response.content)
