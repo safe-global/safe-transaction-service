@@ -6,7 +6,6 @@ from django.db import models
 
 from gnosis.eth.django.models import EthereumAddressField
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +27,10 @@ class Token(models.Model):
             return f'ERC20 - {self.name} - {self.address}'
         else:
             return f'ERC721 - {self.name} - {self.address}'
+
+    def set_trusted(self) -> None:
+        self.trusted = True
+        return self.save(update_fields=['trusted'])
 
     def get_full_logo_uri(self):
         if urlparse(self.logo_uri).netloc:

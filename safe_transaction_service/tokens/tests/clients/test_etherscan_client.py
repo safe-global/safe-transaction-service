@@ -12,4 +12,3 @@ class TestEtherscanClient(TestCase):
         elements = 10
         tokens = etherscan_client.get_tokens_page(elements=elements)
         self.assertEqual(len(tokens), elements)
-

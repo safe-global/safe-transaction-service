@@ -25,14 +25,19 @@ class Command(BaseCommand):
                 token = Token.objects.get(address=token_address)
                 self.stdout.write(self.style.SUCCESS(f'Token {token.name} - {token.symbol} with address '
                                                      f'{token_address} already exists'))
+                if not token.trusted:  # Mark token as trusted if it's not
+                    token.set_trusted()
+                    self.stdout.write(self.style.SUCCESS(f'Marking token {token_address} as trusted'))
                 continue
             except Token.DoesNotExist:
                 pass
+
             info = ethereum_client.erc20.get_info(token_address)
             if no_prompt:
                 response = 'y'
             else:
                 response = input(f'Do you want to create a token {info} (y/n) ').strip().lower()
             if response == 'y':
-                Token.objects.create(address=token_address, name=info.name, symbol=info.symbol, decimals=info.decimals)
+                Token.objects.create(address=token_address, name=info.name, symbol=info.symbol, decimals=info.decimals,
+                                     trusted=True)
                 self.stdout.write(self.style.SUCCESS(f'Created token {info.name} on address {token_address}'))

@@ -8,6 +8,7 @@ from eth_account import Account
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.tests.utils import deploy_example_erc20
 
+from ..models import Token
 from .factories import TokenFactory
 
 
@@ -22,3 +23,4 @@ class TestCommands(TestCase):
         erc20 = deploy_example_erc20(ethereum_client.w3, 10, Account.create().address)
         call_command('add_token', erc20.address, '--no-prompt', stdout=buf)
         self.assertIn('Created token', buf.getvalue())
+        self.assertTrue(Token.objects.get(address=erc20.address).trusted)

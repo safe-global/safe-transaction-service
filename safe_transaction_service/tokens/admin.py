@@ -9,4 +9,3 @@ class TokenAdmin(admin.ModelAdmin):
     list_filter = ('decimals', 'trusted')
     ordering = ('name',)
     search_fields = ['symbol', 'address', 'name']
-

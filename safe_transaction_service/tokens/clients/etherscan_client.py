@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence, List, Literal, ClassVar
+from typing import ClassVar, List, Literal, Sequence
 
 from eth_utils import to_checksum_address
 
