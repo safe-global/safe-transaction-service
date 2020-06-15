@@ -142,8 +142,11 @@ class TestSafeTxProcessor(TestCase):
         self.assertEqual(safe_status.nonce, 7)  # Nonce not incrementing
         self.assertEqual(ModuleTransaction.objects.count(), 1)
 
+        self.assertEqual(MultisigTransaction.objects.count(), 7)
         self.assertEqual(MultisigTransaction.objects.count(),
                          InternalTxDecoded.objects.filter(function_name='execTransaction').count())
+        for multisig_transaction in MultisigTransaction.objects.all():
+            self.assertTrue(multisig_transaction.trusted)
 
         # Test ApproveHash. For that we need the `previous_trace` to get the owner
         hash_to_approve = keccak(text='HariSeldon').hex()

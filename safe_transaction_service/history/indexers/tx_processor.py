@@ -253,12 +253,14 @@ class SafeTxProcessor(TxProcessor):
                     'nonce': safe_tx.safe_nonce,
                     'signatures': safe_tx.signatures,
                     'failed': failed,
+                    'trusted': True,
                 })
             if not multisig_tx.ethereum_tx_id:
                 multisig_tx.ethereum_tx = ethereum_tx
                 multisig_tx.failed = failed
                 multisig_tx.signatures = HexBytes(arguments['signatures'])
-                multisig_tx.save(update_fields=['ethereum_tx', 'failed', 'signatures'])
+                multisig_tx.trusted = True
+                multisig_tx.save(update_fields=['ethereum_tx', 'failed', 'signatures', 'trusted'])
 
             for safe_signature in SafeSignature.parse_signature(safe_tx.signatures, safe_tx_hash):
                 multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
