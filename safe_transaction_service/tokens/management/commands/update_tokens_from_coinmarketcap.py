@@ -25,6 +25,9 @@ class Command(BaseCommand):
         coinmarketcap_client = CoinMarketCapClient(api_key)
 
         self.stdout.write(self.style.SUCCESS('Importing tokens from Coinmarketcap'))
+        if not store_db:
+            self.stdout.write(self.style.SUCCESS('Not modifying database. Set --store-db if you want so'))
+
         for token in coinmarketcap_client.get_ethereum_tokens():
             if download_folder:
                 coinmarketcap_client.download_file(token.logo_uri, download_folder, f'{token.token_address}.png')

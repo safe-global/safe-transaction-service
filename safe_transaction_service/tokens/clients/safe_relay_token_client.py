@@ -14,7 +14,7 @@ class SafeRelayToken:
 
 
 class SafeRelayTokenClient:
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str = 'https://safe-relay.gnosis.io/'):
         self.base_url = base_url
         self.headers = {
             'content-type': 'application/json'
