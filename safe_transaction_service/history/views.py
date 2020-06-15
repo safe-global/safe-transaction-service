@@ -105,7 +105,7 @@ class AllTransactionsListView(ListAPIView):
         page = self.paginate_queryset(queryset)
 
         if not page:
-            return self.get_paginated_response({})
+            return self.get_paginated_response([])
 
         all_tx_hashes = [element['safe_tx_hash'] for element in page]
         all_txs = transaction_service.get_all_txs_from_hashes(safe, all_tx_hashes)

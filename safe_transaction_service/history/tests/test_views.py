@@ -37,7 +37,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
-        self.assertEqual(len(response.data['results']), 0)
+        self.assertEqual(response.data['results'], [])
 
         # Factories create the models using current datetime, so as the txs are returned sorted they should be
         # in the reverse order that they were created
