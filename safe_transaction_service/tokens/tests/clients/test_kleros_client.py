@@ -10,7 +10,7 @@ from safe_transaction_service.history.tests.utils import \
 from ...clients.kleros_client import KlerosClient
 
 
-class TestModels(TestCase):
+class TestKlerosClient(TestCase):
     def test_kleros_client(self):
         mainnet_node = just_test_if_mainnet_node()
         kleros_client = KlerosClient(EthereumClient(mainnet_node))

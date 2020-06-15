@@ -2,6 +2,7 @@ from django.test import TestCase
 
 from eth_account import Account
 
+from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..services.safe_service import SafeInfo, SafeServiceProvider
@@ -13,7 +14,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
 
     def test_get_safe_info(self):
         safe_address = Account.create().address
-        with self.assertRaises(ValueError):
+        with self.assertRaises(CannotRetrieveSafeInfoException):
             self.safe_service.get_safe_info(safe_address)
 
         safe_create_tx = self.deploy_test_safe()

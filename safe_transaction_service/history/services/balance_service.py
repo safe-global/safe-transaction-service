@@ -38,7 +38,7 @@ class Erc20InfoWithLogo:
     logo_uri: str = field(init=False)
 
     def __post_init__(self):
-        self.logo_uri = get_erc20_logo_uri(self.address)  # TODO Improve after implementing whitelisting
+        self.logo_uri = get_erc20_logo_uri(self.address)  # TODO Improve after implementing trusted list
 
 
 @dataclass

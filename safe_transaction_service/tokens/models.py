@@ -23,7 +23,7 @@ class Token(models.Model):
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
     decimals = models.PositiveSmallIntegerField(db_index=True)  # For ERC721 tokens decimals=0
-    logo_uri = models.CharField(blank=True, max_length=300)
+    logo_uri = models.CharField(blank=True, max_length=300, default='')
     trusted = models.BooleanField(default=False)
 
     def __str__(self):

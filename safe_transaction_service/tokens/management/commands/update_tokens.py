@@ -1,12 +1,10 @@
-import os
-
-from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from ethereum.utils import checksum_encode
+from gnosis.eth import EthereumClientProvider
+from gnosis.eth.ethereum_client import InvalidERC20Info, InvalidERC721Info
 
+from ...clients import CoinMarketCapClient
 from ...models import Token
-from ...token_repository import TokenRepository
 
 
 class Command(BaseCommand):
@@ -14,44 +12,48 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         # Positional arguments
-        parser.add_argument('--pages', help='Number of pages of tokens on etherscan to scrap', type=int)
-        parser.add_argument('--download-icons', help='Download icons', action='store_true')
-        parser.add_argument('--download-folder', help='Download folder. It implies --download')
-        parser.add_argument('--store-db', help='Store tokens in db', action='store_true')
+        parser.add_argument('api-key', help='Coinmarketcap API Key', type=str)
+        parser.add_argument('--download-folder', help='Download images to folder', type=str)
+        parser.add_argument('--store-db', help='Do changes on database', action='store_true', default=False)
 
     def handle(self, *args, **options):
-        pages = options['pages'] or 3
-        download = options['download_icons'] or options['download_folder']
-        download_folder = options['download_folder'] or os.path.join(settings.STATIC_ROOT, 'tokens')
+        api_key = options['api-key']
+        download_folder = options['download_folder']
         store_db = options['store_db']
-        token_repository = TokenRepository()
-        tokens = token_repository.get_tokens(pages=pages)
-        self.stdout.write(self.style.SUCCESS(str(tokens)))
-        if store_db:
-            for i, token in enumerate(tokens):
-                symbol = token['symbol']
-                relevance = 0 if symbol == 'GNO' else i + 1
-                token_db, created = Token.objects.get_or_create(
-                    address=checksum_encode(token['address']),
-                    defaults={
-                        'name': token['name'],
-                        'symbol': symbol,
-                        'description': token['description'],
-                        'decimals': token['decimals'],
-                        'logo_uri': token['logo_url'] if token['logo_url'] else '',
-                        'website_uri': token['website_url'],
-                        'gas': False,
-                        'relevance': relevance
-                    }
+
+        ethereum_client = EthereumClientProvider()
+        coinmarketcap_client = CoinMarketCapClient(api_key)
+
+        self.stdout.write(self.style.SUCCESS('Importing tokens from Coinmarketcap'))
+        for token in coinmarketcap_client.get_ethereum_tokens():
+            if download_folder:
+                coinmarketcap_client.download_file(token.logo_uri, download_folder, f'{token.token_address}.png')
+
+            if not store_db:
+                continue
+            try:
+                token_db = Token.objects.get(address=token.token_address)
+                if not token_db.trusted:
+                    token_db.set_trusted()
+            except Token.DoesNotExist:
+                try:
+                    token_info = ethereum_client.erc20.get_info(token.token_address)
+                    decimals = token_info.decimals
+                except InvalidERC20Info:
+                    try:
+                        token_info = ethereum_client.erc721.get_info(token.token_address)
+                        decimals = 0
+                    except InvalidERC721Info:
+                        self.stdout.write(self.style.WARNING(
+                            f'Cannot get token information for {token.name} at address {token.token_address}'))
+                        continue
+
+                Token.objects.create(
+                    address=token.token_address,
+                    name=token_info.name,
+                    symbol=token.symbol,
+                    decimals=decimals,
+                    trusted=True,
                 )
-                if token_db.relevance != relevance:
-                    token_db.relevance = relevance
-                    token_db.save(update_fields=['relevance'])
-                    self.stdout.write(self.style.SUCCESS('%s changed relevance to %d' % (token['name'], relevance)))
-
-                if created:
-                    self.stdout.write(self.style.SUCCESS('Inserted new token %s' % token['name']))
-
-        if download:
-            token_repository.download_images_for_tokens(folder=download_folder,
-                                                        token_addresses=[token['address'] for token in tokens])
+                self.stdout.write(self.style.SUCCESS(
+                    f'Inserted new token {token_info.name} at address {token.token_address}'))
