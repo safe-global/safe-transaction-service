@@ -1,6 +1,7 @@
 from django.conf.urls import url
 from django.urls import path
 
+from ..tokens.views import TokensView, TokenView
 from . import views
 
 app_name = "safe"
@@ -41,4 +42,8 @@ urlpatterns = [
          name='multisig-transaction'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
+    # Tokens
+    path('tokens/', TokensView.as_view(), name='tokens'),
+    path('tokens/<str:address>/', TokenView.as_view(), name='token'),
+
 ]

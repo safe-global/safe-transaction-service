@@ -319,5 +319,9 @@ ETH_UNISWAP_FACTORY_ADDRESS = env('ETH_UNISWAP_FACTORY_ADDRESS',
 ETH_KYBER_NETWORK_PROXY_ADDRESS = env('ETH_KYBER_NETWORK_PROXY_ADDRESS',
                                       default='0x818E6FECD516Ecc3849DAf6845e3EC868087B755')
 
+# Tokens
+TOKEN_LOGO_BASE_URI = env('TOKEN_LOGO_BASE_URI', default='https://gnosis-safe-token-logos.s3.amazonaws.com/')
+TOKEN_LOGO_EXTENSION = env('TOKEN_LOGO_EXTENSION', default='.png')
+
 # Notifications
 SLACK_API_WEBHOOK = env('SLACK_API_WEBHOOK', default=None)
