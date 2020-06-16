@@ -16,9 +16,41 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
 from .services import IndexServiceProvider
 
 
+# Inline objects
+class EthereumEventInline(admin.TabularInline):
+    model = EthereumEvent
+    raw_id_fields = ('ethereum_tx',)
+
+
+class EthereumTxInline(admin.TabularInline):
+    model = EthereumTx
+    raw_id_fields = ('block',)
+
+
+class MultisigTransactionInline(admin.TabularInline):
+    model = MultisigTransaction
+    raw_id_fields = ('ethereum_tx',)
+
+
+class MultisigConfirmationInline(admin.TabularInline):
+    model = MultisigConfirmation
+    raw_id_fields = ('ethereum_tx', 'multisig_transaction')
+
+
+class SafeContractInline(admin.TabularInline):
+    model = SafeContract
+    raw_id_fields = ('ethereum_tx',)
+
+
+class SafeContractDelegateInline(admin.TabularInline):
+    model = SafeContractDelegate
+    raw_id_fields = ('safe_contract',)
+
+
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
+    inlines = (EthereumTxInline,)
     list_display = ('number', 'timestamp', 'confirmed', 'gas_limit', 'gas_used', 'block_hash')
     list_filter = ('confirmed',)
     search_fields = ['=number', '=block_hash']
@@ -76,6 +108,7 @@ class EthereumEventAdmin(admin.ModelAdmin):
 
 @admin.register(EthereumTx)
 class EthereumTxAdmin(admin.ModelAdmin):
+    inlines = (EthereumEventInline, SafeContractInline, MultisigTransactionInline, MultisigConfirmationInline)
     list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
     list_filter = ('status',)
     search_fields = ['=tx_hash', '=_from', '=to']
@@ -168,6 +201,7 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
+    inlines = (MultisigConfirmationInline,)
     list_display = ('created', 'safe', 'executed', 'successful', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value',
                     'nonce', 'data')
     list_filter = ('failed', 'trusted', )
@@ -259,6 +293,7 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
     actions = ['reindex', 'reindex_last_day', 'reindex_last_month']
+    inlines = (SafeContractDelegateInline,)
     list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc20_block_number')
     list_filter = (SafeContractERC20ListFilter, )
     list_select_related = ('ethereum_tx',)
