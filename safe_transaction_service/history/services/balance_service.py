@@ -13,6 +13,7 @@ from gnosis.eth.ethereum_client import InvalidERC20Info
 from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
 from ..models import EthereumEvent
+from ...tokens.models import Token
 
 logger = logging.getLogger(__name__)
 
@@ -25,20 +26,21 @@ class CannotGetEthereumPrice(BalanceServiceException):
     pass
 
 
-def get_erc20_logo_uri(address: str) -> str:
-    return f'https://gnosis-safe-token-logos.s3.amazonaws.com/{address}.png'
-
-
 @dataclass
 class Erc20InfoWithLogo:
     address: str
     name: str
     symbol: str
     decimals: int
-    logo_uri: str = field(init=False)
+    logo_uri: str
 
-    def __post_init__(self):
-        self.logo_uri = get_erc20_logo_uri(self.address)  # TODO Improve after implementing trusted list
+    @classmethod
+    def from_token(cls, token: Token):
+        return cls(token.address,
+                   token.name,
+                   token.symbol,
+                   token.decimals,
+                   token.get_full_logo_uri())
 
 
 @dataclass
@@ -173,11 +175,19 @@ class BalanceService:
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
     def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
         try:
-            erc20_info = self.ethereum_client.erc20.get_info(token_address)
-            return Erc20InfoWithLogo(token_address, erc20_info.name, erc20_info.symbol, erc20_info.decimals)
-        except InvalidERC20Info:
-            logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
-            return None
+            token = Token.objects.get(address=token_address)
+            return Erc20InfoWithLogo.from_token(token)
+        except Token.DoesNotExist:
+            try:
+                erc20_info = self.ethereum_client.erc20.get_info(token_address)
+                token = Token.objects.create(address=token_address,
+                                             name=erc20_info.name,
+                                             symbol=erc20_info.symbol,
+                                             decimals=erc20_info.decimals)
+                return Erc20InfoWithLogo.from_token(token)
+            except InvalidERC20Info:
+                logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
+                return None
 
     def get_usd_balances(self, safe_address: str) -> List[BalanceWithUsd]:
         """

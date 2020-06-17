@@ -19,7 +19,7 @@ from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
 from ..serializers import TransferType
 from ..services import BalanceService, CollectiblesService
-from ..services.balance_service import Erc20InfoWithLogo, get_erc20_logo_uri
+from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
 from .factories import (EthereumEventFactory, EthereumTxFactory,
                         InternalTxFactory, ModuleTransactionFactory,
@@ -27,6 +27,7 @@ from .factories import (EthereumEventFactory, EthereumTxFactory,
                         MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeContractFactory,
                         SafeStatusFactory)
+from ...tokens.models import Token
 
 logger = logging.getLogger(__name__)
 
@@ -533,15 +534,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
+        self.assertEqual(Token.objects.count(), 0)
         EthereumEventFactory(address=erc20.address, to=safe_address)
         response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Token.objects.count(), 1)
         self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value), 'token': None},
                                                 {'tokenAddress': erc20.address, 'balance': str(tokens_value),
                                                  'token': {'name': erc20.functions.name().call(),
                                                            'symbol': erc20.functions.symbol().call(),
                                                            'decimals': erc20.functions.decimals().call(),
-                                                           'logoUri': get_erc20_logo_uri(erc20.address)}}])
+                                                           'logoUri': Token.objects.first().get_full_logo_uri()}}])
 
     @mock.patch.object(BalanceService, 'get_token_info',  autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
@@ -566,7 +569,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
-        erc20_info = Erc20InfoWithLogo(erc20.address, 'UXIO', 'UXI', 18)
+        erc20_info = Erc20InfoWithLogo(erc20.address, 'UXIO', 'UXI', 18, 'http://logo_uri.es')
         get_token_info_mock.return_value = erc20_info
 
         EthereumEventFactory(address=erc20.address, to=safe_address)

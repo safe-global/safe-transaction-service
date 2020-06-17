@@ -13,6 +13,7 @@ from ..services import BalanceService, BalanceServiceProvider
 from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
+from ...tokens.tests.factories import TokenFactory
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
@@ -64,9 +65,20 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertIsInstance(token_eth_value, float)
         self.assertGreater(token_eth_value, 0)
 
-    def test_get_token_info_error(self):
+    def test_get_token_info(self):
         balance_service = BalanceServiceProvider()
-        self.assertIsNone(balance_service.get_token_info(Account.create().address))
+        token_address = Account.create().address
+        self.assertIsNone(balance_service.get_token_info(token_address))
+
+        token_db = TokenFactory(address=token_address)
+        self.assertIsNone(balance_service.get_token_info(token_address))  # It's cached
+
+        balance_service.cache_token_info = {}  # Empty cache
+        token_info = balance_service.get_token_info(token_address)  # It's cached
+        self.assertEqual(token_info.address, token_address)
+        self.assertEqual(token_info.name, token_db.name)
+        self.assertEqual(token_info.symbol, token_db.symbol)
+        self.assertEqual(token_info.decimals, token_db.decimals)
 
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
