@@ -138,6 +138,7 @@ class EthereumBlock(models.Model):
 class EthereumTxManager(models.Manager):
     def create_from_tx_dict(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
                             ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
+        data = HexBytes(tx.get('data') or tx.get('input'))
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx['hash']).hex(),
@@ -148,7 +149,7 @@ class EthereumTxManager(models.Manager):
             logs=tx_receipt and [clean_receipt_log(log) for log in tx_receipt.get('logs', list())],
             status=tx_receipt and tx_receipt.get('status'),
             transaction_index=tx_receipt and tx_receipt['transactionIndex'],
-            data=HexBytes(tx.get('data') or tx.get('input')),
+            data=data if data else None,
             nonce=tx['nonce'],
             to=tx.get('to'),
             value=tx['value'],
@@ -328,6 +329,13 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         return ','.join([str(address) for address in trace_address])
 
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':
+        """
+        Build a InternalTx object from trace, but it doesn't insert it on database
+        :param trace:
+        :param ethereum_tx:
+        :return: InternalTx not inserted
+        """
+        data = trace['action'].get('input') or trace['action'].get('init')
         tx_type = EthereumTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
         trace_address_str = self._trace_address_to_str(trace['traceAddress'])
@@ -336,7 +344,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
             trace_address=trace_address_str,
             _from=trace['action'].get('from'),
             gas=trace['action'].get('gas', 0),
-            data=trace['action'].get('input') or trace['action'].get('init'),
+            data=data if data else None,
             to=trace['action'].get('to') or trace['action'].get('address'),
             value=trace['action'].get('value') or trace['action'].get('balance', 0),
             gas_used=(trace.get('result') or {}).get('gasUsed', 0),

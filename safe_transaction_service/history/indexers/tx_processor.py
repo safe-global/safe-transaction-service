@@ -168,6 +168,7 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Executing Tx from Module')
             module_internal_tx = internal_tx.get_previous_module_trace()
             module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
+            module_data = HexBytes(arguments['data'])
             ModuleTransaction.objects.get_or_create(
                 internal_tx=internal_tx,
                 defaults={
@@ -176,7 +177,7 @@ class SafeTxProcessor(TxProcessor):
                     'module': module_address,
                     'to': arguments['to'],
                     'value': arguments['value'],
-                    'data': HexBytes(arguments['data']),
+                    'data': module_data if module_data else None,
                     'operation': arguments['operation']
                 }
             )
