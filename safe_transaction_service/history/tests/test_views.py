@@ -14,6 +14,7 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ...tokens.models import Token
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
@@ -27,7 +28,6 @@ from .factories import (EthereumEventFactory, EthereumTxFactory,
                         MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeContractFactory,
                         SafeStatusFactory)
-from ...tokens.models import Token
 
 logger = logging.getLogger(__name__)
 
