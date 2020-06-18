@@ -244,13 +244,11 @@ class TxDecoder(SafeTxDecoder):
         # If Gnosis Safe `execTransaction` decode the inner transaction
         # function execTransaction(address to, uint256 value, bytes calldata data...)
         # selector is `0x6a761202` and parameters[2] is data
-        if data[:4] == HexBytes('0x6a761202') and len(parameters) > 2:
-            data = HexBytes(parameters[2]['value'])
-            if data:
-                try:
-                    parameters[2]['decoded_value'] = self.get_data_decoded(data)
-                except TxDecoderException:
-                    logger.warning('Cannot decode `execTransaction`', exc_info=True)
+        if data[:4] == HexBytes('0x6a761202') and len(parameters) > 2 and (data := HexBytes(parameters[2]['value'])):
+            try:
+                parameters[2]['decoded_value'] = self.get_data_decoded(data)
+            except TxDecoderException:
+                logger.warning('Cannot decode `execTransaction`', exc_info=True)
 
         return fn_name, parameters
 

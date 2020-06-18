@@ -1,10 +1,12 @@
 import logging
-from typing import Any, Dict, List, Union
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Union
 
 from django.db.models import Case, F, OuterRef, QuerySet, Subquery, When
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
+from ...tokens.models import Token
 from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
                       InternalTx, ModuleTransaction, MultisigTransaction)
 from ..serializers import (
@@ -145,62 +147,78 @@ class TransactionService:
         :param hashes_to_search:
         :return:
         """
-        multisig_txs = MultisigTransaction.objects.filter(
-            safe=safe_address,
-            safe_tx_hash__in=hashes_to_search
-        ).with_confirmations_required(
-        ).prefetch_related(
-            'confirmations'
-        ).select_related(
-            'ethereum_tx__block'
-        ).order_by(
-            '-nonce',
-            '-created'
-        )
+        multisig_txs = {multisig_tx.safe_tx_hash: multisig_tx
+                        for multisig_tx in
+                        MultisigTransaction.objects.filter(
+                            safe=safe_address,
+                            safe_tx_hash__in=hashes_to_search
+                        ).with_confirmations_required(
+                        ).prefetch_related(
+                            'confirmations'
+                        ).select_related(
+                            'ethereum_tx__block'
+                        ).order_by(
+                            '-nonce',
+                            '-created'
+                        )}
 
-        module_txs = list(ModuleTransaction.objects.filter(
-            safe=safe_address,
-            internal_tx__ethereum_tx__in=hashes_to_search
-        ).select_related('internal_tx'))
-        plain_ethereum_txs = list(EthereumTx.objects.filter(tx_hash__in=hashes_to_search).select_related('block'))
+        module_txs = {module_tx.internal_tx.ethereum_tx_id: module_tx
+                      for module_tx in
+                      ModuleTransaction.objects.filter(
+                          safe=safe_address,
+                          internal_tx__ethereum_tx__in=hashes_to_search
+                      ).select_related('internal_tx')}
+
+        plain_ethereum_txs = {ethereum_tx.tx_hash: ethereum_tx
+                              for ethereum_tx in EthereumTx.objects.filter(tx_hash__in=hashes_to_search
+                                                                           ).select_related('block')}
 
         # We also need the out transfers for the MultisigTxs
-        all_hashes = hashes_to_search + [multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs]
+        all_hashes = hashes_to_search + [multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs.values()]
 
         tokens_queryset = InternalTx.objects.token_txs_for_address(safe_address).filter(
             ethereum_tx__in=all_hashes)
         ether_queryset = InternalTx.objects.ether_txs_for_address(safe_address).filter(
             ethereum_tx__in=all_hashes)
-        transfers = list(InternalTx.objects.union_ether_and_token_txs(tokens_queryset, ether_queryset))
+
+        # Build dict of transfers for optimizing access
+        transfer_dict = defaultdict(list)
+        transfers = InternalTx.objects.union_ether_and_token_txs(tokens_queryset, ether_queryset)
+        for transfer in transfers:
+            transfer_dict[transfer['transaction_hash']].append(transfer)
+
+        """
+        # Add available information about the token on database for the transfers
+        tokens = {token.address: token
+                  for token in Token.objects.filter(address__in={transfer['token_address'] for transfer in transfers
+                                                                 if transfer['token_address']})}
+        for transfer in transfers:
+            if token := tokens.get(transfer['token_address']):
+                transfer.token = token
+        """
 
         # Build the list
-        def get_the_transaction(h: str):
-            # TODO Don't allow duplicates
+        def get_the_transaction(transaction_id: str) -> Optional[Union[MultisigTransaction,
+                                                                       ModuleTransaction,
+                                                                       EthereumTx]]:
             multisig_tx: MultisigTransaction
-            result = None
-            for multisig_tx in multisig_txs:
-                if h == multisig_tx.safe_tx_hash or h == multisig_tx.ethereum_tx_id:
-                    result = multisig_tx
-                    # Populate transfers
-                    result.transfers = [transfer for transfer in transfers
-                                        if result.ethereum_tx_id == transfer['transaction_hash']]
-                    return result
-
             module_tx: ModuleTransaction
-            for module_tx in module_txs:
-                if h == module_tx.internal_tx.ethereum_tx_id:
-                    result = module_tx
-                    result.transfers = [transfer for transfer in transfers
-                                        if result.internal_tx.ethereum_tx_id == transfer['transaction_hash']]
-                    return result
-
             plain_ethereum_tx: EthereumTx
-            for plain_ethereum_tx in plain_ethereum_txs:
-                if h == plain_ethereum_tx.tx_hash:
-                    result = plain_ethereum_tx
-                    result.transfers = [transfer for transfer in transfers
-                                        if result.tx_hash == transfer['transaction_hash']]
-                    return result
+            result: Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]
+
+            if result := multisig_txs.get(transaction_id):
+                # Populate transfers
+                result.transfers = transfer_dict[result.ethereum_tx_id]
+                return result
+
+            if result := module_txs.get(transaction_id):
+                result.transfers = transfer_dict[result.internal_tx.ethereum_tx_id]
+                return result
+
+            if result := plain_ethereum_txs.get(transaction_id):
+                # If no Multisig or Module tx found, fallback to simple tx
+                result.transfers = transfer_dict[result.tx_hash]
+                return result
 
             # This cannot happen if logic is ok
             if not result:
