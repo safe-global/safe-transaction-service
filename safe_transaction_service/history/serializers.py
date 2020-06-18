@@ -17,12 +17,20 @@ from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
 from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
                      SafeContractDelegate)
-# ================================================ #
-#            Request Serializers
-# ================================================ #
 from .services.safe_service import SafeCreationInfo
 
 
+def get_data_decoded_from_data(data: bytes):
+    tx_decoder = get_tx_decoder()
+    try:
+        return tx_decoder.get_data_decoded(data)
+    except TxDecoderException:
+        return None
+
+
+# ================================================ #
+#            Request Serializers
+# ================================================ #
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
@@ -326,12 +334,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             return not obj.failed
 
     def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
-        tx_decoder = get_tx_decoder()
-        try:
-            data = obj.data.tobytes() if obj.data else b''
-            return tx_decoder.get_data_decoded(data)
-        except TxDecoderException:
-            return None
+        return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b'')
 
 
 class Erc20InfoSerializer(serializers.Serializer):
@@ -379,12 +382,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     data_decoded = serializers.SerializerMethodField()
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
-        tx_decoder = get_tx_decoder()
-        try:
-            data = obj.setup_data or b''
-            return tx_decoder.get_data_decoded(data)
-        except TxDecoderException:
-            return None
+        return get_data_decoded_from_data(obj.setup_data or b'')
 
 
 class SafeInfoResponseSerializer(serializers.Serializer):

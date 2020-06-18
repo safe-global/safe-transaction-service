@@ -13,6 +13,7 @@ from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.contract import Contract, ContractFunction
 
 from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
+                                  get_kyber_network_proxy_contract,
                                   get_multi_send_contract, get_safe_contract,
                                   get_safe_V0_0_1_contract,
                                   get_safe_V1_0_0_contract,
@@ -189,6 +190,7 @@ class TxDecoder(SafeTxDecoder):
     def __init__(self):
         super().__init__()
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
+                     get_kyber_network_proxy_contract(self.dummy_w3),
                      self.dummy_w3.eth.contract(abi=gnosis_protocol_abi)]
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
