@@ -222,7 +222,30 @@ class TxDecoder(SafeTxDecoder):
     def multisend_fn_selectors(self) -> Dict[bytes, ContractFunction]:
         return self._generate_selectors_with_abis_from_contracts(self.multisend_contracts)
 
-    def decode_multisend_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
+    def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
+        """
+        Add support for multisend and Gnosis Safe `execTransaction`
+        """
+        fn_name, parameters = super().decode_transaction_with_types(data)
+
+        # If multisend, decode the transactions
+        if data[:4] in self.multisend_fn_selectors:
+            parameters[0]['decoded_value'] = self.get_data_decoded_for_multisend(data)
+
+        # If Gnosis Safe `execTransaction` decode the inner transaction
+        # function execTransaction(address to, uint256 value, bytes calldata data...)
+        # selector is `0x6a761202` and parameters[2] is data
+        if data[:4] == HexBytes('0x6a761202') and len(parameters) > 2:
+            data = HexBytes(parameters[2]['value'])
+            if data:
+                try:
+                    parameters[2]['decoded_value'] = self.get_data_decoded(data)
+                except TxDecoderException:
+                    logger.warning('Cannot decode `execTransaction`', exc_info=True)
+
+        return fn_name, parameters
+
+    def get_data_decoded_for_multisend(self, data: Union[bytes, str]) -> List[Dict[str, Any]]:
         """
         Return a multisend
         :param data:
@@ -238,13 +261,3 @@ class TxDecoder(SafeTxDecoder):
                      } for multisend_tx in multisend_txs]
         except ValueError:
             logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)
-
-    def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Tuple[str, str, Any]]]:
-        """
-        Add support for multisend
-        """
-        fn_name, parameters = super().decode_transaction_with_types(data)
-        if data[:4] in self.multisend_fn_selectors:
-            parameters[0]['decoded_value'] = self.decode_multisend_with_types(data)
-
-        return fn_name, parameters
