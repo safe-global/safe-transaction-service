@@ -20,6 +20,8 @@ from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
                                   get_uniswap_exchange_contract)
 from gnosis.safe.multi_send import MultiSend
 
+from .decoder_abis.compound import comptroller_abi, ctoken_abi
+
 logger = getLogger(__name__)
 
 
@@ -189,19 +191,26 @@ class SafeTxDecoder:
 class TxDecoder(SafeTxDecoder):
     def __init__(self):
         super().__init__()
+
+        compound_contracts = [
+            self.dummy_w3.eth.contract(abi=ctoken_abi)
+            #                      self.dummy_w3.eth.contract(abi=comptroller_abi)]
+        ]
+
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
                      get_kyber_network_proxy_contract(self.dummy_w3),
                      self.dummy_w3.eth.contract(abi=gnosis_protocol_abi)]
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
                                                                            market_maker_factory_abi)]
-        erc_contracts = [get_erc721_contract(self.dummy_w3), get_erc20_contract(self.dummy_w3)]
+        erc_contracts = [get_erc721_contract(self.dummy_w3),
+                         get_erc20_contract(self.dummy_w3)]
 
         self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (exchanges + sight_contracts + erc_contracts +
+        self.supported_contracts = (compound_contracts + exchanges + sight_contracts + erc_contracts +
                                     self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
