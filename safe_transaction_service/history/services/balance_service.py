@@ -74,6 +74,7 @@ class BalanceService:
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.cache_eth_usd_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_rbtc_usd_price = TTLCache(maxsize=2048, ttl=60 * 10)  # 10 minutes of caching
         self.cache_token_info = {}
 
     def get_balances(self, safe_address: str) -> List[Balance]:
@@ -98,6 +99,27 @@ class BalanceService:
                 continue
             balances.append(Balance(**balance))
         return balances
+
+    @cachedmethod(cache=operator.attrgetter('cache_rbtc_usd_price'))
+    def get_rbtc_usd_price_bitfinex(self) -> float:
+        """
+        :return: current USD price for RBTC using Bitfinex
+        :raises: CannotGetRBTCPrice
+        """
+        url = 'https://api-pub.bitfinex.com/v2/ticker/tRBTUSD'
+        response = requests.get(url)
+        api_json = response.json()
+        if not response.ok:
+            logger.warning('Cannot get price from url=%s', url)
+            raise CannotGetEthereumPrice(api_json.get('msg'))
+
+        try:
+            price = float(api_json[6])
+            if not price:
+                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+            return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
 
     def get_eth_usd_price_binance(self) -> float:
         """
@@ -181,12 +203,12 @@ class BalanceService:
         I think we should be alright
         """
         balances: List[Balance] = self.get_balances(safe_address)
-        eth_value = self.get_eth_usd_price()
+        rbtc_value = self.get_rbtc_usd_price_bitfinex()
         balances_with_usd = []
         for balance in balances:
             token_address = balance.token_address
-            if not token_address:  # Ether
-                balance_usd = eth_value * (balance.balance / 10**18)
+            if not token_address:  # RBTC
+                balance_usd = rbtc_value * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
