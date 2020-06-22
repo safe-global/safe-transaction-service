@@ -6,9 +6,11 @@ from django.db.models import Case, F, OuterRef, QuerySet, Subquery, When
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from ...tokens.models import Token
+from safe_transaction_service.tokens.models import Token
+
 from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
-                      InternalTx, ModuleTransaction, MultisigTransaction)
+                      InternalTx, ModuleTransaction, MultisigTransaction,
+                      TransferDict)
 from ..serializers import (
     EthereumTxWithTransfersResponseSerializer,
     SafeModuleTransactionWithTransfersResponseSerializer,
@@ -183,19 +185,17 @@ class TransactionService:
 
         # Build dict of transfers for optimizing access
         transfer_dict = defaultdict(list)
-        transfers = InternalTx.objects.union_ether_and_token_txs(tokens_queryset, ether_queryset)
+        transfers: List[TransferDict] = InternalTx.objects.union_ether_and_token_txs(tokens_queryset,
+                                                                                     ether_queryset)
         for transfer in transfers:
             transfer_dict[transfer['transaction_hash']].append(transfer)
 
-        """
         # Add available information about the token on database for the transfers
         tokens = {token.address: token
                   for token in Token.objects.filter(address__in={transfer['token_address'] for transfer in transfers
                                                                  if transfer['token_address']})}
         for transfer in transfers:
-            if token := tokens.get(transfer['token_address']):
-                transfer.token = token
-        """
+            transfer['token'] = tokens.get(transfer['token_address'])
 
         # Build the list
         def get_the_transaction(transaction_id: str) -> Optional[Union[MultisigTransaction,

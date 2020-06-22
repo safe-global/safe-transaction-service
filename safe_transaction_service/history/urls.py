@@ -1,7 +1,8 @@
 from django.conf.urls import url
 from django.urls import path
 
-from ..tokens.views import TokensView, TokenView
+from safe_transaction_service.tokens.views import TokensView, TokenView
+
 from . import views
 
 app_name = "safe"

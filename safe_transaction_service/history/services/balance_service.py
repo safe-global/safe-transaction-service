@@ -12,7 +12,8 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import InvalidERC20Info
 from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
 
-from ...tokens.models import Token
+from safe_transaction_service.tokens.models import Token
+
 from ..models import EthereumEvent
 
 logger = logging.getLogger(__name__)

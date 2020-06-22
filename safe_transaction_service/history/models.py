@@ -63,7 +63,7 @@ class EthereumTxType(Enum):
             raise ValueError(f'{tx_type} is not a valid EthereumTxType')
 
 
-class EtherAndTokenDict(TypedDict):
+class TransferDict(TypedDict):
     block_number: int
     transaction_hash: HexBytes
     to: str
@@ -440,7 +440,7 @@ class InternalTxQuerySet(models.QuerySet):
         ether_queryset = self.ether_incoming_txs_for_address(address)
         return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
 
-    def union_ether_and_token_txs(self, tokens_queryset: QuerySet, ether_queryset: QuerySet) -> EtherAndTokenDict:
+    def union_ether_and_token_txs(self, tokens_queryset: QuerySet, ether_queryset: QuerySet) -> TransferDict:
         values = ('block_number', 'transaction_hash', 'to', '_from', 'value', 'execution_date', 'token_id',
                   'token_address')
         return ether_queryset.values(*values).union(tokens_queryset.values(*values)).order_by('-block_number')

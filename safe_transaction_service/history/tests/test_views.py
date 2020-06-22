@@ -14,7 +14,9 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ...tokens.models import Token
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.tests.factories import TokenFactory
+
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
@@ -97,12 +99,22 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Add transfer out for the module transaction and transfer in for the multisig transaction
         erc20_transfer_out = EthereumEventFactory(from_=safe_address,
                                                   ethereum_tx=module_transaction.internal_tx.ethereum_tx)
+        # Add token info for that transfer
+        token = TokenFactory(address=erc20_transfer_out.address)
         internal_tx_in = InternalTxFactory(to=safe_address, value=8,
                                            ethereum_tx=multisig_transaction.ethereum_tx)
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(response.data['results'][3]['transfers'][0]['token_info'], {
+            'type': 'ERC20',
+            'address': token.address,
+            'name': token.name,
+            'symbol': token.symbol,
+            'decimals': token.decimals,
+            'logo_uri': token.get_full_logo_uri(),
+        })
         transfers_not_empty = [False,  # Multisig transaction, no transfer
                                True,  # Erc transfer in
                                True,  # internal tx in
