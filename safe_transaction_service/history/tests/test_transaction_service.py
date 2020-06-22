@@ -110,6 +110,8 @@ class TestTransactionService(TestCase):
         for tx, tx_type, number_of_transfers in zip(all_txs, tx_types, numbers_of_transfers):
             self.assertEqual(type(tx), tx_type)
             self.assertEqual(len(tx.transfers), number_of_transfers)
+            for transfer in tx.transfers:
+                self.assertIsNone(transfer['token'])
 
         # Insert 2 transfers for the MultisigTx and one for the ModuleTx
         internal_tx_out_2 = InternalTxFactory(_from=safe_address, value=5,
@@ -130,6 +132,8 @@ class TestTransactionService(TestCase):
         for tx, tx_type, number_of_transfers in zip(all_txs_2, tx_types, numbers_of_transfers):
             self.assertEqual(type(tx), tx_type)
             self.assertEqual(len(tx.transfers), number_of_transfers)
+            for transfer in tx.transfers:
+                self.assertIsNone(transfer['token'])
 
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs_2)
         self.assertEqual(len(all_txs_serialized), len(all_txs_2))
