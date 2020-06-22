@@ -442,7 +442,6 @@ class TransferResponseSerializer(serializers.Serializer):
     value = serializers.CharField()
     token_id = serializers.CharField()
     token_address = EthereumAddressField(allow_null=True, default=None)
-    token_info = TokenTransferInfoResponseSerializer(source='token')
 
     def get_fields(self):
         result = super().get_fields()
@@ -463,6 +462,10 @@ class TransferResponseSerializer(serializers.Serializer):
         return TransferType.UNKNOWN
 
 
+class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
+    token_info = TokenTransferInfoResponseSerializer(source='token')
+
+
 # All txs serializers
 class TxType(Enum):
     ETHEREUM_TRANSACTION = 0
@@ -475,7 +478,7 @@ class SafeModuleTransactionWithTransfersResponseSerializer(SafeModuleTransaction
         model = SafeModuleTransactionResponseSerializer.Meta.model
         fields = SafeModuleTransactionResponseSerializer.Meta.fields + ('transfers', 'tx_type')
 
-    transfers = TransferResponseSerializer(many=True)
+    transfers = TransferWithTokenInfoResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
     def get_tx_type(self, obj):
@@ -483,7 +486,7 @@ class SafeModuleTransactionWithTransfersResponseSerializer(SafeModuleTransaction
 
 
 class SafeMultisigTransactionWithTransfersResponseSerializer(SafeMultisigTransactionResponseSerializer):
-    transfers = TransferResponseSerializer(many=True)
+    transfers = TransferWithTokenInfoResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
     def get_tx_type(self, obj):
@@ -501,7 +504,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     data = HexadecimalField()
     tx_hash = HexadecimalField()
     block_number = serializers.SerializerMethodField()
-    transfers = TransferResponseSerializer(many=True)
+    transfers = TransferWithTokenInfoResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
     def get_tx_type(self, obj):
