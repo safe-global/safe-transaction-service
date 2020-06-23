@@ -15,7 +15,7 @@ class TokenView(RetrieveAPIView):
     lookup_field = 'address'
     queryset = Token.objects.all()
 
-    @method_decorator(cache_page(60 * 5))  # Cache 5 minutes
+    @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -29,6 +29,6 @@ class TokensView(ListAPIView):
     ordering = ('name',)
     queryset = Token.objects.all()
 
-    @method_decorator(cache_page(60 * 5))  # Cache 5 minutes
+    @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
