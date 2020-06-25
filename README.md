@@ -74,7 +74,12 @@ Instructions for production still apply, but some additional steps are required:
 - Deploy the last version of the [Safe Contracts](https://github.com/gnosis/safe-contracts) on your private network.
 - Add their addresses and the number of the block they were deployed (to optimize initial indexing) to
 `safe_transaction_service/history/management/commands/setup_service.py`. Service is currently configured to support
-_Mainnet_, _Rinkeby_, _Goerli_ and _Kovan_. Only contracts that need to be configured are the **ProxyFactory** that will be used to deploy the contracts and the **GnosisSafe**.
+_Mainnet_, _Rinkeby_, _Goerli_ and _Kovan_.
+- If you have a custom `network id` you can change this line
+`ethereum_network = ethereum_client.get_network()` to `ethereum_network_id = ethereum_client.w3.net.version` and use
+the `network id` instead of the `Enum`.
+- Only contracts that need to be configured are the **ProxyFactory** that will be used to deploy the contracts and
+the **GnosisSafe**.
 
 
 Add a new method using the addresses and block numbers for your network.
