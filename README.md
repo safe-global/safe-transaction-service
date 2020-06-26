@@ -111,6 +111,16 @@ Replace `handle` method for:
         self.setup_my_network()
 ```
 
+## Use admin interface
+Services come with a basic administration web ui (provided by Django). A user must be created first to
+get access:
+```bash
+docker exec -it safe-transaction-service_web_1 bash
+python manage.py createsuperuser
+```
+
+Then go to the web browser and navigate to http://localhost:8000/admin/
+
 ## Contributors
 - Denís Graña (denis@gnosis.pm)
 - Giacomo Licari (giacomo.licari@gnosis.pm)
