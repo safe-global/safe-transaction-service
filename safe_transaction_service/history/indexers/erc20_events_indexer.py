@@ -53,6 +53,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         :param addresses:
         :param from_block_number: Starting block number
         :param to_block_number: Ending block number
+        :param current_block_number: Current block number (for cache purposes)
         :return: Tx hashes of txs with relevant erc20 transfer events for the `addresses`
         """
         logger.info('Searching for erc20 txs from block-number=%d to block-number=%d - Number of Safes=%d',
