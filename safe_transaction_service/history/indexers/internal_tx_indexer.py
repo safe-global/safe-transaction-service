@@ -169,8 +169,5 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:
-        current_block_number = current_block_number or self.ethereum_client.current_block_number
-        # Use `trace_block` for last `number_trace_blocks` blocks and `trace_filter` for the others
-        trace_block_number = max(current_block_number - self.number_trace_blocks, 0)
         logger.info('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
         return self._find_relevant_elements_using_trace_block(addresses, from_block_number, to_block_number)
