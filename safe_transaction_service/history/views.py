@@ -44,7 +44,7 @@ from .services.collectibles_service import CollectiblesServiceProvider
 
 class AboutView(APIView):
     """
-    Returns info about the project.
+    Returns information and configuration of the service
     """
     renderer_classes = (JSONRenderer,)
 

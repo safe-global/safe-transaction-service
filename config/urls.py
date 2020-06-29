@@ -14,7 +14,7 @@ schema_view = get_schema_view(
         title='Gnosis Safe Transaction Service API',
         default_version='v1',
         description='API to store safe multisig transactions',
-        contact=openapi.Contact(email='dev@gnosis.pm'),
+        contact=openapi.Contact(email='safe@gnosis.io'),
         license=openapi.License(name='MIT License'),
     ),
     validators=['flex', 'ssv'],
@@ -26,7 +26,7 @@ schema_cache_decorator = cache_control(max_age=schema_cache_timeout)
 
 urlpatterns = [
     url(r'^$',
-        schema_cache_decorator(schema_view.with_ui('swagger', cache_timeout=0)),
+        schema_cache_decorator(schema_view.with_ui('swagger', cache_timeout=schema_cache_timeout)),
         name='schema-swagger-ui'),
     url(r'^swagger(?P<format>\.json|\.yaml)$',
         schema_cache_decorator(schema_view.without_ui(cache_timeout=schema_cache_timeout)),
