@@ -1118,12 +1118,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         owner_address = Account.create().address
         response = self.client.get(reverse('v1:owners', args=(owner_address,)))
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['safes'], [])
 
         safe_status = SafeStatusFactory(owners=[owner_address])
         response = self.client.get(reverse('v1:owners', args=(owner_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertCountEqual(response.data['safes'], [safe_status.address])
+        self.assertEqual(response.data['safes'], [safe_status.address])
 
         safe_status_2 = SafeStatusFactory(owners=[owner_address])
         SafeStatusFactory()  # Test that other SafeStatus don't appear

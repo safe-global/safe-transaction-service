@@ -71,11 +71,11 @@ class AllTransactionsListView(ListAPIView):
     serializer_class = _AllTransactionsSchemaSerializer  # Just for docs, not used
 
     _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
-                                             description='If `True` transactions with `nonce >= Safe current nonce` are '
-                                                         'also shown')
+                                             description='If `True` transactions with `nonce >= Safe current nonce` '
+                                                         'are also shown')
     _schema_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
-                                              description='If `True` just trusted transactions are shown (indexed, added by a '
-                                                          'delegate or with at least one confirmation)')
+                                              description='If `True` just trusted transactions are shown (indexed, '
+                                                          'added by a delegate or with at least one confirmation)')
     _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
                                             'types', _AllTransactionsSchemaSerializer)
 
@@ -114,7 +114,6 @@ class AllTransactionsListView(ListAPIView):
 
     @swagger_auto_schema(responses={200: _schema_200_response,
                                     400: 'Invalid data',
-                                    404: 'Not found',
                                     422: 'Invalid ethereum address'},
                          manual_parameters=[_schema_queued_param, _schema_trusted_param])
     def get(self, request, *args, **kwargs):
@@ -153,7 +152,6 @@ class SafeModuleTransactionListView(ListAPIView):
         )
 
     @swagger_auto_schema(responses={400: 'Invalid data',
-                                    404: 'Not found',
                                     422: 'Invalid ethereum address'})
     def get(self, request, address, format=None):
         """
@@ -215,7 +213,6 @@ class SafeMultisigTransactionListView(ListAPIView):
             return SafeMultisigTransactionSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
-                                    404: 'Not found',
                                     422: 'Invalid ethereum address'})
     def get(self, request, *args, **kwargs):
         """
@@ -232,7 +229,8 @@ class SafeMultisigTransactionListView(ListAPIView):
 
     @swagger_auto_schema(responses={201: 'Created or signature updated',
                                     400: 'Invalid data',
-                                    422: 'Invalid ethereum address/User is not an owner or tx not approved/executed'})
+                                    422: 'Invalid ethereum address/User is not an owner/Invalid safeTxHash/'
+                                         'Invalid signature/Nonce already executed/Sender is not an owner'})
     def post(self, request, address, format=None):
         """
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
@@ -337,7 +335,6 @@ class SafeDelegateListView(ListCreateAPIView):
             return SafeDelegateSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
-                                    404: 'Not found',
                                     422: 'Invalid Ethereum address'})
     def get(self, request, address, **kwargs):
         """
@@ -380,6 +377,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
 
     @swagger_auto_schema(responses={204: 'Deleted',
                                     400: 'Malformed data',
+                                    404: 'Delegate not found',
                                     422: 'Invalid Ethereum address/Error processing data'})
     def delete(self, request, address, delegate_address, *args, **kwargs):
         """
@@ -425,7 +423,6 @@ class SafeTransferListView(ListAPIView):
         return self.get_transfers(address)
 
     @swagger_auto_schema(responses={200: TransferResponseSerializer(many=True),
-                                    404: 'Txs not found',
                                     422: 'Safe address checksum not valid'})
     def get(self, request, address, format=None):
         """
@@ -450,7 +447,7 @@ class SafeCreationView(APIView):
     serializer_class = SafeCreationInfoResponseSerializer
 
     @swagger_auto_schema(responses={200: serializer_class(),
-                                    404: 'Safes not found for that owner',
+                                    404: 'Safe creation not found',
                                     422: 'Owner address checksum not valid'})
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, format=None):
@@ -472,7 +469,7 @@ class SafeInfoView(APIView):
     serializer_class = SafeInfoResponseSerializer
 
     @swagger_auto_schema(responses={200: serializer_class(),
-                                    404: 'Safes not found for that owner',
+                                    404: 'Safes not found',
                                     422: 'Owner address checksum not valid'})
     def get(self, request, address, format=None):
         """
@@ -493,7 +490,6 @@ class OwnersView(APIView):
     serializer_class = OwnerResponseSerializer
 
     @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
-                                    404: 'Safes not found for that owner',
                                     422: 'Owner address checksum not valid'})
     def get(self, request, address, format=None):
         """
@@ -503,9 +499,6 @@ class OwnersView(APIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
-        if not safes_for_owner:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         serializer = self.serializer_class(data={'safes': safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
