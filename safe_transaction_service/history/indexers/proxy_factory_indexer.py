@@ -96,7 +96,7 @@ class ProxyFactoryIndexer(EthereumIndexer):
         :return: List of `SafeContract` already stored in database
         """
         tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in events]).keys()
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes) # noqa F841
         safe_contracts = []
         for event in events:
             int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')

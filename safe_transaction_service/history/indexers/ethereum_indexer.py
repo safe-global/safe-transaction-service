@@ -92,7 +92,7 @@ class EthereumIndexer(ABC):
         :param element:
         :return:
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def process_elements(self, elements: Iterable[Any]) -> Iterable[Any]:
         processed_objects = []

@@ -91,14 +91,15 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         signature = data.get('signature', b'')
         parsed_signatures = SafeSignature.parse_signature(signature, contract_transaction_hash)
         data['parsed_signatures'] = parsed_signatures
-        data['trusted'] = bool(parsed_signatures)  # If signatures, transaction is trusted (until signatures are mandatory)
+        # If there's at least one signature, transaction is trusted (until signatures are mandatory)
+        data['trusted'] = bool(parsed_signatures)
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
             if not safe_signature.is_valid(ethereum_client, safe.address):
                 raise ValidationError(f'Signature={safe_signature.signature.hex()} for owner={owner} is not valid')
 
             if owner in delegates and len(parsed_signatures) > 1:
-                raise ValidationError(f'Just one signature is expected if using delegates')
+                raise ValidationError('Just one signature is expected if using delegates')
             if owner not in allowed_senders:
                 raise ValidationError(f'Signer={owner} is not an owner or delegate. '
                                       f'Current owners={safe_owners}. Delegates={delegates}')
@@ -179,8 +180,8 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         delegator = safe_signature.owner
         if delegator in safe_owners:
             if not safe_signature.is_valid():
-                raise ValidationError(f'Signature of type={safe_signature.signature_type.name} for delegator={delegator} '
-                                      f'is not valid')
+                raise ValidationError(f'Signature of type={safe_signature.signature_type.name} '
+                                      f'for delegator={delegator} is not valid')
             return delegator
 
     def validate(self, data):

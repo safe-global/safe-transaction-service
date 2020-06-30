@@ -19,14 +19,14 @@ class CustomGunicornLogger(glogging.Logger):
         logger.addFilter(IgnoreCheckUrl())
 
 
-def chunks(l: List[Any], n: int):
+def chunks(elements: List[Any], n: int):
     """
-    :param l: List
+    :param elements: List
     :param n: Number of elements per chunk
     :return: Yield successive n-sized chunks from l
     """
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+    for i in range(0, len(elements), n):
+        yield elements[i:i + n]
 
 
 def clean_receipt_log(receipt_logs: Dict[str, Any]) -> Optional[Dict[str, Any]]:

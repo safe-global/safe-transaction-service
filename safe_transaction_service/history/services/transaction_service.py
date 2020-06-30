@@ -54,8 +54,8 @@ class TransactionService:
         :param safe_address:
         :param queued: By default `True`, all transactions are returned. With `False`, just txs wih
         `nonce < current Safe Nonce` are returned.
-        :param trusted: By default `True`, just txs that are trusted are returned (with at least one confirmation, sent by a
-        delegate or indexed). With `False` all txs are returned
+        :param trusted: By default `True`, just txs that are trusted are returned (with at least one confirmation,
+        sent by a delegate or indexed). With `False` all txs are returned
         :return: List with tx hashes sorted by date (newest first)
         """
 
@@ -96,9 +96,10 @@ class TransactionService:
             block=F('internal_tx__ethereum_tx__block_id'),
         ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'block', 'created')
 
-        mulsitig_hashes = MultisigTransaction.objects.filter(safe=safe_address).exclude(ethereum_tx=None).values('ethereum_tx_id')
+        multisig_hashes = MultisigTransaction.objects.filter(safe=safe_address
+                                                             ).exclude(ethereum_tx=None).values('ethereum_tx_id')
         module_hashes = ModuleTransaction.objects.filter(safe=safe_address).values('internal_tx__ethereum_tx_id')
-        multisig_and_module_hashes = mulsitig_hashes.union(mulsitig_hashes)
+        multisig_and_module_hashes = multisig_hashes.union(module_hashes)
 
         # Get incoming tokens not included on Multisig or Module txs
         event_tx_ids = EthereumEvent.objects.erc20_and_721_events().filter(
