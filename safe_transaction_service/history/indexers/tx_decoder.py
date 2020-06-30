@@ -52,16 +52,16 @@ class CannotDecode(TxDecoderException):
     pass
 
 
-def get_safe_tx_decoder() -> 'SafeTxDecoder':
-    if not hasattr(get_safe_tx_decoder, 'instance'):
-        get_safe_tx_decoder.instance = SafeTxDecoder()
-    return get_safe_tx_decoder.instance
-
-
 def get_tx_decoder() -> 'TxDecoder':
     if not hasattr(get_tx_decoder, 'instance'):
         get_tx_decoder.instance = TxDecoder()
     return get_tx_decoder.instance
+
+
+def get_safe_tx_decoder() -> 'SafeTxDecoder':
+    if not hasattr(get_safe_tx_decoder, 'instance'):
+        get_safe_tx_decoder.instance = SafeTxDecoder()
+    return get_safe_tx_decoder.instance
 
 
 class SafeTxDecoder:
@@ -125,6 +125,7 @@ class SafeTxDecoder:
         :return:
         """
         try:
+            data = HexBytes(data)
             fn_name, parameters = self.decode_transaction_with_types(data)
             return {'method': fn_name,
                     'parameters': parameters}
@@ -235,6 +236,7 @@ class TxDecoder(SafeTxDecoder):
         """
         Add support for multisend and Gnosis Safe `execTransaction`
         """
+        data = HexBytes(data)
         fn_name, parameters = super().decode_transaction_with_types(data)
 
         # If multisend, decode the transactions
