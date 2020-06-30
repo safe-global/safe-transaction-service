@@ -24,5 +24,5 @@ class TestEnsClient(TestCase):
         domain_hash = keccak(text='gnosis')
         self.assertEqual('gnosis', ens_client.query_by_domain_hash(domain_hash))
 
-        domain_hash_2 = keccak(text=f'notverycommon-domain-name-made-up-by-me-with-forbidden-word-ñ')
+        domain_hash_2 = keccak(text='notverycommon-domain-name-made-up-by-me-with-forbidden-word-ñ')
         self.assertIsNone(ens_client.query_by_domain_hash(domain_hash_2))

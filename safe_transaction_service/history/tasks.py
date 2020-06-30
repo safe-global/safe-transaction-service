@@ -216,8 +216,8 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             continue
         elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
             continue
-        elif (webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION
-              and not webhook.new_executed_outgoing_transaction):
+        elif (webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not
+              webhook.new_executed_outgoing_transaction):
             continue
         elif webhook_type in (WebHookType.INCOMING_TOKEN,
                               WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:

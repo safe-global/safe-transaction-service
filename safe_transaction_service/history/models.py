@@ -305,12 +305,11 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
         else:
             return self.get_or_create(ethereum_tx_id=decoded_event['transactionHash'],
                                       log_index=decoded_event['logIndex'],
-                                      defaults={
-                                          'address': decoded_event['address'],
-                                          'topic': decoded_event['topics'][0],
-                                          'topics': decoded_event['topics'],
-                                          'arguments': decoded_event['args'],
-                                      })
+                                      defaults={'address': decoded_event['address'],
+                                                'topic': decoded_event['topics'][0],
+                                                'topics': decoded_event['topics'],
+                                                'arguments': decoded_event['args'],
+                                                })
 
 
 class EthereumEvent(models.Model):

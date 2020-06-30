@@ -21,7 +21,8 @@ from gnosis.safe.multi_send import MultiSend
 
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import gnosis_protocol_abi
-from .decoder_abis.sight import conditional_token_abi, market_maker_abi, market_maker_factory_abi
+from .decoder_abis.sight import (conditional_token_abi, market_maker_abi,
+                                 market_maker_factory_abi)
 
 logger = getLogger(__name__)
 
@@ -200,8 +201,8 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (compound_contracts + exchanges + sight_contracts + erc_contracts +
-                                    self.multisend_contracts + self.supported_contracts)
+        self.supported_contracts = (compound_contracts + exchanges + sight_contracts + erc_contracts
+                                    + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """

@@ -69,7 +69,7 @@ class TestModelSignals(TestCase):
             ethereum_tx=ethereum_tx,
             multisig_transaction_hash=safe_tx_hash,
             owner=Account.create().address,
-            signature_type = SafeSignatureType.EOA.value,
+            signature_type=SafeSignatureType.EOA.value,
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 

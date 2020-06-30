@@ -4,7 +4,7 @@ from django.utils import timezone
 
 import factory
 from eth_account import Account
-from factory.fuzzy import FuzzyDateTime, FuzzyInteger
+from factory.fuzzy import FuzzyInteger
 from hexbytes import HexBytes
 from web3 import Web3
 

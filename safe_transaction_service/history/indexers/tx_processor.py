@@ -46,9 +46,9 @@ class SafeTxProcessor(TxProcessor):
         # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
         safe_tx_hash = HexBytes(safe_tx_hash).hex()
         for log in ethereum_tx.logs:
-            if (log['topics'] and log['data'] and
-                    HexBytes(log['topics'][0]) in self.safe_tx_failure_events_topics and
-                    log['data'][:66] == safe_tx_hash):  # 66 is the beginning of the event data, the rest is `payment`
+            if (log['topics'] and log['data']
+                    and HexBytes(log['topics'][0]) in self.safe_tx_failure_events_topics
+                    and log['data'][:66] == safe_tx_hash):  # 66 is the beginning of the event data, the rest is payment
                 return True
         return False
 

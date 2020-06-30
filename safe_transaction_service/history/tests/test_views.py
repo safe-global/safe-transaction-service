@@ -84,14 +84,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertTrue(transaction['tx_type'])
 
         # Test pagination
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) +
-                                   '?limit=3&queued=False&trusted=False')
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
+                                   + '?limit=3&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 3)
 
-        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) +
-                                   '?limit=3&offset=3&queued=False&trusted=False')
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
+                                   + '?limit=3&offset=3&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 5)
         self.assertEqual(len(response.data['results']), 2)
@@ -210,7 +210,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data['results']), 1)
 
         response = self.client.get(reverse('v1:multisig-transactions',
-                                           args=(safe_address,)) + f'?to=0x2a',
+                                           args=(safe_address,)) + '?to=0x2a',
                                    format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['to'][0], 'Enter a valid checksummed Ethereum Address.')
@@ -558,7 +558,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                            'decimals': erc20.functions.decimals().call(),
                                                            'logoUri': Token.objects.first().get_full_logo_uri()}}])
 
-    @mock.patch.object(BalanceService, 'get_token_info',  autospec=True)
+    @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
     def test_safe_balances_usd_view(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_info_mock):
@@ -716,26 +716,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'delegate': another_delegate_address,
             'label': another_label,
             'signature': owner_account.signHash(DelegateSignatureHelper.calculate_hash(another_delegate_address,
-                                                                                         eth_sign=True)
+                                                                                       eth_sign=True)
                                                 )['signature'].hex(),
         }
         response = self.client.post(reverse('v1:safe-delegates', args=(safe_address, )), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         response = self.client.get(reverse('v1:safe-delegates', args=(safe_address,)), format='json')
-        self.assertCountEqual(response.data['results'],
-                              [
-                                  {
-                                      'delegate': delegate_address,
-                                      'delegator': owner_account.address,
-                                      'label': label,
-                                  },
-                                  {
-                                      'delegate': another_delegate_address,
-                                      'delegator': owner_account.address,
-                                      'label': another_label,
-                                  },
-                              ])
+        self.assertCountEqual(response.data['results'], [
+            {
+                'delegate': delegate_address,
+                'delegator': owner_account.address,
+                'label': label,
+            },
+            {
+                'delegate': another_delegate_address,
+                'delegator': owner_account.address,
+                'label': another_label,
+            },
+        ])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
@@ -995,10 +994,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 6)
-        expected_results = [
-           {'type': TransferType.ERC721_TRANSFER.name,
-            'executionDate': ethereum_erc_721_event_2.ethereum_tx.block.timestamp.isoformat().replace(
-                '+00:00', 'Z'),
+        expected_results = [{
+            'type': TransferType.ERC721_TRANSFER.name,
+            'executionDate': ethereum_erc_721_event_2.ethereum_tx.block.timestamp.isoformat(
+            ).replace('+00:00', 'Z'),
             'transactionHash': ethereum_erc_721_event_2.ethereum_tx_id,
             'blockNumber': ethereum_erc_721_event_2.ethereum_tx.block_id,
             'to': ethereum_erc_721_event_2.arguments['to'],
@@ -1006,18 +1005,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'tokenId': str(token_id),
             'tokenAddress': ethereum_erc_721_event_2.address,
             'from': safe_address,
-            },
-            {'type': TransferType.ERC721_TRANSFER.name,
-             'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z'),
-             'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
-             'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
-             'to': safe_address,
-             'value': None,
-             'tokenId': str(token_id),
-             'tokenAddress': ethereum_erc_721_event.address,
-             'from': ethereum_erc_721_event.arguments['from']
-             },
-        ] + expected_results
+        }, {
+            'type': TransferType.ERC721_TRANSFER.name,
+            'executionDate': ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat(
+            ).replace('+00:00', 'Z'),
+            'transactionHash': ethereum_erc_721_event.ethereum_tx_id,
+            'blockNumber': ethereum_erc_721_event.ethereum_tx.block_id,
+            'to': safe_address,
+            'value': None,
+            'tokenId': str(token_id),
+            'tokenAddress': ethereum_erc_721_event.address,
+            'from': ethereum_erc_721_event.arguments['from']
+        }] + expected_results
         self.assertEqual(response.json()['results'], expected_results)
 
     def test_safe_creation_view(self):

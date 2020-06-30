@@ -38,7 +38,7 @@ class Command(BaseCommand):
                 decimals = info.decimals
             except InvalidERC20Info:  # Try with a ERC721
                 info = ethereum_client.erc721.get_info(token_address)
-                self.stdout.write(self.style.SUCCESS(f'Detected ERC721 token'))
+                self.stdout.write(self.style.SUCCESS('Detected ERC721 token'))
                 decimals = 0
 
             if no_prompt:

@@ -1,11 +1,10 @@
-import json
 import logging
 
 from django.test import TestCase
 
 from hexbytes import HexBytes
 
-from gnosis.safe.multi_send import MultiSend, MultiSendOperation
+from gnosis.safe.multi_send import MultiSendOperation
 
 from ..indexers.tx_decoder import (CannotDecode, SafeTxDecoder, TxDecoder,
                                    get_safe_tx_decoder, get_tx_decoder)

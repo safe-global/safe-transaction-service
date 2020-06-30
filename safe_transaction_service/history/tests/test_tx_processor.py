@@ -159,7 +159,7 @@ class TestSafeTxProcessor(TestCase):
             internal_tx__ethereum_tx=approve_hash_decoded_tx.internal_tx.ethereum_tx,
             internal_tx__trace_address='0,1',
             internal_tx___from=owner_approving,
-        )
+        )  # noqa: F841
 
         tx_processor.process_decoded_transactions(
             [

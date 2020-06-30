@@ -80,7 +80,7 @@ class ProxyFactoryIndexer(EthereumIndexer):
 
         logs = self.ethereum_client.w3.eth.getLogs({'address': addresses,
                                                     'topics': [self.proxy_creation_topic],
-                                                    'fromBlock':  from_block_number,
+                                                    'fromBlock': from_block_number,
                                                     'toBlock': to_block_number})
 
         # Log INFO if erc events found, DEBUG otherwise

@@ -28,6 +28,7 @@ class Command(BaseCommand):
                 else:
                     raise RequestException()
             except RequestException as e:
-                self.stdout.write(self.style.ERROR(f'Cannot send slack notification to webhook ({settings.SLACK_API_WEBHOOK}): "{e}"'))
+                self.stdout.write(self.style.ERROR(f'Cannot send slack notification to webhook '
+                                                   f'({settings.SLACK_API_WEBHOOK}): "{e}"'))
         else:
             self.stdout.write(self.style.SUCCESS('Slack not configured, ignoring'))

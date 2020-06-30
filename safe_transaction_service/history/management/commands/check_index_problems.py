@@ -37,7 +37,7 @@ class Command(BaseCommand):
             payload = {'to': address,
                        'data': data,
                        'output_type': output_type,
-                       'fn_name':  fn_name,
+                       'fn_name': fn_name,
                        }
             payloads.append(payload)
         return payloads

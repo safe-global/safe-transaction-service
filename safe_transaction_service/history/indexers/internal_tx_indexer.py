@@ -19,12 +19,17 @@ class InternalTxIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
+            block_process_limit = settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
             if settings.ETH_INTERNAL_NO_FILTER:
-                cls.instance = InternalTxIndexerWithTraceBlock(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                                                               block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+                cls.instance = InternalTxIndexerWithTraceBlock(
+                    EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+                    block_process_limit=block_process_limit
+                )
             else:
-                cls.instance = InternalTxIndexer(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                                                 block_process_limit=settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT)
+                cls.instance = InternalTxIndexer(
+                    EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+                    block_process_limit=block_process_limit
+                )
         return cls.instance
 
     @classmethod
@@ -63,10 +68,10 @@ class InternalTxIndexer(EthereumIndexer):
                         from_block_number, trace_block_number, trace_block_number, to_block_number)
             return OrderedDict.fromkeys(list(self._find_relevant_elements_using_trace_filter(addresses,
                                                                                              from_block_number,
-                                                                                             trace_block_number)) +
-                                        list(self._find_relevant_elements_using_trace_block(addresses,
-                                                                                            trace_block_number,
-                                                                                            to_block_number))
+                                                                                             trace_block_number))
+                                        + list(self._find_relevant_elements_using_trace_block(addresses,
+                                                                                              trace_block_number,
+                                                                                              to_block_number))
                                         ).keys()
 
     def _find_relevant_elements_using_trace_block(self, addresses: List[str], from_block_number: int,
