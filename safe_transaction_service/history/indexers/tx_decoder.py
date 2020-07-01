@@ -184,8 +184,8 @@ class TxDecoder(SafeTxDecoder):
         super().__init__()
 
         compound_contracts = [
-            self.dummy_w3.eth.contract(abi=ctoken_abi)
-            #                      self.dummy_w3.eth.contract(abi=comptroller_abi)]
+            self.dummy_w3.eth.contract(abi=ctoken_abi),
+            self.dummy_w3.eth.contract(abi=comptroller_abi),
         ]
 
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),

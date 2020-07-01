@@ -239,7 +239,14 @@ class TestTxDecoder(TestCase):
                                                                                                 'to': '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
                                                                                                 'value': 0,
                                                                                                 'data': '0xc29982380000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000039aa39c021dfbae8fac545936693ac917d5e7563000000000000000000000000f650c3d88d12db855b8bf7d11be6c55a4e07dcc9',
-                                                                                                'decoded_data': None},
+                                                                                                'decoded_data': {
+                                                                                                    'method': 'enterMarkets',
+                                                                                                    'parameters': [{
+                                                                                                        'name': 'cTokens',
+                                                                                                        'type': 'address[]',
+                                                                                                        'value': [
+                                                                                                            '0x39AA39c021dfbaE8faC545936693aC917d5E7563',
+                                                                                                            '0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9']}]}},
                                                                                                {'operation': 'CALL',
                                                                                                 'to': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
                                                                                                 'value': 0,
