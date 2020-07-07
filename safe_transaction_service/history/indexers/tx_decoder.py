@@ -19,8 +19,15 @@ from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
                                   get_uniswap_exchange_contract)
 from gnosis.safe.multi_send import MultiSend
 
+from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
+                                aave_lending_pool_addresses_provider,
+                                aave_lending_pool_core)
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import gnosis_protocol_abi
+from .decoder_abis.idle import idle_token_v3
+from .decoder_abis.request import request_erc20_proxy, request_ethereum_proxy
+from .decoder_abis.sablier import (sablier_abi, sablier_ctoken_manager,
+                                   sablier_payroll)
 from .decoder_abis.sight import (conditional_token_abi, market_maker_abi,
                                  market_maker_factory_abi)
 
@@ -188,6 +195,15 @@ class TxDecoder(SafeTxDecoder):
             self.dummy_w3.eth.contract(abi=comptroller_abi),
         ]
 
+        aave_abis = [aave_a_token, aave_lending_pool, aave_lending_pool_addresses_provider, aave_lending_pool_core]
+        aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in aave_abis]
+        idle_abis = [idle_token_v3]
+        idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in idle_abis]
+        request_abis = [request_erc20_proxy, request_ethereum_proxy]
+        request_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in request_abis]
+        sablier_abis = [sablier_ctoken_manager, sablier_payroll, sablier_abi]
+        sablier_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in sablier_abis]
+
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
                      get_kyber_network_proxy_contract(self.dummy_w3),
                      self.dummy_w3.eth.contract(abi=gnosis_protocol_abi)]
@@ -201,7 +217,8 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (compound_contracts + exchanges + sight_contracts + erc_contracts
+        self.supported_contracts = (aave_contracts + idle_contracts + request_contracts + sablier_contracts
+                                    + compound_contracts + exchanges + sight_contracts + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
