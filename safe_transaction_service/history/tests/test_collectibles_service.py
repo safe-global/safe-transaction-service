@@ -104,3 +104,9 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.name, retrieve_token_info_mock.return_value.symbol)
         self.assertEqual(Token.objects.count(), 3)
         self.assertEqual(len(collectibles_service.cache_token_info), 4)  # Cache works for not found tokens too
+
+        # Test ENS (hardcoded)
+        retrieve_token_info_mock.return_value = None
+        token_info = collectibles_service.get_token_info(list(collectibles_service.ENS_CONTRACTS_WITH_TLD.keys())[0])
+        self.assertIsNotNone(token_info)
+        self.assertEqual(Token.objects.count(), 4)
