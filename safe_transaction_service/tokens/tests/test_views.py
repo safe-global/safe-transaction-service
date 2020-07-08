@@ -1,4 +1,6 @@
 import logging
+from unittest import mock
+from unittest.mock import MagicMock
 
 from django.urls import reverse
 
@@ -7,8 +9,11 @@ from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 
+from gnosis.eth.ethereum_client import (Erc20Info, Erc20Manager,
+                                        InvalidERC20Info)
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..models import Token
 from .factories import TokenFactory
 
 logger = logging.getLogger(__name__)
@@ -40,6 +45,22 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                                          'name': token.name,
                                          'symbol': token.symbol,
                                          'decimals': token.decimals})
+
+    @mock.patch.object(Erc20Manager, 'get_info', autospec=True)
+    def test_token_view_missing(self, get_token_info_mock: MagicMock):
+        get_token_info_mock.side_effect = InvalidERC20Info
+        random_address = Account.create().address
+        self.assertEqual(Token.objects.count(), 0)
+        response = self.client.get(reverse('v1:token', args=(random_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(Token.objects.count(), 0)
+
+        random_address = Account.create().address  # Use new address to skip caching
+        get_token_info_mock.side_effect = None
+        get_token_info_mock.return_value = Erc20Info('UXIO', 'UXI', 18)
+        response = self.client.get(reverse('v1:token', args=(random_address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Token.objects.count(), 1)
 
     def test_tokens_view(self):
         response = self.client.get(reverse('v1:tokens'))

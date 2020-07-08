@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.conf import settings
 from django.test import TestCase
@@ -20,7 +21,7 @@ from .utils import just_test_if_mainnet_node
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
     @mock.patch.object(BalanceService, 'get_eth_usd_price_kraken', return_value=0.4)
     @mock.patch.object(BalanceService, 'get_eth_usd_price_binance', return_value=0.5)
-    def test_get_eth_usd_price(self, binance_mock, kraken_mock):
+    def test_get_eth_usd_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
         balance_service = BalanceServiceProvider()
         eth_usd_price = balance_service.get_eth_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
@@ -84,7 +85,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_get_usd_balances(self, get_eth_usd_price_mock, get_token_eth_value_mock, get_token_info_mock):
+    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
+                              get_token_info_mock: MagicMock):
         balance_service = BalanceServiceProvider()
         erc20_info = Erc20Info('UXIO', 'UXI', 18)
         get_token_info_mock.return_value = erc20_info
