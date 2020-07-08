@@ -12,7 +12,8 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
-from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.serializers import \
+    TokenInfoResponseSerializer
 
 from .helpers import DelegateSignatureHelper
 from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
@@ -403,29 +404,6 @@ class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
 
-class TokenTransferInfoType(Enum):
-    ERC20 = 0
-    ERC721 = 1
-
-
-class TokenTransferInfoResponseSerializer(serializers.Serializer):
-    type = serializers.SerializerMethodField()
-    address = EthereumAddressField()
-    name = serializers.CharField()
-    symbol = serializers.CharField()
-    decimals = serializers.IntegerField()
-    logo_uri = serializers.SerializerMethodField()
-
-    def get_type(self, obj: Token) -> str:
-        if obj.decimals:
-            return TokenTransferInfoType.ERC20.name
-        else:
-            return TokenTransferInfoType.ERC721.name
-
-    def get_logo_uri(self, obj: Token) -> str:
-        return obj.get_full_logo_uri()
-
-
 class TransferType(Enum):
     ETHER_TRANSFER = 0
     ERC20_TRANSFER = 1
@@ -464,7 +442,7 @@ class TransferResponseSerializer(serializers.Serializer):
 
 
 class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
-    token_info = TokenTransferInfoResponseSerializer(source='token')
+    token_info = TokenInfoResponseSerializer(source='token')
 
 
 # All txs serializers

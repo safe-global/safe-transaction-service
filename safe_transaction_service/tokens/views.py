@@ -7,11 +7,11 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 from .filters import TokenFilter
 from .models import Token
-from .serializers import TokenSerializer
+from .serializers import TokenInfoResponseSerializer
 
 
 class TokenView(RetrieveAPIView):
-    serializer_class = TokenSerializer
+    serializer_class = TokenInfoResponseSerializer
     lookup_field = 'address'
     queryset = Token.objects.all()
 
@@ -21,7 +21,7 @@ class TokenView(RetrieveAPIView):
 
 
 class TokensView(ListAPIView):
-    serializer_class = TokenSerializer
+    serializer_class = TokenInfoResponseSerializer
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = TokenFilter
     search_fields = ('name', 'symbol')

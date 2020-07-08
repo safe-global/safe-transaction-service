@@ -21,15 +21,25 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data, {'detail': ErrorDetail(string='Not found.', code='not_found')})
 
-        token = TokenFactory(address=random_address)
-        response = self.client.get(reverse('v1:token', args=(random_address,)))
+        token = TokenFactory(address=random_address, decimals=18)  # ERC20
+        response = self.client.get(reverse('v1:token', args=(token.address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {'address': random_address,
+        self.assertEqual(response.data, {'type': 'ERC20',
+                                         'address': token.address,
                                          'logo_uri': token.get_full_logo_uri(),
                                          'name': token.name,
                                          'symbol': token.symbol,
-                                         'decimals': token.decimals,
-                                         'trusted': token.trusted})
+                                         'decimals': token.decimals})
+
+        token = TokenFactory(decimals=0)  # ERC721
+        response = self.client.get(reverse('v1:token', args=(token.address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {'type': 'ERC721',
+                                         'address': token.address,
+                                         'logo_uri': token.get_full_logo_uri(),
+                                         'name': token.name,
+                                         'symbol': token.symbol,
+                                         'decimals': token.decimals})
 
     def test_tokens_view(self):
         response = self.client.get(reverse('v1:tokens'))
@@ -41,9 +51,9 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:tokens'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
-        self.assertEqual(response.data['results'], [{'address': token.address,
+        self.assertEqual(response.data['results'], [{'type': 'ERC20',
+                                                     'address': token.address,
                                                      'logo_uri': token.get_full_logo_uri(),
                                                      'name': token.name,
                                                      'symbol': token.symbol,
-                                                     'decimals': token.decimals,
-                                                     'trusted': token.trusted}])
+                                                     'decimals': token.decimals}])
