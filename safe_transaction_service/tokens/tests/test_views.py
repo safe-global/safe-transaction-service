@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 class TestTokenViews(SafeTestCaseMixin, APITestCase):
     def test_token_view(self):
+        invalid_address = '0x1234'
+        response = self.client.get(reverse('v1:token', args=(invalid_address,)))
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
         random_address = Account.create().address
         response = self.client.get(reverse('v1:token', args=(random_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
