@@ -9,9 +9,13 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import Erc721Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.tests.factories import TokenFactory
+
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
-                                             CollectibleWithMetadata)
+                                             CollectibleWithMetadata,
+                                             Erc721InfoWithLogo)
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
@@ -71,14 +75,32 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         collectibles_service = CollectiblesService(self.ethereum_client)
         random_address = Account.create().address
 
-        retrieve_token_info_mock.return_value = Erc721Info('POAP', 'The Proof of Attendance Protocol')
-        self.assertEqual(collectibles_service.get_token_info(random_address),
-                         Erc721Info('The Proof of Attendance Protocol', 'POAP'))
-
-        retrieve_token_info_mock.return_value = Erc721Info('Uxio Collectible Card', 'UCC')
-        self.assertEqual(collectibles_service.get_token_info(random_address),
-                         Erc721Info('Uxio Collectible Card', 'UCC'))
-
+        # No DB, no blockchain source
         retrieve_token_info_mock.return_value = None
-        self.assertEqual(collectibles_service.get_token_info(random_address),
-                         Erc721Info('', ''))
+        self.assertFalse(collectibles_service.cache_token_info)
+        self.assertIsNone(collectibles_service.get_token_info(random_address))
+        self.assertTrue(collectibles_service.cache_token_info)  # Cache works for not found tokens too
+
+        # Add DB source
+        token = TokenFactory()
+        self.assertEqual(collectibles_service.get_token_info(token.address), Erc721InfoWithLogo.from_token(token))
+
+        # Just Blockchain source
+        random_address = Account.create().address
+        self.assertEqual(Token.objects.count(), 1)
+        retrieve_token_info_mock.return_value = Erc721Info('Uxio Collectible Card', 'UCC')
+        token_info = collectibles_service.get_token_info(random_address)
+        self.assertIsInstance(token_info, Erc721InfoWithLogo)
+        self.assertEqual(token_info.name, retrieve_token_info_mock.return_value.name)
+        self.assertEqual(token_info.symbol, retrieve_token_info_mock.return_value.symbol)
+        self.assertEqual(Token.objects.count(), 2)
+
+        # Test switch name-symbol when symbol is way longer than name
+        random_address = Account.create().address
+        retrieve_token_info_mock.return_value = Erc721Info('POAP', 'The Proof of Attendance Protocol')
+        token_info = collectibles_service.get_token_info(random_address)
+        self.assertIsInstance(token_info, Erc721InfoWithLogo)
+        self.assertEqual(token_info.symbol, retrieve_token_info_mock.return_value.name)
+        self.assertEqual(token_info.name, retrieve_token_info_mock.return_value.symbol)
+        self.assertEqual(Token.objects.count(), 3)
+        self.assertEqual(len(collectibles_service.cache_token_info), 4)  # Cache works for not found tokens too

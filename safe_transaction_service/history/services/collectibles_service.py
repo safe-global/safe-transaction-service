@@ -10,6 +10,8 @@ from cachetools import TTLCache, cachedmethod
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import Erc721Info, InvalidERC721Info
 
+from safe_transaction_service.tokens.models import Token
+
 from ..clients import EnsClient
 from ..models import EthereumEvent
 
@@ -25,11 +27,26 @@ class MetadataRetrievalException(CollectiblesServiceException):
 
 
 @dataclass
+class Erc721InfoWithLogo:
+    address: str
+    name: str
+    symbol: str
+    logo_uri: str
+
+    @classmethod
+    def from_token(cls, token: Token, logo_uri: Optional[str] = None):
+        return cls(token.address,
+                   token.name,
+                   token.symbol,
+                   logo_uri if logo_uri else token.get_full_logo_uri())
+
+
+@dataclass
 class Collectible:
     token_name: str
     token_symbol: str
     address: str
-    id: str
+    id: int
     uri: str
 
 
@@ -93,13 +110,15 @@ class CollectiblesService:
     ENS_CONTRACTS_WITH_TLD = {
         '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85': 'eth',  # ENS .eth registrar (Every network)
     }
-    ENS_IMAGE_URL = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
+    ENS_IMAGE_FILENAME = 'ENS.png'
+    ENS_IMAGE_URL = f'https://gnosis-safe-token-logos.s3.amazonaws.com/{ENS_IMAGE_FILENAME}'
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
-        self.cache_token_info: Dict[str, Tuple[str, str]] = {}  # Cache forever
-        self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
         self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
+
+        self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
+        self.cache_token_info: Dict[str, Tuple[str, str]] = {}
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24, prefix='collectibles-_retrieve_metadata_from_uri')  # 1 day
@@ -125,19 +144,20 @@ class CollectiblesService:
         except requests.RequestException as e:
             raise MetadataRetrievalException(uri) from e
 
-    def build_collectible(self, token_info: Erc721Info, token_address: str, token_id: int,
-                          token_uri: Optional[str]) -> Collectible:
-        if not token_uri:
+    def build_collectible(self, token_info: Optional[Erc721InfoWithLogo], token_address: str, token_id: int,
+                          token_metadata_uri: Optional[str]) -> Collectible:
+        if not token_metadata_uri:
             if token_address in self.CRYPTO_KITTIES_CONTRACT_ADDRESSES:
-                token_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
+                token_metadata_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
             else:
                 logger.warning('Not available token_uri to retrieve metadata for ERC721 token=%s with token-id=%d',
                                token_address, token_id, exc_info=True)
-        return Collectible(token_info.name, token_info.symbol, token_address, token_id, token_uri)
+        name = token_info.name if token_info else ''
+        symbol = token_info.symbol if token_info else ''
+        return Collectible(name, symbol, token_address, token_id, token_metadata_uri)
 
     def get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
-        tld = self.ENS_CONTRACTS_WITH_TLD.get(collectible.address)
-        if tld:  # Special case for ENS
+        if tld := self.ENS_CONTRACTS_WITH_TLD.get(collectible.address):  # Special case for ENS
             label_name = self.ens_service.query_by_domain_hash(collectible.id)
             return {
                 'name': f'{label_name}.{tld}' if label_name else f'.{tld}',
@@ -184,26 +204,41 @@ class CollectiblesService:
             )
         return collectibles_with_metadata
 
-    def get_token_info(self, token_address: str) -> Erc721Info:
+    @cachedmethod(cache=operator.attrgetter('cache_token_info'))
+    @cache_memoize(60 * 60 * 24, prefix='collectibles-get_token_info')  # 1 day
+    def get_token_info(self, token_address: str) -> Optional[Erc721InfoWithLogo]:
         """
         :param token_address:
         :return: Erc721 name and symbol. If it cannot be found, `name=''` and `symbol=''`
         """
-        if token_address in self.ENS_CONTRACTS_WITH_TLD:
-            token_info = Erc721Info('Ethereum Name Service', 'ENS')
-        else:
-            token_info = self.retrieve_token_info(token_address)
+        try:
+            token = Token.objects.get(address=token_address)
+            return Erc721InfoWithLogo.from_token(token)
+        except Token.DoesNotExist:
+            logo_uri = ''
+            trusted = False
+            if token_address in self.ENS_CONTRACTS_WITH_TLD:
+                token_info = Erc721Info('Ethereum Name Service', 'ENS')
+                logo_uri = self.ENS_IMAGE_FILENAME
+                trusted = True
+            else:
+                token_info = self.retrieve_token_info(token_address)
 
-        # If symbol is way bigger than name, swap them (e.g. POAP)
-        if token_info and (len(token_info.name) - len(token_info.symbol)) < -5:
-            token_info = Erc721Info(token_info.symbol, token_info.name)
-        elif not token_info:
-            token_info = Erc721Info('', '')
+            # If symbol is way bigger than name, swap them (e.g. POAP)
+            if token_info:
+                if (len(token_info.name) - len(token_info.symbol)) < -5:
+                    token_info = Erc721Info(token_info.symbol, token_info.name)
+
+                token = Token.objects.create(address=token_address,
+                                             name=token_info.name,
+                                             symbol=token_info.symbol,
+                                             decimals=0,
+                                             logo_uri=logo_uri,
+                                             trusted=trusted)
+                return Erc721InfoWithLogo.from_token(token)
 
         return token_info
 
-    @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    @cache_memoize(60 * 60 * 24, prefix='collectibles-retrieve_token_info')  # 1 day
     def retrieve_token_info(self, token_address: str) -> Optional[Erc721Info]:
         """
         Queries blockchain for the token name and symbol
