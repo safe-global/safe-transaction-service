@@ -11,7 +11,7 @@ django-filter==2.3.0
 django-model-utils==4.0.0
 django-redis==4.12.1
 django-timezone-field==4.0.0
-django==3.0.7
+django==3.0.8
 djangorestframework-camel-case==1.2.0
 djangorestframework==3.11.0
 docutils==0.16
