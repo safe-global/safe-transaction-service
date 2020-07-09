@@ -113,7 +113,6 @@ class AllTransactionsListView(ListAPIView):
         return self.get_paginated_response(all_txs_serialized)
 
     @swagger_auto_schema(responses={200: _schema_200_response,
-                                    400: 'Invalid data',
                                     422: 'Invalid ethereum address'},
                          manual_parameters=[_schema_queued_param, _schema_trusted_param])
     def get(self, request, *args, **kwargs):
@@ -469,8 +468,8 @@ class SafeInfoView(APIView):
     serializer_class = SafeInfoResponseSerializer
 
     @swagger_auto_schema(responses={200: serializer_class(),
-                                    404: 'Safes not found',
-                                    422: 'Owner address checksum not valid'})
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid'})
     def get(self, request, address, format=None):
         """
         Get status of the safe
