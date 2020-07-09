@@ -55,8 +55,10 @@ class SafeService:
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
         try:
-            creation_internal_tx = InternalTx.objects.select_related('ethereum_tx__block'
-                                                                     ).get(contract_address=safe_address)
+            creation_internal_tx = InternalTx.objects.filter(
+                ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
+            ).select_related('ethereum_tx__block').get(contract_address=safe_address)
+
             previous_internal_tx = creation_internal_tx.get_previous_trace()
             created = creation_internal_tx.ethereum_tx.block.timestamp
             creator = (previous_internal_tx or creation_internal_tx)._from
