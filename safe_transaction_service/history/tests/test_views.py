@@ -1028,7 +1028,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        internal_tx = InternalTxFactory(contract_address=owner_address, trace_address='0,0')
+        internal_tx = InternalTxFactory(contract_address=owner_address, trace_address='0,0', ethereum_tx__status=1)
         response = self.client.get(reverse('v1:safe-creation', args=(owner_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z')

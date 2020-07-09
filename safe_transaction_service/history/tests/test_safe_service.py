@@ -5,12 +5,25 @@ from eth_account import Account
 from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..services.safe_service import SafeInfo, SafeServiceProvider
+from ..services.safe_service import (SafeCreationInfo, SafeInfo,
+                                     SafeServiceProvider)
+from .factories import InternalTxFactory
 
 
 class TestSafeService(SafeTestCaseMixin, TestCase):
     def setUp(self) -> None:
         self.safe_service = SafeServiceProvider()
+
+    def test_get_safe_creation_info(self):
+        random_address = Account.create().address
+        self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
+
+        InternalTxFactory(contract_address=random_address, ethereum_tx__status=0)
+        self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
+
+        InternalTxFactory(contract_address=random_address, ethereum_tx__status=1)
+        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
+        self.assertIsInstance(safe_creation_info, SafeCreationInfo)
 
     def test_get_safe_info(self):
         safe_address = Account.create().address
