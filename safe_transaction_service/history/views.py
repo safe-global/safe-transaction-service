@@ -40,6 +40,7 @@ from .serializers import (OwnerResponseSerializer,
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
+from .services.safe_service import CannotGetSafeInfo
 
 
 class AboutView(APIView):
@@ -469,20 +470,27 @@ class SafeInfoView(APIView):
 
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe not found',
-                                    422: 'Safe address checksum not valid'})
+                                    422: 'Safe address checksum not valid/Cannot get info from Safe'})
     def get(self, request, address, format=None):
         """
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
+                                                                               'message': 'Invalid ethereum address',
+                                                                               'arguments': [address]})
 
         if not SafeContract.objects.filter(address=address).exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        safe_info = SafeServiceProvider().get_safe_info(address)
-        serializer = self.serializer_class(safe_info)
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        try:
+            safe_info = SafeServiceProvider().get_safe_info(address)
+            serializer = self.serializer_class(safe_info)
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+        except CannotGetSafeInfo:
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 50,
+                                                                               'message': 'Cannot get Safe info',
+                                                                               'arguments': [address]})
 
 
 class OwnersView(APIView):

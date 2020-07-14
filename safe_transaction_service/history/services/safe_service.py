@@ -9,6 +9,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import (get_cpk_factory_contract,
                                   get_proxy_factory_contract)
 from gnosis.safe import Safe
+from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.safe import SafeInfo
 
 from ..models import InternalTx
@@ -17,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class SafeServiceException(Exception):
+    pass
+
+
+class CannotGetSafeInfo(SafeServiceException):
     pass
 
 
@@ -78,8 +83,11 @@ class SafeService:
                                 creation_internal_tx.ethereum_tx_id)
 
     def get_safe_info(self, safe_address: str) -> SafeInfo:
-        safe = Safe(safe_address, self.ethereum_client)
-        return safe.retrieve_all_info()
+        try:
+            safe = Safe(safe_address, self.ethereum_client)
+            return safe.retrieve_all_info()
+        except CannotRetrieveSafeInfoException as e:
+            raise CannotGetSafeInfo from e
 
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
