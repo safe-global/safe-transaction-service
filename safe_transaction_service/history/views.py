@@ -114,7 +114,7 @@ class AllTransactionsListView(ListAPIView):
         return self.get_paginated_response(all_txs_serialized)
 
     @swagger_auto_schema(responses={200: _schema_200_response,
-                                    422: 'Invalid ethereum address'},
+                                    422: 'code = 1: Checksum address validation failed'},
                          manual_parameters=[_schema_queued_param, _schema_trusted_param])
     def get(self, request, *args, **kwargs):
         """
@@ -129,7 +129,9 @@ class AllTransactionsListView(ListAPIView):
         """
         address = kwargs['address']
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
+                                                                               'message': 'Checksum address validation failed',
+                                                                               'arguments': [address]})
 
         response = super().get(request, *args, **kwargs)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -277,14 +279,16 @@ class SafeCollectiblesView(APIView):
 
     @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
-                                    422: 'Safe address checksum not valid'})
+                                    422: 'code = 1: Checksum address validation failed'})
     @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
+                                                                               'message': 'Checksum address validation failed',
+                                                                               'arguments': [address]})
         else:
             try:
                 SafeContract.objects.get(address=address)
@@ -301,14 +305,16 @@ class SafeBalanceUsdView(APIView):
 
     @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
-                                    422: 'Safe address checksum not valid'})
+                                    422: 'code = 1: Checksum address validation failed'})
     @method_decorator(cache_page(15))
     def get(self, request, address, format=None):
         """
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
+                                                                               'message': 'Checksum address validation failed',
+                                                                               'arguments': [address]})
         else:
             try:
                 SafeContract.objects.get(address=address)
@@ -470,14 +476,14 @@ class SafeInfoView(APIView):
 
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe not found',
-                                    422: 'Safe address checksum not valid/Cannot get info from Safe'})
+                                    422: 'code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info'})
     def get(self, request, address, format=None):
         """
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
-                                                                               'message': 'Invalid ethereum address',
+                                                                               'message': 'Checksum address validation failed',
                                                                                'arguments': [address]})
 
         if not SafeContract.objects.filter(address=address).exists():
