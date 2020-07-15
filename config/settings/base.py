@@ -320,8 +320,16 @@ ETH_KYBER_NETWORK_PROXY_ADDRESS = env('ETH_KYBER_NETWORK_PROXY_ADDRESS',
                                       default='0x818E6FECD516Ecc3849DAf6845e3EC868087B755')
 
 # Tokens
-TOKEN_LOGO_BASE_URI = env('TOKEN_LOGO_BASE_URI', default='https://gnosis-safe-token-logos.s3.amazonaws.com/')
-TOKEN_LOGO_EXTENSION = env('TOKEN_LOGO_EXTENSION', default='.png')
+TOKENS_LOGO_BASE_URI = env('TOKENS_LOGO_BASE_URI', default='https://gnosis-safe-token-logos.s3.amazonaws.com/')
+TOKENS_LOGO_EXTENSION = env('TOKENS_LOGO_EXTENSION', default='.png')
+
+# Slack notifications
+SLACK_API_WEBHOOK = env('SLACK_API_WEBHOOK', default=None)
 
 # Notifications
-SLACK_API_WEBHOOK = env('SLACK_API_WEBHOOK', default=None)
+NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default=None)
+if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
+    import json
+    NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS = json.load(
+        environ.Path(NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH).file('firebase-credentials.json')
+    )
