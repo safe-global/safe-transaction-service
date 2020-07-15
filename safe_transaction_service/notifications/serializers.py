@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from safe_transaction_service.notifications.models import DeviceTypeEnum, FirebaseDevice
+from .models import DeviceTypeEnum, FirebaseDevice
 
 
 class FirebaseDeviceSerializer(serializers.Serializer):

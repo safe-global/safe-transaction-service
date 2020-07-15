@@ -3,6 +3,7 @@ from django.urls import path
 from safe_transaction_service.tokens.views import TokensView, TokenView
 
 from . import views
+from safe_transaction_service.notifications.views import FirebaseDeviceCreateView
 
 app_name = "safe"
 
@@ -44,8 +45,13 @@ urlpatterns = [
          name='multisig-transaction'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
+
     # Tokens
     path('tokens/', TokensView.as_view(), name='tokens'),
     path('tokens/<str:address>/', TokenView.as_view(), name='token'),
+
+    # Notifications
+    path('safes/<str:address>/notifications/devices/', FirebaseDeviceCreateView.as_view(),
+         name='notifications-devices'),
 
 ]
