@@ -1,7 +1,9 @@
 import factory
 
+from safe_transaction_service.history.tests.factories import \
+    SafeContractFactory
+
 from ..models import FirebaseDevice
-from safe_transaction_service.history.tests.factories import SafeContractFactory
 
 
 class FirebaseDeviceFactory(factory.DjangoModelFactory):
@@ -13,5 +15,5 @@ class FirebaseDeviceFactory(factory.DjangoModelFactory):
     build_number = factory.Sequence()
     bundle = 'company.package.app'
     device_type = 0
-    version = '1.0.0'
+    version = factory.Sequence(lambda n: f'{n}.0.0')
 

@@ -203,7 +203,7 @@ def check_reorgs_task() -> Optional[int]:
 @app.shared_task()
 def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
-        return False
+        return 0
 
     webhooks = WebHook.objects.matching_for_address(address)
     if not webhooks:

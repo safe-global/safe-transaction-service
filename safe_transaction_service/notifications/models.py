@@ -1,6 +1,7 @@
 from enum import Enum
 
 from django.db import models
+
 from safe_transaction_service.history.models import SafeContract
 
 

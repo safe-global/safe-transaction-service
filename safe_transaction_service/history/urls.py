@@ -1,9 +1,10 @@
 from django.urls import path
 
+from safe_transaction_service.notifications.views import \
+    FirebaseDeviceCreateView
 from safe_transaction_service.tokens.views import TokensView, TokenView
 
 from . import views
-from safe_transaction_service.notifications.views import FirebaseDeviceCreateView
 
 app_name = "safe"
 

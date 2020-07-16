@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Dict, Union, Any
+from typing import Any, Dict, Sequence, Tuple, Union
 
 from firebase_admin import credentials, initialize_app, messaging
 from firebase_admin.exceptions import FirebaseError
+from firebase_admin.messaging import BatchResponse
 
 logger = getLogger(__name__)
 
@@ -34,33 +35,13 @@ class MessagingClient(ABC):
         return self._app
 
     @abstractmethod
-    def send_message(self, data: Dict[str, any], token: str, ios: bool = True) -> str:
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
         raise NotImplementedError
 
 
 class FirebaseClient(MessagingClient):
     # Data for the Apple Push Notification Service
     # see https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging
-    apns = messaging.APNSConfig(
-        headers={'apns-priority': '10'},
-        payload=messaging.APNSPayload(
-            aps=messaging.Aps(
-                alert=messaging.ApsAlert(
-                    # This is a localized key that iOS will search in
-                    # the safe iOS app to show as a default title
-                    title_loc_key='sign_transaction_request_title',
-                ),
-                # Means the content of the notification will be
-                # modified by the safe app.
-                # Depending on the 'type' custom field,
-                # 'alert.title' and 'alert.body' above will be
-                # different
-                mutable_content=True,
-                badge=1,
-                sound='default',
-            ),
-        ),
-    )
 
     def __init__(self, credentials_dict: Dict[str, Any]):
         self._credentials = credentials_dict
@@ -78,6 +59,30 @@ class FirebaseClient(MessagingClient):
     def app(self):
         return self._app
 
+    def _build_apns_config(self, title_loc_key: str = ''):
+        return messaging.APNSConfig(
+            headers={
+                'apns-priority': '10'
+            },
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    alert=messaging.ApsAlert(
+                        # This is a localized key that iOS will search in
+                        # the safe iOS app to show as a default title
+                        title_loc_key=title_loc_key,
+                    ),
+                    # Means the content of the notification will be
+                    # modified by the safe app.
+                    # Depending on the 'type' custom field,
+                    # 'alert.title' and 'alert.body' above will be
+                    # different
+                    mutable_content=True,
+                    badge=1,
+                    sound='default',
+                ),
+            ),
+        )
+
     def verify_token(self, token: str) -> bool:
         """
         Check if a token is valid on firebase for the project. Only way to do it is simulating a message send
@@ -94,23 +99,21 @@ class FirebaseClient(MessagingClient):
         except FirebaseError:
             return False
 
-    def send_message(self, data: Dict[str, any], token: str, ios: bool = True) -> str:
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
         """
         Send message using firebase service
+        :param tokens: Firebase token of recipient
         :param data: Dictionary with the notification data
-        :param token: Firebase token of recipient
-        :param ios: If `True`, `apns` is configured for Apple devices. Otherwise, is not configured and Apple
-        devices will not receive the notification
-        :return: Firebase `MessageId`
+        :return: Success count, failure count
         """
-        logger.debug("Sending data=%s with token=%s", data, token)
-        message = messaging.Message(
-            apns=self.apns if ios else None,
+        logger.debug("Sending data=%s with tokens=%s", data, tokens)
+        message = messaging.MulticastMessage(
+            apns=self._build_apns_config(),
             data=data,
-            token=token
+            tokens=tokens,
         )
-        response = messaging.send(message)
-        return response
+        batch_response: BatchResponse = messaging.send_multicast(message)
+        return batch_response.success_count, batch_response.failure_count
 
 
 class MockedClient(MessagingClient):
@@ -125,6 +128,6 @@ class MockedClient(MessagingClient):
     def verify_token(self, token: str) -> bool:
         return bool(token)
 
-    def send_message(self, data: Dict[str, any], token: str, ios: bool = True) -> str:
-        logger.warning("MockedClient: Not sending message with data %s and token %s", data, token)
-        return 'MockedResponse'
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
+        logger.warning("MockedClient: Not sending message with data=%s and tokens=%s", data, token)
+        return len(tokens), 0
