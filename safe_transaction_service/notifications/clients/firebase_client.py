@@ -9,6 +9,16 @@ from firebase_admin.messaging import BatchResponse
 logger = getLogger(__name__)
 
 
+class FirebaseClientException(Exception):
+    pass
+
+
+class FirebaseTokensNotValid(FirebaseClientException):
+    def __init__(self, tokens: Sequence[str]):
+        self.tokens = tokens
+        super().__init__()
+
+
 class FirebaseProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
@@ -40,9 +50,9 @@ class MessagingClient(ABC):
 
 
 class FirebaseClient(MessagingClient):
-    # Data for the Apple Push Notification Service
-    # see https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging
-
+    """
+    Wrapper Client for Firebase Cloud Messaging Service
+    """
     def __init__(self, credentials_dict: Dict[str, Any]):
         self._credentials = credentials_dict
         self._authenticate()
@@ -59,18 +69,34 @@ class FirebaseClient(MessagingClient):
     def app(self):
         return self._app
 
+    def _build_android_config(self, title_loc_key: str = ''):
+        return messaging.AndroidConfig(
+            priority='high',
+            # ttl=6*60*60,  # 6 hours
+            # notification=messaging.AndroidNotification(
+            # title_loc_key=title_loc_key
+            # )
+        )
+
     def _build_apns_config(self, title_loc_key: str = ''):
+        """
+        Data for the Apple Push Notification Service
+        see https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging
+        :param title_loc_key:
+        :return:
+        """
+
         return messaging.APNSConfig(
             headers={
                 'apns-priority': '10'
             },
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(
-                    alert=messaging.ApsAlert(
-                        # This is a localized key that iOS will search in
-                        # the safe iOS app to show as a default title
-                        title_loc_key=title_loc_key,
-                    ),
+                    # alert=messaging.ApsAlert(
+                    # This is a localized key that iOS will search in
+                    # the safe iOS app to show as a default title
+                    #    title_loc_key=title_loc_key,
+                    # ),
                     # Means the content of the notification will be
                     # modified by the safe app.
                     # Depending on the 'type' custom field,
@@ -99,21 +125,25 @@ class FirebaseClient(MessagingClient):
         except FirebaseError:
             return False
 
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
         """
-        Send message using firebase service
+        Send multicast message using firebase cloud messaging service
         :param tokens: Firebase token of recipient
         :param data: Dictionary with the notification data
-        :return: Success count, failure count
+        :return: Success count, failure count, invalid tokens
         """
         logger.debug("Sending data=%s with tokens=%s", data, tokens)
         message = messaging.MulticastMessage(
+            android=self._build_android_config(),
             apns=self._build_apns_config(),
             data=data,
             tokens=tokens,
         )
         batch_response: BatchResponse = messaging.send_multicast(message)
-        return batch_response.success_count, batch_response.failure_count
+        # Check if there are invalid tokens
+        invalid_tokens = [response for response in batch_response.responses
+                          if not response.success and isinstance(response.exception, messaging.UnregisteredError)]
+        return batch_response.success_count, batch_response.failure_count, invalid_tokens
 
 
 class MockedClient(MessagingClient):
@@ -129,5 +159,5 @@ class MockedClient(MessagingClient):
         return bool(token)
 
     def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
-        logger.warning("MockedClient: Not sending message with data=%s and tokens=%s", data, token)
+        logger.warning("MockedClient: Not sending message with data=%s and tokens=%s", data, tokens)
         return len(tokens), 0
