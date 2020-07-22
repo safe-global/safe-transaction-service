@@ -108,7 +108,10 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
-        self.assertCountEqual(balances, [BalanceWithUsd(None, None, value, 0.0),
-                                         BalanceWithUsd(erc20.address, erc20_info,
-                                                        tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4))
-                                         ])
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+            BalanceWithUsd(
+                erc20.address, erc20_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            )
+        ])

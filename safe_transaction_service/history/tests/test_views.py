@@ -589,12 +589,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         token_dict = asdict(erc20_info)
         del token_dict['address']
-        self.assertCountEqual(response.data, [{'token_address': None, 'token': None, 'balance': str(value),
-                                               'balance_usd': "0.0"},  # 7 wei is rounded to 0.0
-                                              {'token_address': erc20.address,
-                                               'token': token_dict,
-                                               'balance': str(tokens_value),
-                                               'balance_usd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4))}])
+        self.assertCountEqual(response.data, [
+            {'token_address': None,
+             'token': None,
+             'balance': str(value),
+             'balance_usd': '0.0',
+             'usd_conversion': '123.4',
+             },  # 7 wei is rounded to 0.0
+            {'token_address': erc20.address,
+             'token': token_dict,
+             'balance': str(tokens_value),
+             'balance_usd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
+             'usd_conversion': str(round(123.4 * 0.4, 4)),
+             }
+        ])
 
     def test_safe_collectibles(self):
         safe_address = Account.create().address

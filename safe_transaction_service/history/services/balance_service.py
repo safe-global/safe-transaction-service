@@ -54,6 +54,7 @@ class Balance:
 @dataclass
 class BalanceWithUsd(Balance):
     balance_usd: float
+    usd_conversion: float
 
 
 class BalanceServiceProvider:
@@ -201,18 +202,22 @@ class BalanceService:
         for balance in balances:
             token_address = balance.token_address
             if not token_address:  # Ether
-                balance_usd = eth_value * (balance.balance / 10**18)
+                usd_conversion = eth_value
+                balance_usd = usd_conversion * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
+                    usd_conversion = eth_value * token_to_eth_price
                     balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    balance_usd = eth_value * token_to_eth_price * balance_with_decimals
+                    balance_usd = usd_conversion * balance_with_decimals
                 else:
+                    usd_conversion = 0.
                     balance_usd = 0.
 
             balances_with_usd.append(BalanceWithUsd(balance.token_address,
                                                     balance.token,
                                                     balance.balance,
-                                                    round(balance_usd, 4)))
+                                                    round(balance_usd, 4),
+                                                    round(usd_conversion, 4)))
 
         return balances_with_usd

@@ -356,6 +356,7 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     balance_usd = serializers.CharField()
+    usd_conversion = serializers.CharField()
 
 
 class SafeCollectibleResponseSerializer(serializers.Serializer):
