@@ -136,7 +136,7 @@ class CollectiblesService:
             logger.debug('Getting metadata for uri=%s', uri)
             response = requests.get(uri)
             if not response.ok:
-                logger.debug('Error getting metadata for uri=%s', uri)
+                logger.debug('Cannot get metadata for uri=%s', uri)
                 raise MetadataRetrievalException(uri)
             else:
                 logger.debug('Got metadata for uri=%s', uri)
