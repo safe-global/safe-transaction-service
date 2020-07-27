@@ -23,8 +23,10 @@ from safe_transaction_service.version import __version__
 from .filters import (DefaultPagination, MultisigTransactionFilter,
                       SmallPagination, TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
-                     SafeContract, SafeContractDelegate, SafeStatus)
-from .serializers import (OwnerResponseSerializer,
+                     SafeContract, SafeContractDelegate, SafeMasterCopy,
+                     SafeStatus)
+from .serializers import (MasterCopyResponseSerializer,
+                          OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
                           SafeCollectibleResponseSerializer,
@@ -456,7 +458,7 @@ class SafeCreationView(APIView):
                                     404: 'Safe creation not found',
                                     422: 'Owner address checksum not valid'})
     @method_decorator(cache_page(60 * 60))  # 1 hour
-    def get(self, request, address, format=None):
+    def get(self, request, address, *args, **kwargs):
         """
         Get status of the safe
         """
@@ -477,7 +479,7 @@ class SafeInfoView(APIView):
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe not found',
                                     422: 'code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info'})
-    def get(self, request, address, format=None):
+    def get(self, request, address, *args, **kwargs):
         """
         Get status of the safe
         """
@@ -499,12 +501,18 @@ class SafeInfoView(APIView):
                                                                                'arguments': [address]})
 
 
+class MasterCopiesView(ListAPIView):
+    serializer_class = MasterCopyResponseSerializer
+    queryset = SafeMasterCopy.objects.all()
+    pagination_class = None
+
+
 class OwnersView(APIView):
     serializer_class = OwnerResponseSerializer
 
     @swagger_auto_schema(responses={200: OwnerResponseSerializer(),
                                     422: 'Owner address checksum not valid'})
-    def get(self, request, address, format=None):
+    def get(self, request, address, *args, **kwargs):
         """
         Get status of the safe
         """

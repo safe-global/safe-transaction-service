@@ -401,6 +401,11 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     version = serializers.CharField()
 
 
+class MasterCopyResponseSerializer(serializers.Serializer):
+    address = EthereumAddressField()
+    version = serializers.CharField()
+
+
 class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 

@@ -640,7 +640,7 @@ class InternalTxDecoded(models.Model):
                          fields=['processed'],
                          condition=Q(processed=False))
         ]
-        verbose_name_plural = "Internal txs decoded"
+        verbose_name_plural = 'Internal txs decoded'
 
     def __str__(self):
         return f'{"Processed" if self.processed else "Not Processed"} ' \
@@ -846,7 +846,7 @@ class MonitoredAddress(models.Model):
 
     class Meta:
         abstract = True
-        verbose_name_plural = "Monitored addresses"
+        verbose_name_plural = 'Monitored addresses'
 
     def __str__(self):
         return f'Address={self.address} - Initial-block-number={self.initial_block_number}' \
@@ -855,13 +855,15 @@ class MonitoredAddress(models.Model):
 
 class ProxyFactory(MonitoredAddress):
     class Meta:
-        verbose_name_plural = "Proxy factories"
+        verbose_name_plural = 'Proxy factories'
         ordering = ['tx_block_number']
 
 
 class SafeMasterCopy(MonitoredAddress):
+    version = models.CharField(max_length=20)
+
     class Meta:
-        verbose_name_plural = "Safe master copies"
+        verbose_name_plural = 'Safe master copies'
         ordering = ['tx_block_number']
 
 

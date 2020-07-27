@@ -29,7 +29,7 @@ from .factories import (EthereumEventFactory, EthereumTxFactory,
                         MultisigConfirmationFactory,
                         MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeContractFactory,
-                        SafeStatusFactory)
+                        SafeMasterCopyFactory, SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -1117,6 +1117,24 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'modules': [],
             'fallback_handler': safe_create_tx.fallback_handler,
             'version': '1.1.1'})
+
+    def test_master_copies_view(self):
+        response = self.client.get(reverse('v1:master-copies'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = []
+        self.assertEqual(response.data, [])
+
+        safe_master_copy = SafeMasterCopyFactory()
+        response = self.client.get(reverse('v1:master-copies'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
+        self.assertCountEqual(response.data, expected)
+
+        safe_master_copy = SafeMasterCopyFactory()
+        response = self.client.get(reverse('v1:master-copies'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
+        self.assertCountEqual(response.data, expected)
 
     def test_owners_view(self):
         invalid_address = '0x2A'

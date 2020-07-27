@@ -41,6 +41,8 @@ urlpatterns = [
          name='safe-delegate'),
     path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction'),
+    path('master-copies/', views.MasterCopiesView.as_view(),
+         name='master-copies'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
     # Tokens

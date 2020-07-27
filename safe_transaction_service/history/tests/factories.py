@@ -241,6 +241,8 @@ class ProxyFactoryFactory(MonitoredAddressFactory):
 
 
 class SafeMasterCopyFactory(MonitoredAddressFactory):
+    version = factory.Sequence(lambda n: f'1.0.{n}')
+
     class Meta:
         model = SafeMasterCopy
 

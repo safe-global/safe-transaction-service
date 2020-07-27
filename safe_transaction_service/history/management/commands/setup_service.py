@@ -72,12 +72,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('Cannot detect a valid ethereum-network'))
 
     def _setup_safe_master_copies(self, safe_master_copies: Sequence[Tuple[str, int]]):
-        for address, initial_block_number in safe_master_copies:
-            SafeMasterCopy.objects.get_or_create(address=address,
-                                                 defaults={
-                                                     'initial_block_number': initial_block_number,
-                                                     'tx_block_number': initial_block_number,
-                                                 })
+        for address, initial_block_number, version in safe_master_copies:
+            safe_master_copy, _ = SafeMasterCopy.objects.get_or_create(
+                address=address,
+                defaults={
+                    'initial_block_number': initial_block_number,
+                    'tx_block_number': initial_block_number,
+                    'version': version,
+                }
+            )
+            if safe_master_copy.version != version:
+                safe_master_copy.version = version
+                safe_master_copy.save(update_fields=['version'])
 
     def _setup_safe_proxy_factories(self, safe_proxy_factories: Sequence[Tuple[str, int]]):
         for address, initial_block_number in safe_proxy_factories:
@@ -89,12 +95,12 @@ class Command(BaseCommand):
 
     def setup_mainnet(self):
         safe_master_copies = [
-            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10329734),  # v1.2.0
-            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 9084503),   # v1.1.1
-            ('0xaE32496491b53841efb51829d6f886387708F99B', 8915728),   # v1.1.0
-            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 7457553),   # v1.0.0
-            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 6766257),   # v0.1.0
-            ('0xAC6072986E985aaBE7804695EC2d8970Cf7541A2', 6569433),   # v0.0.2
+            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10329734, '1.2.0'),
+            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 9084503, '1.1.1'),
+            ('0xaE32496491b53841efb51829d6f886387708F99B', 8915728, '1.1.0'),
+            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 7457553, '1.0.0'),
+            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 6766257, '0.1.0'),
+            ('0xAC6072986E985aaBE7804695EC2d8970Cf7541A2', 6569433, '0.0.2'),
         ]
 
         safe_proxy_factories = [
@@ -108,12 +114,12 @@ class Command(BaseCommand):
 
     def setup_rinkeby(self):
         safe_master_copies = [
-            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 6723632),  # v1.2.0
-            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 5590754),  # v1.1.1
-            ('0xaE32496491b53841efb51829d6f886387708F99B', 5423491),  # v1.1.0
-            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 4110083),  # v1.0.0
-            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 3392692),  # v0.1.0
-            ('0x2727D69C0BD14B1dDd28371B8D97e808aDc1C2f7', 3055781),  # v0.0.2
+            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 6723632, '1.2.0'),
+            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 5590754, '1.1.1'),
+            ('0xaE32496491b53841efb51829d6f886387708F99B', 5423491, '1.1.0'),
+            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 4110083, '1.0.0'),
+            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 3392692, '0.1.0'),
+            ('0x2727D69C0BD14B1dDd28371B8D97e808aDc1C2f7', 3055781, '0.0.2'),
         ]
 
         safe_proxy_factories = [
@@ -127,11 +133,11 @@ class Command(BaseCommand):
 
     def setup_goerli(self):
         safe_master_copies = [
-            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 2930373),  # v1.2.0
-            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 1798663),  # v1.1.1
-            ('0xaE32496491b53841efb51829d6f886387708F99B', 1631488),  # v1.1.0
-            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 319108),   # v1.0.0
-            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 3392692),  # v0.1.0
+            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 2930373, '1.2.0'),
+            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 1798663, '1.1.1'),
+            ('0xaE32496491b53841efb51829d6f886387708F99B', 1631488, '1.1.0'),
+            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 319108, '1.0.0'),
+            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 34096, '0.1.0'),
         ]
 
         safe_proxy_factories = [
@@ -145,11 +151,11 @@ class Command(BaseCommand):
 
     def setup_kovan(self):
         safe_master_copies = [
-            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 19242615),  # v1.2.0
-            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 15366145),  # v1.1.1
-            ('0xaE32496491b53841efb51829d6f886387708F99B', 14740724),  # v1.1.0
-            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 10638132),  # v1.0.0
-            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 9465686),   # v0.1.0
+            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 19242615, '1.2.0'),
+            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 15366145, '1.1.1'),
+            ('0xaE32496491b53841efb51829d6f886387708F99B', 14740724, '1.1.0'),
+            ('0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A', 10638132, '1.0.0'),
+            ('0x8942595A2dC5181Df0465AF0D7be08c8f23C93af', 9465686, '0.1.0'),
         ]
 
         safe_proxy_factories = [
