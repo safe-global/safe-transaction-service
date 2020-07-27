@@ -1,4 +1,3 @@
-from django.conf.urls import url
 from django.urls import path
 
 from safe_transaction_service.tokens.views import TokensView, TokenView
@@ -10,7 +9,9 @@ app_name = "safe"
 timestamp_regex = '\\d{4}[-]?\\d{1,2}[-]?\\d{1,2} \\d{1,2}:\\d{1,2}:\\d{1,2}'
 
 urlpatterns = [
-    url(r'^about/$', views.AboutView.as_view(), name='about'),
+    path('about/', views.AboutView.as_view(), name='about'),
+    path('about/master-copies/', views.MasterCopiesView.as_view(),
+         name='master-copies'),
     path('safes/<str:address>/', views.SafeInfoView.as_view(),
          name='safe-info'),
     path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
@@ -41,8 +42,6 @@ urlpatterns = [
          name='safe-delegate'),
     path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction'),
-    path('master-copies/', views.MasterCopiesView.as_view(),
-         name='master-copies'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
     # Tokens
