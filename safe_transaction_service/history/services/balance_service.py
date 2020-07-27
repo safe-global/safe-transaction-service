@@ -24,8 +24,14 @@ class CannotGetEthereumPrice(BalanceServiceException):
     pass
 
 
+# TODO adapt to others RSK tokens
 def get_erc20_logo_uri(address: str) -> str:
-    return f'https://gnosis-safe-token-logos.s3.amazonaws.com/{address}.png'
+    address_lower = address.lower()
+    if address_lower == '0x19f64674d8a5b4e652319f5e239efd3bc969a1fe':
+        return 'https://s2.coinmarketcap.com/static/img/coins/32x32/3701.png'
+    if address_lower == '0x2acc95758f8b5f583470ba265eb685a8f45fc9d5':
+        return 'https://s2.coinmarketcap.com/static/img/coins/32x32/3701.png'
+    return 'https://www.myetherwallet.com/img/rsk.3efbc411.svg'
 
 
 @dataclass
@@ -175,18 +181,41 @@ class BalanceService:
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     def get_token_eth_value(self, token_address: str) -> float:
         """
-        Return current ether value for a given `token_address`
+        Return current rbtc value for a given `token_address`
         """
-        try:
-            return self.uniswap_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
+        token_address_lower = token_address.lower()
+        tRif_address = '0x19f64674d8a5b4e652319f5e239efd3bc969a1fe'
+        rif_address = '0x2acc95758f8b5f583470ba265eb685a8f45fc9d5'
+        if token_address_lower != tRif_address and token_address_lower != rif_address:
+            return 0
+
+        url = 'https://api-pub.bitfinex.com/v2/ticker/tRIFBTC'
+        response = requests.get(url)
+        api_json = response.json()
+        if not response.ok:
+            logger.warning('Cannot get price from url=%s', url)
+            return 0
 
         try:
-            return self.kyber_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
-            return 0.
+            price = float(api_json[6])
+            if not price:
+                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+            return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
+
+        return 0
+
+        # try:
+        #     return self.uniswap_oracle.get_price(token_address)
+        # except OracleException:
+        #     logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
+
+        # try:
+        #     return self.kyber_oracle.get_price(token_address)
+        # except OracleException:
+        #     logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
+        #     return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
@@ -213,7 +242,7 @@ class BalanceService:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
                     balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    balance_usd = eth_value * token_to_eth_price * balance_with_decimals
+                    balance_usd = rbtc_value * token_to_eth_price * balance_with_decimals
                 else:
                     balance_usd = 0.
 
