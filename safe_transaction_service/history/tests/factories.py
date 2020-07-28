@@ -172,6 +172,7 @@ class ModuleTransactionFactory(factory.DjangoModelFactory):
     value = FuzzyInteger(low=0, high=10)
     data = factory.Sequence(lambda n: Web3.keccak(text=f'module-tx-{n}'))
     operation = FuzzyInteger(low=0, high=1)
+    failed = False
 
 
 class MultisigTransactionFactory(factory.DjangoModelFactory):
@@ -192,6 +193,7 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
     refund_receiver = NULL_ADDRESS
     signatures = b''
     nonce = factory.Sequence(lambda n: n)
+    failed = False
     origin = factory.Faker('name')
     trusted = False
 

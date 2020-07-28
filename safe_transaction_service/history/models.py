@@ -759,6 +759,7 @@ class ModuleTransaction(TimeStampedModel):
     value = Uint256Field()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in SafeOperation])
+    failed = models.BooleanField(default=False)
 
     def __str__(self):
         if self.value:

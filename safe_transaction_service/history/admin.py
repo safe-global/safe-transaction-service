@@ -222,14 +222,18 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
 @admin.register(ModuleTransaction)
 class ModuleTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'module', 'to', 'operation', 'value', 'data_hex')
+    list_display = ('created', 'safe', 'tx_hash', 'module', 'to', 'operation', 'value', 'data_hex')
     list_filter = ('module', 'operation')
+    list_select_related = ('internal_tx',)
     ordering = ['-created']
     raw_id_fields = ('internal_tx',)
     search_fields = ['safe', 'module', 'to']
 
     def data_hex(self, o: ModuleTransaction):
         return HexBytes(o.data.tobytes()).hex()
+
+    def tx_hash(self, o: ModuleTransaction):
+        return o.internal_tx.ethereum_tx_id
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):

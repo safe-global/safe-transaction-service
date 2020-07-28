@@ -36,19 +36,53 @@ class SafeTxProcessor(TxProcessor):
 
     def __init__(self):
         # This safe_tx_failure events allow us to detect a failed safe transaction
-        self.safe_tx_failure_events = [get_safe_V1_0_0_contract(Web3()).events.ExecutionFailed(),
-                                       get_safe_contract(Web3()).events.ExecutionFailure()]
-        self.safe_tx_failure_events_topics = {event_abi_to_log_topic(event.abi) for event
-                                              in self.safe_tx_failure_events}
+        dummy_w3 = Web3()
+        self.safe_tx_failure_events = [
+            get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
+            get_safe_contract(dummy_w3).events.ExecutionFailure()
+        ]
+        self.safe_tx_module_failure_events = [
+            get_safe_contract(dummy_w3).events.ExecutionFromModuleFailure()
+        ]
+
+        self.safe_tx_failure_events_topics = {
+            event_abi_to_log_topic(event.abi) for event in self.safe_tx_failure_events
+        }
+        self.safe_tx_module_failure_topics = {
+            event_abi_to_log_topic(event.abi) for event in self.safe_tx_module_failure_events
+        }
         self.safe_status_cache: Dict[str, SafeStatus] = {}
 
     def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:
+        """
+        Detects failure events on a Safe Multisig Tx
+        :param ethereum_tx:
+        :param safe_tx_hash:
+        :return: True if a Multisig Transaction is failed, False otherwise
+        """
         # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
         safe_tx_hash = HexBytes(safe_tx_hash).hex()
         for log in ethereum_tx.logs:
             if (log['topics'] and log['data']
                     and HexBytes(log['topics'][0]) in self.safe_tx_failure_events_topics
                     and log['data'][:66] == safe_tx_hash):  # 66 is the beginning of the event data, the rest is payment
+                return True
+        return False
+
+    def is_module_failed(self, ethereum_tx: EthereumTx, module_address: str) -> bool:
+        """
+        Detects module failure events on a Safe Module Tx
+        :param ethereum_tx:
+        :param module_address:
+        :return: True if a Module Transaction is failed, False otherwise
+        """
+        # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
+        for log in ethereum_tx.logs:
+            if (
+                    len(log['topics']) == 2
+                    and HexBytes(log['topics'][0]) in self.safe_tx_module_failure_topics
+                    and log['topics'][1][-20:] == HexBytes(module_address)  # 20 is the size in bytes of the address
+            ):
                 return True
         return False
 
@@ -166,9 +200,11 @@ class SafeTxProcessor(TxProcessor):
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'execTransactionFromModule':
             logger.debug('Executing Tx from Module')
+            ethereum_tx = internal_tx.ethereum_tx
             module_internal_tx = internal_tx.get_previous_module_trace()
             module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
             module_data = HexBytes(arguments['data'])
+            failed = self.is_module_failed(ethereum_tx, module_address)
             ModuleTransaction.objects.get_or_create(
                 internal_tx=internal_tx,
                 defaults={
@@ -178,7 +214,8 @@ class SafeTxProcessor(TxProcessor):
                     'to': arguments['to'],
                     'value': arguments['value'],
                     'data': module_data if module_data else None,
-                    'operation': arguments['operation']
+                    'operation': arguments['operation'],
+                    'failed': failed,
                 }
             )
 
