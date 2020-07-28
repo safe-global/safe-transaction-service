@@ -222,8 +222,8 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
 @admin.register(ModuleTransaction)
 class ModuleTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
-    list_display = ('created', 'safe', 'tx_hash', 'module', 'to', 'operation', 'value', 'data_hex')
-    list_filter = ('module', 'operation')
+    list_display = ('created', 'failed', 'safe', 'tx_hash', 'module', 'to', 'operation', 'value', 'data_hex')
+    list_filter = ('failed', 'operation', 'module')
     list_select_related = ('internal_tx',)
     ordering = ['-created']
     raw_id_fields = ('internal_tx',)
