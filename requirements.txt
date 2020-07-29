@@ -17,7 +17,7 @@ djangorestframework==3.11.0
 docutils==0.16
 drf-yasg[validation]==1.17.1
 ethereum==2.3.2
-gnosis-py==2.5.2
+gnosis-py==2.5.3
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.1
 psycopg2-binary==2.8.5
