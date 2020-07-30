@@ -48,10 +48,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(FirebaseDevice.objects.count(), 2)
 
+        # Add the same FirebaseDevice to another Safe
+        another_safe_contract = SafeContractFactory()
+        another_safe_address = another_safe_contract.address
+        response = self.client.post(reverse('v1:notifications-devices',
+                                            args=(another_safe_address,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(safe_contract.firebase_devices.count(), 2)
+        self.assertEqual(another_safe_contract.firebase_devices.count(), 1)
+        self.assertEqual(FirebaseDevice.objects.count(), 2)
+
         # Use not valid deviceType
         data['deviceType'] = 'RANGER-MORPHER'
         response = self.client.post(reverse('v1:notifications-devices', args=(safe_address,)), format='json', data=data)
         self.assertIn('is not a valid choice', response.content.decode())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.assertEqual(safe_contract.firebase_tokens.count(), 2)
+        self.assertEqual(safe_contract.firebase_devices.count(), 2)

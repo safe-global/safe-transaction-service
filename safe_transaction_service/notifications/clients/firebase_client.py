@@ -45,7 +45,7 @@ class MessagingClient(ABC):
         return self._app
 
     @abstractmethod
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
         raise NotImplementedError
 
 
@@ -71,7 +71,7 @@ class FirebaseClient(MessagingClient):
 
     def _build_android_config(self, title_loc_key: str = ''):
         return messaging.AndroidConfig(
-            priority='high',
+            # priority='high',
             # ttl=6*60*60,  # 6 hours
             # notification=messaging.AndroidNotification(
             # title_loc_key=title_loc_key
@@ -87,9 +87,9 @@ class FirebaseClient(MessagingClient):
         """
 
         return messaging.APNSConfig(
-            headers={
-                'apns-priority': '10'
-            },
+            # headers={
+            #    'apns-priority': '10'
+            # },
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(
                     # alert=messaging.ApsAlert(
@@ -102,9 +102,9 @@ class FirebaseClient(MessagingClient):
                     # Depending on the 'type' custom field,
                     # 'alert.title' and 'alert.body' above will be
                     # different
-                    mutable_content=True,
-                    badge=1,
-                    sound='default',
+                    # mutable_content=True,
+                    # badge=1,
+                    # sound='default',
                 ),
             ),
         )
@@ -158,6 +158,6 @@ class MockedClient(MessagingClient):
     def verify_token(self, token: str) -> bool:
         return bool(token)
 
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int]:
+    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
         logger.warning("MockedClient: Not sending message with data=%s and tokens=%s", data, tokens)
-        return len(tokens), 0
+        return len(tokens), 0, []

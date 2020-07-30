@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 
 from django.db import models
@@ -12,8 +13,9 @@ class DeviceTypeEnum(Enum):
 
 
 class FirebaseDevice(models.Model):
-    safe = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='firebase_tokens')
-    cloud_messaging_token = models.CharField(max_length=200)  # Token length should be 163
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    safe = models.ManyToManyField(SafeContract, related_name='firebase_devices')
+    cloud_messaging_token = models.CharField(unique=True, max_length=200)  # Token length should be 163
     build_number = models.PositiveIntegerField(default=0)  # e.g. 1644
     bundle = models.CharField(max_length=100, default='')
     device_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in DeviceTypeEnum])
@@ -22,7 +24,6 @@ class FirebaseDevice(models.Model):
     class Meta:
         verbose_name = 'Firebase Device'
         verbose_name_plural = 'Firebase Devices'
-        unique_together = (('safe', 'cloud_messaging_token'),)
 
     def __str__(self):
         token = self.cloud_messaging_token[:10] if self.cloud_messaging_token else 'No Token'

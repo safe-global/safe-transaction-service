@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from ..history.models import SafeContract
 from .models import DeviceTypeEnum, FirebaseDevice
 
 
@@ -16,7 +17,6 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         firebase_device, _ = FirebaseDevice.objects.get_or_create(
-            safe_id=self.context['safe'],
             cloud_messaging_token=self.validated_data['cloud_messaging_token'],
             defaults={
                 'build_number': self.validated_data['build_number'],
@@ -25,4 +25,5 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                 'version': self.validated_data['version'],
             }
         )
+        SafeContract.objects.get(address=self.context['safe']).firebase_devices.add(firebase_device)
         return firebase_device
