@@ -84,11 +84,12 @@ def send_webhook(sender: Type[Model],
         address = instance.safe
         payload = {
             'address': address,
-            'type': None,
+            #  'type': None,  It will be asigned later
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
         if instance.executed:
             payload['type'] = WebHookType.EXECUTED_MULTISIG_TRANSACTION.name
+            payload['failed'] = instance.failed
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
@@ -114,5 +115,6 @@ def send_webhook(sender: Type[Model],
 
     if address and payload:
         send_webhook_task.delay(address, payload)
-        send_notification_task.deplay(address, payload)
+        if payload.get('type', '') != WebHookType.PENDING_MULTISIG_TRANSACTION.name:
+            send_notification_task.deplay(address, payload)
 
