@@ -108,9 +108,11 @@ class ProxyFactoryIndexer(EthereumIndexer):
                     block_number = ethereum_tx.block_id
                 else:
                     block_number = event['blockNumber']
+
+                blocks_one_day = int(24 * 60 * 60 / 15)  # 15 seconds block
                 safe_contracts.append(SafeContract(address=contract_address,
                                                    ethereum_tx_id=event['transactionHash'],
-                                                   erc20_block_number=max(block_number - 5760, 0)))
+                                                   erc20_block_number=max(block_number - blocks_one_day , 0)))
         if safe_contracts:
             SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
         return safe_contracts
