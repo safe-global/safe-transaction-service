@@ -85,10 +85,12 @@ class MultisigTransactionFilter(filters.FilterSet):
 
 
 class ModuleTransactionFilter(filters.FilterSet):
-    block_number = django_filters.NumberFilter(field_name='ethereum_tx__block_number')
-    block_number__gt = django_filters.NumberFilter(field_name='ethereum_tx__block_number', lookup_expr='gt')
-    block_number__lt = django_filters.NumberFilter(field_name='ethereum_tx__block_number', lookup_expr='lt')
-    transaction_hash = django_filters.CharFilter(field_name='ethereum_tx_id')
+    block_number = django_filters.NumberFilter(field_name='internal_tx__ethereum_tx__block_number')
+    block_number__gt = django_filters.NumberFilter(field_name='internal_tx__ethereum_tx__block_number',
+                                                   lookup_expr='gt')
+    block_number__lt = django_filters.NumberFilter(field_name='internal_tx__ethereum_tx__block_number',
+                                                   lookup_expr='lt')
+    transaction_hash = django_filters.CharFilter(field_name='internal_tx__ethereum_tx_id')
 
     class Meta:
         model = ModuleTransaction
