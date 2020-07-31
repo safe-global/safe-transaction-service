@@ -20,8 +20,9 @@ from web3 import Web3
 
 from safe_transaction_service.version import __version__
 
-from .filters import (DefaultPagination, MultisigTransactionFilter,
-                      SmallPagination, TransferListFilter)
+from .filters import (DefaultPagination, ModuleTransactionFilter,
+                      MultisigTransactionFilter, SmallPagination,
+                      TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeMasterCopy,
                      SafeStatus)
@@ -142,6 +143,7 @@ class AllTransactionsListView(ListAPIView):
 
 class SafeModuleTransactionListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
+    filterset_class = ModuleTransactionFilter
     ordering_fields = ['created']
     pagination_class = DefaultPagination
     serializer_class = SafeModuleTransactionResponseSerializer

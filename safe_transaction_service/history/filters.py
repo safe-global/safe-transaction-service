@@ -5,7 +5,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from gnosis.eth.django.filters import EthereumAddressFilter
 from gnosis.eth.django.models import EthereumAddressField, Uint256Field
 
-from .models import MultisigTransaction
+from .models import ModuleTransaction, MultisigTransaction
 
 
 class DefaultPagination(LimitOffsetPagination):
@@ -31,6 +31,7 @@ class TransferListFilter(filters.FilterSet):
     nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
     to = django_filters.CharFilter()
     token_address = django_filters.CharFilter()
+    transaction_hash = django_filters.CharFilter(field_name='transaction_hash')
     value = django_filters.NumberFilter(field_name='value')
     value__gt = django_filters.NumberFilter(field_name='value', lookup_expr='gt')
     value__lt = django_filters.NumberFilter(field_name='value', lookup_expr='lt')
@@ -73,6 +74,32 @@ class MultisigTransactionFilter(filters.FilterSet):
             'to': ['exact'],
             'value': ['lt', 'gt', 'exact'],
         }
+        filter_overrides = {
+            Uint256Field: {
+                'filter_class': django_filters.NumberFilter
+            },
+            EthereumAddressField: {
+                'filter_class': EthereumAddressFilter
+            }
+        }
+
+
+class ModuleTransactionFilter(filters.FilterSet):
+    block_number = django_filters.NumberFilter(field_name='ethereum_tx__block_number')
+    block_number__gt = django_filters.NumberFilter(field_name='ethereum_tx__block_number', lookup_expr='gt')
+    block_number__lt = django_filters.NumberFilter(field_name='ethereum_tx__block_number', lookup_expr='lt')
+    transaction_hash = django_filters.CharFilter(field_name='ethereum_tx_id')
+
+    class Meta:
+        model = ModuleTransaction
+        fields = {
+            'safe': ['exact'],
+            'module': ['exact'],
+            'to': ['exact'],
+            'operation': ['exact'],
+            'failed': ['exact'],
+        }
+
         filter_overrides = {
             Uint256Field: {
                 'filter_class': django_filters.NumberFilter

@@ -937,6 +937,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         url = reverse('v1:transfers', args=(safe_address,)) + f'?block_number__gt={block_number - 1}'
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+
+        url = reverse('v1:transfers', args=(safe_address,)) + f'?transaction_hash={internal_tx.ethereum_tx_id}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+
+        url = reverse('v1:transfers', args=(safe_address,)) + f'?transaction_hash=0x2345'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
 
         # Add from tx
         internal_tx_2 = InternalTxFactory(_from=safe_address, value=value)
