@@ -1,7 +1,6 @@
-import factory
+import uuid
 
-from safe_transaction_service.history.tests.factories import \
-    SafeContractFactory
+import factory
 
 from ..models import FirebaseDevice
 
@@ -10,9 +9,9 @@ class FirebaseDeviceFactory(factory.DjangoModelFactory):
     class Meta:
         model = FirebaseDevice
 
-    safe = factory.SubFactory(SafeContractFactory)
-    cloud_messaging_token = factory.faker('isbn13')
-    build_number = factory.Sequence()
+    uuid = factory.LazyFunction(uuid.uuid4)
+    cloud_messaging_token = factory.Faker('isbn13')
+    build_number = factory.Sequence(lambda n: n)
     bundle = 'company.package.app'
     device_type = 0
     version = factory.Sequence(lambda n: f'{n}.0.0')

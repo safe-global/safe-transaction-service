@@ -1,11 +1,12 @@
 from rest_framework import status
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, DestroyAPIView
 from rest_framework.response import Response
 
 from safe_transaction_service.history.decorators import \
     ethereum_address_checksum_validator
 from safe_transaction_service.history.models import SafeContract
 
+from .models import FirebaseDevice
 from .serializers import FirebaseDeviceSerializer
 
 
@@ -27,3 +28,7 @@ class FirebaseDeviceCreateView(CreateAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         return super().post(request, address, *args, **kwargs)
+
+
+class FirebaseDeviceDeleteView(DestroyAPIView):
+    queryset = FirebaseDevice.objects.all()
