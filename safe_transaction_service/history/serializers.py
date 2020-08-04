@@ -244,16 +244,20 @@ class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
 class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
     execution_date = serializers.DateTimeField()
     data = HexadecimalField(allow_null=True, allow_blank=True)
+    data_decoded = serializers.SerializerMethodField()
     transaction_hash = serializers.SerializerMethodField()
     block_number = serializers.SerializerMethodField()
 
     class Meta:
         model = ModuleTransaction
         fields = ('created', 'execution_date', 'block_number', 'transaction_hash', 'safe',
-                  'module', 'to', 'value', 'data', 'operation')
+                  'module', 'to', 'value', 'data', 'operation', 'data_decoded')
 
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
         return obj.internal_tx.ethereum_tx.block_id
+
+    def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
+        return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b'')
 
     def get_transaction_hash(self, obj: ModuleTransaction) -> str:
         return obj.internal_tx.ethereum_tx_id
