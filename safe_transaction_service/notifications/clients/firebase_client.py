@@ -4,7 +4,7 @@ from typing import Any, Dict, Sequence, Tuple, Union
 
 from firebase_admin import credentials, initialize_app, messaging
 from firebase_admin.exceptions import FirebaseError
-from firebase_admin.messaging import BatchResponse
+from firebase_admin.messaging import BatchResponse, UnregisteredError
 
 logger = getLogger(__name__)
 
@@ -122,7 +122,7 @@ class FirebaseClient(MessagingClient):
             )
             messaging.send(message, dry_run=True)
             return True
-        except FirebaseError:
+        except UnregisteredError:
             return False
 
     def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
