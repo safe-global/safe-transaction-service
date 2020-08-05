@@ -16,7 +16,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
         return 0
 
     firebase_client = FirebaseProvider()
-    firebase_devices = FirebaseDevice.objects.filter(safe__address=address)  # TODO Use cache
+    firebase_devices = FirebaseDevice.objects.filter(safes__address=address)  # TODO Use cache
     tokens = [firebase_device.cloud_messaging_token for firebase_device in firebase_devices]
 
     if not tokens:

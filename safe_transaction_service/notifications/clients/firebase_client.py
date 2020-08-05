@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Any, Dict, Sequence, Tuple, Union
+from typing import Any, Dict, Sequence, Tuple
 
 from firebase_admin import credentials, initialize_app, messaging
-from firebase_admin.exceptions import FirebaseError
 from firebase_admin.messaging import BatchResponse, UnregisteredError
 
 logger = getLogger(__name__)
