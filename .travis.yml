@@ -34,7 +34,7 @@ deploy:
   - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
-      branch: develop
+      branch: push-notifications
   - provider: script
     script: bash scripts/deploy_docker.sh $TRAVIS_TAG
     on:
