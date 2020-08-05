@@ -24,8 +24,7 @@ class FirebaseProvider:
             from django.conf import settings
             cls.instance: MessagingClient
             if hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'):
-                cls.instance: MessagingClient = FirebaseClient(
-                    credentials=settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS)
+                cls.instance: MessagingClient = FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS)
             else:
                 logger.warning('Using mocked messaging client')
                 cls.instance: MessagingClient = MockedClient()
