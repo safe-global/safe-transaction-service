@@ -22,6 +22,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
     if not tokens:
         return 0
 
+    logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
     success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
     if invalid_tokens:
         logger.info('Removing invalid tokens for safe=%s', address)

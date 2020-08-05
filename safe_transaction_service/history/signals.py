@@ -58,13 +58,13 @@ def bind_confirmation(sender: Type[Model],
                 pass
 
 
-@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.send_webhook')
-@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.send_webhook')
-@receiver(post_save, sender=EthereumEvent, dispatch_uid='multisig_transaction.ethereum_event')
-@receiver(post_save, sender=InternalTx, dispatch_uid='multisig_transaction.internal_tx')
-def send_webhook(sender: Type[Model],
-                 instance: Union[MultisigConfirmation, MultisigTransaction],
-                 created: bool, **kwargs) -> None:
+@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.process_webhook')
+@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
+@receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')
+@receiver(post_save, sender=InternalTx, dispatch_uid='internal_tx.process_webhook')
+def process_webhook(sender: Type[Model],
+                    instance: Union[MultisigConfirmation, MultisigTransaction],
+                    created: bool, **kwargs) -> None:
 
     address: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
