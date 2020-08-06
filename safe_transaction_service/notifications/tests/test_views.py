@@ -57,7 +57,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Use not valid deviceType
         data['deviceType'] = 'RANGER-MORPHER'
-        response = self.client.post(reverse('v1:notifications-devices', args=(safe_address,)), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
         self.assertIn('is not a valid choice', response.content.decode())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(safe_contract.firebase_devices.count(), 2)
@@ -69,14 +69,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         device_id = firebase_device.uuid
 
         self.assertEqual(FirebaseDevice.objects.count(), 1)
-        response = self.client.delete(reverse('v1:notifications-devices-delete',
-                                              args=(device_id,)),
-                                      format='json')
+        response = self.client.delete(reverse('v1:notifications-devices-delete', args=(device_id,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(FirebaseDevice.objects.count(), 0)
 
         # Try to delete again if not exists
-        response = self.client.delete(reverse('v1:notifications-devices-delete',
-                                              args=(device_id,)),
-                                      format='json')
+        response = self.client.delete(reverse('v1:notifications-devices-delete', args=(device_id,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

@@ -18,11 +18,9 @@ class FirebaseDeviceSerializer(serializers.Serializer):
     version = serializers.CharField(min_length=1, max_length=100)  # e.g. 1.0.0-beta
 
     def validate_safes(self, safes: Sequence[str]):
-        safe_contracts = SafeContract.objects.filter(address__in=safes)
-        if len(safe_contracts) != len(safes):
+        if SafeContract.objects.filter(address__in=safes).count() != len(safes):
             raise serializers.ValidationError("At least one Safe provided was not found")
-
-        return safe_contracts
+        return safes
 
     def save(self, **kwargs):
         firebase_device, _ = FirebaseDevice.objects.get_or_create(
@@ -34,5 +32,6 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                 'version': self.validated_data['version'],
             }
         )
-        firebase_device.safes.add(self.validated_data['safes'])
+        safe_contracts = SafeContract.objects.filter(address__in=self.validated_data['safes'])
+        firebase_device.safes.add(*safe_contracts)
         return firebase_device
