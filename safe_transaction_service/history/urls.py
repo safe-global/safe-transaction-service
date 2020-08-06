@@ -51,9 +51,9 @@ urlpatterns = [
     path('tokens/<str:address>/', token_views.TokenView.as_view(), name='token'),
 
     # Notifications
-    path('safes/<str:address>/notifications/devices/', notification_views.FirebaseDeviceCreateView.as_view(),
+    path('notifications/devices/', notification_views.FirebaseDeviceCreateView.as_view(),
          name='notifications-devices'),
-    path('safes/<str:address>/notifications/devices/<uuid:pk>', notification_views.FirebaseDeviceDeleteView.as_view(),
+    path('/notifications/devices/<uuid:pk>', notification_views.FirebaseDeviceDeleteView.as_view(),
          name='notifications-devices-delete'),
 
 ]
