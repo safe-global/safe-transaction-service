@@ -53,7 +53,9 @@ urlpatterns = [
     # Notifications
     path('notifications/devices/', notification_views.FirebaseDeviceCreateView.as_view(),
          name='notifications-devices'),
-    path('/notifications/devices/<uuid:pk>', notification_views.FirebaseDeviceDeleteView.as_view(),
+    path('notifications/devices/<uuid:pk>/', notification_views.FirebaseDeviceDeleteView.as_view(),
          name='notifications-devices-delete'),
+    path('notifications/devices/<uuid:pk>/safes/<str:address>/',
+         notification_views.FirebaseDeviceSafeDeleteView.as_view(), name='notifications-devices-safes-delete'),
 
 ]

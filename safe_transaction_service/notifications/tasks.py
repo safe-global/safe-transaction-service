@@ -16,7 +16,11 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
         return 0
 
     firebase_client = FirebaseProvider()
-    firebase_devices = FirebaseDevice.objects.filter(safes__address=address)  # TODO Use cache
+    firebase_devices = FirebaseDevice.objects.filter(
+        safes__address=address
+    ).exclude(
+        cloud_messaging_token=None
+    )  # TODO Use cache
     tokens = [firebase_device.cloud_messaging_token for firebase_device in firebase_devices]
 
     if not tokens:
@@ -26,6 +30,6 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
     success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
     if invalid_tokens:
         logger.info('Removing invalid tokens for safe=%s', address)
-        FirebaseDevice.objects.filter(cloud_messaging_token__in=invalid_tokens).delete()
+        FirebaseDevice.objects.filter(cloud_messaging_token__in=invalid_tokens).update(cloud_messaging_token=None)
 
     return success_count, failure_count

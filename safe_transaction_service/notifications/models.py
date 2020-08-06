@@ -15,7 +15,7 @@ class DeviceTypeEnum(Enum):
 class FirebaseDevice(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     safes = models.ManyToManyField(SafeContract, related_name='firebase_devices')
-    cloud_messaging_token = models.CharField(unique=True, max_length=200)  # Token length should be 163
+    cloud_messaging_token = models.CharField(null=True, unique=True, max_length=200)  # Token length should be 163
     build_number = models.PositiveIntegerField(default=0)  # e.g. 1644
     bundle = models.CharField(max_length=100, default='')
     device_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in DeviceTypeEnum])
