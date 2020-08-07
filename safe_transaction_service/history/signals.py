@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, Optional, Type, Union
 
 from django.db.models import Model
@@ -89,7 +90,7 @@ def process_webhook(sender: Type[Model],
         }
         if instance.executed:
             payload['type'] = WebHookType.EXECUTED_MULTISIG_TRANSACTION.name
-            payload['failed'] = instance.failed
+            payload['failed'] = json.dumps(instance.failed)  # Firebase only accepts strings
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
