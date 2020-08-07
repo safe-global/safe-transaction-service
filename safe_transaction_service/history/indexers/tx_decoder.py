@@ -22,6 +22,7 @@ from gnosis.safe.multi_send import MultiSend
 from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_addresses_provider,
                                 aave_lending_pool_core)
+from .decoder_abis.balancer import balancer_bactions, balancer_exchange_proxy
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import gnosis_protocol_abi
 from .decoder_abis.idle import idle_token_v3
@@ -190,13 +191,16 @@ class TxDecoder(SafeTxDecoder):
     def __init__(self):
         super().__init__()
 
+        aave_abis = [aave_a_token, aave_lending_pool, aave_lending_pool_addresses_provider, aave_lending_pool_core]
+        aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in aave_abis]
+        balancer_contracts = [
+            self.dummy_w3.eth.contract(abi=balancer_bactions),
+            self.dummy_w3.eth.contract(abi=balancer_exchange_proxy),
+        ]
         compound_contracts = [
             self.dummy_w3.eth.contract(abi=ctoken_abi),
             self.dummy_w3.eth.contract(abi=comptroller_abi),
         ]
-
-        aave_abis = [aave_a_token, aave_lending_pool, aave_lending_pool_addresses_provider, aave_lending_pool_core]
-        aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in aave_abis]
         idle_abis = [idle_token_v3]
         idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in idle_abis]
         request_abis = [request_erc20_proxy, request_ethereum_proxy]
@@ -217,8 +221,9 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (aave_contracts + idle_contracts + request_contracts + sablier_contracts
-                                    + compound_contracts + exchanges + sight_contracts + erc_contracts
+        self.supported_contracts = (aave_contracts + balancer_contracts + idle_contracts + request_contracts
+                                    + sablier_contracts + compound_contracts + exchanges
+                                    + sight_contracts + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
