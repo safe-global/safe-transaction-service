@@ -26,6 +26,8 @@ from .decoder_abis.balancer import balancer_bactions, balancer_exchange_proxy
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import gnosis_protocol_abi
 from .decoder_abis.idle import idle_token_v3
+from .decoder_abis.open_zeppelin import (
+    open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)
 from .decoder_abis.request import request_erc20_proxy, request_ethereum_proxy
 from .decoder_abis.sablier import (sablier_abi, sablier_ctoken_manager,
                                    sablier_payroll)
@@ -203,6 +205,10 @@ class TxDecoder(SafeTxDecoder):
         ]
         idle_abis = [idle_token_v3]
         idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in idle_abis]
+        open_zeppelin_contracts = [
+            self.dummy_w3.eth.contract(abi=open_zeppelin_admin_upgradeability_proxy),
+            self.dummy_w3.eth.contract(abi=open_zeppelin_proxy_admin),
+        ]
         request_abis = [request_erc20_proxy, request_ethereum_proxy]
         request_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in request_abis]
         sablier_abis = [sablier_ctoken_manager, sablier_payroll, sablier_abi]
@@ -221,8 +227,8 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (aave_contracts + balancer_contracts + idle_contracts + request_contracts
-                                    + sablier_contracts + compound_contracts + exchanges
+        self.supported_contracts = (aave_contracts + balancer_contracts + idle_contracts + open_zeppelin_contracts
+                                    + request_contracts + sablier_contracts + compound_contracts + exchanges
                                     + sight_contracts + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 

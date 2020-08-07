@@ -233,4 +233,5 @@ balancer_exchange_proxy = [
                   'type': 'uint256'}],
      'payable': False,
      'stateMutability': 'nonpayable',
-     'type': 'function'}]
+     'type': 'function'}
+]

@@ -144,7 +144,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['count'], 1)
 
         url = reverse('v1:module-transactions',
-                      args=(safe_address,)) + f'?transaction_hash=0x2345'
+                      args=(safe_address,)) + '?transaction_hash=0x2345'
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
@@ -956,7 +956,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
-        url = reverse('v1:transfers', args=(safe_address,)) + f'?transaction_hash=0x2345'
+        url = reverse('v1:transfers', args=(safe_address,)) + '?transaction_hash=0x2345'
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
