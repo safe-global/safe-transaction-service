@@ -1,5 +1,5 @@
 cachetools==4.1.1
-celery==4.4.6
+celery==4.4.7
 django-authtools==1.7.0
 django-cache-memoize==0.1.7
 django-celery-beat==2.0.0
@@ -11,13 +11,13 @@ django-filter==2.3.0
 django-model-utils==4.0.0
 django-redis==4.12.1
 django-timezone-field==4.0.0
-django==3.0.8
+django==3.0.9
 djangorestframework-camel-case==1.2.0
-djangorestframework==3.11.0
+djangorestframework==3.11.1
 docutils==0.16
 drf-yasg[validation]==1.17.1
 ethereum==2.3.2
-gnosis-py==2.5.4
+gnosis-py==2.5.5
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.1
 psycopg2-binary==2.8.5
