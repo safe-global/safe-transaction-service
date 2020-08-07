@@ -90,19 +90,21 @@ class FirebaseClient(MessagingClient):
             # },
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(
-                    # alert=messaging.ApsAlert(
-                    # This is a localized key that iOS will search in
-                    # the safe iOS app to show as a default title
-                    #    title_loc_key=title_loc_key,
-                    # ),
+                    alert=messaging.ApsAlert(
+                        # This is a localized key that iOS will search in
+                        # the safe iOS app to show as a default title
+                        title="New Activity",
+                        body="New Activity with your Safe",
+                        #    title_loc_key=title_loc_key,
+                    ),
                     # Means the content of the notification will be
                     # modified by the safe app.
                     # Depending on the 'type' custom field,
                     # 'alert.title' and 'alert.body' above will be
                     # different
-                    # mutable_content=True,
-                    # badge=1,
-                    # sound='default',
+                    mutable_content=True,
+                    badge=1,
+                    sound='default',
                 ),
             ),
         )
