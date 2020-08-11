@@ -34,7 +34,7 @@ class FirebaseDeviceSafeDeleteView(DestroyAPIView):
     def perform_destroy(self, firebase_device: FirebaseDevice):
         safe_address = self.kwargs['address']
         try:
-            safe_contract = SafeContract.objects.get()
+            safe_contract = SafeContract.objects.get(address=safe_address)
             firebase_device.safes.remove(safe_contract)
         except SafeContract.DoesNotExist:
             logger.info('Cannot remove safe=%s for firebase_device with uuid=%s', safe_address, self.kwargs['pk'])
