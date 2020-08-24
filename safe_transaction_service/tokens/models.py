@@ -42,7 +42,7 @@ class Token(models.Model):
             return self.logo_uri
         elif self.logo_uri:
             # Just path/filename with extension stored
-            return urljoin(settings.TOKEN_LOGO_BASE_URI, self.logo_uri)
+            return urljoin(settings.TOKENS_LOGO_BASE_URI, self.logo_uri)
         else:
             # Generate logo uri based on configuration
-            return urljoin(settings.TOKEN_LOGO_BASE_URI, self.address + settings.TOKEN_LOGO_EXTENSION)
+            return urljoin(settings.TOKENS_LOGO_BASE_URI, self.address + settings.TOKENS_LOGO_EXTENSION)

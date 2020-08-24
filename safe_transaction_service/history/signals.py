@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, Optional, Type, Union
 
 from django.db.models import Model
@@ -6,6 +7,8 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from hexbytes import HexBytes
+
+from safe_transaction_service.notifications.tasks import send_notification_task
 
 from .models import (EthereumEvent, InternalTx, MultisigConfirmation,
                      MultisigTransaction, WebHookType)
@@ -56,13 +59,13 @@ def bind_confirmation(sender: Type[Model],
                 pass
 
 
-@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.send_webhook')
-@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.send_webhook')
-@receiver(post_save, sender=EthereumEvent, dispatch_uid='multisig_transaction.ethereum_event')
-@receiver(post_save, sender=InternalTx, dispatch_uid='multisig_transaction.internal_tx')
-def send_webhook(sender: Type[Model],
-                 instance: Union[MultisigConfirmation, MultisigTransaction],
-                 created: bool, **kwargs) -> None:
+@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.process_webhook')
+@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
+@receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')
+@receiver(post_save, sender=InternalTx, dispatch_uid='internal_tx.process_webhook')
+def process_webhook(sender: Type[Model],
+                    instance: Union[MultisigConfirmation, MultisigTransaction],
+                    created: bool, **kwargs) -> None:
 
     address: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
@@ -82,11 +85,12 @@ def send_webhook(sender: Type[Model],
         address = instance.safe
         payload = {
             'address': address,
-            'type': None,
+            #  'type': None,  It will be asigned later
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
         if instance.executed:
             payload['type'] = WebHookType.EXECUTED_MULTISIG_TRANSACTION.name
+            payload['failed'] = json.dumps(instance.failed)  # Firebase only accepts strings
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
@@ -112,3 +116,7 @@ def send_webhook(sender: Type[Model],
 
     if address and payload:
         send_webhook_task.delay(address, payload)
+        # Don't send notifications for pending multisig transactions
+        if payload.get('type', '') != WebHookType.PENDING_MULTISIG_TRANSACTION.name:
+            send_notification_task.delay(address, payload)
+

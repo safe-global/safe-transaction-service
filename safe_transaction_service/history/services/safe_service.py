@@ -42,12 +42,11 @@ class SafeServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             cls.instance = SafeService(EthereumClientProvider())
-
         return cls.instance
 
     @classmethod
     def del_singleton(cls):
-        if hasattr(cls, "instance"):
+        if hasattr(cls, 'instance'):
             del cls.instance
 
 
