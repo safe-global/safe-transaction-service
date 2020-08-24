@@ -58,12 +58,17 @@ class AboutView(APIView):
             'version': __version__,
             'api_version': self.request.version,
             'secure': self.request.is_secure(),
+            'firebase_configured': hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'),
             'settings': {
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
-                'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT ': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
+                'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
+                'ETH_INTERNAL_NO_FILTER': settings.ETH_INTERNAL_NO_FILTER,
                 'ETH_REORG_BLOCKS': settings.ETH_REORG_BLOCKS,
                 'ETH_UNISWAP_FACTORY_ADDRESS': settings.ETH_UNISWAP_FACTORY_ADDRESS,
+                'ETH_KYBER_NETWORK_PROXY_ADDRESS': settings.ETH_KYBER_NETWORK_PROXY_ADDRESS,
+                'TOKENS_LOGO_BASE_URI': settings.TOKENS_LOGO_BASE_URI,
+                'TOKENS_LOGO_EXTENSION': settings.TOKENS_LOGO_EXTENSION,
             }
         }
         return Response(content)

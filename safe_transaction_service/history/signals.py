@@ -119,4 +119,3 @@ def process_webhook(sender: Type[Model],
         # Don't send notifications for pending multisig transactions
         if payload.get('type', '') != WebHookType.PENDING_MULTISIG_TRANSACTION.name:
             send_notification_task.delay(address, payload)
-

@@ -15,4 +15,3 @@ class FirebaseDeviceFactory(factory.DjangoModelFactory):
     bundle = 'company.package.app'
     device_type = 0
     version = factory.Sequence(lambda n: f'{n}.0.0')
-

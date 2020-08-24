@@ -303,7 +303,6 @@ REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
 # Ethereum
 # ------------------------------------------------------------------------------
-ETH_HASH_PREFIX = env('ETH_HASH_PREFIX', default='GNO')
 ETHEREUM_NODE_URL = env('ETHEREUM_NODE_URL', default=None)
 ETHEREUM_TRACING_NODE_URL = env('ETHEREUM_TRACING_NODE_URL', default=None)
 ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env('ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT', default=10000)

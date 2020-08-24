@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-import requests
 from celery import app
 from celery.utils.log import get_task_logger
 

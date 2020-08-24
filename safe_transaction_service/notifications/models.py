@@ -29,6 +29,3 @@ class FirebaseDevice(models.Model):
         token = self.cloud_messaging_token[:10] if self.cloud_messaging_token else 'No Token'
         device_name = DeviceTypeEnum(self.device_type).name
         return f'{self.safe_id} - {device_name} {self.version} - {token}...'
-
-
-

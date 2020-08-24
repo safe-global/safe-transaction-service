@@ -119,4 +119,3 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                               args=(device_id, Account.create().address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(FirebaseDevice.objects.first().safes.count(), 0)
-
