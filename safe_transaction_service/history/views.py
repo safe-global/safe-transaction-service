@@ -58,7 +58,6 @@ class AboutView(APIView):
             'version': __version__,
             'api_version': self.request.version,
             'secure': self.request.is_secure(),
-            'firebase_configured': hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'),
             'settings': {
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
