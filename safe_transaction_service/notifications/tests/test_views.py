@@ -94,7 +94,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         firebase_device.safes.add(safe_contract)
         device_id = firebase_device.uuid
 
+        # Test not existing `safe_contract`, even if `device_id` is correct
+        random_safe_address = Account.create().address
         self.assertEqual(FirebaseDevice.objects.first().safes.count(), 1)
+        response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
+                                              args=(device_id, random_safe_address)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 1)
+
+        # Happy path
         response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
                                               args=(device_id, safe_contract.address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
