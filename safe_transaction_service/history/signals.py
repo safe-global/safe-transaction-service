@@ -59,32 +59,21 @@ def bind_confirmation(sender: Type[Model],
                 pass
 
 
-@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.process_webhook')
-@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
-@receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')
-@receiver(post_save, sender=InternalTx, dispatch_uid='internal_tx.process_webhook')
-def process_webhook(sender: Type[Model],
-                    instance: Union[MultisigConfirmation, MultisigTransaction],
-                    created: bool, **kwargs) -> None:
+def build_webhook_payload(sender: Type[Model],
+                          instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction]
+                          ) -> Optional[Dict[str, Any]]:
 
-    address: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
-
-    if not created:
-        return
-
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        address = instance.multisig_transaction.safe  # This is making a db call
         payload = {
-            'address': address,
+            'address': instance.multisig_transaction.safe,  # This could make a db call
             'type': WebHookType.NEW_CONFIRMATION.name,
             'owner': instance.owner,
             'safeTxHash': HexBytes(instance.multisig_transaction.safe_tx_hash).hex()
         }
     elif sender == MultisigTransaction:
-        address = instance.safe
         payload = {
-            'address': address,
+            'address': instance.safe,
             #  'type': None,  It will be asigned later
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
@@ -95,17 +84,15 @@ def process_webhook(sender: Type[Model],
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
     elif sender == InternalTx and instance.is_ether_transfer:  # INCOMING_ETHER
-        address = instance.to
         payload = {
-            'address': address,
+            'address': instance.to,
             'type': WebHookType.INCOMING_ETHER.name,
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
             'value': str(instance.value),
         }
     elif sender == EthereumEvent and 'to' in instance.arguments:  # INCOMING_TOKEN
-        address = instance.arguments['to']
         payload = {
-            'address': address,
+            'address': instance.arguments['to'],
             'type': WebHookType.INCOMING_TOKEN.name,
             'tokenAddress': instance.address,
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
@@ -114,8 +101,21 @@ def process_webhook(sender: Type[Model],
             if element in instance.arguments:
                 payload[element] = str(instance.arguments[element])
 
-    if address and payload:
+    return payload
+
+
+@receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.process_webhook')
+@receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
+@receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')
+@receiver(post_save, sender=InternalTx, dispatch_uid='internal_tx.process_webhook')
+def process_webhook(sender: Type[Model],
+                    instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction],
+                    created: bool, **kwargs) -> None:
+
+    if not created:
+        return
+
+    payload = build_webhook_payload(sender, instance)
+    if payload and (address := payload.get('address')):
         send_webhook_task.delay(address, payload)
-        # Don't send notifications for pending multisig transactions
-        if payload.get('type', '') != WebHookType.PENDING_MULTISIG_TRANSACTION.name:
-            send_notification_task.delay(address, payload)
+        send_notification_task.apply_async(args=(address, payload), countdown=2)

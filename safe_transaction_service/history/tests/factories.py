@@ -203,7 +203,7 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
         model = MultisigConfirmation
 
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
-    multisig_transaction = factory.SubFactory(MultisigTransaction)
+    multisig_transaction = factory.SubFactory(MultisigTransactionFactory)
     multisig_transaction_hash = factory.Sequence(lambda n: Web3.keccak(text=f'multisig-confirmation-tx-{n}').hex())
     owner = factory.LazyFunction(lambda: Account.create().address)
     signature = None
