@@ -100,7 +100,6 @@ def index_new_proxies_task(self) -> Optional[int]:
     try:
         with redis.lock('tasks:index_new_proxies_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
             with BlockchainRunningTask(self.request):
-                logger.info('Start indexing of new proxies')
                 number_proxies = ProxyFactoryIndexerProvider().start()
                 if number_proxies:
                     logger.info('Indexed new %d proxies', number_proxies)

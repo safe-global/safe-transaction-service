@@ -88,10 +88,16 @@ class BalanceService:
         :param safe_address:
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
         """
-        assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
+        # assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
         erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
         raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
+
+        if len(erc20_addresses) == 0:
+            # This is because turning to lowercase in react app brought some inconsistencies
+            checksummed_safe_address = Web3.toChecksumAddress(safe_address)
+            erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(checksummed_safe_address))
+            raw_balances = self.ethereum_client.erc20.get_balances(checksummed_safe_address, erc20_addresses)
 
         balances = []
         for balance in raw_balances:

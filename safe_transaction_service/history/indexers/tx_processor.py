@@ -109,7 +109,7 @@ class SafeTxProcessor(TxProcessor):
             except SafeContract.DoesNotExist:
                 SafeContract.objects.create(address=contract_address,
                                             ethereum_tx=internal_tx.ethereum_tx,
-                                            erc20_block_number=max(internal_tx.ethereum_tx.block_id - 5760, 0))
+                                            erc20_block_number=max(internal_tx.ethereum_tx.block_id - 2700, 0)) # 86400 [seg/dia] / 32 [seg/bloque]
                 logger.info('Found new Safe=%s', contract_address)
 
             SafeStatus.objects.create(internal_tx=internal_tx,
