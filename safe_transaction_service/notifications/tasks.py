@@ -25,10 +25,13 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
         return False
     elif payload.get('type', '') == WebHookType.NEW_CONFIRMATION.name:
         # If MultisigTransaction is executed don't notify about a new confirmation
-        try:
-            return not MultisigTransaction.objects.get(safe_tx_hash=payload.get('safeTxHash')).executed
-        except MultisigTransaction.DoesNotExist:
-            pass
+        # try:
+        #     return not MultisigTransaction.objects.get(safe_tx_hash=payload.get('safeTxHash')).executed
+        # except MultisigTransaction.DoesNotExist:
+        #    pass
+
+        # All confirmations are disabled for now
+        return False
 
     return True
 

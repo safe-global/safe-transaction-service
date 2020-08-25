@@ -19,7 +19,9 @@ class TestViews(TestCase):
         multisig_confirmation.multisig_transaction.ethereum_tx.block = None
         multisig_confirmation.multisig_transaction.ethereum_tx.save()
         confirmation_notification = build_webhook_payload(MultisigConfirmation, multisig_confirmation)
-        self.assertTrue(filter_notification(confirmation_notification))
+        # All confirmations are disabled for now
+        # self.assertTrue(filter_notification(confirmation_notification))
+        self.assertFalse(filter_notification(confirmation_notification))
 
         # Pending multisig transaction should be filtered out
         multisig_transaction = MultisigTransactionFactory()
