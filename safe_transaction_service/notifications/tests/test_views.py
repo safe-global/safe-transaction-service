@@ -67,9 +67,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(FirebaseDevice.objects.first().safes.count(), 2)
 
         # Use not valid deviceType
+        previous_device_type = data['deviceType']
         data['deviceType'] = 'RANGER-MORPHER'
         response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
         self.assertIn('is not a valid choice', response.content.decode())
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(safe_contract.firebase_devices.count(), 1)
+        data['deviceType'] = previous_device_type
+
+        # Use not valid version
+        data['version'] = 'Megazord'
+        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        self.assertIn('Semantic version was expected', response.content.decode())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(safe_contract.firebase_devices.count(), 1)
 

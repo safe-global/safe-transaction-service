@@ -3,6 +3,7 @@ from typing import Sequence
 
 from django.db import IntegrityError
 
+from packaging import version as semantic_version
 from rest_framework import serializers
 
 from gnosis.eth.django.serializers import EthereumAddressField
@@ -23,8 +24,15 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
     def validate_safes(self, safes: Sequence[str]):
         if SafeContract.objects.filter(address__in=safes).count() != len(safes):
-            raise serializers.ValidationError("At least one Safe provided was not found")
+            raise serializers.ValidationError('At least one Safe provided was not found')
         return safes
+
+    def validate_version(self, value: str):
+        try:
+            semantic_version.Version(value)
+        except semantic_version.InvalidVersion:
+            raise serializers.ValidationError('Semantic version was expected')
+        return value
 
     def save(self, **kwargs):
         try:
