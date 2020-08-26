@@ -3,8 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 from celery import app
 from celery.utils.log import get_task_logger
 
-from safe_transaction_service.history.models import (MultisigTransaction,
-                                                     WebHookType)
+from safe_transaction_service.history.models import WebHookType
 
 from .clients.firebase_client import FirebaseProvider
 from .models import FirebaseDevice

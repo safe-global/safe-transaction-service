@@ -74,7 +74,7 @@ def build_webhook_payload(sender: Type[Model],
     elif sender == MultisigTransaction:
         payload = {
             'address': instance.safe,
-            #  'type': None,  It will be asigned later
+            #  'type': None,  It will be assigned later
             'safeTxHash': HexBytes(instance.safe_tx_hash).hex()
         }
         if instance.executed:
@@ -112,7 +112,7 @@ def process_webhook(sender: Type[Model],
                     instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction],
                     created: bool, **kwargs) -> None:
 
-    if not created:
+    if not created and sender != MultisigTransaction:  # MultisigTransaction can change from Pending to Executed
         return
 
     payload = build_webhook_payload(sender, instance)
