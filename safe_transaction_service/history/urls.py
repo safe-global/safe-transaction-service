@@ -42,7 +42,9 @@ urlpatterns = [
     path('safes/<str:address>/delegates/<str:delegate_address>/', views.SafeDelegateDestroyView.as_view(),
          name='safe-delegate'),
     path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
-         name='multisig-transaction'),
+         name='multisig-transaction'),  # DEPRECATED, use `multisig-transactions/`
+    path('multisig-transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
+         name='multisig-transaction-alias'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
 

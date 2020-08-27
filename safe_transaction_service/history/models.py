@@ -789,7 +789,7 @@ class MultisigConfirmation(TimeStampedModel):
     multisig_transaction = models.ForeignKey(MultisigTransaction,
                                              on_delete=models.CASCADE,
                                              null=True,
-                                             related_name="confirmations")
+                                             related_name='confirmations')
     multisig_transaction_hash = Sha3HashField(null=True,
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
@@ -800,6 +800,7 @@ class MultisigConfirmation(TimeStampedModel):
 
     class Meta:
         unique_together = (('multisig_transaction_hash', 'owner'),)
+        ordering = ['created']
 
     def __str__(self):
         if self.multisig_transaction_id:
