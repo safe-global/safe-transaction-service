@@ -137,6 +137,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['results'][0]['safe'], module_transaction.safe)
         self.assertEqual(response.data['results'][0]['module'], module_transaction.module)
 
+        # Add another ModuleTransaction to check filters
+        ModuleTransactionFactory(safe=safe_address)
+
         url = reverse('v1:module-transactions',
                       args=(safe_address,)) + f'?transaction_hash={module_transaction.internal_tx.ethereum_tx_id}'
         response = self.client.get(url, format='json')
@@ -148,6 +151,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
+
+        url = reverse('v1:module-transactions',
+                      args=(safe_address,)) + f'?block_number={module_transaction.internal_tx.ethereum_tx.block_id}'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
 
     def test_get_multisig_transaction(self):
         safe_tx_hash = Web3.keccak(text='gnosis').hex()
