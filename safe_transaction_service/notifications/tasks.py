@@ -1,7 +1,11 @@
+import pickle
 from typing import Any, Dict, Optional, Tuple
+
+from django.conf import settings
 
 from celery import app
 from celery.utils.log import get_task_logger
+from redis import Redis
 
 from safe_transaction_service.history.models import WebHookType
 
@@ -9,6 +13,12 @@ from .clients.firebase_client import FirebaseProvider
 from .models import FirebaseDevice
 
 logger = get_task_logger(__name__)
+
+
+def get_redis() -> Redis:
+    if not hasattr(get_redis, 'redis'):
+        get_redis.redis = Redis.from_url(settings.REDIS_URL)
+    return get_redis.redis
 
 
 def filter_notification(payload: Dict[str, Any]) -> bool:
@@ -34,6 +44,33 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
 
     return True
 
+
+class DuplicateNotification:
+    def __init__(self, address: Optional[str], payload: Dict[str, Any]):
+        self.redis = get_redis()
+        self.address = address
+        self.payload = payload
+        self.redis_payload = self._get_redis_payload(address, payload)
+
+    def _get_redis_payload(self, address: Optional[str], payload: Dict[str, Any]):
+        new_payload = dict(payload)
+        new_payload['notification_to'] = address
+        return 'notifications:'.encode() + pickle.dumps(new_payload)
+
+    def is_duplicated(self) -> bool:
+        """
+        :return: True if payload was already notified, False otherwise
+        """
+        return bool(self.redis.get(self.redis_payload))
+
+    def set_duplicated(self) -> bool:
+        """
+        Stores notification with an expiration time of 5 minutes
+        :return:
+        """
+        return self.redis.set(self.redis_payload, 1, ex=5 * 60)
+
+
 @app.shared_task()
 def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> Tuple[int, int]:
     if not (address and payload):  # Both must be present
@@ -49,6 +86,14 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
 
     if not (tokens and filter_notification(payload)):
         return 0
+
+    # Make sure notification has not been sent before
+    duplicate_notification = DuplicateNotification(address, payload)
+    if duplicate_notification.is_duplicated():
+        logger.info('Duplicated notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
+        return 0
+
+    duplicate_notification.set_duplicated()
 
     logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
     success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
