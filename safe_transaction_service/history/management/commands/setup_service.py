@@ -56,6 +56,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Setting up Safe Contract Addresses'))
         ethereum_client = EthereumClientProvider()
         ethereum_network = ethereum_client.get_network()
+        self.stdout.write(self.style.SUCCESS('Network %s was identified' % ethereum_network))
         if ethereum_network == EthereumNetwork.MAINNET:
             self.stdout.write(self.style.SUCCESS('Setting up Mainnet addresses'))
             self.setup_mainnet()
@@ -68,6 +69,9 @@ class Command(BaseCommand):
         elif ethereum_network == EthereumNetwork.KOVAN:
             self.stdout.write(self.style.SUCCESS('Setting up Kovan addresses'))
             self.setup_kovan()
+        elif ethereum_network == EthereumNetwork.UNKNOWN:
+            self.stdout.write(self.style.SUCCESS('Setting up RSK addresses'))
+            self.setup_rsk()
         else:
             self.stdout.write(self.style.WARNING(f'Cannot detect a valid ethereum-network'))
 
@@ -231,4 +235,28 @@ class Command(BaseCommand):
                                            defaults={
                                                'initial_block_number': 10629898,
                                                'tx_block_number': 10629898,
+                                           })
+
+    def setup_rsk_testnet(self):
+        SafeMasterCopy.objects.get_or_create(address='0x42e36dd00c87ea15e3176d881d506d4bf6ab3300',
+                                             defaults={
+                                                 'initial_block_number': 1047040,
+                                                 'tx_block_number': 1047040,
+                                             })
+        ProxyFactory.objects.get_or_create(address='0x97e9c469f587f9931cbb5eedd8eae1ec815a9e0e',
+                                           defaults={
+                                               'initial_block_number': 1047040,
+                                               'tx_block_number': 1047040,
+                                           })
+
+    def setup_rsk(self):
+        SafeMasterCopy.objects.get_or_create(address='0xe502b44b0f3981f883e03dfa1dff119753178b40',
+                                             defaults={
+                                                 'initial_block_number': 2641655,
+                                                 'tx_block_number': 2641655,
+                                             })
+        ProxyFactory.objects.get_or_create(address='0xe8e29a03eb550a50a9fc199cb8ac6b9d22ec55c5',
+                                           defaults={
+                                               'initial_block_number': 2641646,
+                                               'tx_block_number': 2641646,
                                            })

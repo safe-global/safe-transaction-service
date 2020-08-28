@@ -86,8 +86,8 @@ class AllTransactionsListView(ListAPIView):
         Returns the history of a multisig tx (safe)
         """
         address = kwargs['address']
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, *args, **kwargs)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -116,8 +116,8 @@ class SafeModuleTransactionListView(ListAPIView):
         """
         Returns the module transaction of a Safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -179,8 +179,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         Returns the history of a multisig tx (safe)
         """
         address = kwargs['address']
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, *args, **kwargs)
         response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
@@ -194,10 +194,10 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
-        request.data['safe'] = address
+        request.data['safe'] = Web3.toChecksumAddress(address)
         serializer = self.get_serializer_class()(data=request.data)
 
         if not serializer.is_valid():
@@ -218,17 +218,25 @@ class SafeBalanceView(APIView):
         """
         Get status of the safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        # else:
+        #     try:
+        #         SafeContract.objects.get(address=address)
+        #     except SafeContract.DoesNotExist:
+        #         return Response(status=status.HTTP_404_NOT_FOUND)
 
-            safe_balances = BalanceServiceProvider().get_balances(address)
-            serializer = self.serializer_class(safe_balances, many=True)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
+        #     safe_balances = BalanceServiceProvider().get_balances(address)
+        #     serializer = self.serializer_class(safe_balances, many=True)
+        #     return Response(status=status.HTTP_200_OK, data=serializer.data)
+        try:
+            SafeContract.objects.get(address=address)
+        except SafeContract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        safe_balances = BalanceServiceProvider().get_balances(address)
+        serializer = self.serializer_class(safe_balances, many=True)
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class SafeBalanceUsdView(APIView):
@@ -242,17 +250,25 @@ class SafeBalanceUsdView(APIView):
         """
         Get status of the safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        # else:
+        #     try:
+        #         SafeContract.objects.get(address=address)
+        #     except SafeContract.DoesNotExist:
+        #         return Response(status=status.HTTP_404_NOT_FOUND)
 
-            safe_balances = BalanceServiceProvider().get_usd_balances(address)
-            serializer = self.serializer_class(safe_balances, many=True)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
+        #     safe_balances = BalanceServiceProvider().get_usd_balances(address)
+        #     serializer = self.serializer_class(safe_balances, many=True)
+        #     return Response(status=status.HTTP_200_OK, data=serializer.data)
+        try:
+            SafeContract.objects.get(address=address)
+        except SafeContract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        safe_balances = BalanceServiceProvider().get_usd_balances(address)
+        serializer = self.serializer_class(safe_balances, many=True)
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class SafeDelegateListView(ListCreateAPIView):
@@ -276,8 +292,8 @@ class SafeDelegateListView(ListCreateAPIView):
         """
         Get the list of delegates for a Safe address
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         return super().get(request, address, **kwargs)
 
@@ -296,8 +312,8 @@ class SafeDelegateListView(ListCreateAPIView):
              - TOTP = epoch // 3600 = 1586779140 // 3600 = 440771
              - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
         return super().post(request, address, **kwargs)
@@ -319,8 +335,8 @@ class SafeDelegateDestroyView(DestroyAPIView):
         Delete a delegate for a Safe. Signature is built the same way that for adding a delegate.
         Check `POST /delegates/`
         """
-        if not Web3.isChecksumAddress(address) or not Web3.isChecksumAddress(delegate_address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address) or not Web3.isChecksumAddress(delegate_address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
         request.data['delegate_address'] = delegate_address
@@ -364,8 +380,8 @@ class SafeTransferListView(ListAPIView):
         """
         Returns the history of a multisig tx (safe)
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -374,7 +390,9 @@ class SafeTransferListView(ListAPIView):
 
 class SafeIncomingTransferListView(SafeTransferListView):
     def get_transfers(self, address: str):
-        tokens_queryset = super().filter_queryset(InternalTx.objects.token_incoming_txs_for_address(address))
+        # hack, events seem to be stored with ETH checksum
+        address_eth_checksum = Web3.toChecksumAddress(address)
+        tokens_queryset = super().filter_queryset(InternalTx.objects.token_incoming_txs_for_address(address_eth_checksum))
         ether_queryset = super().filter_queryset(InternalTx.objects.ether_incoming_txs_for_address(address))
         return InternalTx.objects.union_ether_and_token_txs(tokens_queryset, ether_queryset)
 
@@ -390,8 +408,8 @@ class SafeCreationView(APIView):
         """
         Get status of the safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
         if not safe_creation_info:
@@ -411,8 +429,8 @@ class SafeInfoView(APIView):
         """
         Get status of the safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         if not SafeContract.objects.filter(address=address).exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -432,8 +450,8 @@ class OwnersView(APIView):
         """
         Get status of the safe
         """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        # if not Web3.isChecksumAddress(address):
+        #     return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
         if not safes_for_owner:

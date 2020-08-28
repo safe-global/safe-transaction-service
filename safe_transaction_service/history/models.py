@@ -41,6 +41,8 @@ class EthereumTxCallType(Enum):
             return EthereumTxCallType.CALL
         elif call_type.lower() == 'delegatecall':
             return EthereumTxCallType.DELEGATE_CALL
+        elif call_type.lower() == 'delegatecode':
+            return EthereumTxCallType.DELEGATE_CALL
         else:
             return None
 

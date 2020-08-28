@@ -24,8 +24,14 @@ class CannotGetEthereumPrice(BalanceServiceException):
     pass
 
 
+# TODO adapt to others RSK tokens
 def get_erc20_logo_uri(address: str) -> str:
-    return f'https://gnosis-safe-token-logos.s3.amazonaws.com/{address}.png'
+    address_lower = address.lower()
+    if address_lower == '0x19f64674d8a5b4e652319f5e239efd3bc969a1fe':
+        return 'https://s2.coinmarketcap.com/static/img/coins/32x32/3701.png'
+    if address_lower == '0x2acc95758f8b5f583470ba265eb685a8f45fc9d5':
+        return 'https://s2.coinmarketcap.com/static/img/coins/32x32/3701.png'
+    return 'https://www.myetherwallet.com/img/rsk.3efbc411.svg'
 
 
 @dataclass
@@ -74,6 +80,7 @@ class BalanceService:
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.cache_eth_usd_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_rbtc_usd_price = TTLCache(maxsize=2048, ttl=60 * 10)  # 10 minutes of caching
         self.cache_token_info = {}
 
     def get_balances(self, safe_address: str) -> List[Balance]:
@@ -81,10 +88,16 @@ class BalanceService:
         :param safe_address:
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
         """
-        assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
+        # assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
         erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
         raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
+
+        if len(erc20_addresses) == 0:
+            # This is because turning to lowercase in react app brought some inconsistencies
+            checksummed_safe_address = Web3.toChecksumAddress(safe_address)
+            erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(checksummed_safe_address))
+            raw_balances = self.ethereum_client.erc20.get_balances(checksummed_safe_address, erc20_addresses)
 
         balances = []
         for balance in raw_balances:
@@ -98,6 +111,27 @@ class BalanceService:
                 continue
             balances.append(Balance(**balance))
         return balances
+
+    @cachedmethod(cache=operator.attrgetter('cache_rbtc_usd_price'))
+    def get_rbtc_usd_price_bitfinex(self) -> float:
+        """
+        :return: current USD price for RBTC using Bitfinex
+        :raises: CannotGetRBTCPrice
+        """
+        url = 'https://api-pub.bitfinex.com/v2/ticker/tRBTUSD'
+        response = requests.get(url)
+        api_json = response.json()
+        if not response.ok:
+            logger.warning('Cannot get price from url=%s', url)
+            raise CannotGetEthereumPrice(api_json.get('msg'))
+
+        try:
+            price = float(api_json[6])
+            if not price:
+                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+            return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
 
     def get_eth_usd_price_binance(self) -> float:
         """
@@ -153,18 +187,41 @@ class BalanceService:
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     def get_token_eth_value(self, token_address: str) -> float:
         """
-        Return current ether value for a given `token_address`
+        Return current rbtc value for a given `token_address`
         """
-        try:
-            return self.uniswap_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
+        token_address_lower = token_address.lower()
+        tRif_address = '0x19f64674d8a5b4e652319f5e239efd3bc969a1fe'
+        rif_address = '0x2acc95758f8b5f583470ba265eb685a8f45fc9d5'
+        if token_address_lower != tRif_address and token_address_lower != rif_address:
+            return 0
+
+        url = 'https://api-pub.bitfinex.com/v2/ticker/tRIFBTC'
+        response = requests.get(url)
+        api_json = response.json()
+        if not response.ok:
+            logger.warning('Cannot get price from url=%s', url)
+            return 0
 
         try:
-            return self.kyber_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
-            return 0.
+            price = float(api_json[6])
+            if not price:
+                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
+            return price
+        except ValueError as e:
+            raise CannotGetEthereumPrice from e
+
+        return 0
+
+        # try:
+        #     return self.uniswap_oracle.get_price(token_address)
+        # except OracleException:
+        #     logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
+
+        # try:
+        #     return self.kyber_oracle.get_price(token_address)
+        # except OracleException:
+        #     logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
+        #     return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
@@ -181,17 +238,17 @@ class BalanceService:
         I think we should be alright
         """
         balances: List[Balance] = self.get_balances(safe_address)
-        eth_value = self.get_eth_usd_price()
+        rbtc_value = self.get_rbtc_usd_price_bitfinex()
         balances_with_usd = []
         for balance in balances:
             token_address = balance.token_address
-            if not token_address:  # Ether
-                balance_usd = eth_value * (balance.balance / 10**18)
+            if not token_address:  # RBTC
+                balance_usd = rbtc_value * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
                     balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    balance_usd = eth_value * token_to_eth_price * balance_with_decimals
+                    balance_usd = rbtc_value * token_to_eth_price * balance_with_decimals
                 else:
                     balance_usd = 0.
 

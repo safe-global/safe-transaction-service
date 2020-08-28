@@ -165,7 +165,7 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.updated_blocks_behind: int = 5000000  # Hack to process all the addresses together
+        self.updated_blocks_behind: int = 2641600  # Hack to process all the addresses together
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:

@@ -30,7 +30,7 @@ class Erc20EventsIndexer(EthereumIndexer):
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
 
-    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 10000,
+    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 100,
                  updated_blocks_behind: int = 300, query_chunk_size: int = 500):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,

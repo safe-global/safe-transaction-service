@@ -27,7 +27,7 @@ class EthereumIndexer(ABC):
     `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 1,
-                 block_process_limit: int = 1000, updated_blocks_behind: int = 20,
+                 block_process_limit: int = 10, updated_blocks_behind: int = 20,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000,
                  block_auto_process_limit: bool = True):
         """
@@ -176,8 +176,8 @@ class EthereumIndexer(ABC):
         :return: List of processed data and a boolean (`True` if no more blocks to scan, `False` otherwise)
         """
         assert addresses, 'Addresses cannot be empty!'
-        assert all([Web3.isChecksumAddress(address) for address in addresses]), \
-            f'An address has invalid checksum: {addresses}'
+        # assert all([Web3.isChecksumAddress(address) for address in addresses]), \
+        #     f'An address has invalid checksum: {addresses}'
 
         current_block_number = current_block_number or self.ethereum_client.current_block_number
         parameters = self.get_block_numbers_for_search(addresses, current_block_number)
@@ -209,7 +209,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
                             self.block_process_limit)
             if time_diff > 10:
-                new_block_process_limit = self.block_process_limit - 10000
+                new_block_process_limit = self.block_process_limit - 100
                 if new_block_process_limit > 0:
                     self.block_process_limit = new_block_process_limit
                     logger.info('%s: block_process_limit decreased to %d', self.__class__.__name__,
@@ -219,7 +219,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit duplicated to %d', self.__class__.__name__,
                             self.block_process_limit)
             elif time_diff < 3:
-                self.block_process_limit += 10000
+                self.block_process_limit += 100
                 logger.info('%s: block_process_limit increased to %d', self.__class__.__name__,
                             self.block_process_limit)
 
