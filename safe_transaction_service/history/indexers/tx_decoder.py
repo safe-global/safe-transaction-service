@@ -98,16 +98,16 @@ class SafeTxDecoder:
             supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
         return supported_fn_selectors
 
-    def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
+    def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
         Parse decoded arguments, like converting `bytes` to hexadecimal `str` or `int` and `float` to `str` (to
         prevent problems when deserializing in another languages like JavaScript
-        :param value_decoded:
+        :param decoded_value:
         :return: Dict[str, Any]
         """
-        if isinstance(value_decoded, bytes):
-            value_decoded = HexBytes(value_decoded).hex()
-        return value_decoded
+        if isinstance(decoded_value, bytes):
+            decoded_value = HexBytes(decoded_value).hex()
+        return decoded_value
 
     @cached_property
     def supported_fn_selectors(self) -> Dict[bytes, ContractFunction]:
@@ -232,19 +232,19 @@ class TxDecoder(SafeTxDecoder):
                                     + sight_contracts + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
-    def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
+    def _parse_decoded_arguments(self, decoded_value: Any) -> Any:
         """
         Decode integers also
-        :param value_decoded:
+        :param decoded_value:
         :return:
         """
         # TODO Decode on serializer, but it's tricky as it has a nested decoding
-        value_decoded = super()._parse_decoded_arguments(value_decoded)
-        if isinstance(value_decoded, (int, float)):
-            value_decoded = str(value_decoded)
-        elif isinstance(value_decoded, (list, tuple)):
-            value_decoded = list([self._parse_decoded_arguments(e) for e in value_decoded])
-        return value_decoded
+        decoded_value = super()._parse_decoded_arguments(decoded_value)
+        if isinstance(decoded_value, (int, float)):
+            decoded_value = str(decoded_value)
+        elif isinstance(decoded_value, (list, tuple)):
+            decoded_value = list([self._parse_decoded_arguments(e) for e in decoded_value])
+        return decoded_value
 
     @cached_property
     def multisend_fn_selectors(self) -> Dict[bytes, ContractFunction]:
@@ -259,14 +259,14 @@ class TxDecoder(SafeTxDecoder):
 
         # If multisend, decode the transactions
         if data[:4] in self.multisend_fn_selectors:
-            parameters[0]['value_decoded'] = self.get_data_decoded_for_multisend(data)
+            parameters[0]['decoded_value'] = self.get_data_decoded_for_multisend(data)
 
         # If Gnosis Safe `execTransaction` decode the inner transaction
         # function execTransaction(address to, uint256 value, bytes calldata data...)
         # selector is `0x6a761202` and parameters[2] is data
         if data[:4] == HexBytes('0x6a761202') and len(parameters) > 2 and (data := HexBytes(parameters[2]['value'])):
             try:
-                parameters[2]['value_decoded'] = self.get_data_decoded(data)
+                parameters[2]['decoded_value'] = self.get_data_decoded(data)
             except TxDecoderException:
                 logger.warning('Cannot decode `execTransaction`', exc_info=True)
 
@@ -280,11 +280,11 @@ class TxDecoder(SafeTxDecoder):
         """
         try:
             multisend_txs = MultiSend.from_transaction_data(data)
-            return [{'operation': multisend_tx.operation.value,
+            return [{'operation': multisend_tx.operation.name,
                      'to': multisend_tx.to,
                      'value': multisend_tx.value,
                      'data': multisend_tx.data.hex(),
-                     'data_decoded': self.get_data_decoded(multisend_tx.data),
+                     'decoded_data': self.get_data_decoded(multisend_tx.data),
                      } for multisend_tx in multisend_txs]
         except ValueError:
             logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)

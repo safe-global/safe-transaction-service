@@ -90,18 +90,18 @@ class SafeService:
 
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
-            _, data_decoded = self.proxy_factory_contract.decode_function_input(data)
-            master_copy = data_decoded.get('masterCopy', data_decoded.get('_mastercopy'))
-            setup_data = data_decoded.get('data', data_decoded.get('initializer'))
+            _, decoded_data = self.proxy_factory_contract.decode_function_input(data)
+            master_copy = decoded_data.get('masterCopy', decoded_data.get('_mastercopy'))
+            setup_data = decoded_data.get('data', decoded_data.get('initializer'))
             return master_copy, setup_data
         except ValueError:
             return None
 
     def _decode_cpk_proxy_factory(self, data) -> Optional[Tuple[str, bytes]]:
         try:
-            _, data_decoded = self.cpk_proxy_factory_contract.decode_function_input(data)
-            master_copy = data_decoded.get('masterCopy')
-            setup_data = data_decoded.get('data')
+            _, decoded_data = self.cpk_proxy_factory_contract.decode_function_input(data)
+            master_copy = decoded_data.get('masterCopy')
+            setup_data = decoded_data.get('data')
             return master_copy, setup_data
         except ValueError:
             return None
