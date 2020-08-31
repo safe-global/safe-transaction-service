@@ -53,9 +53,7 @@ class DuplicateNotification:
         self.redis_payload = self._get_redis_payload(address, payload)
 
     def _get_redis_payload(self, address: Optional[str], payload: Dict[str, Any]):
-        new_payload = dict(payload)
-        new_payload['notification_to'] = address
-        return 'notifications:'.encode() + pickle.dumps(new_payload)
+        return f'notifications:{address}:'.encode() + pickle.dumps(payload)
 
     def is_duplicated(self) -> bool:
         """
