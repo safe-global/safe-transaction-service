@@ -19,6 +19,12 @@ class EnsClient:
             url = base_url + 'ens'
         self.url: str = url
 
+    def is_available(self):
+        """
+        :return: True if service is available, False if it's down
+        """
+        return not requests.get(self.url).ok
+
     @staticmethod
     def domain_hash_to_hex_str(domain_hash: Union[str, bytes, int]) -> str:
         """
