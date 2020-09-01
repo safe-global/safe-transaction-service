@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 from cache_memoize import cache_memoize
 from hexbytes import HexBytes
+from requests import Timeout
 
 
 class EnsClient:
@@ -18,12 +19,17 @@ class EnsClient:
         else:  # Fallback to mainnet
             url = base_url + 'ens'
         self.url: str = url
+        self.request_timeout = 5  # Seconds
+        self.request_session = requests.Session()
 
     def is_available(self):
         """
         :return: True if service is available, False if it's down
         """
-        return not requests.get(self.url).ok
+        try:
+            return not self.request_session.get(self.url, timeout=self.request_timeout).ok
+        except Timeout:
+            return False
 
     @staticmethod
     def domain_hash_to_hex_str(domain_hash: Union[str, bytes, int]) -> str:
@@ -45,7 +51,11 @@ class EnsClient:
                     }
                 }
                 """.replace('domain_hash', domain_hash_str)
-        r = requests.post(self.url, json={'query': query})
+        try:
+            r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
+        except Timeout:
+            return None
+
         if not r.ok:
             return None
         else:
@@ -114,7 +124,11 @@ class EnsClient:
             }
           }
         }'''.replace('account_id', account.lower())
-        r = requests.post(self.url, json={'query': query})
+        try:
+            r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
+        except Timeout:
+            return None
+
         if not r.ok:
             return None
         else:
