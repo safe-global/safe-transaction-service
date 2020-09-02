@@ -68,6 +68,9 @@ class Command(BaseCommand):
         elif ethereum_network == EthereumNetwork.KOVAN:
             self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} addresses'))
             self.setup_kovan()
+        elif ethereum_network == EthereumNetwork.XDAI:
+            self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} addresses'))
+            self.setup_xdai()
         else:
             self.stdout.write(self.style.WARNING('Cannot detect a valid ethereum-network'))
 
@@ -162,6 +165,19 @@ class Command(BaseCommand):
             ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 15366151),
             ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 14740731),
             ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 10629898),
+        ]
+
+        self._setup_safe_master_copies(safe_master_copies)
+        self._setup_safe_proxy_factories(safe_proxy_factories)
+
+    def setup_xdai(self):
+        safe_master_copies = [
+            ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10612049, '1.2.0'),
+            ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 10045292, '1.1.1'),
+        ]
+
+        safe_proxy_factories = [
+            ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 10045327),
         ]
 
         self._setup_safe_master_copies(safe_master_copies)
