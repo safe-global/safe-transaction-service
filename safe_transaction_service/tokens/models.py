@@ -2,7 +2,9 @@ import logging
 from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from gnosis.eth.django.models import EthereumAddressField
 
@@ -10,11 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class TokenQuerySet(models.QuerySet):
+    erc721_query = Q(decimals=None)
+    erc20_query = ~erc721_query
+
     def erc20(self):
-        return self.exclude(decimals=0)
+        return self.filter(self.erc20_query)
 
     def erc721(self):
-        return self.filter(decimals=0)
+        return self.filter(self.erc721_query)
 
 
 class Token(models.Model):
@@ -22,19 +27,36 @@ class Token(models.Model):
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
-    decimals = models.PositiveSmallIntegerField(db_index=True)  # For ERC721 tokens decimals=0
+    decimals = models.PositiveSmallIntegerField(db_index=True,
+                                                null=True, blank=True)  # For ERC721 tokens `decimals=None`
     logo_uri = models.CharField(blank=True, max_length=300, default='')
     trusted = models.BooleanField(default=False)
+    spam = models.BooleanField(default=False)  # Spam and trusted cannot be both True
 
     def __str__(self):
+        spam_text = 'SPAM ' if self.spam else ''
         if self.decimals:
-            return f'ERC20 - {self.name} - {self.address}'
+            return f'{spam_text}ERC20 - {self.name} - {self.address}'
         else:
             return f'ERC721 - {self.name} - {self.address}'
+
+    def clean(self):
+        if self.trusted and self.spam:
+            raise ValidationError('Spam and trusted cannot be both `True`')
+
+    def is_erc20(self):
+        return self.decimals is not None
+
+    def is_erc721(self):
+        return not self.is_erc20()
 
     def set_trusted(self) -> None:
         self.trusted = True
         return self.save(update_fields=['trusted'])
+
+    def set_spam(self) -> None:
+        self.spam = True
+        return self.save(update_fields=['spam'])
 
     def get_full_logo_uri(self):
         if urlparse(self.logo_uri).netloc:

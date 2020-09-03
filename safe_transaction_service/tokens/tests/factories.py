@@ -13,3 +13,5 @@ class TokenFactory(factory.DjangoModelFactory):
     symbol = factory.Faker('cryptocurrency_code')
     decimals = 18
     logo_uri = ''
+    trusted = False
+    spam = False

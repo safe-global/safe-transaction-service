@@ -232,7 +232,7 @@ class CollectiblesService:
                 token = Token.objects.create(address=token_address,
                                              name=token_info.name,
                                              symbol=token_info.symbol,
-                                             decimals=0,
+                                             decimals=None,
                                              logo_uri=logo_uri,
                                              trusted=trusted)
                 return Erc721InfoWithLogo.from_token(token)

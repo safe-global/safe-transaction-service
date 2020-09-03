@@ -40,7 +40,7 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                                          'symbol': token.symbol,
                                          'decimals': token.decimals})
 
-        token = TokenFactory(decimals=0)  # ERC721
+        token = TokenFactory(decimals=None)  # ERC721
         response = self.client.get(reverse('v1:token', args=(token.address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {'type': 'ERC721',

@@ -8,6 +8,7 @@ from .models import Token
 
 
 class TokenTransferInfoType(Enum):
+    UNKNOWN = -1
     ERC20 = 0
     ERC721 = 1
 
@@ -21,10 +22,12 @@ class TokenInfoResponseSerializer(serializers.Serializer):
     logo_uri = serializers.SerializerMethodField()
 
     def get_type(self, obj: Token) -> str:
-        if obj.decimals:
+        if obj.is_erc20():
             return TokenTransferInfoType.ERC20.name
-        else:
+        elif obj.is_erc721():
             return TokenTransferInfoType.ERC721.name
+        else:
+            return TokenTransferInfoType.UNKNOWN.name
 
     def get_logo_uri(self, obj: Token) -> str:
         return obj.get_full_logo_uri()
