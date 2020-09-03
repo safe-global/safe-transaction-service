@@ -1,7 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import requests
 from cache_memoize import cache_memoize
@@ -167,13 +167,38 @@ class CollectiblesService:
 
         return self._retrieve_metadata_from_uri(collectible.uri)
 
-    def get_collectibles(self, safe_address: str) -> List[Collectible]:
+    def _filter_addresses(self, addresses_with_token_ids: Sequence[Tuple[str, int]],
+                          only_trusted: bool = False, exclude_spam: bool = False):
+        """
+        :param addresses_with_token_ids:
+        :param only_trusted:
+        :param exclude_spam:
+        :return: ERC20 tokens filtered by spam or trusted
+        """
+        if only_trusted or exclude_spam:
+            addresses = [address_with_token_id[0] for address_with_token_id in addresses_with_token_ids]
+            base_queryset = Token.objects.filter(address__in=addresses)
+            if only_trusted:
+                addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
+            elif exclude_spam:
+                addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
+            return [address_with_token_id for address_with_token_id in addresses_with_token_ids
+                    if address_with_token_id[0] in addresses]
+        else:
+            return addresses_with_token_ids
+
+    def get_collectibles(self, safe_address: str, only_trusted: bool = False,
+                         exclude_spam: bool = False) -> List[Collectible]:
         """
         Get collectibles using the owner, addresses and the token_ids
         :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
         :return:
         """
-        addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(address=safe_address)
+        unfiltered_addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(address=safe_address)
+        addresses_with_token_ids = self._filter_addresses(unfiltered_addresses_with_token_ids,
+                                                          only_trusted, exclude_spam)
         if not addresses_with_token_ids:
             return []
 
@@ -188,9 +213,17 @@ class CollectiblesService:
 
         return collectibles
 
-    def get_collectibles_with_metadata(self, safe_address: str) -> List[CollectibleWithMetadata]:
+    def get_collectibles_with_metadata(self, safe_address: str, only_trusted: bool = False,
+                                       exclude_spam: bool = False) -> List[CollectibleWithMetadata]:
+        """
+        Get collectibles using the owner, addresses and the token_ids
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :return:
+        """
         collectibles_with_metadata = []
-        for collectible in self.get_collectibles(safe_address):
+        for collectible in self.get_collectibles(safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam):
             try:
                 metadata = self.get_metadata(collectible)
             except MetadataRetrievalException:

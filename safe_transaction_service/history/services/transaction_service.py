@@ -131,8 +131,6 @@ class TransactionService:
         ).union(
             internal_tx_ids
         ).union(
-            internal_tx_ids
-        ).union(
             module_tx_ids
         ).order_by('-execution_date', 'block', '-created')
         # Order by block because `block_number < NULL`, so txs mined will have preference,

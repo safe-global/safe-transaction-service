@@ -258,14 +258,37 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_201_CREATED)
 
 
+_schema_token_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
+                                                description='If `True` just trusted tokens will be returned')
+_schema_token_exclude_spam_param = openapi.Parameter('exclude_spam', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
+                                                     default=False,
+                                                     description='If `True` spam tokens will not be returned')
+
+
 class SafeBalanceView(APIView):
     serializer_class = SafeBalanceResponseSerializer
 
+    def _parse_boolean(self, value: Union[bool, str]) -> bool:
+        if value in (True, 'True', 'true', '1'):
+            return True
+        else:
+            return False
+
+    def get_parameters(self) -> Tuple[bool, bool]:
+        """
+        Parse query parameters:
+        :return: Tuple with only_trusted, exclude_spam
+        """
+        only_trusted = self._parse_boolean(self.request.query_params.get('trusted', False))
+        exclude_spam = self._parse_boolean(self.request.query_params.get('exclude_spam', False))
+        return only_trusted, exclude_spam
+
     @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
-                                    422: 'Safe address checksum not valid'})
+                                    422: 'Safe address checksum not valid'},
+                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
     @method_decorator(cache_page(15))
-    def get(self, request, address, format=None):
+    def get(self, request, address):
         """
         Get status of the safe
         """
@@ -277,60 +300,70 @@ class SafeBalanceView(APIView):
             except SafeContract.DoesNotExist:
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
-            safe_balances = BalanceServiceProvider().get_balances(address)
+            only_trusted, exclude_spam = self.get_parameters()
+            safe_balances = BalanceServiceProvider().get_balances(address, only_trusted=only_trusted,
+                                                                  exclude_spam=exclude_spam)
             serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeCollectiblesView(APIView):
-    serializer_class = SafeCollectibleResponseSerializer
-
-    @swagger_auto_schema(responses={200: serializer_class(many=True),
-                                    404: 'Safe not found',
-                                    422: 'code = 1: Checksum address validation failed'})
-    @method_decorator(cache_page(15))
-    def get(self, request, address, format=None):
-        """
-        Get status of the safe
-        """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
-                                                                               'message': 'Checksum address validation failed',
-                                                                               'arguments': [address]})
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-
-            collectibles_with_metadata = CollectiblesServiceProvider().get_collectibles_with_metadata(address)
-            serializer = self.serializer_class(collectibles_with_metadata, many=True)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
-
-
-class SafeBalanceUsdView(APIView):
+class SafeBalanceUsdView(SafeBalanceView):
     serializer_class = SafeBalanceUsdResponseSerializer
 
     @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
-                                    422: 'code = 1: Checksum address validation failed'})
+                                    422: 'code = 1: Checksum address validation failed'},
+                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
     @method_decorator(cache_page(15))
-    def get(self, request, address, format=None):
+    def get(self, request, address):
         """
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
-                                                                               'message': 'Checksum address validation failed',
-                                                                               'arguments': [address]})
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
         else:
             try:
                 SafeContract.objects.get(address=address)
             except SafeContract.DoesNotExist:
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
-            safe_balances = BalanceServiceProvider().get_usd_balances(address)
+            only_trusted, exclude_spam = self.get_parameters()
+            safe_balances = BalanceServiceProvider().get_usd_balances(address, only_trusted, exclude_spam)
             serializer = self.serializer_class(safe_balances, many=True)
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class SafeCollectiblesView(SafeBalanceView):
+    serializer_class = SafeCollectibleResponseSerializer
+
+    @swagger_auto_schema(responses={200: serializer_class(many=True),
+                                    404: 'Safe not found',
+                                    422: 'code = 1: Checksum address validation failed'},
+                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
+    @method_decorator(cache_page(15))
+    def get(self, request, address, format=None):
+        """
+        Get status of the safe
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            only_trusted, exclude_spam = self.get_parameters()
+            collectibles_with_metadata = CollectiblesServiceProvider().get_collectibles_with_metadata(address,
+                                                                                                      only_trusted,
+                                                                                                      exclude_spam)
+            serializer = self.serializer_class(collectibles_with_metadata, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
