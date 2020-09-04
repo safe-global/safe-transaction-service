@@ -1,5 +1,5 @@
 import hashlib
-from typing import Tuple, Union
+from typing import Tuple
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -44,6 +44,7 @@ from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
 from .services.safe_service import CannotGetSafeInfo
+from .utils import parse_boolean_query_param
 
 
 class AboutView(APIView):
@@ -87,12 +88,6 @@ class AllTransactionsListView(ListAPIView):
     _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
                                             'types', _AllTransactionsSchemaSerializer)
 
-    def _parse_boolean(self, value: Union[bool, str]) -> bool:
-        if value in (True, 'True', 'true', '1'):
-            return True
-        else:
-            return False
-
     def get_parameters(self) -> Tuple[bool, bool]:
         """
         Parse query parameters:
@@ -101,8 +96,8 @@ class AllTransactionsListView(ListAPIView):
         or with at least one confirmation)
         :return: Tuple with queued, trusted
         """
-        queued = self._parse_boolean(self.request.query_params.get('queued', True))
-        trusted = self._parse_boolean(self.request.query_params.get('trusted', True))
+        queued = parse_boolean_query_param(self.request.query_params.get('queued', True))
+        trusted = parse_boolean_query_param(self.request.query_params.get('trusted', True))
         return queued, trusted
 
     def list(self, request, *args, **kwargs):
@@ -258,30 +253,27 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_201_CREATED)
 
 
-_schema_token_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
-                                                description='If `True` just trusted tokens will be returned')
-_schema_token_exclude_spam_param = openapi.Parameter('exclude_spam', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
-                                                     default=False,
-                                                     description='If `True` spam tokens will not be returned')
-
-
 class SafeBalanceView(APIView):
     serializer_class = SafeBalanceResponseSerializer
 
-    def _parse_boolean(self, value: Union[bool, str]) -> bool:
-        if value in (True, 'True', 'true', '1'):
-            return True
-        else:
-            return False
+    _schema_token_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
+                                                    default=False,
+                                                    description='If `True` just trusted tokens will be returned')
+    _schema_token_exclude_spam_param = openapi.Parameter('exclude_spam', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
+                                                         default=False,
+                                                         description='If `True` spam tokens will not be returned')
 
     def get_parameters(self) -> Tuple[bool, bool]:
         """
         Parse query parameters:
         :return: Tuple with only_trusted, exclude_spam
         """
-        only_trusted = self._parse_boolean(self.request.query_params.get('trusted', False))
-        exclude_spam = self._parse_boolean(self.request.query_params.get('exclude_spam', False))
+        only_trusted = parse_boolean_query_param(self.request.query_params.get('trusted', False))
+        exclude_spam = parse_boolean_query_param(self.request.query_params.get('exclude_spam', False))
         return only_trusted, exclude_spam
+
+    def get_result(self, *args, **kwargs):
+        return BalanceServiceProvider().get_balances(*args, **kwargs)
 
     @swagger_auto_schema(responses={200: serializer_class(many=True),
                                     404: 'Safe not found',
@@ -293,7 +285,10 @@ class SafeBalanceView(APIView):
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
         else:
             try:
                 SafeContract.objects.get(address=address)
@@ -301,8 +296,7 @@ class SafeBalanceView(APIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
             only_trusted, exclude_spam = self.get_parameters()
-            safe_balances = BalanceServiceProvider().get_balances(address, only_trusted=only_trusted,
-                                                                  exclude_spam=exclude_spam)
+            safe_balances = self.get_result(address, only_trusted=only_trusted, exclude_spam=exclude_spam)
             serializer = self.serializer_class(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
@@ -310,61 +304,15 @@ class SafeBalanceView(APIView):
 class SafeBalanceUsdView(SafeBalanceView):
     serializer_class = SafeBalanceUsdResponseSerializer
 
-    @swagger_auto_schema(responses={200: serializer_class(many=True),
-                                    404: 'Safe not found',
-                                    422: 'code = 1: Checksum address validation failed'},
-                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
-    @method_decorator(cache_page(15))
-    def get(self, request, address):
-        """
-        Get status of the safe
-        """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            data={'code': 1,
-                                  'message': 'Checksum address validation failed',
-                                  'arguments': [address]})
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-
-            only_trusted, exclude_spam = self.get_parameters()
-            safe_balances = BalanceServiceProvider().get_usd_balances(address, only_trusted, exclude_spam)
-            serializer = self.serializer_class(safe_balances, many=True)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
+    def get_result(self, *args, **kwargs):
+        return BalanceServiceProvider().get_usd_balances(*args, **kwargs)
 
 
 class SafeCollectiblesView(SafeBalanceView):
     serializer_class = SafeCollectibleResponseSerializer
 
-    @swagger_auto_schema(responses={200: serializer_class(many=True),
-                                    404: 'Safe not found',
-                                    422: 'code = 1: Checksum address validation failed'},
-                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
-    @method_decorator(cache_page(15))
-    def get(self, request, address, format=None):
-        """
-        Get status of the safe
-        """
-        if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            data={'code': 1,
-                                  'message': 'Checksum address validation failed',
-                                  'arguments': [address]})
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-
-            only_trusted, exclude_spam = self.get_parameters()
-            collectibles_with_metadata = CollectiblesServiceProvider().get_collectibles_with_metadata(address,
-                                                                                                      only_trusted,
-                                                                                                      exclude_spam)
-            serializer = self.serializer_class(collectibles_with_metadata, many=True)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
+    def get_result(self, *args, **kwargs):
+        return CollectiblesServiceProvider().get_collectibles_with_metadata(*args, **kwargs)
 
 
 class SafeDelegateListView(ListCreateAPIView):

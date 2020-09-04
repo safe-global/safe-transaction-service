@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from gunicorn import glogging
 
@@ -38,3 +38,10 @@ def clean_receipt_log(receipt_logs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     parsed_logs = {'data': receipt_logs['data'],
                    'topics': [topic.hex() for topic in receipt_logs['topics']]}
     return parsed_logs
+
+
+def parse_boolean_query_param(value: Union[bool, str]) -> bool:
+    if value in (True, 'True', 'true', '1'):
+        return True
+    else:
+        return False

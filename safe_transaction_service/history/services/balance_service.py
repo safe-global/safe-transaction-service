@@ -81,7 +81,7 @@ class BalanceService:
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
 
-    def _filter_addresses(self, erc20_addresses: Sequence[str], only_trusted: bool, exclude_spam: bool):
+    def _filter_addresses(self, erc20_addresses: Sequence[str], only_trusted: bool, exclude_spam: bool) -> List[str]:
         """
         :param erc20_addresses:
         :param only_trusted:
@@ -94,7 +94,7 @@ class BalanceService:
                 erc20_addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
             elif exclude_spam:
                 erc20_addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
-        return erc20_addresses
+        return list(erc20_addresses)
 
     def get_balances(self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
         """
@@ -107,13 +107,6 @@ class BalanceService:
 
         all_erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
         erc20_addresses = self._filter_addresses(all_erc20_addresses, only_trusted, exclude_spam)
-
-        if only_trusted or exclude_spam:
-            base_queryset = Token.objects.erc20().filter(address__in=erc20_addresses)
-            if only_trusted:
-                erc20_addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
-            elif exclude_spam:
-                erc20_addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
         raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
 
         balances = []

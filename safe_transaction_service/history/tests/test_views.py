@@ -579,6 +579,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                            'decimals': erc20.functions.decimals().call(),
                                                            'logoUri': Token.objects.first().get_full_logo_uri()}}])
 
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)) + '?trusted=True', format='json')
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value), 'token': None}])
+        Token.objects.all().update(trusted=True)
+
+        response = self.client.get(reverse('v1:safe-balances', args=(safe_address,)) + '?trusted=True', format='json')
+        self.assertCountEqual(response.json(), [{'tokenAddress': None, 'balance': str(value), 'token': None},
+                                                {'tokenAddress': erc20.address, 'balance': str(tokens_value),
+                                                 'token': {'name': erc20.functions.name().call(),
+                                                           'symbol': erc20.functions.symbol().call(),
+                                                           'decimals': erc20.functions.decimals().call(),
+                                                           'logoUri': Token.objects.first().get_full_logo_uri()}}])
+
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)

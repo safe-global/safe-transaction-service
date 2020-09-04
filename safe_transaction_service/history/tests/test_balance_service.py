@@ -16,6 +16,7 @@ from ..services import BalanceService, BalanceServiceProvider
 from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
+from safe_transaction_service.tokens.models import Token
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
@@ -108,6 +109,21 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+            BalanceWithUsd(
+                erc20.address, erc20_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            )
+        ])
+
+        balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+        ])
+
+        TokenFactory(address=erc20.address, trusted=True, spam=False)
+        balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
             BalanceWithUsd(None, None, value, 0.0, 123.4),
             BalanceWithUsd(
