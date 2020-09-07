@@ -10,13 +10,13 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
 from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
-from safe_transaction_service.tokens.models import Token
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
