@@ -10,6 +10,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
@@ -108,6 +109,21 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+            BalanceWithUsd(
+                erc20.address, erc20_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            )
+        ])
+
+        balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+        ])
+
+        TokenFactory(address=erc20.address, trusted=True, spam=False)
+        balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
             BalanceWithUsd(None, None, value, 0.0, 123.4),
             BalanceWithUsd(

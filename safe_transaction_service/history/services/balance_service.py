@@ -1,7 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 import requests
 from cache_memoize import cache_memoize
@@ -81,14 +81,32 @@ class BalanceService:
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
 
-    def get_balances(self, safe_address: str) -> List[Balance]:
+    def _filter_addresses(self, erc20_addresses: Sequence[str], only_trusted: bool, exclude_spam: bool) -> List[str]:
+        """
+        :param erc20_addresses:
+        :param only_trusted:
+        :param exclude_spam:
+        :return: ERC20 tokens filtered by spam or trusted
+        """
+        if only_trusted or exclude_spam:
+            base_queryset = Token.objects.filter(address__in=erc20_addresses)
+            if only_trusted:
+                erc20_addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
+            elif exclude_spam:
+                erc20_addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
+        return list(erc20_addresses)
+
+    def get_balances(self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
         """
         :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
         """
         assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
-        erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
+        all_erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
+        erc20_addresses = self._filter_addresses(all_erc20_addresses, only_trusted, exclude_spam)
         raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
 
         balances = []
@@ -193,12 +211,18 @@ class BalanceService:
                 logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
                 return None
 
-    def get_usd_balances(self, safe_address: str) -> List[BalanceWithUsd]:
+    def get_usd_balances(self, safe_address: str, only_trusted: bool = False,
+                         exclude_spam: bool = False) -> List[BalanceWithUsd]:
         """
         All this could be more optimal (e.g. batching requests), but as everything is cached
         I think we should be alright
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :return: `{'token_address': str, 'balance': int, `balance_usd`: float, `usdConversion`: float}`.
+        For ether, `token_address` is `None`
         """
-        balances: List[Balance] = self.get_balances(safe_address)
+        balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
         eth_value = self.get_eth_usd_price()
         balances_with_usd = []
         for balance in balances:
