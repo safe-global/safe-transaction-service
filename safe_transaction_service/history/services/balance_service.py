@@ -88,8 +88,6 @@ class BalanceService:
         :param safe_address:
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
         """
-        # assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
-
         erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
         raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
 
@@ -211,17 +209,6 @@ class BalanceService:
             raise CannotGetEthereumPrice from e
 
         return 0
-
-        # try:
-        #     return self.uniswap_oracle.get_price(token_address)
-        # except OracleException:
-        #     logger.warning('Cannot get eth value for token-address=%s on uniswap, trying Kyber', token_address)
-
-        # try:
-        #     return self.kyber_oracle.get_price(token_address)
-        # except OracleException:
-        #     logger.warning('Cannot get eth value for token-address=%s from Kyber', token_address)
-        #     return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:

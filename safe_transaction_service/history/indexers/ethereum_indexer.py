@@ -176,8 +176,6 @@ class EthereumIndexer(ABC):
         :return: List of processed data and a boolean (`True` if no more blocks to scan, `False` otherwise)
         """
         assert addresses, 'Addresses cannot be empty!'
-        # assert all([Web3.isChecksumAddress(address) for address in addresses]), \
-        #     f'An address has invalid checksum: {addresses}'
 
         current_block_number = current_block_number or self.ethereum_client.current_block_number
         parameters = self.get_block_numbers_for_search(addresses, current_block_number)

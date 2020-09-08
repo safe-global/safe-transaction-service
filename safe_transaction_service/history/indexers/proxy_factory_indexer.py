@@ -100,7 +100,6 @@ class ProxyFactoryIndexer(EthereumIndexer):
         safe_contracts = []
         for event in events:
             int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')
-            #contract_address = Web3.toChecksumAddress('{:#042x}'.format(int_contract_address))
             contract_address = '{:#042x}'.format(int_contract_address).lower()
             if contract_address != NULL_ADDRESS:
                 if event['blockNumber'] == 0:
