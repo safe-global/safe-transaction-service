@@ -70,7 +70,7 @@ class TestTransactionService(TestCase):
         queryset = transaction_service.get_all_tx_hashes(safe_address, trusted=True, queued=False)
         self.assertEqual(queryset.count(), 3)
 
-    def test_get_all_tx_hashes_nonce(self):
+    def test_get_all_tx_hashes_queued(self):
         transaction_service: TransactionService = TransactionServiceProvider()
         safe_address = Account.create().address
 
@@ -78,10 +78,22 @@ class TestTransactionService(TestCase):
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 0)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=False).count(), 2)
 
         # Mine tx with higher nonce, all should appear
         MultisigTransactionFactory(safe=safe_address)
         self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 3)
+
+    def test_get_all_tx_nonce_sorting(self):
+        transaction_service: TransactionService = TransactionServiceProvider()
+        safe_address = Account.create().address
+        # Test edge case of 2 multisig transactions inside the same ethereum transaction
+        m_1 = MultisigTransactionFactory(safe=safe_address, trusted=True, nonce=1)
+        MultisigTransactionFactory(safe=safe_address, trusted=True, ethereum_tx=m_1.ethereum_tx, nonce=0)
+        tx_hashes = list(transaction_service.get_all_tx_hashes(safe_address).values_list('safe_tx_hash', flat=True))
+        transactions = transaction_service.get_all_txs_from_hashes(safe_address, tx_hashes)
+        self.assertEqual(transactions[0].nonce, 1)
+        self.assertEqual(transactions[1].nonce, 0)
 
     def test_get_all_txs_from_hashes(self):
         transaction_service: TransactionService = TransactionServiceProvider()

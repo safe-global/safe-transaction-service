@@ -2,9 +2,10 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Union
 
-from django.db.models import Case, F, OuterRef, QuerySet, Subquery, When
+from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.django.models import Uint256Field
 
 from safe_transaction_service.tokens.models import Token
 
@@ -75,8 +76,9 @@ class TransactionService:
         ).annotate(
             execution_date=case,
             block=F('ethereum_tx__block_id'),
+            safe_nonce=F('nonce'),
         ).values('safe_tx_hash', 'execution_date',
-                 'block', 'created')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
+                 'created', 'block', 'safe_nonce')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
         # Block is needed to get stable ordering
 
         if not queued:  # Filter out txs with nonce >= Safe nonce
@@ -94,7 +96,8 @@ class TransactionService:
         ).annotate(
             execution_date=F('internal_tx__ethereum_tx__block__timestamp'),
             block=F('internal_tx__ethereum_tx__block_id'),
-        ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'block', 'created')
+            safe_nonce=Value(0, output_field=Uint256Field()),
+        ).distinct().values('internal_tx__ethereum_tx_id', 'execution_date', 'created', 'block', 'safe_nonce')
 
         multisig_hashes = MultisigTransaction.objects.filter(safe=safe_address
                                                              ).exclude(ethereum_tx=None).values('ethereum_tx_id')
@@ -110,7 +113,8 @@ class TransactionService:
             execution_date=F('ethereum_tx__block__timestamp'),
             created=F('ethereum_tx__block__timestamp'),
             block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block', 'created')
+            safe_nonce=Value(0, output_field=Uint256Field()),
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'created', 'block', 'safe_nonce')
 
         # Get incoming txs not included on Multisig or Module txs
         internal_tx_ids = InternalTx.objects.filter(
@@ -123,7 +127,8 @@ class TransactionService:
             execution_date=F('ethereum_tx__block__timestamp'),
             created=F('ethereum_tx__block__timestamp'),
             block=F('ethereum_tx__block_id'),
-        ).distinct().values('ethereum_tx_id', 'execution_date', 'block', 'created')
+            safe_nonce=Value(0, output_field=Uint256Field()),
+        ).distinct().values('ethereum_tx_id', 'execution_date', 'created', 'block', 'safe_nonce')
 
         # Tricky, we merge SafeTx hashes with EthereumTx hashes
         queryset = multisig_safe_tx_ids.distinct().union(
@@ -132,7 +137,7 @@ class TransactionService:
             internal_tx_ids
         ).union(
             module_tx_ids
-        ).order_by('-execution_date', 'block', '-created')
+        ).order_by('safe_nonce', '-execution_date', 'block', '-created')
         # Order by block because `block_number < NULL`, so txs mined will have preference,
         # and `created` to get always the same ordering with not executed transactions, as they will share
         # the same `execution_date` that the mined tx
