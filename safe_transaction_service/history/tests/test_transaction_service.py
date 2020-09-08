@@ -90,7 +90,10 @@ class TestTransactionService(TestCase):
         # Test edge case of 2 multisig transactions inside the same ethereum transaction
         m_1 = MultisigTransactionFactory(safe=safe_address, trusted=True, nonce=1)
         MultisigTransactionFactory(safe=safe_address, trusted=True, ethereum_tx=m_1.ethereum_tx, nonce=0)
-        tx_hashes = list(transaction_service.get_all_tx_hashes(safe_address).values_list('safe_tx_hash', flat=True))
+
+        # Test sorting
+        queryset = transaction_service.get_all_tx_hashes(safe_address)
+        tx_hashes = list([q['safe_tx_hash'] for q in queryset])
         transactions = transaction_service.get_all_txs_from_hashes(safe_address, tx_hashes)
         self.assertEqual(transactions[0].nonce, 1)
         self.assertEqual(transactions[1].nonce, 0)
@@ -111,9 +114,10 @@ class TestTransactionService(TestCase):
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
-        all_tx_hashes = list(transaction_service.get_all_tx_hashes(
+        queryset = transaction_service.get_all_tx_hashes(
             safe_address, queued=False, trusted=False
-        ).values_list('safe_tx_hash', flat=True))
+        )
+        all_tx_hashes = list([q['safe_tx_hash'] for q in queryset])
 
         all_txs = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes)
         self.assertEqual(len(all_txs), 5)
@@ -133,9 +137,10 @@ class TestTransactionService(TestCase):
         internal_tx_in_2 = InternalTxFactory(to=safe_address, value=4,
                                              ethereum_tx=module_transaction.internal_tx.ethereum_tx)
 
-        all_tx_hashes_2 = list(transaction_service.get_all_tx_hashes(
+        queryset_2 = transaction_service.get_all_tx_hashes(
             safe_address, queued=False, trusted=False
-        ).values_list('safe_tx_hash', flat=True))
+        )
+        all_tx_hashes_2 = list([q['safe_tx_hash'] for q in queryset_2])
 
         all_txs_2 = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes_2)
         self.assertEqual(len(all_txs_2), 5)

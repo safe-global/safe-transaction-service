@@ -137,11 +137,10 @@ class TransactionService:
             internal_tx_ids
         ).union(
             module_tx_ids
-        ).order_by('safe_nonce', '-execution_date', 'block', '-created')
+        ).order_by('-execution_date', '-safe_nonce', 'block', '-created')
         # Order by block because `block_number < NULL`, so txs mined will have preference,
         # and `created` to get always the same ordering with not executed transactions, as they will share
         # the same `execution_date` that the mined tx
-
         return queryset
 
     def get_all_txs_from_hashes(self, safe_address: str, hashes_to_search: List[str]) -> List[Union[EthereumTx,
