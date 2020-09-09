@@ -45,6 +45,7 @@ class Erc721InfoWithLogo:
 class Collectible:
     token_name: str
     token_symbol: str
+    logo_uri: str
     address: str
     id: int
     uri: str
@@ -154,7 +155,7 @@ class CollectiblesService:
                                token_address, token_id, exc_info=True)
         name = token_info.name if token_info else ''
         symbol = token_info.symbol if token_info else ''
-        return Collectible(name, symbol, token_address, token_id, token_metadata_uri)
+        return Collectible(name, symbol, token_info.logo_uri, token_address, token_id, token_metadata_uri)
 
     def get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
         if tld := self.ENS_CONTRACTS_WITH_TLD.get(collectible.address):  # Special case for ENS
@@ -232,7 +233,7 @@ class CollectiblesService:
                                f'for token-address={collectible.address}')
 
             collectibles_with_metadata.append(
-                CollectibleWithMetadata(collectible.token_name, collectible.token_symbol,
+                CollectibleWithMetadata(collectible.token_name, collectible.token_symbol, collectible.logo_uri,
                                         collectible.address, collectible.id, collectible.uri, metadata)
             )
         return collectibles_with_metadata

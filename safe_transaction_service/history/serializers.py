@@ -367,6 +367,7 @@ class SafeCollectibleResponseSerializer(serializers.Serializer):
     address = serializers.CharField()
     token_name = serializers.CharField()
     token_symbol = serializers.CharField()
+    logo_uri = serializers.CharField()
     id = serializers.CharField()
     uri = serializers.CharField()
     name = serializers.CharField()

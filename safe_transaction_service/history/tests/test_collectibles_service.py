@@ -32,7 +32,9 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
         safe_address = '0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7'
         ens_address = '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85'
+        ens_logo_uri = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
         dappcon_2020_address = '0x202d2f33449Bf46d6d32Ae7644aDA130876461a4'
+        dappcon_logo_uri = Token(address=dappcon_2020_address, name='', symbol='').get_full_logo_uri()
         self.assertEqual(collectibles_service.get_collectibles(safe_address), [])
 
         erc721_addresses = [(dappcon_2020_address, 13),
@@ -44,26 +46,31 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
         expected = [Collectible(token_name='Ethereum Name Service',
                                 token_symbol='ENS',
+                                logo_uri=ens_logo_uri,
                                 address=ens_address,
                                 id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
                                 uri=None),
                     Collectible(token_name='DappCon2020',
                                 token_symbol='D20',
+                                logo_uri=dappcon_logo_uri,
                                 address=dappcon_2020_address,
                                 id=13,
                                 uri='https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l')]
         collectibles = collectibles_service.get_collectibles(safe_address)
+        print(collectibles)
         self.assertEqual(len(collectibles), len(expected))
         self.assertEqual(collectibles, expected)
 
         expected = [CollectibleWithMetadata(token_name='Ethereum Name Service',
                                             token_symbol='ENS',
+                                            logo_uri=ens_logo_uri,
                                             address=ens_address,
                                             id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
                                             uri=None,
-                                            metadata={'name': 'safe-multisig.eth', 'description': '.eth ENS Domain', 'image': 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'}),
+                                            metadata={'name': 'safe-multisig.eth','description': '.eth ENS Domain', 'image': 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'}),
                     CollectibleWithMetadata(token_name='DappCon2020',
                                             token_symbol='D20',
+                                            logo_uri=dappcon_logo_uri,
                                             address=dappcon_2020_address,
                                             id=13,
                                             uri='https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l',

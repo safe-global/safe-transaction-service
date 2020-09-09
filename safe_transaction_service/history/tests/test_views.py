@@ -651,6 +651,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             token_name = 'TokenName'
             token_symbol = 'SYMBOL'
             token_address = Account.create().address
+            logo_uri = f'http://token.org/{token_address}.png'
             token_id = 54
             token_uri = f'http://token.org/token-id/{token_id}'
             image = 'http://token.org/token-id/1/image'
@@ -658,6 +659,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             description = 'Test token description'
             function.return_value = [CollectibleWithMetadata(token_name,
                                                              token_symbol,
+                                                             logo_uri,
                                                              token_address,
                                                              token_id,
                                                              token_uri,
@@ -669,6 +671,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(response.data, [{'address': token_address,
                                               'token_name': token_name,
                                               'token_symbol': token_symbol,
+                                              'logo_uri': logo_uri,
                                               'id': str(token_id),
                                               'uri': token_uri,
                                               'name': name,
