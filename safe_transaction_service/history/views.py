@@ -2,6 +2,7 @@ import hashlib
 from typing import Tuple
 
 from django.conf import settings
+from django.db.models import Count
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -27,6 +28,7 @@ from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
                      SafeContract, SafeContractDelegate, SafeMasterCopy,
                      SafeStatus)
 from .serializers import (MasterCopyResponseSerializer,
+                          MultisigTransactionAnalyticsResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
@@ -251,6 +253,12 @@ class SafeMultisigTransactionListView(ListAPIView):
         else:
             serializer.save()
             return Response(status=status.HTTP_201_CREATED)
+
+
+class SafeMultisigTransactionAnalyticsListView(ListAPIView):
+    serializer_class = MultisigTransactionAnalyticsResponseSerializer
+    queryset = MultisigTransaction.objects.values('origin').annotate(transactions=Count('*')).order_by('-transactions')
+    pagination_class = None
 
 
 class SafeBalanceView(APIView):

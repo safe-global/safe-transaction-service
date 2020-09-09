@@ -512,6 +512,11 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
             return obj.block_id
 
 
+class MultisigTransactionAnalyticsResponseSerializer(serializers.Serializer):
+    origin = serializers.CharField()
+    transactions = serializers.IntegerField()
+
+
 class _AllTransactionsSchemaSerializer(serializers.Serializer):
     """
     Just for the purpose of documenting, don't use it

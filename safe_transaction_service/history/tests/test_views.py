@@ -1169,7 +1169,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:master-copies'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = []
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data, expected)
 
         safe_master_copy = SafeMasterCopyFactory()
         response = self.client.get(reverse('v1:master-copies'))
@@ -1182,6 +1182,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
         self.assertCountEqual(response.data, expected)
+
+    def test_multisig_transactions_analytics_view(self):
+        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        origin = 'Safe Web app'
+        origin_2 = 'Not the safe Web app'
+        MultisigTransactionFactory(origin=origin)
+        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = [
+            {'origin': origin, 'transactions': 1},
+        ]
+        self.assertEqual(response.data, expected)
+
+        for _ in range(3):
+            MultisigTransactionFactory(origin=origin_2)
+
+        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = [
+            {'origin': origin_2, 'transactions': 3},
+            {'origin': origin, 'transactions': 1},
+        ]
+        self.assertEqual(response.data, expected)
+
+        for _ in range(3):
+            MultisigTransactionFactory(origin=origin)
+
+        # Check sorting by the biggest
+        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = [
+            {'origin': origin, 'transactions': 4},
+            {'origin': origin_2, 'transactions': 3},
+        ]
+        self.assertEqual(response.data, expected)
 
     def test_owners_view(self):
         invalid_address = '0x2A'

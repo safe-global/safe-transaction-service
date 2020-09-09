@@ -110,3 +110,29 @@ class ModuleTransactionFilter(filters.FilterSet):
                 'filter_class': EthereumAddressFilter
             }
         }
+
+
+class MultisigTransactionAnalyticsFilter(filters.FilterSet):
+    class Meta:
+        model = MultisigTransaction
+        fields = {
+            'safe': ['exact'],
+            'to': ['exact'],
+            'operation': ['exact'],
+            'failed': ['exact'],
+            'safe_tx_gas': ['lt', 'gt', 'lte', 'gte', 'exact'],
+            'base_gas': ['lt', 'gt', 'lte', 'gte', 'exact'],
+            'gas_price': ['lt', 'gt', 'lte', 'gte', 'exact'],
+            'gas_token': ['exact'],
+            'refund_receiver': ['exact'],
+            'trusted': ['exact'],
+        }
+
+        filter_overrides = {
+            Uint256Field: {
+                'filter_class': django_filters.NumberFilter
+            },
+            EthereumAddressField: {
+                'filter_class': EthereumAddressFilter
+            }
+        }
