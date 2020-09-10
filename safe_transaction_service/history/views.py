@@ -22,6 +22,7 @@ from web3 import Web3
 from safe_transaction_service.version import __version__
 
 from .filters import (DefaultPagination, ModuleTransactionFilter,
+                      MultisigTransactionAnalyticsFilter,
                       MultisigTransactionFilter, SmallPagination,
                       TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
@@ -256,9 +257,11 @@ class SafeMultisigTransactionListView(ListAPIView):
 
 
 class SafeMultisigTransactionAnalyticsListView(ListAPIView):
-    serializer_class = MultisigTransactionAnalyticsResponseSerializer
-    queryset = MultisigTransaction.objects.values('origin').annotate(transactions=Count('*')).order_by('-transactions')
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = MultisigTransactionAnalyticsFilter
     pagination_class = None
+    queryset = MultisigTransaction.objects.values('origin').annotate(transactions=Count('*')).order_by('-transactions')
+    serializer_class = MultisigTransactionAnalyticsResponseSerializer
 
 
 class SafeBalanceView(APIView):

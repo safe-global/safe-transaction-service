@@ -1187,9 +1187,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:multisig-transactions-analytics'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        origin = 'Safe Web app'
-        origin_2 = 'Not the safe Web app'
-        MultisigTransactionFactory(origin=origin)
+        origin = 'Millennium Falcon Navigation Computer'
+        origin_2 = 'HAL 9000'
+        multisig_transaction = MultisigTransactionFactory(origin=origin)
         response = self.client.get(reverse('v1:multisig-transactions-analytics'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -1217,6 +1217,24 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected = [
             {'origin': origin, 'transactions': 4},
             {'origin': origin_2, 'transactions': 3},
+        ]
+        self.assertEqual(response.data, expected)
+
+        # Test filters
+        origin_3 = 'Skynet'
+        safe_address = Account.create().address
+        MultisigTransactionFactory(origin=origin_3, safe=safe_address)
+        response = self.client.get(reverse('v1:multisig-transactions-analytics') + f'?safe={safe_address}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = [
+            {'origin': origin_3, 'transactions': 1},
+        ]
+        self.assertEqual(response.data, expected)
+
+        response = self.client.get(reverse('v1:multisig-transactions-analytics') + f'?to={multisig_transaction.to}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = [
+            {'origin': multisig_transaction.origin, 'transactions': 1},
         ]
         self.assertEqual(response.data, expected)
 
