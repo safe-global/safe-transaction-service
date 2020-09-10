@@ -1,5 +1,6 @@
 import signal
 from typing import Any, Dict, List, NoReturn, Optional
+from urllib.parse import urlparse
 
 from django.conf import settings
 
@@ -230,7 +231,9 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
 
         r = requests.post(webhook.url, json=payload)
         if not r.ok:
-            logger.warning('Error posting to url=%s', webhook.url)
+            parsed_url = urlparse(webhook.url)
+            host = f'{parsed_url.scheme}://{parsed_url.netloc}'
+            logger.warning('Error %d posting to host=%s with content=%s', r.status_code, host, r.content)
 
         sent_requests += 1
     return sent_requests
