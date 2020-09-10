@@ -155,7 +155,8 @@ class CollectiblesService:
                                token_address, token_id, exc_info=True)
         name = token_info.name if token_info else ''
         symbol = token_info.symbol if token_info else ''
-        return Collectible(name, symbol, token_info.logo_uri, token_address, token_id, token_metadata_uri)
+        logo_uri = token_info.logo_uri if token_info else ''
+        return Collectible(name, symbol, logo_uri, token_address, token_id, token_metadata_uri)
 
     def get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
         if tld := self.ENS_CONTRACTS_WITH_TLD.get(collectible.address):  # Special case for ENS
