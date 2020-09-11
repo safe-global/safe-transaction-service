@@ -224,15 +224,15 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
                               WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
             continue
 
+        parsed_url = urlparse(webhook.url)
+        host = f'{parsed_url.scheme}://{parsed_url.netloc}'
         if webhook.address:
-            logger.info('Sending webhook for address=%s url=%s and payload=%s', address, webhook.url, payload)
+            logger.info('Sending webhook for address=%s host=%s and payload=%s', address, host, payload)
         else:  # Generic WebHook
-            logger.info('Sending webhook for url=%s and payload=%s', webhook.url, payload)
+            logger.info('Sending webhook for host=%s and payload=%s', host, payload)
 
         r = requests.post(webhook.url, json=payload)
         if not r.ok:
-            parsed_url = urlparse(webhook.url)
-            host = f'{parsed_url.scheme}://{parsed_url.netloc}'
             logger.warning('Error %d posting to host=%s with content=%s', r.status_code, host, r.content)
 
         sent_requests += 1
