@@ -118,6 +118,7 @@ class MultisigTransactionAnalyticsFilter(filters.FilterSet):
         fields = {
             'safe': ['exact'],
             'to': ['exact'],
+            'value': ['lt', 'gt', 'lte', 'gte', 'exact'],
             'operation': ['exact'],
             'failed': ['exact'],
             'safe_tx_gas': ['lt', 'gt', 'lte', 'gte', 'exact'],
