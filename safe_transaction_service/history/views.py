@@ -264,15 +264,22 @@ class SafeMultisigTransactionAnalyticsListView(ListAPIView):
     serializer_class = MultisigTransactionAnalyticsResponseSerializer
 
 
-class SafeBalanceView(APIView):
-    serializer_class = SafeBalanceResponseSerializer
-
+def swagger_safe_balance_schema(serializer_class):
     _schema_token_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
                                                     default=False,
                                                     description='If `True` just trusted tokens will be returned')
     _schema_token_exclude_spam_param = openapi.Parameter('exclude_spam', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN,
                                                          default=False,
                                                          description='If `True` spam tokens will not be returned')
+    return swagger_auto_schema(responses={200: serializer_class(many=True),
+                                          404: 'Safe not found',
+                                          422: 'Safe address checksum not valid'},
+                               manual_parameters=[_schema_token_trusted_param,
+                                                  _schema_token_exclude_spam_param])
+
+
+class SafeBalanceView(APIView):
+    serializer_class = SafeBalanceResponseSerializer
 
     def get_parameters(self) -> Tuple[bool, bool]:
         """
@@ -286,14 +293,12 @@ class SafeBalanceView(APIView):
     def get_result(self, *args, **kwargs):
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
-    @swagger_auto_schema(responses={200: serializer_class(many=True),
-                                    404: 'Safe not found',
-                                    422: 'Safe address checksum not valid'},
-                         manual_parameters=[_schema_token_trusted_param, _schema_token_exclude_spam_param])
+
+    @swagger_safe_balance_schema(serializer_class)
     @method_decorator(cache_page(15))
     def get(self, request, address):
         """
-        Get status of the safe
+        Get balance for Ether and ERC20 tokens
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -318,12 +323,28 @@ class SafeBalanceUsdView(SafeBalanceView):
     def get_result(self, *args, **kwargs):
         return BalanceServiceProvider().get_usd_balances(*args, **kwargs)
 
+    @swagger_safe_balance_schema(serializer_class)
+    @method_decorator(cache_page(15))
+    def get(self, *args, **kwargs):
+        """
+        Get balance for Ether and ERC20 tokens with USD fiat conversion
+        """
+        return super().get(*args, **kwargs)
+
 
 class SafeCollectiblesView(SafeBalanceView):
     serializer_class = SafeCollectibleResponseSerializer
 
     def get_result(self, *args, **kwargs):
         return CollectiblesServiceProvider().get_collectibles_with_metadata(*args, **kwargs)
+
+    @swagger_safe_balance_schema(serializer_class)
+    @method_decorator(cache_page(15))
+    def get(self, *args, **kwargs):
+        """
+        Get collectibles (ERC721 tokens) and information about them
+        """
+        return super().get(*args, **kwargs)
 
 
 class SafeDelegateListView(ListCreateAPIView):
