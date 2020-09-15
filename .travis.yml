@@ -12,7 +12,7 @@ env:
   - DATABASE_URL=psql://postgres@localhost/travisci
   - ETHEREUM_NODE_URL=http://localhost:8545
 addons:
-  postgresql: "9.6"
+  postgresql: "10"
 services:
   - docker
   - postgresql
