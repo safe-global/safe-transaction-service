@@ -10,7 +10,8 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import InvalidERC20Info
-from gnosis.eth.oracles import KyberOracle, OracleException, UniswapOracle
+from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
+                                UniswapV2Oracle)
 
 from safe_transaction_service.tokens.models import Token
 
@@ -76,6 +77,7 @@ class BalanceService:
                  uniswap_factory_address: str, kyber_network_proxy_address: str):
         self.ethereum_client = ethereum_client
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
+        self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.cache_eth_usd_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
@@ -183,15 +185,18 @@ class BalanceService:
         try:
             return self.kyber_oracle.get_price(token_address)
         except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s from Kyber, trying Uniswap', token_address)
+            logger.warning('Cannot get eth value for token-address=%s from Kyber, trying Uniswap V2', token_address)
+
+        try:
+            return self.uniswap_v2_oracle.get_price(token_address)
+        except OracleException:
+            logger.warning('Cannot get eth value for token-address=%s on Uniswap V2, trying Uniswap', token_address)
 
         try:
             return self.uniswap_oracle.get_price(token_address)
         except OracleException:
             logger.warning('Cannot get eth value for token-address=%s on Uniswap', token_address)
             return 0.
-
-        return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
