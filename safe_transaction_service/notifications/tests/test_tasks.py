@@ -50,4 +50,4 @@ class TestViews(TestCase):
         multisig_transaction.save()
         pending_transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)
         self.assertNotEqual(multisig_transaction, pending_transaction_notification)
-        self.assertFalse(filter_notification(pending_transaction_notification ))
+        self.assertFalse(filter_notification(pending_transaction_notification))

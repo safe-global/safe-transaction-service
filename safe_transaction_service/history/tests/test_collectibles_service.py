@@ -67,7 +67,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                                             address=ens_address,
                                             id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
                                             uri=None,
-                                            metadata={'name': 'safe-multisig.eth','description': '.eth ENS Domain', 'image': 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'}),
+                                            metadata={'name': 'safe-multisig.eth', 'description': '.eth ENS Domain', 'image': 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'}),
                     CollectibleWithMetadata(token_name='DappCon2020',
                                             token_symbol='D20',
                                             logo_uri=dappcon_logo_uri,

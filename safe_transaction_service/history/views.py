@@ -293,7 +293,6 @@ class SafeBalanceView(APIView):
     def get_result(self, *args, **kwargs):
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
-
     @swagger_safe_balance_schema(serializer_class)
     @method_decorator(cache_page(15))
     def get(self, request, address):
