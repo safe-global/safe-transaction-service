@@ -90,13 +90,23 @@ class BalanceService:
         :param exclude_spam:
         :return: ERC20 tokens filtered by spam or trusted
         """
-        if only_trusted or exclude_spam:
-            base_queryset = Token.objects.filter(address__in=erc20_addresses)
-            if only_trusted:
-                erc20_addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
-            elif exclude_spam:
-                erc20_addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
-        return list(erc20_addresses)
+        base_queryset = Token.objects.filter(
+            address__in=erc20_addresses
+        ).values_list(
+            'address', flat=True
+        ).order_by('name')
+        if only_trusted:
+            addresses = list(base_queryset.filter(trusted=True))
+        elif exclude_spam:
+            addresses = list(base_queryset.filter(spam=False))
+        else:
+            addresses = list(base_queryset)
+            # Add missing tokens not on database
+            for erc20_address in erc20_addresses:
+                if erc20_address not in addresses:
+                    addresses.append(erc20_address)
+
+        return addresses
 
     def get_balances(self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
         """

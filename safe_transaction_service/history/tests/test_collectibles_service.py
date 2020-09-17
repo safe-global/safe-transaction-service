@@ -57,7 +57,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                                 id=13,
                                 uri='https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l')]
         collectibles = collectibles_service.get_collectibles(safe_address)
-        print(collectibles)
         self.assertEqual(len(collectibles), len(expected))
         self.assertEqual(collectibles, expected)
 
