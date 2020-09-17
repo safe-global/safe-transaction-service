@@ -7,9 +7,10 @@ from django.test import TestCase
 from eth_account import Account
 
 from gnosis.eth import EthereumClient
-from gnosis.eth.ethereum_client import Erc20Info
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from gnosis.eth.tests.utils import deploy_erc20
 
+from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
@@ -82,14 +83,10 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.symbol, token_db.symbol)
         self.assertEqual(token_info.decimals, token_db.decimals)
 
-    @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
-                              get_token_info_mock: MagicMock):
+    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         balance_service = BalanceServiceProvider()
-        erc20_info = Erc20Info('UXIO', 'UXI', 18)
-        get_token_info_mock.return_value = erc20_info
 
         safe_address = Account.create().address
         SafeContractFactory(address=safe_address)
@@ -102,16 +99,17 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(balances[0].balance, value)
 
         tokens_value = int(12 * 1e18)
-        erc20 = self.deploy_example_erc20(tokens_value, safe_address)
+        erc20 = deploy_erc20(self.w3, 'Eurodollar', 'EUD', safe_address, tokens_value)
         balances = balance_service.get_usd_balances(safe_address)
         self.assertEqual(len(balances), 1)
 
         EthereumEventFactory(address=erc20.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
+        token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(balances, [
             BalanceWithUsd(None, None, value, 0.0, 123.4),
             BalanceWithUsd(
-                erc20.address, erc20_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             )
         ])
@@ -121,12 +119,38 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
             BalanceWithUsd(None, None, value, 0.0, 123.4),
         ])
 
-        TokenFactory(address=erc20.address, trusted=True, spam=False)
+        Token.objects.filter(address=erc20.address).update(trusted=True, spam=False)
         balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
             BalanceWithUsd(None, None, value, 0.0, 123.4),
             BalanceWithUsd(
-                erc20.address, erc20_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             )
+        ])
+
+        # Test sorting
+        erc20_2 = deploy_erc20(self.w3, 'Peseta', 'PTA', safe_address, tokens_value)
+        token_info_2 = balance_service.get_token_info(erc20_2.address)
+        erc20_3 = deploy_erc20(self.w3, 'Double Dollars', 'DD', safe_address, tokens_value)
+        token_info_3 = balance_service.get_token_info(erc20_3.address)
+
+        EthereumEventFactory(address=erc20_2.address, to=safe_address)
+        EthereumEventFactory(address=erc20_3.address, to=safe_address)
+        balances = balance_service.get_usd_balances(safe_address)
+        token_info = balance_service.get_token_info(erc20.address)
+        self.assertCountEqual(balances, [
+            BalanceWithUsd(None, None, value, 0.0, 123.4),
+            BalanceWithUsd(
+                erc20_3.address, token_info_3, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            ),
+            BalanceWithUsd(
+                erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            ),
+            BalanceWithUsd(
+                erc20_2.address, token_info_2, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                round(123.4 * 0.4, 4)
+            ),
         ])
