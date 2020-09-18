@@ -23,7 +23,8 @@ class TestCommands(TestCase):
         self.assertEqual(PeriodicTask.objects.count(), 0)
 
         call_command(command, stdout=buf)
-        self.assertIn(f'Setting up {ethereum_network.name} addresses', buf.getvalue())
+        self.assertIn(f'Setting up {ethereum_network.name} safe addresses', buf.getvalue())
+        self.assertIn(f'Setting up {ethereum_network.name} proxy factory addresses', buf.getvalue())
         self.assertIn('Created Periodic Task', buf.getvalue())
         self.assertNotIn('was already created', buf.getvalue())
         self.assertGreater(SafeMasterCopy.objects.count(), 0)
@@ -44,7 +45,8 @@ class TestCommands(TestCase):
 
         buf = StringIO()
         call_command(command, stdout=buf)
-        self.assertIn(f'Setting up {ethereum_network.name} addresses', buf.getvalue())
+        self.assertIn(f'Setting up {ethereum_network.name} safe addresses', buf.getvalue())
+        self.assertIn(f'Setting up {ethereum_network.name} proxy factory addresses', buf.getvalue())
         self.assertNotIn('Created Periodic Task', buf.getvalue())
         self.assertIn('was already created', buf.getvalue())
 
