@@ -24,7 +24,9 @@ from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_core)
 from .decoder_abis.balancer import balancer_bactions, balancer_exchange_proxy
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
-from .decoder_abis.gnosis_protocol import gnosis_protocol_abi
+from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
+                                           fleet_factory_deterministic_abi,
+                                           gnosis_protocol_abi)
 from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.open_zeppelin import (
     open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)
@@ -215,11 +217,14 @@ class TxDecoder(SafeTxDecoder):
         sablier_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in sablier_abis]
 
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
-                     get_kyber_network_proxy_contract(self.dummy_w3),
-                     self.dummy_w3.eth.contract(abi=gnosis_protocol_abi)]
+                     get_kyber_network_proxy_contract(self.dummy_w3)]
+
         sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
                                                                            market_maker_abi,
                                                                            market_maker_factory_abi)]
+        gnosis_protocol = [self.dummy_w3.eth.contract(abi=abi) for abi in (gnosis_protocol_abi,
+                                                                           fleet_factory_deterministic_abi,
+                                                                           fleet_factory_abi)]
         erc_contracts = [get_erc721_contract(self.dummy_w3),
                          get_erc20_contract(self.dummy_w3)]
 
@@ -229,7 +234,7 @@ class TxDecoder(SafeTxDecoder):
         # will take preference
         self.supported_contracts = (aave_contracts + balancer_contracts + idle_contracts + open_zeppelin_contracts
                                     + request_contracts + sablier_contracts + compound_contracts + exchanges
-                                    + sight_contracts + erc_contracts
+                                    + sight_contracts + gnosis_protocol + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
