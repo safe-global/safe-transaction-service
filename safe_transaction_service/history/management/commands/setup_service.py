@@ -57,9 +57,9 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
 
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     EthereumNetwork.MAINNET: [
-        ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 9084508),
-        ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 8915731),
-        ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 7450116),
+        ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 9084508),  # v1.1.1
+        ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 8915731),  # v1.1.0
+        ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 7450116),  # v1.0.0
     ],
     EthereumNetwork.RINKEBY: [
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 5590757),
