@@ -532,7 +532,7 @@ class OwnersView(APIView):
                                     422: 'Owner address checksum not valid'})
     def get(self, request, address, *args, **kwargs):
         """
-        Get status of the safe
+        Return Safes where the address provided is an owner
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
