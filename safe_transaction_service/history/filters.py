@@ -27,8 +27,6 @@ class TransferListFilter(filters.FilterSet):
     execution_date__lte = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='lte')
     execution_date__gt = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='gt')
     execution_date__lt = django_filters.IsoDateTimeFilter(field_name='execution_date', lookup_expr='lt')
-    nonce__gt = django_filters.NumberFilter(lookup_expr='gt')
-    nonce__lt = django_filters.NumberFilter(lookup_expr='lt')
     to = django_filters.CharFilter()
     token_address = django_filters.CharFilter()
     transaction_hash = django_filters.CharFilter(field_name='transaction_hash')
