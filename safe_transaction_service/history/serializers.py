@@ -46,10 +46,17 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
         ethereum_client = EthereumClientProvider()
         safe = Safe(data['safe'], ethereum_client)
+        try:
+            safe_version = safe.retrieve_version()
+        except BadFunctionCallOutput as e:
+            raise ValidationError('Could not get Safe version from blockchain, check contract') from e
+
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
                                          data['safe_tx_gas'], data['base_gas'], data['gas_price'],
                                          data['gas_token'],
-                                         data['refund_receiver'], safe_nonce=data['nonce'])
+                                         data['refund_receiver'],
+                                         safe_nonce=data['nonce'],
+                                         safe_version=safe_version)
         contract_transaction_hash = safe_tx.safe_tx_hash
 
         # Check safe tx hash matches
