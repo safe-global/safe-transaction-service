@@ -9,6 +9,40 @@ from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ...models import ProxyFactory, SafeMasterCopy
 
+
+class CeleryTaskConfiguration(NamedTuple):
+    name: str
+    description: str
+    interval: int
+    period: str
+
+    def create_task(self) -> Tuple[PeriodicTask, bool]:
+        interval, _ = IntervalSchedule.objects.get_or_create(every=self.interval, period=self.period)
+        periodic_task, created = PeriodicTask.objects.get_or_create(task=self.name,
+                                                                    defaults={
+                                                                        'name': self.description,
+                                                                        'interval': interval
+                                                                    })
+        if periodic_task.interval != interval:
+            periodic_task.interval = interval
+            periodic_task.save(update_fields=['interval'])
+
+        return periodic_task, created
+
+
+TASKS = [
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
+                                'Index Internal Txs', 13, IntervalSchedule.SECONDS),
+        # CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
+        #                        'Index new Proxies', 15, IntervalSchedule.SECONDS),
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
+                                'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
+                                'Process Internal Txs', 2, IntervalSchedule.MINUTES),
+        CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
+                                'Check Reorgs', 3, IntervalSchedule.MINUTES),
+    ]
+
 MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
     EthereumNetwork.MAINNET: [
         ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10329734, '1.2.0'),
@@ -88,43 +122,11 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
 }
 
 
-class CeleryTaskConfiguration(NamedTuple):
-    name: str
-    description: str
-    interval: int
-    period: str
-
-    def create_task(self) -> Tuple[PeriodicTask, bool]:
-        interval, _ = IntervalSchedule.objects.get_or_create(every=self.interval, period=self.period)
-        periodic_task, created = PeriodicTask.objects.get_or_create(task=self.name,
-                                                                    defaults={
-                                                                        'name': self.description,
-                                                                        'interval': interval
-                                                                    })
-        if periodic_task.interval != interval:
-            periodic_task.interval = interval
-            periodic_task.save(update_fields=['interval'])
-
-        return periodic_task, created
-
-
 class Command(BaseCommand):
     help = 'Setup Transaction Service Required Tasks'
-    tasks = [
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
-                                'Index Internal Txs', 13, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
-                                'Index new Proxies', 15, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
-                                'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
-                                'Process Internal Txs', 2, IntervalSchedule.MINUTES),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
-                                'Check Reorgs', 3, IntervalSchedule.MINUTES),
-    ]
 
     def handle(self, *args, **options):
-        for task in self.tasks:
+        for task in TASKS:
             _, created = task.create_task()
             if created:
                 self.stdout.write(self.style.SUCCESS('Created Periodic Task %s' % task.name))
