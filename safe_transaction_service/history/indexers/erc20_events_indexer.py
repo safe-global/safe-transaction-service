@@ -1,8 +1,13 @@
+import operator
 from collections import OrderedDict
 from logging import getLogger
 from typing import Any, Dict, Iterable, List, Optional
 
+from cache_memoize import cache_memoize
+from cachetools import cachedmethod
+from eth_abi.exceptions import InsufficientDataBytes
 from requests import RequestException
+from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient
 
@@ -30,12 +35,13 @@ class Erc20EventsIndexer(EthereumIndexer):
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
 
-    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 10000,
-                 updated_blocks_behind: int = 300, query_chunk_size: int = 500):
+    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 1000,
+                 updated_blocks_behind: int = 100000000, query_chunk_size: int = 1000000):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
                          updated_blocks_behind=updated_blocks_behind,
                          query_chunk_size=query_chunk_size)
+        self.cache_is_erc20 = {}
 
     @property
     def database_model(self):
@@ -56,21 +62,45 @@ class Erc20EventsIndexer(EthereumIndexer):
         :param current_block_number: Current block number (for cache purposes)
         :return: Tx hashes of txs with relevant erc20 transfer events for the `addresses`
         """
+        addresses_set = set(addresses)  # Linear time `in` filtering
+        addresses_len = len(addresses_set)
         logger.info('Searching for erc20 txs from block-number=%d to block-number=%d - Number of Safes=%d',
-                    from_block_number, to_block_number, len(addresses))
+                    from_block_number, to_block_number, addresses_len)
 
-        # It will get erc721 events, as `topic` is the same
+        # It will get ERC20/721 events for EVERY address and we will filter afterwards, due to some Transfer
+        # events not having `from` or `to` as topics, so we cannot query them
         try:
-            erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(addresses,
-                                                                                          from_block=from_block_number,
+            erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(from_block=from_block_number,
                                                                                           to_block=to_block_number)
         except RequestException as e:
             raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
 
-        logger.info('Found %d relevant erc20 txs between block-number=%d and block-number=%d. Number of Safes=%d',
-                    len(erc20_transfer_events), from_block_number, to_block_number, len(addresses))
+        logger.info('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
+                    len(erc20_transfer_events), from_block_number, to_block_number, addresses_len)
 
-        return erc20_transfer_events
+        filtered_events = []
+        for event in erc20_transfer_events:
+            event_args = event.get('args')
+            if event_args and (event_args.get('from') in addresses_set or event_args.get('to') in addresses_set):
+                if 'unknown' in event_args:  # Not standard event, trying to tell apart ERC20 from ERC721
+                    value = event_args['unknown']
+                    del event_args['unknown']
+                    if self.is_erc20(event['address']):
+                        event_args['value'] = value
+                    else:
+                        event_args['tokenId'] = value
+                filtered_events.append(event)
+
+        return filtered_events
+
+    @cachedmethod(cache=operator.attrgetter('cache_is_erc20'))
+    @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day
+    def is_erc20(self, token_address: str) -> bool:
+        try:
+            decimals = self.ethereum_client.erc20.get_decimals(token_address)
+            return decimals >= 0
+        except (ValueError, BadFunctionCallOutput, InsufficientDataBytes):
+            return False
 
     def process_elements(self, events: Iterable[Dict[str, Any]]) -> List[EthereumEvent]:
         """

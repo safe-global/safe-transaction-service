@@ -1,7 +1,7 @@
 import time
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Any, Collection, Iterable, List, Optional, Tuple
+from typing import Any, Collection, Iterable, List, Optional, Sequence, Tuple
 
 from django.db.models import Min
 
@@ -73,7 +73,7 @@ class EthereumIndexer(ABC):
         return MonitoredAddress
 
     @abstractmethod
-    def find_relevant_elements(self, addresses: List[str], from_block_number: int,
+    def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
                                to_block_number: int,
                                current_block_number: Optional[int] = None) -> Collection[Any]:
         """
@@ -94,7 +94,7 @@ class EthereumIndexer(ABC):
         """
         raise NotImplementedError
 
-    def process_elements(self, elements: Iterable[Any]) -> Iterable[Any]:
+    def process_elements(self, elements: Sequence[Any]) -> Iterable[Any]:
         processed_objects = []
         for i, element in enumerate(elements):
             logger.info('Processing element %d/%d', i + 1, len(list(elements)))
@@ -120,7 +120,7 @@ class EthereumIndexer(ABC):
         """
         return self.database_model.objects.not_updated(self.database_field, current_block_number, self.confirmations)
 
-    def update_monitored_address(self, addresses: List[str], from_block_number: int, to_block_number: int) -> int:
+    def update_monitored_address(self, addresses: Sequence[str], from_block_number: int, to_block_number: int) -> int:
         """
         :param addresses: Addresses to have the block number updated
         :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
@@ -136,7 +136,7 @@ class EthereumIndexer(ABC):
 
         return updated_addresses
 
-    def get_block_numbers_for_search(self, addresses: List[str],
+    def get_block_numbers_for_search(self, addresses: Sequence[str],
                                      current_block_number: Optional[int] = None) -> Optional[Tuple[int, int]]:
         """
         :param addresses:
@@ -167,7 +167,7 @@ class EthereumIndexer(ABC):
 
         return from_block_number, to_block_number
 
-    def process_addresses(self, addresses: List[str],
+    def process_addresses(self, addresses: Sequence[str],
                           current_block_number: Optional[int] = None) -> Tuple[List[Any], bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
