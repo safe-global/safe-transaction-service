@@ -794,7 +794,7 @@ class MultisigConfirmation(TimeStampedModel):
                                               db_index=True)  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressField()
 
-    signature = HexField(null=True, default=None, max_length=500)
+    signature = HexField(null=True, default=None, max_length=2000)
     signature_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in SafeSignatureType],
                                                       db_index=True)
 
