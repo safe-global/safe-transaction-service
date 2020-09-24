@@ -64,7 +64,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         """
         addresses_set = set(addresses)  # Linear time `in` filtering
         addresses_len = len(addresses_set)
-        logger.info('Searching for erc20 txs from block-number=%d to block-number=%d - Number of Safes=%d',
+        logger.info('Searching for erc20/721 events from block-number=%d to block-number=%d - Number of Safes=%d',
                     from_block_number, to_block_number, addresses_len)
 
         # It will get ERC20/721 events for EVERY address and we will filter afterwards, due to some Transfer
