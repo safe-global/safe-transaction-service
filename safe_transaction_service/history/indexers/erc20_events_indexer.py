@@ -82,20 +82,29 @@ class Erc20EventsIndexer(EthereumIndexer):
         for event in erc20_transfer_events:
             event_args = event.get('args')
             if event_args and (event_args.get('from') in addresses_set or event_args.get('to') in addresses_set):
-                if 'unknown' in event_args:  # Not standard event, trying to tell apart ERC20 from ERC721
-                    value = event_args['unknown']
-                    del event_args['unknown']
-                    if self.is_erc20(event['address']):
-                        event_args['value'] = value
-                    else:
-                        event_args['tokenId'] = value
-                filtered_events.append(event)
+                filtered_events.append(self._transform_transfer_event(event))
 
         return filtered_events
 
+    def _transform_transfer_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        :param event: Be careful, it will be modified instead of copied
+        :return: The same event if it's a ERC20/ERC721. Tries to tell apart if it's not defined (`unknown` instead
+        of `value` or `tokenId`)
+        """
+        event_args = event['args']
+        if 'unknown' in event_args:  # Not standard event, trying to tell apart ERC20 from ERC721
+            value = event_args['unknown']
+            del event_args['unknown']
+            if self._is_erc20(event['address']):
+                event_args['value'] = value
+            else:
+                event_args['tokenId'] = value
+        return event
+
     @cachedmethod(cache=operator.attrgetter('cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day
-    def is_erc20(self, token_address: str) -> bool:
+    def _is_erc20(self, token_address: str) -> bool:
         try:
             decimals = self.ethereum_client.erc20.get_decimals(token_address)
             return decimals >= 0
