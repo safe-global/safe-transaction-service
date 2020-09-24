@@ -117,7 +117,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         :param events: Events to store in database
         :return: List of `EthereumEvent` already stored in database
         """
-        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in events]).keys()
+        tx_hashes = list(OrderedDict.fromkeys([event['transactionHash'] for event in events]))
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)  # noqa: F841
         ethereum_events = [EthereumEvent.objects.from_decoded_event(event) for event in events]
         return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)

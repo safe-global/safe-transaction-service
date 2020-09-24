@@ -1,7 +1,7 @@
 import time
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Any, Collection, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 from django.db.models import Min
 
@@ -75,7 +75,7 @@ class EthereumIndexer(ABC):
     @abstractmethod
     def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
                                to_block_number: int,
-                               current_block_number: Optional[int] = None) -> Collection[Any]:
+                               current_block_number: Optional[int] = None) -> Sequence[Any]:
         """
         Find blockchain relevant elements for the `addresses`
         :param addresses:
@@ -94,7 +94,7 @@ class EthereumIndexer(ABC):
         """
         raise NotImplementedError
 
-    def process_elements(self, elements: Sequence[Any]) -> Iterable[Any]:
+    def process_elements(self, elements: Sequence[Any]) -> Sequence[Any]:
         processed_objects = []
         for i, element in enumerate(elements):
             logger.info('Processing element %d/%d', i + 1, len(list(elements)))
@@ -137,7 +137,7 @@ class EthereumIndexer(ABC):
         return updated_addresses
 
     def get_block_numbers_for_search(self, addresses: Sequence[str],
-                                     current_block_number: Optional[int] = None) -> Optional[Tuple[int, int]]:
+                                     current_block_number: Optional[int] = None) -> Optional[Sequence[Tuple[int, int]]]:
         """
         :param addresses:
         :param current_block_number: To prevent fetching it again
@@ -168,7 +168,7 @@ class EthereumIndexer(ABC):
         return from_block_number, to_block_number
 
     def process_addresses(self, addresses: Sequence[str],
-                          current_block_number: Optional[int] = None) -> Tuple[List[Any], bool]:
+                          current_block_number: Optional[int] = None) -> Tuple[Sequence[Any], bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
         :param addresses: Addresses to process
@@ -249,5 +249,5 @@ class EthereumIndexer(ABC):
             updated = False
             while not updated:
                 processed_elements, updated = self.process_addresses([monitored_contract.address], current_block_number)
-            number_processed_elements += len(processed_elements)
+                number_processed_elements += len(processed_elements)
         return number_processed_elements

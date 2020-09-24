@@ -1,5 +1,5 @@
 import logging
-from typing import List, NoReturn, OrderedDict, Union
+from typing import Collection, List, OrderedDict, Union
 
 from django.db import transaction
 
@@ -50,7 +50,7 @@ class IndexService:
 
     def block_get_or_create_from_block_number(self, block_number: int):
         try:
-            return EthereumBlock.get(number=block_number)
+            return EthereumBlock.objects.get(number=block_number)
         except EthereumBlock.DoesNotExist:
             current_block_number = self.ethereum_client.current_block_number  # For reorgs
             block = self.ethereum_client.get_block(block_number)
@@ -72,7 +72,7 @@ class IndexService:
             tx = self.ethereum_client.get_transaction(tx_hash)
             return EthereumTx.objects.create_from_tx_dict(tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block)
 
-    def txs_create_or_update_from_tx_hashes(self, tx_hashes: List[Union[str, bytes]]) -> List['EthereumTx']:
+    def txs_create_or_update_from_tx_hashes(self, tx_hashes: Collection[Union[str, bytes]]) -> List['EthereumTx']:
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys([HexBytes(tx_hash).hex() for tx_hash in tx_hashes])
         db_ethereum_txs = EthereumTx.objects.filter(tx_hash__in=tx_hashes).exclude(block=None)
@@ -143,7 +143,7 @@ class IndexService:
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
-    def reindex_addresses(self, addresses: List[str]) -> NoReturn:
+    def reindex_addresses(self, addresses: List[str]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
         every `InternalTxDecoded` not processed to be processed again
@@ -162,7 +162,7 @@ class IndexService:
         InternalTxDecoded.objects.filter(internal_tx___from__in=addresses).update(processed=False)
 
     @transaction.atomic
-    def reindex_all(self) -> NoReturn:
+    def reindex_all(self):
         MultisigConfirmation.objects.filter(signature=None).delete()  # Remove onchain confirmations
         MultisigTransaction.objects.exclude(ethereum_tx=None).delete()  # Remove not indexed transactions
         SafeStatus.objects.all().delete()
