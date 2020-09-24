@@ -75,14 +75,14 @@ class Erc20EventsIndexer(EthereumIndexer):
         except RequestException as e:
             raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
 
-        logger.info('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
-                    len(erc20_transfer_events), from_block_number, to_block_number, addresses_len)
-
         filtered_events = []
         for event in erc20_transfer_events:
             event_args = event.get('args')
             if event_args and (event_args.get('from') in addresses_set or event_args.get('to') in addresses_set):
                 filtered_events.append(self._transform_transfer_event(event))
+
+        logger.info('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
+                    len(filtered_events), from_block_number, to_block_number, addresses_len)
 
         return filtered_events
 
