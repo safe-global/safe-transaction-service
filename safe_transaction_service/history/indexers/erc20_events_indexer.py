@@ -35,12 +35,12 @@ class Erc20EventsIndexer(EthereumIndexer):
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
 
-    def __init__(self, ethereum_client: EthereumClient, block_process_limit: int = 1000,
-                 updated_blocks_behind: int = 100000000, query_chunk_size: int = 1000000):
+    def __init__(self, ethereum_client: EthereumClient,
+                 block_process_limit: int = 1000,  # Better be careful when asking for every `Transfer` on mainnet
+                 *args, **kwargs):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
-                         updated_blocks_behind=updated_blocks_behind,
-                         query_chunk_size=query_chunk_size)
+                         *args, **kwargs)
         self.cache_is_erc20 = {}
 
     @property
@@ -121,3 +121,18 @@ class Erc20EventsIndexer(EthereumIndexer):
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)  # noqa: F841
         ethereum_events = [EthereumEvent.objects.from_decoded_event(event) for event in events]
         return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)
+
+    def start(self) -> int:
+        """
+        Find and process relevant data for existing database addresses
+        :return: Number of elements processed
+        """
+        current_block_number = self.ethereum_client.current_block_number
+        number_processed_elements = 0
+
+        # Process all contracts together (we will be retrieving every `Transfer` on blockchain)
+        addresses = [monitored_contract.address
+                     for monitored_contract in self.get_not_updated_addresses(current_block_number)]
+        processed_elements, _ = self.process_addresses(addresses, current_block_number)
+        number_processed_elements += len(processed_elements)
+        return number_processed_elements
