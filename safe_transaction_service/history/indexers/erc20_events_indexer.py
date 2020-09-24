@@ -133,6 +133,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         # Process all contracts together (we will be retrieving every `Transfer` on blockchain)
         addresses = [monitored_contract.address
                      for monitored_contract in self.get_not_updated_addresses(current_block_number)]
-        processed_elements, _ = self.process_addresses(addresses, current_block_number)
-        number_processed_elements += len(processed_elements)
+        if addresses:
+            processed_elements, _ = self.process_addresses(addresses, current_block_number)
+            number_processed_elements += len(processed_elements)
         return number_processed_elements
