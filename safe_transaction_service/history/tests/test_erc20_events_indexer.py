@@ -1,3 +1,5 @@
+import copy
+
 from django.test import TestCase
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
@@ -35,3 +37,14 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
                          self.ethereum_client.current_block_number - erc20_events_indexer.confirmations)
         self.assertTrue(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertTrue(EthereumEvent.objects.erc20_tokens_used_by_address(safe_contract.address))
+
+        # Test _transform_transfer_event
+        block_number = self.ethereum_client.get_transaction(tx_hash)['blockNumber']
+        event = self.ethereum_client.erc20.get_total_transfer_history(from_block=block_number, to_block=block_number)[0]
+        self.assertIn('value', event['args'])
+
+        original_event = copy.deepcopy(event)
+        del event['args']['value']
+        event['args']['unknown'] = original_event['args']['value']
+
+        self.assertEqual(erc20_events_indexer._transform_transfer_event(event), original_event)

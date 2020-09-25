@@ -31,17 +31,17 @@ class CeleryTaskConfiguration(NamedTuple):
 
 
 TASKS = [
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
-                                'Index Internal Txs', 13, IntervalSchedule.SECONDS),
-        # CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
-        #                        'Index new Proxies', 15, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
-                                'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
-                                'Process Internal Txs', 2, IntervalSchedule.MINUTES),
-        CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
-                                'Check Reorgs', 3, IntervalSchedule.MINUTES),
-    ]
+    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
+                            'Index Internal Txs', 13, IntervalSchedule.SECONDS),
+    # CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
+    #                        'Index new Proxies', 15, IntervalSchedule.SECONDS),
+    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
+                            'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
+    CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
+                            'Process Internal Txs', 2, IntervalSchedule.MINUTES),
+    CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
+                            'Check Reorgs', 3, IntervalSchedule.MINUTES),
+]
 
 MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
     EthereumNetwork.MAINNET: [
