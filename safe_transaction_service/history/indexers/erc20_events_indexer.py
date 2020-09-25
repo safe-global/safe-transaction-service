@@ -41,7 +41,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
                          *args, **kwargs)
-        self.cache_is_erc20 = {}
+        self._cache_is_erc20 = {}
 
     @property
     def database_model(self):
@@ -94,6 +94,8 @@ class Erc20EventsIndexer(EthereumIndexer):
         """
         event_args = event['args']
         if 'unknown' in event_args:  # Not standard event, trying to tell apart ERC20 from ERC721
+            logger.info('Cannot tell apart erc20 or 721 for token-address=%s - Checking token decimals',
+                        event['address'])
             value = event_args['unknown']
             del event_args['unknown']
             if self._is_erc20(event['address']):
@@ -102,7 +104,7 @@ class Erc20EventsIndexer(EthereumIndexer):
                 event_args['tokenId'] = value
         return event
 
-    @cachedmethod(cache=operator.attrgetter('cache_is_erc20'))
+    @cachedmethod(cache=operator.attrgetter('_cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day
     def _is_erc20(self, token_address: str) -> bool:
         try:
@@ -131,8 +133,8 @@ class Erc20EventsIndexer(EthereumIndexer):
         number_processed_elements = 0
 
         # Process all contracts together (we will be retrieving every `Transfer` on blockchain)
-        addresses = [monitored_contract.address
-                     for monitored_contract in self.get_not_updated_addresses(current_block_number)]
+        addresses = [monitored_contract.address for monitored_contract
+                     in self.get_not_updated_addresses(current_block_number)]
         if addresses:
             processed_elements, _ = self.process_addresses(addresses, current_block_number)
             number_processed_elements += len(processed_elements)
