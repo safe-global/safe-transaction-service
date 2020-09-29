@@ -37,7 +37,7 @@ class Erc20EventsIndexer(EthereumIndexer):
 
     def __init__(self, ethereum_client: EthereumClient,
                  block_process_limit: int = 10000,
-                 updated_blocks_behind: int = 50,  # For last 50 blocks, process all transactions together
+                 updated_blocks_behind: int = 100,  # For last 100 blocks, process all transactions together
                  query_chunk_size: int = int(1e6),  # For last blocks, process every Safe together
                  *args, **kwargs):
         super().__init__(ethereum_client,
