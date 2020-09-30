@@ -127,6 +127,12 @@ class SafeTxProcessor(TxProcessor):
         internal_tx = internal_tx_decoded.internal_tx
         contract_address = internal_tx._from
         master_copy = internal_tx.to
+        if internal_tx.gas_used < 1000:
+            # When calling a non existing function, fallback of the proxy does not return any error but we can detect
+            # this kind of functions due to little gas used. Some of this transactions get decoded as they were
+            # valid in old versions of the proxies, like changes to `setup`
+            return False
+
         processed_successfully = True
         if function_name == 'setup' and contract_address != NULL_ADDRESS:
             logger.debug('Processing Safe setup')
