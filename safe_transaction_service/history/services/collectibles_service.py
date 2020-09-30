@@ -199,6 +199,9 @@ class CollectiblesService:
         :return:
         """
         unfiltered_addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(address=safe_address)
+        for address, _ in unfiltered_addresses_with_token_ids:
+            # Store tokens in database if not present
+            self.get_token_info(address)  # This is cached
         addresses_with_token_ids = self._filter_addresses(unfiltered_addresses_with_token_ids,
                                                           only_trusted, exclude_spam)
         if not addresses_with_token_ids:
