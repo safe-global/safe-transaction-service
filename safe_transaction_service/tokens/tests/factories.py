@@ -1,10 +1,11 @@
 import factory
 from eth_account import Account
+from factory.django import DjangoModelFactory
 
 from .. import models
 
 
-class TokenFactory(factory.DjangoModelFactory):
+class TokenFactory(DjangoModelFactory):
     class Meta:
         model = models.Token
 

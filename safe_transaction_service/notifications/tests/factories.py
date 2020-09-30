@@ -1,11 +1,12 @@
 import uuid
 
 import factory
+from factory.django import DjangoModelFactory
 
 from ..models import FirebaseDevice
 
 
-class FirebaseDeviceFactory(factory.DjangoModelFactory):
+class FirebaseDeviceFactory(DjangoModelFactory):
     class Meta:
         model = FirebaseDevice
 

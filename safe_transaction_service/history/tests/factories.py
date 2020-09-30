@@ -4,6 +4,7 @@ from django.utils import timezone
 
 import factory
 from eth_account import Account
+from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
 from hexbytes import HexBytes
 from web3 import Web3
@@ -19,7 +20,7 @@ from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       SafeStatus, WebHook)
 
 
-class EthereumBlockFactory(factory.DjangoModelFactory):
+class EthereumBlockFactory(DjangoModelFactory):
     class Meta:
         model = EthereumBlock
 
@@ -31,7 +32,7 @@ class EthereumBlockFactory(factory.DjangoModelFactory):
     parent_hash = factory.Sequence(lambda n: Web3.keccak(text=f'block{n - 1}').hex())
 
 
-class EthereumTxFactory(factory.DjangoModelFactory):
+class EthereumTxFactory(DjangoModelFactory):
     class Meta:
         model = EthereumTx
 
@@ -47,7 +48,7 @@ class EthereumTxFactory(factory.DjangoModelFactory):
     logs = factory.LazyFunction(lambda: [])
 
 
-class EthereumEventFactory(factory.DjangoModelFactory):
+class EthereumEventFactory(DjangoModelFactory):
     class Meta:
         model = EthereumEvent
 
@@ -68,7 +69,7 @@ class EthereumEventFactory(factory.DjangoModelFactory):
                                       )
 
 
-class InternalTxFactory(factory.DjangoModelFactory):
+class InternalTxFactory(DjangoModelFactory):
     class Meta:
         model = InternalTx
 
@@ -89,7 +90,7 @@ class InternalTxFactory(factory.DjangoModelFactory):
     error = None
 
 
-class InternalTxDecodedFactory(factory.DjangoModelFactory):
+class InternalTxDecodedFactory(DjangoModelFactory):
     class Meta:
         model = InternalTxDecoded
 
@@ -161,7 +162,7 @@ class InternalTxDecodedFactory(factory.DjangoModelFactory):
             return {}
 
 
-class ModuleTransactionFactory(factory.DjangoModelFactory):
+class ModuleTransactionFactory(DjangoModelFactory):
     class Meta:
         model = ModuleTransaction
 
@@ -175,7 +176,7 @@ class ModuleTransactionFactory(factory.DjangoModelFactory):
     failed = False
 
 
-class MultisigTransactionFactory(factory.DjangoModelFactory):
+class MultisigTransactionFactory(DjangoModelFactory):
     class Meta:
         model = MultisigTransaction
 
@@ -198,7 +199,7 @@ class MultisigTransactionFactory(factory.DjangoModelFactory):
     trusted = False
 
 
-class MultisigConfirmationFactory(factory.DjangoModelFactory):
+class MultisigConfirmationFactory(DjangoModelFactory):
     class Meta:
         model = MultisigConfirmation
 
@@ -210,7 +211,7 @@ class MultisigConfirmationFactory(factory.DjangoModelFactory):
     signature_type = SafeSignatureType.APPROVED_HASH.value
 
 
-class SafeContractFactory(factory.DjangoModelFactory):
+class SafeContractFactory(DjangoModelFactory):
     class Meta:
         model = SafeContract
 
@@ -219,7 +220,7 @@ class SafeContractFactory(factory.DjangoModelFactory):
     erc20_block_number = factory.LazyFunction(lambda: 0)
 
 
-class SafeContractDelegateFactory(factory.DjangoModelFactory):
+class SafeContractDelegateFactory(DjangoModelFactory):
     class Meta:
         model = SafeContractDelegate
 
@@ -231,7 +232,7 @@ class SafeContractDelegateFactory(factory.DjangoModelFactory):
     write = True
 
 
-class MonitoredAddressFactory(factory.DjangoModelFactory):
+class MonitoredAddressFactory(DjangoModelFactory):
     address = factory.LazyFunction(lambda: Account.create().address)
     initial_block_number = factory.LazyFunction(lambda: 0)
     tx_block_number = factory.LazyFunction(lambda: 0)
@@ -249,7 +250,7 @@ class SafeMasterCopyFactory(MonitoredAddressFactory):
         model = SafeMasterCopy
 
 
-class SafeStatusFactory(factory.DjangoModelFactory):
+class SafeStatusFactory(DjangoModelFactory):
     class Meta:
         model = SafeStatus
 
@@ -261,7 +262,7 @@ class SafeStatusFactory(factory.DjangoModelFactory):
     master_copy = factory.LazyFunction(lambda: Account.create().address)
 
 
-class WebHookFactory(factory.DjangoModelFactory):
+class WebHookFactory(DjangoModelFactory):
     class Meta:
         model = WebHook
 
