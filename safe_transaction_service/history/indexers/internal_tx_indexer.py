@@ -140,7 +140,6 @@ class InternalTxIndexer(EthereumIndexer):
         logger.info('End prefetching of traces(internal txs)')
 
         logger.info('Storing traces')
-
         with transaction.atomic():
             internal_txs = InternalTx.objects.bulk_create(internal_txs_batch, ignore_conflicts=True)
             logger.info('End storing of traces')
@@ -159,9 +158,11 @@ class InternalTxIndexer(EthereumIndexer):
                                                                             processed=False))
                     except CannotDecode:
                         pass
+            logger.info('End decoding of traces')
+            logger.info('Storing decoded traces')
             if internal_txs_decoded_batch:
                 InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
-            logger.info('End decoding of traces')
+            logger.info('End storing of traces')
             return internal_txs
 
 

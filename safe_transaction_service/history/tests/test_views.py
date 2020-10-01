@@ -49,7 +49,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         internal_tx_in = InternalTxFactory(to=safe_address, value=4)
         internal_tx_out = InternalTxFactory(_from=safe_address, value=5)  # Should not appear
         erc20_transfer_in = EthereumEventFactory(to=safe_address)
-        erc20_transfer_out = EthereumEventFactory(from_=safe_address)  # Should not appear
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address)
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = MultisigTransactionFactory()  # Should not appear, it's for another Safe
 
@@ -59,21 +59,22 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 3)
+        self.assertEqual(response.data['count'], 4)
 
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=True&trusted=True')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 3)
+        self.assertEqual(response.data['count'], 4)
 
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=True&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 7)
+        self.assertEqual(response.data['count'], 8)
 
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 5)
-        self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(response.data['count'], 6)
+        self.assertEqual(len(response.data['results']), 6)
         transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer out
                                True,  # Erc transfer in
                                True,  # internal tx in
                                False,  # Module transaction
@@ -87,13 +88,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
                                    + '?limit=3&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(response.data['count'], 6)
         self.assertEqual(len(response.data['results']), 3)
 
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
-                                   + '?limit=3&offset=3&queued=False&trusted=False')
+                                   + '?limit=4&offset=4&queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 5)
+        self.assertEqual(response.data['count'], 6)
         self.assertEqual(len(response.data['results']), 2)
 
         # Add transfer out for the module transaction and transfer in for the multisig transaction
@@ -105,9 +106,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                            ethereum_tx=multisig_transaction.ethereum_tx)
         response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=False')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 5)
-        self.assertEqual(len(response.data['results']), 5)
-        self.assertEqual(response.data['results'][3]['transfers'][0]['token_info'], {
+        self.assertEqual(response.data['count'], 6)
+        self.assertEqual(len(response.data['results']), 6)
+        self.assertEqual(response.data['results'][4]['transfers'][0]['token_info'], {
             'type': 'ERC20',
             'address': token.address,
             'name': token.name,
@@ -116,6 +117,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'logo_uri': token.get_full_logo_uri(),
         })
         transfers_not_empty = [False,  # Multisig transaction, no transfer
+                               True,  # Erc transfer out
                                True,  # Erc transfer in
                                True,  # internal tx in
                                True,  # Module transaction

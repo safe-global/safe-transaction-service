@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Union
 
-from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When
+from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When, Q
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
@@ -104,9 +104,11 @@ class TransactionService:
         module_hashes = ModuleTransaction.objects.filter(safe=safe_address).values('internal_tx__ethereum_tx_id')
         multisig_and_module_hashes = multisig_hashes.union(module_hashes)
 
-        # Get incoming tokens not included on Multisig or Module txs
+        # Get incoming/outgoing tokens not included on Multisig or Module txs.
+        # Outgoing tokens can be triggered by another user after the Safe calls `approve`, that's why it will not
+        # always appear as a MultisigTransaction
         event_tx_ids = EthereumEvent.objects.erc20_and_721_events().filter(
-            arguments__to=safe_address
+            Q(arguments__to=safe_address) | Q(arguments__from=safe_address)
         ).exclude(
             ethereum_tx__in=multisig_and_module_hashes
         ).annotate(
