@@ -209,7 +209,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
                             self.block_process_limit)
             if time_diff > 10:
-                new_block_process_limit = max(self.block_process_limit - 100, 1)
+                new_block_process_limit = max(self.block_process_limit - 5000, 500)
                 self.block_process_limit = new_block_process_limit
                 logger.info('%s: block_process_limit decreased to %d', self.__class__.__name__,
                             self.block_process_limit)
@@ -218,7 +218,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit duplicated to %d', self.__class__.__name__,
                             self.block_process_limit)
             elif time_diff < 3:
-                self.block_process_limit += 100
+                self.block_process_limit += 5000
                 logger.info('%s: block_process_limit increased to %d', self.__class__.__name__,
                             self.block_process_limit)
 
