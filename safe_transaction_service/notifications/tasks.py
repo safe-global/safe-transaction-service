@@ -7,7 +7,8 @@ from celery import app
 from celery.utils.log import get_task_logger
 from redis import Redis
 
-from safe_transaction_service.history.models import WebHookType
+from safe_transaction_service.history.models import (MultisigTransaction,
+                                                     WebHookType)
 
 from .clients.firebase_client import FirebaseProvider
 from .models import FirebaseDevice
@@ -26,13 +27,14 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
     :param payload: Notification payload
     :return: `True` if payload is valid, `False` otherwise
     """
-    if not payload:
+    payload_type = payload.get('type', '')
+    if not payload_type:
         # Don't send notifications for empty payload (it shouldn't happen)
         return False
-    elif payload.get('type', '') == WebHookType.PENDING_MULTISIG_TRANSACTION.name:
+    elif payload_type == WebHookType.PENDING_MULTISIG_TRANSACTION.name:
         # Don't send notifications for pending multisig transactions
         return False
-    elif payload.get('type', '') == WebHookType.NEW_CONFIRMATION.name:
+    elif payload_type == WebHookType.NEW_CONFIRMATION.name:
         # If MultisigTransaction is executed don't notify about a new confirmation
         # try:
         #     return not MultisigTransaction.objects.get(safe_tx_hash=payload.get('safeTxHash')).executed
@@ -41,6 +43,14 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
 
         # All confirmations are disabled for now
         return False
+    elif payload_type in (WebHookType.INCOMING_ETHER.name, WebHookType.INCOMING_TOKEN.name):
+        # Only send ETH/token pushes when they weren't triggered by a tx from some account other than the Safe.
+        # If Safe triggers a transaction to transfer Ether/Tokens into itself, 2 notifications will be generated, and
+        # that's not desired
+        return not MultisigTransaction.objects.filter(
+            ethereum_tx=payload['txHash'],
+            safe=payload['address']
+        ).exists()
 
     return True
 

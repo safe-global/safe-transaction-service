@@ -2,12 +2,15 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from safe_transaction_service.history.models import (MultisigConfirmation,
+from safe_transaction_service.history.models import (EthereumTxCallType,
+                                                     EthereumTxType,
+                                                     InternalTx,
+                                                     MultisigConfirmation,
                                                      MultisigTransaction)
 from safe_transaction_service.history.signals import build_webhook_payload
+from safe_transaction_service.history.tests.factories import (
+    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory)
 
-from ...history.tests.factories import (MultisigConfirmationFactory,
-                                        MultisigTransactionFactory)
 from ..tasks import DuplicateNotification, filter_notification
 
 
@@ -51,3 +54,15 @@ class TestViews(TestCase):
         pending_transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)
         self.assertNotEqual(multisig_transaction, pending_transaction_notification)
         self.assertFalse(filter_notification(pending_transaction_notification))
+
+        # Incoming transaction to a Safe must be filtered out if it was triggered by that same Safe
+        internal_tx = InternalTxFactory(
+            value=5,
+            tx_type=EthereumTxType.CALL.value,
+            call_type=EthereumTxCallType.CALL.value
+        )
+        internal_tx_payload = build_webhook_payload(InternalTx, internal_tx)
+        self.assertEqual(internal_tx_payload['address'], internal_tx.to)
+        self.assertTrue(filter_notification(internal_tx_payload))
+        MultisigTransactionFactory(safe=internal_tx.to, ethereum_tx=internal_tx.ethereum_tx)
+        self.assertFalse(filter_notification(internal_tx_payload))

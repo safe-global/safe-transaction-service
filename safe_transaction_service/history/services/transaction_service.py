@@ -2,7 +2,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Union
 
-from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When, Q
+from django.db.models import (Case, F, OuterRef, Q, QuerySet, Subquery, Value,
+                              When)
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
