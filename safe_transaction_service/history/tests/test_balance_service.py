@@ -14,7 +14,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
-from ..services.balance_service import BalanceWithUsd, CannotGetEthereumPrice
+from ..services.balance_service import BalanceWithFiat, CannotGetEthereumPrice
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
 
@@ -107,8 +107,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         balances = balance_service.get_usd_balances(safe_address)
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(balances, [
-            BalanceWithUsd(None, None, value, 0.0, 123.4),
-            BalanceWithUsd(
+            BalanceWithFiat(None, None, value, 0.0, 123.4),
+            BalanceWithFiat(
                 erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             )
@@ -116,14 +116,14 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
-            BalanceWithUsd(None, None, value, 0.0, 123.4),
+            BalanceWithFiat(None, None, value, 0.0, 123.4),
         ])
 
         Token.objects.filter(address=erc20.address).update(trusted=True, spam=False)
         balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
-            BalanceWithUsd(None, None, value, 0.0, 123.4),
-            BalanceWithUsd(
+            BalanceWithFiat(None, None, value, 0.0, 123.4),
+            BalanceWithFiat(
                 erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             )
@@ -140,16 +140,16 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         balances = balance_service.get_usd_balances(safe_address)
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(balances, [
-            BalanceWithUsd(None, None, value, 0.0, 123.4),
-            BalanceWithUsd(
+            BalanceWithFiat(None, None, value, 0.0, 123.4),
+            BalanceWithFiat(
                 erc20_3.address, token_info_3, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             ),
-            BalanceWithUsd(
+            BalanceWithFiat(
                 erc20.address, token_info, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             ),
-            BalanceWithUsd(
+            BalanceWithFiat(
                 erc20_2.address, token_info_2, tokens_value, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
                 round(123.4 * 0.4, 4)
             ),

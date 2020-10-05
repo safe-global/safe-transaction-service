@@ -630,12 +630,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'balance': str(value),
              'balance_usd': '0.0',
              'usd_conversion': '123.4',
+             'balance_fiat': '0.0',
+             'fiat_conversion': '123.4',
+             'fiat_code': 'USD',
              },  # 7 wei is rounded to 0.0
             {'token_address': erc20.address,
              'token': token_dict,
              'balance': str(tokens_value),
              'balance_usd': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
              'usd_conversion': str(round(123.4 * 0.4, 4)),
+             'balance_fiat': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
+             'fiat_conversion': str(round(123.4 * 0.4, 4)),
+             'fiat_code': 'USD',
              }
         ])
 

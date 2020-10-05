@@ -366,8 +366,11 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
-    balance_usd = serializers.CharField()
-    usd_conversion = serializers.CharField()
+    balance_usd = serializers.CharField(source='balance_fiat')
+    usd_conversion = serializers.CharField(source='fiat_conversion')
+    balance_fiat = serializers.CharField()
+    fiat_conversion = serializers.CharField()
+    fiat_code = serializers.CharField()
 
 
 class SafeCollectibleResponseSerializer(serializers.Serializer):

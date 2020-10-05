@@ -47,22 +47,24 @@ class Erc20InfoWithLogo:
 
 @dataclass
 class Balance:
-    token_address: Optional[str]
+    token_address: Optional[str]  # For ether, `token_address` is `None`
     token: Optional[Erc20InfoWithLogo]
     balance: int
 
 
 @dataclass
-class BalanceWithUsd(Balance):
-    balance_usd: float
-    usd_conversion: float
+class BalanceWithFiat(Balance):
+    balance_fiat: float
+    fiat_conversion: float
+    fiat_code: str = 'USD'
 
 
 class BalanceServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = BalanceService(EthereumClientProvider(), settings.ETH_UNISWAP_FACTORY_ADDRESS,
+            cls.instance = BalanceService(EthereumClientProvider(),
+                                          settings.ETH_UNISWAP_FACTORY_ADDRESS,
                                           settings.ETH_KYBER_NETWORK_PROXY_ADDRESS)
         return cls.instance
 
@@ -230,15 +232,14 @@ class BalanceService:
                 return None
 
     def get_usd_balances(self, safe_address: str, only_trusted: bool = False,
-                         exclude_spam: bool = False) -> List[BalanceWithUsd]:
+                         exclude_spam: bool = False) -> List[BalanceWithFiat]:
         """
         All this could be more optimal (e.g. batching requests), but as everything is cached
         I think we should be alright
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :return: `{'token_address': str, 'balance': int, `balance_usd`: float, `usdConversion`: float}`.
-        For ether, `token_address` is `None`
+        :return: List of BalanceWithFiat
         """
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
         eth_value = self.get_eth_usd_price()
@@ -246,22 +247,23 @@ class BalanceService:
         for balance in balances:
             token_address = balance.token_address
             if not token_address:  # Ether
-                usd_conversion = eth_value
-                balance_usd = usd_conversion * (balance.balance / 10**18)
+                fiat_conversion = eth_value
+                balance_fiat = fiat_conversion * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
-                    usd_conversion = eth_value * token_to_eth_price
+                    fiat_conversion = eth_value * token_to_eth_price
                     balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    balance_usd = usd_conversion * balance_with_decimals
+                    balance_fiat = fiat_conversion * balance_with_decimals
                 else:
-                    usd_conversion = 0.
-                    balance_usd = 0.
+                    fiat_conversion = 0.
+                    balance_fiat = 0.
 
-            balances_with_usd.append(BalanceWithUsd(balance.token_address,
-                                                    balance.token,
-                                                    balance.balance,
-                                                    round(balance_usd, 4),
-                                                    round(usd_conversion, 4)))
+            balances_with_usd.append(BalanceWithFiat(balance.token_address,
+                                                     balance.token,
+                                                     balance.balance,
+                                                     round(balance_fiat, 4),
+                                                     round(fiat_conversion, 4),
+                                                     'USD'))
 
         return balances_with_usd
