@@ -6,6 +6,7 @@ from typing import List, Optional, Sequence
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
+from requests.exceptions import ConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -156,7 +157,7 @@ class BalanceService:
             if not price:
                 raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
             return price
-        except ValueError as e:
+        except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
     def get_eth_usd_price_kraken(self) -> float:
@@ -180,7 +181,7 @@ class BalanceService:
                 if not price:
                     raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
                 return price
-        except ValueError as e:
+        except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_usd_price'))
