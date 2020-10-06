@@ -774,6 +774,21 @@ class ModuleTransaction(TimeStampedModel):
         return None
 
 
+class MultisigConfirmationManager(models.Manager):
+    def remove_unused_confirmations(self, safe: str, current_safe_none: int, owner: str) -> int:
+        """
+        :return: Remove confirmations for not executed transactions with nonce higher or equal than
+        the current Safe nonce for a Safe and an owner (as an owner can be an owner of multiple Safes).
+        Used when an owner is removed from the Safe.
+        """
+        return self.filter(
+            multisig_transaction__ethereum_tx=None,  # Not executed
+            multisig_transaction__safe=safe,
+            multisig_transaction__nonce__gte=current_safe_none,
+            owner=owner,
+        ).delete()[0]
+
+
 class MultisigConfirmationQuerySet(models.QuerySet):
     def without_transaction(self):
         return self.filter(multisig_transaction=None)
@@ -783,7 +798,7 @@ class MultisigConfirmationQuerySet(models.QuerySet):
 
 
 class MultisigConfirmation(TimeStampedModel):
-    objects = MultisigConfirmationQuerySet.as_manager()
+    objects = MultisigConfirmationManager.from_queryset(MultisigConfirmationQuerySet)()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='multisig_confirmations',
                                     null=True)  # `null=True` for signature confirmations
     multisig_transaction = models.ForeignKey(MultisigTransaction,

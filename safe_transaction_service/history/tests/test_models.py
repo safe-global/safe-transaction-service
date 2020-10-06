@@ -291,6 +291,48 @@ class TestSafeContract(TestCase):
                               [safe_contract_delegate_another_safe.delegate])
 
 
+class TestMultisigConfirmations(TestCase):
+    def test_remove_unused_confirmations(self):
+        safe_address = Account.create().address
+        owner_address = Account.create().address
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=0,
+                                                            multisig_transaction__ethereum_tx=None,
+                                                            multisig_transaction__safe=safe_address)
+        self.assertEqual(MultisigConfirmation.objects.remove_unused_confirmations(safe_address, 0, owner_address), 1)
+        self.assertEqual(MultisigConfirmation.objects.count(), 0)
+
+        # With an executed multisig transaction it shouldn't delete the confirmation
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=0,
+                                                            multisig_transaction__safe=safe_address)
+        self.assertEqual(MultisigConfirmation.objects.remove_unused_confirmations(safe_address, 0, owner_address), 0)
+        self.assertEqual(MultisigConfirmation.objects.all().delete()[0], 1)
+
+        # More testing
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=0,
+                                                            multisig_transaction__safe=safe_address)
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=0,
+                                                            multisig_transaction__ethereum_tx=None,
+                                                            multisig_transaction__safe=safe_address)
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=1,
+                                                            multisig_transaction__ethereum_tx=None,
+                                                            multisig_transaction__safe=safe_address)
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=1,
+                                                            multisig_transaction__ethereum_tx=None,
+                                                            multisig_transaction__safe=safe_address)
+        multisig_confirmation = MultisigConfirmationFactory(owner=owner_address,
+                                                            multisig_transaction__nonce=1,
+                                                            multisig_transaction__ethereum_tx=None,
+                                                            multisig_transaction__safe=safe_address)
+        self.assertEqual(MultisigConfirmation.objects.remove_unused_confirmations(safe_address, 1, owner_address), 3)
+        self.assertEqual(MultisigConfirmation.objects.all().delete()[0], 2)
+
+
 class TestMultisigTransactions(TestCase):
     def test_last_nonce(self):
         safe_address = Account.create().address
