@@ -54,7 +54,7 @@ class Balance:
 
 @dataclass
 class BalanceWithFiat(Balance):
-    balance_fiat: float
+    fiat_balance: float
     fiat_conversion: float
     fiat_code: str = 'USD'
 
@@ -248,21 +248,21 @@ class BalanceService:
             token_address = balance.token_address
             if not token_address:  # Ether
                 fiat_conversion = eth_value
-                balance_fiat = fiat_conversion * (balance.balance / 10**18)
+                fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
                     fiat_conversion = eth_value * token_to_eth_price
                     balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    balance_fiat = fiat_conversion * balance_with_decimals
+                    fiat_balance = fiat_conversion * balance_with_decimals
                 else:
                     fiat_conversion = 0.
-                    balance_fiat = 0.
+                    fiat_balance = 0.
 
             balances_with_usd.append(BalanceWithFiat(balance.token_address,
                                                      balance.token,
                                                      balance.balance,
-                                                     round(balance_fiat, 4),
+                                                     round(fiat_balance, 4),
                                                      round(fiat_conversion, 4),
                                                      'USD'))
 
