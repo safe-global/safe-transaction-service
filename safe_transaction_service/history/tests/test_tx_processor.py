@@ -12,7 +12,8 @@ from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeStatus)
-from .factories import EthereumTxFactory, InternalTxDecodedFactory
+from .factories import (EthereumTxFactory, InternalTxDecodedFactory,
+                        MultisigConfirmationFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,15 @@ class TestSafeTxProcessor(TestCase):
         self.assertEqual(safe_status.threshold, threshold)
 
         threshold = 1
+        # Check deleting the owner did delete this pending confirmation
+        # It will insert a transaction we will remove after we check the confirmation was deleted
+        unused_multisig_confirmation = MultisigConfirmationFactory(
+            owner=another_owner,
+            multisig_transaction__ethereum_tx=None,
+            multisig_transaction__nonce=safe_status.nonce + 1,
+            multisig_transaction__safe=safe_address
+        )
+        number_confirmations = MultisigConfirmation.objects.count()
         tx_processor.process_decoded_transactions(
             [
                 InternalTxDecodedFactory(function_name='execTransaction',
@@ -78,6 +88,9 @@ class TestSafeTxProcessor(TestCase):
                 InternalTxDecodedFactory(function_name='removeOwner', old_owner=another_owner, threshold=threshold,
                                          internal_tx___from=safe_address)
             ])
+        # At least 1 confirmation is always added by `execTransaction` and 1 should be removed
+        self.assertEqual(MultisigConfirmation.objects.count(), number_confirmations + 1 - 1)
+        unused_multisig_confirmation.multisig_transaction.delete()  # Remove this transaction inserted manually
         self.assertEqual(SafeStatus.objects.count(), 7)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         self.assertEqual(safe_status.owners, [new_owner])
