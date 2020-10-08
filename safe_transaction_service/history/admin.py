@@ -198,13 +198,30 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
             return obj.ethereum_tx.block_id
 
 
+class MultisigTransactionExecutedListFilter(admin.SimpleListFilter):
+    title = 'Executed'
+    parameter_name = 'executed'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('YES', 'Transaction executed (mined)'),
+            ('NO', 'Transaction not executed'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'YES':
+            return queryset.executed()
+        elif self.value() == 'NO':
+            return queryset.not_executed()
+
+
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created'
     inlines = (MultisigConfirmationInline,)
     list_display = ('created', 'safe', 'executed', 'successful', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value',
                     'nonce', 'data')
-    list_filter = ('failed', 'trusted', )
+    list_filter = (MultisigTransactionExecutedListFilter, 'failed', 'trusted')
     list_select_related = ('ethereum_tx',)
     ordering = ['-created']
     raw_id_fields = ('ethereum_tx',)
