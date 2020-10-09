@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/gnosis/safe-transaction-service.svg?branch=master)](https://travis-ci.org/gnosis/safe-transaction-service)
+[![Build Status](https://travis-ci.com/gnosis/safe-transaction-service.svg?branch=master)](https://travis-ci.com/gnosis/safe-transaction-service)
 [![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-service?branch=master)
 ![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
