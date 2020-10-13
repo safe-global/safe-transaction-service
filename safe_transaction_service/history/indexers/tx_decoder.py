@@ -27,6 +27,7 @@ from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
                                            fleet_factory_deterministic_abi,
                                            gnosis_protocol_abi)
+from .decoder_abis.gnosis_safe import decoging_test_abi
 from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.open_zeppelin import (
     open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)
@@ -228,13 +229,18 @@ class TxDecoder(SafeTxDecoder):
         erc_contracts = [get_erc721_contract(self.dummy_w3),
                          get_erc20_contract(self.dummy_w3)]
 
+        test_contracts = [
+            self.dummy_w3.eth.contract(abi=decoging_test_abi)
+        ]  # https://rinkeby.etherscan.io/address/0x479adf13cc2e1844451f71dcf0bf5194df53b14b#code
+
         self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (aave_contracts + balancer_contracts + idle_contracts + open_zeppelin_contracts
-                                    + request_contracts + sablier_contracts + compound_contracts + exchanges
-                                    + sight_contracts + gnosis_protocol + erc_contracts
+        self.supported_contracts = (test_contracts + aave_contracts + balancer_contracts + idle_contracts +
+                                    open_zeppelin_contracts + request_contracts + sablier_contracts +
+                                    compound_contracts + exchanges +
+                                    sight_contracts + gnosis_protocol + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
