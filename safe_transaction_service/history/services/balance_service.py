@@ -146,13 +146,13 @@ class BalanceService:
         :raises: CannotGetEthereumPrice
         """
         url = 'https://api.binance.com/api/v3/avgPrice?symbol=ETHUSDT'
-        response = requests.get(url)
-        api_json = response.json()
-        if not response.ok:
-            logger.warning('Cannot get price from url=%s', url)
-            raise CannotGetEthereumPrice(api_json.get('msg'))
-
         try:
+            response = requests.get(url)
+            api_json = response.json()
+            if not response.ok:
+                logger.warning('Cannot get price from url=%s', url)
+                raise CannotGetEthereumPrice(api_json.get('msg'))
+
             price = float(api_json['price'])
             if not price:
                 raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
@@ -167,14 +167,14 @@ class BalanceService:
         """
         # Use kraken for eth_value
         url = 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD'
-        response = requests.get(url)
-        api_json = response.json()
-        error = api_json.get('error')
-        if not response.ok or error:
-            logger.warning('Cannot get price from url=%s', url)
-            raise CannotGetEthereumPrice(str(api_json['error']))
-
         try:
+            response = requests.get(url)
+            api_json = response.json()
+            error = api_json.get('error')
+            if not response.ok or error:
+                logger.warning('Cannot get price from url=%s', url)
+                raise CannotGetEthereumPrice(str(api_json['error']))
+
             result = api_json['result']
             for new_ticker in result:
                 price = float(result[new_ticker]['c'][0])
