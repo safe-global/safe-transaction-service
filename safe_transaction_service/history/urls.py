@@ -47,6 +47,8 @@ urlpatterns = [
          name='multisig-transaction'),  # DEPRECATED, use `multisig-transactions/`
     path('multisig-transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction-alias'),
+    path('multisig-transactions/<str:safe_tx_hash>/confirmations/', views.SafeMultisigConfirmationsView.as_view(),
+         name='multisig-transaction-confirmations'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
 

@@ -160,6 +160,61 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
+    def test_get_multisig_confirmation(self):
+        safe_tx_hash = Web3.keccak(text='enxebre').hex()
+        response = self.client.get(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
+        multisig_confirmation_1 = MultisigConfirmationFactory()
+        MultisigConfirmationFactory(multisig_transaction=multisig_confirmation_1.multisig_transaction)
+        safe_tx_hash = multisig_confirmation_1.multisig_transaction_id
+        response = self.client.get(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                   format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+
+    def test_post_multisig_confirmation(self):
+        owner_account_1 = Account.create()
+        owner_account_2 = Account.create()
+        safe_create2_tx = self.deploy_test_safe(owners=[owner_account_1.address, owner_account_2.address])
+        safe_address = safe_create2_tx.safe_address
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        safe_tx_hash = multisig_transaction.safe_tx_hash
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                    format='json', data={})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        random_account = Account.create()
+        data = {
+            'signature': random_account.signHash(safe_tx_hash)['signature'].hex()  # Not valid signature
+        }
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(f'Signer={random_account.address} is not an owner', response.data['signature'][0])
+
+        data = {
+            'signature': owner_account_1.signHash(safe_tx_hash)['signature'].hex()
+        }
+        self.assertEqual(MultisigConfirmation.objects.count(), 0)
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+
+        # Add multiple signatures
+        data = {
+            'signature': (owner_account_1.signHash(safe_tx_hash)['signature']
+                          + owner_account_2.signHash(safe_tx_hash)['signature']).hex()
+        }
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigConfirmation.objects.count(), 2)
+
     def test_get_multisig_transaction(self):
         safe_tx_hash = Web3.keccak(text='gnosis').hex()
         response = self.client.get(reverse('v1:multisig-transaction', args=(safe_tx_hash,)), format='json')
@@ -441,7 +496,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_tx_db = MultisigTransaction.objects.get(safe_tx_hash=safe_tx.safe_tx_hash)
         self.assertEqual(multisig_tx_db.origin, data['origin'])
 
-    def test_post_mulisig_transactions_with_multiple_signatures(self):
+    def test_post_multisig_transactions_with_multiple_signatures(self):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
         safe_create2_tx = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
@@ -491,7 +546,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertIn(safe_signature.owner, safe_owner_addresses)
             safe_owner_addresses.remove(safe_signature.owner)
 
-    def test_post_mulisig_transactions_with_delegate(self):
+    def test_post_multisig_transactions_with_delegate(self):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
         safe_delegate = Account.create()

@@ -237,10 +237,10 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (test_contracts + aave_contracts + balancer_contracts + idle_contracts +
-                                    open_zeppelin_contracts + request_contracts + sablier_contracts +
-                                    compound_contracts + exchanges +
-                                    sight_contracts + gnosis_protocol + erc_contracts
+        self.supported_contracts = (test_contracts + aave_contracts + balancer_contracts + idle_contracts
+                                    + open_zeppelin_contracts + request_contracts + sablier_contracts
+                                    + compound_contracts + exchanges
+                                    + sight_contracts + gnosis_protocol + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:

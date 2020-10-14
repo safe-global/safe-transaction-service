@@ -25,9 +25,9 @@ from .filters import (DefaultPagination, ModuleTransactionFilter,
                       MultisigTransactionAnalyticsFilter,
                       MultisigTransactionFilter, SmallPagination,
                       TransferListFilter)
-from .models import (InternalTx, ModuleTransaction, MultisigTransaction,
-                     SafeContract, SafeContractDelegate, SafeMasterCopy,
-                     SafeStatus)
+from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
+                     MultisigTransaction, SafeContract, SafeContractDelegate,
+                     SafeMasterCopy, SafeStatus)
 from .serializers import (MasterCopyResponseSerializer,
                           MultisigTransactionAnalyticsResponseSerializer,
                           OwnerResponseSerializer,
@@ -39,6 +39,8 @@ from .serializers import (MasterCopyResponseSerializer,
                           SafeDelegateResponseSerializer,
                           SafeDelegateSerializer, SafeInfoResponseSerializer,
                           SafeModuleTransactionResponseSerializer,
+                          SafeMultisigConfirmationResponseSerializer,
+                          SafeMultisigConfirmationSerializer,
                           SafeMultisigTransactionResponseSerializer,
                           SafeMultisigTransactionSerializer,
                           TransferResponseSerializer,
@@ -171,6 +173,41 @@ class SafeModuleTransactionListView(ListAPIView):
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
         return response
+
+
+class SafeMultisigConfirmationsView(ListCreateAPIView):
+    pagination_class = DefaultPagination
+
+    def get_queryset(self):
+        return MultisigConfirmation.objects.filter(multisig_transaction_id=self.kwargs['safe_tx_hash'])
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['safe_tx_hash'] = self.kwargs['safe_tx_hash']
+        return context
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return SafeMultisigConfirmationResponseSerializer
+        elif self.request.method == 'POST':
+            return SafeMultisigConfirmationSerializer
+
+    @swagger_auto_schema(responses={400: 'Invalid data'})
+    def get(self, request, *args, **kwargs):
+        """
+        Get the list of confirmations for a multisig transaction
+        """
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data',
+                                    422: 'Error processing data'})
+    def post(self, request, *args, **kwargs):
+        """
+        Add a confirmation for a transaction. More than one signature can be used. This endpoint does not support
+        the use of delegates to make a transaction trusted.
+        """
+        return super().post(request, *args, **kwargs)
 
 
 @swagger_auto_schema(responses={200: 'Ok',

@@ -34,6 +34,56 @@ def get_data_decoded_from_data(data: bytes):
 # ================================================ #
 #            Request Serializers
 # ================================================ #
+class SafeMultisigConfirmationSerializer(serializers.Serializer):
+    signature = HexadecimalField(min_length=130)  # Signatures must be at least 65 bytes
+
+    def validate_signature(self, signature: bytes):
+        safe_tx_hash = self.context['safe_tx_hash']
+        safe_address = MultisigTransaction.objects.get(safe_tx_hash=safe_tx_hash).safe
+
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(safe_address, ethereum_client)
+        try:
+            safe_owners = safe.retrieve_owners(block_identifier='pending')
+        except BadFunctionCallOutput:  # Error using pending block identifier
+            safe_owners = safe.retrieve_owners(block_identifier='latest')
+
+        parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
+        signature_owners = []
+        for safe_signature in parsed_signatures:
+            owner = safe_signature.owner
+            if owner not in safe_owners:
+                raise ValidationError(f'Signer={owner} is not an owner. Current owners={safe_owners}')
+            if not safe_signature.is_valid(ethereum_client, safe.address):
+                raise ValidationError(f'Signature={safe_signature.signature.hex()} for owner={owner} is not valid')
+            if owner in signature_owners:
+                raise ValidationError(f'Signature for owner={owner} is duplicated')
+
+            signature_owners.append(owner)
+        return signature
+
+    def save(self, **kwargs):
+        safe_tx_hash = self.context['safe_tx_hash']
+        signature = self.validated_data['signature']
+        multisig_confirmations = []
+        parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
+        for safe_signature in parsed_signatures:
+            multisig_confirmation, _ = MultisigConfirmation.objects.get_or_create(
+                multisig_transaction_hash=safe_tx_hash,
+                owner=safe_signature.owner,
+                defaults={
+                    'multisig_transaction_id': safe_tx_hash,
+                    'signature': safe_signature.export_signature(),
+                    'signature_type': safe_signature.signature_type.value,
+                }
+            )
+            multisig_confirmations.append(multisig_confirmation)
+
+        if self.validated_data['signature']:
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).update(trusted=True)
+        return multisig_confirmations
+
+
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
