@@ -4,6 +4,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 
 from django.contrib.postgres.fields import ArrayField, JSONField
+from django.contrib.postgres.indexes import GinIndex
 from django.db import IntegrityError, models
 from django.db.models import Case, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
@@ -323,6 +324,7 @@ class EthereumEvent(models.Model):
 
     class Meta:
         unique_together = (('ethereum_tx', 'log_index'),)
+        indexes = [GinIndex(fields=['arguments'])]
 
     def __str__(self):
         return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'
