@@ -161,8 +161,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['count'], 1)
 
     def test_get_multisig_confirmation(self):
-        safe_tx_hash = Web3.keccak(text='enxebre').hex()
-        response = self.client.get(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+        random_safe_tx_hash = Web3.keccak(text='enxebre').hex()
+        response = self.client.get(reverse('v1:multisig-transaction-confirmations', args=(random_safe_tx_hash,)),
                                    format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
@@ -176,11 +176,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['count'], 2)
 
     def test_post_multisig_confirmation(self):
+        random_safe_tx_hash = Web3.keccak(text='enxebre').hex()
+        data = {
+            'signature': Account.create().signHash(random_safe_tx_hash)['signature'].hex()  # Not valid signature
+        }
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(random_safe_tx_hash,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('was not found', response.data['detail'])
+
         owner_account_1 = Account.create()
         owner_account_2 = Account.create()
         safe_create2_tx = self.deploy_test_safe(owners=[owner_account_1.address, owner_account_2.address])
         safe_address = safe_create2_tx.safe_address
-        multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, trusted=False)
         safe_tx_hash = multisig_transaction.safe_tx_hash
         response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
                                     format='json', data={})
@@ -190,6 +199,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         data = {
             'signature': random_account.signHash(safe_tx_hash)['signature'].hex()  # Not valid signature
         }
+        # Transaction was executed, confirmations cannot be added
+        response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(f'Transaction with safe-tx-hash={safe_tx_hash} was already executed',
+                      response.data['signature'][0])
+
+        # Mark transaction as not executed, signature is still not valid
+        multisig_transaction.ethereum_tx = None
+        multisig_transaction.save(update_fields=['ethereum_tx'])
         response = self.client.post(reverse('v1:multisig-transaction-confirmations', args=(safe_tx_hash,)),
                                     format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -203,6 +222,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                     format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
+        multisig_transaction.refresh_from_db()
+        self.assertTrue(multisig_transaction.trusted)
 
         # Add multiple signatures
         data = {

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClientProvider
@@ -39,7 +39,16 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
 
     def validate_signature(self, signature: bytes):
         safe_tx_hash = self.context['safe_tx_hash']
-        safe_address = MultisigTransaction.objects.get(safe_tx_hash=safe_tx_hash).safe
+        try:
+            multisig_transaction = MultisigTransaction.objects.select_related(
+                'ethereum_tx'
+            ).get(safe_tx_hash=safe_tx_hash)
+        except MultisigTransaction.DoesNotExist:
+            raise NotFound(f'Multisig transaction with safe-tx-hash={safe_tx_hash} was not found')
+
+        safe_address = multisig_transaction.safe
+        if multisig_transaction.executed:
+            raise ValidationError(f'Transaction with safe-tx-hash={safe_tx_hash} was already executed')
 
         ethereum_client = EthereumClientProvider()
         safe = Safe(safe_address, ethereum_client)
