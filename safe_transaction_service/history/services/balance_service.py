@@ -1,6 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass
+from functools import cached_property
 from typing import List, Optional, Sequence
 
 import requests
@@ -10,7 +11,7 @@ from requests.exceptions import ConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.ethereum_client import InvalidERC20Info
+from gnosis.eth.ethereum_client import EthereumNetwork, InvalidERC20Info
 from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
                                 UniswapV2Oracle)
 
@@ -82,9 +83,13 @@ class BalanceService:
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
-        self.cache_eth_usd_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
+
+    @cached_property
+    def ethereum_network(self):
+        return self.ethereum_client.get_network()
 
     def _filter_addresses(self, erc20_addresses: Sequence[str], only_trusted: bool, exclude_spam: bool) -> List[str]:
         """
@@ -140,12 +145,8 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_eth_usd_price_binance(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        url = 'https://api.binance.com/api/v3/avgPrice?symbol=ETHUSDT'
+    def get_binance_price(self, symbol: str):
+        url = f'https://api.binance.com/api/v3/avgPrice?symbol={symbol}'
         try:
             response = requests.get(url)
             api_json = response.json()
@@ -160,13 +161,8 @@ class BalanceService:
         except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
-    def get_eth_usd_price_kraken(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        # Use kraken for eth_value
-        url = 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD'
+    def get_kraken_price(self, symbol: str):
+        url = f'https://api.kraken.com/0/public/Ticker?pair={symbol}'
         try:
             response = requests.get(url)
             api_json = response.json()
@@ -184,13 +180,44 @@ class BalanceService:
         except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
-    @cachedmethod(cache=operator.attrgetter('cache_eth_usd_price'))
-    @cache_memoize(60 * 30, prefix='balances-get_eth_usd_price')  # 30 minutes
-    def get_eth_usd_price(self) -> float:
-        try:
-            return self.get_eth_usd_price_kraken()
-        except CannotGetEthereumPrice:
-            return self.get_eth_usd_price_binance()
+    def get_eth_usd_price_binance(self) -> float:
+        """
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
+        """
+        return self.get_binance_price('ETHUSDT')
+
+    def get_eth_usd_price_kraken(self) -> float:
+        """
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
+        """
+        return self.get_kraken_price('ETHUSD')
+
+    def get_dai_usd_price_kraken(self) -> float:
+        """
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
+        """
+        return self.get_kraken_price('DAIUSD')
+
+    @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
+    @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes
+    def get_eth_price(self) -> float:
+        """
+        Get USD price for Ether. On xDAI we use DAI price.
+        :return: USD price for Ether
+        """
+        if self.ethereum_network == EthereumNetwork.XDAI:
+            try:
+                return self.get_dai_usd_price_kraken()
+            except CannotGetEthereumPrice:
+                return 1  # DAI/USD should be close to 1
+        else:
+            try:
+                return self.get_eth_usd_price_kraken()
+            except CannotGetEthereumPrice:
+                return self.get_eth_usd_price_binance()
 
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     @cache_memoize(60 * 30, prefix='balances-get_token_eth_value')  # 30 minutes
@@ -243,7 +270,7 @@ class BalanceService:
         :return: List of BalanceWithFiat
         """
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
-        eth_value = self.get_eth_usd_price()
+        eth_value = self.get_eth_price()
         balances_with_usd = []
         for balance in balances:
             token_address = balance.token_address

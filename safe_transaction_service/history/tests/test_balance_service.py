@@ -22,21 +22,21 @@ from .utils import just_test_if_mainnet_node
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
     @mock.patch.object(BalanceService, 'get_eth_usd_price_kraken', return_value=0.4)
     @mock.patch.object(BalanceService, 'get_eth_usd_price_binance', return_value=0.5)
-    def test_get_eth_usd_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
+    def test_get_eth_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
         balance_service = BalanceServiceProvider()
-        eth_usd_price = balance_service.get_eth_usd_price()
+        eth_usd_price = balance_service.get_eth_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
         binance_mock.assert_not_called()
 
         kraken_mock.side_effect = CannotGetEthereumPrice
 
         # Cache is still working
-        eth_usd_price = balance_service.get_eth_usd_price()
+        eth_usd_price = balance_service.get_eth_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
 
         # Remove cache and test binance is called
-        balance_service.cache_eth_usd_price.clear()
-        eth_usd_price = balance_service.get_eth_usd_price()
+        balance_service.cache_eth_price.clear()
+        eth_usd_price = balance_service.get_eth_price()
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
@@ -84,8 +84,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.decimals, token_db.decimals)
 
     @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
-    @mock.patch.object(BalanceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
+    @mock.patch.object(BalanceService, 'get_eth_price', return_value=123.4, autospec=True)
+    def test_get_usd_balances(self, get_eth_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         balance_service = BalanceServiceProvider()
 
         safe_address = Account.create().address
