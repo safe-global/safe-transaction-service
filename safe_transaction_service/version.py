@@ -1,2 +1,2 @@
-__version__ = '2.3.8'
+__version__ = '2.3.9-beta'
 __version_info__ = tuple([int(num) if num.isdigit() else num for num in __version__.replace('-', '.', 1).split('.')])
