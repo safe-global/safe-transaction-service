@@ -183,7 +183,7 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context['safe_tx_hash'] = self.kwargs['safe_tx_hash']
+        context['safe_tx_hash'] = self.kwargs.get('safe_tx_hash')
         return context
 
     def get_serializer_class(self):
