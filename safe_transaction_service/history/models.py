@@ -3,10 +3,10 @@ from enum import Enum
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 
-from django.contrib.postgres.fields import ArrayField, JSONField
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import IntegrityError, models
-from django.db.models import Case, Q, QuerySet, Sum
+from django.db.models import Case, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
@@ -727,7 +727,7 @@ class MultisigTransaction(TimeStampedModel):
     refund_receiver = EthereumAddressField(null=True)
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
-    failed = models.NullBooleanField(default=None, db_index=True)
+    failed = models.BooleanField(null=True, default=None, db_index=True)
     origin = models.CharField(null=True, default=None, max_length=100)  # To store arbitrary data on the tx
     trusted = models.BooleanField(default=False, db_index=True)  # Txs proposed by a delegate or with one confirmation
 
