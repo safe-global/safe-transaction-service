@@ -37,8 +37,8 @@ class Erc20EventsIndexer(EthereumIndexer):
 
     def __init__(self, ethereum_client: EthereumClient,
                  block_process_limit: int = 10000,
-                 updated_blocks_behind: int = 100,  # For last 100 blocks, process all transactions together
-                 query_chunk_size: int = int(1e6),  # For last blocks, process every Safe together
+                 updated_blocks_behind: int = 300,  # For last 300 blocks, process `query_chunk_size` Safes together
+                 query_chunk_size: int = 500,
                  *args, **kwargs):
         super().__init__(ethereum_client,
                          block_process_limit=block_process_limit,
@@ -68,16 +68,16 @@ class Erc20EventsIndexer(EthereumIndexer):
         """
         addresses_len = len(addresses)
 
-        if (current_block_number - self.updated_blocks_behind) < from_block_number:
-            logger.info('Searching for all erc20/721 events from block-number=%d to block-number=%d - '
-                        'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
-            erc20_transfer_events = self._find_elements_without_transfer_topics(addresses, from_block_number,
-                                                                                to_block_number)
-        else:
-            logger.info('Filtering for erc20/721 events from block-number=%d to block-number=%d - '
-                        'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
-            erc20_transfer_events = self._find_elements_using_transfer_topics(addresses, from_block_number,
-                                                                              to_block_number)
+        # Disable find elements without transfer topics. It's too much for the nodes
+        # if (current_block_number - self.updated_blocks_behind) < from_block_number:
+        #    logger.info('Searching for all erc20/721 events from block-number=%d to block-number=%d - '
+        #                'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
+        #    erc20_transfer_events = self._find_elements_without_transfer_topics(addresses, from_block_number,
+        #                                                                        to_block_number)
+        # else:
+        logger.info('Filtering for erc20/721 events from block-number=%d to block-number=%d - '
+                    'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
+        erc20_transfer_events = self._find_elements_using_transfer_topics(addresses, from_block_number, to_block_number)
 
         logger.info('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
                     len(erc20_transfer_events), from_block_number, to_block_number, addresses_len)
