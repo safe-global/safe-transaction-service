@@ -676,6 +676,39 @@ class MultisigTransactionManager(models.Manager):
         if nonce_query:
             return nonce_query['nonce']
 
+    def last_valid_transaction(self, safe: str) -> Optional['MultisigTransaction']:
+        """
+        Find last transaction where signers match the owners registered for that Safe. Transactions out of sync
+        have an invalid `safeNonce`, so `safeTxHash` is not valid and owners recovered from the signatures wouldn't be
+        valid. We exclude `Approved hashes` and `Contract signatures` as that owners are not retrieved using the
+        signature, so they will show the right owner even if `safeNonce` is not valid
+        :param safe:
+        :return: Last valid indexed transaction mined
+        """
+        # Build list of every owner known for that Safe (even if it was deleted/replaced). Changes of collision for
+        # invalid recovered owners from signatures are almost impossible
+        owners_set = set()
+        for owners_list in SafeStatus.objects.filter(address=safe).values_list('owners', flat=True).distinct():
+            owners_set.update(owners_list)
+
+        print(MultisigTransaction.objects.filter(
+            safe=safe,
+            confirmations__owner__in=owners_set,
+            confirmations__signature_type__in=[SafeSignatureType.EOA.value,
+                                               SafeSignatureType.ETH_SIGN.value]
+        ).exclude(
+            ethereum_tx=None
+        ).order_by('-nonce'))
+
+        return MultisigTransaction.objects.filter(
+            safe=safe,
+            confirmations__owner__in=owners_set,
+            confirmations__signature_type__in=[SafeSignatureType.EOA.value,
+                                               SafeSignatureType.ETH_SIGN.value]
+        ).exclude(
+            ethereum_tx=None
+        ).order_by('-nonce').first()
+
 
 class MultisigTransactionQuerySet(models.QuerySet):
     def executed(self):

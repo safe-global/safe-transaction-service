@@ -6,7 +6,7 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import Safe
 
-from ...models import SafeStatus
+from ...models import MultisigTransaction, SafeStatus
 from ...services import IndexServiceProvider
 
 
@@ -68,6 +68,11 @@ class Command(BaseCommand):
                 if nonce != blockchain_nonce:
                     self.stdout.write(self.style.WARNING(f'Safe={address} stored nonce={nonce} is '
                                                          f'different from blockchain-nonce={blockchain_nonce}'))
+                    if last_valid_transaction := MultisigTransaction.objects.last_valid_transaction(address):
+                        self.stdout.write(self.style.WARNING(
+                            f'Last valid transaction for Safe={address} has safe-nonce={last_valid_transaction.nonce} '
+                            f'safe-transaction-hash={last_valid_transaction.safe_tx_hash} and '
+                            f'ethereum-tx-hash={last_valid_transaction.ethereum_tx_id}'))
                     addresses_to_reindex.append(address)
 
             if fix and addresses_to_reindex:

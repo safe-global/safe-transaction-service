@@ -359,3 +359,22 @@ class TestMultisigTransactions(TestCase):
         MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
         self.assertEqual(MultisigTransaction.objects.without_confirmations().count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 1)
+
+    def test_last_valid_transaction(self):
+        safe_address = Account.create().address
+        self.assertIsNone(MultisigTransaction.objects.last_valid_transaction(safe_address))
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address, nonce=0)
+        self.assertIsNone(MultisigTransaction.objects.last_valid_transaction(safe_address))
+        multisig_confirmation = MultisigConfirmationFactory(multisig_transaction=multisig_transaction,
+                                                            signature_type=SafeSignatureType.EOA.value)
+        self.assertIsNone(MultisigTransaction.objects.last_valid_transaction(safe_address))
+        SafeStatusFactory(address=safe_address, owners=[multisig_confirmation.owner])
+        self.assertEqual(MultisigTransaction.objects.last_valid_transaction(safe_address),
+                         multisig_transaction)
+
+        multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, nonce=2)
+        multisig_confirmation_2 = MultisigConfirmationFactory(multisig_transaction=multisig_transaction_2,
+                                                              signature_type=SafeSignatureType.EOA.value,
+                                                              owner=multisig_confirmation.owner)
+        self.assertEqual(MultisigTransaction.objects.last_valid_transaction(safe_address),
+                         multisig_transaction_2)
