@@ -40,6 +40,15 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
+    def test_get_dai_usd_price_kraken(self) -> float:
+        just_test_if_mainnet_node()
+        balance_service = BalanceServiceProvider()
+
+        # Binance is used
+        price = balance_service.get_dai_usd_price_kraken()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
     def test_get_eth_usd_price_binance(self):
         just_test_if_mainnet_node()
         balance_service = BalanceServiceProvider()
@@ -57,6 +66,15 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         eth_usd_price = balance_service.get_eth_usd_price_kraken()
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
+
+    def test_get_ewt_usd_price_kucoin(self) -> float:
+        just_test_if_mainnet_node()
+        balance_service = BalanceServiceProvider()
+
+        # Binance is used
+        price = balance_service.get_ewt_usd_price_kucoin()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
 
     def test_token_eth_value(self):
         mainnet_node = just_test_if_mainnet_node()

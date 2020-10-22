@@ -180,6 +180,13 @@ class BalanceService:
         except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
+    def get_dai_usd_price_kraken(self) -> float:
+        """
+        :return: current USD price for ethereum using Kraken
+        :raises: CannotGetEthereumPrice
+        """
+        return self.get_kraken_price('DAIUSD')
+
     def get_eth_usd_price_binance(self) -> float:
         """
         :return: current USD price for ethereum using Kraken
@@ -194,12 +201,14 @@ class BalanceService:
         """
         return self.get_kraken_price('ETHUSD')
 
-    def get_dai_usd_price_kraken(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        return self.get_kraken_price('DAIUSD')
+    def get_ewt_usd_price_kucoin(self) -> float:
+        url = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
+        response = requests.get(url)
+        try:
+            result = response.json()
+            return float(result['data']['price'])
+        except (ValueError, ConnectionError) as e:
+            raise CannotGetEthereumPrice from e
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
     @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes
@@ -213,6 +222,8 @@ class BalanceService:
                 return self.get_dai_usd_price_kraken()
             except CannotGetEthereumPrice:
                 return 1  # DAI/USD should be close to 1
+        elif self.ethereum_network in (EthereumNetwork.ENERGY_WEB_CHAIN, EthereumNetwork.VOLTA):
+            return self.get_ewt_usd_price_kucoin()
         else:
             try:
                 return self.get_eth_usd_price_kraken()
