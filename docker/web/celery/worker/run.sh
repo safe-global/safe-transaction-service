@@ -11,4 +11,4 @@ fi
 
 sleep 10  # Wait for migrations
 echo "==> $(date +%H:%M:%S) ==> Running Celery worker <=="
-exec celery -A safe_transaction_service.taskapp worker --loglevel $log_level -c 4
+exec celery -A safe_transaction_service.taskapp worker --loglevel $log_level --pool=gevent --concurrency=100
