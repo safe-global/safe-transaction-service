@@ -58,14 +58,14 @@ class InternalTxIndexer(EthereumIndexer):
         # Use `trace_block` for last `number_trace_blocks` blocks and `trace_filter` for the others
         trace_block_number = max(current_block_number - self.number_trace_blocks, 0)
         if from_block_number > trace_block_number:  # Just trace_block
-            logger.info('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
+            logger.debug('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
             return self._find_relevant_elements_using_trace_block(addresses, from_block_number, to_block_number)
         elif to_block_number < trace_block_number:  # Just trace_filter
-            logger.info('Using trace_filter from-block=%d to-block=%d', from_block_number, to_block_number)
+            logger.debug('Using trace_filter from-block=%d to-block=%d', from_block_number, to_block_number)
             return self._find_relevant_elements_using_trace_filter(addresses, from_block_number, to_block_number)
         else:  # trace_filter for old blocks and trace_filter for the most recent ones
-            logger.info('Using trace_filter from-block=%d to-block=%d and trace_block from-block=%d to-block=%d',
-                        from_block_number, trace_block_number, trace_block_number, to_block_number)
+            logger.debug('Using trace_filter from-block=%d to-block=%d and trace_block from-block=%d to-block=%d',
+                         from_block_number, trace_block_number, trace_block_number, to_block_number)
             return OrderedDict.fromkeys(list(self._find_relevant_elements_using_trace_filter(addresses,
                                                                                              from_block_number,
                                                                                              trace_block_number))
@@ -128,22 +128,22 @@ class InternalTxIndexer(EthereumIndexer):
         if not tx_hashes:
             return []
 
-        logger.info('Prefetching and storing ethereum txs')
+        logger.debug('Prefetching and storing ethereum txs')
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.info('End prefetching and storing of ethereum txs')
+        logger.debug('End prefetching and storing of ethereum txs')
 
-        logger.info('Prefetching of traces(internal txs)')
+        logger.debug('Prefetching of traces(internal txs)')
         internal_txs_batch = [InternalTx.objects.build_from_trace(trace, ethereum_tx)
                               for ethereum_tx, traces
                               in zip(ethereum_txs, self.ethereum_client.parity.trace_transactions(tx_hashes))
                               for trace in traces]
-        logger.info('End prefetching of traces(internal txs)')
+        logger.debug('End prefetching of traces(internal txs)')
 
-        logger.info('Storing traces')
+        logger.debug('Storing traces')
         with transaction.atomic():
             internal_txs = InternalTx.objects.bulk_create(internal_txs_batch, ignore_conflicts=True)
-            logger.info('End storing of traces')
-            logger.info('Decoding of traces')
+            logger.debug('End storing of traces')
+            logger.debug('Decoding of traces')
             internal_txs_decoded_batch = []
             for internal_tx in internal_txs:
                 if internal_tx.can_be_decoded:
@@ -158,17 +158,17 @@ class InternalTxIndexer(EthereumIndexer):
                                                                             processed=False))
                     except CannotDecode:
                         pass
-            logger.info('End decoding of traces')
-            logger.info('Storing decoded traces')
+            logger.debug('End decoding of traces')
+            logger.debug('Storing decoded traces')
             if internal_txs_decoded_batch:
                 InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
-            logger.info('End storing of traces')
+            logger.debug('End storing of traces')
             return internal_txs
 
 
 class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
     """
-    Optimize receiving all the addresses
+    Indexer for nodes not supporting `trace_filter`, so it will always use `trace_block`
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -176,5 +176,5 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
 
     def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
                                to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:
-        logger.info('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
+        logger.debug('Using trace_block from-block=%d to-block=%d', from_block_number, to_block_number)
         return self._find_relevant_elements_using_trace_block(addresses, from_block_number, to_block_number)

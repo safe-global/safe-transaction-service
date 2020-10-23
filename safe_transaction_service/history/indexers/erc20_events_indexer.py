@@ -75,12 +75,14 @@ class Erc20EventsIndexer(EthereumIndexer):
         #    erc20_transfer_events = self._find_elements_without_transfer_topics(addresses, from_block_number,
         #                                                                        to_block_number)
         # else:
-        logger.info('Filtering for erc20/721 events from block-number=%d to block-number=%d - '
-                    'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
+        logger.debug('Filtering for erc20/721 events from block-number=%d to block-number=%d - '
+                     'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
         erc20_transfer_events = self._find_elements_using_transfer_topics(addresses, from_block_number, to_block_number)
 
-        logger.info('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
-                    len(erc20_transfer_events), from_block_number, to_block_number, addresses_len)
+        len_erc20_transfer_events = len(erc20_transfer_events)
+        logger_fn = logger.info if len_erc20_transfer_events else logger.debug
+        logger_fn('Found %d erc20/721 events between block-number=%d and block-number=%d. Number of Safes=%d',
+                  len_erc20_transfer_events, from_block_number, to_block_number, addresses_len)
 
         return erc20_transfer_events
 

@@ -275,7 +275,7 @@ LOGGING = {
             'level': 'INFO',
         },
         'safe_transaction_service.history.services.collectibles_service': {
-            'level': 'DEBUG',
+            'level': 'INFO',
         },
         'celery': {
             'handlers': ['celery_console'],
