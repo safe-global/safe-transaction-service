@@ -18,7 +18,7 @@ docutils==0.16
 drf-yasg[validation]==1.17.1
 ethereum==2.3.2
 firebase-admin==4.4.0
-gnosis-py==2.6.8
+gnosis-py==2.6.10
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.1
 packaging>=20.4
