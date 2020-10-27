@@ -159,7 +159,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
             logger.info('Start processing decoded internal txs')
             number_processed = 0
             count = InternalTxDecoded.objects.not_processed().count()  # Just get a rough estimate, faster for DB
-            batch = 500
+            batch = 250
             if not count:
                 logger.info('No decoded internal txs to process')
             else:
