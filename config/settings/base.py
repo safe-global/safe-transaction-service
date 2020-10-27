@@ -269,7 +269,7 @@ LOGGING = {
             'level': 'INFO',
         },
         'safe_transaction_service.history.indexers.internal_tx_indexer': {
-            'level': 'INFO',
+            'level': 'DEBUG',
         },
         'safe_transaction_service.history.indexers.erc20_events_indexer': {
             'level': 'INFO',

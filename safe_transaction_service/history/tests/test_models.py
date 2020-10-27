@@ -1,5 +1,7 @@
 import logging
 
+import psycopg2
+from django.db import IntegrityError
 from django.test import TestCase
 
 from eth_account import Account
@@ -242,6 +244,21 @@ class TestInternalTx(TestCase):
         parent_internal_tx.error = None
         parent_internal_tx.save(update_fields=['error'])
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
+
+    def test_internal_txs_bulk(self):
+        internal_txs = [InternalTxFactory() for _ in range(5)]
+        for internal_tx in internal_txs:
+            internal_tx.pk = None
+
+        # If bulk inserted with `ignore_conflicts` pk will not be populated
+        InternalTx.objects.all().delete()
+        InternalTx.objects.bulk_create(internal_txs, ignore_conflicts=True)
+        for internal_tx in internal_txs:
+            self.assertIsNone(internal_tx.pk)
+        InternalTx.objects.all().delete()
+        InternalTx.objects.bulk_create(internal_txs[:3])
+        with self.assertRaises(IntegrityError):
+            InternalTx.objects.bulk_create(internal_txs)  # Cannot bulk create again first 2 transactions
 
 
 class TestSafeStatus(TestCase):

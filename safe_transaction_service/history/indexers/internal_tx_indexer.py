@@ -147,11 +147,11 @@ class InternalTxIndexer(EthereumIndexer):
             internal_txs_decoded_batch = []
             for internal_tx in internal_txs:
                 if internal_tx.can_be_decoded:
-                    if internal_tx.pk is None:  # Internal tx not created, already exists
-                        internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
-                                                             trace_address=internal_tx.trace_address)
                     try:
                         function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
+                        if internal_tx.pk is None:  # Internal tx not created, already exists
+                            internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
+                                                                 trace_address=internal_tx.trace_address)
                         internal_txs_decoded_batch.append(InternalTxDecoded(internal_tx=internal_tx,
                                                                             function_name=function_name,
                                                                             arguments=arguments,
