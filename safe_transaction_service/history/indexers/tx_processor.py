@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Dict, List, Union
+from typing import Dict, List, Sequence, Union
 
 from django.db import transaction
 
@@ -25,7 +25,7 @@ class TxProcessor(ABC):
     def process_decoded_transaction(self, internal_tx_decoded: InternalTxDecoded) -> bool:
         pass
 
-    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
+    def process_decoded_transactions(self, internal_txs_decoded: Sequence[InternalTxDecoded]) -> List[bool]:
         return [self.process_decoded_transaction(decoded_transaction) for decoded_transaction in internal_txs_decoded]
 
 
@@ -101,7 +101,7 @@ class SafeTxProcessor(TxProcessor):
         return processed_successfully
 
     @transaction.atomic
-    def process_decoded_transactions(self, internal_txs_decoded: List[InternalTxDecoded]) -> List[bool]:
+    def process_decoded_transactions(self, internal_txs_decoded: Sequence[InternalTxDecoded]) -> List[bool]:
         """
         Optimize to process multiple transactions in a batch
         :param internal_txs_decoded:
@@ -134,6 +134,8 @@ class SafeTxProcessor(TxProcessor):
             return False
 
         processed_successfully = True
+        logger.debug('Start processing InternalTxDecoded in tx-hash=%s',
+                     HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id).hex())
         if function_name == 'setup' and contract_address != NULL_ADDRESS:
             logger.debug('Processing Safe setup')
             owners = arguments['_owners']

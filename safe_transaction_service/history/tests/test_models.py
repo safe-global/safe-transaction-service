@@ -1,6 +1,5 @@
 import logging
 
-import psycopg2
 from django.db import IntegrityError
 from django.test import TestCase
 
@@ -246,6 +245,9 @@ class TestInternalTx(TestCase):
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
 
     def test_internal_txs_bulk(self):
+        """
+        This is the same for every bulk_insert
+        """
         internal_txs = [InternalTxFactory() for _ in range(5)]
         for internal_tx in internal_txs:
             internal_tx.pk = None
