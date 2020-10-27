@@ -280,7 +280,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeMasterCopy)
 class SafeMasterCopyAdmin(MonitoredAddressAdmin):
-    pass
+    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version')
 
 
 @admin.register(ProxyFactory)

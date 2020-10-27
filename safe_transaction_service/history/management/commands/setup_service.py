@@ -77,6 +77,7 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
     EthereumNetwork.XDAI: [
         ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10612049, '1.2.0'),
         ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 10045292, '1.1.1'),
+        ('0x2CB0ebc503dE87CFD8f0eCEED8197bF7850184ae', 12529466, '1.1.1-Circles'),
     ],
     EthereumNetwork.ENERGY_WEB_CHAIN: [
         ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 6398655, '1.2.0'),
