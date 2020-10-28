@@ -691,15 +691,6 @@ class MultisigTransactionManager(models.Manager):
         for owners_list in SafeStatus.objects.filter(address=safe).values_list('owners', flat=True).distinct():
             owners_set.update(owners_list)
 
-        print(MultisigTransaction.objects.filter(
-            safe=safe,
-            confirmations__owner__in=owners_set,
-            confirmations__signature_type__in=[SafeSignatureType.EOA.value,
-                                               SafeSignatureType.ETH_SIGN.value]
-        ).exclude(
-            ethereum_tx=None
-        ).order_by('-nonce'))
-
         return MultisigTransaction.objects.filter(
             safe=safe,
             confirmations__owner__in=owners_set,
