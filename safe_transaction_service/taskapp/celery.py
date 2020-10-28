@@ -10,7 +10,6 @@ from celery.app.log import TaskFormatter
 from celery.signals import setup_logging
 from celery.utils.log import ColorFormatter
 
-
 logger = logging.getLogger(__name__)
 
 

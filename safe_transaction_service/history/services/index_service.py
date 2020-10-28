@@ -1,7 +1,7 @@
 import logging
 from typing import Collection, List, OrderedDict, Union
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from hexbytes import HexBytes
 
@@ -131,15 +131,16 @@ class IndexService:
                                                 f'with hash={ethereum_block.block_hash} '
                                                 f'is not marching retrieved hash={block["hash"].hex()}')
             try:
+                with transaction.atomic():
+                    ethereum_tx = EthereumTx.objects.create_from_tx_dict(tx,
+                                                                         tx_receipt=tx_receipt,
+                                                                         ethereum_block=ethereum_block)
+                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
+            except IntegrityError:  # Tx exists
                 ethereum_tx = EthereumTx.objects.get(tx_hash=tx['hash'])
                 # For txs stored before being mined
                 ethereum_tx.update_with_block_and_receipt(ethereum_block, tx_receipt)
                 ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
-            except EthereumTx.DoesNotExist:
-                ethereum_tx = EthereumTx.objects.create_from_tx_dict(tx,
-                                                                     tx_receipt=tx_receipt,
-                                                                     ethereum_block=ethereum_block)
-                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
