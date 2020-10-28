@@ -9,6 +9,7 @@ from redis import Redis
 
 from safe_transaction_service.history.models import (MultisigTransaction,
                                                      WebHookType)
+from safe_transaction_service.history.utils import close_gevent_db_connection
 
 from .clients.firebase_client import FirebaseProvider
 from .models import FirebaseDevice
@@ -81,32 +82,35 @@ class DuplicateNotification:
 
 @app.shared_task()
 def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> Tuple[int, int]:
-    if not (address and payload):  # Both must be present
-        return 0
+    try:
+        if not (address and payload):  # Both must be present
+            return 0
 
-    firebase_client = FirebaseProvider()
-    firebase_devices = FirebaseDevice.objects.filter(
-        safes__address=address
-    ).exclude(
-        cloud_messaging_token=None
-    )  # TODO Use cache
-    tokens = [firebase_device.cloud_messaging_token for firebase_device in firebase_devices]
+        firebase_client = FirebaseProvider()
+        firebase_devices = FirebaseDevice.objects.filter(
+            safes__address=address
+        ).exclude(
+            cloud_messaging_token=None
+        )  # TODO Use cache
+        tokens = [firebase_device.cloud_messaging_token for firebase_device in firebase_devices]
 
-    if not (tokens and filter_notification(payload)):
-        return 0
+        if not (tokens and filter_notification(payload)):
+            return 0
 
-    # Make sure notification has not been sent before
-    duplicate_notification = DuplicateNotification(address, payload)
-    if duplicate_notification.is_duplicated():
-        logger.info('Duplicated notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
-        return 0
+        # Make sure notification has not been sent before
+        duplicate_notification = DuplicateNotification(address, payload)
+        if duplicate_notification.is_duplicated():
+            logger.info('Duplicated notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
+            return 0
 
-    duplicate_notification.set_duplicated()
+        duplicate_notification.set_duplicated()
 
-    logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
-    success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
-    if invalid_tokens:
-        logger.info('Removing invalid tokens for safe=%s', address)
-        FirebaseDevice.objects.filter(cloud_messaging_token__in=invalid_tokens).update(cloud_messaging_token=None)
+        logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
+        success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
+        if invalid_tokens:
+            logger.info('Removing invalid tokens for safe=%s', address)
+            FirebaseDevice.objects.filter(cloud_messaging_token__in=invalid_tokens).update(cloud_messaging_token=None)
 
-    return success_count, failure_count
+        return success_count, failure_count
+    finally:
+        close_gevent_db_connection()

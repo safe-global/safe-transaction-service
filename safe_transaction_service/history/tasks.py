@@ -18,6 +18,7 @@ from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
 from .indexers.tx_processor import SafeTxProcessor, TxProcessor
 from .models import InternalTxDecoded, WebHook, WebHookType
 from .services import ReorgService, ReorgServiceProvider
+from .utils import close_gevent_db_connection
 
 logger = get_task_logger(__name__)
 
@@ -83,6 +84,7 @@ class BlockchainRunningTask:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.blockchain_running_task_manager.remove_task(self.task_id)
+        close_gevent_db_connection()  # Need for django-db-geventpool
 
 
 @worker_shutting_down.connect
@@ -178,6 +180,8 @@ def process_decoded_internal_txs_task() -> Optional[int]:
                 return number_processed
     except LockError:
         pass
+    finally:
+        close_gevent_db_connection()
 
 
 @app.shared_task(soft_time_limit=LOCK_TIMEOUT)
@@ -199,6 +203,8 @@ def check_reorgs_task() -> Optional[int]:
                 return first_reorg_block_number
     except LockError:
         pass
+    finally:
+        close_gevent_db_connection()
 
 
 @app.shared_task()
@@ -206,34 +212,37 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
         return 0
 
-    webhooks = WebHook.objects.matching_for_address(address)
-    if not webhooks:
-        return 0
+    try:
+        webhooks = WebHook.objects.matching_for_address(address)
+        if not webhooks:
+            return 0
 
-    sent_requests = 0
-    for webhook in webhooks:
-        webhook_type = WebHookType[payload['type']]
-        if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
-            continue
-        elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
-            continue
-        elif (webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not
-              webhook.new_executed_outgoing_transaction):
-            continue
-        elif webhook_type in (WebHookType.INCOMING_TOKEN,
-                              WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
-            continue
+        sent_requests = 0
+        for webhook in webhooks:
+            webhook_type = WebHookType[payload['type']]
+            if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
+                continue
+            elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
+                continue
+            elif (webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not
+                  webhook.new_executed_outgoing_transaction):
+                continue
+            elif webhook_type in (WebHookType.INCOMING_TOKEN,
+                                  WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
+                continue
 
-        parsed_url = urlparse(webhook.url)
-        host = f'{parsed_url.scheme}://{parsed_url.netloc}'
-        if webhook.address:
-            logger.info('Sending webhook for address=%s host=%s and payload=%s', address, host, payload)
-        else:  # Generic WebHook
-            logger.info('Sending webhook for host=%s and payload=%s', host, payload)
+            parsed_url = urlparse(webhook.url)
+            host = f'{parsed_url.scheme}://{parsed_url.netloc}'
+            if webhook.address:
+                logger.info('Sending webhook for address=%s host=%s and payload=%s', address, host, payload)
+            else:  # Generic WebHook
+                logger.info('Sending webhook for host=%s and payload=%s', host, payload)
 
-        r = requests.post(webhook.url, json=payload)
-        if not r.ok:
-            logger.warning('Error %d posting to host=%s with content=%s', r.status_code, host, r.content)
+            r = requests.post(webhook.url, json=payload)
+            if not r.ok:
+                logger.warning('Error %d posting to host=%s with content=%s', r.status_code, host, r.content)
 
-        sent_requests += 1
-    return sent_requests
+            sent_requests += 1
+        return sent_requests
+    finally:
+        close_gevent_db_connection()

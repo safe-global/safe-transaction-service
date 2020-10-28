@@ -4,6 +4,7 @@ django-authtools==1.7.0
 django-cache-memoize==0.1.7
 django-celery-beat==2.0.0
 django-cors-headers==3.5.0
+django-db-geventpool==3.2.3
 django-debug-toolbar
 django-debug-toolbar-force
 django-environ==0.4.5
@@ -22,6 +23,7 @@ gnosis-py==2.6.10
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.1
 packaging>=20.4
+psycogreen==1.0.2
 psycopg2-binary==2.8.6
 redis==3.5.3
 requests==2.24.0

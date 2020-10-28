@@ -1,6 +1,9 @@
 import logging
 from typing import Any, Dict, List, Optional, Union
 
+from django.core.signals import request_finished
+from django.db import connection
+
 from gunicorn import glogging
 
 
@@ -45,3 +48,14 @@ def parse_boolean_query_param(value: Union[bool, str]) -> bool:
         return True
     else:
         return False
+
+
+def close_gevent_db_connection():
+    """
+    Clean gevent db connections. Check `atomic block` to prevent breaking the tests (Django `TestCase` wraps tests
+    inside an atomic block that rollbacks at the end of the test)
+    https://github.com/jneight/django-db-geventpool#using-orm-when-not-serving-requests
+    :return:
+    """
+    if not connection.in_atomic_block:
+        request_finished.send(sender="greenlet")

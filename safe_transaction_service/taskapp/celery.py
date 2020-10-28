@@ -10,6 +10,10 @@ from celery.app.log import TaskFormatter
 from celery.signals import setup_logging
 from celery.utils.log import ColorFormatter
 
+
+logger = logging.getLogger(__name__)
+
+
 if not settings.configured:
     # set the default Django settings module for the 'celery' program.
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')  # pragma: no cover
@@ -39,9 +43,18 @@ class CeleryConfig(AppConfig):
     def ready(self):
         # Using a string here means the worker will not have to
         # pickle the object when using Windows.
+        self._patch_psycopg()
         app.config_from_object('django.conf:settings')
         installed_apps = [app_config.name for app_config in apps.get_app_configs()]
         app.autodiscover_tasks(lambda: installed_apps, force=True)
+
+    def _patch_psycopg(self):
+        try:
+            from psycogreen.gevent import patch_psycopg
+            logger.info('Patching psycopg for gevent')
+            patch_psycopg()
+        except ImportError:
+            pass
 
 
 class IgnoreSucceededNone(logging.Filter):

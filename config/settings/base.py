@@ -43,7 +43,12 @@ USE_TZ = True
 DATABASES = {
     'default': env.db('DATABASE_URL'),
 }
-DATABASES['default']['ATOMIC_REQUESTS'] = True
+DATABASES['default']['ATOMIC_REQUESTS'] = False
+DATABASES['default']['ENGINE'] = 'django_db_geventpool.backends.postgresql_psycopg2'
+DATABASES['default']['OPTIONS'] = {
+    'MAX_CONNS': 20,
+    'REUSE_CONNS': 10
+}
 
 # URLS
 # ------------------------------------------------------------------------------
