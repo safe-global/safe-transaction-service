@@ -75,6 +75,18 @@ class TestModelSignals(TestCase):
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
 
+class TestModelMixins(TestCase):
+    def test_bulk_create_from_generator(self):
+        self.assertEqual(InternalTx.objects.bulk_create_from_generator((x for x in range(0)), ignore_conflicts=True), 0)
+        number = 5
+        internal_txs = (InternalTxFactory() for _ in range(number))
+        self.assertEqual(InternalTx.objects.bulk_create_from_generator(internal_txs, ignore_conflicts=True), number)
+        internal_txs = [InternalTxFactory() for _ in range(number)]
+        InternalTx.objects.all().delete()
+        another_generator = (x for x in internal_txs)
+        self.assertEqual(InternalTx.objects.bulk_create_from_generator(another_generator), number)
+
+
 class TestSafeMasterCopy(TestCase):
     def test_safe_master_copy_sorting(self):
         SafeMasterCopy.objects.create(address=Account.create().address,

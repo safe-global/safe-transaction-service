@@ -1,8 +1,6 @@
 import json
 from typing import Any, Dict, Optional, Type, Union
 
-from django.core.signals import request_finished
-from django.db import close_old_connections, connection
 from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver

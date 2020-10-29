@@ -1,5 +1,6 @@
 import datetime
 from enum import Enum
+from itertools import islice
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 
@@ -76,11 +77,26 @@ class TransferDict(TypedDict):
 
 
 class BulkCreateSignalMixin:
-    def bulk_create(self, objs, **kwargs):
-        result = super().bulk_create(objs, **kwargs)
+    def bulk_create(self, objs, batch_size: Optional[int] = None, ignore_conflicts: bool = False):
+        objs = list(objs)  # If not it won't be iterate later
+        result = super().bulk_create(objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts)
         for obj in objs:
             post_save.send(obj.__class__, instance=obj, created=True)
         return result
+
+    def bulk_create_from_generator(self, objs, batch_size: int = 10000, ignore_conflicts: bool = False) -> int:
+        """
+        Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
+        they will be brought to RAM. This approach is more friendly
+        :return: Count of inserted elements
+        """
+        assert batch_size is not None and batch_size > 0
+        total = 0
+        while True:
+            if inserted := len(self.bulk_create(islice(objs, batch_size), ignore_conflicts=ignore_conflicts)):
+                total += inserted
+            else:
+                return total
 
 
 # class EnsLabel(models.Model):
@@ -601,7 +617,7 @@ class InternalTx(models.Model):
         return None
 
 
-class InternalTxDecodedManager(models.Manager):
+class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
     pass
 
 

@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import List, Optional, Sequence, Set
+from typing import Generator, List, Optional, Sequence, Set
 
 from django.db import transaction
 
@@ -123,6 +123,23 @@ class InternalTxIndexer(EthereumIndexer):
 
         return tx_hashes
 
+    def _get_internal_txs_to_decode(self, tx_hashes: Sequence[str]) -> Generator[InternalTxDecoded, None, None]:
+        """
+        Use generator to be more RAM friendly
+        """
+        for internal_tx in InternalTx.objects.can_be_decoded().filter(ethereum_tx__in=tx_hashes):
+            try:
+                function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
+                if internal_tx.pk is None:  # pk is not populated on `bulk_create ignore_conflicts=True`
+                    internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
+                                                         trace_address=internal_tx.trace_address)
+                yield InternalTxDecoded(internal_tx=internal_tx,
+                                        function_name=function_name,
+                                        arguments=arguments,
+                                        processed=False)
+            except CannotDecode:
+                pass
+
     def process_elements(self, tx_hashes: Sequence[str]) -> List[InternalTx]:
         # Prefetch ethereum txs
         if not tx_hashes:
@@ -133,37 +150,25 @@ class InternalTxIndexer(EthereumIndexer):
         logger.debug('End prefetching and storing of ethereum txs')
 
         logger.debug('Prefetching of traces(internal txs)')
-        internal_txs_batch = [InternalTx.objects.build_from_trace(trace, ethereum_tx)
+        internal_txs_batch = (InternalTx.objects.build_from_trace(trace, ethereum_tx)
                               for ethereum_tx, traces
                               in zip(ethereum_txs, self.ethereum_client.parity.trace_transactions(tx_hashes))
-                              for trace in traces]
+                              for trace in traces)
         logger.debug('End prefetching of traces(internal txs)')
 
-        logger.debug('Storing %d traces', len(internal_txs_batch))
+        logger.debug('Storing traces')
         with transaction.atomic():
-            internal_txs = InternalTx.objects.bulk_create(internal_txs_batch, ignore_conflicts=True)
-            logger.debug('End storing of traces')
-            logger.debug('Decoding of traces')
-            internal_txs_decoded_batch = []
-            for internal_tx in internal_txs:
-                if internal_tx.can_be_decoded:
-                    try:
-                        function_name, arguments = self.tx_decoder.decode_transaction(bytes(internal_tx.data))
-                        if internal_tx.pk is None:  # Internal tx not created, already exists
-                            internal_tx = InternalTx.objects.get(ethereum_tx=internal_tx.ethereum_tx,
-                                                                 trace_address=internal_tx.trace_address)
-                        internal_txs_decoded_batch.append(InternalTxDecoded(internal_tx=internal_tx,
-                                                                            function_name=function_name,
-                                                                            arguments=arguments,
-                                                                            processed=False))
-                    except CannotDecode:
-                        pass
-            logger.debug('End decoding of traces')
-            logger.debug('Storing %d decoded traces', len(internal_txs_batch))
-            if internal_txs_decoded_batch:
-                InternalTxDecoded.objects.bulk_create(internal_txs_decoded_batch, ignore_conflicts=True)
-            logger.debug('End storing of traces')
-            return internal_txs
+            traces_stored = InternalTx.objects.bulk_create_from_generator(
+                internal_txs_batch, ignore_conflicts=True
+            )
+            logger.debug('End storing of %d traces', traces_stored)
+
+            logger.debug('Start decoding and storing of decoded traces')
+            internal_txs_decoded = InternalTxDecoded.objects.bulk_create_from_generator(
+                self._get_internal_txs_to_decode(tx_hashes), ignore_conflicts=True
+            )
+            logger.debug('End decoding and storing of %d decoded traces', internal_txs_decoded)
+            return tx_hashes
 
 
 class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
