@@ -1,8 +1,8 @@
 cachetools==4.1.1
-celery==4.4.7
+celery==5.0.1
 django-authtools==1.7.0
 django-cache-memoize==0.1.7
-django-celery-beat==2.0.0
+django-celery-beat==2.1.0
 django-cors-headers==3.5.0
 django-db-geventpool==3.2.3
 django-debug-toolbar
@@ -14,9 +14,9 @@ django-redis==4.12.1
 django-timezone-field==4.0.0
 django==3.1.2
 djangorestframework-camel-case==1.2.0
-djangorestframework==3.11.2
+djangorestframework==3.12.1
 docutils==0.16
-drf-yasg[validation]==1.17.1
+drf-yasg[validation]==1.20.0
 ethereum==2.3.2
 firebase-admin==4.4.0
 gnosis-py==2.6.10
@@ -27,4 +27,4 @@ psycogreen==1.0.2
 psycopg2-binary==2.8.6
 redis==3.5.3
 requests==2.24.0
-web3==5.12.2
+web3==5.13.0
