@@ -112,7 +112,7 @@ def index_new_proxies_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(bind=True)
 def index_internal_txs_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
@@ -121,7 +121,7 @@ def index_internal_txs_task(self) -> Optional[int]:
 
     redis = get_redis()
     try:
-        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
+        with redis.lock('tasks:index_internal_txs_task', blocking_timeout=1):
             with BlockchainRunningTask(self.request):
                 logger.info('Start indexing of internal txs')
                 number_traces = InternalTxIndexerProvider().start()
