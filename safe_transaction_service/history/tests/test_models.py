@@ -84,7 +84,7 @@ class TestModelMixins(TestCase):
         internal_txs = [InternalTxFactory() for _ in range(number)]
         InternalTx.objects.all().delete()
         another_generator = (x for x in internal_txs)
-        self.assertEqual(InternalTx.objects.bulk_create_from_generator(another_generator), number)
+        self.assertEqual(InternalTx.objects.bulk_create_from_generator(another_generator, batch_size=2), number)
 
 
 class TestSafeMasterCopy(TestCase):
