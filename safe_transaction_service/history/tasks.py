@@ -24,7 +24,7 @@ logger = get_task_logger(__name__)
 
 
 COUNTDOWN = 60  # seconds
-LOCK_TIMEOUT = 60 * 10  # 10 minutes
+LOCK_TIMEOUT = 60 * 15  # 15 minutes
 
 
 def get_redis() -> Redis:

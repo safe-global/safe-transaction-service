@@ -118,8 +118,8 @@ class InternalTxIndexer(EthereumIndexer):
         tx_hashes = OrderedDict.fromkeys([trace['transactionHash']
                                           for trace in (to_traces + from_traces)]).keys()
         log_fn = logger.info if len(tx_hashes) else logger.debug
-        log_fn('Found %d relevant txs with %d internal txs between block-number=%d and block-number=%d. Addresses=%s',
-               len(to_traces + from_traces), len(tx_hashes), from_block_number, to_block_number, addresses)
+        log_fn('Found %d relevant txs with internal txs between block-number=%d and block-number=%d. Addresses=%s',
+               len(tx_hashes), from_block_number, to_block_number, addresses)
 
         return tx_hashes
 
@@ -145,7 +145,7 @@ class InternalTxIndexer(EthereumIndexer):
         if not tx_hashes:
             return []
 
-        logger.debug('Prefetching and storing ethereum txs')
+        logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug('End prefetching and storing of ethereum txs')
 
