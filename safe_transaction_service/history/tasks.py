@@ -69,7 +69,7 @@ class BlockchainRunningTaskManager:
 
 class BlockchainRunningTask:
     """
-    Context Manager to store blockchain related task ids. That way we can terminate all blockchain related task at
+    Context Manager to store blockchain related task ids. That way we can terminate all blockchain related tasks at
     once, e.g. reorg is detected
     """
     def __init__(self, celery_request: CeleryRequest):

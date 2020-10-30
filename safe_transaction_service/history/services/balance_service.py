@@ -145,7 +145,7 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_binance_price(self, symbol: str):
+    def _get_binance_price(self, symbol: str):
         url = f'https://api.binance.com/api/v3/avgPrice?symbol={symbol}'
         try:
             response = requests.get(url)
@@ -161,7 +161,7 @@ class BalanceService:
         except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
-    def get_kraken_price(self, symbol: str):
+    def _get_kraken_price(self, symbol: str):
         url = f'https://api.kraken.com/0/public/Ticker?pair={symbol}'
         try:
             response = requests.get(url)
@@ -185,21 +185,21 @@ class BalanceService:
         :return: current USD price for ethereum using Kraken
         :raises: CannotGetEthereumPrice
         """
-        return self.get_kraken_price('DAIUSD')
+        return self._get_kraken_price('DAIUSD')
 
     def get_eth_usd_price_binance(self) -> float:
         """
         :return: current USD price for ethereum using Kraken
         :raises: CannotGetEthereumPrice
         """
-        return self.get_binance_price('ETHUSDT')
+        return self._get_binance_price('ETHUSDT')
 
     def get_eth_usd_price_kraken(self) -> float:
         """
         :return: current USD price for ethereum using Kraken
         :raises: CannotGetEthereumPrice
         """
-        return self.get_kraken_price('ETHUSD')
+        return self._get_kraken_price('ETHUSD')
 
     def get_ewt_usd_price_kucoin(self) -> float:
         url = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'

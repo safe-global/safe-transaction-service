@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import IntegrityError, models
 from django.db.models import Case, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
@@ -293,14 +293,30 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
         :param address:
         :return: List of token addresses used by an address
         """
-        return self.erc20_events(address=address).values_list('address', flat=True).distinct()
+        # return self.erc20_events(address=address).values_list('address', flat=True).distinct()
+        address_as_postgres_text = f'"{address}"'
+        events = self.raw("""SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
+            ("topic" = %s
+            AND (("arguments" -> 'to')::text = %s
+            OR ("arguments" -> 'from')::text = %s)
+            AND "arguments" ? 'value')
+        """, [ERC20_721_TRANSFER_TOPIC[2:], address_as_postgres_text, address_as_postgres_text])
+        return [event.address for event in events]
 
     def erc721_tokens_used_by_address(self, address: str) -> List[str]:
         """
         :param address:
         :return: List of token addresses used by an address
         """
-        return self.erc721_events(address=address).values_list('address', flat=True).distinct()
+        # return self.erc721_events(address=address).values_list('address', flat=True).distinct()
+        address_as_postgres_text = f'"{address}"'
+        events = self.raw("""SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
+                    ("topic" = '%s'
+                    AND (("arguments" -> 'to')::text = '"%s"'
+                    OR ("arguments" -> 'from')::text = '"%s"')
+                    AND "arguments" ? 'tokenId')
+        """, [ERC20_721_TRANSFER_TOPIC[2:], address_as_postgres_text, address_as_postgres_text])
+        return [event.address for event in events]
 
     def erc20_tokens_with_balance(self, address: str) -> List[Dict[str, Any]]:
         """
@@ -341,6 +357,8 @@ class EthereumEvent(models.Model):
     class Meta:
         unique_together = (('ethereum_tx', 'log_index'),)
         indexes = [GinIndex(fields=['arguments'])]
+        # There are also 2 indexes created manually by 0026 migration, both Btree for arguments->to and arguments->from
+        # To use that indexes json queries must be rewritten to use `::text` fields
 
     def __str__(self):
         return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'

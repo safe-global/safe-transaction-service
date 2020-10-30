@@ -331,7 +331,7 @@ class SafeBalanceView(APIView):
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(15))
+    @method_decorator(cache_page(20))
     def get(self, request, address):
         """
         Get balance for Ether and ERC20 tokens
@@ -360,7 +360,7 @@ class SafeBalanceUsdView(SafeBalanceView):
         return BalanceServiceProvider().get_usd_balances(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(15))
+    @method_decorator(cache_page(20))
     def get(self, *args, **kwargs):
         """
         Get balance for Ether and ERC20 tokens with USD fiat conversion
