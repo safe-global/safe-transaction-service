@@ -142,7 +142,7 @@ class CollectiblesService:
             else:
                 logger.debug('Got metadata for uri=%s', uri)
                 return response.json()
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
 
     def build_collectible(self, token_info: Optional[Erc721InfoWithLogo], token_address: str, token_id: int,
