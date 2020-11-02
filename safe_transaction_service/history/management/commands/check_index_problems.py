@@ -66,7 +66,7 @@ class Command(BaseCommand):
             addresses_to_reindex = []
             for address, nonce, blockchain_nonce in zip(addresses, nonces, blockchain_nonces):
                 if blockchain_nonce is None:
-                    self.stdout.write(self.style.WARNING(f'Safe={address} stored nonce={nonce} looks problematic, '
+                    self.stdout.write(self.style.WARNING(f'Safe={address} looks problematic, '
                                                          f'cannot retrieve blockchain-nonce'))
                 if nonce != blockchain_nonce:
                     self.stdout.write(self.style.WARNING(f'Safe={address} stored nonce={nonce} is '
