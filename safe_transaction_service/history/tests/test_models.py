@@ -1,6 +1,7 @@
 import logging
 
 from django.db import IntegrityError
+from django.db.models import QuerySet
 from django.test import TestCase
 
 from eth_account import Account
@@ -13,10 +14,11 @@ from ..models import (EthereumEvent, EthereumTxCallType, InternalTx,
                       MultisigTransaction, SafeContractDelegate,
                       SafeMasterCopy, SafeStatus)
 from .factories import (EthereumBlockFactory, EthereumEventFactory,
-                        EthereumTxFactory, InternalTxFactory,
-                        MultisigConfirmationFactory,
+                        EthereumTxFactory, InternalTxDecodedFactory,
+                        InternalTxFactory, MultisigConfirmationFactory,
                         MultisigTransactionFactory,
-                        SafeContractDelegateFactory, SafeStatusFactory)
+                        SafeContractDelegateFactory, SafeContractFactory,
+                        SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -273,6 +275,28 @@ class TestInternalTx(TestCase):
         InternalTx.objects.bulk_create(internal_txs[:3])
         with self.assertRaises(IntegrityError):
             InternalTx.objects.bulk_create(internal_txs)  # Cannot bulk create again first 2 transactions
+
+
+class TestInternalTxDecoded(TestCase):
+    def test_safes_pending_to_be_processed(self):
+        self.assertCountEqual(InternalTxDecoded.objects.safes_pending_to_be_processed(), [])
+
+        safe_address_1 = SafeContractFactory().address
+        internal_tx_decoded_1 = InternalTxDecodedFactory(internal_tx___from=safe_address_1)
+        InternalTxDecodedFactory(internal_tx___from=safe_address_1)
+        results = InternalTxDecoded.objects.safes_pending_to_be_processed()
+        self.assertIsInstance(results, QuerySet)
+        self.assertCountEqual(results, [safe_address_1])
+
+        safe_address_2 = SafeContractFactory().address
+        internal_tx_decoded_2 = InternalTxDecodedFactory(internal_tx___from=safe_address_2)
+        self.assertCountEqual(InternalTxDecoded.objects.safes_pending_to_be_processed(),
+                              [safe_address_1, safe_address_2])
+
+        # Safes with all processed internal txs decoded are not returned
+        internal_tx_decoded_1.set_processed()
+        internal_tx_decoded_2.set_processed()
+        self.assertCountEqual(InternalTxDecoded.objects.safes_pending_to_be_processed(), [safe_address_1])
 
 
 class TestSafeStatus(TestCase):

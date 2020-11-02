@@ -25,6 +25,7 @@ logger = get_task_logger(__name__)
 
 COUNTDOWN = 60  # seconds
 LOCK_TIMEOUT = 60 * 15  # 15 minutes
+SOFT_TIMEOUT = 60 * 10  # 10 minutes
 
 
 def get_redis() -> Redis:
@@ -93,7 +94,7 @@ def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     return len(BlockchainRunningTaskManager().stop_running_tasks())
 
 
-@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
 def index_new_proxies_task(self) -> Optional[int]:
     """
     :return: Number of proxies created
@@ -112,7 +113,7 @@ def index_new_proxies_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
 def index_internal_txs_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
@@ -134,7 +135,7 @@ def index_internal_txs_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(bind=True, soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
 def index_erc20_events_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
@@ -153,29 +154,50 @@ def index_erc20_events_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(soft_time_limit=SOFT_TIMEOUT)
 def process_decoded_internal_txs_task() -> Optional[int]:
     redis = get_redis()
     try:
         with redis.lock('tasks:process_decoded_internal_txs_task', blocking_timeout=1, timeout=LOCK_TIMEOUT):
-            logger.info('Start processing decoded internal txs')
-            number_processed = 0
             count = InternalTxDecoded.objects.pending_for_safes().count()
-            batch = 250
             if not count:
                 logger.info('No decoded internal txs to process')
             else:
-                logger.info('%d decoded internal txs to process. Starting with first %d', count, min(batch, count))
-                tx_processor: TxProcessor = SafeTxProcessor()
-                # Use slicing for memory issues
-                for _ in range(0, count, batch):
-                    internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()[:batch]
-                    if not internal_txs_decoded:
-                        break
-                    number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
-                    logger.info('Processed %d/%d decoded transactions', number_processed, count)
+                logger.info('%d decoded internal txs to process', count)
+                for safe_to_process in InternalTxDecoded.objects.safes_pending_to_be_processed():
+                    process_decoded_internal_txs_for_safe_task.delay(safe_to_process)
+    except LockError:
+        pass
+    finally:
+        close_gevent_db_connection()
+
+
+@app.shared_task(soft_time_limit=SOFT_TIMEOUT, task_time_limit=LOCK_TIMEOUT)
+def process_decoded_internal_txs_for_safe_task(safe_address: str) -> Optional[int]:
+    """
+    Process decoded internal txs for one Safe. Processing decoded transactions is very slow and this way multiple
+    Safes can be processed at the same time
+    :param safe_address:
+    :return:
+    """
+    redis = get_redis()
+    try:
+        with redis.lock(f'tasks:process_decoded_internal_txs_task:{safe_address}',
+                        blocking_timeout=1, timeout=LOCK_TIMEOUT):
+            logger.info('Start processing decoded internal txs for safe %s', safe_address)
+            number_processed = 0
+            batch = 100  # Process at most 100 decoded transactions for a single Safe
+            tx_processor: TxProcessor = SafeTxProcessor()
+            # Use slicing for memory issues
+            while True:
+                internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]
+                if not internal_txs_decoded:
+                    break
+                number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
+                logger.info('Processed %d decoded transactions', number_processed)
             if number_processed:
-                logger.info('%d decoded internal txs successfully processed', number_processed)
+                logger.info('%d decoded internal txs successfully processed for safe %s',
+                            number_processed, safe_address)
                 return number_processed
     except LockError:
         pass
@@ -183,7 +205,7 @@ def process_decoded_internal_txs_task() -> Optional[int]:
         close_gevent_db_connection()
 
 
-@app.shared_task(soft_time_limit=LOCK_TIMEOUT)
+@app.shared_task(soft_time_limit=SOFT_TIMEOUT)
 def check_reorgs_task() -> Optional[int]:
     """
     :return: Number of oldest block with reorg detected. `None` if not reorg found

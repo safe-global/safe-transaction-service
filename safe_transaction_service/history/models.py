@@ -640,26 +640,48 @@ class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
+    def for_indexed_safes(self):
+        return self.filter(
+            Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
+            | Q(function_name='setup')  # This way we can index new Safes without events
+        )
+
     def not_processed(self):
         return self.filter(processed=False)
+
+    def order_by_processing_queue(self):
+        """
+        :return: Transactions ordered to be processed. First older transactions
+        """
+        return self.order_by(
+            'internal_tx__ethereum_tx__block_id',
+            'internal_tx__ethereum_tx__transaction_index',
+            'internal_tx__trace_address',
+        )
 
     def pending_for_safes(self):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
         return self.not_processed(
-        ).filter(
-            Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
-            | Q(function_name='setup')  # This way we can index new Safes without events
+        ).for_indexed_safes(
         ).select_related(
-            'internal_tx',
-            'internal_tx__ethereum_tx',
             'internal_tx__ethereum_tx__block',
-        ).order_by(
-            'internal_tx__ethereum_tx__block_id',
-            'internal_tx__ethereum_tx__transaction_index',
-            'internal_tx__trace_address',
-        )
+        ).order_by_processing_queue()
+
+    def pending_for_safe(self, safe_address: str):
+        """
+        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
+        """
+        return self.pending_for_safes().filter(internal_tx___from=safe_address)
+
+    def safes_pending_to_be_processed(self) -> QuerySet:
+        """
+        :return: List of Safe addresses that have transactions pending to be processed
+        """
+        return self.not_processed().for_indexed_safes().values_list(
+            'internal_tx___from', flat=True
+        ).distinct('internal_tx___from')
 
 
 class InternalTxDecoded(models.Model):
