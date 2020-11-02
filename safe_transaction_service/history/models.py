@@ -613,7 +613,10 @@ class InternalTx(models.Model):
         traces = [it.trace_address for it in internal_txs]
         index = traces.index(self.trace_address)
         if (index - 1) >= 0:
-            return internal_txs[index - 1]
+            internal_tx = internal_txs[index - 1]
+            if no_delegate_calls and internal_tx.is_delegate_call:
+                return internal_tx.get_previous_trace(no_delegate_calls=True)
+            return internal_tx
         else:
             return None
 

@@ -63,7 +63,7 @@ class SafeService:
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
 
-            previous_internal_tx = creation_internal_tx.get_previous_trace()
+            previous_internal_tx = creation_internal_tx.get_previous_trace(no_delegate_calls=True)
             created = creation_internal_tx.ethereum_tx.block.timestamp
             creator = (previous_internal_tx or creation_internal_tx)._from
             proxy_factory = creation_internal_tx._from
