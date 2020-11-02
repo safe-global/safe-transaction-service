@@ -61,10 +61,13 @@ class Command(BaseCommand):
                 nonces.append(result['nonce'])
 
             blockchain_nonce_payloads = self.build_nonce_payload(addresses)
-            blockchain_nonces = ethereum_client.batch_call_custom(blockchain_nonce_payloads)
+            blockchain_nonces = ethereum_client.batch_call_custom(blockchain_nonce_payloads, raise_exception=False)
 
             addresses_to_reindex = []
             for address, nonce, blockchain_nonce in zip(addresses, nonces, blockchain_nonces):
+                if blockchain_nonce is None:
+                    self.stdout.write(self.style.WARNING(f'Safe={address} stored nonce={nonce} looks problematic, '
+                                                         f'cannot retrieve blockchain-nonce'))
                 if nonce != blockchain_nonce:
                     self.stdout.write(self.style.WARNING(f'Safe={address} stored nonce={nonce} is '
                                                          f'different from blockchain-nonce={blockchain_nonce}'))
