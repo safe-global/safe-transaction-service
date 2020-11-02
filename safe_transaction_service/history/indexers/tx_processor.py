@@ -211,8 +211,11 @@ class SafeTxProcessor(TxProcessor):
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'execTransactionFromModule':
             logger.debug('Executing Tx from Module')
+            # TODO Add test with previous traces for processing a module transaction
             ethereum_tx = internal_tx.ethereum_tx
-            module_internal_tx = internal_tx.get_previous_module_trace()
+            # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
+            # The trace that is been processed is the last one, so indexer needs to go at least 2 traces back
+            module_internal_tx = internal_tx.get_previous_trace(no_delegate_calls=True, number_traces=2)
             module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
             module_data = HexBytes(arguments['data'])
             failed = self.is_module_failed(ethereum_tx, module_address)

@@ -604,38 +604,26 @@ class InternalTx(models.Model):
         except IndexError:
             return None
 
-    def get_previous_trace(self, no_delegate_calls=False) -> Optional['InternalTx']:
+    def get_previous_trace(self, number_traces: int = 1, no_delegate_calls: bool = False) -> Optional['InternalTx']:
         """
+        :param number_traces: Number of traces to skip, by default get the immediately previous one
         :param no_delegate_calls: If True filter out delegate calls
         :return:
         """
         internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
         traces = [it.trace_address for it in internal_txs]
-        index = traces.index(self.trace_address)
-        if (index - 1) >= 0:
-            internal_tx = internal_txs[index - 1]
-            if no_delegate_calls and internal_tx.is_delegate_call:
-                return internal_tx.get_previous_trace(no_delegate_calls=True)
+        index = traces.index(self.trace_address) - number_traces
+        if index >= 0:
+            internal_tx = internal_txs[index]
+            if no_delegate_calls:
+                while internal_tx.is_delegate_call:
+                    index -= 1
+                    if index < 0:
+                        return None
+                    internal_tx = internal_txs[index]
             return internal_tx
         else:
             return None
-
-    def get_previous_module_trace(self) -> Optional['InternalTx']:
-        """
-        Current trace should be `delegate call` to the proxy contract. We skip previous one and search for the previous
-        call trace
-        :return:
-        """
-        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
-        traces = [it.trace_address for it in internal_txs]
-        index = traces.index(self.trace_address) - 2
-        while index >= 0:
-            internal_tx = internal_txs[index]
-            if not internal_tx.is_delegate_call:
-                return internal_tx
-            else:
-                index -= 1
-        return None
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
