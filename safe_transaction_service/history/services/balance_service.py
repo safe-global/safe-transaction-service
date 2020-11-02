@@ -98,7 +98,7 @@ class BalanceService:
         :param exclude_spam:
         :return: ERC20 tokens filtered by spam or trusted
         """
-        base_queryset = Token.objects.filter(
+        base_queryset = Token.objects.erc20().filter(
             address__in=erc20_addresses
         ).values_list(
             'address', flat=True
