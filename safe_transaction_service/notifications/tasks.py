@@ -11,7 +11,7 @@ from safe_transaction_service.history.models import (MultisigTransaction,
                                                      WebHookType)
 from safe_transaction_service.history.utils import close_gevent_db_connection
 
-from .clients.firebase_client import FirebaseProvider
+from .clients.firebase_client import get_firebase_client
 from .models import FirebaseDevice
 
 logger = get_task_logger(__name__)
@@ -86,7 +86,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
         if not (address and payload):  # Both must be present
             return 0
 
-        firebase_client = FirebaseProvider()
+        firebase_client = get_firebase_client()
         firebase_devices = FirebaseDevice.objects.filter(
             safes__address=address
         ).exclude(

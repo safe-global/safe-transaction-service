@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Any, Dict, Sequence, Tuple
 
+from django.conf import settings
+
 from firebase_admin import credentials, initialize_app, messaging
 from firebase_admin.messaging import BatchResponse, UnregisteredError
 
@@ -18,16 +20,22 @@ class FirebaseTokensNotValid(FirebaseClientException):
         super().__init__()
 
 
+def get_firebase_client() -> 'MessagingClient':
+    """
+    Don't use singleton due to gevent. Google Services is keeping the same socket opened
+    :return: New instance of a configured MessagingClient
+    """
+    if hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'):
+        return FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS)
+    else:
+        logger.warning('Using mocked messaging client')
+        return MockedClient()
+
+
 class FirebaseProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
-            from django.conf import settings
-            cls.instance: MessagingClient
-            if hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'):
-                cls.instance: MessagingClient = FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS)
-            else:
-                logger.warning('Using mocked messaging client')
-                cls.instance: MessagingClient = MockedClient()
+            cls.instance: MessagingClient = get_firebase_client()
         return cls.instance
 
 
