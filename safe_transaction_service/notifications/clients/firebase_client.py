@@ -16,20 +16,51 @@ class FirebaseClientException(Exception):
 
 class FirebaseTokensNotValid(FirebaseClientException):
     def __init__(self, tokens: Sequence[str]):
-        self.tokens = tokens
         super().__init__()
+        self.tokens = tokens
 
 
 def get_firebase_client() -> 'MessagingClient':
     """
-    Don't use singleton due to gevent. Google Services is keeping the same socket opened
+    Don't use singleton due to gevent. Google Services is keeping the same socket opened. When creating multiple
+    instances they need to have a different name, we use an incremental index for that
     :return: New instance of a configured MessagingClient
     """
     if hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'):
-        return FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS)
+        if not hasattr(get_firebase_client, 'created_count'):
+            get_firebase_client.created_count = 0
+        get_firebase_client.created_count += 1
+        created_count = get_firebase_client.created_count
+        return FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS, app_name=f'[SAFE-{created_count}]')
     else:
         logger.warning('Using mocked messaging client')
         return MockedClient()
+
+
+class FirebaseClientPool:
+    """
+    Context manager to get a free FirebaseClient from the pool or create a new one and it to the pool if all the
+    instances are taken. Very useful for gevent, as socket cannot be shared between multiple green threads.
+    Use:
+    ```
+    with FirebaseClientPool() as firebase_client:
+        firebase_client...
+    ```
+    """
+    firebase_client_pool = []
+
+    def __init__(self):
+        self.instance: FirebaseClient
+
+    def __enter__(self):
+        if self.firebase_client_pool:
+            self.instance = self.firebase_client_pool.pop()
+        else:
+            self.instance = get_firebase_client()
+        return self.instance
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.firebase_client_pool.append(self.instance)
 
 
 class FirebaseProvider:
@@ -59,13 +90,13 @@ class FirebaseClient(MessagingClient):
     """
     Wrapper Client for Firebase Cloud Messaging Service
     """
-    def __init__(self, credentials_dict: Dict[str, Any]):
+    def __init__(self, credentials_dict: Dict[str, Any], app_name: str = '[DEFAULT]'):
         self._credentials = credentials_dict
-        self._authenticate()
+        self._authenticate(app_name)
 
-    def _authenticate(self):
+    def _authenticate(self, app_name: str):
         self._certificate = credentials.Certificate(self._credentials)
-        self._app = initialize_app(self._certificate)
+        self._app = initialize_app(self._certificate, name=app_name)
 
     @property
     def auth_provider(self):

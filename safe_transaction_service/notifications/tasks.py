@@ -11,7 +11,7 @@ from safe_transaction_service.history.models import (MultisigTransaction,
                                                      WebHookType)
 from safe_transaction_service.history.utils import close_gevent_db_connection
 
-from .clients.firebase_client import get_firebase_client
+from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice
 
 logger = get_task_logger(__name__)
@@ -86,7 +86,6 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
         if not (address and payload):  # Both must be present
             return 0
 
-        firebase_client = get_firebase_client()
         firebase_devices = FirebaseDevice.objects.filter(
             safes__address=address
         ).exclude(
@@ -105,11 +104,14 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
 
         duplicate_notification.set_duplicated()
 
-        logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
-        success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
-        if invalid_tokens:
-            logger.info('Removing invalid tokens for safe=%s', address)
-            FirebaseDevice.objects.filter(cloud_messaging_token__in=invalid_tokens).update(cloud_messaging_token=None)
+        with FirebaseClientPool as firebase_client:
+            logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
+            success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
+            if invalid_tokens:
+                logger.info('Removing invalid tokens for safe=%s', address)
+                FirebaseDevice.objects.filter(
+                    cloud_messaging_token__in=invalid_tokens
+                ).update(cloud_messaging_token=None)
 
         return success_count, failure_count
     finally:
