@@ -71,16 +71,6 @@ class FirebaseProvider:
 
 
 class MessagingClient(ABC):
-    @property
-    @abstractmethod
-    def auth_provider(self):
-        pass
-
-    @property
-    @abstractmethod
-    def app(self):
-        return self._app
-
     @abstractmethod
     def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
         raise NotImplementedError
