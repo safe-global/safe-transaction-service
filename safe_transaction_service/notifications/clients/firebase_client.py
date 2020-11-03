@@ -4,7 +4,7 @@ from typing import Any, Dict, Sequence, Tuple
 
 from django.conf import settings
 
-from firebase_admin import credentials, initialize_app, messaging
+from firebase_admin import App, credentials, initialize_app, messaging
 from firebase_admin.messaging import BatchResponse, UnregisteredError
 
 logger = getLogger(__name__)
@@ -93,18 +93,15 @@ class FirebaseClient(MessagingClient):
     def __init__(self, credentials_dict: Dict[str, Any], app_name: str = '[DEFAULT]'):
         self._credentials = credentials_dict
         self._authenticate(app_name)
+        self.app: App
 
     def _authenticate(self, app_name: str):
         self._certificate = credentials.Certificate(self._credentials)
-        self._app = initialize_app(self._certificate, name=app_name)
+        self.app = initialize_app(self._certificate, name=app_name)
 
     @property
     def auth_provider(self):
         return self._certificate
-
-    @property
-    def app(self):
-        return self._app
 
     def _build_android_config(self, title_loc_key: str = ''):
         return messaging.AndroidConfig(
@@ -159,7 +156,7 @@ class FirebaseClient(MessagingClient):
                 data={},
                 token=token
             )
-            messaging.send(message, dry_run=True)
+            messaging.send(message, dry_run=True, app=self.app)
             return True
         except UnregisteredError:
             return False
@@ -178,7 +175,7 @@ class FirebaseClient(MessagingClient):
             data=data,
             tokens=tokens,
         )
-        batch_response: BatchResponse = messaging.send_multicast(message)
+        batch_response: BatchResponse = messaging.send_multicast(message, app=self.app)
         # Check if there are invalid tokens
         invalid_tokens = [response for response in batch_response.responses
                           if not response.success and isinstance(response.exception, messaging.UnregisteredError)]
