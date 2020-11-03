@@ -104,7 +104,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
 
         duplicate_notification.set_duplicated()
 
-        with FirebaseClientPool as firebase_client:
+        with FirebaseClientPool() as firebase_client:
             logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
             success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
             if invalid_tokens:
