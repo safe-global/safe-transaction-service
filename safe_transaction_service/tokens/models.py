@@ -11,6 +11,13 @@ from gnosis.eth.django.models import EthereumAddressField
 logger = logging.getLogger(__name__)
 
 
+class TokenManager(models.Manager):
+    def create(self, **kwargs):
+        for field in ('name', 'symbol'):
+            kwargs[field] = kwargs[field][:60]
+        return super().create(**kwargs)
+
+
 class TokenQuerySet(models.QuerySet):
     erc721_query = Q(decimals=None)
     erc20_query = ~erc721_query
@@ -23,7 +30,7 @@ class TokenQuerySet(models.QuerySet):
 
 
 class Token(models.Model):
-    objects = TokenQuerySet.as_manager()
+    objects = TokenManager.from_queryset(TokenQuerySet)()
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
