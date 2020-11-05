@@ -32,17 +32,26 @@ class ConfirmationType(Enum):
 
 
 class EthereumTxCallType(Enum):
+    # https://ethereum.stackexchange.com/questions/63743/whats-the-difference-between-type-and-calltype-in-parity-trace
     CALL = 0
     DELEGATE_CALL = 1
+    CALL_CODE = 2
+    STATIC_CALL = 3
 
     @staticmethod
-    def parse_call_type(call_type: str):
+    def parse_call_type(call_type: Optional[str]):
         if not call_type:
             return None
-        elif call_type.lower() == 'call':
+
+        call_type = call_type.lower()
+        if call_type == 'call':
             return EthereumTxCallType.CALL
-        elif call_type.lower() == 'delegatecall':
+        elif call_type == 'delegatecall':
             return EthereumTxCallType.DELEGATE_CALL
+        elif call_type == 'callcode':
+            return EthereumTxCallType.CALL_CODE
+        elif call_type == 'staticcall':
+            return EthereumTxCallType.STATIC_CALL
         else:
             return None
 
@@ -51,6 +60,7 @@ class EthereumTxType(Enum):
     CALL = 0
     CREATE = 1
     SELF_DESTRUCT = 2
+    REWARD = 3
 
     @staticmethod
     def parse(tx_type: str):
@@ -61,6 +71,8 @@ class EthereumTxType(Enum):
             return EthereumTxType.CREATE
         elif tx_type == 'SUICIDE':
             return EthereumTxType.SELF_DESTRUCT
+        elif tx_type == 'REWARD':
+            return EthereumTxType.REWARD
         else:
             raise ValueError(f'{tx_type} is not a valid EthereumTxType')
 
