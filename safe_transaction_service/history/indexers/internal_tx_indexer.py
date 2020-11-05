@@ -150,16 +150,17 @@ class InternalTxIndexer(EthereumIndexer):
         logger.debug('End prefetching and storing of ethereum txs')
 
         logger.debug('Prefetching of traces(internal txs)')
-        internal_txs_batch = (InternalTx.objects.build_from_trace(trace, ethereum_tx)
-                              for ethereum_tx, traces
-                              in zip(ethereum_txs, self.ethereum_client.parity.trace_transactions(tx_hashes))
-                              for trace in traces)
+        internal_txs = (InternalTx.objects.build_from_trace(trace, ethereum_tx)
+                        for ethereum_tx, traces in zip(ethereum_txs,
+                                                       self.ethereum_client.parity.trace_transactions(tx_hashes))
+                        for trace in self.ethereum_client.parity.filter_out_errored_traces(traces))
+        revelant_internal_txs_batch = (trace for trace in internal_txs if trace.is_relevant)
         logger.debug('End prefetching of traces(internal txs)')
 
         logger.debug('Storing traces')
         with transaction.atomic():
             traces_stored = InternalTx.objects.bulk_create_from_generator(
-                internal_txs_batch, ignore_conflicts=True
+                revelant_internal_txs_batch, ignore_conflicts=True
             )
             logger.debug('End storing of %d traces', traces_stored)
 

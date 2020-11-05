@@ -1,14 +1,14 @@
 from django.db import migrations
 from django.db.models import Q
 
-from safe_transaction_service.history.indexers.tx_processor import \
-    SafeTxProcessor
+from safe_transaction_service.history.indexers.tx_processor import (
+    SafeTxProcessor, SafeTxProcessorProvider)
 
 
 def set_failed_for_multisig_txs(apps, schema_editor):
     # We can't import the Person model directly as it may be a newer
     # version than this migration expects. We use the historical version.
-    safe_tx_processor = SafeTxProcessor()
+    safe_tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
     MultisigTransaction = apps.get_model('history', 'MultisigTransaction')
     for multisig_tx in MultisigTransaction.objects.exclude(
             Q(ethereum_tx=None) | Q(failed=True)

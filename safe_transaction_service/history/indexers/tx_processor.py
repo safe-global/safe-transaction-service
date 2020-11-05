@@ -8,6 +8,7 @@ from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from web3 import Web3
 
+from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract, get_safe_V1_0_0_contract
 from gnosis.safe import SafeTx
@@ -18,6 +19,19 @@ from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       MultisigTransaction, SafeContract, SafeStatus)
 
 logger = getLogger(__name__)
+
+
+class SafeTxProcessorProvider:
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            from django.conf import settings
+            cls.instance = SafeTxProcessor(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL))
+        return cls.instance
+
+    @classmethod
+    def del_singleton(cls):
+        if hasattr(cls, 'instance'):
+            del cls.instance
 
 
 class TxProcessor(ABC):
@@ -34,8 +48,9 @@ class SafeTxProcessor(TxProcessor):
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
 
-    def __init__(self):
+    def __init__(self, ethereum_client: EthereumClient):
         # This safe_tx_failure events allow us to detect a failed safe transaction
+        self.ethereum_client = ethereum_client
         dummy_w3 = Web3()
         self.safe_tx_failure_events = [
             get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
@@ -215,7 +230,16 @@ class SafeTxProcessor(TxProcessor):
             ethereum_tx = internal_tx.ethereum_tx
             # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
             # The trace that is been processed is the last one, so indexer needs to go at least 2 traces back
-            module_internal_tx = internal_tx.get_previous_trace(no_delegate_calls=True, number_traces=2)
+            previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
+                                                                            internal_tx.trace_address_as_list,
+                                                                            number_traces=2,
+                                                                            skip_delegate_calls=True)
+            if not previous_trace:
+                message = f'Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} and ' \
+                          f'trace-address={internal_tx.trace_address}'
+                logger.warning(message)
+                raise ValueError(message)
+            module_internal_tx = InternalTx.objects.build_from_trace(previous_trace, internal_tx.ethereum_tx)
             module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
             module_data = HexBytes(arguments['data'])
             failed = self.is_module_failed(ethereum_tx, module_address)
@@ -237,8 +261,16 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Processing hash approval')
             multisig_transaction_hash = arguments['hashToApprove']
             ethereum_tx = internal_tx.ethereum_tx
-            # TODO Check previous trace is not a delegate call
-            owner = internal_tx.get_previous_trace()._from
+            previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
+                                                                            internal_tx.trace_address_as_list,
+                                                                            skip_delegate_calls=True)
+            if not previous_trace:
+                message = f'Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} and ' \
+                          f'trace-address={internal_tx.trace_address}'
+                logger.warning(message)
+                raise ValueError(message)
+            previous_internal_tx = InternalTx.objects.build_from_trace(previous_trace, internal_tx.ethereum_tx)
+            owner = previous_internal_tx._from
             safe_signature = SafeSignatureApprovedHash.build_for_owner(owner, multisig_transaction_hash)
             (multisig_confirmation,
              _) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,

@@ -11,6 +11,7 @@ env:
   - DJANGO_SETTINGS_MODULE=config.settings.test
   - DATABASE_URL=psql://postgres@localhost/travisci
   - ETHEREUM_NODE_URL=http://localhost:8545
+  - ETHEREUM_TRACING_NODE_URL=http://localhost:8545
 addons:
   postgresql: "10"
 services:

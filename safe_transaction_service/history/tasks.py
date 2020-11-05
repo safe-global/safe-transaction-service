@@ -15,7 +15,7 @@ from redis.exceptions import LockError
 from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
-from .indexers.tx_processor import SafeTxProcessor, TxProcessor
+from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import InternalTxDecoded, WebHook, WebHookType
 from .services import ReorgService, ReorgServiceProvider
 from .utils import close_gevent_db_connection
@@ -187,7 +187,7 @@ def process_decoded_internal_txs_for_safe_task(safe_address: str) -> Optional[in
             logger.info('Start processing decoded internal txs for safe %s', safe_address)
             number_processed = 0
             batch = 100  # Process at most 100 decoded transactions for a single Safe
-            tx_processor: TxProcessor = SafeTxProcessor()
+            tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
             # Use slicing for memory issues
             while True:
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]

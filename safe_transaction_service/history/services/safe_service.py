@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 
 from web3 import Web3
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient
 from gnosis.eth.contracts import (get_cpk_factory_contract,
                                   get_proxy_factory_contract)
 from gnosis.safe import Safe
@@ -41,7 +41,8 @@ class SafeCreationInfo:
 class SafeServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
-            cls.instance = SafeService(EthereumClientProvider())
+            from django.conf import settings
+            cls.instance = SafeService(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL))
         return cls.instance
 
     @classmethod
@@ -63,7 +64,15 @@ class SafeService:
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
 
-            previous_internal_tx = creation_internal_tx.get_previous_trace(no_delegate_calls=True)
+            previous_trace = self.ethereum_client.parity.get_previous_trace(creation_internal_tx.ethereum_tx_id,
+                                                                            creation_internal_tx.trace_address_as_list,
+                                                                            skip_delegate_calls=True)
+            if previous_trace:
+                previous_internal_tx = InternalTx.objects.build_from_trace(previous_trace,
+                                                                           creation_internal_tx.ethereum_tx)
+            else:
+                previous_internal_tx = None
+
             created = creation_internal_tx.ethereum_tx.block.timestamp
             creator = (previous_internal_tx or creation_internal_tx)._from
             proxy_factory = creation_internal_tx._from
@@ -71,7 +80,7 @@ class SafeService:
             master_copy = None
             setup_data = None
             if previous_internal_tx:
-                data = previous_internal_tx.data.tobytes()
+                data = previous_internal_tx.data
                 result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
                 if result:
                     master_copy, setup_data = result

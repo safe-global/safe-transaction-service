@@ -1,4 +1,5 @@
 import logging
+from unittest import mock
 
 from django.test import TestCase
 
@@ -6,21 +7,23 @@ from eth_account import Account
 from eth_utils import keccak
 from web3 import Web3
 
+from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.safe_signature import SafeSignatureType
 
-from ..indexers.tx_processor import SafeTxProcessor
+from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeStatus)
 from .factories import (EthereumTxFactory, InternalTxDecodedFactory,
                         MultisigConfirmationFactory)
+from .mocks.traces import call_trace
 
 logger = logging.getLogger(__name__)
 
 
 class TestSafeTxProcessor(TestCase):
     def test_tx_processor_with_factory(self):
-        tx_processor = SafeTxProcessor()
+        tx_processor = SafeTxProcessorProvider()
         owner = Account.create().address
         safe_address = Account.create().address
         fallback_handler = Account.create().address
@@ -146,11 +149,16 @@ class TestSafeTxProcessor(TestCase):
         self.assertEqual(safe_status.enabled_modules, [])
         self.assertEqual(safe_status.nonce, 7)
 
-        tx_processor.process_decoded_transactions(
-            [
-                InternalTxDecodedFactory(function_name='execTransactionFromModule',
-                                         internal_tx___from=safe_address),
-            ])
+        with mock.patch.object(ParityManager, 'trace_transaction', autospec=True, return_value=[call_trace]):
+            # call_trace has [] as a trace address and module txs need to get the grandfather tx, so [0,0] must
+            # be used
+            module_internal_tx_decoded = InternalTxDecodedFactory(function_name='execTransactionFromModule',
+                                                                  internal_tx___from=safe_address,
+                                                                  internal_tx__trace_address='0,0')
+            tx_processor.process_decoded_transactions(
+                [
+                    module_internal_tx_decoded,
+                ])
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         self.assertEqual(safe_status.nonce, 7)  # Nonce not incrementing
         self.assertEqual(ModuleTransaction.objects.count(), 1)
@@ -168,25 +176,26 @@ class TestSafeTxProcessor(TestCase):
                                                            hash_to_approve=hash_to_approve,
                                                            internal_tx___from=safe_address,
                                                            internal_tx__trace_address='0,1,0')
-        previous_approve_hash_internal_tx = InternalTxDecodedFactory(
-            internal_tx__ethereum_tx=approve_hash_decoded_tx.internal_tx.ethereum_tx,
-            internal_tx__trace_address='0,1',
-            internal_tx___from=owner_approving,
-        )  # noqa: F841
-
-        tx_processor.process_decoded_transactions(
-            [
-                InternalTxDecodedFactory(function_name='execTransaction',
-                                         internal_tx___from=safe_address),
-                approve_hash_decoded_tx,
-            ])
-        safe_status = SafeStatus.objects.last_for_address(safe_address)
-        self.assertEqual(safe_status.nonce, 8)
-        multisig_confirmation = MultisigConfirmation.objects.get(multisig_transaction_hash=hash_to_approve)
-        self.assertEqual(multisig_confirmation.signature_type, SafeSignatureType.APPROVED_HASH.value)
+        approve_hash_previous_call_trace = dict(call_trace)
+        approve_hash_previous_call_trace['action']['from'] = owner_approving
+        approve_hash_previous_call_trace['traceAddress'] = [0, 1]
+        # Not needed
+        # approve_hash_call_trace['transactionHash'] = approve_hash_decoded_tx.internal_tx.ethereum_tx_id
+        with mock.patch.object(ParityManager, 'trace_transaction', autospec=True,
+                               return_value=[approve_hash_previous_call_trace]):
+            tx_processor.process_decoded_transactions(
+                [
+                    InternalTxDecodedFactory(function_name='execTransaction',
+                                             internal_tx___from=safe_address),
+                    approve_hash_decoded_tx,
+                ])
+            safe_status = SafeStatus.objects.last_for_address(safe_address)
+            self.assertEqual(safe_status.nonce, 8)
+            multisig_confirmation = MultisigConfirmation.objects.get(multisig_transaction_hash=hash_to_approve)
+            self.assertEqual(multisig_confirmation.signature_type, SafeSignatureType.APPROVED_HASH.value)
 
     def test_tx_processor_failed(self):
-        tx_processor = SafeTxProcessor()
+        tx_processor = SafeTxProcessorProvider()
         # Event for Safes < 1.1.1
         logs = [{'data': '0x0034bff0dedc4c75f43df64a179ff26d56b99fa742fcfaeeee51e2da4e279b67',
                  'topics': ['0xabfd711ecdd15ae3a6b3ad16ff2e9d81aec026a39d16725ee164be4fbf857a7c']}]

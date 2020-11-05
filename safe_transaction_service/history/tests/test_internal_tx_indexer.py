@@ -8,15 +8,15 @@ from gnosis.eth.ethereum_client import ParityManager
 
 from ..indexers import InternalTxIndexer, InternalTxIndexerProvider
 from ..indexers.internal_tx_indexer import InternalTxIndexerWithTraceBlock
-from ..indexers.tx_processor import SafeTxProcessor
+from ..indexers.tx_processor import SafeTxProcessorProvider
 from ..models import (EthereumBlock, EthereumTx, InternalTx, InternalTxDecoded,
                       SafeContract, SafeMasterCopy, SafeStatus)
 from .factories import SafeMasterCopyFactory
-from .mocks_internal_tx_indexer import (block_result, trace_blocks_result,
-                                        trace_filter_result,
-                                        trace_transactions_result,
-                                        transaction_receipts_result,
-                                        transactions_result)
+from .mocks.mocks_internal_tx_indexer import (block_result, trace_blocks_result,
+                                              trace_filter_result,
+                                              trace_transactions_result,
+                                              transaction_receipts_result,
+                                              transactions_result)
 
 
 class TestInternalTxIndexer(TestCase):
@@ -57,7 +57,7 @@ class TestInternalTxIndexer(TestCase):
 
         self.assertEqual(EthereumTx.objects.count(), len(transactions_result))
         self.assertEqual(EthereumBlock.objects.count(), len(block_result))
-        self.assertEqual(InternalTx.objects.count(), len([y for x in trace_transactions_result for y in x]))
+        self.assertEqual(InternalTx.objects.count(), 3)  # Just store useful traces 2 decoded + 1 contract creation
         self.assertEqual(InternalTxDecoded.objects.count(), 2)
         create_internal_tx = InternalTx.objects.get(contract_address='0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2')
         self.assertFalse(create_internal_tx.is_call)
@@ -147,7 +147,7 @@ class TestInternalTxIndexer(TestCase):
 
     def test_tx_processor_using_internal_tx_indexer(self):
         self._test_internal_tx_indexer()
-        tx_processor = SafeTxProcessor()
+        tx_processor = SafeTxProcessorProvider()
         self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
         internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
@@ -171,7 +171,7 @@ class TestInternalTxIndexer(TestCase):
 
     def test_tx_processor_using_internal_tx_indexer_with_existing_safe(self):
         self._test_internal_tx_indexer()
-        tx_processor = SafeTxProcessor()
+        tx_processor = SafeTxProcessorProvider()
         tx_processor.process_decoded_transactions(InternalTxDecoded.objects.pending_for_safes())
         safe_contract: SafeContract = SafeContract.objects.first()
         self.assertGreater(safe_contract.erc20_block_number, 0)

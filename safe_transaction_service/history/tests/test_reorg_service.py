@@ -11,7 +11,7 @@ from ..services import ReorgServiceProvider
 from .factories import (EthereumBlockFactory, EthereumTxFactory,
                         ProxyFactoryFactory, SafeContractFactory,
                         SafeMasterCopyFactory)
-from .mocks_internal_tx_indexer import block_result
+from .mocks.mocks_internal_tx_indexer import block_result
 
 
 class TestReorgService(TestCase):

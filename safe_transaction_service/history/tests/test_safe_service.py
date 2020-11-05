@@ -1,12 +1,16 @@
+from unittest import mock
+
 from django.test import TestCase
 
 from eth_account import Account
 
+from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..services.safe_service import (CannotGetSafeInfo, SafeCreationInfo,
                                      SafeInfo, SafeServiceProvider)
 from .factories import InternalTxFactory
+from .mocks.traces import create_trace
 
 
 class TestSafeService(SafeTestCaseMixin, TestCase):
@@ -20,9 +24,10 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         InternalTxFactory(contract_address=random_address, ethereum_tx__status=0)
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
-        InternalTxFactory(contract_address=random_address, ethereum_tx__status=1)
-        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
-        self.assertIsInstance(safe_creation_info, SafeCreationInfo)
+        with mock.patch.object(ParityManager, 'trace_transaction', autospec=True, return_value=[create_trace]):
+            InternalTxFactory(contract_address=random_address, ethereum_tx__status=1, trace_address='0')
+            safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
+            self.assertIsInstance(safe_creation_info, SafeCreationInfo)
 
     def test_get_safe_info(self):
         safe_address = Account.create().address

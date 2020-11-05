@@ -201,21 +201,12 @@ class TestInternalTx(TestCase):
 
     def test_internal_tx_can_be_decoded(self):
         trace_address = '0,0,20,0'
-        trace_address_parent = '0,0,20'
         internal_tx = InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value, trace_address=trace_address,
                                         error=None, data=b'123', ethereum_tx__status=1)
-        self.assertFalse(internal_tx.parent_is_errored())
         self.assertTrue(internal_tx.can_be_decoded)
 
-        parent_internal_tx = InternalTxFactory(trace_address=trace_address_parent, error='Reverted',
-                                               ethereum_tx=internal_tx.ethereum_tx)
-        self.assertTrue(internal_tx.parent_is_errored())
+        internal_tx.ethereum_tx.status = 0
         self.assertFalse(internal_tx.can_be_decoded)
-
-        parent_internal_tx.error = None
-        parent_internal_tx.save(update_fields=['error'])
-        self.assertFalse(internal_tx.parent_is_errored())
-        self.assertTrue(internal_tx.can_be_decoded)
 
     def test_internal_txs_can_be_decoded(self):
         InternalTxFactory(call_type=EthereumTxCallType.CALL.value)
@@ -239,24 +230,6 @@ class TestInternalTx(TestCase):
 
         InternalTxDecoded.objects.create(function_name='alo', arguments={}, internal_tx=internal_tx)
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
-
-    def test_internal_txs_parent(self):
-        # Test parent trace errored
-        trace_address = '0,0,20,0'
-        trace_address_parent = '0,0,20'
-        another_trace = '0,1'
-        internal_tx = InternalTxFactory(call_type=EthereumTxCallType.DELEGATE_CALL.value, trace_address=trace_address,
-                                        error=None, data=b'123', ethereum_tx__status=1)
-        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
-        not_a_parent_internal_tx = InternalTxFactory(trace_address=another_trace, error='Reverted',
-                                                     ethereum_tx=internal_tx.ethereum_tx)
-        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
-        parent_internal_tx = InternalTxFactory(trace_address=trace_address_parent, error='Reverted',
-                                               ethereum_tx=internal_tx.ethereum_tx)
-        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
-        parent_internal_tx.error = None
-        parent_internal_tx.save(update_fields=['error'])
-        self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
 
     def test_internal_txs_bulk(self):
         """

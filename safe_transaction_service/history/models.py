@@ -496,33 +496,19 @@ class InternalTxQuerySet(models.QuerySet):
         """
         Every InternalTx can be decoded if:
             - Has data
-            - Parent InternalTx is not errored
             - InternalTx is not errored
             - EthereumTx is successful (not reverted or out of gas)
             - CallType is a DELEGATE_CALL (to the master copy contract)
             - Not already decoded
         :return: Txs that can be decoded
         """
-        # Get errored parents for every InternalTx. We check every InternalTx whose trace_address starts the same as
-        # our InternalTx and is errored
-        parent_errored_query = InternalTx.objects.annotate(
-            child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
-            #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
-        ).filter(
-            child_trace_address__startswith=F('trace_address'),
-            ethereum_tx=OuterRef('ethereum_tx'),
-        ).exclude(
-            error=None
-        )
-
-        return self.exclude(data=None).annotate(
-            parent_errored=Subquery(parent_errored_query.values('pk')[:1])
+        return self.exclude(
+            data=None
         ).filter(
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
             error=None,
             ethereum_tx__status=1,
             decoded_tx=None,
-            parent_errored=None,
         )
 
 
@@ -564,8 +550,7 @@ class InternalTx(models.Model):
         return bool(self.is_delegate_call
                     and not self.error
                     and self.data
-                    and self.ethereum_tx.success
-                    and not self.parent_is_errored())
+                    and self.ethereum_tx.success)
 
     @property
     def is_call(self):
@@ -593,49 +578,13 @@ class InternalTx(models.Model):
     def is_ether_transfer(self) -> bool:
         return self.call_type == EthereumTxCallType.CALL.value and self.value > 0
 
-    def parent_is_errored(self) -> bool:
-        """
-        Check if parent trace has been errored (`trace_address` is contained in children `trace_address`)
-        :return:
-        """
-        count = self.__class__.objects.annotate(
-            child_trace_address=Value(self.trace_address, output_field=models.CharField())
-        ).filter(
-            ethereum_tx=self.ethereum_tx, child_trace_address__startswith=F('trace_address')
-        ).exclude(
-            error=None
-        ).count()
-        return bool(count)
+    @property
+    def is_relevant(self):
+        return self.can_be_decoded or self.contract_address
 
-    def get_next_trace(self) -> Optional['InternalTx']:
-        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
-        traces = [it.trace_address for it in internal_txs]
-        index = traces.index(self.trace_address)
-        try:
-            return internal_txs[index + 1]
-        except IndexError:
-            return None
-
-    def get_previous_trace(self, number_traces: int = 1, no_delegate_calls: bool = False) -> Optional['InternalTx']:
-        """
-        :param number_traces: Number of traces to skip, by default get the immediately previous one
-        :param no_delegate_calls: If True filter out delegate calls
-        :return:
-        """
-        internal_txs = InternalTx.objects.filter(ethereum_tx=self.ethereum_tx).order_by('trace_address')
-        traces = [it.trace_address for it in internal_txs]
-        index = traces.index(self.trace_address) - number_traces
-        if index >= 0:
-            internal_tx = internal_txs[index]
-            if no_delegate_calls:
-                while internal_tx.is_delegate_call:
-                    index -= 1
-                    if index < 0:
-                        return None
-                    internal_tx = internal_txs[index]
-            return internal_tx
-        else:
-            return None
+    @property
+    def trace_address_as_list(self) -> List[int]:
+        return [int(x) for x in self.trace_address.split(',')]
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):

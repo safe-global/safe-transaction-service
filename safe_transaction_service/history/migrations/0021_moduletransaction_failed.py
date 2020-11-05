@@ -2,11 +2,11 @@
 
 from django.db import migrations, models
 
-from ..indexers.tx_processor import SafeTxProcessor
+from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 
 
 def set_failed_for_module_txs(apps, schema_editor):
-    safe_tx_processor = SafeTxProcessor()
+    safe_tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
     ModuleTransaction = apps.get_model('history', 'ModuleTransaction')
     for module_tx in ModuleTransaction.objects.select_related('internal_tx__ethereum_tx').iterator():
         current_failed = module_tx.failed
