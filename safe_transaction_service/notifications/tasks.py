@@ -1,26 +1,18 @@
 import pickle
 from typing import Any, Dict, Optional, Tuple
 
-from django.conf import settings
-
 from celery import app
 from celery.utils.log import get_task_logger
-from redis import Redis
 
 from safe_transaction_service.history.models import (MultisigTransaction,
                                                      WebHookType)
-from safe_transaction_service.history.utils import close_gevent_db_connection
+from safe_transaction_service.history.utils import (close_gevent_db_connection,
+                                                    get_redis)
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice
 
 logger = get_task_logger(__name__)
-
-
-def get_redis() -> Redis:
-    if not hasattr(get_redis, 'redis'):
-        get_redis.redis = Redis.from_url(settings.REDIS_URL)
-    return get_redis.redis
 
 
 def filter_notification(payload: Dict[str, Any]) -> bool:
