@@ -12,7 +12,8 @@ from ..indexers.tx_processor import SafeTxProcessorProvider
 from ..models import (EthereumBlock, EthereumTx, InternalTx, InternalTxDecoded,
                       SafeContract, SafeMasterCopy, SafeStatus)
 from .factories import SafeMasterCopyFactory
-from .mocks.mocks_internal_tx_indexer import (block_result, trace_blocks_result,
+from .mocks.mocks_internal_tx_indexer import (block_result,
+                                              trace_blocks_result,
                                               trace_filter_result,
                                               trace_transactions_result,
                                               transaction_receipts_result,

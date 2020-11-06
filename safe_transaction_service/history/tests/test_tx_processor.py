@@ -10,7 +10,7 @@ from web3 import Web3
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.safe_signature import SafeSignatureType
 
-from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
+from ..indexers.tx_processor import SafeTxProcessorProvider
 from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeStatus)
