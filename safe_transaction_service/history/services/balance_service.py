@@ -98,19 +98,19 @@ class BalanceService:
         :param exclude_spam:
         :return: ERC20 tokens filtered by spam or trusted
         """
-        base_queryset = Token.objects.erc20().filter(
+        base_queryset = Token.objects.filter(
             address__in=erc20_addresses
         ).order_by('name')
         if only_trusted:
-            addresses = list(base_queryset.filter(trusted=True).values_list('address', flat=True))
+            addresses = list(base_queryset.erc20().filter(trusted=True).values_list('address', flat=True))
         elif exclude_spam:
-            addresses = list(base_queryset.filter(spam=False).values_list('address', flat=True))
+            addresses = list(base_queryset.erc20().filter(spam=False).values_list('address', flat=True))
         else:
             # There could be some addresses that are not in the list
             addresses_set = set(erc20_addresses)
             addresses = []
             for token in base_queryset:
-                if token.is_erc20():
+                if token.is_erc20() and not (exclude_spam and token.spam):
                     addresses.append(token.address)
                 addresses_set.remove(token.address)
             # Add unkown addresses
