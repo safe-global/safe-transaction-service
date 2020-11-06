@@ -198,7 +198,8 @@ class EthereumIndexer(ABC):
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
                                                    current_block_number=current_block_number)
         except (self.FindRelevantElementsException, SoftTimeLimitExceeded) as e:
-            self.block_process_limit = self.initial_block_process_limit  # Set back to default
+            self.block_process_limit = min(self.initial_block_process_limit, 10)  # Set back to less than default
+            logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e
 
         if start:
