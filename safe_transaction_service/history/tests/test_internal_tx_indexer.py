@@ -57,7 +57,8 @@ class TestInternalTxIndexer(TestCase):
 
         self.assertEqual(EthereumTx.objects.count(), len(transactions_result))
         self.assertEqual(EthereumBlock.objects.count(), len(block_result))
-        self.assertEqual(InternalTx.objects.count(), 3)  # Just store useful traces 2 decoded + 1 contract creation
+        # Just store useful traces 2 decoded + 1 contract creation + 2 ether transfers
+        self.assertEqual(InternalTx.objects.count(), 5)
         self.assertEqual(InternalTxDecoded.objects.count(), 2)
         create_internal_tx = InternalTx.objects.get(contract_address='0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2')
         self.assertFalse(create_internal_tx.is_call)
