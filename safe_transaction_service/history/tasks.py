@@ -26,6 +26,7 @@ COUNTDOWN = 60  # seconds
 LOCK_TIMEOUT = 60 * 15  # 15 minutes
 SOFT_TIMEOUT = 60 * 10  # 10 minutes
 ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
+WORKER_STOPPED = set()  # Worker status
 
 
 @worker_shutting_down.connect
@@ -35,6 +36,7 @@ def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
 
 
 def shutdown_worker():
+    WORKER_STOPPED.add(True)
     if ACTIVE_LOCKS:
         logger.warning('Force releasing of redis locks %s', ACTIVE_LOCKS)
         get_redis().delete(*ACTIVE_LOCKS)
@@ -61,6 +63,8 @@ def ony_one_running_task(task: CeleryTask,
     :return: Instance of redis `Lock`
     :raises: LockError if lock cannot be acquired
     """
+    if WORKER_STOPPED:
+        raise ValueError('Worker is stopping')
     redis = get_redis()
     lock_name = f'tasks:{task.name}'
     if lock_name_suffix:
