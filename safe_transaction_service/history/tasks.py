@@ -10,7 +10,6 @@ from celery.app.task import Task as CeleryTask
 from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
-from redis.lock import Lock
 
 from ..taskapp.celery import app as celery_app
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
@@ -26,18 +25,22 @@ logger = get_task_logger(__name__)
 COUNTDOWN = 60  # seconds
 LOCK_TIMEOUT = 60 * 15  # 15 minutes
 SOFT_TIMEOUT = 60 * 10  # 10 minutes
-ACTIVE_LOCKS: Set[Lock] = set()  # Active redis locks, release them when worker stops
+ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning('Worker shutting down')
-    for active_lock in ACTIVE_LOCKS:
-        try:
-            logger.warning('Force releasing of redis lock')
-            active_lock.release()
-        except LockError:
-            logger.warning('Error releasing redis lock')
+    return shutdown_worker()
+
+
+def shutdown_worker():
+    if ACTIVE_LOCKS:
+        logger.warning('Force releasing of redis locks %s', ACTIVE_LOCKS)
+        get_redis().delete(*ACTIVE_LOCKS)
+        logger.warning('Released redis locks')
+    else:
+        logger.warning('No redis locks to release')
     return len(BlockchainRunningTaskManager().stop_running_tasks())
 
 
@@ -56,22 +59,21 @@ def ony_one_running_task(task: CeleryTask,
     :param lock_timeout: How long the lock will be stored, in case worker is halted so key is not stored forever
     in Redis
     :return: Instance of redis `Lock`
+    :raises: LockError if lock cannot be acquired
     """
-    try:
-        redis = get_redis()
-        lock_name = f'tasks:{task.name}'
-        if lock_name_suffix:
-            lock_name = f'{lock_name}:{lock_name_suffix}'
-        with redis.lock(lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout) as lock:
-            ACTIVE_LOCKS.add(lock)
-            yield lock
-            ACTIVE_LOCKS.remove(lock)
-    except LockError:
-        pass
+    redis = get_redis()
+    lock_name = f'tasks:{task.name}'
+    if lock_name_suffix:
+        lock_name = f'{lock_name}:{lock_name_suffix}'
+    with redis.lock(lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout) as lock:
+        ACTIVE_LOCKS.add(lock_name)
+        yield lock
+        ACTIVE_LOCKS.remove(lock_name)
 
 
 def generate_handler(task_id: str) -> NoReturn:
     def handler(signum, frame):
+        shutdown_worker()  # It shouldn't be here, but gevent can catch the sigterm in every task
         logger.warning('Received SIGTERM on task-id=%s', task_id)
         raise OSError(f'Received SIGTERM on task-id={task_id}. Probably a reorg. Task must exit')
     return handler
@@ -129,14 +131,14 @@ def index_new_proxies_task(self) -> Optional[int]:
     """
     :return: Number of proxies created
     """
-
-    with ony_one_running_task(self):
-        with BlockchainRunningTask(self.request):
-            logger.info('Start indexing of new proxies')
-            number_proxies = ProxyFactoryIndexerProvider().start()
-            if number_proxies:
-                logger.info('Indexed new %d proxies', number_proxies)
-                return number_proxies
+    with contextlib.suppress(LockError):
+        with ony_one_running_task(self):
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of new proxies')
+                number_proxies = ProxyFactoryIndexerProvider().start()
+                if number_proxies:
+                    logger.info('Indexed new %d proxies', number_proxies)
+                    return number_proxies
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
@@ -146,15 +148,16 @@ def index_internal_txs_task(self) -> Optional[int]:
     :return: Number of addresses processed
     """
 
-    with ony_one_running_task(self):
-        with BlockchainRunningTask(self.request):
-            logger.info('Start indexing of internal txs')
-            number_traces = InternalTxIndexerProvider().start()
-            logger.info('Find internal txs task processed %d traces', number_traces)
-            if number_traces:
-                logger.info('Calling task to process decoded traces')
-                process_decoded_internal_txs_task.delay()
-            return number_traces
+    with contextlib.suppress(LockError):
+        with ony_one_running_task(self):
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of internal txs')
+                number_traces = InternalTxIndexerProvider().start()
+                logger.info('Find internal txs task processed %d traces', number_traces)
+                if number_traces:
+                    logger.info('Calling task to process decoded traces')
+                    process_decoded_internal_txs_task.delay()
+                return number_traces
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
@@ -163,12 +166,13 @@ def index_erc20_events_task(self) -> Optional[int]:
     Find and process internal txs for monitored addresses
     :return: Number of addresses processed
     """
-    with ony_one_running_task(self):
-        with BlockchainRunningTask(self.request):
-            logger.info('Start indexing of erc20/721 events')
-            number_events = Erc20EventsIndexerProvider().start()
-            logger.info('Indexing of erc20/721 events task processed %d events', number_events)
-            return number_events
+    with contextlib.suppress(LockError):
+        with ony_one_running_task(self):
+            with BlockchainRunningTask(self.request):
+                logger.info('Start indexing of erc20/721 events')
+                number_events = Erc20EventsIndexerProvider().start()
+                logger.info('Indexing of erc20/721 events task processed %d events', number_events)
+                return number_events
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
@@ -182,6 +186,8 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 logger.info('%d decoded internal txs to process', count)
                 for safe_to_process in InternalTxDecoded.objects.safes_pending_to_be_processed():
                     process_decoded_internal_txs_for_safe_task.delay(safe_to_process)
+    except LockError:
+        pass
     finally:
         close_gevent_db_connection()
 
@@ -211,6 +217,8 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                 logger.info('%d decoded internal txs successfully processed for safe %s',
                             number_processed, safe_address)
                 return number_processed
+    except LockError:
+        pass
     finally:
         close_gevent_db_connection()
 
@@ -231,6 +239,8 @@ def check_reorgs_task(self) -> Optional[int]:
                 BlockchainRunningTaskManager().stop_running_tasks()
                 reorg_service.recover_from_reorg(first_reorg_block_number)
                 return first_reorg_block_number
+    except LockError:
+        pass
     finally:
         close_gevent_db_connection()
 
