@@ -7,6 +7,8 @@ from django.test import TestCase
 from eth_account import Account
 
 from gnosis.eth import EthereumClient
+from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
+                                UniswapV2Oracle)
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
 
@@ -85,6 +87,24 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         token_eth_value = balance_service.get_token_eth_value(gno_token_address)
         self.assertIsInstance(token_eth_value, float)
         self.assertGreater(token_eth_value, 0)
+
+    @mock.patch.object(KyberOracle, 'get_price', return_value=1.23, autospec=True)
+    def test_token_eth_value_mocked(self, kyber_get_price_mock: MagicMock):
+        balance_service = BalanceServiceProvider()
+        random_address = Account.create().address
+        self.assertEqual(len(balance_service.cache_token_eth_value), 0)
+        self.assertEqual(balance_service.get_token_eth_value(random_address), 1.23)
+        self.assertEqual(balance_service.cache_token_eth_value[(random_address,)], 1.23)
+
+        # Every oracle is not accesible
+        kyber_get_price_mock.side_effect = OracleException
+        with mock.patch.object(UniswapOracle, 'get_price', side_effect=OracleException, autospec=True):
+            with mock.patch.object(UniswapV2Oracle, 'get_price', side_effect=OracleException, autospec=True):
+                self.assertEqual(balance_service.get_token_eth_value(random_address), 1.23)
+                random_address_2 = Account.create().address
+                self.assertEqual(balance_service.get_token_eth_value(random_address_2), 0.)
+                self.assertEqual(balance_service.cache_token_eth_value[(random_address,)], 1.23)
+                self.assertEqual(balance_service.cache_token_eth_value[(random_address_2,)], 0.)
 
     def test_get_token_info(self):
         balance_service = BalanceServiceProvider()
