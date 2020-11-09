@@ -2,6 +2,7 @@ import contextlib
 from typing import Any, Dict, Optional, Set
 from urllib.parse import urlparse
 
+import gevent
 import requests
 from celery import app
 from celery.app.task import Task as CeleryTask
@@ -29,7 +30,7 @@ WORKER_STOPPED = set()  # Worker status
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning('Worker shutting down')
-    return shutdown_worker()
+    gevent.spawn(shutdown_worker)  # If not raises a `BlockingSwitchOutError`
 
 
 def shutdown_worker():
