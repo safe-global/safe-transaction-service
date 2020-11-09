@@ -276,6 +276,7 @@ class SafeTxProcessor(TxProcessor):
              _) = MultisigConfirmation.objects.get_or_create(multisig_transaction_hash=multisig_transaction_hash,
                                                              owner=owner,
                                                              defaults={
+                                                                 'created': internal_tx.ethereum_tx.block.timestamp,
                                                                  'ethereum_tx': ethereum_tx,
                                                                  'signature': safe_signature.export_signature(),
                                                                  'signature_type': safe_signature.signature_type.value,
@@ -351,6 +352,7 @@ class SafeTxProcessor(TxProcessor):
                     multisig_transaction_hash=safe_tx_hash,
                     owner=safe_signature.owner,
                     defaults={
+                        'created': internal_tx.ethereum_tx.block.timestamp,
                         'ethereum_tx': None,
                         'multisig_transaction': multisig_tx,
                         'signature': safe_signature.export_signature(),

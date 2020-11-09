@@ -186,6 +186,7 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
                     'signature_type', 'owner')
     list_filter = (MultisigConfirmationListFilter, 'signature_type')
     list_select_related = ('ethereum_tx',)
+    ordering = ['-created']
     raw_id_fields = ('ethereum_tx', 'multisig_transaction')
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 

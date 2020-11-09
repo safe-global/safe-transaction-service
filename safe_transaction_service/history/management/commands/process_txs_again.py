@@ -31,7 +31,7 @@ class Command(BaseCommand):
                 call_command(decode_txs_again.Command(), verbosity=0)
                 self.stdout.write(self.style.SUCCESS('Decoded InternalTxs'))
 
-            self.stdout.write(self.style.SUCCESS('Removing MultisigTransactions (and confirmations binded)'))
+            self.stdout.write(self.style.SUCCESS('Removing elements from database'))
             IndexServiceProvider().reindex_all()
 
         if not sync:
