@@ -8,7 +8,8 @@ from hexbytes import HexBytes
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
 from ..models import (EthereumBlock, EthereumTx, InternalTxDecoded,
-                      MultisigConfirmation, MultisigTransaction, SafeStatus)
+                      ModuleTransaction, MultisigConfirmation,
+                      MultisigTransaction, SafeStatus)
 
 logger = logging.getLogger(__name__)
 
@@ -160,11 +161,18 @@ class IndexService:
         ).filter(
             safe__in=addresses
         ).delete()  # Remove not indexed transactions
+        ModuleTransaction.objects.filter(safe__in=addresses).delete()
         InternalTxDecoded.objects.filter(internal_tx___from__in=addresses).update(processed=False)
 
     @transaction.atomic
     def reindex_all(self):
-        MultisigConfirmation.objects.filter(signature=None).delete()  # Remove onchain confirmations
-        MultisigTransaction.objects.exclude(ethereum_tx=None).delete()  # Remove not indexed transactions
+        logger.info('Remove onchain confirmations')
+        MultisigConfirmation.objects.filter(signature=None).delete()
+        logger.info('Remove transactions automatically indexed')
+        MultisigTransaction.objects.exclude(ethereum_tx=None).delete()
+        logger.info('Remove module transactions')
+        ModuleTransaction.objects.all().delete()
+        logger.info('Remove Safe statuses')
         SafeStatus.objects.all().delete()
+        logger.info('Mark all internal txs decoded as not processed')
         InternalTxDecoded.objects.update(processed=False)

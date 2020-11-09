@@ -4,7 +4,8 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from ...models import InternalTxDecoded, MultisigTransaction, SafeStatus
+from ...models import InternalTxDecoded
+from ...services import IndexServiceProvider
 from ...tasks import process_decoded_internal_txs_task
 from . import decode_txs_again
 
@@ -31,15 +32,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS('Decoded InternalTxs'))
 
             self.stdout.write(self.style.SUCCESS('Removing MultisigTransactions (and confirmations binded)'))
-            # Remove mined transactions. This is important, as if `nonce` gets wrong due to a problem of indexing
-            # we could be indexing existing txs with wrong SafeTxHash, so they will be duplicated. Deleting this
-            # we will retrieve then again from blockchain
-            MultisigTransaction.objects.exclude(ethereum_tx=None).delete()
-            self.stdout.write(self.style.SUCCESS('Removing SafeStatus objects'))
-            SafeStatus.objects.all().delete()
-
-            self.stdout.write(self.style.SUCCESS('Setting all InternalTxDecoded as not Processed'))
-            InternalTxDecoded.objects.update(processed=False)
+            IndexServiceProvider().reindex_all()
 
         if not sync:
             process_decoded_internal_txs_task.delay()
