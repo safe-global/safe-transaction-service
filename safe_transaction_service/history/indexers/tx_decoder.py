@@ -37,6 +37,7 @@ from .decoder_abis.sablier import (sablier_abi, sablier_ctoken_manager,
                                    sablier_payroll)
 from .decoder_abis.sight import (conditional_token_abi, market_maker_abi,
                                  market_maker_factory_abi)
+from .decoder_abis.timelock import timelock_abi
 
 logger = getLogger(__name__)
 
@@ -207,8 +208,8 @@ class TxDecoder(SafeTxDecoder):
             self.dummy_w3.eth.contract(abi=ctoken_abi),
             self.dummy_w3.eth.contract(abi=comptroller_abi),
         ]
-        idle_abis = [idle_token_v3]
-        idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in idle_abis]
+        idle_contracts = [self.dummy_w3.eth.contract(abi=abi)
+                          for abi in [idle_token_v3]]
         maker_dao_contracts = [
             self.dummy_w3.eth.contract(abi=maker_dao_erc20_fee_proxy),
         ]
@@ -216,10 +217,10 @@ class TxDecoder(SafeTxDecoder):
             self.dummy_w3.eth.contract(abi=open_zeppelin_admin_upgradeability_proxy),
             self.dummy_w3.eth.contract(abi=open_zeppelin_proxy_admin),
         ]
-        request_abis = [request_erc20_proxy, request_ethereum_proxy]
-        request_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in request_abis]
-        sablier_abis = [sablier_ctoken_manager, sablier_payroll, sablier_abi]
-        sablier_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in sablier_abis]
+        request_contracts = [self.dummy_w3.eth.contract(abi=abi)
+                             for abi in (request_erc20_proxy, request_ethereum_proxy)]
+        sablier_contracts = [self.dummy_w3.eth.contract(abi=abi)
+                             for abi in (sablier_ctoken_manager, sablier_payroll, sablier_abi)]
 
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
                      get_kyber_network_proxy_contract(self.dummy_w3)]
@@ -237,13 +238,17 @@ class TxDecoder(SafeTxDecoder):
             self.dummy_w3.eth.contract(abi=decoging_test_abi)
         ]  # https://rinkeby.etherscan.io/address/0x479adf13cc2e1844451f71dcf0bf5194df53b14b#code
 
+        timelock_contracts = [
+            self.dummy_w3.eth.contract(abi=timelock_abi)
+        ]
+
         self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (test_contracts + aave_contracts + balancer_contracts + idle_contracts
-                                    + open_zeppelin_contracts + maker_dao_contracts + request_contracts
-                                    + sablier_contracts + compound_contracts + exchanges
+        self.supported_contracts = (test_contracts + timelock_contracts + aave_contracts + balancer_contracts
+                                    + idle_contracts + open_zeppelin_contracts + maker_dao_contracts
+                                    + request_contracts + sablier_contracts + compound_contracts + exchanges
                                     + sight_contracts + gnosis_protocol + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
