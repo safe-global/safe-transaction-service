@@ -282,7 +282,8 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
 
             r = requests.post(webhook.url, json=payload)
             if not r.ok:
-                logger.warning('Error %d posting to host=%s with content=%s', r.status_code, host, r.content)
+                logger.warning('Failed status code %d posting to host=%s with content=%s',
+                               r.status_code, host, r.content)
 
             sent_requests += 1
         return sent_requests
