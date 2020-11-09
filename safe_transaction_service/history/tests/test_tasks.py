@@ -6,8 +6,7 @@ from django.test import TestCase
 from eth_account import Account
 
 from ..models import SafeContract, SafeStatus
-from ..tasks import (BlockchainRunningTask, BlockchainRunningTaskManager,
-                     process_decoded_internal_txs_task)
+from ..tasks import process_decoded_internal_txs_task
 from .factories import (EthereumEventFactory, InternalTxDecodedFactory,
                         InternalTxFactory, WebHookFactory)
 
@@ -28,24 +27,6 @@ class TestTasks(TestCase):
         WebHookFactory(address=to)
         InternalTxFactory(to=to)
         self.assertEqual(mock_post.call_count, 2)
-
-    def test_blockchain_running_task(self):
-        # Test context manager
-        class A:
-            def __init__(self, id: str):
-                self.id = id
-
-        BlockchainRunningTaskManager().delete_all_tasks()
-        a = A('custom-task-id')
-        b = A('another-task_id')
-        with BlockchainRunningTask(a) as blockchain_running_task:
-            self.assertEqual(blockchain_running_task.blockchain_running_task_manager.get_running_tasks(),
-                             [a.id])
-            with BlockchainRunningTask(b):
-                self.assertEqual(blockchain_running_task.blockchain_running_task_manager.get_running_tasks(),
-                                 [b.id, a.id])
-
-        self.assertEqual(BlockchainRunningTaskManager().get_running_tasks(), [])
 
     def test_process_decoded_internal_txs_task(self):
         owner = Account.create().address
