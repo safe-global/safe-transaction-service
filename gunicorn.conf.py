@@ -1,11 +1,12 @@
-worker_class = 'gevent'
-timeout = 60
+access_logfile = '-'
+error_logfile = '-'
 graceful_timeout = 60
 log_file = '-'
-error_logfile = '-'
-access_logfile = '-'
 log_level = 'info'
 logger_class = 'safe_transaction_service.history.utils.CustomGunicornLogger'
+timeout = 60
+worker_class = 'gevent'
+worker_connections = 2000
 
 
 def post_fork(server, worker):
