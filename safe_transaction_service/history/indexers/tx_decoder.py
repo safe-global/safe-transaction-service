@@ -27,7 +27,7 @@ from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
                                            fleet_factory_deterministic_abi,
                                            gnosis_protocol_abi)
-from .decoder_abis.gnosis_safe import decoging_test_abi
+from .decoder_abis.gnosis_safe import allowance_module_abi, decoging_test_abi
 from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.maker_dao import maker_dao_erc20_fee_proxy
 from .decoder_abis.open_zeppelin import (
@@ -231,6 +231,8 @@ class TxDecoder(SafeTxDecoder):
         gnosis_protocol = [self.dummy_w3.eth.contract(abi=abi) for abi in (gnosis_protocol_abi,
                                                                            fleet_factory_deterministic_abi,
                                                                            fleet_factory_abi)]
+
+        gnosis_safe = [self.dummy_w3.eth.contract(abi=abi) for abi in (allowance_module_abi,)]
         erc_contracts = [get_erc721_contract(self.dummy_w3),
                          get_erc20_contract(self.dummy_w3)]
 
@@ -249,7 +251,7 @@ class TxDecoder(SafeTxDecoder):
         self.supported_contracts = (test_contracts + timelock_contracts + aave_contracts + balancer_contracts
                                     + idle_contracts + open_zeppelin_contracts + maker_dao_contracts
                                     + request_contracts + sablier_contracts + compound_contracts + exchanges
-                                    + sight_contracts + gnosis_protocol + erc_contracts
+                                    + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
