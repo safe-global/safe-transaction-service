@@ -120,6 +120,7 @@ class CollectiblesService:
 
         self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
         self.cache_token_info: Dict[str, Tuple[str, str]] = {}
+        self.cache_token_uri: Dict[Tuple[str, int], str] = {}
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24, prefix='collectibles-_retrieve_metadata_from_uri')  # 1 day
@@ -208,7 +209,7 @@ class CollectiblesService:
             return []
 
         logger.debug('Getting token_uris for %s', addresses_with_token_ids)
-        token_uris = self.ethereum_client.erc721.get_token_uris(addresses_with_token_ids)
+        token_uris = self.get_token_uris(addresses_with_token_ids)
         logger.debug('Got token_uris for %s', addresses_with_token_ids)
         collectibles = []
         for (token_address, token_id), token_uri in zip(addresses_with_token_ids, token_uris):
@@ -276,6 +277,23 @@ class CollectiblesService:
                 return Erc721InfoWithLogo.from_token(token)
 
         return token_info
+
+    def get_token_uris(self, addresses_with_token_ids: Sequence[Tuple[str, int]]) -> List[Optional[str]]:
+        """
+        Cache token_uris, as they shouldn't change
+        :param addresses_with_token_ids:
+        :return: List of token_uris in the same orther that `addresses_with_token_ids` were provided
+        """
+        not_found = [address_with_token_id for address_with_token_id in addresses_with_token_ids
+                     if address_with_token_id not in self.cache_token_uri]
+        # Find missing in database
+        self.cache_token_uri.update({address_with_token_id: token_uri
+                                    for address_with_token_id, token_uri
+                                    in zip(not_found,
+                                           self.ethereum_client.erc721.get_token_uris(not_found))})
+
+        return [self.cache_token_uri[address_with_token_id]
+                for address_with_token_id in addresses_with_token_ids]
 
     def retrieve_token_info(self, token_address: str) -> Optional[Erc721Info]:
         """

@@ -6,7 +6,7 @@ from django.test import TestCase
 from eth_account import Account
 
 from gnosis.eth import EthereumClient
-from gnosis.eth.ethereum_client import Erc721Info
+from gnosis.eth.ethereum_client import Erc721Info, Erc721Manager
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
@@ -134,3 +134,14 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         token_info = collectibles_service.get_token_info(list(collectibles_service.ENS_CONTRACTS_WITH_TLD.keys())[0])
         self.assertIsNotNone(token_info)
         self.assertEqual(Token.objects.count(), 4)
+
+    @mock.patch.object(Erc721Manager, 'get_token_uris', autospec=True)
+    def test_get_token_uris(self, get_token_uris_mock: MagicMock):
+        get_token_uris_mock.return_value = ['http://testing.com/12', None, '']
+        addresses_with_token_ids = [(Account.create(), i) for i in range(3)]
+        collectibles_service = CollectiblesService(self.ethereum_client)
+        self.assertFalse(collectibles_service.cache_token_uri)
+        collectibles_service.get_token_uris(addresses_with_token_ids)
+        self.assertEqual(len(collectibles_service.cache_token_uri), 3)
+        for address_with_token_id, token_uri in zip(addresses_with_token_ids, get_token_uris_mock.return_value):
+            self.assertEqual(collectibles_service.cache_token_uri[address_with_token_id], token_uri)
