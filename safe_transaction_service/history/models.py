@@ -375,6 +375,10 @@ class EthereumEvent(models.Model):
     def __str__(self):
         return f'Tx-hash={self.ethereum_tx_id} Log-index={self.log_index} Topic={self.topic} Arguments={self.arguments}'
 
+    @property
+    def created(self):
+        return self.ethereum_tx.block.timestamp
+
     def is_erc20(self) -> bool:
         return self.topic == ERC20_721_TRANSFER_TOPIC and 'value' in self.arguments and 'to' in self.arguments
 
@@ -544,6 +548,10 @@ class InternalTx(models.Model):
     @property
     def block_number(self):
         return self.ethereum_tx.block_id
+
+    @property
+    def created(self):
+        return self.ethereum_tx.block.timestamp
 
     @property
     def can_be_decoded(self) -> bool:

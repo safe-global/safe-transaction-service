@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from typing import Any, Dict, Optional, Type, Union
 
 from django.db.models import Model
@@ -62,7 +63,6 @@ def bind_confirmation(sender: Type[Model],
 def build_webhook_payload(sender: Type[Model],
                           instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction]
                           ) -> Optional[Dict[str, Any]]:
-
     payload: Optional[Dict[str, Any]] = None
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
         payload = {
@@ -115,7 +115,10 @@ def process_webhook(sender: Type[Model],
     if not created and sender != MultisigTransaction:  # MultisigTransaction can change from Pending to Executed
         return
 
-    payload = build_webhook_payload(sender, instance)
-    if payload and (address := payload.get('address')):
-        send_webhook_task.delay(address, payload)
-        send_notification_task.apply_async(args=(address, payload), countdown=2)
+    # Don't send information for older than 10 minutes transactions
+    # This triggers a DB query on EthereumEvent, InternalTx (they are not TimeStampedModel)
+    if (instance.created + timedelta(minutes=10)) > timezone.now():
+        payload = build_webhook_payload(sender, instance)
+        if payload and (address := payload.get('address')):
+            send_webhook_task.delay(address, payload)
+            send_notification_task.apply_async(args=(address, payload), countdown=2)
