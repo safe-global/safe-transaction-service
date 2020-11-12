@@ -51,11 +51,8 @@ class TestTransactionService(TestCase):
         # We change a queued tx, a change was not expected unless we set queued=True
         higher_nonce_safe_multisig_transaction.trusted = True
         higher_nonce_safe_multisig_transaction.save()
-        self.assertEqual(len(self.transaction_service.redis.keys('*', 0)))
         self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=True).count(), 4)
-        self.assertEqual(len(self.transaction_service.redis.keys('*', 1)))
         self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=True).count(), 5)
-        self.assertEqual(len(self.transaction_service.redis.keys('*', 1)))
 
         queryset = transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=False)
         self.assertEqual(queryset.count(), 9)
@@ -138,8 +135,11 @@ class TestTransactionService(TestCase):
         )
         all_tx_hashes = list([q['safe_tx_hash'] for q in queryset])
 
+        self.assertEqual(len(self.transaction_service.redis.keys('*')), 0)
         all_txs = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes)
+        self.assertEqual(len(self.transaction_service.redis.keys('*')), 1)
         all_txs = transaction_service.get_all_txs_from_hashes(safe_address, all_tx_hashes)  # Force caching
+        self.assertEqual(len(self.transaction_service.redis.keys('*')), 1)
         self.assertEqual(len(all_txs), 6)
         tx_types = [MultisigTransaction, EthereumTx, EthereumTx, EthereumTx, ModuleTransaction, MultisigTransaction]
         numbers_of_transfers = [0, 1, 1, 1, 0, 0]
