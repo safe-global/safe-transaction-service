@@ -21,6 +21,14 @@ from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
 logger = getLogger(__name__)
 
 
+class TxProcessorException(Exception):
+    pass
+
+
+class OwnerCannotBeRemoved(TxProcessorException):
+    pass
+
+
 class SafeTxProcessorProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
@@ -104,6 +112,22 @@ class SafeTxProcessor(TxProcessor):
     def get_last_safe_status_for_address(self, address: str) -> SafeStatus:
         return self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
 
+    def remove_owner(self, internal_tx: InternalTx, safe_status: SafeStatus, owner: str):
+        """
+        :param internal_tx:
+        :param safe_status:
+        :param owner:
+        :return:
+        """
+        contract_address = internal_tx._from
+        try:
+            safe_status.owners.remove(owner)
+            MultisigConfirmation.objects.remove_unused_confirmations(contract_address, safe_status.nonce, owner)
+        except ValueError as e:
+            logger.error('Error processing trace=%s for contract=%s with tx-hash=%s. Cannot remove owner=%s',
+                         internal_tx.trace_address, contract_address, internal_tx.ethereum_tx_id, owner)
+            raise OwnerCannotBeRemoved() from e
+
     def store_new_safe_status(self, safe_status: SafeStatus, internal_tx: InternalTx) -> SafeStatus:
         safe_status.store_new(internal_tx)
         self.safe_status_cache[safe_status.address] = safe_status
@@ -179,23 +203,17 @@ class SafeTxProcessor(TxProcessor):
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.threshold = arguments['_threshold']
             owner = arguments['owner']
-            try:
-                if function_name == 'addOwnerWithThreshold':
-                    safe_status.owners.append(owner)
-                else:  # removeOwner, removeOwnerWithThreshold
-                    safe_status.owners.remove(owner)
-                    MultisigConfirmation.objects.remove_unused_confirmations(contract_address, safe_status.nonce, owner)
-            except ValueError:
-                logger.error('Error processing trace=%s for contract=%s with tx-hash=%s',
-                             internal_tx.trace_address, contract_address,
-                             internal_tx.ethereum_tx_id)
+            if function_name == 'addOwnerWithThreshold':
+                safe_status.owners.append(owner)
+            else:  # removeOwner, removeOwnerWithThreshold
+                self.remove_owner(internal_tx, safe_status, owner)
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'swapOwner':
             logger.debug('Processing owner swap')
             old_owner = arguments['oldOwner']
             new_owner = arguments['newOwner']
             safe_status = self.get_last_safe_status_for_address(contract_address)
-            safe_status.owners.remove(old_owner)
+            self.remove_owner(internal_tx, safe_status, old_owner)
             safe_status.owners.append(new_owner)
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'changeThreshold':
