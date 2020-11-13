@@ -2,7 +2,7 @@ import datetime
 from enum import Enum
 from itertools import islice
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
@@ -387,7 +387,7 @@ class EthereumEvent(models.Model):
 
 
 class InternalTxManager(BulkCreateSignalMixin, models.Manager):
-    def _trace_address_to_str(self, trace_address) -> str:
+    def _trace_address_to_str(self, trace_address: Sequence[int]) -> str:
         return ','.join([str(address) for address in trace_address])
 
     def build_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> 'InternalTx':

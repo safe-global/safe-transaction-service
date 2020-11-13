@@ -1,5 +1,8 @@
 from hexbytes import HexBytes
 
+from gnosis.eth.tests.mocks.mock_internal_txs import \
+    creation_internal_txs  # noqa
+
 create_trace = {
     'action': {'from': '0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
                'gas': 470747,

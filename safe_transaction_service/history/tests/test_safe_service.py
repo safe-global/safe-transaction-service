@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
@@ -10,7 +11,7 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from ..services.safe_service import (CannotGetSafeInfo, SafeCreationInfo,
                                      SafeInfo, SafeServiceProvider)
 from .factories import InternalTxFactory
-from .mocks.traces import create_trace
+from .mocks.traces import create_trace, creation_internal_txs
 
 
 class TestSafeService(SafeTestCaseMixin, TestCase):
@@ -28,6 +29,16 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             InternalTxFactory(contract_address=random_address, ethereum_tx__status=1, trace_address='0')
             safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
             self.assertIsInstance(safe_creation_info, SafeCreationInfo)
+
+    @mock.patch.object(ParityManager, 'trace_transaction', return_value=creation_internal_txs)
+    def test_get_safe_creation_info_with_next_trace(self, trace_transaction_mock: MagicMock):
+        random_address = Account.create().address
+        InternalTxFactory(contract_address=random_address, ethereum_tx__status=1, trace_address='')
+        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
+        self.assertIsInstance(safe_creation_info, SafeCreationInfo)
+        self.assertEqual(safe_creation_info.creator, '0xCBBb8430469192eF4aBb77281Bb36De2B8fffCe6')
+        self.assertEqual(safe_creation_info.master_copy, '0x8942595A2dC5181Df0465AF0D7be08c8f23C93af')
+        self.assertTrue(safe_creation_info.setup_data)
 
     def test_get_safe_info(self):
         safe_address = Account.create().address

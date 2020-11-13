@@ -64,26 +64,23 @@ class SafeService:
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
 
-            previous_trace = self.ethereum_client.parity.get_previous_trace(creation_internal_tx.ethereum_tx_id,
-                                                                            creation_internal_tx.trace_address_as_list,
-                                                                            skip_delegate_calls=True)
-            if previous_trace:
-                previous_internal_tx = InternalTx.objects.build_from_trace(previous_trace,
-                                                                           creation_internal_tx.ethereum_tx)
-            else:
-                previous_internal_tx = None
+            previous_internal_tx = self._get_previous_internal_tx(creation_internal_tx)
 
             created = creation_internal_tx.ethereum_tx.block.timestamp
             creator = (previous_internal_tx or creation_internal_tx)._from
             proxy_factory = creation_internal_tx._from
 
-            master_copy = None
-            setup_data = None
+            master_copy: Optional[str] = None
+            setup_data: Optional[bytes] = None
             if previous_internal_tx:
                 data = previous_internal_tx.data
                 result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
                 if result:
                     master_copy, setup_data = result
+            else:
+                if next_internal_tx := self._get_next_internal_tx(creation_internal_tx):
+                    master_copy = next_internal_tx.to
+                    setup_data = next_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
 
@@ -106,7 +103,7 @@ class SafeService:
         except ValueError:
             return None
 
-    def _decode_cpk_proxy_factory(self, data) -> Optional[Tuple[str, bytes]]:
+    def _decode_cpk_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
             _, data_decoded = self.cpk_proxy_factory_contract.decode_function_input(data)
             master_copy = data_decoded.get('masterCopy')
@@ -114,3 +111,17 @@ class SafeService:
             return master_copy, setup_data
         except ValueError:
             return None
+
+    def _get_next_internal_tx(self, internal_tx: InternalTx):
+        next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
+                                                                  internal_tx.trace_address_as_list,
+                                                                  remove_calls=True)
+        return next_traces and InternalTx.objects.build_from_trace(next_traces[0],
+                                                                   internal_tx.ethereum_tx)
+
+    def _get_previous_internal_tx(self, internal_tx: InternalTx):
+        previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
+                                                                        internal_tx.trace_address_as_list,
+                                                                        skip_delegate_calls=True)
+        return previous_trace and InternalTx.objects.build_from_trace(previous_trace,
+                                                                      internal_tx.ethereum_tx)
