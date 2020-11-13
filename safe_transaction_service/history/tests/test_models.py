@@ -297,6 +297,7 @@ class TestSafeStatus(TestCase):
         SafeStatus.objects.all().delete()
         SafeStatusFactory(nonce=0, address=address)
         SafeStatusFactory(nonce=1, address=address)
+        SafeStatusFactory(nonce=1, address=address)
         another_safe_status = SafeStatusFactory(nonce=2, address=address)
         self.assertFalse(another_safe_status.is_corrupted())
 
