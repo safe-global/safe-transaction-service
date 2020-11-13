@@ -603,7 +603,20 @@ class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
+    def for_safe(self, safe_address: str):
+        """
+        :param safe_address:
+        :return: Queryset of all InternalTxDecoded for one Safe with `safe_address`
+        """
+        return self.filter(
+            internal_tx___from=safe_address
+        )
+
     def for_indexed_safes(self):
+        """
+        :return: Queryset of InternalTxDecoded for Safes already indexed or calling `setup`. Use this to index Safes
+        for the first time
+        """
         return self.filter(
             Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
             | Q(function_name='setup')  # This way we can index new Safes without events
@@ -1037,6 +1050,17 @@ class SafeStatus(models.Model):
     @property
     def block_number(self):
         return self.internal_tx.ethereum_tx.block_id
+
+    def is_corrupted(self):
+        """
+        SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
+        something is wrong.
+        :return: True if corrupted, False otherwise
+        """
+        return self.__class__.objects.filter(
+            address=self.address,
+            nonce__lte=self.nonce
+        ).count() - 1 != self.nonce
 
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx

@@ -13,8 +13,8 @@ from redis.exceptions import LockError
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
-from .models import InternalTxDecoded, WebHook, WebHookType
-from .services import ReorgService, ReorgServiceProvider
+from .models import InternalTxDecoded, SafeStatus, WebHook, WebHookType
+from .services import IndexServiceProvider, ReorgService, ReorgServiceProvider
 from .utils import close_gevent_db_connection, get_redis
 
 logger = get_task_logger(__name__)
@@ -153,6 +153,14 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]
                 if not internal_txs_decoded:
                     break
+
+                # Check if something is wrong during indexing
+                if SafeStatus.objects.last_for_address(safe_address).is_corrupted():
+                    message = f'A problem was found in SafeStatus for safe-address={safe_address}, reindexing'
+                    logger.warning(message)
+                    IndexServiceProvider().reindex_addresses([safe_address])
+                    raise ValueError(message)
+
                 number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
                 logger.info('Processed %d decoded transactions', number_processed)
             if number_processed:
