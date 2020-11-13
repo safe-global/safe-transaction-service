@@ -1052,13 +1052,14 @@ class SafeStatus(models.Model):
     def is_corrupted(self):
         """
         SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
-        something is wrong.
+        something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
+        adding owners and enabling a Module in the same contract `execTransaction`)
         :return: True if corrupted, False otherwise
         """
         return self.__class__.objects.filter(
             address=self.address,
             nonce__lte=self.nonce
-        ).count() - 1 != self.nonce
+        ).count() <= self.nonce
 
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx

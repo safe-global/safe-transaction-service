@@ -280,18 +280,25 @@ class TestSafeStatus(TestCase):
         safe_status.store_new(internal_tx)
         self.assertEqual(SafeStatus.objects.all().count(), 2)
 
-    def test_safe_status_corrupted(self):
-        safe_status = SafeStatusFactory(nonce=0)
+    def test_safe_status_is_corrupted(self):
+        address = Account.create().address
+        safe_status = SafeStatusFactory(nonce=0, address=address)
         self.assertFalse(safe_status.is_corrupted())
-        safe_status_2 = SafeStatusFactory(nonce=1)
-        self.assertFalse(safe_status.is_corrupted())
-        safe_status_3 = SafeStatusFactory(nonce=2)
+        safe_status_2 = SafeStatusFactory(nonce=1, address=address)
+        self.assertFalse(safe_status_2.is_corrupted())
+        safe_status_3 = SafeStatusFactory(nonce=2, address=address)
         self.assertEqual(SafeStatus.objects.count(), 3)
         safe_status_2.delete()
         self.assertEqual(SafeStatus.objects.count(), 2)
         # First SafeStatus is ok, as it has no previous SafeStatus missing
         self.assertFalse(safe_status.is_corrupted())
         self.assertTrue(safe_status_3.is_corrupted())
+
+        SafeStatus.objects.all().delete()
+        SafeStatusFactory(nonce=0, address=address)
+        SafeStatusFactory(nonce=1, address=address)
+        another_safe_status = SafeStatusFactory(nonce=2, address=address)
+        self.assertFalse(another_safe_status.is_corrupted())
 
     def test_safe_status_last_for_address(self):
         address = Account.create().address
