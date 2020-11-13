@@ -150,19 +150,20 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
             # Use slicing for memory issues
             while True:
-                internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]
-                if not internal_txs_decoded:
-                    break
-
                 # Check if something is wrong during indexing
                 safe_status = SafeStatus.objects.last_for_address(safe_address)
                 if safe_status and safe_status.is_corrupted():
                     tx_processor.clear_cache()
-                    message = f'A problem was found in SafeStatus for safe-address={safe_address}, reindexing'
+                    message = f'A problem was found in SafeStatus with nonce={safe_status.nonce} ' \
+                              f'on internal-tx-id={safe_status.internal_tx_id} ' \
+                              f'for safe-address={safe_address}, reindexing'
                     logger.warning(message)
                     IndexServiceProvider().reindex_addresses([safe_address])
                     raise ValueError(message)
 
+                internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]
+                if not internal_txs_decoded:
+                    break
                 number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
                 logger.info('Processed %d decoded transactions', number_processed)
             if number_processed:
