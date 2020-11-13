@@ -108,7 +108,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         try:
             safe_version = safe.retrieve_version()
         except BadFunctionCallOutput as e:
-            raise ValidationError('Could not get Safe version from blockchain, check contract') from e
+            raise ValidationError(f'Could not get Safe version from blockchain, check contract exists on network '
+                                  f'{ethereum_client.get_network().name}') from e
 
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
                                          data['safe_tx_gas'], data['base_gas'], data['gas_price'],
