@@ -36,9 +36,12 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         InternalTxFactory(contract_address=random_address, ethereum_tx__status=1, trace_address='')
         safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
         self.assertIsInstance(safe_creation_info, SafeCreationInfo)
-        self.assertEqual(safe_creation_info.creator, '0xCBBb8430469192eF4aBb77281Bb36De2B8fffCe6')
         self.assertEqual(safe_creation_info.master_copy, '0x8942595A2dC5181Df0465AF0D7be08c8f23C93af')
         self.assertTrue(safe_creation_info.setup_data)
+        trace_transaction_mock.return_value = []
+        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
+        self.assertIsNone(safe_creation_info.master_copy)
+        self.assertIsNone(safe_creation_info.setup_data)
 
     def test_get_safe_info(self):
         safe_address = Account.create().address
