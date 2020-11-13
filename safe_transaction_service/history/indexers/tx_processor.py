@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Dict, List, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 from django.db import transaction
 
@@ -75,6 +75,12 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi) for event in self.safe_tx_module_failure_events
         }
         self.safe_status_cache: Dict[str, SafeStatus] = {}
+
+    def clear_cache(self, safe_address: Optional[str] = None):
+        if safe_address and safe_address in self.safe_status_cache:
+            del self.safe_status_cache[safe_address]
+        else:
+            self.safe_status_cache.clear()
 
     def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]) -> bool:
         """
