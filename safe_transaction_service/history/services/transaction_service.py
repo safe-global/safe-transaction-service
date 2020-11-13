@@ -62,11 +62,20 @@ class TransactionService:
         return [pickle.loads(data) if data else None for data in self.redis.mget(keys_to_search)]
 
     def store_in_cache_txs(self, hashes_with_txs: Tuple[str, Union[EthereumTx, MultisigTransaction, ModuleTransaction]]):
+        """
+        Store executed transactions older than 10 minutes, using `ethereum_tx_hash` as key (for
+        MultisigTransaction it will be `SafeTxHash`) and expire then in one hour
+        :param hashes_with_txs:
+        """
         # Just store executed transactions older than 10 minutes
         to_store = {self.get_cached_key(tx_hash): pickle.dumps(tx) for tx_hash, tx in hashes_with_txs
                     if tx.execution_date and (tx.execution_date + timedelta(minutes=10)) < timezone.now()}
         if to_store:
-            return self.redis.mset(to_store)
+            pipe = self.redis.pipeline()
+            pipe.mset(to_store)
+            for key in to_store.keys():
+                pipe.expire(key, 60 * 60)  # Expire in one hour
+            pipe.execute()
     # End of cache methods
 
     def get_all_tx_hashes(self, safe_address: str, queued: bool = True, trusted: bool = True) -> QuerySet:
