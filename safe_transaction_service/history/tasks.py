@@ -155,7 +155,8 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                     break
 
                 # Check if something is wrong during indexing
-                if SafeStatus.objects.last_for_address(safe_address).is_corrupted():
+                safe_status = SafeStatus.objects.last_for_address(safe_address)
+                if safe_status and safe_status.is_corrupted():
                     message = f'A problem was found in SafeStatus for safe-address={safe_address}, reindexing'
                     logger.warning(message)
                     IndexServiceProvider().reindex_addresses([safe_address])
