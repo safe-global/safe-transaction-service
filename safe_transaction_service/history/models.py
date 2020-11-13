@@ -1023,8 +1023,6 @@ class SafeStatusQuerySet(models.QuerySet):
         safe_status = self.last_for_every_address().filter(
             address=address
         ).first()
-        if not safe_status:
-            logger.error('SafeStatus not found for address=%s', address)
         return safe_status
 
 

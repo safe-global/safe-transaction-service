@@ -116,7 +116,10 @@ class SafeTxProcessor(TxProcessor):
         return False
 
     def get_last_safe_status_for_address(self, address: str) -> SafeStatus:
-        return self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
+        safe_status = self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
+        if not safe_status:
+            logger.error('SafeStatus not found for address=%s', address)
+        return safe_status
 
     def remove_owner(self, internal_tx: InternalTx, safe_status: SafeStatus, owner: str):
         """
