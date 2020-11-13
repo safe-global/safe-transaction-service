@@ -77,8 +77,9 @@ class SafeTxProcessor(TxProcessor):
         self.safe_status_cache: Dict[str, SafeStatus] = {}
 
     def clear_cache(self, safe_address: Optional[str] = None):
-        if safe_address and safe_address in self.safe_status_cache:
-            del self.safe_status_cache[safe_address]
+        if safe_address:
+            if safe_address in self.safe_status_cache:
+                del self.safe_status_cache[safe_address]
         else:
             self.safe_status_cache.clear()
 
@@ -207,6 +208,7 @@ class SafeTxProcessor(TxProcessor):
             SafeStatus.objects.create(internal_tx=internal_tx,
                                       address=contract_address, owners=owners, threshold=threshold,
                                       nonce=nonce, master_copy=master_copy, fallback_handler=fallback_handler)
+            self.clear_cache(contract_address)
         elif function_name in ('addOwnerWithThreshold', 'removeOwner', 'removeOwnerWithThreshold'):
             logger.debug('Processing owner/threshold modification')
             safe_status = self.get_last_safe_status_for_address(contract_address)
