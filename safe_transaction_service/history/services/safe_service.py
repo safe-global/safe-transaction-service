@@ -77,7 +77,7 @@ class SafeService:
                 result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
                 if result:
                     master_copy, setup_data = result
-            else:
+            if not (master_copy and setup_data):
                 if next_internal_tx := self._get_next_internal_tx(creation_internal_tx):
                     master_copy = next_internal_tx.to
                     setup_data = next_internal_tx.data
