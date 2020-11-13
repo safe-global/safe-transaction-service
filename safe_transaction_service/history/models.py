@@ -592,7 +592,10 @@ class InternalTx(models.Model):
 
     @property
     def trace_address_as_list(self) -> List[int]:
-        return [int(x) for x in self.trace_address.split(',')]
+        if not self.trace_address:
+            return []
+        else:
+            return [int(x) for x in self.trace_address.split(',')]
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
