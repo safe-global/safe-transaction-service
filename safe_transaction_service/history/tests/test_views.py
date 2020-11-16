@@ -1277,14 +1277,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
         self.assertCountEqual(response.data, expected)
 
-    def test_multisig_transactions_analytics_view(self):
-        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+    def test_analytics_multisig_txs_by_origin_view(self):
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         origin = 'Millennium Falcon Navigation Computer'
         origin_2 = 'HAL 9000'
         multisig_transaction = MultisigTransactionFactory(origin=origin)
-        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
             {'origin': origin, 'transactions': 1},
@@ -1294,7 +1294,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         for _ in range(3):
             MultisigTransactionFactory(origin=origin_2)
 
-        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
             {'origin': origin_2, 'transactions': 3},
@@ -1306,7 +1306,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             MultisigTransactionFactory(origin=origin)
 
         # Check sorting by the biggest
-        response = self.client.get(reverse('v1:multisig-transactions-analytics'))
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
             {'origin': origin, 'transactions': 4},
@@ -1318,19 +1318,56 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         origin_3 = 'Skynet'
         safe_address = Account.create().address
         MultisigTransactionFactory(origin=origin_3, safe=safe_address)
-        response = self.client.get(reverse('v1:multisig-transactions-analytics') + f'?safe={safe_address}')
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin') + f'?safe={safe_address}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
             {'origin': origin_3, 'transactions': 1},
         ]
         self.assertEqual(response.data, expected)
 
-        response = self.client.get(reverse('v1:multisig-transactions-analytics') + f'?to={multisig_transaction.to}')
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-origin') + f'?to={multisig_transaction.to}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
             {'origin': multisig_transaction.origin, 'transactions': 1},
         ]
         self.assertEqual(response.data, expected)
+
+    def test_analytics_multisig_txs_by_safe_view(self):
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        safe_address_1 = Account.create().address
+        safe_address_2 = Account.create().address
+        safe_address_3 = Account.create().address
+        MultisigTransactionFactory(safe=safe_address_1)
+        MultisigTransactionFactory(safe=safe_address_1)
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['count'], 1)
+        self.assertEqual(result['results'][0], {'safe': safe_address_1, 'transactions': 2})
+        MultisigTransactionFactory(safe=safe_address_1)
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['count'], 1)
+        self.assertEqual(result['results'][0], {'safe': safe_address_1, 'transactions': 3})
+        MultisigTransactionFactory(safe=safe_address_2)
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['results'], [
+            {'safe': safe_address_1, 'transactions': 3},
+            {'safe': safe_address_2, 'transactions': 1}
+        ])
+        [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['results'], [
+            {'safe': safe_address_3, 'transactions': 4},
+            {'safe': safe_address_1, 'transactions': 3},
+            {'safe': safe_address_2, 'transactions': 1}
+        ])
 
     def test_owners_view(self):
         invalid_address = '0x2A'

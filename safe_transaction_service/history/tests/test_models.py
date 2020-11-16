@@ -395,6 +395,34 @@ class TestMultisigTransactions(TestCase):
         MultisigTransactionFactory(safe=safe_address, nonce=13)
         self.assertEqual(MultisigTransaction.objects.last_nonce(safe_address), 25)
 
+    def test_safes_with_number_of_transactions_executed(self):
+        self.assertEqual(MultisigTransaction.objects.safes_with_number_of_transactions_executed().count(), 0)
+        safe_address_1 = Account.create().address
+        safe_address_2 = Account.create().address
+        safe_address_3 = Account.create().address
+        MultisigTransactionFactory(safe=safe_address_1)
+        MultisigTransactionFactory(safe=safe_address_1)
+        safes_with_number_of_transactions = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], {'safe': safe_address_1, 'transactions': 2})
+        MultisigTransactionFactory(safe=safe_address_1)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+        self.assertEqual(result[0], {'safe': safe_address_1, 'transactions': 3})
+        MultisigTransactionFactory(safe=safe_address_2)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_1, 'transactions': 3},
+            {'safe': safe_address_2, 'transactions': 1}
+        ])
+        [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_3, 'transactions': 4},
+            {'safe': safe_address_1, 'transactions': 3},
+            {'safe': safe_address_2, 'transactions': 1}
+        ])
+
     def test_with_confirmations(self):
         multisig_transaction = MultisigTransactionFactory()
         self.assertEqual(MultisigTransaction.objects.with_confirmations().count(), 0)

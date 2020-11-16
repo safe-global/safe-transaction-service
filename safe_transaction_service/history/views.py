@@ -21,15 +21,15 @@ from web3 import Web3
 
 from safe_transaction_service.version import __version__
 
-from .filters import (DefaultPagination, ModuleTransactionFilter,
-                      MultisigTransactionAnalyticsFilter,
-                      MultisigTransactionFilter, SmallPagination,
-                      TransferListFilter)
+from .filters import (AnalyticsMultisigTxsByOriginFilter, DefaultPagination,
+                      ModuleTransactionFilter, MultisigTransactionFilter,
+                      SmallPagination, TransferListFilter)
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
                      MultisigTransaction, SafeContract, SafeContractDelegate,
                      SafeMasterCopy, SafeStatus)
-from .serializers import (MasterCopyResponseSerializer,
-                          MultisigTransactionAnalyticsResponseSerializer,
+from .serializers import (AnalyticsMultisigTxsByOriginResponseSerializer,
+                          AnalyticsMultisigTxsBySafeResponseSerializer,
+                          MasterCopyResponseSerializer,
                           OwnerResponseSerializer,
                           SafeBalanceResponseSerializer,
                           SafeBalanceUsdResponseSerializer,
@@ -77,6 +77,19 @@ class AboutView(APIView):
             }
         }
         return Response(content)
+
+
+class AnalyticsMultisigTxsByOriginListView(ListAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = AnalyticsMultisigTxsByOriginFilter
+    pagination_class = None
+    queryset = MultisigTransaction.objects.values('origin').annotate(transactions=Count('*')).order_by('-transactions')
+    serializer_class = AnalyticsMultisigTxsByOriginResponseSerializer
+
+
+class AnalyticsMultisigTxsBySafeListView(ListAPIView):
+    queryset = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+    serializer_class = AnalyticsMultisigTxsBySafeResponseSerializer
 
 
 class AllTransactionsListView(ListAPIView):
@@ -291,14 +304,6 @@ class SafeMultisigTransactionListView(ListAPIView):
         else:
             serializer.save()
             return Response(status=status.HTTP_201_CREATED)
-
-
-class SafeMultisigTransactionAnalyticsListView(ListAPIView):
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = MultisigTransactionAnalyticsFilter
-    pagination_class = None
-    queryset = MultisigTransaction.objects.values('origin').annotate(transactions=Count('*')).order_by('-transactions')
-    serializer_class = MultisigTransactionAnalyticsResponseSerializer
 
 
 def swagger_safe_balance_schema(serializer_class):

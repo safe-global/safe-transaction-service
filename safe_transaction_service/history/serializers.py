@@ -582,8 +582,13 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
             return obj.block_id
 
 
-class MultisigTransactionAnalyticsResponseSerializer(serializers.Serializer):
+class AnalyticsMultisigTxsByOriginResponseSerializer(serializers.Serializer):
     origin = serializers.CharField()
+    transactions = serializers.IntegerField()
+
+
+class AnalyticsMultisigTxsBySafeResponseSerializer(serializers.Serializer):
+    safe = EthereumAddressField()
     transactions = serializers.IntegerField()
 
 

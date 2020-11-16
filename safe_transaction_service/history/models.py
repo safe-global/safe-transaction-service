@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import IntegrityError, models
-from django.db.models import Case, JSONField, Q, QuerySet, Sum
+from django.db.models import Case, Count, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
@@ -731,6 +731,9 @@ class MultisigTransactionManager(models.Manager):
         ).exclude(
             ethereum_tx=None
         ).order_by('-nonce').first()
+
+    def safes_with_number_of_transactions_executed(self):
+        return self.executed().values('safe').annotate(transactions=Count('safe')).order_by('-transactions')
 
 
 class MultisigTransactionQuerySet(models.QuerySet):

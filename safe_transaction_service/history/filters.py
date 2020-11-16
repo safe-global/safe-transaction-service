@@ -110,7 +110,7 @@ class ModuleTransactionFilter(filters.FilterSet):
         }
 
 
-class MultisigTransactionAnalyticsFilter(filters.FilterSet):
+class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
     class Meta:
         model = MultisigTransaction
         fields = {
