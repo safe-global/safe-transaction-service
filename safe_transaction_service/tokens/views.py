@@ -3,20 +3,20 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters.rest_framework
-from rest_framework import filters, response, status
+from rest_framework import response, status
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from web3 import Web3
 
 from safe_transaction_service.history.services import (
     BalanceServiceProvider, CollectiblesServiceProvider)
 
-from .filters import TokenFilter
+from . import filters, serializers
 from .models import Token
-from .serializers import TokenInfoResponseSerializer
 
 
 class TokenView(RetrieveAPIView):
-    serializer_class = TokenInfoResponseSerializer
+    serializer_class = serializers.TokenInfoResponseSerializer
     lookup_field = 'address'
     queryset = Token.objects.all()
 
@@ -42,9 +42,9 @@ class TokenView(RetrieveAPIView):
 
 
 class TokensView(ListAPIView):
-    serializer_class = TokenInfoResponseSerializer
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filterset_class = TokenFilter
+    serializer_class = serializers.TokenInfoResponseSerializer
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, SearchFilter, OrderingFilter)
+    filterset_class = filters.TokenFilter
     search_fields = ('name', 'symbol')
     ordering_fields = '__all__'
     ordering = ('name',)

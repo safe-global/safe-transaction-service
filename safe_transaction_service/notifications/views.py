@@ -2,9 +2,10 @@ import logging
 
 from rest_framework.generics import CreateAPIView, DestroyAPIView
 
-from ..history.models import SafeContract
+from safe_transaction_service.history.models import SafeContract
+
+from . import serializers
 from .models import FirebaseDevice
-from .serializers import FirebaseDeviceSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class FirebaseDeviceCreateView(CreateAPIView):
     If a uuid for an existing Safe is provided the FirebaseDevice will be updated with all the new data provided.
     Safes provided on the request are always added and never removed/replaced
     """
-    serializer_class = FirebaseDeviceSerializer
+    serializer_class = serializers.FirebaseDeviceSerializer
 
 
 class FirebaseDeviceDeleteView(DestroyAPIView):

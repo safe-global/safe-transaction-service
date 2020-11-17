@@ -8,16 +8,6 @@ from gnosis.eth.django.models import EthereumAddressField, Uint256Field
 from .models import ModuleTransaction, MultisigTransaction
 
 
-class DefaultPagination(LimitOffsetPagination):
-    max_limit = 200
-    default_limit = 100
-
-
-class SmallPagination(LimitOffsetPagination):
-    max_limit = 100
-    default_limit = 20
-
-
 class TransferListFilter(filters.FilterSet):
     _from = django_filters.CharFilter()
     block_number = django_filters.NumberFilter(field_name='block_number')
