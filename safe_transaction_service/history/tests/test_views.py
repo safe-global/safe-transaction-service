@@ -1344,29 +1344,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(result['count'], 1)
-        self.assertEqual(result['results'][0], {'safe': safe_address_1, 'transactions': 2})
+        self.assertEqual(result['results'][0], {'safe': safe_address_1, 'masterCopy': None, 'transactions': 2})
         MultisigTransactionFactory(safe=safe_address_1)
+        safe_status_1 = SafeStatusFactory(address=safe_address_1)
         response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(result['count'], 1)
-        self.assertEqual(result['results'][0], {'safe': safe_address_1, 'transactions': 3})
+        self.assertIsNotNone(safe_status_1.master_copy)
+        self.assertEqual(result['results'][0], {'safe': safe_address_1,
+                                                'masterCopy': safe_status_1.master_copy,
+                                                'transactions': 3})
         MultisigTransactionFactory(safe=safe_address_2)
         response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(result['results'], [
-            {'safe': safe_address_1, 'transactions': 3},
-            {'safe': safe_address_2, 'transactions': 1}
+            {'safe': safe_address_1, 'masterCopy': safe_status_1.master_copy, 'transactions': 3},
+            {'safe': safe_address_2, 'masterCopy': None, 'transactions': 1}
         ])
+        safe_status_2 = SafeStatusFactory(address=safe_address_2)
+        safe_status_3 = SafeStatusFactory(address=safe_address_3)
         [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
         response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe'))
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(result['results'], [
-            {'safe': safe_address_3, 'transactions': 4},
-            {'safe': safe_address_1, 'transactions': 3},
-            {'safe': safe_address_2, 'transactions': 1}
+            {'safe': safe_address_3, 'masterCopy': safe_status_3.master_copy, 'transactions': 4},
+            {'safe': safe_address_1, 'masterCopy': safe_status_1.master_copy, 'transactions': 3},
+            {'safe': safe_address_2, 'masterCopy': safe_status_2.master_copy, 'transactions': 1}
+        ])
+
+        response = self.client.get(reverse('v1:analytics-multisig-txs-by-safe')
+                                   + f'?master_copy={safe_status_1.master_copy}')
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['results'], [
+            {'safe': safe_address_1, 'masterCopy': safe_status_1.master_copy, 'transactions': 3},
         ])
 
     def test_owners_view(self):

@@ -735,6 +735,16 @@ class MultisigTransactionManager(models.Manager):
     def safes_with_number_of_transactions_executed(self):
         return self.executed().values('safe').annotate(transactions=Count('safe')).order_by('-transactions')
 
+    def safes_with_number_of_transactions_executed_and_master_copy(self):
+        master_copy_query = SafeStatus.objects.last_for_every_address().filter(
+            address=OuterRef('safe')
+        ).values('master_copy')
+
+        return self.safes_with_number_of_transactions_executed(
+        ).annotate(
+            master_copy=Subquery(master_copy_query[:1])
+        ).order_by('-transactions')
+
 
 class MultisigTransactionQuerySet(models.QuerySet):
     def executed(self):
@@ -1023,10 +1033,9 @@ class SafeStatusQuerySet(models.QuerySet):
         ).sorted_by_internal_tx()
 
     def last_for_address(self, address: str) -> Optional['SafeStatus']:
-        safe_status = self.last_for_every_address().filter(
+        return self.last_for_every_address().filter(
             address=address
         ).first()
-        return safe_status
 
 
 class SafeStatus(models.Model):

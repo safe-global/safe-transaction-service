@@ -413,14 +413,55 @@ class TestMultisigTransactions(TestCase):
         result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
         self.assertEqual(list(result), [
             {'safe': safe_address_1, 'transactions': 3},
-            {'safe': safe_address_2, 'transactions': 1}
+            {'safe': safe_address_2, 'transactions': 1},
         ])
         [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
         result = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
         self.assertEqual(list(result), [
             {'safe': safe_address_3, 'transactions': 4},
             {'safe': safe_address_1, 'transactions': 3},
-            {'safe': safe_address_2, 'transactions': 1}
+            {'safe': safe_address_2, 'transactions': 1},
+        ])
+
+    def test_safes_with_number_of_transactions_executed_and_master_copy(self):
+        self.assertEqual(
+            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy().count(), 0)
+        safe_address_1 = Account.create().address
+        safe_address_2 = Account.create().address
+        safe_address_3 = Account.create().address
+        MultisigTransactionFactory(safe=safe_address_1)
+        MultisigTransactionFactory(safe=safe_address_1)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], {'safe': safe_address_1, 'transactions': 2, 'master_copy': None})
+        MultisigTransactionFactory(safe=safe_address_2)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_1, 'transactions': 2, 'master_copy': None},
+            {'safe': safe_address_2, 'transactions': 1, 'master_copy': None},
+        ])
+
+        safe_status_1 = SafeStatusFactory(address=safe_address_1)
+        self.assertIsNotNone(safe_status_1.master_copy)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_1, 'transactions': 2, 'master_copy': safe_status_1.master_copy},
+            {'safe': safe_address_2, 'transactions': 1, 'master_copy': None},
+        ])
+
+        safe_status_2 = SafeStatusFactory(address=safe_address_2)
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_1, 'transactions': 2, 'master_copy': safe_status_1.master_copy},
+            {'safe': safe_address_2, 'transactions': 1, 'master_copy': safe_status_2.master_copy},
+        ])
+
+        [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
+        self.assertEqual(list(result), [
+            {'safe': safe_address_3, 'transactions': 4, 'master_copy': None},
+            {'safe': safe_address_1, 'transactions': 2, 'master_copy': safe_status_1.master_copy},
+            {'safe': safe_address_2, 'transactions': 1, 'master_copy': safe_status_2.master_copy},
         ])
 
     def test_with_confirmations(self):

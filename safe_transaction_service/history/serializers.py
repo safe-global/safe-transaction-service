@@ -589,6 +589,7 @@ class AnalyticsMultisigTxsByOriginResponseSerializer(serializers.Serializer):
 
 class AnalyticsMultisigTxsBySafeResponseSerializer(serializers.Serializer):
     safe = EthereumAddressField()
+    master_copy = EthereumAddressField()
     transactions = serializers.IntegerField()
 
 

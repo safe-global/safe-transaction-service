@@ -68,7 +68,9 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
 
 
 class AnalyticsMultisigTxsBySafeListView(ListAPIView):
-    queryset = MultisigTransaction.objects.safes_with_number_of_transactions_executed()
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = filters.AnalyticsMultisigTxsBySafeFilter
+    queryset = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
     serializer_class = serializers.AnalyticsMultisigTxsBySafeResponseSerializer
 
 

@@ -125,3 +125,7 @@ class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
                 'filter_class': EthereumAddressFilter
             }
         }
+
+
+class AnalyticsMultisigTxsBySafeFilter(filters.FilterSet):
+    master_copy = django_filters.CharFilter()
