@@ -33,7 +33,9 @@ from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.maker_dao import maker_dao_erc20_fee_proxy
 from .decoder_abis.open_zeppelin import (
     open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)
-from .decoder_abis.request import request_erc20_proxy, request_ethereum_proxy
+from .decoder_abis.request import (request_erc20_proxy,
+                                   request_erc20_swap_to_pay,
+                                   request_ethereum_proxy)
 from .decoder_abis.sablier import (sablier_abi, sablier_ctoken_manager,
                                    sablier_payroll)
 from .decoder_abis.sight import (conditional_token_abi, market_maker_abi,
@@ -213,7 +215,7 @@ class TxDecoder(SafeTxDecoder):
         open_zeppelin_contracts = [self.dummy_w3.eth.contract(abi=abi)
                                    for abi in (open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)]
         request_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                             for abi in (request_erc20_proxy, request_ethereum_proxy)]
+                             for abi in (request_erc20_proxy, request_erc20_swap_to_pay, request_ethereum_proxy)]
         sablier_contracts = [self.dummy_w3.eth.contract(abi=abi)
                              for abi in (sablier_ctoken_manager, sablier_payroll, sablier_abi)]
 

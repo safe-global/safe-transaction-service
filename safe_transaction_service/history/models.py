@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import IntegrityError, models
-from django.db.models import Case, Count, JSONField, Q, QuerySet, Sum, Index
+from django.db.models import Case, Count, Index, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
