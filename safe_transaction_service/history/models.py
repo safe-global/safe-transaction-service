@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import IntegrityError, models
-from django.db.models import Case, Count, JSONField, Q, QuerySet, Sum
+from django.db.models import Case, Count, JSONField, Q, QuerySet, Sum, Index
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
@@ -367,8 +367,8 @@ class EthereumEvent(models.Model):
     arguments = JSONField()
 
     class Meta:
-        unique_together = (('ethereum_tx', 'log_index'),)
         indexes = [GinIndex(fields=['arguments'])]
+        unique_together = (('ethereum_tx', 'log_index'),)
         # There are also 2 indexes created manually by 0026 migration, both Btree for arguments->to and arguments->from
         # To use that indexes json queries must be rewritten to use `::text` fields
 
@@ -736,9 +736,9 @@ class MultisigTransactionManager(models.Manager):
         return self.executed().values('safe').annotate(transactions=Count('safe')).order_by('-transactions')
 
     def safes_with_number_of_transactions_executed_and_master_copy(self):
-        master_copy_query = SafeStatus.objects.last_for_every_address().filter(
+        master_copy_query = SafeStatus.objects.filter(
             address=OuterRef('safe')
-        ).values('master_copy')
+        ).order_by('-nonce').values('master_copy')
 
         return self.safes_with_number_of_transactions_executed(
         ).annotate(
@@ -1004,8 +1004,15 @@ class SafeStatusManager(models.Manager):
 
 class SafeStatusQuerySet(models.QuerySet):
     def sorted_by_internal_tx(self):
+        """
+        Last SafeStatus first. Usually ordering by `nonce` it should be enough, but in some cases (MultiSend)
+        there could be multiple transactions with the same nonce. `address` must be part of the expression to use
+        `distinct()` later
+        :return: SafeStatus QuerySet sorted
+        """
         return self.order_by(
             'address',
+            '-nonce',
             '-internal_tx__ethereum_tx__block_id',
             '-internal_tx__ethereum_tx__transaction_index',
             '-internal_tx__trace_address',
@@ -1014,6 +1021,7 @@ class SafeStatusQuerySet(models.QuerySet):
     def sorted_reverse_by_internal_tx(self):
         return self.order_by(
             'address',
+            'nonce',
             'internal_tx__ethereum_tx__block_id',
             'internal_tx__ethereum_tx__transaction_index',
             'internal_tx__trace_address',
@@ -1033,9 +1041,9 @@ class SafeStatusQuerySet(models.QuerySet):
         ).sorted_by_internal_tx()
 
     def last_for_address(self, address: str) -> Optional['SafeStatus']:
-        return self.last_for_every_address().filter(
+        return self.filter(
             address=address
-        ).first()
+        ).sorted_by_internal_tx().first()
 
 
 class SafeStatus(models.Model):
@@ -1043,7 +1051,7 @@ class SafeStatus(models.Model):
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
                                        primary_key=True)
     address = EthereumAddressField(db_index=True)
-    owners = ArrayField(EthereumAddressField())
+    owners = ArrayField(EthereumAddressField(), db_index=True)
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
     master_copy = EthereumAddressField()
@@ -1051,6 +1059,7 @@ class SafeStatus(models.Model):
     enabled_modules = ArrayField(EthereumAddressField(), default=list)
 
     class Meta:
+        indexes = [Index(fields=['address', '-nonce'])]  # Index on address and nonce DESC
         unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe statuses'
 
