@@ -1,6 +1,5 @@
 import django_filters
 from django_filters import rest_framework as filters
-from rest_framework.pagination import LimitOffsetPagination
 
 from gnosis.eth.django.filters import EthereumAddressFilter
 from gnosis.eth.django.models import EthereumAddressField, Uint256Field

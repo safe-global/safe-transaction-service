@@ -30,7 +30,7 @@ from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
                                            gnosis_protocol_abi)
 from .decoder_abis.gnosis_safe import allowance_module_abi, decoging_test_abi
 from .decoder_abis.idle import idle_token_v3
-from .decoder_abis.maker_dao import maker_dao_erc20_fee_proxy
+from .decoder_abis.maker_dao import maker_dao_abis
 from .decoder_abis.open_zeppelin import (
     open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)
 from .decoder_abis.request import (request_erc20_proxy,
@@ -210,7 +210,8 @@ class TxDecoder(SafeTxDecoder):
         compound_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (ctoken_abi, comptroller_abi)]
         idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (idle_token_v3,)]
         maker_dao_contracts = [
-            self.dummy_w3.eth.contract(abi=maker_dao_erc20_fee_proxy),
+            self.dummy_w3.eth.contract(abi=abi)
+            for abi in maker_dao_abis
         ]
         open_zeppelin_contracts = [self.dummy_w3.eth.contract(abi=abi)
                                    for abi in (open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)]
