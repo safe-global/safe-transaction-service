@@ -129,6 +129,26 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
             self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
 
+    def test_all_transactions_wrong_transfer_type_view(self):
+        safe_address = Account.create().address
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address)
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['transfers'][0]['type'], TransferType.ERC20_TRANSFER.name)
+
+        # Result should be the same, as we are adding an ERC20 token
+        token = TokenFactory(address=erc20_transfer_out.address, decimals=18)
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['transfers'][0]['type'], TransferType.ERC20_TRANSFER.name)
+
+        # Result should change if we set the token as an ERC721
+        token.decimals = None
+        token.save(update_fields=['decimals'])
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['transfers'][0]['type'], TransferType.ERC721_TRANSFER.name)
+
     def test_get_module_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')

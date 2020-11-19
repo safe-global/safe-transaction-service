@@ -525,6 +525,18 @@ class TransferResponseSerializer(serializers.Serializer):
 class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
     token_info = TokenInfoResponseSerializer(source='token')
 
+    def get_type(self, obj: Dict[str, Any]) -> str:
+        # Sometimes ERC20/721 `Transfer` events look the same, if token info is available better use that information
+        # to check
+        transfer_type = super().get_type(obj)
+        if transfer_type in (TransferType.ERC20_TRANSFER.name, TransferType.ERC721_TRANSFER.name):
+            if token := obj['token']:
+                if token.decimals is None:
+                    transfer_type = TransferType.ERC721_TRANSFER.name
+                else:
+                    transfer_type = TransferType.ERC20_TRANSFER.name
+        return transfer_type
+
 
 # All txs serializers
 class TxType(Enum):
