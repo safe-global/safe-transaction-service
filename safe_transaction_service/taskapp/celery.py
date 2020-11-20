@@ -40,23 +40,11 @@ class CeleryConfig(AppConfig):
     #     # logger.addHandler(handler)
 
     def ready(self):
-        self._patch_psycopg()
         # Using a string here means the worker will not have to
         # pickle the object when using Windows.
         app.config_from_object('django.conf:settings')
         installed_apps = [app_config.name for app_config in apps.get_app_configs()]
         app.autodiscover_tasks(lambda: installed_apps, force=True)
-
-    def _patch_psycopg(self):
-        """
-        Patch postgresql to be friendly with gevent
-        """
-        try:
-            from psycogreen.gevent import patch_psycopg
-            logger.info('Patching psycopg for gevent')
-            patch_psycopg()
-        except ImportError:
-            pass
 
 
 class IgnoreSucceededNone(logging.Filter):

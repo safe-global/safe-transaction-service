@@ -6,7 +6,7 @@ import gevent
 import requests
 from celery import app
 from celery.app.task import Task as CeleryTask
-from celery.signals import worker_shutting_down
+from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
@@ -25,6 +25,21 @@ LOCK_TIMEOUT = 60 * 15  # 15 minutes
 SOFT_TIMEOUT = 60 * 10  # 10 minutes
 ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
 WORKER_STOPPED = set()  # Worker status
+
+
+@celeryd_init.connect
+def configure_workers(sender=None, conf=None, **kwargs):
+    def patch_psycopg():
+        """
+        Patch postgresql to be friendly with gevent
+        """
+        try:
+            from psycogreen.gevent import patch_psycopg
+            logger.info('Patching psycopg for gevent')
+            patch_psycopg()
+        except ImportError:
+            pass
+    patch_psycopg()
 
 
 @worker_shutting_down.connect
