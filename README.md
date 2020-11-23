@@ -54,7 +54,7 @@ For example, to set up a Göerli node:
 
 Run an OpenEthereum node in your local computer:
 ```bash
-openethereum --chain goerli --tracing on --db-path=/media/ethereum/parity --unsafe-expose
+openethereum --chain goerli --tracing on --db-path=/media/ethereum/openethereum --unsafe-expose
 ```
 
 Edit `.env` so docker points to the host OpenEthereum node:
