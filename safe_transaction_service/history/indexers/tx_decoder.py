@@ -40,6 +40,7 @@ from .decoder_abis.sablier import (sablier_abi, sablier_ctoken_manager,
                                    sablier_payroll)
 from .decoder_abis.sight import (conditional_token_abi, market_maker_abi,
                                  market_maker_factory_abi)
+from .decoder_abis.snapshot import snapshot_delegate_registry_abi
 from .decoder_abis.timelock import timelock_abi
 
 logger = getLogger(__name__)
@@ -220,6 +221,9 @@ class TxDecoder(SafeTxDecoder):
         sablier_contracts = [self.dummy_w3.eth.contract(abi=abi)
                              for abi in (sablier_ctoken_manager, sablier_payroll, sablier_abi)]
 
+        snapshot_contracts = [self.dummy_w3.eth.contract(abi=abi)
+                              for abi in (snapshot_delegate_registry_abi,)]
+
         exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
                      get_kyber_network_proxy_contract(self.dummy_w3)]
 
@@ -248,7 +252,7 @@ class TxDecoder(SafeTxDecoder):
         # will take preference
         self.supported_contracts = (test_contracts + timelock_contracts + aave_contracts + balancer_contracts
                                     + chainlink_contracts + idle_contracts + open_zeppelin_contracts
-                                    + maker_dao_contracts + request_contracts + sablier_contracts
+                                    + maker_dao_contracts + request_contracts + sablier_contracts + snapshot_contracts
                                     + compound_contracts + exchanges
                                     + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
