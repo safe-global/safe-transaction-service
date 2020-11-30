@@ -54,17 +54,20 @@ class Command(BaseCommand):
         for i in range(0, count, batch):
             self.stdout.write(self.style.SUCCESS(f'Processed {i}/{count}'))
             safe_statuses = queryset[i:i + batch]
-            addresses = []
-            nonces = []
-            for result in safe_statuses.values('address', 'nonce'):
-                addresses.append(result['address'])
-                nonces.append(result['nonce'])
-
-            blockchain_nonce_payloads = self.build_nonce_payload(addresses)
+            safe_statuses_list = list(safe_statuses)  # Force retrieve queryset from DB
+            blockchain_nonce_payloads = self.build_nonce_payload([safe_status.address
+                                                                  for safe_status in safe_statuses_list])
             blockchain_nonces = ethereum_client.batch_call_custom(blockchain_nonce_payloads, raise_exception=False)
 
-            addresses_to_reindex = []
-            for address, nonce, blockchain_nonce in zip(addresses, nonces, blockchain_nonces):
+            addresses_to_reindex = set()
+            for safe_status, blockchain_nonce in zip(safe_statuses_list, blockchain_nonces):
+                address = safe_status.address
+                nonce = safe_status.nonce
+                if safe_status.is_corrupted():
+                    self.stdout.write(self.style.WARNING(f'Safe={address} is corrupted, has some old '
+                                                         f'transactions missing'))
+                    addresses_to_reindex.add(address)
+
                 if blockchain_nonce is None:
                     self.stdout.write(self.style.WARNING(f'Safe={address} looks problematic, '
                                                          f'cannot retrieve blockchain-nonce'))
@@ -76,7 +79,7 @@ class Command(BaseCommand):
                             f'Last valid transaction for Safe={address} has safe-nonce={last_valid_transaction.nonce} '
                             f'safe-transaction-hash={last_valid_transaction.safe_tx_hash} and '
                             f'ethereum-tx-hash={last_valid_transaction.ethereum_tx_id}'))
-                    addresses_to_reindex.append(address)
+                    addresses_to_reindex.add(address)
 
             if fix and addresses_to_reindex:
                 self.stdout.write(self.style.SUCCESS(f'Fixing Safes={addresses_to_reindex}'))
