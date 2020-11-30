@@ -47,7 +47,7 @@ class Command(BaseCommand):
 
         queryset = SafeStatus.objects.last_for_every_address()
         count = queryset.count()
-        batch = 200
+        batch = 100
         ethereum_client = EthereumClientProvider()
         index_service = IndexServiceProvider()
 
