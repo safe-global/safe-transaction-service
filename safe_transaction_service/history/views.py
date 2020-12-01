@@ -79,7 +79,7 @@ class AllTransactionsListView(ListAPIView):
     pagination_class = pagination.SmallPagination
     serializer_class = serializers._AllTransactionsSchemaSerializer  # Just for docs, not used
 
-    _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
+    _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
                                              description='If `True` transactions with `nonce >= Safe current nonce` '
                                                          'are also shown')
     _schema_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
