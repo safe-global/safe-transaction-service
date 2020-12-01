@@ -533,8 +533,12 @@ class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
             if token := obj['token']:
                 if token.decimals is None:
                     transfer_type = TransferType.ERC721_TRANSFER.name
+                    if not obj['token_id']:
+                        obj['token_id'], obj['value'] = obj['value'], obj['token_id']
                 else:
                     transfer_type = TransferType.ERC20_TRANSFER.name
+                    if not obj['value']:
+                        obj['token_id'], obj['value'] = obj['value'], obj['token_id']
         return transfer_type
 
 
