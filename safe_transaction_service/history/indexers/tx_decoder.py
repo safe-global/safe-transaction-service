@@ -22,6 +22,8 @@ from gnosis.safe.multi_send import MultiSend
 from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_addresses_provider,
                                 aave_lending_pool_core)
+from .decoder_abis.admin_upgradeability_proxy import \
+    initializable_admin_upgradeability_proxy_abi
 from .decoder_abis.balancer import balancer_bactions, balancer_exchange_proxy
 from .decoder_abis.chainlink import chainlink_token_abi
 from .decoder_abis.compound import comptroller_abi, ctoken_abi
@@ -205,6 +207,9 @@ class TxDecoder(SafeTxDecoder):
         aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (aave_a_token, aave_lending_pool,
                                                                           aave_lending_pool_addresses_provider,
                                                                           aave_lending_pool_core)]
+        initializable_admin_upgradeability_proxy_contracts = [
+            self.dummy_w3.eth.contract(abi=initializable_admin_upgradeability_proxy_abi)
+        ]
         balancer_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (balancer_bactions,
                                                                               balancer_exchange_proxy)]
         chainlink_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (chainlink_token_abi,)]
@@ -250,9 +255,11 @@ class TxDecoder(SafeTxDecoder):
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (test_contracts + timelock_contracts + aave_contracts + balancer_contracts
-                                    + chainlink_contracts + idle_contracts + open_zeppelin_contracts
+        self.supported_contracts = (test_contracts + timelock_contracts
+                                    + initializable_admin_upgradeability_proxy_contracts + aave_contracts
+                                    + balancer_contracts + chainlink_contracts + idle_contracts
                                     + maker_dao_contracts + request_contracts + sablier_contracts + snapshot_contracts
+                                    + open_zeppelin_contracts
                                     + compound_contracts + exchanges
                                     + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
                                     + self.multisend_contracts + self.supported_contracts)
