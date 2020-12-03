@@ -190,10 +190,16 @@ class BalanceService:
         token_address_lower = token_address.lower()
         tRif_address = '0x19f64674d8a5b4e652319f5e239efd3bc969a1fe'
         rif_address = '0x2acc95758f8b5f583470ba265eb685a8f45fc9d5'
+        rdoc_address = '0x2d919f19d4892381d58edebeca66d5642cef1a1f'
+        doc_address = '0xe700691da7b9851f2f35f8b8182c69c53ccad9db'
+
+        if token_address_lower == rdoc_address or token_address_lower == doc_address:
+            return 1 / self.get_rbtc_usd_price_bitfinex()
+
         if token_address_lower != tRif_address and token_address_lower != rif_address:
             return 0
 
-        url = 'https://api-pub.bitfinex.com/v2/ticker/tRIFBTC'
+        url = 'https://api.hitbtc.com/api/2/public/ticker/RIFBTC'
         response = requests.get(url)
         api_json = response.json()
         if not response.ok:
@@ -201,7 +207,7 @@ class BalanceService:
             return 0
 
         try:
-            price = float(api_json[6])
+            price = float(api_json['last'])
             if not price:
                 raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
             return price
