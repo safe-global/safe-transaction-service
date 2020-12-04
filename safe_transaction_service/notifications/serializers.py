@@ -29,7 +29,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
     timestamp = serializers.IntegerField(required=False)  # TODO Make it required
     signatures = serializers.ListField(
         required=False,
-        child=HexadecimalField(required=False, min_length=130, max_length=130)  # Signatures must be 65 bytes
+        child=HexadecimalField(required=False, min_length=65, max_length=65)  # Signatures must be 65 bytes
     )
 
     def validate_safes(self, safes: Sequence[str]):

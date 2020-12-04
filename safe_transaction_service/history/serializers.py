@@ -35,7 +35,7 @@ def get_data_decoded_from_data(data: bytes):
 #            Request Serializers
 # ================================================ #
 class SafeMultisigConfirmationSerializer(serializers.Serializer):
-    signature = HexadecimalField(min_length=130)  # Signatures must be at least 65 bytes
+    signature = HexadecimalField(min_length=65)  # Signatures must be at least 65 bytes
 
     def validate_signature(self, signature: bytes):
         safe_tx_hash = self.context['safe_tx_hash']
@@ -97,7 +97,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     # TODO Make signature mandatory
-    signature = HexadecimalField(required=False, min_length=130)  # Signatures must be at least 65 bytes
+    signature = HexadecimalField(required=False, min_length=65)  # Signatures must be at least 65 bytes
     origin = serializers.CharField(max_length=100, allow_null=True, default=None)
 
     def validate(self, data):
@@ -228,7 +228,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 class SafeDelegateDeleteSerializer(serializers.Serializer):
     safe = EthereumAddressField()
     delegate = EthereumAddressField()
-    signature = HexadecimalField(min_length=130)
+    signature = HexadecimalField(min_length=65)
 
     def check_signature(self, signature: bytes, operation_hash: bytes, safe_owners: List[str]) -> Optional[str]:
         """
