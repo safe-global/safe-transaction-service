@@ -34,7 +34,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
     def validate_safes(self, safes: Sequence[str]):
         if SafeContract.objects.filter(address__in=safes).count() != len(safes):
-            raise serializers.ValidationError('At least one Safe provided was not found')
+            raise serializers.ValidationError('At least one Safe provided was not found or is duplicated')
         return safes
 
     def validate_timestamp(self, timestamp: int):
@@ -60,7 +60,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
     def validate(self, data: Dict[str, Any]):
         data = super().validate(data)
-        data['owners'] = []
+        signature_owners = []
         signatures = data.get('signatures') or []
         if signatures:
             current_owners = {owner for safe in data['safes'] for owner in get_safe_owners(safe)}
@@ -76,12 +76,17 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                     if safe_signature.signature_type != SafeSignatureType.EOA or not safe_signature.is_valid():
                         raise ValidationError('An externally owned account signature was expected')
                     owner = safe_signature.owner
-                    if owner in data['owners']:
+                    if owner in signature_owners:
                         raise ValidationError(f'Signature for owner={owner} is duplicated')
                     elif owner not in current_owners:
-                        raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}')
+                        raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
+                                              f'Expected hash to sign {hash_to_sign.hex()}')
                     else:
-                        data['owners'].append(owner)
+                        signature_owners.append(owner)
+            if len(signatures) > len(signature_owners):
+                raise ValidationError('Number of signatures is less than the number of owners detected')
+
+        data['owners'] = signature_owners
         return data
 
     def save(self, **kwargs):
