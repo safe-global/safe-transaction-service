@@ -27,6 +27,6 @@ class FirebaseDeviceAdmin(admin.ModelAdmin):
 
 @admin.register(FirebaseDeviceOwner)
 class FirebaseDeviceOwnerAdmin(admin.ModelAdmin):
-    list_display = ('firebase_device', 'owner')
-    ordering = ['firebase_device']
-    search_fields = ['firebase_device', 'owner']
+    list_display = ('firebase_device_id', 'owner')
+    ordering = ['firebase_device_id']
+    search_fields = ['firebase_device_id', 'owner']

@@ -117,6 +117,7 @@ def process_webhook(sender: Type[Model],
 
     # Don't send information for older than 10 minutes transactions
     # This triggers a DB query on EthereumEvent, InternalTx (they are not TimeStampedModel)
+    # TODO Fix MultisigTransaction changing state and write a test
     if (instance.created + timedelta(minutes=10)) > timezone.now():
         payload = build_webhook_payload(sender, instance)
         if payload and (address := payload.get('address')):
