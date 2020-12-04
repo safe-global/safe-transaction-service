@@ -1,17 +1,24 @@
+from unittest import mock
+
 from django.test import TestCase
 
 from eth_account import Account
+from web3 import Web3
 
 from safe_transaction_service.history.models import (EthereumTxCallType,
                                                      EthereumTxType,
                                                      InternalTx,
                                                      MultisigConfirmation,
-                                                     MultisigTransaction)
+                                                     MultisigTransaction,
+                                                     WebHookType)
 from safe_transaction_service.history.signals import build_webhook_payload
 from safe_transaction_service.history.tests.factories import (
-    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory)
+    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory,
+    SafeStatusFactory)
 
-from ..tasks import DuplicateNotification, filter_notification
+from ..tasks import (DuplicateNotification, filter_notification,
+                     send_notification_owner_task, send_notification_task)
+from .factories import FirebaseDeviceOwnerFactory
 
 
 class TestViews(TestCase):
@@ -66,3 +73,64 @@ class TestViews(TestCase):
         self.assertTrue(filter_notification(internal_tx_payload))
         MultisigTransactionFactory(safe=internal_tx.to, ethereum_tx=internal_tx.ethereum_tx)
         self.assertFalse(filter_notification(internal_tx_payload))
+
+    def test_send_notification_owner_task(self):
+        from ..tasks import logger as task_logger
+        safe_address = Account.create().address
+        threshold = 2
+        owners = [Account.create().address for _ in range(2)]
+        safe_tx_hash = Web3.keccak(text='hola').hex()
+        with self.assertLogs(logger=task_logger) as cm:
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+            self.assertIn('Cannot find threshold information', cm.output[0])
+
+        SafeStatusFactory(address=safe_address, threshold=threshold, owners=owners)
+        with self.assertLogs(logger=task_logger) as cm:
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+            self.assertIn('No cloud messaging tokens found', cm.output[0])
+
+        for owner in owners:
+            FirebaseDeviceOwnerFactory(owner=owner)
+
+        # Notification was sent to both owners
+        self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (2, 0))
+
+        # Duplicated notifications are not sent
+        with self.assertLogs(logger=task_logger) as cm:
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+            self.assertIn('Duplicated notification', cm.output[0])
+
+        # Disable duplicated detection
+        with mock.patch.object(DuplicateNotification, 'is_duplicated', autospec=True, return_value=False):
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (2, 0))
+
+            # Add one confirmation for that transaction and other random confirmation for other transaction
+            # to check that they don't influence each other
+            multisig_confirmation = MultisigConfirmationFactory(owner=owners[0],
+                                                                multisig_transaction__safe_tx_hash=safe_tx_hash)
+            MultisigConfirmationFactory(owner=owners[1])  # Not related multisig transaction
+
+            # Just one transaction sent, as owners[0] already confirmed
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (1, 0))
+
+            # Reach the threshold with an unrelated owner
+            MultisigConfirmationFactory(multisig_transaction=multisig_confirmation.multisig_transaction)
+            with self.assertLogs(logger=task_logger) as cm:
+                self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+                self.assertIn('does not require more confirmations', cm.output[0])
+
+    def test_send_notification_owner_task_called(self):
+        safe_address = Account.create().address
+        safe_tx_hash = Web3.keccak(text='hola').hex()
+        payload = {
+            'address': safe_address,
+            'type': WebHookType.PENDING_MULTISIG_TRANSACTION.name,
+            'safeTxHash': safe_tx_hash,
+        }
+
+        with mock.patch(
+                'safe_transaction_service.notifications.tasks.send_notification_owner_task.delay'
+        ) as send_notification_owner_task_mock:
+            send_notification_owner_task_mock.assert_not_called()
+            send_notification_task.delay(safe_address, payload)
+            send_notification_owner_task_mock.assert_called_with(safe_address, safe_tx_hash)

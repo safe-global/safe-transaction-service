@@ -1093,6 +1093,7 @@ class WebHookType(Enum):
     EXECUTED_MULTISIG_TRANSACTION = 2
     INCOMING_ETHER = 3
     INCOMING_TOKEN = 4
+    CONFIRMATION_REQUEST = 5
 
 
 class WebHookQuerySet(models.QuerySet):

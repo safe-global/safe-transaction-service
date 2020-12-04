@@ -3,6 +3,8 @@ from enum import Enum
 
 from django.db import models
 
+from gnosis.eth.django.models import EthereumAddressField
+
 from safe_transaction_service.history.models import SafeContract
 
 
@@ -29,3 +31,16 @@ class FirebaseDevice(models.Model):
         token = self.cloud_messaging_token[:10] if self.cloud_messaging_token else 'No Token'
         device_name = DeviceTypeEnum(self.device_type).name
         return f'{device_name} {self.version} - {token}...'
+
+
+class FirebaseDeviceOwner(models.Model):
+    firebase_device = models.ForeignKey(FirebaseDevice, on_delete=models.CASCADE, related_name='owners')
+    owner = EthereumAddressField(db_index=True)
+
+    class Meta:
+        verbose_name = 'Firebase Device Owner'
+        verbose_name_plural = 'Firebase Device Owners'
+        unique_together = (('firebase_device', 'owner'),)
+
+    def __str__(self):
+        return f'{self.owner} for device {self.firebase_device_id}'
