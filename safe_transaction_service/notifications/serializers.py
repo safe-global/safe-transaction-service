@@ -46,10 +46,8 @@ class FirebaseDeviceSerializer(serializers.Serializer):
         if timestamp is not None:
             minutes_allowed = 5
             current_epoch = int(time.time())
-            time_delta = current_epoch - timestamp
-            if time_delta < 0:  # Timestamp on the future
-                raise ValidationError('Provided timestamp is on the future')
-            elif time_delta > (60 * minutes_allowed):  # Timestamp older than 5 minutes
+            time_delta = abs(current_epoch - timestamp)
+            if time_delta > (60 * minutes_allowed):  # Timestamp older than 5 minutes
                 raise ValidationError(f'Provided timestamp is older than {minutes_allowed} minutes')
         return timestamp
 
