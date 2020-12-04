@@ -150,9 +150,9 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
 
         # Get cloud messaging token for missing owners
         owners_to_notify = set(safe_status.owners) - set(confirmed_owners)
-        tokens = FirebaseDeviceOwner.objects.filter(
+        tokens = list(FirebaseDeviceOwner.objects.filter(
             owner__in=owners_to_notify
-        ).values_list('firebase_device__cloud_messaging_token', flat=True)
+        ).values_list('firebase_device__cloud_messaging_token', flat=True))
 
         if not tokens:
             logger.info('No cloud messaging tokens found for needed owners %s to sign safe-tx-hash=%s for safe=%s',
