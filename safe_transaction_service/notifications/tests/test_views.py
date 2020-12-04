@@ -15,7 +15,7 @@ from safe_transaction_service.history.tests.factories import \
 from safe_transaction_service.notifications.models import (FirebaseDevice,
                                                            FirebaseDeviceOwner)
 
-from ..utils import calculate_device_registration_hash, get_safe_owners
+from ..utils import calculate_device_registration_hash
 from .factories import FirebaseDeviceFactory, FirebaseDeviceOwnerFactory
 
 

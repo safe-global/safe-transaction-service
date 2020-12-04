@@ -4,8 +4,9 @@ from typing import Any, Dict, Optional, Tuple
 from celery import app
 from celery.utils.log import get_task_logger
 
-from safe_transaction_service.history.models import (MultisigTransaction,
-                                                     WebHookType, MultisigConfirmation, SafeStatus)
+from safe_transaction_service.history.models import (MultisigConfirmation,
+                                                     MultisigTransaction,
+                                                     SafeStatus, WebHookType)
 from safe_transaction_service.history.utils import (close_gevent_db_connection,
                                                     get_redis)
 

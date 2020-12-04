@@ -45,4 +45,4 @@ ETHEREUM_TEST_PRIVATE_KEY = '6370fd033278c143179d81c5526140625662b8daa446c22ee2d
 ETH_REORG_BLOCKS = 1
 
 # Fix error with `task_id` when running celery in eager mode
-LOGGING['formatters']['celery_verbose'] = LOGGING['formatters']['verbose']
+LOGGING['formatters']['celery_verbose'] = LOGGING['formatters']['verbose']  # noqa F405

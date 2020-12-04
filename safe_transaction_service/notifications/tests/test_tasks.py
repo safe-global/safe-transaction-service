@@ -9,13 +9,16 @@ from safe_transaction_service.history.models import (EthereumTxCallType,
                                                      EthereumTxType,
                                                      InternalTx,
                                                      MultisigConfirmation,
-                                                     MultisigTransaction, WebHookType)
+                                                     MultisigTransaction,
+                                                     WebHookType)
 from safe_transaction_service.history.signals import build_webhook_payload
 from safe_transaction_service.history.tests.factories import (
-    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory, SafeStatusFactory)
-from .factories import FirebaseDeviceOwnerFactory
+    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory,
+    SafeStatusFactory)
 
-from ..tasks import DuplicateNotification, filter_notification, send_notification_owner_task, send_notification_task
+from ..tasks import (DuplicateNotification, filter_notification,
+                     send_notification_owner_task, send_notification_task)
+from .factories import FirebaseDeviceOwnerFactory
 
 
 class TestViews(TestCase):
