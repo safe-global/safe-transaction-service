@@ -176,19 +176,28 @@ class CollectiblesService:
         :param addresses_with_token_ids:
         :param only_trusted:
         :param exclude_spam:
-        :return: ERC20 tokens filtered by spam or trusted
+        :return: ERC721 tokens filtered by spam or trusted
         """
-        if only_trusted or exclude_spam:
-            addresses = [address_with_token_id[0] for address_with_token_id in addresses_with_token_ids]
-            base_queryset = Token.objects.filter(address__in=addresses)
-            if only_trusted:
-                addresses = base_queryset.filter(trusted=True).values_list('address', flat=True)
-            elif exclude_spam:
-                addresses = base_queryset.filter(spam=False).values_list('address', flat=True)
-            return [address_with_token_id for address_with_token_id in addresses_with_token_ids
-                    if address_with_token_id[0] in addresses]
+        addresses_set = {address_with_token_id[0] for address_with_token_id in addresses_with_token_ids}
+        base_queryset = Token.objects.filter(
+            address__in=addresses_set
+        ).order_by('name')
+        if only_trusted:
+            addresses = list(base_queryset.erc721().filter(trusted=True).values_list('address', flat=True))
+        elif exclude_spam:
+            addresses = list(base_queryset.erc721().filter(spam=False).values_list('address', flat=True))
         else:
-            return addresses_with_token_ids
+            # There could be some addresses that are not in the list
+            addresses = []
+            for token in base_queryset:
+                if token.is_erc721():
+                    addresses.append(token.address)
+                addresses_set.remove(token.address)
+            # Add unkown addresses
+            addresses.extend(addresses_set)
+
+        return [address_with_token_id for address_with_token_id in addresses_with_token_ids
+                if address_with_token_id[0] in addresses]
 
     def get_collectibles(self, safe_address: str, only_trusted: bool = False,
                          exclude_spam: bool = False) -> List[Collectible]:

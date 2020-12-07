@@ -110,7 +110,7 @@ class BalanceService:
             addresses_set = set(erc20_addresses)
             addresses = []
             for token in base_queryset:
-                if token.is_erc20() and not (exclude_spam and token.spam):
+                if token.is_erc20():
                     addresses.append(token.address)
                 addresses_set.remove(token.address)
             # Add unkown addresses
