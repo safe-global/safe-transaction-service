@@ -39,7 +39,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
     def validate_timestamp(self, timestamp: int):
         """
-        Validate if timestamp is not on the future or older than 5 minutes
+        Validate if timestamp is not on a range within 5 minutes
         :param timestamp:
         :return:
         """
@@ -48,7 +48,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
             current_epoch = int(time.time())
             time_delta = abs(current_epoch - timestamp)
             if time_delta > (60 * minutes_allowed):  # Timestamp older than 5 minutes
-                raise ValidationError(f'Provided timestamp is older than {minutes_allowed} minutes')
+                raise ValidationError(f'Provided timestamp is not in a range within {minutes_allowed} minutes')
         return timestamp
 
     def validate_version(self, value: str):
