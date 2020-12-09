@@ -76,6 +76,7 @@ THIRD_PARTY_APPS = [
     'drf_yasg',
 ]
 LOCAL_APPS = [
+    'safe_transaction_service.contracts.apps.ContractsConfig',
     'safe_transaction_service.history.apps.HistoryConfig',
     'safe_transaction_service.notifications.apps.NotificationsConfig',
     'safe_transaction_service.tokens.apps.TokensConfig',

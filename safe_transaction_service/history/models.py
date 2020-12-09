@@ -22,6 +22,7 @@ from gnosis.safe import SafeOperation
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from .utils import clean_receipt_log
+from safe_transaction_service.contracts.models import Contract
 
 logger = getLogger(__name__)
 
@@ -109,14 +110,6 @@ class BulkCreateSignalMixin:
                 total += inserted
             else:
                 return total
-
-
-# class EnsLabel(models.Model):
-#    label_hash = Sha3HashField(unique=True)  # Keccak of the label
-#    label = models.CharField(max_length=20, blank=True)
-
-#    def __str__(self):
-#        return f'Label={self.label} with hash={self.label_hash}'
 
 
 class EthereumBlockManager(models.Manager):
@@ -744,6 +737,17 @@ class MultisigTransactionManager(models.Manager):
         ).annotate(
             master_copy=Subquery(master_copy_query[:1])
         ).order_by('-transactions')
+
+    def not_indexed_metadata_contract_addresses(self):
+        """
+        Find contracts with metadata not indexed
+        :return:
+        """
+        return MultisigTransaction.objects.exclude(
+            data=None
+        ).exclude(
+            to__in=Contract.objects.values('address')
+        ).values_list('to', flat=True)
 
 
 class MultisigTransactionQuerySet(models.QuerySet):
