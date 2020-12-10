@@ -23,7 +23,10 @@ class ContractManager(models.Manager):
         sourcify = Sourcify()
         contract_metadata = sourcify.get_contract_metadata(address, network_id=network_id)
         if contract_metadata:
-            contract_abi = ContractAbi.objects.create(abi=contract_metadata.abi) if contract_metadata.abi else None
+            contract_abi = ContractAbi.objects.create(
+                abi=contract_metadata.abi, description=contract_metadata.name
+            ) if contract_metadata.abi else None
+
             return super().create(
                 address=address,
                 name=contract_metadata.name,
