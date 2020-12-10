@@ -11,8 +11,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--addresses', nargs='+',
                             help='Index provided contract addresses instead of the ones from multisig txs on database')
-        parser.add_argument('--sync', help="Don't use an async task", action='store_true', type=int, default=False)
-        parser.add_argument('--batch', help='Number of contracts to index together', type=int, default=False)
+        parser.add_argument('--sync', help="Don't use an async task", action='store_true', default=False)
+        parser.add_argument('--batch', help='Number of contracts to index together', type=int, default=100)
 
     def handle(self, *args, **options):
         addresses = options['addresses']
