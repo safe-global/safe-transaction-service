@@ -2,6 +2,7 @@ from typing import Optional
 
 from django.db import models
 from django.db.models import JSONField
+
 from gnosis.eth.django.models import EthereumAddressField
 
 from safe_transaction_service.contracts.sourcify import Sourcify
@@ -18,9 +19,9 @@ class ContractAbi(models.Model):
 
 
 class ContractManager(models.Manager):
-    def create_from_address(self, address: str) -> Optional['Contract']:
+    def create_from_address(self, address: str, network_id: int = 1) -> Optional['Contract']:
         sourcify = Sourcify()
-        contract_metadata = sourcify.get_contract_metadata(address)
+        contract_metadata = sourcify.get_contract_metadata(address, network_id=network_id)
         if contract_metadata:
             contract_abi = ContractAbi.objects.create(abi=contract_metadata.abi) if contract_metadata.abi else None
             return super().create(
@@ -33,7 +34,7 @@ class ContractManager(models.Manager):
 class Contract(models.Model):
     objects = ContractManager()
     address = EthereumAddressField(primary_key=True)
-    name = models.CharField(max_length=200, blank=True)
+    name = models.CharField(max_length=200, blank=True, default='')
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
 

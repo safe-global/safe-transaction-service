@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 from django.db import IntegrityError
 from django.test import TestCase
 
-from .mocks import sourcify_safe_metadata
 from ..models import Contract
 from ..sourcify import Sourcify
+from .mocks import sourcify_safe_metadata
 
 
 class TestContract(TestCase):

@@ -9,6 +9,7 @@ from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
 
+from ...contracts.tests.factories import ContractFactory
 from ..models import (EthereumEvent, EthereumTxCallType, InternalTx,
                       InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContractDelegate,
@@ -19,7 +20,6 @@ from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeContractFactory,
                         SafeStatusFactory)
-from ...contracts.tests.factories import ContractFactory
 
 logger = logging.getLogger(__name__)
 

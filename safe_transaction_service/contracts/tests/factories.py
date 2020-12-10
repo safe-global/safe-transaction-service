@@ -2,8 +2,8 @@ import factory
 from eth_account import Account
 from factory.django import DjangoModelFactory
 
+from ..models import Contract, ContractAbi
 from .mocks import sourcify_safe_metadata
-from ..models import ContractAbi, Contract
 
 
 class ContractAbiFactory(DjangoModelFactory):
