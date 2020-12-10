@@ -25,5 +25,5 @@ class Command(BaseCommand):
         addresses_iter = iter(addresses)
         fn = index_contracts_metadata if sync else index_contracts_metadata.delay
 
-        while addresses_batch := islice(addresses_iter, batch):
+        while addresses_batch := list(islice(addresses_iter, batch)):
             fn(addresses_batch)
