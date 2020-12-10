@@ -1,3 +1,5 @@
+from itertools import islice
+
 from django.core.management.base import BaseCommand
 
 from safe_transaction_service.contracts.tasks import index_contracts_metadata
@@ -19,8 +21,9 @@ class Command(BaseCommand):
         sync = options['sync']
         batch = options['batch']
 
-        addresses = addresses or MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
-        for address in addresses[:batch]:
-            if sync:
-                fn = index_contracts_metadata if sync else index_contracts_metadata.delay
-            fn(address)
+        addresses = addresses or list(MultisigTransaction.objects.not_indexed_metadata_contract_addresses())
+        addresses_iter = iter(addresses)
+        fn = index_contracts_metadata if sync else index_contracts_metadata.delay
+
+        while addresses_batch := islice(addresses_iter, batch):
+            fn(addresses_batch)
