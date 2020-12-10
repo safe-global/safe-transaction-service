@@ -748,7 +748,7 @@ class MultisigTransactionManager(models.Manager):
             data=None
         ).exclude(
             to__in=Contract.objects.values('address')
-        ).values_list('to', flat=True)
+        ).values_list('to', flat=True).distinct()
 
 
 class MultisigTransactionQuerySet(models.QuerySet):

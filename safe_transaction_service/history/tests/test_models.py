@@ -471,6 +471,7 @@ class TestMultisigTransactions(TestCase):
         MultisigTransactionFactory(data=None)
         self.assertFalse(MultisigTransaction.objects.not_indexed_metadata_contract_addresses())
         multisig_transaction = MultisigTransactionFactory(data=b'12')
+        MultisigTransactionFactory(data=b'12', to=multisig_transaction.to)  # Check distinct
         self.assertCountEqual(MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),
                               [multisig_transaction.to])
         ContractFactory(address=multisig_transaction.to)
