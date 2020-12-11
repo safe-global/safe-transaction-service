@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -30,6 +30,9 @@ class ContractAbi(models.Model):
     abi = JSONField(validators=[validate_abi])
     description = models.CharField(max_length=200, blank=True)
     relevance = models.SmallIntegerField(default=100)  # A lower number will indicate more relevance
+
+    def abi_functions(self) -> List[str]:
+        return [x['name'] for x in self.abi if x['type'] == 'function']
 
 
 class ContractManager(models.Manager):

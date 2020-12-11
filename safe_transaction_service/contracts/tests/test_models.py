@@ -17,6 +17,7 @@ class TestContract(TestCase):
         contract = Contract.objects.create_from_address(safe_contract_address)
         self.assertEqual(contract.name, 'GnosisSafe')
         self.assertTrue(contract.contract_abi.abi)
+        self.assertEqual(len(contract.contract_abi.abi_functions()), 31)
 
         with self.assertRaises(IntegrityError):
             Contract.objects.create_from_address(safe_contract_address)

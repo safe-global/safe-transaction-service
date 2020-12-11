@@ -5,7 +5,10 @@ from .models import Contract, ContractAbi
 
 @admin.register(ContractAbi)
 class ContractAbiAdmin(admin.ModelAdmin):
-    list_display = ('description', 'abi')
+    list_display = ('pk', 'description', 'abi_functions')
+
+    def abi_functions(self, obj: ContractAbi):
+        return obj.abi_functions()
 
 
 class HasAbiFilter(admin.SimpleListFilter):
