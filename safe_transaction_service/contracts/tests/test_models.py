@@ -1,11 +1,11 @@
-from typing import List
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
 
-from ..models import Contract
+from ..models import Contract, validate_abi
 from ..sourcify import Sourcify
 from .mocks import sourcify_safe_metadata
 
@@ -23,3 +23,12 @@ class TestContract(TestCase):
 
         do_request_mock.return_value = None
         self.assertIsNone(Contract.objects.create_from_address(safe_contract_address))
+
+    def test_validate_abi(self):
+        validate_abi([])
+        validate_abi(sourcify_safe_metadata['output']['abi'])
+        with self.assertRaises(ValidationError):
+            validate_abi([1])
+
+        with self.assertRaises(ValidationError):
+            validate_abi(['a'])

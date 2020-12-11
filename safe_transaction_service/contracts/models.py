@@ -1,11 +1,25 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import JSONField
+from django.utils.translation import gettext_lazy as _
+
+from web3._utils.normalizers import normalize_abi
 
 from gnosis.eth.django.models import EthereumAddressField
 
 from safe_transaction_service.contracts.sourcify import Sourcify
+
+
+def validate_abi(value: Dict[str, Any]):
+    try:
+        normalize_abi(value)
+    except ValueError:
+        raise ValidationError(
+            _('%(value)s is not a valid Ethereum Contract ABI'),
+            params={'value': value},
+        )
 
 
 class ContractAbi(models.Model):
@@ -13,7 +27,7 @@ class ContractAbi(models.Model):
     This model holds contract ABIs. Contract ABIS don't have to be tied to a contract
     (e.g. generic ERC20/721 ABI)
     """
-    abi = JSONField()
+    abi = JSONField(validators=[validate_abi])
     description = models.CharField(max_length=200, blank=True)
     relevance = models.SmallIntegerField(default=100)  # A lower number will indicate more relevance
 
@@ -26,6 +40,7 @@ class ContractManager(models.Manager):
             contract_abi = ContractAbi.objects.create(
                 abi=contract_metadata.abi, description=contract_metadata.name
             ) if contract_metadata.abi else None
+            normalize_abi
 
             return super().create(
                 address=address,
