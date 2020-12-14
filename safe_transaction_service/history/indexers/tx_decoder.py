@@ -65,6 +65,12 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+def get_db_tx_decoder() -> 'TxDecoder':
+    if not hasattr(get_db_tx_decoder, 'instance'):
+        get_db_tx_decoder.instance = DbTxDecoder()
+    return get_db_tx_decoder.instance
+
+
 def get_tx_decoder() -> 'TxDecoder':
     if not hasattr(get_tx_decoder, 'instance'):
         get_tx_decoder.instance = TxDecoder()

@@ -16,7 +16,7 @@ from safe_transaction_service.tokens.serializers import \
     TokenInfoResponseSerializer
 
 from .helpers import DelegateSignatureHelper
-from .indexers.tx_decoder import TxDecoderException, get_tx_decoder
+from .indexers.tx_decoder import TxDecoderException, get_db_tx_decoder
 from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
                      SafeContractDelegate)
@@ -24,7 +24,7 @@ from .services.safe_service import SafeCreationInfo
 
 
 def get_data_decoded_from_data(data: bytes):
-    tx_decoder = get_tx_decoder()
+    tx_decoder = get_db_tx_decoder()
     try:
         return tx_decoder.get_data_decoded(data)
     except TxDecoderException:
