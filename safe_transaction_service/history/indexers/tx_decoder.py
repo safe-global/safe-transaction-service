@@ -2,6 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
 
+from cachetools import TTLCache, cached
 from eth_abi.exceptions import InsufficientDataBytes
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
@@ -65,10 +66,9 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+@cached(TTLCache(maxsize=2, ttl=60 * 60))  # Cached 1 hour
 def get_db_tx_decoder() -> 'TxDecoder':
-    if not hasattr(get_db_tx_decoder, 'instance'):
-        get_db_tx_decoder.instance = DbTxDecoder()
-    return get_db_tx_decoder.instance
+    return DbTxDecoder()
 
 
 def get_tx_decoder() -> 'TxDecoder':
