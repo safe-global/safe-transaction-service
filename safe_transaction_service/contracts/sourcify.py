@@ -42,6 +42,3 @@ class Sourcify:
             return ContractMetadata(name, abi)
         else:
             return None
-
-
-

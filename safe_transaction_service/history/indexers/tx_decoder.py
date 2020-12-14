@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Dict, Iterable, List, Tuple, Union, cast
+from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
 
 from eth_abi.exceptions import InsufficientDataBytes
 from eth_utils import function_abi_to_4byte_selector
@@ -18,6 +18,8 @@ from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
                                   get_safe_V1_0_0_contract,
                                   get_uniswap_exchange_contract)
 from gnosis.safe.multi_send import MultiSend
+
+from safe_transaction_service.contracts.models import ContractAbi
 
 from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_addresses_provider,
@@ -76,17 +78,22 @@ def get_safe_tx_decoder() -> 'SafeTxDecoder':
 
 
 class SafeTxDecoder:
+    dummy_w3 = Web3()
     """
     Decode txs for supported contracts
     """
     def __init__(self):
-        self.dummy_w3 = Web3()
-        self.safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
-                               get_safe_contract(self.dummy_w3)]
+        logger.info('Loading contract ABIs for decoding')
+        self.supported_contracts: List[Type[Contract]] = self.get_supported_contracts()
+        logger.info('Contract ABIs for decoding were loaded')
+
+    def get_supported_contracts(self) -> List[Type[Contract]]:
+        safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
+                          get_safe_contract(self.dummy_w3)]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = self.safe_contracts
+        return safe_contracts
 
     def _generate_selectors_with_abis_from_contract(self, contract: Contract) -> Dict[bytes, ContractFunction]:
         """
@@ -96,7 +103,7 @@ class SafeTxDecoder:
         return {function_abi_to_4byte_selector(contract_fn.abi): contract_fn
                 for contract_fn in contract.all_functions()}
 
-    def _generate_selectors_with_abis_from_contracts(self, contracts: Iterable[Contract]) -> Dict[bytes,
+    def _generate_selectors_with_abis_from_contracts(self, contracts: Sequence[Contract]) -> Dict[bytes,
                                                                                                   ContractFunction]:
         """
         :param contracts: Web3 Contracts. Last contracts on the Iterable have preference if there's a collision on the
@@ -202,7 +209,11 @@ class SafeTxDecoder:
 
 class TxDecoder(SafeTxDecoder):
     def __init__(self):
+        self.multisend_contracts: List[Type[Contract]] = [get_multi_send_contract(self.dummy_w3)]
         super().__init__()
+
+    def get_supported_contracts(self) -> List[Type[Contract]]:
+        supported_contracts = super().get_supported_contracts()
 
         aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (aave_a_token, aave_lending_pool,
                                                                           aave_lending_pool_addresses_provider,
@@ -251,18 +262,16 @@ class TxDecoder(SafeTxDecoder):
             self.dummy_w3.eth.contract(abi=timelock_abi)
         ]
 
-        self.multisend_contracts = [get_multi_send_contract(self.dummy_w3)]
-
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        self.supported_contracts = (test_contracts + timelock_contracts
-                                    + initializable_admin_upgradeability_proxy_contracts + aave_contracts
-                                    + balancer_contracts + chainlink_contracts + idle_contracts
-                                    + maker_dao_contracts + request_contracts + sablier_contracts + snapshot_contracts
-                                    + open_zeppelin_contracts
-                                    + compound_contracts + exchanges
-                                    + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
-                                    + self.multisend_contracts + self.supported_contracts)
+        return (test_contracts + timelock_contracts
+                + initializable_admin_upgradeability_proxy_contracts + aave_contracts
+                + balancer_contracts + chainlink_contracts + idle_contracts
+                + maker_dao_contracts + request_contracts + sablier_contracts + snapshot_contracts
+                + open_zeppelin_contracts
+                + compound_contracts + exchanges
+                + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
+                + self.multisend_contracts + supported_contracts)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -320,3 +329,15 @@ class TxDecoder(SafeTxDecoder):
                      } for multisend_tx in multisend_txs]
         except ValueError:
             logger.warning('Problem decoding multisend transaction with data=%s', HexBytes(data).hex(), exc_info=True)
+
+
+class DbTxDecoder(TxDecoder):
+    """
+    Decode contracts from ABIs in database
+    """
+
+    def get_supported_contracts(self) -> List[Type[Contract]]:
+        supported_contracts = super().get_supported_contracts()
+        db_contracts = [self.dummy_w3.eth.contract(abi=abi)
+                        for abi in ContractAbi.objects.all().order_by('-relevance').values_list('abi', flat=True)]
+        return db_contracts + supported_contracts

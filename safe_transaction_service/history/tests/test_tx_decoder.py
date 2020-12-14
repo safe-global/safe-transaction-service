@@ -3,11 +3,17 @@ import logging
 from django.test import TestCase
 
 from hexbytes import HexBytes
+from web3 import Web3
 
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe.multi_send import MultiSendOperation
 
-from ..indexers.tx_decoder import (CannotDecode, SafeTxDecoder, TxDecoder,
-                                   get_safe_tx_decoder, get_tx_decoder)
+from safe_transaction_service.contracts.tests.factories import \
+    ContractAbiFactory
+
+from ..indexers.tx_decoder import (CannotDecode, DbTxDecoder, SafeTxDecoder,
+                                   TxDecoder, get_safe_tx_decoder,
+                                   get_tx_decoder)
 
 logger = logging.getLogger(__name__)
 
@@ -353,3 +359,38 @@ class TestTxDecoder(TestCase):
             self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
             self.assertIn(b'\xb6>\x80\r', tx_decoder.supported_fn_selectors)  # setup for Safe V1.1.0
             self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
+
+    def test_db_tx_decoder(self):
+        example_abi = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "uxioSayHi",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ]
+        example_data = Web3().eth.contract(
+            abi=example_abi
+        ).functions.uxioSayHi().buildTransaction({'gas': 0, 'gasPrice': 0, 'to': NULL_ADDRESS})['data']
+
+        db_tx_decoder = DbTxDecoder()
+        with self.assertRaises(CannotDecode):
+            db_tx_decoder.decode_transaction(example_data)
+
+        ContractAbiFactory(abi=example_abi)
+        db_tx_decoder = DbTxDecoder()
+        fn_name, arguments = db_tx_decoder.decode_transaction(example_data)
+        self.assertEqual(fn_name, 'uxioSayHi')
+        self.assertFalse(arguments)

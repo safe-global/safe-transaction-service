@@ -58,4 +58,3 @@ class Contract(models.Model):
     name = models.CharField(max_length=200, blank=True, default='')
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
-

@@ -5,7 +5,9 @@ from .models import Contract, ContractAbi
 
 @admin.register(ContractAbi)
 class ContractAbiAdmin(admin.ModelAdmin):
-    list_display = ('pk', 'description', 'abi_functions')
+    list_display = ('pk', 'relevance', 'description', 'abi_functions')
+    ordering = ['relevance']
+    search_fields = ['description']
 
     def abi_functions(self, obj: ContractAbi):
         return obj.abi_functions()
@@ -32,11 +34,15 @@ class HasAbiFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ('address', 'name', 'has_abi')
+    list_display = ('address', 'name', 'has_abi', 'abi_relevance')
     list_filter = (HasAbiFilter,)
+    list_select_related = ('contract_abi',)
     ordering = ['address']
     raw_id_fields = ('contract_abi',)
     search_fields = ['address', 'name', 'contract_abi__abi', 'contract_abi__description']
+
+    def abi_relevance(self, obj: Contract):
+        return obj.contract_abi.relevance
 
     def has_abi(self, obj: Contract) -> bool:
         return obj.contract_abi_id is not None
