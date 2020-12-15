@@ -9,6 +9,7 @@ from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
 
+from ...contracts.tests.factories import ContractFactory
 from ..models import (EthereumEvent, EthereumTxCallType, InternalTx,
                       InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContractDelegate,
@@ -463,6 +464,18 @@ class TestMultisigTransactions(TestCase):
             {'safe': safe_address_1, 'transactions': 2, 'master_copy': safe_status_1.master_copy},
             {'safe': safe_address_2, 'transactions': 1, 'master_copy': safe_status_2.master_copy},
         ])
+
+    def test_not_indexed_metadata_contract_addresses(self):
+        self.assertFalse(MultisigTransaction.objects.not_indexed_metadata_contract_addresses())
+
+        MultisigTransactionFactory(data=None)
+        self.assertFalse(MultisigTransaction.objects.not_indexed_metadata_contract_addresses())
+        multisig_transaction = MultisigTransactionFactory(data=b'12')
+        MultisigTransactionFactory(data=b'12', to=multisig_transaction.to)  # Check distinct
+        self.assertCountEqual(MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),
+                              [multisig_transaction.to])
+        ContractFactory(address=multisig_transaction.to)
+        self.assertFalse(MultisigTransaction.objects.not_indexed_metadata_contract_addresses())
 
     def test_with_confirmations(self):
         multisig_transaction = MultisigTransactionFactory()
