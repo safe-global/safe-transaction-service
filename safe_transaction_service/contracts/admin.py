@@ -43,7 +43,8 @@ class ContractAdmin(admin.ModelAdmin):
     search_fields = ['address', 'name', 'contract_abi__abi', 'contract_abi__description']
 
     def abi_relevance(self, obj: Contract):
-        return obj.contract_abi.relevance
+        if obj.contract_abi_id:
+            return obj.contract_abi.relevance
 
     def has_abi(self, obj: Contract) -> bool:
         return obj.contract_abi_id is not None

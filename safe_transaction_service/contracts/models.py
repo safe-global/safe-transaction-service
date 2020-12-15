@@ -46,7 +46,6 @@ class ContractManager(models.Manager):
             contract_abi = ContractAbi.objects.create(
                 abi=contract_metadata.abi, description=contract_metadata.name
             ) if contract_metadata.abi else None
-            normalize_abi
 
             return super().create(
                 address=address,
