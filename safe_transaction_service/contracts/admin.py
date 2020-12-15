@@ -6,6 +6,7 @@ from .models import Contract, ContractAbi
 @admin.register(ContractAbi)
 class ContractAbiAdmin(admin.ModelAdmin):
     list_display = ('pk', 'relevance', 'description', 'abi_functions')
+    list_filter = ('relevance',)
     ordering = ['relevance']
     search_fields = ['description']
 

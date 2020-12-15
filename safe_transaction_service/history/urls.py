@@ -1,5 +1,6 @@
 from django.urls import path
 
+from safe_transaction_service.contracts import views as contract_views
 from safe_transaction_service.notifications import views as notification_views
 from safe_transaction_service.tokens import views as token_views
 
@@ -53,6 +54,10 @@ urlpatterns = [
          name='multisig-transaction-confirmations'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
+
+    # Contracts
+    path('contracts/', contract_views.ContractsView.as_view(), name='contracts'),
+    path('contracts/<str:address>/', contract_views.ContractView.as_view(), name='contract'),
 
     # Tokens
     path('tokens/', token_views.TokensView.as_view(), name='tokens'),
