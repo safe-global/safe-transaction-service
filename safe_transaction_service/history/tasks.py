@@ -10,10 +10,13 @@ from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
+from safe_transaction_service.contracts.tasks import index_contracts_metadata
+
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
-from .models import InternalTxDecoded, SafeStatus, WebHook, WebHookType
+from .models import (InternalTxDecoded, MultisigTransaction, SafeStatus,
+                     WebHook, WebHookType)
 from .services import IndexServiceProvider, ReorgService, ReorgServiceProvider
 from .utils import close_gevent_db_connection, get_redis
 
@@ -248,3 +251,22 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
         return sent_requests
     finally:
         close_gevent_db_connection()
+
+
+@app.shared_task()
+def index_contract_metadata() -> int:
+    """
+    Call `index_contracts_metadata` in the `contracts` app to index contracts with missing metadata
+    :return:
+    """
+    batch = 100
+    processed = 0
+
+    while True:
+        addresses = MultisigTransaction.objects.not_indexed_metadata_contract_addresses()[:batch]
+        if not addresses:
+            break
+        else:
+            index_contracts_metadata.delay(list(addresses))
+            processed += len(addresses)
+    return processed

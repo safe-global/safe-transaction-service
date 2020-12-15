@@ -6,9 +6,10 @@ from django.test import TestCase
 from eth_account import Account
 
 from ..models import SafeContract, SafeStatus
-from ..tasks import process_decoded_internal_txs_task
+from ..tasks import index_contract_metadata, process_decoded_internal_txs_task
 from .factories import (EthereumEventFactory, InternalTxDecodedFactory,
-                        InternalTxFactory, WebHookFactory)
+                        InternalTxFactory, MultisigTransactionFactory,
+                        WebHookFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -46,3 +47,9 @@ class TestTasks(TestCase):
         self.assertEqual(safe_status.master_copy, master_copy)
         self.assertEqual(safe_status.owners, [owner])
         self.assertEqual(safe_status.threshold, threshold)
+
+    def test_index_contract_metadata(self):
+        self.assertEqual(index_contract_metadata.delay().result, 0)
+        [MultisigTransactionFactory(to=Account.create().address, data=b'12') for _ in range(2)]
+        self.assertEqual(index_contract_metadata.delay().result, 2)
+        self.assertEqual(index_contract_metadata.delay().result, 0)
