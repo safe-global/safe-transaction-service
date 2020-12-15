@@ -31,6 +31,9 @@ class ContractAbi(models.Model):
     description = models.CharField(max_length=200, blank=True)
     relevance = models.SmallIntegerField(default=100)  # A lower number will indicate more relevance
 
+    def __str__(self):
+        return f'ContractABI {self.relevance} - {self.description}'
+
     def abi_functions(self) -> List[str]:
         return [x['name'] for x in self.abi if x['type'] == 'function']
 
@@ -58,3 +61,7 @@ class Contract(models.Model):
     name = models.CharField(max_length=200, blank=True, default='')
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
+
+    def __str__(self):
+        has_abi = self.contract_abi_id is not None
+        return f'Contract {self.address} - {self.name} - with abi {has_abi}'
