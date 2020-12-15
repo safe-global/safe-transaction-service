@@ -35,7 +35,7 @@ deploy:
   - provider: script
     script: bash scripts/deploy_docker.sh develop
     on:
-      branch: 95-decode-contract-interactions
+      branch: develop
   - provider: script
     script: bash scripts/deploy_docker.sh $TRAVIS_TAG
     on:
