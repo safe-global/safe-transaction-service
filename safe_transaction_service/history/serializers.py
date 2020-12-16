@@ -498,9 +498,9 @@ class TransferResponseSerializer(serializers.Serializer):
     block_number = serializers.IntegerField()
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
-    from_ = EthereumAddressField(source='_from')
-    value = serializers.CharField()
-    token_id = serializers.CharField()
+    from_ = EthereumAddressField(source='_from', allow_zero_address=True)
+    value = serializers.CharField(allow_null=True)
+    token_id = serializers.CharField(allow_null=True)
     token_address = EthereumAddressField(allow_null=True, default=None)
 
     def get_fields(self):
@@ -521,23 +521,34 @@ class TransferResponseSerializer(serializers.Serializer):
 
         return TransferType.UNKNOWN
 
+    def validate(self, data):
+        super().validate(data)
+        if data['value'] is None and data['token_id'] is None:
+            raise ValidationError('Both value and token_id cannot be null')
+        return data
+
 
 class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
     token_info = TokenInfoResponseSerializer(source='token')
 
     def get_type(self, obj: Dict[str, Any]) -> str:
-        # Sometimes ERC20/721 `Transfer` events look the same, if token info is available better use that information
-        # to check
+        """
+        Sometimes ERC20/721 `Transfer` events look the same, if token info is available better use that information
+        to check
+        :param obj:
+        :return: `TransferType` as a string
+        """
         transfer_type = super().get_type(obj)
         if transfer_type in (TransferType.ERC20_TRANSFER.name, TransferType.ERC721_TRANSFER.name):
             if token := obj['token']:
-                if token.decimals is None:
+                decimals = token['decimals'] if isinstance(token, dict) else token.decimals
+                if decimals is None:
                     transfer_type = TransferType.ERC721_TRANSFER.name
-                    if not obj['token_id']:
+                    if obj['token_id'] is None:
                         obj['token_id'], obj['value'] = obj['value'], obj['token_id']
                 else:
                     transfer_type = TransferType.ERC20_TRANSFER.name
-                    if not obj['value']:
+                    if obj['value'] is None:
                         obj['token_id'], obj['value'] = obj['value'], obj['token_id']
         return transfer_type
 

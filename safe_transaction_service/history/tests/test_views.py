@@ -157,6 +157,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data['results'][0]['transfers'][0]['value'])
         self.assertIsNotNone(response.data['results'][0]['transfers'][0]['token_id'])
 
+        # It should work with value=0
+        safe_address = Account.create().address
+        erc20_transfer_out = EthereumEventFactory(from_=safe_address, value=0)  # ERC20 event (with `value`)
+        token = TokenFactory(address=erc20_transfer_out.address, decimals=18)
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,)) + '?queued=False&trusted=True')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['transfers'][0]['type'], TransferType.ERC20_TRANSFER.name)
+        self.assertIsNone(response.data['results'][0]['transfers'][0]['token_id'])
+        self.assertEqual(response.data['results'][0]['transfers'][0]['value'], '0')
+
     def test_get_module_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:module-transactions', args=(safe_address,)), format='json')
