@@ -129,6 +129,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         for transfer_not_empty, transaction in zip(transfers_not_empty, response.data['results']):
             self.assertEqual(bool(transaction['transfers']), transfer_not_empty)
 
+    def test_all_transactions_executed(self):
+        safe_address = Account.create().address
+
+        # No mined
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        # Mine tx with higher nonce, all should appear
+        MultisigTransactionFactory(safe=safe_address)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
+                                   + '?executed=False&queued=True&trusted=False')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 3)
+
+        response = self.client.get(reverse('v1:all-transactions', args=(safe_address,))
+                                   + '?executed=True&queued=True&trusted=False')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
         safe_address = Account.create().address

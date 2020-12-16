@@ -78,7 +78,8 @@ class TransactionService:
             pipe.execute()
     # End of cache methods
 
-    def get_all_tx_hashes(self, safe_address: str, queued: bool = True, trusted: bool = True) -> QuerySet:
+    def get_all_tx_hashes(self, safe_address: str, executed: bool = False,
+                          queued: bool = True, trusted: bool = True) -> QuerySet:
         """
         Build a queryset with hashes for every tx for a Safe for pagination filtering. In the case of
         Multisig Transactions, as some of them are not mined, we use the SafeTxHash
@@ -90,7 +91,8 @@ class TransactionService:
           - Incoming and outgoing transfers or Eth/tokens must be under a multisig/module tx if triggered by one.
           Otherwise they should have their own entry in the list using a EthereumTx
         :param safe_address:
-        :param queued: By default `True`, all transactions are returned. With `False`, just txs wih
+        :param executed: By default `False`, all transactions are returned. With `True`, just txs executed are returned.
+        :param queued: By default `True`, all transactions are returned. With `False`, just txs with
         `nonce < current Safe Nonce` are returned.
         :param trusted: By default `True`, just txs that are trusted are returned (with at least one confirmation,
         sent by a delegate or indexed). With `False` all txs are returned
@@ -126,6 +128,9 @@ class TransactionService:
 
         if trusted:  # Just show trusted transactions
             multisig_safe_tx_ids = multisig_safe_tx_ids.filter(trusted=True)
+
+        if executed:
+            multisig_safe_tx_ids = multisig_safe_tx_ids.exclude(ethereum_tx__block=None)
 
         # Get module txs
         module_tx_ids = ModuleTransaction.objects.filter(

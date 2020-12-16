@@ -79,16 +79,18 @@ class AllTransactionsListView(ListAPIView):
     pagination_class = pagination.SmallPagination
     serializer_class = serializers._AllTransactionsSchemaSerializer  # Just for docs, not used
 
+    _schema_queued_param = openapi.Parameter('executed', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
+                                             description='If `True` only executed transactions are returned')
     _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
                                              description='If `True` transactions with `nonce >= Safe current nonce` '
-                                                         'are also shown')
+                                                         'are also returned')
     _schema_trusted_param = openapi.Parameter('trusted', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
                                               description='If `True` just trusted transactions are shown (indexed, '
                                                           'added by a delegate or with at least one confirmation)')
     _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
                                             'types', serializers._AllTransactionsSchemaSerializer)
 
-    def get_parameters(self) -> Tuple[bool, bool]:
+    def get_parameters(self) -> Tuple[bool, bool, bool]:
         """
         Parse query parameters:
         - queued: Default, True. If `queued=True` transactions with `nonce >= Safe current nonce` are also shown
@@ -96,15 +98,17 @@ class AllTransactionsListView(ListAPIView):
         or with at least one confirmation)
         :return: Tuple with queued, trusted
         """
+        executed = parse_boolean_query_param(self.request.query_params.get('executed', False))
         queued = parse_boolean_query_param(self.request.query_params.get('queued', True))
         trusted = parse_boolean_query_param(self.request.query_params.get('trusted', True))
-        return queued, trusted
+        return executed, queued, trusted
 
     def list(self, request, *args, **kwargs):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs['address']
-        queued, trusted = self.get_parameters()
-        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe, queued=queued, trusted=trusted))
+        executed, queued, trusted = self.get_parameters()
+        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe, executed=executed,
+                                                                              queued=queued, trusted=trusted))
         page = self.paginate_queryset(queryset)
 
         if not page:

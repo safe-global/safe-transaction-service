@@ -85,6 +85,23 @@ class TestTransactionService(TestCase):
         queryset = transaction_service.get_all_tx_hashes(safe_address, trusted=True, queued=False)
         self.assertEqual(queryset.count(), 4)
 
+    def test_get_all_tx_hashes_executed(self):
+        transaction_service: TransactionService = self.transaction_service
+        safe_address = Account.create().address
+
+        # No mined
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 0)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=True, trusted=False).count(), 2)
+        # Mine tx with higher nonce, all should appear
+        MultisigTransactionFactory(safe=safe_address)
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, queued=False, trusted=False).count(), 3)
+
+        # Only one is executed
+        self.assertEqual(transaction_service.get_all_tx_hashes(safe_address, executed=True,
+                                                               queued=False, trusted=False).count(), 1)
+
     def test_get_all_tx_hashes_queued(self):
         transaction_service: TransactionService = self.transaction_service
         safe_address = Account.create().address
