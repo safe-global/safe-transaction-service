@@ -199,11 +199,16 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         db_trusted_addresses = [TokenFactory(trusted=True).address for _ in range(2)]
         db_spam_address = TokenFactory(trusted=False, spam=True).address
         db_invalid_address = TokenFactory(decimals=None).address  # This should not be shown
+        db_events_bugged_erc20_address = TokenFactory(events_bugged=True).address  # This should be shown always
+        db_events_bugged_not_erc20 = TokenFactory(decimals=None, events_bugged=True).address  # This should not be shown
         not_in_db_address = Account.create().address
 
         addresses = (db_not_trusted_addresses + db_trusted_addresses + [db_invalid_address]
                      + [not_in_db_address] + [db_spam_address])
-        expected_address = db_not_trusted_addresses + db_trusted_addresses + [not_in_db_address] + [db_spam_address]
+
+        expected_address = (db_not_trusted_addresses + db_trusted_addresses + [not_in_db_address] + [db_spam_address]
+                            + [db_events_bugged_erc20_address])
+
         self.assertCountEqual(balance_service._filter_addresses(addresses, False, False),
                               expected_address)
 
@@ -211,6 +216,11 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertCountEqual(balance_service._filter_addresses(addresses, True, False),
                               expected_address)
 
-        expected_address = db_not_trusted_addresses + db_trusted_addresses
+        Token.objects.filter(address=db_events_bugged_erc20_address).update(trusted=True)
+        expected_address = db_trusted_addresses + [db_events_bugged_erc20_address]
+        self.assertCountEqual(balance_service._filter_addresses(addresses, True, False),
+                              expected_address)
+
+        expected_address = db_not_trusted_addresses + db_trusted_addresses + [db_events_bugged_erc20_address]
         self.assertCountEqual(balance_service._filter_addresses(addresses, False, True),
                               expected_address)

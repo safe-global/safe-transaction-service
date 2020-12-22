@@ -28,6 +28,12 @@ class TokenQuerySet(models.QuerySet):
     def erc721(self):
         return self.filter(self.erc721_query)
 
+    def not_spam(self):
+        return self.filter(spam=False)
+
+    def trusted(self):
+        return self.filter(trusted=True)
+
 
 class Token(models.Model):
     objects = TokenManager.from_queryset(TokenQuerySet)()
@@ -37,8 +43,20 @@ class Token(models.Model):
     decimals = models.PositiveSmallIntegerField(db_index=True,
                                                 null=True, blank=True)  # For ERC721 tokens `decimals=None`
     logo_uri = models.CharField(blank=True, max_length=300, default='')
-    trusted = models.BooleanField(default=False)
+    events_bugged = models.BooleanField(default=False)  # If `True` token does not send `Transfer` event sometimes,
+    # like `WETH` on minting
     spam = models.BooleanField(default=False)  # Spam and trusted cannot be both True
+    trusted = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(name='token_trusted_idx',
+                         fields=['trusted'],
+                         condition=Q(trusted=True)),
+            models.Index(name='token_events_bugged_idx',
+                         fields=['events_bugged'],
+                         condition=Q(events_bugged=True)),
+        ]
 
     def __str__(self):
         spam_text = 'SPAM ' if self.spam else ''

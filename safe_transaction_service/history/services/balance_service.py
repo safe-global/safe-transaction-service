@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import List, Optional, Sequence
 
+from django.db.models import Q
+
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
@@ -99,7 +101,7 @@ class BalanceService:
         :return: ERC20 tokens filtered by spam or trusted
         """
         base_queryset = Token.objects.filter(
-            address__in=erc20_addresses
+            Q(address__in=erc20_addresses) | Q(events_bugged=True)
         ).order_by('name')
         if only_trusted:
             addresses = list(base_queryset.erc20().filter(trusted=True).values_list('address', flat=True))
@@ -112,8 +114,9 @@ class BalanceService:
             for token in base_queryset:
                 if token.is_erc20():
                     addresses.append(token.address)
-                addresses_set.remove(token.address)
-            # Add unkown addresses
+                if token.address in addresses_set:  # events_bugged tokens might not be on the `addresses_set`
+                    addresses_set.remove(token.address)
+            # Add unknown addresses
             addresses.extend(addresses_set)
 
         return addresses

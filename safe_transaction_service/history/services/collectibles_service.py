@@ -3,6 +3,8 @@ import operator
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from django.db.models import Q
+
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
@@ -180,7 +182,7 @@ class CollectiblesService:
         """
         addresses_set = {address_with_token_id[0] for address_with_token_id in addresses_with_token_ids}
         base_queryset = Token.objects.filter(
-            address__in=addresses_set
+            Q(address__in=addresses_set) | Q(events_bugged=True)
         ).order_by('name')
         if only_trusted:
             addresses = list(base_queryset.erc721().filter(trusted=True).values_list('address', flat=True))
@@ -188,13 +190,14 @@ class CollectiblesService:
             addresses = list(base_queryset.erc721().filter(spam=False).values_list('address', flat=True))
         else:
             # There could be some addresses that are not in the list
-            addresses = []
+            addresses = set()
             for token in base_queryset:
                 if token.is_erc721():
-                    addresses.append(token.address)
-                addresses_set.remove(token.address)
-            # Add unkown addresses
-            addresses.extend(addresses_set)
+                    addresses.add(token.address)
+                if token.address in addresses_set:  # events_bugged tokens might not be on the `addresses_set`
+                    addresses_set.remove(token.address)
+            # Add unknown addresses
+            addresses.union(addresses_set)
 
         return [address_with_token_id for address_with_token_id in addresses_with_token_ids
                 if address_with_token_id[0] in addresses]
