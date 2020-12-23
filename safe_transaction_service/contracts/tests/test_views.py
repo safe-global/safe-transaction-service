@@ -60,7 +60,7 @@ class TestContractViews(APITestCase):
             }
         }])
 
-        ContractFactory()
+        ContractFactory(contract_abi__abi=[])
         response = self.client.get(reverse('v1:contracts'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
