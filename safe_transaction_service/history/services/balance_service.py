@@ -241,21 +241,13 @@ class BalanceService:
         """
         Return current ether value for a given `token_address`
         """
-        try:
-            return self.kyber_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s from Kyber, trying Uniswap V2', token_address)
-
-        try:
-            return self.uniswap_v2_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s on Uniswap V2, trying Uniswap', token_address)
-
-        try:
-            return self.uniswap_oracle.get_price(token_address)
-        except OracleException:
-            logger.warning('Cannot get eth value for token-address=%s on Uniswap', token_address)
-            return 0.
+        for oracle in (self.kyber_oracle, self.uniswap_v2_oracle, self.uniswap_oracle):
+            try:
+                return oracle.get_price(token_address)
+            except OracleException:
+                logger.warning('Cannot get eth value for token-address=%s from %s, trying Uniswap V2', token_address,
+                               oracle.__class__.__name__)
+        return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day

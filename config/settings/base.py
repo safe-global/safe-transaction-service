@@ -283,8 +283,11 @@ LOGGING = {
         'safe_transaction_service.history.indexers.tx_processor': {
             'level': 'INFO',
         },
+        'safe_transaction_service.history.services.balance_service': {
+            'level': 'ERROR',
+        },
         'safe_transaction_service.history.services.collectibles_service': {
-            'level': 'INFO',
+            'level': 'ERROR',
         },
         'celery': {
             'handlers': ['celery_console'],

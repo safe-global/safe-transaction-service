@@ -155,7 +155,7 @@ class CollectiblesService:
                 token_metadata_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
             else:
                 logger.warning('Not available token_uri to retrieve metadata for ERC721 token=%s with token-id=%d',
-                               token_address, token_id, exc_info=True)
+                               token_address, token_id)
         name = token_info.name if token_info else ''
         symbol = token_info.symbol if token_info else ''
         logo_uri = token_info.logo_uri if token_info else ''
@@ -246,6 +246,7 @@ class CollectiblesService:
                 metadata = self.get_metadata(collectible)
             except MetadataRetrievalException:
                 metadata = {}
+                # TODO Support IPFS
                 logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
                                f'for token-address={collectible.address}')
 
