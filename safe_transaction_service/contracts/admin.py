@@ -35,7 +35,7 @@ class HasAbiFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ('address', 'name', 'has_abi', 'abi_relevance')
+    list_display = ('address', 'name', 'has_abi', 'abi_relevance', 'contract_abi_id')
     list_filter = (HasAbiFilter,)
     list_select_related = ('contract_abi',)
     ordering = ['address']

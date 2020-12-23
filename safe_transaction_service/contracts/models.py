@@ -27,7 +27,7 @@ class ContractAbi(models.Model):
     This model holds contract ABIs. Contract ABIS don't have to be tied to a contract
     (e.g. generic ERC20/721 ABI)
     """
-    abi = JSONField(validators=[validate_abi])
+    abi = JSONField(validators=[validate_abi], unique=True)
     description = models.CharField(max_length=200, blank=True)
     relevance = models.SmallIntegerField(default=100)  # A lower number will indicate more relevance
 
