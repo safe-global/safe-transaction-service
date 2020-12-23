@@ -4,10 +4,12 @@ from typing import ClassVar, List, Literal, Optional, Sequence
 
 from eth_utils import to_checksum_address
 from hexbytes import HexBytes
+from web3 import Web3
 
 
 @dataclass
 class EtherscanContract:
+    address: str
     name: str
     code: str
     abi: str
@@ -40,6 +42,7 @@ class EtherscanClient:
             return None
 
         name = tree.xpath('//*[@id="ContentPlaceHolder1_contractCodeDiv"]/div[2]/div[1]/div[1]/div[2]/span')[0].text
+        address = Web3.toChecksumAddress(tree.xpath('//*[@id="mainaddress"]')[0].text)
         code = tree.xpath('//*[@id="editor"]')[0].text_content()
         abi = tree.xpath('//*[@id="js-copytextarea2"]')[0].text
         contract_creation_code_tree = tree.xpath('//*[@id="verifiedbytecode2"]')
@@ -47,7 +50,7 @@ class EtherscanClient:
         compiler_version = tree.xpath('//*[@id="ContentPlaceHolder1_contractCodeDiv"]/div[2]/div[1]/div[2]/div[2]/span')[0].text
         optimization_enabled = tree.xpath('//*[@id="ContentPlaceHolder1_contractCodeDiv"]/div[2]/div[2]/div[1]/div[2]/span')[0].text_content()
 
-        return EtherscanContract(name, code, abi, contract_creation_code, compiler_version,
+        return EtherscanContract(address, name, code, abi, contract_creation_code, compiler_version,
                                  optimization_enabled)
 
     def _parse_tokens_page(self, content: bytes) -> Sequence[EtherscanToken]:
