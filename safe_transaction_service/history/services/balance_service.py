@@ -245,8 +245,10 @@ class BalanceService:
             try:
                 return oracle.get_price(token_address)
             except OracleException:
-                logger.warning('Cannot get eth value for token-address=%s from %s, trying Uniswap V2', token_address,
-                               oracle.__class__.__name__)
+                logger.info('Cannot get eth value for token-address=%s from %s, trying Uniswap V2', token_address,
+                            oracle.__class__.__name__)
+
+        logger.warning('Cannot find eth value for token-address=%s', token_address)
         return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))

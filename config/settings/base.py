@@ -284,10 +284,10 @@ LOGGING = {
             'level': 'INFO',
         },
         'safe_transaction_service.history.services.balance_service': {
-            'level': 'ERROR',
+            'level': 'WARNING',
         },
         'safe_transaction_service.history.services.collectibles_service': {
-            'level': 'ERROR',
+            'level': 'WARNING',
         },
         'celery': {
             'handlers': ['celery_console'],
