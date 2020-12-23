@@ -19,12 +19,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
 
+from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.version import __version__
 
 from . import filters, pagination, serializers
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
                      MultisigTransaction, SafeContract, SafeContractDelegate,
-                     SafeMasterCopy, SafeStatus)
+                     SafeMasterCopy, SafeStatus, TransferDict)
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -451,7 +452,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
 class SafeTransferListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.TransferListFilter
-    serializer_class = serializers.TransferResponseSerializer
+    serializer_class = serializers.TransferWithTokenInfoResponseSerializer
     pagination_class = pagination.DefaultPagination
 
     def list(self, request, *args, **kwargs):
@@ -467,6 +468,14 @@ class SafeTransferListView(ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    def add_tokens_to_transfers(self, transfers: TransferDict) -> TransferDict:
+        tokens = {token.address: token
+                  for token in Token.objects.filter(address__in={transfer['token_address'] for transfer in transfers
+                                                                 if transfer['token_address']})}
+        for transfer in transfers:
+            transfer['token'] = tokens.get(transfer['token_address'])
+        return transfers
+
     def get_transfers(self, address: str):
         tokens_queryset = super().filter_queryset(InternalTx.objects.token_txs_for_address(address))
         ether_queryset = super().filter_queryset(InternalTx.objects.ether_txs_for_address(address))
@@ -474,7 +483,7 @@ class SafeTransferListView(ListAPIView):
 
     def get_queryset(self):
         address = self.kwargs['address']
-        return self.get_transfers(address)
+        return self.add_tokens_to_transfers(self.get_transfers(address))
 
     @swagger_auto_schema(responses={200: serializers.TransferResponseSerializer(many=True),
                                     422: 'Safe address checksum not valid'})
