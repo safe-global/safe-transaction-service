@@ -145,3 +145,15 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(len(collectibles_service.cache_token_uri), 3)
         for address_with_token_id, token_uri in zip(addresses_with_token_ids, get_token_uris_mock.return_value):
             self.assertEqual(collectibles_service.cache_token_uri[address_with_token_id], token_uri)
+
+    def test_retrieve_metadata_from_uri(self):
+        collectibles_service = CollectiblesService(self.ethereum_client)
+        # Test ipfs
+        ipfs_address = 'ipfs://ipfs/Qmc4ZMDNMu5bguGohtGQGx5DQexitnNvf5Rb7Yzbja47bo'
+        expected_object = {
+            'description': 'Flamingo DAO Initial Token',
+            'name': 'Flamingo DAO',
+            'image': 'https://ipfs.io/ipfs/QmXKU5RBTrGaYn5M1iWQaeKuCKV34g417YDGN5Yh7Uxk4i'
+        }
+
+        self.assertEqual(collectibles_service._retrieve_metadata_from_uri(ipfs_address), expected_object)

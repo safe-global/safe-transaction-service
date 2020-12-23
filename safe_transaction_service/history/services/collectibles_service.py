@@ -2,6 +2,7 @@ import logging
 import operator
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from urllib.parse import urljoin
 
 from django.db.models import Q
 
@@ -115,6 +116,7 @@ class CollectiblesService:
     }
     ENS_IMAGE_FILENAME = 'ENS.png'
     ENS_IMAGE_URL = f'https://gnosis-safe-token-logos.s3.amazonaws.com/{ENS_IMAGE_FILENAME}'
+    IPFS_GATEWAY = 'https://ipfs.io/'
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
@@ -133,6 +135,9 @@ class CollectiblesService:
         :param uri: Uri starting with the protocol, like http://example.org/token/3
         :return: Metadata as a decoded json
         """
+        if uri and uri.startswith('ipfs://'):
+            uri = urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', ''))  # Use ipfs gateway
+
         if not uri or not uri.startswith('http'):
             raise MetadataRetrievalException(uri)
 
@@ -246,7 +251,6 @@ class CollectiblesService:
                 metadata = self.get_metadata(collectible)
             except MetadataRetrievalException:
                 metadata = {}
-                # TODO Support IPFS
                 logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
                                f'for token-address={collectible.address}')
 
