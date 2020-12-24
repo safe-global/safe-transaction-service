@@ -90,7 +90,9 @@ class SafeTxDecoder:
     """
     def __init__(self):
         logger.info('Loading contract ABIs for decoding')
-        self.supported_contracts: List[Type[Contract]] = self.get_supported_contracts()
+        self.supported_fn_selectors: Dict[bytes, ContractFunction] = self._get_supported_fn_selectors(
+            self.get_supported_contracts()
+        )
         logger.info('Contract ABIs for decoding were loaded')
 
     def get_supported_contracts(self) -> List[Type[Contract]]:
@@ -122,6 +124,14 @@ class SafeTxDecoder:
             supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
         return supported_fn_selectors
 
+    def _get_supported_fn_selectors(self, supported_contracts: List[Type[Contract]]) -> Dict[bytes, ContractFunction]:
+        """
+        Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
+        Store function selectors with abi
+        :return: A dictionary with the selectors and the contract function
+        """
+        return self._generate_selectors_with_abis_from_contracts(supported_contracts)
+
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
         Parse decoded arguments, like converting `bytes` to hexadecimal `str` or `int` and `float` to `str` (to
@@ -132,15 +142,6 @@ class SafeTxDecoder:
         if isinstance(value_decoded, bytes):
             value_decoded = HexBytes(value_decoded).hex()
         return value_decoded
-
-    @cached_property
-    def supported_fn_selectors(self) -> Dict[bytes, ContractFunction]:
-        """
-        Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
-        Store function selectors with abi
-        :return: A dictionary with the selectors and the contract function
-        """
-        return self._generate_selectors_with_abis_from_contracts(self.supported_contracts)
 
     def get_data_decoded(self, data: Union[str, bytes]):
         """
