@@ -66,7 +66,7 @@ class CannotDecode(TxDecoderException):
     pass
 
 
-@cached(TTLCache(maxsize=2, ttl=60 * 60))  # Cached 1 hour
+@cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
 def get_db_tx_decoder() -> 'TxDecoder':
     return DbTxDecoder()
 
