@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
 
 from cachetools import TTLCache, cached
-from eth_abi.exceptions import InsufficientDataBytes
+from eth_abi.exceptions import DecodingError
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from web3 import Web3
@@ -207,7 +207,7 @@ class SafeTxDecoder:
             decoded = self.dummy_w3.codec.decode_abi(types, cast(HexBytes, params))
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
-        except (ValueError, InsufficientDataBytes) as exc:
+        except (ValueError, DecodingError) as exc:
             logger.warning('Cannot decode %s', data.hex())
             raise UnexpectedProblemDecoding(data) from exc
 

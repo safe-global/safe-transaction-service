@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
-from eth_abi.exceptions import InsufficientDataBytes
+from eth_abi.exceptions import DecodingError
 from requests import RequestException
 from web3.exceptions import BadFunctionCallOutput
 
@@ -151,7 +151,7 @@ class Erc20EventsIndexer(EthereumIndexer):
         try:
             decimals = self.ethereum_client.erc20.get_decimals(token_address)
             return decimals >= 0
-        except (ValueError, BadFunctionCallOutput, InsufficientDataBytes):
+        except (ValueError, BadFunctionCallOutput, DecodingError):
             return False
 
     def process_elements(self, events: Iterable[Dict[str, Any]]) -> List[EthereumEvent]:

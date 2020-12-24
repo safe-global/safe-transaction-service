@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-from eth_abi.exceptions import InsufficientDataBytes
+from eth_abi.exceptions import DecodingError
 from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClientProvider
@@ -18,7 +18,7 @@ def fix_token_decimals(apps, schema_editor):
             if decimals != token.decimals:
                 token.decimals = decimals
                 token.save(update_fields=['decimals'])
-        except (ValueError, BadFunctionCallOutput, InsufficientDataBytes):
+        except (ValueError, BadFunctionCallOutput, DecodingError):
             token.decimals = None
             token.save(update_fields=['decimals'])
 
