@@ -88,6 +88,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
+    'safe_transaction_service.history.utils.LoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -241,6 +242,9 @@ LOGGING = {
         },
     },
     'formatters': {
+        'short': {
+            'format': '%(message)s'
+        },
         'verbose': {
             'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s'
         },
@@ -262,6 +266,10 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'console_short': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'short',
+        },
         'celery_console': {
             'level': 'DEBUG',
             'filters': ['ignore_succeeded_none'],
@@ -272,6 +280,10 @@ LOGGING = {
     'loggers': {
         '': {
             'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'LoggingMiddleware': {
+            'handlers': ['console_short'],
             'level': 'INFO',
         },
         'safe_transaction_service.history.indexers.internal_tx_indexer': {

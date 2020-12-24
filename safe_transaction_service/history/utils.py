@@ -1,9 +1,11 @@
 import logging
+import time
 from typing import Any, Dict, List, Optional, Union
 
 from django.conf import settings
 from django.core.signals import request_finished
 from django.db import connection
+from django.http import HttpRequest
 
 from gunicorn import glogging
 from redis import Redis
@@ -22,6 +24,23 @@ class CustomGunicornLogger(glogging.Logger):
         # Add filters to Gunicorn logger
         logger = logging.getLogger("gunicorn.access")
         logger.addFilter(IgnoreCheckUrl())
+
+
+class LoggingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.logger = logging.getLogger('LoggingMiddleware')
+
+    def get_milliseconds_now(self):
+        return int(time.time() * 1000)
+
+    def __call__(self, request: HttpRequest):
+        milliseconds = self.get_milliseconds_now()
+        response = self.get_response(request)
+        route = request.resolver_match.route[1:] if request.resolver_match else request.path
+        self.logger.info('MT::%s::%s::%s::%d', request.method, route, self.get_milliseconds_now() - milliseconds,
+                         response.status_code)
+        return response
 
 
 def close_gevent_db_connection():
