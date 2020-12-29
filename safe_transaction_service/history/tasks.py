@@ -183,6 +183,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                 if not internal_txs_decoded:
                     break
                 number_processed += len(tx_processor.process_decoded_transactions(internal_txs_decoded))
+                tx_processor.clear_cache()  # TODO Fix this properly
                 logger.info('Processed %d decoded transactions', number_processed)
             if number_processed:
                 logger.info('%d decoded internal txs successfully processed for safe %s',
