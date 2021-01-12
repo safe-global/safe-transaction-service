@@ -169,31 +169,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_notifications_devices_safe_delete_view(self):
         safe_contract = SafeContractFactory()
         firebase_device = FirebaseDeviceFactory()
+        firebase_device_owner = FirebaseDeviceOwnerFactory(firebase_device=firebase_device)
+        not_related_firebase_device_owner = FirebaseDeviceOwnerFactory()
         firebase_device.safes.add(safe_contract)
         device_id = firebase_device.uuid
 
         # Test not existing `safe_contract`, even if `device_id` is correct
         random_safe_address = Account.create().address
-        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 1)
+        self.assertEqual(firebase_device.safes.count(), 1)
+        self.assertEqual(FirebaseDeviceOwner.objects.count(), 2)
         response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
                                               args=(device_id, random_safe_address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 1)
+        self.assertEqual(firebase_device.safes.count(), 1)
+        self.assertEqual(FirebaseDeviceOwner.objects.count(), 2)
 
         # Happy path
         response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
                                               args=(device_id, safe_contract.address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 0)
+        self.assertEqual(firebase_device.safes.count(), 0)
+        self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
+        self.assertEqual(FirebaseDeviceOwner.objects.get(), not_related_firebase_device_owner)
 
         # Try to delete again and get the same result even if the Safe is not linked
         response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
                                               args=(device_id, safe_contract.address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 0)
+        self.assertEqual(firebase_device.safes.count(), 0)
+        self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
 
         # Remove not existing Safe should not trigger an error
         response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
                                               args=(device_id, Account.create().address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(FirebaseDevice.objects.first().safes.count(), 0)
+        self.assertEqual(firebase_device.safes.count(), 0)
+        self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
