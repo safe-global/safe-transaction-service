@@ -37,11 +37,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-test.txt
         pip install coveralls
-    - name: Checking code
-      run: |
-        python manage.py check
     - name: Run tests and coverage
       run: |
+        python manage.py check
         coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
