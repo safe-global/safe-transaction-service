@@ -1,7 +1,8 @@
 name: Python package
-on: [push]
+on: push
+
 jobs:
-  build:
+  safe-transaction-service:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -52,8 +53,8 @@ jobs:
         DOCKERHUB_PROJECT: safe-transaction-service
         SOURCE_FOLDER: safe_transaction_service
         DJANGO_SETTINGS_MODULE: config.settings.test
-        DATABASE_URL: psql://postgres:postgres@postgres/postgres
-        ETHEREUM_NODE_URL: http://ganache:8545
-        ETHEREUM_TRACING_NODE_URL: http://ganache:8545
-        REDIS_URL: redis://redis:6379/0
-        CELERY_BROKER_URL: redis://redis:6379/0
+        DATABASE_URL: psql://postgres:postgres@localhost/postgres
+        ETHEREUM_NODE_URL: http://localhost:8545
+        ETHEREUM_TRACING_NODE_URL: http://localhost:8545
+        REDIS_URL: redis://localhost:6379/0
+        CELERY_BROKER_URL: redis://localhost:6379/0
