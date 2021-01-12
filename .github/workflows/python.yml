@@ -23,16 +23,10 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      ganache:
-        image: trufflesuite/ganache-cli
-        env:
-          DOCKER: true
-        options: >-
-          --defaultBalanceEther 10000
-          --gasLimit 10000000
-          -a 30
-          --noVMErrorsOnRPCResponse
     steps:
+    - name: Setup ganache
+      run: |
+        docker run --detach --publish 8545:8545 --network-alias ganache -e DOCKER=true trufflesuite/ganache-cli:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --noVMErrorsOnRPCResponse
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
