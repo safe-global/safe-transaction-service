@@ -28,7 +28,10 @@ jobs:
         env:
           DOCKER: true
         options: >-
-          --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --noVMErrorsOnRPCResponse
+          --defaultBalanceEther 10000
+          --gasLimit 10000000
+          -a 30
+          --noVMErrorsOnRPCResponse
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
