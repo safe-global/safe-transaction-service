@@ -37,14 +37,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-test.txt
         pip install coveralls
+      env:
+        PIP_USE_MIRRORS: true
     - name: Run tests and coverage
       run: |
         python manage.py check
-        coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
+        python manage.py test
+        # coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
         SOURCE_FOLDER: safe_transaction_service
-        PIP_USE_MIRRORS: true
         DJANGO_SETTINGS_MODULE: config.settings.test
         DATABASE_URL: psql://postgres@postgres/postgres
         ETHEREUM_NODE_URL: http://ganache:8545
