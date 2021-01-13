@@ -285,6 +285,7 @@ LOGGING = {
         'LoggingMiddleware': {
             'handlers': ['console_short'],
             'level': 'INFO',
+            'propagate': False,
         },
         'safe_transaction_service.history.indexers.internal_tx_indexer': {
             'level': 'INFO',
