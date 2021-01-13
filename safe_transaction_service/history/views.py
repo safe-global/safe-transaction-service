@@ -199,7 +199,7 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         """
         return super().get(request, *args, **kwargs)
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(responses={201: 'Created',
                                     400: 'Malformed data',
                                     422: 'Error processing data'})
     def post(self, request, *args, **kwargs):
