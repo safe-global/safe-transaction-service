@@ -57,7 +57,7 @@ jobs:
         pipenv run python manage.py check
         # pytest -rxXs
         pipenv run coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
-        pipenv run coveralls
+        # pipenv run coveralls
       env:
         SOURCE_FOLDER: safe_transaction_service
         DJANGO_SETTINGS_MODULE: config.settings.test
