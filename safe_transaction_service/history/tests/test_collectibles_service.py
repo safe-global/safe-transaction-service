@@ -22,6 +22,7 @@ from .utils import just_test_if_mainnet_node
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
     def test_get_collectibles(self):
+        self.maxDiff = None
         mainnet_node = just_test_if_mainnet_node()
         ethereum_client = EthereumClient(mainnet_node)
         collectibles_service = CollectiblesService(ethereum_client)

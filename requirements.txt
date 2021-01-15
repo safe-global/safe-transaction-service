@@ -18,7 +18,7 @@ djangorestframework==3.12.2
 docutils==0.16
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
-firebase-admin==4.5.0
+firebase-admin==4.5.1
 gnosis-py==2.7.3
 gunicorn[gevent]==20.0.4
 hexbytes==0.2.1
