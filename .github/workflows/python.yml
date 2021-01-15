@@ -64,3 +64,5 @@ jobs:
         ETHEREUM_TRACING_NODE_URL: http://localhost:8545
         REDIS_URL: redis://localhost:6379/0
         CELERY_BROKER_URL: redis://localhost:6379/0
+        ETHEREUM_MAINNET_NODE: ${{ secrets.ETHEREUM_MAINNET_NODE }}
+        COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
