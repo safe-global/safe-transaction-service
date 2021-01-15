@@ -49,8 +49,6 @@ jobs:
         pip install coveralls
       env:
         PIP_USE_MIRRORS: true
-    - name: Branch name
-      run: echo running on branch ${GITHUB_REF##*/}
     - name: Run tests and coverage
       run: |
         python manage.py check
@@ -68,3 +66,12 @@ jobs:
         CELERY_BROKER_URL: redis://localhost:6379/0
         ETHEREUM_MAINNET_NODE: ${{ secrets.ETHEREUM_MAINNET_NODE }}
         COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
+    - name: Deploy Master
+      if: github.ref == 'refs/heads/master'
+      run: bash scripts/deploy_docker.sh staging
+    - name: Deploy Develop
+      if: github.ref == 'refs/heads/develop'
+      run: bash scripts/deploy_docker.sh develop
+    - name: Deploy Tag
+      if: startsWith(github.ref, 'refs/tags/')
+      run: echo Tag is ${GITHUB_REF##*/}
