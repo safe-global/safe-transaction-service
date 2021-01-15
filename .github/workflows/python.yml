@@ -1,5 +1,5 @@
 name: Python CI
-on: push
+on: [push, pull_request]
 
 jobs:
   test-app:
