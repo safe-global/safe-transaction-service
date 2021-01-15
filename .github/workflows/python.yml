@@ -29,7 +29,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-    - name: Setup ganache
+    - name: Setup and run ganache
       run: |
         docker run --detach --publish 8545:8545 --network-alias ganache -e DOCKER=true trufflesuite/ganache-cli:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --noVMErrorsOnRPCResponse -d
     - uses: actions/checkout@v2
@@ -44,7 +44,7 @@ jobs:
       id: cache-pip
       with:
         path: ~/.local/share/virtualenvs
-        key: ${{ hashFiles('requirements-test.txt') }}-${{ hashFiles('requirements.txt') }}
+        key: ${{ matrix.python-version }}-${{ hashFiles('requirements-test.txt') }}-${{ hashFiles('requirements.txt') }}
     - name: Install dependencies
       if: steps.cache-pipenv.outputs.cache-hit != 'true'
       run: |
