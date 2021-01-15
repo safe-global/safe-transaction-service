@@ -49,6 +49,8 @@ jobs:
         pip install coveralls
       env:
         PIP_USE_MIRRORS: true
+    - name: Branch name
+      run: echo running on branch ${GITHUB_REF##*/}
     - name: Run tests and coverage
       run: |
         python manage.py check
