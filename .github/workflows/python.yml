@@ -52,11 +52,9 @@ jobs:
     - name: Run tests and coverage
       run: |
         python manage.py check
-        # python manage.py test
-        pytest
+        pytest -rxXs
         # coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
       env:
-        DOCKERHUB_PROJECT: safe-transaction-service
         SOURCE_FOLDER: safe_transaction_service
         DJANGO_SETTINGS_MODULE: config.settings.test
         DATABASE_URL: psql://postgres:postgres@localhost/postgres
@@ -69,9 +67,21 @@ jobs:
     - name: Deploy Master
       if: github.ref == 'refs/heads/master'
       run: bash scripts/deploy_docker.sh staging
+      env:
+        DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKERHUB_PROJECT: safe-transaction-service
     - name: Deploy Develop
       if: github.ref == 'refs/heads/develop'
       run: bash scripts/deploy_docker.sh develop
+      env:
+        DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKERHUB_PROJECT: safe-transaction-service
     - name: Deploy Tag
       if: startsWith(github.ref, 'refs/tags/')
       run: echo Tag is ${GITHUB_REF##*/}
+      env:
+        DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKERHUB_PROJECT: safe-transaction-service
