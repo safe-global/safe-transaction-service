@@ -1,4 +1,4 @@
-![Build Status](https://github.com/gnosis/safe-transaction-service/workflows/Python%20package/badge.svg?branch=master)
+![Build Status](https://github.com/gnosis/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-service?branch=master)
 ![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
