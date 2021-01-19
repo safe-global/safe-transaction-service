@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Optional
 
 from django.core.exceptions import ValidationError
@@ -60,13 +61,28 @@ class ContractManager(models.Manager):
             )
 
 
+def get_contract_logo_path(instance: 'Contract', filename):
+    # file will be uploaded to MEDIA_ROOT/<address>
+    _, extension = os.path.splitext(filename)
+    return f'contracts/logos/{instance.address}{extension}'  # extension includes '.'
+
+
 class Contract(models.Model):
     objects = ContractManager()
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default='')
+    display_name = models.CharField(max_length=200, blank=True, default='')
+    logo = models.ImageField(null=True, default=None, upload_to=get_contract_logo_path)
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
 
     def __str__(self):
         has_abi = self.contract_abi_id is not None
-        return f'Contract {self.address} - {self.name} - with abi {has_abi}'
+        logo = ' with logo' if self.logo else ' without logo'
+        return f'Contract {self.address} - {self.name} - with abi {has_abi}{logo}'
+
+    def get_main_name(self):
+        """
+        :return: `display_name` if available, else use scraped `name`
+        """
+        return self.display_name if self.display_name else self.name

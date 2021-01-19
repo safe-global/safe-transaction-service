@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urljoin
 
 from django.urls import reverse
 
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class TestContractViews(APITestCase):
+    def _build_full_file_url(self, path: str):
+        return urljoin('http://testserver/', path)
+
     def test_contract_view(self):
         contract_address = Account.create().address
         response = self.client.get(reverse('v1:contract', args=(contract_address,)))
@@ -23,6 +27,7 @@ class TestContractViews(APITestCase):
         self.assertEqual(response.data, {
             'address': contract.address,
             'name': contract.name,
+            'logo_uri': self._build_full_file_url(contract.logo.url),
             'contract_abi': {
                 'abi': contract.contract_abi.abi,
                 'description': contract.contract_abi.description,
@@ -30,14 +35,18 @@ class TestContractViews(APITestCase):
             }
         })
 
+        display_name = 'SharinganContract'
         contract.contract_abi = None
-        contract.save(update_fields=['contract_abi'])
+        contract.display_name = display_name
+        contract.logo = None
+        contract.save()
         response = self.client.get(reverse('v1:contract', args=(contract_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {
             'address': contract.address,
-            'name': contract.name,
-            'contract_abi': None
+            'name': display_name,
+            'logo_uri': None,
+            'contract_abi': None,
         })
 
     def test_contracts_view(self):
@@ -53,6 +62,7 @@ class TestContractViews(APITestCase):
         self.assertEqual(response.data['results'], [{
             'address': contract.address,
             'name': contract.name,
+            'logo_uri': self._build_full_file_url(contract.logo.url),
             'contract_abi': {
                 'abi': contract.contract_abi.abi,
                 'description': contract.contract_abi.description,

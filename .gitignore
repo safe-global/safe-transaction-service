@@ -104,6 +104,6 @@ venv.bak/
 
 # Django
 staticfiles/
-
+safe_transaction_service/media
 
 .idea/

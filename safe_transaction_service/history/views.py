@@ -46,6 +46,7 @@ class AboutView(APIView):
             'api_version': self.request.version,
             'secure': self.request.is_secure(),
             'settings': {
+                'AWS_CONFIGURED': settings.AWS_CONFIGURED,
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
                 'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,

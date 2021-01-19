@@ -359,3 +359,13 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
     NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS = json.load(
         environ.Path(NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH).file('firebase-credentials.json')
     )
+
+
+# AWS S3 https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
+AWS_S3_CUSTOM_DOMAIN = env('AWS_S3_CUSTOM_DOMAIN', default=None)  # configure cloudfront
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default=None)
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default=None)
+AWS_CONFIGURED = bool(AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME)
+if AWS_CONFIGURED:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

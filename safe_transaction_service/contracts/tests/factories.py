@@ -21,4 +21,6 @@ class ContractFactory(DjangoModelFactory):
 
     address = factory.LazyFunction(lambda: Account.create().address)
     name = factory.Faker('cryptocurrency_name')
+    display_name = ''
+    logo = factory.django.ImageField(color='green')
     contract_abi = factory.SubFactory(ContractAbiFactory)
