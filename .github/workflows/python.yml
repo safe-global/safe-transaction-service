@@ -46,7 +46,7 @@ jobs:
         path: ~/.local/share/virtualenvs
         key: ${{ matrix.python-version }}-${{ hashFiles('requirements-test.txt') }}-${{ hashFiles('requirements.txt') }}
     - name: Install dependencies
-      if: steps.cache-pipenv.outputs.cache-hit != 'true'
+      if: steps.cache-pip.outputs.cache-hit != 'true'
       run: |
         pipenv install -r requirements-test.txt
         pipenv install coveralls
