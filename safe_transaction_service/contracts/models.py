@@ -1,16 +1,26 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db import models
 from django.db.models import JSONField
 from django.utils.translation import gettext_lazy as _
 
+from storages.backends.s3boto3 import S3Boto3Storage
 from web3._utils.normalizers import normalize_abi
 
 from gnosis.eth.django.models import EthereumAddressField
 
 from safe_transaction_service.contracts.sourcify import Sourcify
+
+
+def get_file_storage():
+    if settings.AWS_CONFIGURED:
+        return S3Boto3Storage()
+    else:
+        return default_storage
 
 
 def validate_abi(value: Dict[str, Any]):
@@ -72,7 +82,7 @@ class Contract(models.Model):
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default='')
     display_name = models.CharField(max_length=200, blank=True, default='')
-    logo = models.ImageField(null=True, default=None, upload_to=get_contract_logo_path)
+    logo = models.ImageField(null=True, default=None, upload_to=get_contract_logo_path, storage=get_file_storage)
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
 
