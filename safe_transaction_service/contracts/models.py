@@ -1,23 +1,28 @@
 import os
+from logging import getLogger
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
-from django.db.models import JSONField
+from django.db.models import JSONField, Q
 from django.utils.translation import gettext_lazy as _
 
-from storages.backends.s3boto3 import S3Boto3Storage
+import requests
+from requests import RequestException
 from web3._utils.normalizers import normalize_abi
 
 from gnosis.eth.django.models import EthereumAddressField
 
 from safe_transaction_service.contracts.sourcify import Sourcify
 
+logger = getLogger(__name__)
+
 
 def get_file_storage():
     if settings.AWS_CONFIGURED:
+        from storages.backends.s3boto3 import S3Boto3Storage
         return S3Boto3Storage()
     else:
         return default_storage
@@ -49,6 +54,12 @@ class ContractAbi(models.Model):
         return [x['name'] for x in self.abi if x['type'] == 'function']
 
 
+def get_contract_logo_path(instance: 'Contract', filename):
+    # file will be uploaded to MEDIA_ROOT/<address>
+    _, extension = os.path.splitext(filename)
+    return f'contracts/logos/{instance.address}{extension}'  # extension includes '.'
+
+
 class ContractManager(models.Manager):
     def create_from_address(self, address: str, network_id: int = 1) -> Optional['Contract']:
         sourcify = Sourcify()
@@ -70,15 +81,33 @@ class ContractManager(models.Manager):
                 contract_abi=contract_abi,
             )
 
+    def fix_missing_logos(self) -> int:
+        """
+        Syncs contracts with empty logos with files that exist on S3 and match the address. This usually happens
+        when logos
+        :return: Number of synced logos
+        """
+        synced_logos = 0
+        for contract in self.without_logo():
+            filename = get_contract_logo_path(contract, f'{contract.address}.png')
+            contract.logo.name = filename
+            try:
+                full_url = contract.logo.url
+                if requests.head(full_url).ok:
+                    synced_logos += 1
+                    contract.save(update_fields=['logo'])
+            except RequestException:
+                logger.error('Error retrieving url %s', full_url)
+        return synced_logos
 
-def get_contract_logo_path(instance: 'Contract', filename):
-    # file will be uploaded to MEDIA_ROOT/<address>
-    _, extension = os.path.splitext(filename)
-    return f'contracts/logos/{instance.address}{extension}'  # extension includes '.'
+
+class ContractQuerySet(models.QuerySet):
+    def without_logo(self):
+        return self.filter(Q(logo=None) | Q(logo=''))
 
 
 class Contract(models.Model):
-    objects = ContractManager()
+    objects = ContractManager.from_queryset(ContractQuerySet)()
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default='')
     display_name = models.CharField(max_length=200, blank=True, default='')
