@@ -9,8 +9,7 @@ from django.db import models
 from django.db.models import JSONField, Q
 from django.utils.translation import gettext_lazy as _
 
-import requests
-from requests import RequestException
+from botocore.exceptions import ClientError
 from web3._utils.normalizers import normalize_abi
 
 from gnosis.eth.django.models import EthereumAddressField
@@ -92,12 +91,11 @@ class ContractManager(models.Manager):
             filename = get_contract_logo_path(contract, f'{contract.address}.png')
             contract.logo.name = filename
             try:
-                full_url = contract.logo.url
-                if requests.head(full_url).ok:
+                if contract.logo.size:
                     synced_logos += 1
                     contract.save(update_fields=['logo'])
-            except RequestException:
-                logger.error('Error retrieving url %s', full_url)
+            except (ClientError, FileNotFoundError):  # Depending on aws or filesystem
+                logger.error('Error retrieving url %s', contract.logo.url)
         return synced_logos
 
 
