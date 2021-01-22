@@ -513,7 +513,8 @@ class SafeCreationView(APIView):
 
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe creation not found',
-                                    422: 'Owner address checksum not valid'})
+                                    422: 'Owner address checksum not valid',
+                                    503: 'Problem connecting to Ethereum network'})
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, *args, **kwargs):
         """
@@ -522,12 +523,15 @@ class SafeCreationView(APIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
-        if not safe_creation_info:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
+            if not safe_creation_info:
+                return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.serializer_class(safe_creation_info)
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+            serializer = self.serializer_class(safe_creation_info)
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+        except IOError:
+            return Response(status=status.HTTP_503_SERVICE_UNAVAILABLE, data='Problem connecting to Ethereum network')
 
 
 class SafeInfoView(APIView):
