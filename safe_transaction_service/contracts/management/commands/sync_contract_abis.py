@@ -31,7 +31,7 @@ class Command(BaseCommand):
 
         contract_queryset = Contract.objects.all()
         if not every_contract:
-            contract_queryset.filter(contract_abi=None)
+            contract_queryset = contract_queryset.filter(contract_abi=None)
 
         for contract in contract_queryset:
             if not scraper:
