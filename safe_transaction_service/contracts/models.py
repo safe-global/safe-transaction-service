@@ -83,7 +83,7 @@ class ContractManager(models.Manager):
             )
         else:  # Fallback to etherscan API (no name for contract)
             try:
-                etherscan = EtherscanApi(EthereumNetwork(network_id))
+                etherscan = EtherscanApi(EthereumNetwork(network_id), api_key=settings.ETHERSCAN_API_KEY)
                 abi = etherscan.get_contract_abi(address)
             except EtherscanApiConfigurationError:
                 return
