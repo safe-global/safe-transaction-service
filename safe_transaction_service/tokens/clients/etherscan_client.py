@@ -7,6 +7,10 @@ from hexbytes import HexBytes
 from web3 import Web3
 
 
+class EtherscanClientException(Exception):
+    pass
+
+
 @dataclass
 class BasicEtherscanContract:
     address: str
@@ -41,9 +45,13 @@ class EtherscanClient:
 
     def _parse_contracts_page(self, content: bytes) -> Optional[Union[BasicEtherscanContract, EtherscanContract]]:
         from lxml import html
-        tree = html.fromstring(content)
 
-        address = Web3.toChecksumAddress(tree.xpath('//*[@id="mainaddress"]')[0].text)
+        tree = html.fromstring(content)
+        address_xpath = tree.xpath('//*[@id="mainaddress"]')
+        if not address_xpath:
+            raise EtherscanClientException('Maintenance mode enabled / Rate limit')
+
+        address = Web3.toChecksumAddress(address_xpath[0].text)
         if not tree.xpath('//*[@id="editor"]'):
             if abi_text := tree.xpath('//*[@id="dividcode"]/pre[2]/text()'):
                 # Only ABI, like https://etherscan.io/address/0x43892992B0b102459E895B88601Bb2C76736942c
