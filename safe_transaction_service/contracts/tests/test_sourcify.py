@@ -2,7 +2,7 @@ from typing import List
 
 from django.test import TestCase
 
-from ..sourcify import Sourcify
+from ..clients import Sourcify
 
 
 class TestSourcify(TestCase):

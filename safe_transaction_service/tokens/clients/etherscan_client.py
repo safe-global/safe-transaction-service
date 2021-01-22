@@ -1,6 +1,8 @@
+import json
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, List, Literal, Optional, Sequence, Union
+from typing import (Any, ClassVar, Dict, List, Literal, Optional, Sequence,
+                    Union)
 
 from eth_utils import to_checksum_address
 from hexbytes import HexBytes
@@ -14,13 +16,12 @@ class EtherscanClientException(Exception):
 @dataclass
 class BasicEtherscanContract:
     address: str
-    abi: str
+    abi: Dict[str, Any]
+    name: Optional[str]
 
 
 @dataclass
 class EtherscanContract(BasicEtherscanContract):
-    address: str
-    name: str
     code: str
     contract_creation_code: Optional[HexBytes]
     compiler_version: str
@@ -55,14 +56,14 @@ class EtherscanClient:
         if not tree.xpath('//*[@id="editor"]'):
             if abi_text := tree.xpath('//*[@id="dividcode"]/pre[2]/text()'):
                 # Only ABI, like https://etherscan.io/address/0x43892992B0b102459E895B88601Bb2C76736942c
-                abi = abi_text[0]
-                return BasicEtherscanContract(address, abi)
+                abi = json.loads(abi_text[0])
+                return BasicEtherscanContract(address, abi, None)
             else:
                 return None
 
         name = tree.xpath('//*[@id="ContentPlaceHolder1_contractCodeDiv"]/div[2]/div[1]/div[1]/div[2]/span')[0].text
         code = tree.xpath('//*[@id="editor"]')[0].text_content()
-        abi = tree.xpath('//*[@id="js-copytextarea2"]')[0].text
+        abi = json.loads(tree.xpath('//*[@id="js-copytextarea2"]')[0].text)
         contract_creation_code_tree = tree.xpath('//*[@id="verifiedbytecode2"]')
         contract_creation_code = HexBytes(contract_creation_code_tree[0].text) if contract_creation_code_tree else None
         compiler_version = tree.xpath('//*[@id="ContentPlaceHolder1_contractCodeDiv"]/div[2]/div[1]/div[2]/div[2]/span')[0].text
