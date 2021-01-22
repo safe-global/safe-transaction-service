@@ -130,7 +130,8 @@ class Contract(models.Model):
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default='')
     display_name = models.CharField(max_length=200, blank=True, default='')
-    logo = models.ImageField(null=True, default=None, upload_to=get_contract_logo_path, storage=get_file_storage)
+    logo = models.ImageField(blank=True, default='',
+                             upload_to=get_contract_logo_path, storage=get_file_storage)
     contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
                                      related_name='contracts')
 
