@@ -43,8 +43,8 @@ class EtherscanApi:
 
     def get_contract_abi(self, contract_address: str) -> Optional[Dict[str, Any]]:
         url = self.build_url(f'api?module=contract&action=getabi&address={contract_address}')
-
         response = requests.get(url)
+
         if response.ok:
             response_json = response.json()
             result = response_json['result']

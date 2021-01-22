@@ -52,7 +52,9 @@ class TestContract(TestCase):
         with self.assertRaises(ValidationError):
             validate_abi(['a'])
 
-    def test_sync_abi_from_api(self):
+    @mock.patch.object(EtherscanApi, 'get_contract_abi', autospec=True,
+                       return_value=sourcify_safe_metadata['output']['abi'])
+    def test_sync_abi_from_api(self, get_contract_abi_mock: MagicMock):
         contract_name = 'Hello'
         contract = Contract.objects.create(address='0xaE32496491b53841efb51829d6f886387708F99B', name=contract_name,
                                            contract_abi=None)
