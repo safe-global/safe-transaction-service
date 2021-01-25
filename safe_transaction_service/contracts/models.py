@@ -132,7 +132,7 @@ class Contract(models.Model):
     display_name = models.CharField(max_length=200, blank=True, default='')
     logo = models.ImageField(blank=True, default='',
                              upload_to=get_contract_logo_path, storage=get_file_storage)
-    contract_abi = models.ForeignKey(ContractAbi, on_delete=models.CASCADE, null=True, default=None,
+    contract_abi = models.ForeignKey(ContractAbi, on_delete=models.SET_NULL, null=True, default=None, blank=True,
                                      related_name='contracts')
 
     def __str__(self):
