@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
@@ -41,7 +42,7 @@ class EtherscanApi:
         elif network == EthereumNetwork.VOLTA:
             return 'https://volta-explorer.energyweb.org'
 
-    def get_contract_abi(self, contract_address: str) -> Optional[Dict[str, Any]]:
+    def _get_contract_abi(self, contract_address: str) -> Optional[Dict[str, Any]]:
         url = self.build_url(f'api?module=contract&action=getabi&address={contract_address}')
         response = requests.get(url)
 
@@ -52,3 +53,13 @@ class EtherscanApi:
                 raise RateLimitError
             if response_json['status'] == '1':
                 return json.loads(result)
+
+    def get_contract_abi(self, contract_address: str, retry: bool = True):
+        for _ in range(3):
+            try:
+                return self._get_contract_abi(contract_address)
+            except RateLimitError as exc:
+                if not retry:
+                    raise exc
+                else:
+                    time.sleep(5)

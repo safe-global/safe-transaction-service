@@ -1,5 +1,4 @@
 import os
-import time
 from logging import getLogger
 from typing import Any, Dict, List, Optional
 
@@ -18,8 +17,8 @@ from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
 from safe_transaction_service.contracts.clients import EtherscanApi, Sourcify
-from safe_transaction_service.contracts.clients.etherscan_api import (
-    EtherscanApiConfigurationError, RateLimitError)
+from safe_transaction_service.contracts.clients.etherscan_api import \
+    EtherscanApiConfigurationError
 
 logger = getLogger(__name__)
 
@@ -85,21 +84,18 @@ class ContractManager(models.Manager):
             try:
                 etherscan = EtherscanApi(EthereumNetwork(network_id), api_key=settings.ETHERSCAN_API_KEY)
                 abi = etherscan.get_contract_abi(address)
+                if abi:
+                    try:
+                        contract_abi = ContractAbi.objects.get(abi=abi)
+                    except ContractAbi.DoesNotExist:
+                        contract_abi = ContractAbi.objects.create(abi=abi, description='')
+                    return super().create(
+                        address=address,
+                        name='',
+                        contract_abi=contract_abi,
+                    )
             except EtherscanApiConfigurationError:
                 return
-            except RateLimitError:
-                time.sleep(5)
-                abi = etherscan.get_contract_abi(address)
-            if abi:
-                try:
-                    contract_abi = ContractAbi.objects.get(abi=abi)
-                except ContractAbi.DoesNotExist:
-                    contract_abi = ContractAbi.objects.create(abi=abi, description='')
-                return super().create(
-                    address=address,
-                    name='',
-                    contract_abi=contract_abi,
-                )
 
     def fix_missing_logos(self) -> int:
         """
@@ -155,11 +151,7 @@ class Contract(models.Model):
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
         etherscan_api = EtherscanApi(network)
-        try:
-            abi = etherscan_api.get_contract_abi(self.address)
-        except RateLimitError:
-            time.sleep(5)
-            abi = etherscan_api.get_contract_abi(self.address)
+        abi = etherscan_api.get_contract_abi(self.address)
         if abi:
             contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
             self.contract_abi = contract_abi
