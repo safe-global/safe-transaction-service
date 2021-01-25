@@ -1,4 +1,4 @@
-boto3==1.16.56
+boto3==1.16.59
 celery==5.0.5
 django-authtools==1.7.0
 django-cache-memoize==0.1.7
@@ -30,4 +30,4 @@ psycopg2-binary==2.8.6
 redis==3.5.3
 requests==2.25.1
 web3==5.15.0
-cachetools==4.2.0
+cachetools==4.2.1
