@@ -10,7 +10,7 @@ from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
-from safe_transaction_service.contracts.tasks import index_contracts_metadata
+from safe_transaction_service.contracts.tasks import index_contracts_metadata_task
 
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
@@ -257,7 +257,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
 @app.shared_task()
 def index_contract_metadata() -> int:
     """
-    Call `index_contracts_metadata` in the `contracts` app to index contracts with missing metadata
+    Call `index_contracts_metadata_task` in the `contracts` app to index contracts with missing metadata
     :return:
     """
     batch = 100
@@ -268,6 +268,6 @@ def index_contract_metadata() -> int:
         if not addresses:
             break
         else:
-            index_contracts_metadata.delay(list(addresses))
+            index_contracts_metadata_task.delay(list(addresses))
             processed += len(addresses)
     return processed

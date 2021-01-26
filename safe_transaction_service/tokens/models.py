@@ -6,7 +6,11 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 
+from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.models import EthereumAddressField
+
+from safe_transaction_service.tokens.clients.zerion_client import \
+    ZerionUniswapV2TokenAdapterClient
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +20,20 @@ class TokenManager(models.Manager):
         for field in ('name', 'symbol'):
             kwargs[field] = kwargs[field][:60]
         return super().create(**kwargs)
+
+    def fix_uniswap_pool_tokens(self) -> int:
+        """
+        All Uniswap V2 tokens have the same name: "Uniswap V2". This method will return better names
+        :return: Number of pool tokens fixed
+        """
+        zerion_client = ZerionUniswapV2TokenAdapterClient(EthereumClientProvider())
+        updated = 0
+        for token in self.filter(name='Uniswap V2'):
+            if metadata := zerion_client.get_metadata(token.address):
+                token.name = metadata.name
+                token.save(update_fields=['name'])
+                updated += 1
+        return updated
 
 
 class TokenQuerySet(models.QuerySet):

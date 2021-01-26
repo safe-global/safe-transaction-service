@@ -1,7 +1,12 @@
+from unittest import mock
+from unittest.mock import MagicMock
+
 from django.test import TestCase
 
 from eth_account import Account
 
+from ..clients.zerion_client import (UniswapPoolMetadata,
+                                     ZerionUniswapV2TokenAdapterClient)
 from ..models import Token
 from .factories import TokenFactory
 
@@ -33,3 +38,19 @@ class TestModels(TestCase):
                                      trusted=True)
         self.assertEqual(token.name, truncated_name)
         self.assertEqual(token.symbol, truncated_name)
+
+    @mock.patch.object(ZerionUniswapV2TokenAdapterClient, 'get_metadata',
+                       autospec=True,
+                       return_value=UniswapPoolMetadata(address='0xBA6329EAe69707D6A0F273Bd082f4a0807A6B011',
+                                                        name='OWL/USDC Pool',
+                                                        symbol='UNI-V2',
+                                                        decimals=18))
+    def test_fix_uniswap_pool_tokens(self, get_metadata_mock: MagicMock):
+        self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 0)
+        TokenFactory()
+        self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 0)
+        token = TokenFactory(name='Uniswap V2')
+        self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 1)
+        self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 0)  # Repeating the command will not fix token again
+        token.refresh_from_db()
+        self.assertEqual(token.name, get_metadata_mock.return_value.name)

@@ -14,7 +14,7 @@ logger = get_task_logger(__name__)
 
 
 @app.shared_task()
-def index_contracts_metadata(addresses: Sequence[str]):
+def index_contracts_metadata_task(addresses: Sequence[str]):
     ethereum_client = EthereumClientProvider()
     ethereum_network = ethereum_client.get_network()
     try:
