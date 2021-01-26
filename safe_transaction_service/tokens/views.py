@@ -20,7 +20,7 @@ class TokenView(RetrieveAPIView):
     lookup_field = 'address'
     queryset = Token.objects.all()
 
-    @method_decorator(cache_page(60 * 60 * 6))  # Cache 6 hours, this should never change
+    @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this should never change
     def get(self, request, *args, **kwargs):
         address = self.kwargs['address']
         if not Web3.isChecksumAddress(address):

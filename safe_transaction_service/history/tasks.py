@@ -10,7 +10,8 @@ from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
-from safe_transaction_service.contracts.tasks import index_contracts_metadata_task
+from safe_transaction_service.contracts.tasks import \
+    index_contracts_metadata_task
 
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)

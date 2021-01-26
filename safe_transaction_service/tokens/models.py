@@ -30,7 +30,7 @@ class TokenManager(models.Manager):
         updated = 0
         for token in self.filter(name='Uniswap V2'):
             if metadata := zerion_client.get_metadata(token.address):
-                token.name = metadata.name
+                token.name = 'Uniswap V2 ' + metadata.name
                 token.save(update_fields=['name'])
                 updated += 1
         return updated

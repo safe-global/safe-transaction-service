@@ -2,7 +2,8 @@ from itertools import islice
 
 from django.core.management.base import BaseCommand
 
-from safe_transaction_service.contracts.tasks import index_contracts_metadata_task
+from safe_transaction_service.contracts.tasks import \
+    index_contracts_metadata_task
 
 from ...models import MultisigTransaction
 
