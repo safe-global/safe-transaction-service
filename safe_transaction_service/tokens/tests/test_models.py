@@ -53,4 +53,4 @@ class TestModels(TestCase):
         self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 1)
         self.assertEqual(Token.objects.fix_uniswap_pool_tokens(), 0)  # Repeating the command will not fix token again
         token.refresh_from_db()
-        self.assertEqual(token.name, get_metadata_mock.return_value.name)
+        self.assertEqual(token.name, 'Uniswap V2 ' + get_metadata_mock.return_value.name)
