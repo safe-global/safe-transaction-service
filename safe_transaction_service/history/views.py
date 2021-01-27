@@ -23,7 +23,6 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.version import __version__
 
 from . import filters, pagination, serializers
-from .exceptions import NodeConnectionError
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
                      MultisigTransaction, SafeContract, SafeContractDelegate,
                      SafeMasterCopy, SafeStatus, TransferDict)
@@ -521,6 +520,7 @@ class SafeCreationView(APIView):
         """
         Get status of the safe
         """
+
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 

@@ -19,11 +19,12 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
+from ..exceptions import NodeConnectionError
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
 from ..serializers import TransferType
-from ..services import BalanceService, CollectiblesService
+from ..services import BalanceService, CollectiblesService, SafeService
 from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
 from .factories import (EthereumEventFactory, EthereumTxFactory,
@@ -1349,6 +1350,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'modules': [],
             'fallback_handler': safe_create_tx.fallback_handler,
             'version': '1.1.1'})
+
+        with mock.patch.object(SafeService, 'get_safe_info', side_effect=NodeConnectionError, autospec=True):
+            response = self.client.get(reverse('v1:safe-info', args=(safe_address,)), format='json')
+            self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
 
     def test_master_copies_view(self):
         response = self.client.get(reverse('v1:master-copies'))

@@ -94,6 +94,8 @@ class SafeService:
         try:
             safe = Safe(safe_address, self.ethereum_client)
             return safe.retrieve_all_info()
+        except IOError as exc:
+            raise NodeConnectionError from exc
         except CannotRetrieveSafeInfoException as e:
             raise CannotGetSafeInfo from e
 

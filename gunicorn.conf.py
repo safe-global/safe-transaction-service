@@ -4,6 +4,7 @@ graceful_timeout = 60
 log_file = '-'
 log_level = 'info'
 logger_class = 'safe_transaction_service.history.utils.CustomGunicornLogger'
+# max_requests = 2000  # Restart a worker after it has processed a given number of requests (for memory leaks)
 timeout = 60
 worker_class = 'gevent'
 worker_connections = 2000
