@@ -23,6 +23,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.version import __version__
 
 from . import filters, pagination, serializers
+from .exceptions import NodeConnectionError
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
                      MultisigTransaction, SafeContract, SafeContractDelegate,
                      SafeMasterCopy, SafeStatus, TransferDict)
@@ -523,15 +524,12 @@ class SafeCreationView(APIView):
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        try:
-            safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
-            if not safe_creation_info:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
+        if not safe_creation_info:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-            serializer = self.serializer_class(safe_creation_info)
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
-        except IOError:
-            return Response(status=status.HTTP_503_SERVICE_UNAVAILABLE, data='Problem connecting to Ethereum network')
+        serializer = self.serializer_class(safe_creation_info)
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class SafeInfoView(APIView):

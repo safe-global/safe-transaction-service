@@ -12,6 +12,7 @@ from gnosis.safe import Safe
 from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.safe import SafeInfo
 
+from ..exceptions import NodeConnectionError
 from ..models import InternalTx
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,8 @@ class SafeService:
                     setup_data = next_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
+        except IOError as exc:
+            raise NodeConnectionError from exc
 
         return SafeCreationInfo(created, creator, proxy_factory, master_copy, setup_data,
                                 creation_internal_tx.ethereum_tx_id)

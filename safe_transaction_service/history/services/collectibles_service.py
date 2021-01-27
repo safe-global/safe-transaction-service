@@ -16,6 +16,7 @@ from gnosis.eth.ethereum_client import Erc721Info, InvalidERC721Info
 from safe_transaction_service.tokens.models import Token
 
 from ..clients import EnsClient
+from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
 
 logger = logging.getLogger(__name__)
@@ -304,10 +305,13 @@ class CollectiblesService:
         not_found = [address_with_token_id for address_with_token_id in addresses_with_token_ids
                      if address_with_token_id not in self.cache_token_uri]
         # Find missing in database
-        self.cache_token_uri.update({address_with_token_id: token_uri
-                                    for address_with_token_id, token_uri
-                                    in zip(not_found,
-                                           self.ethereum_client.erc721.get_token_uris(not_found))})
+        try:
+            self.cache_token_uri.update({address_with_token_id: token_uri
+                                        for address_with_token_id, token_uri
+                                        in zip(not_found,
+                                               self.ethereum_client.erc721.get_token_uris(not_found))})
+        except IOError as exc:
+            raise NodeConnectionError from exc
 
         return [self.cache_token_uri[address_with_token_id]
                 for address_with_token_id in addresses_with_token_ids]

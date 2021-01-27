@@ -19,6 +19,7 @@ from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
 
 from safe_transaction_service.tokens.models import Token
 
+from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,11 @@ class BalanceService:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached
         erc20_addresses = self._filter_addresses(all_erc20_addresses, only_trusted, exclude_spam)
-        raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
+
+        try:
+            raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
+        except IOError as exc:
+            raise NodeConnectionError from exc
 
         balances = []
         for balance in raw_balances:
