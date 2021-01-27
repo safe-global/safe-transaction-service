@@ -1,3 +1,4 @@
+import threading
 from functools import cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
@@ -66,8 +67,13 @@ class CannotDecode(TxDecoderException):
     pass
 
 
-@cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
 def get_db_tx_decoder() -> 'TxDecoder':
+    with threading.Lock():
+        return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
+
+
+@cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
+def build_db_tx_decoder():
     return DbTxDecoder()
 
 
@@ -346,5 +352,6 @@ class DbTxDecoder(TxDecoder):
     def get_supported_contracts(self) -> List[Type[Contract]]:
         supported_contracts = super().get_supported_contracts()
         db_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                        for abi in ContractAbi.objects.all().order_by('-relevance').values_list('abi', flat=True)]
+                        for abi in ContractAbi.objects.all().order_by('-relevance').values_list('abi',
+                                                                                                flat=True).distinct()]
         return db_contracts + supported_contracts
