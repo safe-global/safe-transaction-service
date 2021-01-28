@@ -68,13 +68,13 @@ class CannotDecode(TxDecoderException):
     pass
 
 
-def get_db_tx_decoder() -> 'TxDecoder':
+def get_db_tx_decoder() -> 'DbTxDecoder':
     with threading.Lock():
         return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
 
 
 @cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
-def build_db_tx_decoder():
+def build_db_tx_decoder() -> 'DbTxDecoder':
     return DbTxDecoder()
 
 

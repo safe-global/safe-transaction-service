@@ -110,6 +110,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         except BadFunctionCallOutput as e:
             raise ValidationError(f'Could not get Safe version from blockchain, check contract exists on network '
                                   f'{ethereum_client.get_network().name}') from e
+        except IOError:
+            raise ValidationError('Problem connecting to the ethereum node, please try again later')
 
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
                                          data['safe_tx_gas'], data['base_gas'], data['gas_price'],
@@ -145,6 +147,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             safe_owners = safe.retrieve_owners(block_identifier='pending')
         except BadFunctionCallOutput:  # Error using pending block identifier
             safe_owners = safe.retrieve_owners(block_identifier='latest')
+        except IOError:
+            raise ValidationError('Problem connecting to the ethereum node, please try again later')
 
         data['safe_owners'] = safe_owners
 
