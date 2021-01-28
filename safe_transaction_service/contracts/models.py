@@ -53,6 +53,14 @@ class ContractAbi(models.Model):
     def __str__(self):
         return f'ContractABI {self.relevance} - {self.description}'
 
+    def clean(self):
+        try:
+            contract_abi = ContractAbi.objects.get(abi=self.abi)
+            raise ValidationError(_(f'Abi cannot be duplicated. Already exists: '
+                                    f'{contract_abi.pk} - {contract_abi.description}'))
+        except ContractAbi.DoesNotExist:
+            pass
+
     def abi_functions(self) -> List[str]:
         return [x['name'] for x in self.abi if x['type'] == 'function']
 
