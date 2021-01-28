@@ -68,8 +68,10 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+lock = threading.Lock()
+
+
 def get_db_tx_decoder() -> 'DbTxDecoder':
-    lock = threading.Lock()
     if lock.acquire(blocking=False):
         try:
             return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
