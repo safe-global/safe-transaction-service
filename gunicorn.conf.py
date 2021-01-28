@@ -5,6 +5,7 @@ log_file = '-'
 log_level = 'info'
 logger_class = 'safe_transaction_service.history.utils.CustomGunicornLogger'
 # max_requests = 2000  # Restart a worker after it has processed a given number of requests (for memory leaks)
+preload_app = False  # Load application code before the worker processes are forked (problems with gevent patching)
 timeout = 60
 worker_class = 'gevent'
 worker_connections = 2000

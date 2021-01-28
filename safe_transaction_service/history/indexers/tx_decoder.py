@@ -34,7 +34,8 @@ from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
                                            fleet_factory_deterministic_abi,
                                            gnosis_protocol_abi)
-from .decoder_abis.gnosis_safe import allowance_module_abi, decoging_test_abi
+from .decoder_abis.gnosis_safe import (gnosis_safe_allowance_module_abi,
+                                       gnosis_safe_decoding_test_abi)
 from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.maker_dao import maker_dao_abis
 from .decoder_abis.open_zeppelin import (
@@ -263,12 +264,12 @@ class TxDecoder(SafeTxDecoder):
                                                                            fleet_factory_deterministic_abi,
                                                                            fleet_factory_abi)]
 
-        gnosis_safe = [self.dummy_w3.eth.contract(abi=abi) for abi in (allowance_module_abi,)]
+        gnosis_safe = [self.dummy_w3.eth.contract(abi=abi) for abi in (gnosis_safe_allowance_module_abi,)]
         erc_contracts = [get_erc721_contract(self.dummy_w3),
                          get_erc20_contract(self.dummy_w3)]
 
         test_contracts = [
-            self.dummy_w3.eth.contract(abi=decoging_test_abi)
+            self.dummy_w3.eth.contract(abi=gnosis_safe_decoding_test_abi)
         ]  # https://rinkeby.etherscan.io/address/0x479adf13cc2e1844451f71dcf0bf5194df53b14b#code
 
         timelock_contracts = [
