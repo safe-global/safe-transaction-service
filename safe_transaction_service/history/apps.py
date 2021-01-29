@@ -10,7 +10,10 @@ class HistoryConfig(AppConfig):
     def ready(self):
         from . import signals  # noqa
 
-        if bool({'manage.py', 'shell'} - set(sys.argv)):
-            # Ignore init if running from django shell
-            from .indexers.tx_decoder import get_db_tx_decoder
-            get_db_tx_decoder()  # Build tx decoder cache
+        for argument in sys.argv:
+            if 'gunicorn' in argument:
+                # Just run this on production
+                # TODO Find a better way
+                from .indexers.tx_decoder import get_db_tx_decoder
+                get_db_tx_decoder()  # Build tx decoder cache
+                break
