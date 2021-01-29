@@ -1,9 +1,7 @@
-import threading
 from functools import cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
 
-from cachetools import TTLCache, cached
 from eth_abi.exceptions import DecodingError
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
@@ -68,17 +66,10 @@ class CannotDecode(TxDecoderException):
     pass
 
 
-lock = threading.Lock()
-
-
 def get_db_tx_decoder() -> 'DbTxDecoder':
-    with lock:
-        return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
-
-
-@cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
-def build_db_tx_decoder() -> 'DbTxDecoder':
-    return DbTxDecoder()
+    if not hasattr(get_db_tx_decoder, 'instance'):
+        get_db_tx_decoder.instance = DbTxDecoder()
+    return get_db_tx_decoder.instance
 
 
 def get_tx_decoder() -> 'TxDecoder':

@@ -7,3 +7,5 @@ class HistoryConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa
+        from .indexers.tx_decoder import get_db_tx_decoder
+        get_db_tx_decoder()  # Build tx decoder cache
