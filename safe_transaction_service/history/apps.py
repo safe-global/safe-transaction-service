@@ -1,3 +1,5 @@
+import sys
+
 from django.apps import AppConfig
 
 
@@ -7,5 +9,8 @@ class HistoryConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa
-        from .indexers.tx_decoder import get_db_tx_decoder
-        get_db_tx_decoder()  # Build tx decoder cache
+
+        if bool({'manage.py', 'shell'} - set(sys.argv)):
+            # Ignore init if running from django shell
+            from .indexers.tx_decoder import get_db_tx_decoder
+            get_db_tx_decoder()  # Build tx decoder cache
