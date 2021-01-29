@@ -119,11 +119,9 @@ class SafeTxDecoder:
         selector
         :return: Dictionary with function selector as bytes and the function abi
         """
-        # TODO Use comprehension
-        supported_fn_selectors: Dict[bytes, ContractFunction] = {}
-        for supported_abi in abis:
-            supported_fn_selectors.update(self._generate_selectors_with_abis_from_abi(supported_abi))
-        return supported_fn_selectors
+        return {fn_selector: fn_abi
+                for supported_abi in abis
+                for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(supported_abi).items()}
 
     def _get_supported_fn_selectors(self, supported_abis: Sequence[AbiType]) -> Dict[bytes, AbiType]:
         """
@@ -216,9 +214,15 @@ class SafeTxDecoder:
 
 
 class TxDecoder(SafeTxDecoder):
-    def __init__(self):
-        self.multisend_abis: List[AbiType] = [get_multi_send_contract(self.dummy_w3).abi]
-        super().__init__()
+    """
+    Decode MultiSend and use some hardcoded ABIs (Gnosis contracts, erc20/721 tokens...)
+    """
+    @cached_property
+    def multisend_fn_selectors(self) -> Dict[bytes, AbiType]:
+        return self._generate_selectors_with_abis_from_abis(self.get_multisend_abis())
+
+    def get_multisend_abis(self):
+        return [get_multi_send_contract(self.dummy_w3).abi]
 
     def get_supported_abis(self) -> List[AbiType]:
         supported_abis = super().get_supported_abis()
@@ -271,7 +275,7 @@ class TxDecoder(SafeTxDecoder):
                 + open_zeppelin_contracts
                 + compound_contracts + exchanges
                 + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
-                + self.multisend_abis + supported_abis)
+                + self.get_multisend_abis() + supported_abis)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -279,17 +283,13 @@ class TxDecoder(SafeTxDecoder):
         :param value_decoded:
         :return:
         """
-        # TODO Decode on serializer, but it's tricky as it has a nested decoding
         value_decoded = super()._parse_decoded_arguments(value_decoded)
         if isinstance(value_decoded, (int, float)):
-            value_decoded = str(value_decoded)
-        elif isinstance(value_decoded, (list, tuple)):
-            value_decoded = list([self._parse_decoded_arguments(e) for e in value_decoded])
+            value_decoded = str(value_decoded)  # Return numbers as `str` for json compatibility
+        elif isinstance(value_decoded, (list, tuple, set)):
+            value_decoded = list([self._parse_decoded_arguments(e)
+                                  for e in value_decoded])  # Parse recursive inside sequences
         return value_decoded
-
-    @cached_property
-    def multisend_fn_selectors(self) -> Dict[bytes, AbiType]:
-        return self._generate_selectors_with_abis_from_abis(self.multisend_abis)
 
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Dict[str, Any]]]:
         """
