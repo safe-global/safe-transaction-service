@@ -72,13 +72,8 @@ lock = threading.Lock()
 
 
 def get_db_tx_decoder() -> 'DbTxDecoder':
-    if lock.acquire(blocking=False):
-        try:
-            return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
-        finally:
-            lock.release()
-    else:
-        return get_tx_decoder()
+    with lock:
+        return build_db_tx_decoder()  # First request will build the cache, next ones will read from the cache
 
 
 @cached(TTLCache(maxsize=2, ttl=60 * 60 * 6))  # Cached 6 hours
@@ -101,51 +96,51 @@ def get_safe_tx_decoder() -> 'SafeTxDecoder':
 class SafeTxDecoder:
     dummy_w3 = Web3()
     """
-    Decode txs for supported contracts
+    Decode simple txs for Safe contracts.
     """
     def __init__(self):
-        logger.info('Loading contract ABIs for decoding')
+        logger.info('%s: Loading contract ABIs for decoding', self.__class__.__name__)
         self.supported_fn_selectors: Dict[bytes, ContractFunction] = self._get_supported_fn_selectors(
-            self.get_supported_contracts()
+            self.get_supported_abis()
         )
-        logger.info('Contract ABIs for decoding were loaded')
+        logger.info('%s: Contract ABIs for decoding were loaded', self.__class__.__name__)
 
-    def get_supported_contracts(self) -> List[Type[Contract]]:
-        safe_contracts = [get_safe_V0_0_1_contract(self.dummy_w3), get_safe_V1_0_0_contract(self.dummy_w3),
-                          get_safe_contract(self.dummy_w3)]
+    def get_supported_abis(self) -> List[AbiType]:
+        safe_abis = [get_safe_V0_0_1_contract(self.dummy_w3).abi,
+                     get_safe_V1_0_0_contract(self.dummy_w3).abi,
+                     get_safe_contract(self.dummy_w3).abi]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        return safe_contracts
+        return safe_abis
 
-    def _generate_selectors_with_abis_from_contract(self, contract: Contract) -> Dict[bytes, ContractFunction]:
+    def _generate_selectors_with_abis_from_abi(self, abi: AbiType) -> Dict[bytes, AbiType]:
         """
-        :param contract: Web3 Contract
+        :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
-        return {function_abi_to_4byte_selector(contract_fn.abi): contract_fn
-                for contract_fn in contract.all_functions()}
+        return {function_abi_to_4byte_selector(fn_abi): fn_abi
+                for fn_abi in abi if fn_abi['type'] == 'function'}
 
-    def _generate_selectors_with_abis_from_contracts(self, contracts: Sequence[Contract]) -> Dict[bytes,
-                                                                                                  ContractFunction]:
+    def _generate_selectors_with_abis_from_abis(self, abis: Sequence[AbiType]) -> Dict[bytes, AbiType]:
         """
-        :param contracts: Web3 Contracts. Last contracts on the Iterable have preference if there's a collision on the
+        :param abis: Contract abis. Last abis on the Sequence have preference if there's a collision on the
         selector
-        :return: Dictionary with function selector as bytes and the ContractFunction.
+        :return: Dictionary with function selector as bytes and the function abi
         """
         # TODO Use comprehension
         supported_fn_selectors: Dict[bytes, ContractFunction] = {}
-        for supported_contract in contracts:
-            supported_fn_selectors.update(self._generate_selectors_with_abis_from_contract(supported_contract))
+        for supported_abi in abis:
+            supported_fn_selectors.update(self._generate_selectors_with_abis_from_abi(supported_abi))
         return supported_fn_selectors
 
-    def _get_supported_fn_selectors(self, supported_contracts: List[Type[Contract]]) -> Dict[bytes, ContractFunction]:
+    def _get_supported_fn_selectors(self, supported_abis: Sequence[AbiType]) -> Dict[bytes, AbiType]:
         """
         Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
         Store function selectors with abi
         :return: A dictionary with the selectors and the contract function
         """
-        return self._generate_selectors_with_abis_from_contracts(supported_contracts)
+        return self._generate_selectors_with_abis_from_abis(supported_abis)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -216,9 +211,9 @@ class SafeTxDecoder:
             raise CannotDecode(data.hex())
 
         try:
-            contract_fn = self.supported_fn_selectors[selector]
-            names = get_abi_input_names(contract_fn.abi)
-            types = get_abi_input_types(contract_fn.abi)
+            fn_abi = self.supported_fn_selectors[selector]
+            names = get_abi_input_names(fn_abi)
+            types = get_abi_input_types(fn_abi)
             decoded = self.dummy_w3.codec.decode_abi(types, cast(HexBytes, params))
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
@@ -226,62 +221,54 @@ class SafeTxDecoder:
             logger.warning('Cannot decode %s', data.hex())
             raise UnexpectedProblemDecoding(data) from exc
 
-        return contract_fn.fn_name, list(zip(names, types, values))
+        return fn_abi['name'], list(zip(names, types, values))
 
 
 class TxDecoder(SafeTxDecoder):
     def __init__(self):
-        self.multisend_contracts: List[Type[Contract]] = [get_multi_send_contract(self.dummy_w3)]
+        self.multisend_abis: List[AbiType] = [get_multi_send_contract(self.dummy_w3).abi]
         super().__init__()
 
-    def get_supported_contracts(self) -> List[Type[Contract]]:
-        supported_contracts = super().get_supported_contracts()
+    def get_supported_abis(self) -> List[AbiType]:
+        supported_abis = super().get_supported_abis()
 
-        aave_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (aave_a_token, aave_lending_pool,
-                                                                          aave_lending_pool_addresses_provider,
-                                                                          aave_lending_pool_core)]
+        aave_contracts = [aave_a_token, aave_lending_pool,
+                          aave_lending_pool_addresses_provider,
+                          aave_lending_pool_core]
         initializable_admin_upgradeability_proxy_contracts = [
-            self.dummy_w3.eth.contract(abi=initializable_admin_upgradeability_proxy_abi)
+            initializable_admin_upgradeability_proxy_abi
         ]
-        balancer_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (balancer_bactions,
-                                                                              balancer_exchange_proxy)]
-        chainlink_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (chainlink_token_abi,)]
-        compound_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (ctoken_abi, comptroller_abi)]
-        idle_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (idle_token_v3,)]
-        maker_dao_contracts = [
-            self.dummy_w3.eth.contract(abi=abi)
-            for abi in maker_dao_abis
-        ]
-        open_zeppelin_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                                   for abi in (open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin)]
-        request_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                             for abi in (request_erc20_proxy, request_erc20_swap_to_pay, request_ethereum_proxy)]
-        sablier_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                             for abi in (sablier_ctoken_manager, sablier_payroll, sablier_abi)]
+        balancer_contracts = [balancer_bactions, balancer_exchange_proxy]
+        chainlink_contracts = [chainlink_token_abi]
+        compound_contracts = [ctoken_abi, comptroller_abi]
+        idle_contracts = [idle_token_v3]
+        maker_dao_contracts = maker_dao_abis
+        open_zeppelin_contracts = [open_zeppelin_admin_upgradeability_proxy, open_zeppelin_proxy_admin]
+        request_contracts = [request_erc20_proxy, request_erc20_swap_to_pay, request_ethereum_proxy]
+        sablier_contracts = [sablier_ctoken_manager, sablier_payroll, sablier_abi]
 
-        snapshot_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                              for abi in (snapshot_delegate_registry_abi,)]
+        snapshot_contracts = [snapshot_delegate_registry_abi]
 
-        exchanges = [get_uniswap_exchange_contract(self.dummy_w3),
-                     get_kyber_network_proxy_contract(self.dummy_w3)]
+        exchanges = [get_uniswap_exchange_contract(self.dummy_w3).abi,
+                     get_kyber_network_proxy_contract(self.dummy_w3).abi]
 
-        sight_contracts = [self.dummy_w3.eth.contract(abi=abi) for abi in (conditional_token_abi,
-                                                                           market_maker_abi,
-                                                                           market_maker_factory_abi)]
-        gnosis_protocol = [self.dummy_w3.eth.contract(abi=abi) for abi in (gnosis_protocol_abi,
-                                                                           fleet_factory_deterministic_abi,
-                                                                           fleet_factory_abi)]
+        sight_contracts = [conditional_token_abi,
+                           market_maker_abi,
+                           market_maker_factory_abi]
+        gnosis_protocol = [gnosis_protocol_abi,
+                           fleet_factory_deterministic_abi,
+                           fleet_factory_abi]
 
-        gnosis_safe = [self.dummy_w3.eth.contract(abi=abi) for abi in (gnosis_safe_allowance_module_abi,)]
-        erc_contracts = [get_erc721_contract(self.dummy_w3),
-                         get_erc20_contract(self.dummy_w3)]
+        gnosis_safe = [gnosis_safe_allowance_module_abi]
+        erc_contracts = [get_erc721_contract(self.dummy_w3).abi,
+                         get_erc20_contract(self.dummy_w3).abi]
 
         test_contracts = [
-            self.dummy_w3.eth.contract(abi=gnosis_safe_decoding_test_abi)
+            gnosis_safe_decoding_test_abi
         ]  # https://rinkeby.etherscan.io/address/0x479adf13cc2e1844451f71dcf0bf5194df53b14b#code
 
         timelock_contracts = [
-            self.dummy_w3.eth.contract(abi=timelock_abi)
+            timelock_abi
         ]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
@@ -293,7 +280,7 @@ class TxDecoder(SafeTxDecoder):
                 + open_zeppelin_contracts
                 + compound_contracts + exchanges
                 + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
-                + self.multisend_contracts + supported_contracts)
+                + self.multisend_abis + supported_abis)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -310,8 +297,8 @@ class TxDecoder(SafeTxDecoder):
         return value_decoded
 
     @cached_property
-    def multisend_fn_selectors(self) -> Dict[bytes, ContractFunction]:
-        return self._generate_selectors_with_abis_from_contracts(self.multisend_contracts)
+    def multisend_fn_selectors(self) -> Dict[bytes, AbiType]:
+        return self._generate_selectors_with_abis_from_abis(self.multisend_abis)
 
     def decode_transaction_with_types(self, data: Union[bytes, str]) -> Tuple[str, List[Dict[str, Any]]]:
         """
@@ -358,9 +345,7 @@ class DbTxDecoder(TxDecoder):
     Decode contracts from ABIs in database
     """
 
-    def get_supported_contracts(self) -> List[Type[Contract]]:
-        supported_contracts = super().get_supported_contracts()
-        db_contracts = [self.dummy_w3.eth.contract(abi=abi)
-                        for abi in ContractAbi.objects.all().order_by('-relevance').values_list('abi',
-                                                                                                flat=True).distinct()]
-        return db_contracts + supported_contracts
+    def get_supported_abis(self) -> List[Type[Contract]]:
+        supported_abis = super().get_supported_abis()
+        db_abis = list(ContractAbi.objects.all().order_by('-relevance').values_list('abi', flat=True))
+        return db_abis + supported_abis
