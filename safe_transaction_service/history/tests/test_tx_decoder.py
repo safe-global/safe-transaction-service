@@ -121,7 +121,7 @@ class TestTxDecoder(TestCase):
     def test_decode_multisend(self):
         # Change Safe contract master copy and set fallback manager multisend transaction
         safe_contract_address = '0x5B9ea52Aaa931D4EEf74C8aEaf0Fe759434FeD74'
-        value = 0
+        value = '0'
         operation = MultiSendOperation.CALL.value
         data = HexBytes('0x8d80ff0a0000000000000000000000000000000000000000000000000000000000000020000000000000000000'
                         '00000000000000000000000000000000000000000000f2005b9ea52aaa931d4eef74c8aeaf0fe759434fed740000'
@@ -245,7 +245,7 @@ class TestTxDecoder(TestCase):
                                        'value_decoded': [
                                            {'operation': 0,
                                             'to': '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0xc29982380000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000039aa39c021dfbae8fac545936693ac917d5e7563000000000000000000000000f650c3d88d12db855b8bf7d11be6c55a4e07dcc9',
                                             'data_decoded': {
                                                 'method': 'enterMarkets',
@@ -257,7 +257,7 @@ class TestTxDecoder(TestCase):
                                                         '0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9']}]}},
                                            {'operation': 0,
                                             'to': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0x095ea7b300000000000000000000000039aa39c021dfbae8fac545936693ac917d5e75630000000000000000000000000000000000000000000000000000000000989680',
                                             'data_decoded': {
                                                 'method': 'approve',
@@ -271,7 +271,7 @@ class TestTxDecoder(TestCase):
                                                         'value': '10000000'}]}},
                                            {'operation': 0,
                                             'to': '0x39AA39c021dfbaE8faC545936693aC917d5E7563',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0xa0712d680000000000000000000000000000000000000000000000000000000000989680',
                                             'data_decoded': {
                                                 'method': 'mint',
@@ -281,7 +281,7 @@ class TestTxDecoder(TestCase):
                                                     'value': '10000000'}]}},
                                            {'operation': 0,
                                             'to': '0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0xc5ebeaec00000000000000000000000000000000000000000000000000000000001e8480',
                                             'data_decoded': {
                                                 'method': 'borrow',
@@ -291,7 +291,7 @@ class TestTxDecoder(TestCase):
                                                     'value': '2000000'}]}},
                                            {'operation': 0,
                                             'to': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0x095ea7b30000000000000000000000006f400810b62df8e13fded51be75ff5393eaa841f00000000000000000000000000000000000000000000000000000000001e8480',
                                             'data_decoded': {
                                                 'method': 'approve',
@@ -305,7 +305,7 @@ class TestTxDecoder(TestCase):
                                                         'value': '2000000'}]}},
                                            {'operation': 0,
                                             'to': '0x6F400810b62df8E13fded51bE75fF5393eaa841F',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0x26c3d3940000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000005265c000000000000000000000000000000000000000000000000000000000001e5d7000000000000000000000000000000000000000000000000000000000001e8480',
                                             'data_decoded': {
                                                 'method': 'placeOrder',
@@ -331,7 +331,7 @@ class TestTxDecoder(TestCase):
                                                         'value': '2000000'}]}},
                                            {'operation': 0,
                                             'to': '0x6F400810b62df8E13fded51bE75fF5393eaa841F',
-                                            'value': 0,
+                                            'value': '0',
                                             'data': '0x47e7ef24000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec700000000000000000000000000000000000000000000000000000000001e8480',
                                             'data_decoded': {
                                                 'method': 'deposit',

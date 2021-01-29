@@ -323,7 +323,7 @@ class TxDecoder(SafeTxDecoder):
             multisend_txs = MultiSend.from_transaction_data(data)
             return [{'operation': multisend_tx.operation.value,
                      'to': multisend_tx.to,
-                     'value': multisend_tx.value,
+                     'value': str(multisend_tx.value),
                      'data': multisend_tx.data.hex(),
                      'data_decoded': self.get_data_decoded(multisend_tx.data),
                      } for multisend_tx in multisend_txs]
