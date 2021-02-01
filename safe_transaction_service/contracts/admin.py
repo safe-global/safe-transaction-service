@@ -54,8 +54,8 @@ class HasLogoFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ('address', 'name', 'display_name', 'has_abi', 'abi_relevance', 'contract_abi_id')
-    list_filter = (HasAbiFilter,)
+    list_display = ('address', 'name', 'display_name', 'has_abi', 'has_logo', 'abi_relevance', 'contract_abi_id')
+    list_filter = (HasAbiFilter, HasLogoFilter)
     list_select_related = ('contract_abi',)
     ordering = ['address']
     raw_id_fields = ('contract_abi',)
