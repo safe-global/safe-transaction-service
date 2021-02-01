@@ -25,7 +25,7 @@ def bind_confirmation(sender: Type[Model],
     When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
     :param sender: Could be MultisigConfirmation or MultisigTransaction
     :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
-    :param created: True if model has just been created, `False` otherwise
+    :param created: `True` if model has just been created, `False` otherwise
     :param kwargs:
     :return:
     """

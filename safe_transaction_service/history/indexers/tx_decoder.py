@@ -91,10 +91,22 @@ class SafeTxDecoder:
     """
     def __init__(self):
         logger.info('%s: Loading contract ABIs for decoding', self.__class__.__name__)
-        self.supported_fn_selectors: Dict[bytes, ContractFunction] = self._get_supported_fn_selectors(
+        self.fn_selectors_with_abis: Dict[bytes, ContractFunction] = self._generate_selectors_with_abis_from_abis(
             self.get_supported_abis()
         )
         logger.info('%s: Contract ABIs for decoding were loaded', self.__class__.__name__)
+
+    def add_abi(self, abi: AbiType) -> bool:
+        """
+        Add a new abi without rebuilding the entire decoder
+        :return: True if decoder updated, False otherwise
+        """
+        updated = False
+        for selector, abi in self._generate_selectors_with_abis_from_abi(abi).items():
+            if selector not in self.fn_selectors_with_abis:
+                self.fn_selectors_with_abis[selector] = abi
+                updated = True
+        return updated
 
     def get_supported_abis(self) -> List[AbiType]:
         safe_abis = [get_safe_V0_0_1_contract(self.dummy_w3).abi,
@@ -122,14 +134,6 @@ class SafeTxDecoder:
         return {fn_selector: fn_abi
                 for supported_abi in abis
                 for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(supported_abi).items()}
-
-    def _get_supported_fn_selectors(self, supported_abis: Sequence[AbiType]) -> Dict[bytes, AbiType]:
-        """
-        Web3 generates possible selectors every time. We cache that and use a dict to do a fast check
-        Store function selectors with abi
-        :return: A dictionary with the selectors and the contract function
-        """
-        return self._generate_selectors_with_abis_from_abis(supported_abis)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -196,11 +200,11 @@ class SafeTxDecoder:
 
         data = HexBytes(data)
         selector, params = data[:4], data[4:]
-        if selector not in self.supported_fn_selectors:
+        if selector not in self.fn_selectors_with_abis:
             raise CannotDecode(data.hex())
 
         try:
-            fn_abi = self.supported_fn_selectors[selector]
+            fn_abi = self.fn_selectors_with_abis[selector]
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
             decoded = self.dummy_w3.codec.decode_abi(types, cast(HexBytes, params))

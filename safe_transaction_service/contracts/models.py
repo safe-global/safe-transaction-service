@@ -16,9 +16,8 @@ from web3.contract import Contract
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
-from safe_transaction_service.contracts.clients import EtherscanApi, Sourcify
-from safe_transaction_service.contracts.clients.etherscan_api import \
-    EtherscanApiConfigurationError
+from .clients import EtherscanApi, Sourcify
+from .clients.etherscan_api import EtherscanApiConfigurationError
 
 logger = getLogger(__name__)
 

@@ -357,9 +357,9 @@ class TestTxDecoder(TestCase):
 
     def test_supported_fn_selectors(self):
         for tx_decoder in (TxDecoder(), get_tx_decoder(), get_safe_tx_decoder()):
-            self.assertIn(b'jv\x12\x02', tx_decoder.supported_fn_selectors)  # execTransaction for Safe >= V1.0.0
-            self.assertIn(b'\xb6>\x80\r', tx_decoder.supported_fn_selectors)  # setup for Safe V1.1.0
-            self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.supported_fn_selectors)  # setup for Safe V1.0.0
+            self.assertIn(b'jv\x12\x02', tx_decoder.fn_selectors_with_abis)  # execTransaction for Safe >= V1.0.0
+            self.assertIn(b'\xb6>\x80\r', tx_decoder.fn_selectors_with_abis)  # setup for Safe V1.1.0
+            self.assertIn(b'\xa9z\xb1\x8a', tx_decoder.fn_selectors_with_abis)  # setup for Safe V1.0.0
 
     def test_db_tx_decoder(self):
         example_abi = [
@@ -390,6 +390,13 @@ class TestTxDecoder(TestCase):
         with self.assertRaises(CannotDecode):
             db_tx_decoder.decode_transaction(example_data)
 
+        # Test `add_abi`
+        db_tx_decoder.add_abi(example_abi)
+        fn_name, arguments = db_tx_decoder.decode_transaction(example_data)
+        self.assertEqual(fn_name, 'uxioSayHi')
+        self.assertFalse(arguments)
+
+        # Test load a new DbTxDecoder
         ContractAbiFactory(abi=example_abi)
         db_tx_decoder = DbTxDecoder()
         fn_name, arguments = db_tx_decoder.decode_transaction(example_data)

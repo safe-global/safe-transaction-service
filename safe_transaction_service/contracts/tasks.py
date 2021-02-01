@@ -7,8 +7,9 @@ from celery.utils.log import get_task_logger
 
 from gnosis.eth import EthereumClientProvider
 
-from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.history.utils import close_gevent_db_connection
+
+from .models import Contract
 
 logger = get_task_logger(__name__)
 
