@@ -8,9 +8,11 @@ from requests import RequestException
 
 from gnosis.eth import EthereumClient
 
+from safe_transaction_service.contracts.tx_decoder import (CannotDecode,
+                                                           get_safe_tx_decoder)
+
 from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer
-from .tx_decoder import CannotDecode, get_safe_tx_decoder
 
 logger = getLogger(__name__)
 

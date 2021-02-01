@@ -11,9 +11,9 @@ from gnosis.safe.multi_send import MultiSendOperation
 from safe_transaction_service.contracts.tests.factories import \
     ContractAbiFactory
 
-from ..indexers.tx_decoder import (CannotDecode, DbTxDecoder, SafeTxDecoder,
-                                   TxDecoder, get_db_tx_decoder,
-                                   get_safe_tx_decoder, get_tx_decoder)
+from ..tx_decoder import (CannotDecode, DbTxDecoder, SafeTxDecoder, TxDecoder,
+                          get_db_tx_decoder, get_safe_tx_decoder,
+                          get_tx_decoder)
 
 logger = logging.getLogger(__name__)
 

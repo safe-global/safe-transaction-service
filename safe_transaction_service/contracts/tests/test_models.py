@@ -44,13 +44,16 @@ class TestContract(TestCase):
         self.assertIsNone(Contract.objects.create_from_address(safe_contract_address))
 
     def test_validate_abi(self):
-        validate_abi([])
-        validate_abi(sourcify_safe_metadata['output']['abi'])
+        with self.assertRaises(ValidationError):
+            validate_abi([])
+
         with self.assertRaises(ValidationError):
             validate_abi([1])
 
         with self.assertRaises(ValidationError):
             validate_abi(['a'])
+
+        validate_abi(sourcify_safe_metadata['output']['abi'])
 
     @mock.patch.object(EtherscanApi, 'get_contract_abi', autospec=True,
                        return_value=sourcify_safe_metadata['output']['abi'])

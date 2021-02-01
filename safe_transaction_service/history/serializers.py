@@ -12,11 +12,12 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from safe_transaction_service.contracts.tx_decoder import (TxDecoderException,
+                                                           get_db_tx_decoder)
 from safe_transaction_service.tokens.serializers import \
     TokenInfoResponseSerializer
 
 from .helpers import DelegateSignatureHelper
-from .indexers.tx_decoder import TxDecoderException, get_db_tx_decoder
 from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
                      SafeContractDelegate)
