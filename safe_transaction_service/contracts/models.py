@@ -119,14 +119,20 @@ class ContractManager(models.Manager):
                 if contract.logo.size:
                     synced_logos += 1
                     contract.save(update_fields=['logo'])
+                    logger.info('Found logo on url %s', contract.logo.url)
             except (ClientError, FileNotFoundError):  # Depending on aws or filesystem
                 logger.error('Error retrieving url %s', contract.logo.url)
         return synced_logos
 
 
 class ContractQuerySet(models.QuerySet):
+    no_logo_query = Q(logo=None) | Q(logo='')
+
+    def with_logo(self):
+        return self.exclude(self.no_logo_query)
+
     def without_logo(self):
-        return self.filter(Q(logo=None) | Q(logo=''))
+        return self.filter(self.no_logo_query)
 
 
 class Contract(models.Model):
