@@ -39,6 +39,7 @@ class AboutView(APIView):
     """
     renderer_classes = (JSONRenderer,)
 
+    @method_decorator(cache_page(60 * 60))  # Cache 1 hour
     def get(self, request, format=None):
         content = {
             'name': 'Safe Transaction Service',
