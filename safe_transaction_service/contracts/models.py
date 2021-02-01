@@ -32,11 +32,13 @@ def get_file_storage():
 
 def validate_abi(value: Dict[str, Any]):
     try:
+        if not value:
+            raise ValueError('Empty ABI not allowed')
         normalize_abi(value)
-    except ValueError:
+    except ValueError as exc:
         raise ValidationError(
-            _('%(value)s is not a valid Ethereum Contract ABI'),
-            params={'value': value},
+            _('%(value)s is not a valid Ethereum Contract ABI: %(reason)s'),
+            params={'value': value, 'reason': str(exc)},
         )
 
 
