@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -22,9 +23,9 @@ class UniswapPoolMetadata:
     decimals: int
 
 
-class ZerionUniswapV2TokenAdapterClient:
+class ZerionTokenAdapterClient(ABC):
     """
-    Client for Zerion Uniswap V2 Token Adapter
+    Client for Zerion Token Adapter
     https://github.com/zeriontech/defi-sdk
     """
     abi = [{'inputs': [{'internalType': 'address', 'name': 'token', 'type': 'address'}],
@@ -52,11 +53,15 @@ class ZerionUniswapV2TokenAdapterClient:
                          'type': 'tuple'}],
             'stateMutability': 'view',
             'type': 'function'}]
-    mainnet_address = '0x6C5D49157863f942A5E6115aaEAb7d6A67a852d3'
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
         self.contract = ethereum_client.w3.eth.contract(self.mainnet_address, abi=self.abi)
+
+    @property
+    @abstractmethod
+    def mainnet_address(self) -> ChecksumAddress:
+        raise NotImplementedError
 
     def get_components(self, token_address: ChecksumAddress) -> Optional[List[UniswapComponent]]:
         try:
@@ -70,3 +75,9 @@ class ZerionUniswapV2TokenAdapterClient:
             return UniswapPoolMetadata(*self.contract.functions.getMetadata(token_address).call())
         except ContractLogicError:
             return None
+
+
+class ZerionUniswapV2TokenAdapterClient(ZerionTokenAdapterClient):
+    @property
+    def mainnet_address(self) -> ChecksumAddress:
+        return ChecksumAddress('0x6C5D49157863f942A5E6115aaEAb7d6A67a852d3')

@@ -51,17 +51,17 @@ class TransactionService:
         # Encode memoryview for redis
         copyreg.pickle(memoryview, lambda val: (memoryview, (bytes(val),)))
 
-    # Cache methods
-    def get_cached_key(self, safe_address: str, tx_hash: str):
+    #  Cache methods ---------------------------------
+    def get_cache_key(self, safe_address: str, tx_hash: str):
         return f'tx-service:{safe_address}:{tx_hash}'
 
-    def get_cached_txs_from_hashes(self, safe_address: str,
-                                   hashes_to_search: Sequence[str]
-                                   ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
-        keys_to_search = [self.get_cached_key(safe_address, hash_to_search) for hash_to_search in hashes_to_search]
+    def get_txs_from_cache(self, safe_address: str,
+                           hashes_to_search: Sequence[str]
+                           ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
+        keys_to_search = [self.get_cache_key(safe_address, hash_to_search) for hash_to_search in hashes_to_search]
         return [pickle.loads(data) if data else None for data in self.redis.mget(keys_to_search)]
 
-    def store_in_cache_txs(self, safe_address: str,
+    def store_txs_in_cache(self, safe_address: str,
                            hashes_with_txs: Tuple[str, Union[EthereumTx, MultisigTransaction, ModuleTransaction]]):
         """
         Store executed transactions older than 10 minutes, using `ethereum_tx_hash` as key (for
@@ -70,7 +70,7 @@ class TransactionService:
         :param hashes_with_txs:
         """
         # Just store executed transactions older than 10 minutes
-        to_store = {self.get_cached_key(safe_address, tx_hash): pickle.dumps(tx) for tx_hash, tx in hashes_with_txs
+        to_store = {self.get_cache_key(safe_address, tx_hash): pickle.dumps(tx) for tx_hash, tx in hashes_with_txs
                     if tx.execution_date and (tx.execution_date + timedelta(minutes=10)) < timezone.now()}
         if to_store:
             pipe = self.redis.pipeline()
@@ -78,7 +78,7 @@ class TransactionService:
             for key in to_store.keys():
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
-    # End of cache methods
+    # End of cache methods ----------------------------
 
     def get_all_tx_hashes(self, safe_address: str, executed: bool = False,
                           queued: bool = True, trusted: bool = True) -> QuerySet:
@@ -201,7 +201,7 @@ class TransactionService:
         """
         cached_txs = {hash_to_search: cached_tx
                       for hash_to_search, cached_tx
-                      in zip(hashes_to_search, self.get_cached_txs_from_hashes(safe_address, hashes_to_search))
+                      in zip(hashes_to_search, self.get_txs_from_cache(safe_address, hashes_to_search))
                       if cached_tx}
         hashes_not_cached = [hash_to_search for hash_to_search in hashes_to_search if hash_to_search not in cached_txs]
         multisig_txs = {multisig_tx.safe_tx_hash: multisig_tx
@@ -284,7 +284,7 @@ class TransactionService:
 
         hash_with_txs = [(hash_to_search, get_the_transaction(hash_to_search))
                          for hash_to_search in hashes_to_search]
-        self.store_in_cache_txs(safe_address, hash_with_txs)
+        self.store_txs_in_cache(safe_address, hash_with_txs)
         return list(dict.fromkeys(tx for _, tx in hash_with_txs))  # Sorted already by execution_date
 
     def serialize_all_txs(self, models: List[Union[EthereumTx,
