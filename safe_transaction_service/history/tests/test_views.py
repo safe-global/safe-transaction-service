@@ -552,6 +552,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
 
+        origin_max_len = 200  # Origin field limit
         to = Account.create().address
         data = {"to": to,
                 "value": 100000000000000000,
@@ -565,7 +566,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "refundReceiver": "0x0000000000000000000000000000000000000000",
                 # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
                 "sender": safe_owner_1.address,
-                "origin": 'Testing origin field',
+                "origin": 'A' * (origin_max_len + 1),
                 }
 
         safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
@@ -573,6 +574,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                          data['gasToken'],
                                          data['refundReceiver'], safe_nonce=data['nonce'])
         data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        data['origin'] = 'A' * origin_max_len
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         multisig_tx_db = MultisigTransaction.objects.get(safe_tx_hash=safe_tx.safe_tx_hash)

@@ -98,7 +98,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     sender = EthereumAddressField()
     # TODO Make signature mandatory
     signature = HexadecimalField(required=False, min_length=65)  # Signatures must be at least 65 bytes
-    origin = serializers.CharField(max_length=100, allow_null=True, default=None)
+    origin = serializers.CharField(max_length=200, allow_null=True, default=None)
 
     def validate(self, data):
         super().validate(data)
