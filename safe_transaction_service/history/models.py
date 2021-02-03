@@ -802,7 +802,7 @@ class MultisigTransaction(TimeStampedModel):
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
     failed = models.BooleanField(null=True, default=None, db_index=True)
-    origin = models.CharField(null=True, default=None, max_length=100)  # To store arbitrary data on the tx
+    origin = models.CharField(null=True, default=None, max_length=200)  # To store arbitrary data on the tx
     trusted = models.BooleanField(default=False, db_index=True)  # Txs proposed by a delegate or with one confirmation
 
     def __str__(self):
