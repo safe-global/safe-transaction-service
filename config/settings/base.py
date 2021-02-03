@@ -244,7 +244,7 @@ LOGGING = {
     },
     'formatters': {
         'short': {
-            'format': '%(message)s'
+            'format': '%(asctime)s %(message)s'
         },
         'verbose': {
             'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s'
