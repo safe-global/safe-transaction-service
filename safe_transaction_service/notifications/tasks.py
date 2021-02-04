@@ -113,7 +113,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
             logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
             success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
             if invalid_tokens:
-                logger.info('Removing invalid tokens for safe=%s', address)
+                logger.info('Removing invalid tokens for safe=%s. Tokens=%s', address, invalid_tokens)
                 FirebaseDevice.objects.filter(
                     cloud_messaging_token__in=invalid_tokens
                 ).update(cloud_messaging_token=None)
@@ -176,7 +176,7 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
             logger.info('Sending notification about Safe=%s with payload=%s to tokens=%s', address, payload, tokens)
             success_count, failure_count, invalid_tokens = firebase_client.send_message(tokens, payload)
             if invalid_tokens:
-                logger.info('Removing invalid tokens for safe=%s', address)
+                logger.info('Removing invalid tokens for owners of safe=%s. Tokens=%s', address, invalid_tokens)
                 FirebaseDevice.objects.filter(
                     cloud_messaging_token__in=invalid_tokens
                 ).update(cloud_messaging_token=None)
