@@ -14,8 +14,8 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork, InvalidERC20Info
-from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
-                                UniswapV2Oracle)
+from gnosis.eth.oracles import (KyberOracle, OracleException, SushiswapOracle,
+                                UniswapOracle, UniswapV2Oracle)
 
 from safe_transaction_service.tokens.models import Token
 
@@ -86,6 +86,7 @@ class BalanceService:
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
+        self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
@@ -246,7 +247,7 @@ class BalanceService:
         """
         Return current ether value for a given `token_address`
         """
-        for oracle in (self.kyber_oracle, self.uniswap_v2_oracle, self.uniswap_oracle):
+        for oracle in (self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle):
             try:
                 return oracle.get_price(token_address)
             except OracleException:
