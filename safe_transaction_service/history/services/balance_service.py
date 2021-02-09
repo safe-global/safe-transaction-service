@@ -9,12 +9,14 @@ from django.db.models import Q
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
+from pycoingecko import CoinGeckoAPI
 from requests.exceptions import ConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork, InvalidERC20Info
-from gnosis.eth.oracles import (KyberOracle, OracleException, SushiswapOracle,
+from gnosis.eth.oracles import (CannotGetPriceFromOracle, CurveOracle,
+                                KyberOracle, OracleException, SushiswapOracle,
                                 UniswapOracle, UniswapV2Oracle)
 
 from safe_transaction_service.tokens.models import Token
@@ -83,12 +85,15 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient,
                  uniswap_factory_address: str, kyber_network_proxy_address: str):
         self.ethereum_client = ethereum_client
-        self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
-        self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
+        self.coingecko_api = CoinGeckoAPI()
+        self.curve_oracle = CurveOracle(self.ethereum_client)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
+        self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
+        self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_token_usd_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
 
     @cached_property
@@ -236,11 +241,32 @@ class BalanceService:
         except (ValueError, ConnectionError) as e:
             raise CannotGetEthereumPrice from e
 
+    def get_coingecko_token_usd_price(self, token_address: str) -> float:
+        """
+        Return current usd value for a given `token_address` using coingecko
+        """
+        try:
+            result = self.coingecko_api.get_token_price(id='ethereum',
+                                                        contract_addresses=[token_address],
+                                                        vs_currencies=['usd'])
+            # Result is returned with lowercased `token_address`
+            price = result.get(token_address.lower())
+            if price and 'usd' in price:
+                return price['usd']
+            else:
+                return 0.
+        except IOError:
+            logger.warning('Error getting usd value on coingecko for token-address=%s', token_address)
+            return 0.
+
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
     @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes
     def get_eth_price(self) -> float:
         """
-        Get USD price for Ether. On xDAI we use DAI price.
+        Get USD price for Ether. It depends on the ethereum network:
+            - On mainnet, use ETH/USD
+            - On xDAI, use DAI/USD.
+            - On EWT/VOLTA, use EWT/USD
         :return: USD price for Ether
         """
         if self.ethereum_network == EthereumNetwork.XDAI:
@@ -271,6 +297,17 @@ class BalanceService:
 
         logger.warning('Cannot find eth value for token-address=%s', token_address)
         return 0.
+
+    @cachedmethod(cache=operator.attrgetter('cache_token_usd_value'))
+    @cache_memoize(60 * 30, prefix='balances-get_token_usd_price')  # 30 minutes
+    def get_token_usd_price(self, token_address: str) -> float:
+        """
+        Return current usd value for a given `token_address` using Curve, if not use Coingecko as last resource
+        """
+        try:
+            return self.curve_oracle.get_price(token_address)
+        except CannotGetPriceFromOracle:
+            return self.get_coingecko_token_usd_price(token_address)
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
@@ -312,11 +349,11 @@ class BalanceService:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
                     fiat_conversion = eth_value * token_to_eth_price
-                    balance_with_decimals = balance.balance / 10**balance.token.decimals
-                    fiat_balance = fiat_conversion * balance_with_decimals
-                else:
-                    fiat_conversion = 0.
-                    fiat_balance = 0.
+                else:  # Use coingecko as last resource
+                    fiat_conversion = self.get_token_usd_price(token_address)
+
+                balance_with_decimals = balance.balance / 10**balance.token.decimals
+                fiat_balance = fiat_conversion * balance_with_decimals
 
             balances_with_usd.append(BalanceWithFiat(balance.token_address,
                                                      balance.token,
