@@ -69,11 +69,31 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 
+    @mock.patch.object(BalanceService, 'get_ewt_usd_price_kucoin', return_value=5.)
+    @mock.patch.object(BalanceService, 'get_ewt_usd_price_coingecko', return_value=3.)
+    def test_get_ewt_usd_price(self, get_ewt_usd_price_coingecko_mock: MagicMock,
+                               get_ewt_usd_price_kucoin_mock: MagicMock):
+        balance_service = BalanceServiceProvider()
+
+        price = balance_service.get_ewt_usd_price()
+        self.assertEqual(price, 5.)
+
+        get_ewt_usd_price_kucoin_mock.side_effect = CannotGetEthereumPrice
+        price = balance_service.get_ewt_usd_price()
+        self.assertEqual(price, 3.)
+
+    def test_get_ewt_usd_price_coingecko(self) -> float:
+        just_test_if_mainnet_node()
+        balance_service = BalanceServiceProvider()
+
+        price = balance_service.get_ewt_usd_price_coingecko()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
     def test_get_ewt_usd_price_kucoin(self) -> float:
         just_test_if_mainnet_node()
         balance_service = BalanceServiceProvider()
 
-        # Binance is used
         price = balance_service.get_ewt_usd_price_kucoin()
         self.assertIsInstance(price, float)
         self.assertGreater(price, 0)

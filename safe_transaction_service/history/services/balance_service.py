@@ -212,6 +212,21 @@ class BalanceService:
         """
         return self._get_kraken_price('ETHUSD')
 
+    def get_ewt_usd_price(self) -> float:
+        try:
+            return self.get_ewt_usd_price_kucoin()
+        except CannotGetEthereumPrice:
+            return self.get_ewt_usd_price_coingecko()
+
+    def get_ewt_usd_price_coingecko(self) -> float:
+        url = 'https://api.coingecko.com/api/v3/simple/price?ids=energy-web-token&vs_currencies=usd'
+        response = requests.get(url)
+        try:
+            result = response.json()
+            return float(result['energy-web-token']['usd'])
+        except (ValueError, ConnectionError) as e:
+            raise CannotGetEthereumPrice from e
+
     def get_ewt_usd_price_kucoin(self) -> float:
         url = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
         response = requests.get(url)
@@ -234,7 +249,7 @@ class BalanceService:
             except CannotGetEthereumPrice:
                 return 1  # DAI/USD should be close to 1
         elif self.ethereum_network in (EthereumNetwork.ENERGY_WEB_CHAIN, EthereumNetwork.VOLTA):
-            return self.get_ewt_usd_price_kucoin()
+            return self.get_ewt_usd_price()
         else:
             try:
                 return self.get_eth_usd_price_kraken()
