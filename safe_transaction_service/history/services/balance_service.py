@@ -315,7 +315,7 @@ class BalanceService:
         Return current usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
         try:
-            return self.curve_oracle.get_price(token_address)
+            return self.curve_oracle.get_pool_token_price(token_address)
         except CannotGetPriceFromOracle:
             return self.get_coingecko_token_usd_price(token_address)
 
