@@ -28,7 +28,7 @@ class KlerosClient:
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
-        self.kleros_contract = ethereum_client.w3.eth.contract(self.mainnet_address, abi=self.abi)
+        self.kleros_contract = ethereum_client.erc20.slow_w3.eth.contract(self.mainnet_address, abi=self.abi)
 
     def get_token_count(self) -> int:
         return self.kleros_contract.functions.tokenCount().call()
