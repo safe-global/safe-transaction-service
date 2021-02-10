@@ -15,9 +15,10 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork, InvalidERC20Info
-from gnosis.eth.oracles import (CannotGetPriceFromOracle, CurveOracle,
-                                KyberOracle, OracleException, SushiswapOracle,
-                                UniswapOracle, UniswapV2Oracle)
+from gnosis.eth.oracles import (BalancerOracle, CannotGetPriceFromOracle,
+                                CurveOracle, KyberOracle, OracleException,
+                                SushiswapOracle, UniswapOracle,
+                                UniswapV2Oracle)
 
 from safe_transaction_service.tokens.models import Token
 
@@ -91,6 +92,7 @@ class BalanceService:
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
+        self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_usd_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
@@ -292,7 +294,15 @@ class BalanceService:
             try:
                 return oracle.get_price(token_address)
             except OracleException:
-                logger.info('Cannot get eth value for token-address=%s from %s, trying Uniswap V2', token_address,
+                logger.info('Cannot get eth value for token-address=%s from %s', token_address,
+                            oracle.__class__.__name__)
+
+        # Try pool tokens
+        for oracle in (self.uniswap_v2_oracle, self.balancer_oracle):
+            try:
+                return oracle.get_pool_token_price(token_address)
+            except OracleException:
+                logger.info('Cannot get eth value for token-address=%s from %s', token_address,
                             oracle.__class__.__name__)
 
         logger.warning('Cannot find eth value for token-address=%s', token_address)
