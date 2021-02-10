@@ -1,3 +1,4 @@
+import logging
 from typing import Type
 
 from django.db.models import Model
@@ -6,6 +7,8 @@ from django.dispatch import receiver
 
 from .models import ContractAbi
 from .tx_decoder import get_db_tx_decoder
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=ContractAbi, dispatch_uid='contract_abi.add_abi_to_tx_decoder')
@@ -23,4 +26,5 @@ def add_abi_to_tx_decoder(sender: Type[Model],
 
     if instance.abi:
         db_tx_decoder = get_db_tx_decoder()
-        db_tx_decoder.add_abi(instance.abi)
+        if db_tx_decoder.add_abi(instance.abi):
+            logger.info('ABI for ContractAbi %s was loaded on the TxDecoder', instance)

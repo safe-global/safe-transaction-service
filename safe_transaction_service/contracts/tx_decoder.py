@@ -9,7 +9,7 @@ from web3 import Web3
 from web3._utils.abi import (get_abi_input_names, get_abi_input_types,
                              map_abi_data)
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
-from web3.contract import Contract, ContractFunction
+from web3.contract import Contract
 
 from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
                                   get_kyber_network_proxy_contract,
@@ -91,7 +91,7 @@ class SafeTxDecoder:
     """
     def __init__(self):
         logger.info('%s: Loading contract ABIs for decoding', self.__class__.__name__)
-        self.fn_selectors_with_abis: Dict[bytes, ContractFunction] = self._generate_selectors_with_abis_from_abis(
+        self.fn_selectors_with_abis: Dict[bytes, AbiType] = self._generate_selectors_with_abis_from_abis(
             self.get_supported_abis()
         )
         logger.info('%s: Contract ABIs for decoding were loaded', self.__class__.__name__)
