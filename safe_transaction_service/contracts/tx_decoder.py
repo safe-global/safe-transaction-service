@@ -96,7 +96,7 @@ class SafeTxDecoder:
         )
         logger.info('%s: Contract ABIs for decoding were loaded', self.__class__.__name__)
 
-    def add_abi(self, abi: AbiType) -> bool:
+    def load_abi(self, abi: AbiType) -> bool:
         """
         Add a new abi without rebuilding the entire decoder
         :return: True if decoder updated, False otherwise

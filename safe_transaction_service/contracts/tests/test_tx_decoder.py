@@ -390,8 +390,8 @@ class TestTxDecoder(TestCase):
         with self.assertRaises(CannotDecode):
             db_tx_decoder.decode_transaction(example_data)
 
-        # Test `add_abi`
-        db_tx_decoder.add_abi(example_abi)
+        # Test `load_abi`
+        db_tx_decoder.load_abi(example_abi)
         fn_name, arguments = db_tx_decoder.decode_transaction(example_data)
         self.assertEqual(fn_name, 'uxioSayHi')
         self.assertFalse(arguments)
