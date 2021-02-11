@@ -2,24 +2,26 @@ import logging
 import operator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from django.db.models import Q
 
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
-from pycoingecko import CoinGeckoAPI
 from requests.exceptions import ConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork, InvalidERC20Info
 from gnosis.eth.oracles import (BalancerOracle, CannotGetPriceFromOracle,
-                                CurveOracle, KyberOracle, OracleException,
-                                SushiswapOracle, UniswapOracle,
-                                UniswapV2Oracle)
+                                CurveOracle, KyberOracle, MooniswapOracle,
+                                OracleException, SushiswapOracle,
+                                UniswapOracle, UniswapV2Oracle)
+from gnosis.eth.oracles.oracles import PriceOracle, PricePoolOracle
 
+from safe_transaction_service.tokens.clients.coingecko_client import \
+    CoingeckoClient
 from safe_transaction_service.tokens.models import Token
 
 from ..exceptions import NodeConnectionError
@@ -86,17 +88,32 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient,
                  uniswap_factory_address: str, kyber_network_proxy_address: str):
         self.ethereum_client = ethereum_client
-        self.coingecko_api = CoinGeckoAPI()
+        self.coingecko_client = CoingeckoClient()
         self.curve_oracle = CurveOracle(self.ethereum_client)
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
+        self.mooniswap_oracle = MooniswapOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_usd_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
+
+    @cached_property
+    def enabled_price_oracles(self) -> Tuple[PriceOracle]:
+        if self.ethereum_network == EthereumNetwork.MAINNET:
+            return self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle
+        else:
+            return self.kyber_oracle, self.uniswap_v2_oracle  # They provide versions in another networks
+
+    @cached_property
+    def enabled_pool_price_oracles(self) -> Tuple[PricePoolOracle]:
+        if self.ethereum_network == EthereumNetwork.MAINNET:
+            return self.uniswap_v2_oracle, self.balancer_oracle, self.mooniswap_oracle
+        else:
+            return tuple()
 
     @cached_property
     def ethereum_network(self):
@@ -226,13 +243,11 @@ class BalanceService:
             return self.get_ewt_usd_price_coingecko()
 
     def get_ewt_usd_price_coingecko(self) -> float:
-        url = 'https://api.coingecko.com/api/v3/simple/price?ids=energy-web-token&vs_currencies=usd'
-        response = requests.get(url)
-        try:
-            result = response.json()
-            return float(result['energy-web-token']['usd'])
-        except (ValueError, ConnectionError) as e:
-            raise CannotGetEthereumPrice from e
+        price = self.coingecko_client.get_price('energy-web-token')
+        if price:
+            return price
+        else:
+            raise CannotGetEthereumPrice
 
     def get_ewt_usd_price_kucoin(self) -> float:
         url = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
@@ -247,17 +262,19 @@ class BalanceService:
         """
         Return current usd value for a given `token_address` using coingecko
         """
+        return self.coingecko_client.get_token_price(token_address)
+        url = f'https://api.coingecko.com/api/v3/simple/token_price/ethereum?contract_addresses={token_address}&vs_currencies=usd'
         try:
-            result = self.coingecko_api.get_token_price(id='ethereum',
-                                                        contract_addresses=[token_address],
-                                                        vs_currencies=['usd'])
+            response = requests.get(url)
+            if not response.ok:
+                raise IOError
             # Result is returned with lowercased `token_address`
-            price = result.get(token_address.lower())
+            price = response.json().get(token_address.lower())
             if price and 'usd' in price:
                 return price['usd']
             else:
                 return 0.
-        except IOError:
+        except (IOError, ValueError):
             logger.warning('Error getting usd value on coingecko for token-address=%s', token_address)
             return 0.
 
@@ -290,7 +307,7 @@ class BalanceService:
         """
         Return current ether value for a given `token_address`
         """
-        for oracle in (self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle):
+        for oracle in self.enabled_price_oracles:
             try:
                 return oracle.get_price(token_address)
             except OracleException:
@@ -298,7 +315,7 @@ class BalanceService:
                             oracle.__class__.__name__)
 
         # Try pool tokens
-        for oracle in (self.uniswap_v2_oracle, self.balancer_oracle):
+        for oracle in self.enabled_pool_price_oracles:
             try:
                 return oracle.get_pool_token_price(token_address)
             except OracleException:
@@ -314,10 +331,12 @@ class BalanceService:
         """
         Return current usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
-        try:
-            return self.curve_oracle.get_pool_token_price(token_address)
-        except CannotGetPriceFromOracle:
-            return self.get_coingecko_token_usd_price(token_address)
+        if self.ethereum_network == EthereumNetwork.MAINNET:
+            try:
+                return self.curve_oracle.get_pool_token_price(token_address)
+            except CannotGetPriceFromOracle:
+                return self.get_coingecko_token_usd_price(token_address)
+        return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
@@ -359,7 +378,7 @@ class BalanceService:
                 token_to_eth_price = self.get_token_eth_value(token_address)
                 if token_to_eth_price:
                     fiat_conversion = eth_value * token_to_eth_price
-                else:  # Use coingecko as last resource
+                else:  # Use curve/coingecko as last resource
                     fiat_conversion = self.get_token_usd_price(token_address)
 
                 balance_with_decimals = balance.balance / 10**balance.token.decimals
