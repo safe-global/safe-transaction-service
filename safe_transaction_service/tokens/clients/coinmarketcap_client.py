@@ -30,11 +30,12 @@ class CoinMarketCapClient:
             'Accepts': 'application/json',
             'X-CMC_PRO_API_KEY': api_token,
         }
+        self.http_session = requests.session()
 
     def download_file(self, url: str, taget_folder: str, local_filename: str) -> str:
         if not os.path.exists(taget_folder):
             os.makedirs(taget_folder)
-        r = requests.get(url, stream=True)
+        r = self.http_session.get(url, stream=True)
         if not r.ok:
             logger.warning("Image not found for url %s", url)
             return
@@ -73,7 +74,7 @@ class CoinMarketCapClient:
         }
 
         try:
-            return requests.get(url, headers=self.headers, params=parameters).json().get('data', [])
+            return self.http_session.get(url, headers=self.headers, params=parameters).json().get('data', [])
         except (ConnectionError, Timeout, TooManyRedirects):
             logger.warning('Problem getting tokens from coinmarketcap', exc_info=True)
             return []

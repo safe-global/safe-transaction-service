@@ -263,20 +263,6 @@ class BalanceService:
         Return current usd value for a given `token_address` using coingecko
         """
         return self.coingecko_client.get_token_price(token_address)
-        url = f'https://api.coingecko.com/api/v3/simple/token_price/ethereum?contract_addresses={token_address}&vs_currencies=usd'
-        try:
-            response = requests.get(url)
-            if not response.ok:
-                raise IOError
-            # Result is returned with lowercased `token_address`
-            price = response.json().get(token_address.lower())
-            if price and 'usd' in price:
-                return price['usd']
-            else:
-                return 0.
-        except (IOError, ValueError):
-            logger.warning('Error getting usd value on coingecko for token-address=%s', token_address)
-            return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
     @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes

@@ -23,6 +23,7 @@ class EtherscanApi:
         self.base_url = self.get_base_url(network)
         if self.base_url is None:
             raise EtherscanApiConfigurationError(f'Network {network.name} - {network.value} not supported')
+        self.http_session = requests.session()
 
     def build_url(self, path: str):
         url = urljoin(self.base_url, path)
@@ -44,7 +45,7 @@ class EtherscanApi:
 
     def _get_contract_abi(self, contract_address: str) -> Optional[Dict[str, Any]]:
         url = self.build_url(f'api?module=contract&action=getabi&address={contract_address}')
-        response = requests.get(url)
+        response = self.http_session.get(url)
 
         if response.ok:
             response_json = response.json()

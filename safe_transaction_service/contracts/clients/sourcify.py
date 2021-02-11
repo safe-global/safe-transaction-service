@@ -15,6 +15,7 @@ class ContractMetadata:
 class Sourcify:
     def __init__(self, base_url: str = 'https://contractrepo.komputing.org/'):
         self.base_url = base_url
+        self.http_session = requests.session()
 
     def _get_abi_from_metadata(self, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         return metadata['output']['abi']
@@ -25,7 +26,7 @@ class Sourcify:
             return values[0]
 
     def _do_request(self, url: str) -> Optional[Dict[str, Any]]:
-        response = requests.get(url)
+        response = self.http_session.get(url)
         if not response.ok:
             return None
 

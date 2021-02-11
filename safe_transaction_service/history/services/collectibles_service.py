@@ -126,6 +126,7 @@ class CollectiblesService:
         self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
         self.cache_token_info: Dict[str, Tuple[str, str]] = {}
         self.cache_token_uri: Dict[Tuple[str, int], str] = {}
+        self.http_session = requests.session()
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24, prefix='collectibles-_retrieve_metadata_from_uri')  # 1 day
@@ -144,7 +145,7 @@ class CollectiblesService:
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
-            response = requests.get(uri)
+            response = self.http_session.get(uri)
             if not response.ok:
                 logger.debug('Cannot get metadata for uri=%s', uri)
                 raise MetadataRetrievalException(uri)
