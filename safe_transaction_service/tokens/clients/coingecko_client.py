@@ -4,6 +4,8 @@ from urllib.parse import urljoin
 import requests
 from eth_typing import ChecksumAddress
 
+from safe_transaction_service.tokens.clients.exceptions import CannotGetPrice
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,16 +19,16 @@ class CoingeckoClient:
         try:
             response = self.http_session.get(url)
             if not response.ok:
-                raise IOError
+                raise CannotGetPrice
             # Result is returned with lowercased `token_address`
             price = response.json().get(name)
             if price and 'usd' in price:
                 return price['usd']
             else:
-                return 0.
-        except (IOError, ValueError):
-            logger.warning('Error getting usd value on coingecko for token-name=%s', name)
-            return 0.
+                raise CannotGetPrice(f'Price from url={url} is {price}')
+        except (ValueError, IOError) as e:
+            logger.warning('Problem getting usd value on coingecko for token-name=%s', name)
+            raise CannotGetPrice from e
 
     def get_price(self, name: str) -> float:
         """
@@ -47,3 +49,6 @@ class CoingeckoClient:
         url = urljoin(self.base_url,
                       f'api/v3/simple/token_price/ethereum?contract_addresses={token_address}&vs_currencies=usd')
         return self._get_price(url, token_address)
+
+    def get_ewt_usd_price(self) -> float:
+        return self.get_price('energy-web-token')

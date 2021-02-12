@@ -1,0 +1,2 @@
+class CannotGetPrice(Exception):
+    pass

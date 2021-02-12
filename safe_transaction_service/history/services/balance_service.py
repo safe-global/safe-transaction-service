@@ -6,10 +6,8 @@ from typing import List, Optional, Sequence, Tuple
 
 from django.db.models import Q
 
-import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
-from requests.exceptions import ConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -20,8 +18,11 @@ from gnosis.eth.oracles import (BalancerOracle, CannotGetPriceFromOracle,
                                 UniswapOracle, UniswapV2Oracle)
 from gnosis.eth.oracles.oracles import PriceOracle, PricePoolOracle
 
-from safe_transaction_service.tokens.clients.coingecko_client import \
-    CoingeckoClient
+from safe_transaction_service.tokens.clients import (BinanceClient,
+                                                     CannotGetPrice,
+                                                     CoingeckoClient,
+                                                     KrakenClient,
+                                                     KucoinClient)
 from safe_transaction_service.tokens.models import Token
 
 from ..exceptions import NodeConnectionError
@@ -31,10 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 class BalanceServiceException(Exception):
-    pass
-
-
-class CannotGetEthereumPrice(BalanceServiceException):
     pass
 
 
@@ -88,8 +85,11 @@ class BalanceService:
     def __init__(self, ethereum_client: EthereumClient,
                  uniswap_factory_address: str, kyber_network_proxy_address: str):
         self.ethereum_client = ethereum_client
+        self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient()
-        self.curve_oracle = CurveOracle(self.ethereum_client)
+        self.kraken_client = KrakenClient()
+        self.kucoin_client = KucoinClient()
+        self.curve_oracle = CurveOracle(self.ethereum_client)  # Curve returns price in usd
         self.kyber_oracle = KyberOracle(self.ethereum_client, kyber_network_proxy_address)
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.uniswap_oracle = UniswapOracle(self.ethereum_client, uniswap_factory_address)
@@ -180,89 +180,11 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def _get_binance_price(self, symbol: str):
-        url = f'https://api.binance.com/api/v3/avgPrice?symbol={symbol}'
-        try:
-            response = requests.get(url)
-            api_json = response.json()
-            if not response.ok:
-                logger.warning('Cannot get price from url=%s', url)
-                raise CannotGetEthereumPrice(api_json.get('msg'))
-
-            price = float(api_json['price'])
-            if not price:
-                raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
-            return price
-        except (ValueError, ConnectionError) as e:
-            raise CannotGetEthereumPrice from e
-
-    def _get_kraken_price(self, symbol: str):
-        url = f'https://api.kraken.com/0/public/Ticker?pair={symbol}'
-        try:
-            response = requests.get(url)
-            api_json = response.json()
-            error = api_json.get('error')
-            if not response.ok or error:
-                logger.warning('Cannot get price from url=%s', url)
-                raise CannotGetEthereumPrice(str(api_json['error']))
-
-            result = api_json['result']
-            for new_ticker in result:
-                price = float(result[new_ticker]['c'][0])
-                if not price:
-                    raise CannotGetEthereumPrice(f'Price from url={url} is {price}')
-                return price
-        except (ValueError, ConnectionError) as e:
-            raise CannotGetEthereumPrice from e
-
-    def get_dai_usd_price_kraken(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        return self._get_kraken_price('DAIUSD')
-
-    def get_eth_usd_price_binance(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        return self._get_binance_price('ETHUSDT')
-
-    def get_eth_usd_price_kraken(self) -> float:
-        """
-        :return: current USD price for ethereum using Kraken
-        :raises: CannotGetEthereumPrice
-        """
-        return self._get_kraken_price('ETHUSD')
-
     def get_ewt_usd_price(self) -> float:
         try:
-            return self.get_ewt_usd_price_kucoin()
-        except CannotGetEthereumPrice:
-            return self.get_ewt_usd_price_coingecko()
-
-    def get_ewt_usd_price_coingecko(self) -> float:
-        price = self.coingecko_client.get_price('energy-web-token')
-        if price:
-            return price
-        else:
-            raise CannotGetEthereumPrice
-
-    def get_ewt_usd_price_kucoin(self) -> float:
-        url = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
-        response = requests.get(url)
-        try:
-            result = response.json()
-            return float(result['data']['price'])
-        except (ValueError, ConnectionError) as e:
-            raise CannotGetEthereumPrice from e
-
-    def get_coingecko_token_usd_price(self, token_address: str) -> float:
-        """
-        Return current usd value for a given `token_address` using coingecko
-        """
-        return self.coingecko_client.get_token_price(token_address)
+            return self.kucoin_client.get_ewt_usd_price()
+        except CannotGetPrice:
+            return self.coingecko_client.get_ewt_usd_price()
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
     @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes
@@ -276,16 +198,16 @@ class BalanceService:
         """
         if self.ethereum_network == EthereumNetwork.XDAI:
             try:
-                return self.get_dai_usd_price_kraken()
-            except CannotGetEthereumPrice:
+                return self.kraken_client.get_dai_usd_price()
+            except CannotGetPrice:
                 return 1  # DAI/USD should be close to 1
         elif self.ethereum_network in (EthereumNetwork.ENERGY_WEB_CHAIN, EthereumNetwork.VOLTA):
             return self.get_ewt_usd_price()
         else:
             try:
-                return self.get_eth_usd_price_kraken()
-            except CannotGetEthereumPrice:
-                return self.get_eth_usd_price_binance()
+                return self.kraken_client.get_eth_usd_price()
+            except CannotGetPrice:
+                return self.binance_client.get_eth_usd_price()
 
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     @cache_memoize(60 * 30, prefix='balances-get_token_eth_value')  # 30 minutes
@@ -321,7 +243,7 @@ class BalanceService:
             try:
                 return self.curve_oracle.get_pool_token_price(token_address)
             except CannotGetPriceFromOracle:
-                return self.get_coingecko_token_usd_price(token_address)
+                return self.coingecko_client.get_token_price(token_address)
         return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))

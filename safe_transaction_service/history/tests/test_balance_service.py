@@ -12,25 +12,30 @@ from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
 
+from safe_transaction_service.tokens.clients import (BinanceClient,
+                                                     CannotGetPrice,
+                                                     CoingeckoClient,
+                                                     KrakenClient,
+                                                     KucoinClient)
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
-from ..services.balance_service import BalanceWithFiat, CannotGetEthereumPrice
+from ..services.balance_service import BalanceWithFiat
 from .factories import EthereumEventFactory, SafeContractFactory
 from .utils import just_test_if_mainnet_node
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
-    @mock.patch.object(BalanceService, 'get_eth_usd_price_kraken', return_value=0.4)
-    @mock.patch.object(BalanceService, 'get_eth_usd_price_binance', return_value=0.5)
+    @mock.patch.object(KrakenClient, 'get_eth_usd_price', return_value=0.4)
+    @mock.patch.object(BinanceClient, 'get_eth_usd_price', return_value=0.5)
     def test_get_eth_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
         balance_service = BalanceServiceProvider()
         eth_usd_price = balance_service.get_eth_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
         binance_mock.assert_not_called()
 
-        kraken_mock.side_effect = CannotGetEthereumPrice
+        kraken_mock.side_effect = CannotGetPrice
 
         # Cache is still working
         eth_usd_price = balance_service.get_eth_price()
@@ -42,35 +47,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
-    def test_get_dai_usd_price_kraken(self) -> float:
-        just_test_if_mainnet_node()
-        balance_service = BalanceServiceProvider()
-
-        # Binance is used
-        price = balance_service.get_dai_usd_price_kraken()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
-
-    def test_get_eth_usd_price_binance(self):
-        just_test_if_mainnet_node()
-        balance_service = BalanceServiceProvider()
-
-        # Binance is used
-        eth_usd_price = balance_service.get_eth_usd_price_binance()
-        self.assertIsInstance(eth_usd_price, float)
-        self.assertGreater(eth_usd_price, 0)
-
-    def test_get_eth_usd_price_kraken(self):
-        just_test_if_mainnet_node()
-        balance_service = BalanceServiceProvider()
-
-        # Kraken is used
-        eth_usd_price = balance_service.get_eth_usd_price_kraken()
-        self.assertIsInstance(eth_usd_price, float)
-        self.assertGreater(eth_usd_price, 0)
-
-    @mock.patch.object(BalanceService, 'get_ewt_usd_price_kucoin', return_value=5.)
-    @mock.patch.object(BalanceService, 'get_ewt_usd_price_coingecko', return_value=3.)
+    @mock.patch.object(KucoinClient, 'get_ewt_usd_price', return_value=5.)
+    @mock.patch.object(CoingeckoClient, 'get_ewt_usd_price', return_value=3.)
     def test_get_ewt_usd_price(self, get_ewt_usd_price_coingecko_mock: MagicMock,
                                get_ewt_usd_price_kucoin_mock: MagicMock):
         balance_service = BalanceServiceProvider()
@@ -78,25 +56,9 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         price = balance_service.get_ewt_usd_price()
         self.assertEqual(price, 5.)
 
-        get_ewt_usd_price_kucoin_mock.side_effect = CannotGetEthereumPrice
+        get_ewt_usd_price_kucoin_mock.side_effect = CannotGetPrice
         price = balance_service.get_ewt_usd_price()
         self.assertEqual(price, 3.)
-
-    def test_get_ewt_usd_price_coingecko(self) -> float:
-        just_test_if_mainnet_node()
-        balance_service = BalanceServiceProvider()
-
-        price = balance_service.get_ewt_usd_price_coingecko()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
-
-    def test_get_ewt_usd_price_kucoin(self) -> float:
-        just_test_if_mainnet_node()
-        balance_service = BalanceServiceProvider()
-
-        price = balance_service.get_ewt_usd_price_kucoin()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
 
     def test_token_eth_value(self):
         mainnet_node = just_test_if_mainnet_node()
