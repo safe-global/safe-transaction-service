@@ -243,7 +243,10 @@ class BalanceService:
             try:
                 return self.curve_oracle.get_pool_token_price(token_address)
             except CannotGetPriceFromOracle:
-                return self.coingecko_client.get_token_price(token_address)
+                try:
+                    return self.coingecko_client.get_token_price(token_address)
+                except CannotGetPrice:
+                    pass
         return 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
