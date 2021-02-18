@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -6,6 +5,7 @@ from eth_typing import ChecksumAddress
 from web3.exceptions import ContractLogicError
 
 from gnosis.eth import EthereumClient
+from gnosis.eth.constants import NULL_ADDRESS
 
 
 @dataclass
@@ -23,12 +23,12 @@ class UniswapPoolMetadata:
     decimals: int
 
 
-class ZerionTokenAdapterClient(ABC):
+class ZerionTokenAdapterClient:
     """
     Client for Zerion Token Adapter
     https://github.com/zeriontech/defi-sdk
     """
-    abi = [{'inputs': [{'internalType': 'address', 'name': 'token', 'type': 'address'}],
+    ABI = [{'inputs': [{'internalType': 'address', 'name': 'token', 'type': 'address'}],
             'name': 'getComponents',
             'outputs': [{'components': [{'internalType': 'address',
                                          'name': 'token',
@@ -53,15 +53,12 @@ class ZerionTokenAdapterClient(ABC):
                          'type': 'tuple'}],
             'stateMutability': 'view',
             'type': 'function'}]
+    ADAPTER_ADDRESS: ChecksumAddress = ChecksumAddress(NULL_ADDRESS)
 
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self, ethereum_client: EthereumClient, adapter_address: Optional[ChecksumAddress] = None):
         self.ethereum_client = ethereum_client
-        self.contract = ethereum_client.w3.eth.contract(self.mainnet_address, abi=self.abi)
-
-    @property
-    @abstractmethod
-    def mainnet_address(self) -> ChecksumAddress:
-        raise NotImplementedError
+        self.adapter_address = adapter_address if adapter_address else self.ADAPTER_ADDRESS
+        self.contract = ethereum_client.w3.eth.contract(self.adapter_address, abi=self.ABI)
 
     def get_components(self, token_address: ChecksumAddress) -> Optional[List[UniswapComponent]]:
         try:
@@ -78,6 +75,4 @@ class ZerionTokenAdapterClient(ABC):
 
 
 class ZerionUniswapV2TokenAdapterClient(ZerionTokenAdapterClient):
-    @property
-    def mainnet_address(self) -> ChecksumAddress:
-        return ChecksumAddress('0x6C5D49157863f942A5E6115aaEAb7d6A67a852d3')
+    ADAPTER_ADDRESS: ChecksumAddress = ChecksumAddress('0x6C5D49157863f942A5E6115aaEAb7d6A67a852d3')
