@@ -66,12 +66,13 @@ jobs:
         CELERY_BROKER_URL: redis://localhost:6379/0
         ETHEREUM_MAINNET_NODE: ${{ secrets.ETHEREUM_MAINNET_NODE }}
         COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Required for coveralls
         PIPENV_DONT_LOAD_ENV: 1  # By default pipenv loads .env file
     - name: Send results to coveralls
+      if: ${{ env.COVERALLS_REPO_TOKEN }}
       run: pipenv run coveralls
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Required for coveralls
   docker-deploy:
     runs-on: ubuntu-latest
     needs: test-app
