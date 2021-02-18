@@ -16,7 +16,7 @@ class UniswapComponent:
 
 
 @dataclass
-class UniswapPoolMetadata:
+class ZerionPoolMetadata:
     address: ChecksumAddress
     name: str
     symbol: str
@@ -67,12 +67,16 @@ class ZerionTokenAdapterClient:
         except ContractLogicError:
             return None
 
-    def get_metadata(self, token_address: ChecksumAddress) -> Optional[UniswapPoolMetadata]:
+    def get_metadata(self, token_address: ChecksumAddress) -> Optional[ZerionPoolMetadata]:
         try:
-            return UniswapPoolMetadata(*self.contract.functions.getMetadata(token_address).call())
+            return ZerionPoolMetadata(*self.contract.functions.getMetadata(token_address).call())
         except ContractLogicError:
             return None
 
 
 class ZerionUniswapV2TokenAdapterClient(ZerionTokenAdapterClient):
     ADAPTER_ADDRESS: ChecksumAddress = ChecksumAddress('0x6C5D49157863f942A5E6115aaEAb7d6A67a852d3')
+
+
+class BalancerTokenAdapterClient(ZerionTokenAdapterClient):
+    ADAPTER_ADDRESS: ChecksumAddress = ChecksumAddress('0xb45c5AE417F70E4C52DFB784569Ce843a45FE8ca')

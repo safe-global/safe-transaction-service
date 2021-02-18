@@ -14,14 +14,14 @@ logger = get_task_logger(__name__)
 
 
 @app.shared_task()
-def fix_uniswap_pool_tokens_task() -> Optional[int]:
+def fix_pool_tokens_task() -> Optional[int]:
     ethereum_client = EthereumClientProvider()
     ethereum_network = ethereum_client.get_network()
     if ethereum_network == EthereumNetwork.MAINNET:
         try:
-            number = Token.objects.fix_uniswap_pool_tokens()
+            number = Token.pool_tokens.fix_all_pool_tokens()
             if number:
-                logger.info('%d uniswap pool token names were fixed', number)
+                logger.info('%d pool token names were fixed', number)
             return number
         finally:
             close_gevent_db_connection()

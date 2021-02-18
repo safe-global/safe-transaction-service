@@ -7,7 +7,7 @@ from gnosis.eth import EthereumClient
 from safe_transaction_service.history.tests.utils import \
     just_test_if_mainnet_node
 
-from ...clients.zerion_client import (UniswapComponent, UniswapPoolMetadata,
+from ...clients.zerion_client import (UniswapComponent, ZerionPoolMetadata,
                                       ZerionUniswapV2TokenAdapterClient)
 
 
@@ -29,10 +29,10 @@ class TestZerionClient(TestCase):
         self.assertEqual(components, expected)
 
         metadata = client.get_metadata(owl_pool_address)
-        expected = UniswapPoolMetadata(address='0xBA6329EAe69707D6A0F273Bd082f4a0807A6B011',
-                                       name='OWL/USDC Pool',
-                                       symbol='UNI-V2',
-                                       decimals=18)
+        expected = ZerionPoolMetadata(address='0xBA6329EAe69707D6A0F273Bd082f4a0807A6B011',
+                                      name='OWL/USDC Pool',
+                                      symbol='UNI-V2',
+                                      decimals=18)
         self.assertEqual(metadata, expected)
 
         random_address = Account.create().address

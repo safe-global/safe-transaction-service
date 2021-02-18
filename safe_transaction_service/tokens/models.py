@@ -9,17 +9,26 @@ from django.db.models import Q
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.django.models import EthereumAddressField
 
-from safe_transaction_service.tokens.clients.zerion_client import \
-    ZerionUniswapV2TokenAdapterClient
+from .clients.zerion_client import (BalancerTokenAdapterClient,
+                                    ZerionTokenAdapterClient,
+                                    ZerionUniswapV2TokenAdapterClient)
 
 logger = logging.getLogger(__name__)
 
 
-class TokenManager(models.Manager):
-    def create(self, **kwargs):
-        for field in ('name', 'symbol'):
-            kwargs[field] = kwargs[field][:60]
-        return super().create(**kwargs)
+class PoolTokenManager(models.Manager):
+    def fix_all_pool_tokens(self):
+        return self.fix_uniswap_pool_tokens() + self.fix_balancer_pool_tokens()
+
+    def _fix_pool_tokens(self, name: str, zerion_client: ZerionTokenAdapterClient):
+        updated = 0
+        for token in self.filter(name=name):
+            if metadata := zerion_client.get_metadata(token.address):
+                token.name = name + ' ' + metadata.name
+                token.name = token.name[:60]
+                token.save(update_fields=['name'])
+                updated += 1
+        return updated
 
     def fix_uniswap_pool_tokens(self) -> int:
         """
@@ -27,13 +36,22 @@ class TokenManager(models.Manager):
         :return: Number of pool tokens fixed
         """
         zerion_client = ZerionUniswapV2TokenAdapterClient(EthereumClientProvider())
-        updated = 0
-        for token in self.filter(name='Uniswap V2'):
-            if metadata := zerion_client.get_metadata(token.address):
-                token.name = 'Uniswap V2 ' + metadata.name
-                token.save(update_fields=['name'])
-                updated += 1
-        return updated
+        return self._fix_pool_tokens('Uniswap V2', zerion_client)
+
+    def fix_balancer_pool_tokens(self) -> int:
+        """
+        All Uniswap V2 tokens have the same name: "Uniswap V2". This method will return better names
+        :return: Number of pool tokens fixed
+        """
+        zerion_client = BalancerTokenAdapterClient(EthereumClientProvider())
+        return self._fix_pool_tokens('Balancer Pool Token', zerion_client)
+
+
+class TokenManager(models.Manager):
+    def create(self, **kwargs):
+        for field in ('name', 'symbol'):
+            kwargs[field] = kwargs[field][:60]
+        return super().create(**kwargs)
 
 
 class TokenQuerySet(models.QuerySet):
@@ -55,6 +73,7 @@ class TokenQuerySet(models.QuerySet):
 
 class Token(models.Model):
     objects = TokenManager.from_queryset(TokenQuerySet)()
+    pool_tokens = PoolTokenManager()
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
