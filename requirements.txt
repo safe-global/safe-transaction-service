@@ -1,4 +1,4 @@
-boto3==1.17.7
+boto3==1.17.10
 cachetools==4.2.1
 celery==5.0.5
 django-authtools==1.7.0
