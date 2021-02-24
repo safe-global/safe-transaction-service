@@ -32,8 +32,7 @@ from .decoder_abis.compound import comptroller_abi, ctoken_abi
 from .decoder_abis.gnosis_protocol import (fleet_factory_abi,
                                            fleet_factory_deterministic_abi,
                                            gnosis_protocol_abi)
-from .decoder_abis.gnosis_safe import (gnosis_safe_allowance_module_abi,
-                                       gnosis_safe_decoding_test_abi)
+from .decoder_abis.gnosis_safe import gnosis_safe_allowance_module_abi
 from .decoder_abis.idle import idle_token_v3
 from .decoder_abis.maker_dao import maker_dao_abis
 from .decoder_abis.open_zeppelin import (
@@ -223,10 +222,10 @@ class TxDecoder(SafeTxDecoder):
     Decode MultiSend and use some hardcoded ABIs (Gnosis contracts, erc20/721 tokens...)
     """
     @cached_property
-    def multisend_fn_selectors(self) -> Dict[bytes, AbiType]:
-        return self._generate_selectors_with_abis_from_abis(self.get_multisend_abis())
+    def multisend_fn_selectors_with_abis(self) -> Dict[bytes, AbiType]:
+        return self._generate_selectors_with_abis_from_abis(self._get_multisend_abis())
 
-    def get_multisend_abis(self):
+    def _get_multisend_abis(self):
         return [get_multi_send_contract(self.dummy_w3).abi]
 
     def get_supported_abis(self) -> List[AbiType]:
@@ -263,24 +262,20 @@ class TxDecoder(SafeTxDecoder):
         erc_contracts = [get_erc721_contract(self.dummy_w3).abi,
                          get_erc20_contract(self.dummy_w3).abi]
 
-        test_contracts = [
-            gnosis_safe_decoding_test_abi
-        ]  # https://rinkeby.etherscan.io/address/0x479adf13cc2e1844451f71dcf0bf5194df53b14b#code
-
         timelock_contracts = [
             timelock_abi
         ]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list
         # will take preference
-        return (test_contracts + timelock_contracts
+        return (timelock_contracts
                 + initializable_admin_upgradeability_proxy_contracts + aave_contracts
                 + balancer_contracts + chainlink_contracts + idle_contracts
                 + maker_dao_contracts + request_contracts + sablier_contracts + snapshot_contracts
                 + open_zeppelin_contracts
                 + compound_contracts + exchanges
                 + sight_contracts + gnosis_protocol + gnosis_safe + erc_contracts
-                + self.get_multisend_abis() + supported_abis)
+                + self._get_multisend_abis() + supported_abis)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -304,7 +299,7 @@ class TxDecoder(SafeTxDecoder):
         fn_name, parameters = super().decode_transaction_with_types(data)
         data = HexBytes(data)
 
-        if data[:4] in self.multisend_fn_selectors:
+        if data[:4] in self.multisend_fn_selectors_with_abis:
             # If multisend, decode the transactions
             parameters[0]['value_decoded'] = self.get_data_decoded_for_multisend(data)
 
