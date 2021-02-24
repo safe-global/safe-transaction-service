@@ -20,14 +20,10 @@ urlpatterns = [
          name='analytics-multisig-txs-by-origin'),
     path('safes/<str:address>/', views.SafeInfoView.as_view(),
          name='safe-info'),
-    path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
-         name='multisig-transactions'),  # DEPRECATED, use `multisig-transactions`
     path('safes/<str:address>/multisig-transactions/', views.SafeMultisigTransactionListView.as_view(),
-         name='multisig-transactions-alias'),
+         name='multisig-transactions'),
     path('safes/<str:address>/all-transactions/', views.AllTransactionsListView.as_view(),
          name='all-transactions'),
-    path('safes/<str:address>/incoming-transactions/', views.SafeIncomingTransferListView.as_view(),
-         name='incoming-transactions'),  # DEPRECATED, use `incoming-transfers`
     path('safes/<str:address>/incoming-transfers/', views.SafeIncomingTransferListView.as_view(),
          name='incoming-transfers'),
     path('safes/<str:address>/transfers/', views.SafeTransferListView.as_view(),
@@ -46,10 +42,8 @@ urlpatterns = [
          name='safe-delegates'),
     path('safes/<str:address>/delegates/<str:delegate_address>/', views.SafeDelegateDestroyView.as_view(),
          name='safe-delegate'),
-    path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
-         name='multisig-transaction'),  # DEPRECATED, use `multisig-transactions/`
     path('multisig-transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
-         name='multisig-transaction-alias'),
+         name='multisig-transaction'),
     path('multisig-transactions/<str:safe_tx_hash>/confirmations/', views.SafeMultisigConfirmationsView.as_view(),
          name='multisig-transaction-confirmations'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
