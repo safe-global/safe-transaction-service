@@ -1499,3 +1499,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:owners', args=(owner_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(response.data['safes'], [safe_status.address, safe_status_2.address])
+
+    def test_data_decoder_view(self):
+        response = self.client.post(reverse('v1:data-decoder'), format='json', data={'data': '0x12'})
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        response = self.client.post(reverse('v1:data-decoder'), format='json', data={'data': '0x12121212'})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        add_owner_with_threshold_data = HexBytes('0x0d582f130000000000000000000000001b9a0da11a5cace4e7035993cbb2e4'
+                                                 'b1b3b164cf000000000000000000000000000000000000000000000000000000'
+                                                 '0000000001')
+        response = self.client.post(reverse('v1:data-decoder'), format='json',
+                                    data={'data': add_owner_with_threshold_data.hex()})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

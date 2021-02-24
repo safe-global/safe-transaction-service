@@ -85,10 +85,11 @@ def get_safe_tx_decoder() -> 'SafeTxDecoder':
 
 
 class SafeTxDecoder:
+    """
+    Decode simple txs for Safe contracts. No multisend or nested transactions are decoded
+    """
     dummy_w3 = Web3()
-    """
-    Decode simple txs for Safe contracts.
-    """
+
     def __init__(self):
         logger.info('%s: Loading contract ABIs for decoding', self.__class__.__name__)
         self.fn_selectors_with_abis: Dict[bytes, AbiType] = self._generate_selectors_with_abis_from_abis(
@@ -153,7 +154,6 @@ class SafeTxDecoder:
         :return:
         """
         try:
-            data = HexBytes(data)
             fn_name, parameters = self.decode_transaction_with_types(data)
             return {'method': fn_name,
                     'parameters': parameters}
@@ -169,6 +169,7 @@ class SafeTxDecoder:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
+        data = HexBytes(data)
         fn_name, parameters = self._decode_transaction(data)
         return fn_name, [{'name': name, 'type': argument_type, 'value': value}
                          for name, argument_type, value in parameters]
@@ -283,7 +284,8 @@ class TxDecoder(SafeTxDecoder):
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
-        Decode integers also
+        Add custom parsing to the decoded function arguments. Converts numbers to strings and recursively parses lists
+        tuples and sets.
         :param value_decoded:
         :return:
         """
@@ -299,17 +301,17 @@ class TxDecoder(SafeTxDecoder):
         """
         Add support for multisend and Gnosis Safe `execTransaction`
         """
-        data = HexBytes(data)
         fn_name, parameters = super().decode_transaction_with_types(data)
+        data = HexBytes(data)
 
-        # If multisend, decode the transactions
         if data[:4] in self.multisend_fn_selectors:
+            # If multisend, decode the transactions
             parameters[0]['value_decoded'] = self.get_data_decoded_for_multisend(data)
 
-        # If Gnosis Safe `execTransaction` decode the inner transaction
-        # function execTransaction(address to, uint256 value, bytes calldata data...)
-        # selector is `0x6a761202` and parameters[2] is data
-        if data[:4] == HexBytes('0x6a761202') and len(parameters) > 2 and (data := HexBytes(parameters[2]['value'])):
+        elif data[:4] == HexBytes('0x6a761202') and len(parameters) > 2 and (data := HexBytes(parameters[2]['value'])):
+            # If Gnosis Safe `execTransaction` decode the inner transaction
+            # function execTransaction(address to, uint256 value, bytes calldata data...)
+            # selector is `0x6a761202` and parameters[2] is data
             try:
                 parameters[2]['value_decoded'] = self.get_data_decoded(data)
             except TxDecoderException:

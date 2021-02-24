@@ -48,6 +48,8 @@ urlpatterns = [
          name='multisig-transaction-confirmations'),
     path('owners/<str:address>/', views.OwnersView.as_view(),
          name='owners'),
+    path('data-decoder/', views.DataDecoderView.as_view(),
+         name='data-decoder'),
 
     # Contracts
     path('contracts/', contract_views.ContractsView.as_view(), name='contracts'),

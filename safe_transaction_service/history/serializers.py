@@ -310,6 +310,10 @@ class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
         return obj
 
 
+class DataDecoderSerializer(serializers.Serializer):
+    data = HexadecimalField(allow_null=False, allow_blank=False, min_length=4)
+
+
 # ================================================ #
 #            Response Serializers
 # ================================================ #
