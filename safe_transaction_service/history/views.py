@@ -26,6 +26,7 @@ from . import filters, pagination, serializers
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,
                      MultisigTransaction, SafeContract, SafeContractDelegate,
                      SafeMasterCopy, SafeStatus, TransferDict)
+from .serializers import get_data_decoded_from_data
 from .services import (BalanceServiceProvider, SafeServiceProvider,
                        TransactionServiceProvider)
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -583,3 +584,27 @@ class OwnersView(APIView):
         serializer = self.serializer_class(data={'safes': safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class DataDecoderView(APIView):
+    def get_serializer_class(self):
+        return serializers.DataDecoderSerializer
+
+    @swagger_auto_schema(responses={200: 'Decoded data',
+                                    404: 'Cannot find function selector to decode data',
+                                    422: 'Invalid data'})
+    def post(self, request, format=None):
+        """
+        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
+        """
+
+        serializer = self.get_serializer_class()(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
+        else:
+            data_decoded = get_data_decoded_from_data(serializer.data['data'])
+            if data_decoded:
+                return Response(status=status.HTTP_200_OK, data=data_decoded)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND, data=data_decoded)
