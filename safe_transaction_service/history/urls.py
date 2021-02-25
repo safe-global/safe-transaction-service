@@ -20,6 +20,8 @@ urlpatterns = [
          name='analytics-multisig-txs-by-origin'),
     path('safes/<str:address>/', views.SafeInfoView.as_view(),
          name='safe-info'),
+    path('safes/<str:address>/transactions/', views.SafeMultisigTransactionListView.as_view(),
+         name='multisig-transactions-alias'),
     path('safes/<str:address>/multisig-transactions/', views.SafeMultisigTransactionListView.as_view(),
          name='multisig-transactions'),
     path('safes/<str:address>/all-transactions/', views.AllTransactionsListView.as_view(),
