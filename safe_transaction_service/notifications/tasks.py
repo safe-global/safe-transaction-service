@@ -138,8 +138,13 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
             multisig_transaction_id=safe_tx_hash
         ).values_list('owner', flat=True)
         safe_status = SafeStatus.objects.last_for_address(address)
+
         if not safe_status:
             logger.info('Cannot find threshold information for safe=%s', address)
+            return 0, 0
+
+        if safe_status.threshold == 1:
+            logger.info('No need to send confirmation notification for safe=%s with threshold=1', address)
             return 0, 0
 
         if safe_status.threshold <= len(confirmed_owners):

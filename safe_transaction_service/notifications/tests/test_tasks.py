@@ -84,7 +84,13 @@ class TestViews(TestCase):
             self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
             self.assertIn('Cannot find threshold information', cm.output[0])
 
-        SafeStatusFactory(address=safe_address, threshold=threshold, owners=owners)
+        safe_status = SafeStatusFactory(address=safe_address, threshold=1, owners=owners)
+        with self.assertLogs(logger=task_logger) as cm:
+            self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+            self.assertIn('No need to send confirmation notification for ', cm.output[0])
+
+        safe_status.threshold = threshold
+        safe_status.save(update_fields=['threshold'])
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
             self.assertIn('No cloud messaging tokens found', cm.output[0])
