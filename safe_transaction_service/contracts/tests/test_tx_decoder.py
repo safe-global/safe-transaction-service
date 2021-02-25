@@ -168,7 +168,7 @@ class TestTxDecoder(TestCase):
              }
         ]
         # Get just the multisend object
-        self.assertEqual(tx_decoder.get_data_decoded_for_multisend(data), expected)
+        self.assertEqual(tx_decoder._get_data_decoded_for_multisend(data), expected)
 
         # Now decode all the data
         expected = ('multiSend',
@@ -223,7 +223,7 @@ class TestTxDecoder(TestCase):
                         '8a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000'
                         '000000')
         tx_decoder = get_tx_decoder()
-        self.assertEqual(tx_decoder.get_data_decoded_for_multisend(data), [])
+        self.assertEqual(tx_decoder._get_data_decoded_for_multisend(data), [])
         self.assertEqual(tx_decoder.decode_transaction_with_types(data),
                          ('multiSend', [{'name': 'transactions', 'type': 'bytes', 'value': '0x', 'value_decoded': []}]))
 
