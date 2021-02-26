@@ -8,6 +8,7 @@ from django.db.models import Q
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
+from redis import Redis
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -24,9 +25,11 @@ from safe_transaction_service.tokens.clients import (BinanceClient,
                                                      KrakenClient,
                                                      KucoinClient)
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.tasks import calculate_token_eth_price
 
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
+from ..utils import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,7 @@ class BalanceServiceProvider:
         if not hasattr(cls, 'instance'):
             from django.conf import settings
             cls.instance = BalanceService(EthereumClientProvider(),
+                                          get_redis(),
                                           settings.ETH_UNISWAP_FACTORY_ADDRESS,
                                           settings.ETH_KYBER_NETWORK_PROXY_ADDRESS)
         return cls.instance
@@ -82,9 +86,10 @@ class BalanceServiceProvider:
 
 
 class BalanceService:
-    def __init__(self, ethereum_client: EthereumClient,
+    def __init__(self, ethereum_client: EthereumClient, redis: Redis,
                  uniswap_factory_address: str, kyber_network_proxy_address: str):
         self.ethereum_client = ethereum_client
+        self.redis = redis
         self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient()
         self.kraken_client = KrakenClient()
@@ -209,6 +214,17 @@ class BalanceService:
             except CannotGetPrice:
                 return self.binance_client.get_eth_usd_price()
 
+    def get_cached_token_eth_value(self, token_address: str) -> float:
+        cache_key = f'balance-service:{token_address}:eth-price'
+        if eth_value := self.redis.get(cache_key):
+            return float(eth_value)
+        else:
+            result = calculate_token_eth_price.delay(token_address, cache_key)
+            if result.ready():
+                return float(result.get())
+            else:
+                return 0.0
+
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     @cache_memoize(60 * 30, prefix='balances-get_token_eth_value')  # 30 minutes
     def get_token_eth_value(self, token_address: str) -> float:
@@ -286,7 +302,7 @@ class BalanceService:
                 fiat_conversion = eth_value
                 fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
-                token_to_eth_price = self.get_token_eth_value(token_address)
+                token_to_eth_price = self.get_cached_token_eth_value(token_address)
                 if token_to_eth_price:
                     fiat_conversion = eth_value * token_to_eth_price
                 else:  # Use curve/coingecko as last resource

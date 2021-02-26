@@ -18,6 +18,7 @@ from safe_transaction_service.tokens.clients import (BinanceClient,
                                                      KrakenClient,
                                                      KucoinClient)
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.tasks import BalanceAlternativeService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceService, BalanceServiceProvider
@@ -103,7 +104,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.symbol, token_db.symbol)
         self.assertEqual(token_info.decimals, token_db.decimals)
 
-    @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(BalanceAlternativeService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(BalanceService, 'get_eth_price', return_value=123.4, autospec=True)
     def test_get_usd_balances(self, get_eth_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         balance_service = BalanceServiceProvider()
