@@ -17,6 +17,7 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..exceptions import NodeConnectionError
@@ -735,8 +736,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                                            'logoUri': Token.objects.first().get_full_logo_uri()}}])
 
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
-    @mock.patch.object(BalanceService, 'get_token_eth_value', return_value=0.4, autospec=True)
-    @mock.patch.object(BalanceService, 'get_eth_price', return_value=123.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_price', return_value=123.4, autospec=True)
     def test_safe_balances_usd_view(self, get_eth_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
                                     get_token_info_mock: MagicMock):
         safe_address = Account.create().address
