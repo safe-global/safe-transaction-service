@@ -29,10 +29,6 @@ Configure the parameters needed on `.env`. These parameters **need to be changed
 - `ETHEREUM_TRACING_NODE_URL`: Http/s address of an OpenEthereum node with
 [tracing enabled](https://openethereum.github.io/JSONRPC-trace-module).
 
-If you need the Usd conversion for tokens don't forget to configure:
-- `ETH_UNISWAP_FACTORY_ADDRESS`: Checksummed address of Uniswap Factory contract.
-- `ETH_KYBER_NETWORK_PROXY_ADDRESS`: Checksummed address of Kyber Network Proxy contract.
-
 If you don't want to use `trace_filter` for the internal tx indexing and just rely on `trace_block`, set:
 - `ETH_INTERNAL_NO_FILTER=1`
 

@@ -55,8 +55,6 @@ class AboutView(APIView):
                 'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
                 'ETH_INTERNAL_NO_FILTER': settings.ETH_INTERNAL_NO_FILTER,
                 'ETH_REORG_BLOCKS': settings.ETH_REORG_BLOCKS,
-                'ETH_UNISWAP_FACTORY_ADDRESS': settings.ETH_UNISWAP_FACTORY_ADDRESS,
-                'ETH_KYBER_NETWORK_PROXY_ADDRESS': settings.ETH_KYBER_NETWORK_PROXY_ADDRESS,
                 'TOKENS_LOGO_BASE_URI': settings.TOKENS_LOGO_BASE_URI,
                 'TOKENS_LOGO_EXTENSION': settings.TOKENS_LOGO_EXTENSION,
             }
