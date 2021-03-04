@@ -23,21 +23,21 @@ from ..services.price_service import PriceService, PriceServiceProvider
 class TestPriceService(TestCase):
     @mock.patch.object(KrakenClient, 'get_eth_usd_price', return_value=0.4)
     @mock.patch.object(BinanceClient, 'get_eth_usd_price', return_value=0.5)
-    def test_get_eth_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
+    def test_get_eth_usd_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
         price_service = PriceServiceProvider()
-        eth_usd_price = price_service.get_eth_price()
+        eth_usd_price = price_service.get_eth_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
         binance_mock.assert_not_called()
 
         kraken_mock.side_effect = CannotGetPrice
 
         # Cache is still working
-        eth_usd_price = price_service.get_eth_price()
+        eth_usd_price = price_service.get_eth_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
 
         # Remove cache and test binance is called
         price_service.cache_eth_price.clear()
-        eth_usd_price = price_service.get_eth_price()
+        eth_usd_price = price_service.get_eth_usd_price()
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 

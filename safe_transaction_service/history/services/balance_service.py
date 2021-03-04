@@ -2,12 +2,13 @@ import logging
 import operator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Optional, Sequence, Iterator
+from typing import Iterator, List, Optional, Sequence
 
 from django.db.models import Q
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
+from eth_typing import ChecksumAddress
 from redis import Redis
 from web3 import Web3
 
@@ -32,7 +33,7 @@ class BalanceServiceException(Exception):
 
 @dataclass
 class Erc20InfoWithLogo:
-    address: str
+    address: ChecksumAddress
     name: str
     symbol: str
     decimals: int
@@ -49,7 +50,7 @@ class Erc20InfoWithLogo:
 
 @dataclass
 class Balance:
-    token_address: Optional[str]  # For ether, `token_address` is `None`
+    token_address: Optional[ChecksumAddress]  # For ether, `token_address` is `None`
     token: Optional[Erc20InfoWithLogo]
     balance: int
 
@@ -84,7 +85,8 @@ class BalanceService:
     def ethereum_network(self):
         return self.ethereum_client.get_network()
 
-    def _filter_addresses(self, erc20_addresses: Sequence[str], only_trusted: bool, exclude_spam: bool) -> List[str]:
+    def _filter_addresses(self, erc20_addresses: Sequence[ChecksumAddress],
+                          only_trusted: bool, exclude_spam: bool) -> List[ChecksumAddress]:
         """
         :param erc20_addresses:
         :param only_trusted:
@@ -112,7 +114,8 @@ class BalanceService:
 
         return addresses
 
-    def get_balances(self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
+    def get_balances(self, safe_address: ChecksumAddress,
+                     only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -145,7 +148,7 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_cached_token_eth_values(self, token_addresses: Sequence[str]) -> Iterator[float]:
+    def get_cached_token_eth_values(self, token_addresses: Sequence[ChecksumAddress]) -> Iterator[float]:
         """
         Get token eth prices if ready on cache. If not, schedule tasks to do the calculation so next time is available
         on cache and return 0.
@@ -155,6 +158,8 @@ class BalanceService:
         cache_keys = [f'balance-service:{token_address}:eth-price' for token_address in token_addresses]
         eth_values = self.redis.mget(cache_keys)
         for token_address, cache_key, eth_value in zip(token_addresses, cache_keys, eth_values):
+            if not token_address:  # Ether, this will not be used
+                yield 1.  # Even if not used, Ether value in ether is 1 :)
             if eth_value:
                 yield float(eth_value)
             else:
@@ -166,7 +171,7 @@ class BalanceService:
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
-    def get_token_info(self, token_address: str) -> Optional[Erc20InfoWithLogo]:
+    def get_token_info(self, token_address: ChecksumAddress) -> Optional[Erc20InfoWithLogo]:
         try:
             token = Token.objects.get(address=token_address)
             return Erc20InfoWithLogo.from_token(token)
@@ -182,7 +187,7 @@ class BalanceService:
                 logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
                 return None
 
-    def get_usd_balances(self, safe_address: str, only_trusted: bool = False,
+    def get_usd_balances(self, safe_address: ChecksumAddress, only_trusted: bool = False,
                          exclude_spam: bool = False) -> List[BalanceWithFiat]:
         """
         All this could be more optimal (e.g. batching requests), but as everything is cached
@@ -193,10 +198,10 @@ class BalanceService:
         :return: List of BalanceWithFiat
         """
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
-        eth_price = self.price_service.get_eth_price()
+        eth_price = self.price_service.get_eth_usd_price()
         balances_with_usd = []
-        token_addresses = [balance.token_address for balance in balances if balance.token_address]
-        token_eth_values = [0.] + list(self.get_cached_token_eth_values(token_addresses))  # Ether 0. value is not used
+        token_addresses = [balance.token_address for balance in balances]
+        token_eth_values = self.get_cached_token_eth_values(token_addresses)
         for balance, token_to_eth_price in zip(balances, token_eth_values):
             token_address = balance.token_address
             if not token_address:  # Ether

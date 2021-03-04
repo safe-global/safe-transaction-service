@@ -52,6 +52,6 @@ def calculate_token_eth_price(token_address: str, redis_key: str) -> Optional[fl
         if not eth_price:  # Try usd oracles
             usd_price = price_service.get_token_usd_price(token_address)
             if usd_price:
-                eth_price = usd_price / price_service.get_eth_price()
+                eth_price = usd_price / price_service.get_eth_usd_price()
         redis.setex(redis_key, 60 * 30, eth_price)  # Expire in 30 minutes
         return eth_price

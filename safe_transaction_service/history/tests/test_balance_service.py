@@ -34,8 +34,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.decimals, token_db.decimals)
 
     @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
-    @mock.patch.object(PriceService, 'get_eth_price', return_value=123.4, autospec=True)
-    def test_get_usd_balances(self, get_eth_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         balance_service = BalanceServiceProvider()
 
         safe_address = Account.create().address

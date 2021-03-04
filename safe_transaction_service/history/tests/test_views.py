@@ -737,8 +737,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
-    @mock.patch.object(PriceService, 'get_eth_price', return_value=123.4, autospec=True)
-    def test_safe_balances_usd_view(self, get_eth_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    def test_safe_balances_usd_view(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
                                     get_token_info_mock: MagicMock):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')

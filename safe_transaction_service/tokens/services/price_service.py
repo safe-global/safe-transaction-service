@@ -5,6 +5,7 @@ from typing import Tuple
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from celery.utils.log import get_task_logger
+from eth_typing import ChecksumAddress
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -80,8 +81,8 @@ class PriceService:
             return self.coingecko_client.get_ewt_usd_price()
 
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
-    @cache_memoize(60 * 30, prefix='balances-get_eth_price')  # 30 minutes
-    def get_eth_price(self) -> float:
+    @cache_memoize(60 * 30, prefix='balances-get_eth_usd_price')  # 30 minutes
+    def get_eth_usd_price(self) -> float:
         """
         Get USD price for Ether. It depends on the ethereum network:
             - On mainnet, use ETH/USD
@@ -104,7 +105,7 @@ class PriceService:
 
     @cachedmethod(cache=operator.attrgetter('cache_token_eth_value'))
     @cache_memoize(60 * 30, prefix='balances-get_token_eth_value')  # 30 minutes
-    def get_token_eth_value(self, token_address: str) -> float:
+    def get_token_eth_value(self, token_address: ChecksumAddress) -> float:
         """
         Uses multiple decentralized and centralized oracles to get token prices
         :param token_address:
@@ -130,9 +131,10 @@ class PriceService:
 
     @cachedmethod(cache=operator.attrgetter('cache_token_usd_value'))
     @cache_memoize(60 * 30, prefix='balances-get_token_usd_price')  # 30 minutes
-    def get_token_usd_price(self, token_address: str) -> float:
+    def get_token_usd_price(self, token_address: ChecksumAddress) -> float:
         """
-        Return current usd value for a given `token_address` using Curve, if not use Coingecko as last resource
+        :param token_address:
+        :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
         if self.ethereum_network == EthereumNetwork.MAINNET:
             try:
