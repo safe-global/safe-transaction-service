@@ -158,7 +158,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             'image': 'https://ipfs.io/ipfs/QmXKU5RBTrGaYn5M1iWQaeKuCKV34g417YDGN5Yh7Uxk4i'
         }
 
-        try:
-            self.assertEqual(collectibles_service._retrieve_metadata_from_uri(ipfs_address), expected_object)
-        except MetadataRetrievalException:
-            self.skipTest('Cannot connect to IPFS gateway')
+        # try:
+        self.assertEqual(collectibles_service._retrieve_metadata_from_uri(ipfs_address), expected_object)
+        # except MetadataRetrievalException:
+        #    self.skipTest('Cannot connect to IPFS gateway')

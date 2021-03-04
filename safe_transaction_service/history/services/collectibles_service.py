@@ -117,7 +117,7 @@ class CollectiblesService:
     }
     ENS_IMAGE_FILENAME = 'ENS.png'
     ENS_IMAGE_URL = f'https://gnosis-safe-token-logos.s3.amazonaws.com/{ENS_IMAGE_FILENAME}'
-    IPFS_GATEWAY = 'https://ipfs.io/'
+    IPFS_GATEWAY = 'https://cloudflare-ipfs.com/'
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
