@@ -2,7 +2,7 @@ import logging
 import operator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Iterator
 
 from django.db.models import Q
 
@@ -145,22 +145,24 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_cached_token_eth_value(self, token_address: str) -> float:
+    def get_cached_token_eth_values(self, token_addresses: Sequence[str]) -> Iterator[float]:
         """
-        Get token eth price if ready on cache. If not, schedule a task to do the calculation so next time is available
-        on cache and return 0 (unless calculation is ready))
-        :param token_address:
-        :return: eth price if ready on cache, `0` otherwise
+        Get token eth prices if ready on cache. If not, schedule tasks to do the calculation so next time is available
+        on cache and return 0.
+        :param token_addresses:
+        :return: eth prices if ready on cache, `0.` otherwise
         """
-        cache_key = f'balance-service:{token_address}:eth-price'
-        if eth_value := self.redis.get(cache_key):
-            return float(eth_value)
-        else:
-            result = calculate_token_eth_price.delay(token_address, cache_key)
-            if result.ready():
-                return float(result.get())
+        cache_keys = [f'balance-service:{token_address}:eth-price' for token_address in token_addresses]
+        eth_values = self.redis.mget(cache_keys)
+        for token_address, cache_key, eth_value in zip(token_addresses, cache_keys, eth_values):
+            if eth_value:
+                yield float(eth_value)
             else:
-                return 0.0
+                task_result = calculate_token_eth_price.delay(token_address, cache_key)
+                if task_result.ready():
+                    yield float(task_result.get())
+                else:
+                    yield 0.
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
@@ -191,19 +193,18 @@ class BalanceService:
         :return: List of BalanceWithFiat
         """
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
-        eth_value = self.price_service.get_eth_price()
+        eth_price = self.price_service.get_eth_price()
         balances_with_usd = []
-        for balance in balances:
+        token_addresses = [balance.token_address for balance in balances if balance.token_address]
+        token_eth_values = [0.] + list(self.get_cached_token_eth_values(token_addresses))  # Ether 0. value is not used
+        for balance, token_to_eth_price in zip(balances, token_eth_values):
             token_address = balance.token_address
             if not token_address:  # Ether
-                fiat_conversion = eth_value
+                fiat_conversion = eth_price
                 fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
-                token_to_eth_price = self.get_cached_token_eth_value(token_address)
                 if token_to_eth_price:
-                    fiat_conversion = eth_value * token_to_eth_price
-                else:  # Use curve/coingecko as last resource
-                    fiat_conversion = self.price_service.get_token_usd_price(token_address)
+                    fiat_conversion = eth_price * token_to_eth_price
 
                 balance_with_decimals = balance.balance / 10**balance.token.decimals
                 fiat_balance = fiat_conversion * balance_with_decimals
