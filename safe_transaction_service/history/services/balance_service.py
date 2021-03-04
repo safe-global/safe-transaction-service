@@ -160,7 +160,7 @@ class BalanceService:
         for token_address, cache_key, eth_value in zip(token_addresses, cache_keys, eth_values):
             if not token_address:  # Ether, this will not be used
                 yield 1.  # Even if not used, Ether value in ether is 1 :)
-            if eth_value:
+            elif eth_value:
                 yield float(eth_value)
             else:
                 task_result = calculate_token_eth_price.delay(token_address, cache_key)
