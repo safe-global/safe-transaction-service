@@ -15,8 +15,7 @@ from safe_transaction_service.tokens.tests.factories import TokenFactory
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
                                              CollectibleWithMetadata,
-                                             Erc721InfoWithLogo,
-                                             MetadataRetrievalException)
+                                             Erc721InfoWithLogo)
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
@@ -158,7 +157,4 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             'image': 'https://ipfs.io/ipfs/QmXKU5RBTrGaYn5M1iWQaeKuCKV34g417YDGN5Yh7Uxk4i'
         }
 
-        # try:
         self.assertEqual(collectibles_service._retrieve_metadata_from_uri(ipfs_address), expected_object)
-        # except MetadataRetrievalException:
-        #    self.skipTest('Cannot connect to IPFS gateway')

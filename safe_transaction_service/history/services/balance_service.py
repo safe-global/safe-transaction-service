@@ -201,16 +201,14 @@ class BalanceService:
         eth_price = self.price_service.get_eth_usd_price()
         balances_with_usd = []
         token_addresses = [balance.token_address for balance in balances]
-        token_eth_values = self.get_cached_token_eth_values(token_addresses)
-        for balance, token_to_eth_price in zip(balances, token_eth_values):
+        token_eth_prices = self.get_cached_token_eth_values(token_addresses)
+        for balance, token_to_eth_price in zip(balances, token_eth_prices):
             token_address = balance.token_address
             if not token_address:  # Ether
                 fiat_conversion = eth_price
                 fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
-                if token_to_eth_price:
-                    fiat_conversion = eth_price * token_to_eth_price
-
+                fiat_conversion = eth_price * token_to_eth_price
                 balance_with_decimals = balance.balance / 10**balance.token.decimals
                 fiat_balance = fiat_conversion * balance_with_decimals
 
