@@ -44,6 +44,8 @@ urlpatterns = [
          name='safe-delegates'),
     path('safes/<str:address>/delegates/<str:delegate_address>/', views.SafeDelegateDestroyView.as_view(),
          name='safe-delegate'),
+    path('transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
+         name='multisig-transaction-alias'),
     path('multisig-transactions/<str:safe_tx_hash>/', views.SafeMultisigTransactionDetailView.as_view(),
          name='multisig-transaction'),
     path('multisig-transactions/<str:safe_tx_hash>/confirmations/', views.SafeMultisigConfirmationsView.as_view(),
