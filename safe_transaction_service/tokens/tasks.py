@@ -1,6 +1,8 @@
 
 from typing import Optional
 
+from django.conf import settings
+
 from celery import app
 from celery.utils.log import get_task_logger
 
@@ -43,15 +45,15 @@ def calculate_token_eth_price(token_address: str, redis_key: str) -> Optional[fl
     :return: token price (in ether) when calculated
     """
     redis = get_redis()
-    cache_key = f'balance-service:{token_address}:eth-price'
-    if eth_value := redis.get(cache_key):
-        return float(eth_value)
-    else:
-        price_service = PriceServiceProvider()
-        eth_price = price_service.get_token_eth_value(token_address)
-        if not eth_price:  # Try usd oracles
-            usd_price = price_service.get_token_usd_price(token_address)
-            if usd_price:
-                eth_price = usd_price / price_service.get_eth_usd_price()
-        redis.setex(redis_key, 60 * 30, eth_price)  # Expire in 30 minutes
-        return eth_price
+    price_service = PriceServiceProvider()
+    eth_price = price_service.get_token_eth_value(token_address)
+    if not eth_price:  # Try usd oracles
+        usd_price = price_service.get_token_usd_price(token_address)
+        if usd_price:
+            eth_usd_price = price_service.get_eth_usd_price()
+            eth_price = usd_price / eth_usd_price
+    redis_expiration_time = 60 * 30  # Expire in 30 minutes
+    redis.setex(redis_key, redis_expiration_time, eth_price)
+    if eth_price and not settings.CELERY_ALWAYS_EAGER:  # Recalculate price before cache expires and prevents recursion
+        calculate_token_eth_price.apply_async((token_address, redis_key), countdown=redis_expiration_time - 300)
+    return eth_price
