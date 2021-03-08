@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
@@ -6,12 +7,16 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 
-from gnosis.eth import EthereumClientProvider
+from eth_typing import ChecksumAddress
+
+from gnosis.eth import (EthereumClientProvider, InvalidERC20Info,
+                        InvalidERC721Info)
 from gnosis.eth.django.models import EthereumAddressField
 
 from .clients.zerion_client import (BalancerTokenAdapterClient,
                                     ZerionTokenAdapterClient,
                                     ZerionUniswapV2TokenAdapterClient)
+from .constants import ENS_CONTRACTS_WITH_TLD
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +57,37 @@ class TokenManager(models.Manager):
         for field in ('name', 'symbol'):
             kwargs[field] = kwargs[field][:60]
         return super().create(**kwargs)
+
+    def create_from_blockchain(self, token_address: ChecksumAddress) -> Optional['Token']:
+        ethereum_client = EthereumClientProvider()
+        if token_address in ENS_CONTRACTS_WITH_TLD:  # Special case for ENS
+            return self.create(address=token_address,
+                               name='Ethereum Name Service',
+                               symbol='ENS',
+                               logo_uri='ENS.png',
+                               decimals=None,
+                               trusted=True)
+        try:
+            logger.debug('Querying blockchain for info for erc20 token=%s', token_address)
+            erc_info = ethereum_client.erc20.get_info(token_address)
+            decimals = erc_info.decimals
+        except InvalidERC20Info:
+            logger.debug('Erc20 token not found, querying blockchain for info for erc721 token=%s', token_address)
+            try:
+                erc_info = ethereum_client.erc721.get_info(token_address)
+                decimals = None
+            except InvalidERC721Info:
+                logger.debug('Cannot find anything on blockchain for token=%s', token_address)
+                return None
+
+        # If symbol is way bigger than name (by 5 characters), swap them (e.g. POAP)
+        name, symbol = erc_info.name, erc_info.symbol
+        if (len(name) - len(symbol)) < -5:
+            name, symbol = symbol, name
+        return self.create(address=token_address,
+                           name=name,
+                           symbol=symbol,
+                           decimals=decimals)
 
 
 class TokenQuerySet(models.QuerySet):

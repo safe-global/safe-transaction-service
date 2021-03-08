@@ -63,6 +63,10 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         get_token_info_mock.side_effect = None
         get_token_info_mock.return_value = Erc20Info('UXIO', 'UXI', 18)
         response = self.client.get(reverse('v1:token', args=(random_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(Token.objects.count(), 1)
+
+        response = self.client.get(reverse('v1:token', args=(random_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Token.objects.count(), 1)
 

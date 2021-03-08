@@ -5,6 +5,7 @@ from django.conf import settings
 
 from celery import app
 from celery.utils.log import get_task_logger
+from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
@@ -16,6 +17,30 @@ from .models import Token
 from .services.price_service import PriceServiceProvider
 
 logger = get_task_logger(__name__)
+
+
+@app.shared_task()
+def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str) -> Optional[float]:
+    """
+    Do price calculation for token in an async way and store it on redis
+    :param token_address: Token address
+    :param redis_key: Redis key for token price
+    :return: token price (in ether) when calculated
+    """
+    redis = get_redis()
+    price_service = PriceServiceProvider()
+    eth_price = price_service.get_token_eth_value(token_address)
+    if not eth_price:  # Try usd oracles
+        usd_price = price_service.get_token_usd_price(token_address)
+        if usd_price:
+            eth_usd_price = price_service.get_eth_usd_price()
+            eth_price = usd_price / eth_usd_price
+    redis_expiration_time = 60 * 30  # Expire in 30 minutes
+    redis.setex(redis_key, redis_expiration_time, eth_price)
+    if eth_price and not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
+        # Recalculate price before cache expires and prevents recursion checking Celery Eager property
+        calculate_token_eth_price.apply_async((token_address, redis_key), countdown=redis_expiration_time - 300)
+    return eth_price
 
 
 @app.shared_task()
@@ -37,24 +62,16 @@ def fix_pool_tokens_task() -> Optional[int]:
 
 
 @app.shared_task()
-def calculate_token_eth_price(token_address: str, redis_key: str) -> Optional[float]:
+def get_token_info_from_blockchain(token_address: ChecksumAddress) -> bool:
     """
-    Do price calculation for token in an async way and store it on redis
-    :param token_address: Token address
-    :param redis_key: Redis key for token price
-    :return: token price (in ether) when calculated
+    Retrieve token information from blockchain
+    :param token_address:
+    :return: `True` if found, `False` otherwise
     """
     redis = get_redis()
-    price_service = PriceServiceProvider()
-    eth_price = price_service.get_token_eth_value(token_address)
-    if not eth_price:  # Try usd oracles
-        usd_price = price_service.get_token_usd_price(token_address)
-        if usd_price:
-            eth_usd_price = price_service.get_eth_usd_price()
-            eth_price = usd_price / eth_usd_price
-    redis_expiration_time = 60 * 30  # Expire in 30 minutes
-    redis.setex(redis_key, redis_expiration_time, eth_price)
-    if eth_price and not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
-        # Recalculate price before cache expires and prevents recursion checking Celery Eager property
-        calculate_token_eth_price.apply_async((token_address, redis_key), countdown=redis_expiration_time - 300)
-    return eth_price
+    key = f'token-task:{token_address}'
+    if result := redis.get(key):
+        return bool(int(result))
+    token_found = bool(Token.objects.create_from_blockchain(token_address))
+    redis.setex(key, 60 * 60 * 6, int(token_found))  # Cache result 6 hours
+    return token_found

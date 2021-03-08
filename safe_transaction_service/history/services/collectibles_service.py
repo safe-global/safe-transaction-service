@@ -11,8 +11,9 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.ethereum_client import Erc721Info, InvalidERC721Info
 
+from safe_transaction_service.tokens.constants import (
+    CRYPTO_KITTIES_CONTRACT_ADDRESSES, ENS_CONTRACTS_WITH_TLD)
 from safe_transaction_service.tokens.models import Token
 
 from ..clients import EnsClient
@@ -108,15 +109,7 @@ class CollectiblesServiceProvider:
 
 
 class CollectiblesService:
-    CRYPTO_KITTIES_CONTRACT_ADDRESSES = {
-        '0x06012c8cf97BEaD5deAe237070F9587f8E7A266d',  # Mainnet
-        '0x16baF0dE678E52367adC69fD067E5eDd1D33e3bF'  # Rinkeby
-    }
-    ENS_CONTRACTS_WITH_TLD = {
-        '0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85': 'eth',  # ENS .eth registrar (Every network)
-    }
-    ENS_IMAGE_FILENAME = 'ENS.png'
-    ENS_IMAGE_URL = f'https://gnosis-safe-token-logos.s3.amazonaws.com/{ENS_IMAGE_FILENAME}'
+    ENS_IMAGE_URL = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
     IPFS_GATEWAY = 'https://cloudflare-ipfs.com/'
 
     def __init__(self, ethereum_client: EthereumClient):
@@ -158,7 +151,7 @@ class CollectiblesService:
     def build_collectible(self, token_info: Optional[Erc721InfoWithLogo], token_address: str, token_id: int,
                           token_metadata_uri: Optional[str]) -> Collectible:
         if not token_metadata_uri:
-            if token_address in self.CRYPTO_KITTIES_CONTRACT_ADDRESSES:
+            if token_address in CRYPTO_KITTIES_CONTRACT_ADDRESSES:
                 token_metadata_uri = f'https://api.cryptokitties.co/kitties/{token_id}'
             else:
                 logger.info('Not available token_uri to retrieve metadata for ERC721 token=%s with token-id=%d',
@@ -169,7 +162,7 @@ class CollectiblesService:
         return Collectible(name, symbol, logo_uri, token_address, token_id, token_metadata_uri)
 
     def get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
-        if tld := self.ENS_CONTRACTS_WITH_TLD.get(collectible.address):  # Special case for ENS
+        if tld := ENS_CONTRACTS_WITH_TLD.get(collectible.address):  # Special case for ENS
             label_name = self.ens_service.query_by_domain_hash(collectible.id)
             return {
                 'name': f'{label_name}.{tld}' if label_name else f'.{tld}',
@@ -273,29 +266,8 @@ class CollectiblesService:
             token = Token.objects.get(address=token_address)
             return Erc721InfoWithLogo.from_token(token)
         except Token.DoesNotExist:
-            logo_uri = ''
-            trusted = False
-            if token_address in self.ENS_CONTRACTS_WITH_TLD:
-                token_info = Erc721Info('Ethereum Name Service', 'ENS')
-                logo_uri = self.ENS_IMAGE_FILENAME
-                trusted = True
-            else:
-                token_info = self.retrieve_token_info(token_address)
-
-            # If symbol is way bigger than name, swap them (e.g. POAP)
-            if token_info:
-                if (len(token_info.name) - len(token_info.symbol)) < -5:
-                    token_info = Erc721Info(token_info.symbol, token_info.name)
-
-                token = Token.objects.create(address=token_address,
-                                             name=token_info.name,
-                                             symbol=token_info.symbol,
-                                             decimals=None,
-                                             logo_uri=logo_uri,
-                                             trusted=trusted)
+            if token := Token.objects.create_from_blockchain(token_address):
                 return Erc721InfoWithLogo.from_token(token)
-
-        return token_info
 
     def get_token_uris(self, addresses_with_token_ids: Sequence[Tuple[str, int]]) -> List[Optional[str]]:
         """
@@ -316,15 +288,3 @@ class CollectiblesService:
 
         return [self.cache_token_uri[address_with_token_id]
                 for address_with_token_id in addresses_with_token_ids]
-
-    def retrieve_token_info(self, token_address: str) -> Optional[Erc721Info]:
-        """
-        Queries blockchain for the token name and symbol
-        :param token_address: address for a erc721 token
-        :return: tuple with name and symbol of the erc721 token
-        """
-        try:
-            logger.debug('Querying blockchain for info for token=%s', token_address)
-            return self.ethereum_client.erc721.get_info(token_address)
-        except InvalidERC721Info:
-            logger.warning('Cannot get erc721 token info for token-address=%s', token_address)

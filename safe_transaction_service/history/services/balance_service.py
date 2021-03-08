@@ -13,7 +13,6 @@ from redis import Redis
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.ethereum_client import InvalidERC20Info
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
@@ -176,14 +175,9 @@ class BalanceService:
             token = Token.objects.get(address=token_address)
             return Erc20InfoWithLogo.from_token(token)
         except Token.DoesNotExist:
-            try:
-                erc20_info = self.ethereum_client.erc20.get_info(token_address)
-                token = Token.objects.create(address=token_address,
-                                             name=erc20_info.name,
-                                             symbol=erc20_info.symbol,
-                                             decimals=erc20_info.decimals)
+            if token := Token.objects.create_from_blockchain(token_address):
                 return Erc20InfoWithLogo.from_token(token)
-            except InvalidERC20Info:
+            else:
                 logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
                 return None
 
