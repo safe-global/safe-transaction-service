@@ -14,13 +14,13 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
+from ...tokens.constants import ENS_CONTRACTS_WITH_TLD
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
                                              CollectibleWithMetadata,
                                              Erc721InfoWithLogo)
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
-from ...tokens.constants import ENS_CONTRACTS_WITH_TLD
 
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):

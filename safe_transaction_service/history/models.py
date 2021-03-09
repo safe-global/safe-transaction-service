@@ -974,6 +974,10 @@ class SafeContract(models.Model):
         return f'Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}'
 
     @property
+    def created(self):
+        return self.ethereum_tx.block.timestamp
+
+    @property
     def created_block_number(self) -> Optional[Type[int]]:
         if self.ethereum_tx:
             return self.ethereum_tx.block_id
@@ -1099,6 +1103,7 @@ class WebHookType(Enum):
     INCOMING_ETHER = 3
     INCOMING_TOKEN = 4
     CONFIRMATION_REQUEST = 5
+    SAFE_CREATED = 6
 
 
 class WebHookQuerySet(models.QuerySet):
@@ -1115,6 +1120,7 @@ class WebHook(models.Model):
     pending_outgoing_transaction = models.BooleanField(default=True)
     new_executed_outgoing_transaction = models.BooleanField(default=True)
     new_incoming_transaction = models.BooleanField(default=True)
+    new_safe = models.BooleanField(default=True)
 
     class Meta:
         unique_together = (('address', 'url'),)
