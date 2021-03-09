@@ -432,10 +432,12 @@ class SafeDelegateDestroyView(DestroyAPIView):
                                  safe_contract_id=self.kwargs['address'],
                                  delegate=self.kwargs['delegate_address'])
 
-    @swagger_auto_schema(responses={204: 'Deleted',
-                                    400: 'Malformed data',
-                                    404: 'Delegate not found',
-                                    422: 'Invalid Ethereum address/Error processing data'})
+    @swagger_auto_schema(
+        request_body=serializer_class(),
+        responses={204: 'Deleted',
+                   400: 'Malformed data',
+                   404: 'Delegate not found',
+                   422: 'Invalid Ethereum address/Error processing data'})
     def delete(self, request, address, delegate_address, *args, **kwargs):
         """
         Delete a delegate for a Safe. Signature is built the same way that for adding a delegate.
