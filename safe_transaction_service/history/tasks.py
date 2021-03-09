@@ -236,6 +236,8 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             elif webhook_type in (WebHookType.INCOMING_TOKEN,
                                   WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
                 continue
+            elif webhook_type == WebHookType.SAFE_CREATED and not webhook.new_safe:
+                continue
 
             parsed_url = urlparse(webhook.url)
             host = f'{parsed_url.scheme}://{parsed_url.netloc}'

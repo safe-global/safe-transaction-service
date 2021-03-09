@@ -12,7 +12,7 @@ from hexbytes import HexBytes
 from safe_transaction_service.notifications.tasks import send_notification_task
 
 from .models import (EthereumEvent, InternalTx, MultisigConfirmation,
-                     MultisigTransaction, WebHookType)
+                     MultisigTransaction, SafeContract, WebHookType)
 from .tasks import send_webhook_task
 
 
@@ -100,6 +100,13 @@ def build_webhook_payload(sender: Type[Model],
         for element in ('tokenId', 'value'):
             if element in instance.arguments:
                 payload[element] = str(instance.arguments[element])
+    elif sender == SafeContract:  # Safe created
+        payload = {
+            'address': instance.address,
+            'type': WebHookType.SAFE_CREATED.name,
+            'txHash': HexBytes(instance.ethereum_tx_id).hex(),
+            'blockNumber': instance.created_block_number,
+        }
 
     return payload
 
@@ -131,8 +138,9 @@ def is_valid_webhook(sender: Type[Model],
 @receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
 @receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')
 @receiver(post_save, sender=InternalTx, dispatch_uid='internal_tx.process_webhook')
+@receiver(post_save, sender=SafeContract, dispatch_uid='safe_contract.process_webhook')
 def process_webhook(sender: Type[Model],
-                    instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction],
+                    instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction, SafeContract],
                     created: bool, **kwargs) -> None:
     if is_valid_webhook(sender, instance, created):
         # Don't send information for older than 10 minutes transactions
