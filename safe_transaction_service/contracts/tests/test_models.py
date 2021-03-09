@@ -6,9 +6,10 @@ from django.db import IntegrityError
 from django.db.transaction import atomic
 from django.test import TestCase
 
+from gnosis.eth.clients import Sourcify
 from gnosis.eth.ethereum_client import EthereumNetwork
 
-from ..clients import EtherscanApi, Sourcify
+from ..clients import EtherscanApi
 from ..models import Contract, validate_abi
 from .mocks import sourcify_safe_metadata
 

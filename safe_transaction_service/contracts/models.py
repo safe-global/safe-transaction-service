@@ -13,10 +13,11 @@ from botocore.exceptions import ClientError
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
 
+from gnosis.eth.clients import Sourcify
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
-from .clients import EtherscanApi, Sourcify
+from .clients import EtherscanApi
 from .clients.etherscan_api import EtherscanApiConfigurationError
 
 logger = getLogger(__name__)
