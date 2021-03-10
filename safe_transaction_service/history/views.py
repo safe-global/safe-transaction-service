@@ -13,7 +13,7 @@ from rest_framework import status
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import (DestroyAPIView, GenericAPIView,
                                      ListAPIView, ListCreateAPIView,
-                                     RetrieveAPIView, get_object_or_404)
+                                     RetrieveAPIView, get_object_or_404, CreateAPIView)
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -608,3 +608,33 @@ class DataDecoderView(GenericAPIView):
                 return Response(status=status.HTTP_200_OK, data=data_decoded)
             else:
                 return Response(status=status.HTTP_404_NOT_FOUND, data=data_decoded)
+
+
+class SafeMultisigTransactionEstimateView(CreateAPIView):
+    serializer_class = serializers.SafeMultisigTransactionEstimateSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['safe_address'] = self.kwargs['address']
+        return context
+
+    @swagger_auto_schema(responses={200: serializers.SafeMultisigTransactionEstimateResponseSerializer,
+                                    400: 'Data not valid',
+                                    404: 'Safe not found',
+                                    422: 'Safe address checksum not valid/Tx not valid'})
+    def post(self, request, address):
+        """
+        Estimates a Safe Multisig Transaction. `operational_gas` and `data_gas` are deprecated, use `base_gas` instead
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        request.data['safe'] = address
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer(data=serializer.save())
+            response_serializer.is_valid(raise_exception=True)
+            return Response(status=status.HTTP_200_OK, data=response_serializer.data)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)

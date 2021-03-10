@@ -230,6 +230,21 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         return multisig_transaction
 
 
+class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
+    to = EthereumAddressField()
+    value = serializers.IntegerField(min_value=0)
+    data = HexadecimalField(default=None, allow_null=True, allow_blank=True)
+    operation = serializers.IntegerField(min_value=0)
+
+    def save(self, **kwargs):
+        safe_address = self.context['safe_address']
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(safe_address, ethereum_client)
+        safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
+                                           self.validated_data['data'], self.validated_data['operation'])
+        return {'safe_tx_gas': safe_tx_gas}
+
+
 class SafeDelegateDeleteSerializer(serializers.Serializer):
     safe = EthereumAddressField()
     delegate = EthereumAddressField()
@@ -452,6 +467,10 @@ class SafeCollectibleResponseSerializer(serializers.Serializer):
     description = serializers.CharField()
     image_uri = serializers.CharField()
     metadata = serializers.DictField()
+
+
+class SafeMultisigTransactionEstimateResponseSerializer(serializers.Serializer):
+    safe_tx_gas = serializers.CharField()
 
 
 class SafeDelegateResponseSerializer(serializers.Serializer):

@@ -1517,3 +1517,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:data-decoder'), format='json',
                                     data={'data': add_owner_with_threshold_data.hex()})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_estimate_multisig_tx_view(self):
+        safe_address = Account.create().address
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                }
+        with mock.patch.object(Safe, 'estimate_tx_gas', return_value=52000, autospec=True) as estimate_tx_gas_mock:
+            response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                        format='json', data=data)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data, {'safe_tx_gas': str(estimate_tx_gas_mock.return_value)})
