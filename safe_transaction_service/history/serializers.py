@@ -435,6 +435,7 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
 
 
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
+    eth_value = serializers.CharField()
     fiat_balance = serializers.CharField()
     fiat_conversion = serializers.CharField()
     fiat_code = serializers.CharField()

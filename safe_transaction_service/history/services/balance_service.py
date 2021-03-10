@@ -56,6 +56,7 @@ class Balance:
 
 @dataclass
 class BalanceWithFiat(Balance):
+    eth_value: float  # Value in ether
     fiat_balance: float
     fiat_conversion: float
     fiat_code: str = 'USD'
@@ -195,22 +196,27 @@ class BalanceService:
         eth_price = self.price_service.get_eth_usd_price()
         balances_with_usd = []
         token_addresses = [balance.token_address for balance in balances]
-        token_eth_prices = self.get_cached_token_eth_values(token_addresses)
-        for balance, token_to_eth_price in zip(balances, token_eth_prices):
+        token_eth_values = self.get_cached_token_eth_values(token_addresses)
+        for balance, token_eth_value in zip(balances, token_eth_values):
             token_address = balance.token_address
             if not token_address:  # Ether
                 fiat_conversion = eth_price
                 fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
-                fiat_conversion = eth_price * token_to_eth_price
+                fiat_conversion = eth_price * token_eth_value
                 balance_with_decimals = balance.balance / 10**balance.token.decimals
                 fiat_balance = fiat_conversion * balance_with_decimals
 
-            balances_with_usd.append(BalanceWithFiat(balance.token_address,
-                                                     balance.token,
-                                                     balance.balance,
-                                                     round(fiat_balance, 4),
-                                                     round(fiat_conversion, 4),
-                                                     'USD'))
+            balances_with_usd.append(
+                BalanceWithFiat(
+                    balance.token_address,
+                    balance.token,
+                    balance.balance,
+                    token_eth_value,
+                    round(fiat_balance, 4),
+                    round(fiat_conversion, 4),
+                    'USD'
+                )
+            )
 
         return balances_with_usd

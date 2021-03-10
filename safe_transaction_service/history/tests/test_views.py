@@ -752,6 +752,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertIsNone(response.data[0]['token_address'])
         self.assertEqual(response.data[0]['balance'], str(value))
+        self.assertEqual(response.data[0]['eth_value'], '1.0')
 
         tokens_value = int(12 * 1e18)
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
@@ -771,6 +772,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             {'token_address': None,
              'token': None,
              'balance': str(value),
+             'eth_value': '1.0',
              'fiat_balance': '0.0',
              'fiat_conversion': '123.4',
              'fiat_code': 'USD',
@@ -778,6 +780,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             {'token_address': erc20.address,
              'token': token_dict,
              'balance': str(tokens_value),
+             'eth_value': '0.4',
              'fiat_balance': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
              'fiat_conversion': str(round(123.4 * 0.4, 4)),
              'fiat_code': 'USD',
