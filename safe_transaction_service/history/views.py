@@ -286,7 +286,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
@@ -598,7 +598,7 @@ class DataDecoderView(GenericAPIView):
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
 
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
@@ -612,28 +612,27 @@ class DataDecoderView(GenericAPIView):
 
 class SafeMultisigTransactionEstimateView(CreateAPIView):
     serializer_class = serializers.SafeMultisigTransactionEstimateSerializer
+    response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['safe_address'] = self.kwargs['address']
         return context
 
-    @swagger_auto_schema(responses={200: serializers.SafeMultisigTransactionEstimateResponseSerializer,
+    @swagger_auto_schema(responses={200: response_serializer,
                                     400: 'Data not valid',
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid/Tx not valid'})
-    def post(self, request, address):
+    def post(self, request, address, *args, **kwargs):
         """
         Estimates a Safe Multisig Transaction. `operational_gas` and `data_gas` are deprecated, use `base_gas` instead
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        request.data['safe'] = address
         serializer = self.get_serializer(data=request.data)
-
         if serializer.is_valid():
-            response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer(data=serializer.save())
+            response_serializer = self.response_serializer(data=serializer.save())
             response_serializer.is_valid(raise_exception=True)
             return Response(status=status.HTTP_200_OK, data=response_serializer.data)
         else:
