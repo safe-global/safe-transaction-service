@@ -1,5 +1,6 @@
 import uuid
 from enum import Enum
+from typing import List, Sequence
 
 from django.db import models
 
@@ -33,7 +34,19 @@ class FirebaseDevice(models.Model):
         return f'{device_name} {self.version} - {token}...'
 
 
+class FirebaseDeviceOwnerManager(models.Manager):
+    def get_devices_for_owners(self, owners: Sequence[str]) -> List[str]:
+        """
+        :param owners:
+        :return: List of devices for owners (unique)
+        """
+        return list(FirebaseDeviceOwner.objects.filter(
+            owner__in=owners
+        ).values_list('firebase_device__cloud_messaging_token', flat=True).distinct())
+
+
 class FirebaseDeviceOwner(models.Model):
+    objects = FirebaseDeviceOwnerManager()
     firebase_device = models.ForeignKey(FirebaseDevice, on_delete=models.CASCADE, related_name='owners')
     owner = EthereumAddressField(db_index=True)
 
