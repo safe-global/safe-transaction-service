@@ -11,13 +11,16 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import (DestroyAPIView, GenericAPIView,
-                                     ListAPIView, ListCreateAPIView,
-                                     RetrieveAPIView, get_object_or_404)
+from rest_framework.generics import (CreateAPIView, DestroyAPIView,
+                                     GenericAPIView, ListAPIView,
+                                     ListCreateAPIView, RetrieveAPIView,
+                                     get_object_or_404)
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
+
+from gnosis.safe import CannotEstimateGas
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.version import __version__
@@ -286,7 +289,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
 
         request.data['safe'] = address
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
@@ -598,7 +601,7 @@ class DataDecoderView(GenericAPIView):
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
 
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
@@ -608,3 +611,38 @@ class DataDecoderView(GenericAPIView):
                 return Response(status=status.HTTP_200_OK, data=data_decoded)
             else:
                 return Response(status=status.HTTP_404_NOT_FOUND, data=data_decoded)
+
+
+class SafeMultisigTransactionEstimateView(CreateAPIView):
+    serializer_class = serializers.SafeMultisigTransactionEstimateSerializer
+    response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['safe_address'] = self.kwargs['address']
+        return context
+
+    @swagger_auto_schema(responses={200: response_serializer,
+                                    400: 'Data not valid',
+                                    404: 'Safe not found',
+                                    422: 'Tx not valid'})
+    def post(self, request, address, *args, **kwargs):
+        """
+        Estimates a Safe Multisig Transaction. `operational_gas` and `data_gas` are deprecated, use `base_gas` instead
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        if not SafeContract.objects.filter(address=address).exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                response_serializer = self.response_serializer(data=serializer.save())
+                response_serializer.is_valid(raise_exception=True)
+                return Response(status=status.HTTP_200_OK, data=response_serializer.data)
+            except CannotEstimateGas:
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)

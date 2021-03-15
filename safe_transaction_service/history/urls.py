@@ -24,6 +24,8 @@ urlpatterns = [
          name='multisig-transactions-alias'),
     path('safes/<str:address>/multisig-transactions/', views.SafeMultisigTransactionListView.as_view(),
          name='multisig-transactions'),
+    path('safes/<str:address>/multisig-transactions/estimations/', views.SafeMultisigTransactionEstimateView.as_view(),
+         name='multisig-transaction-estimate'),
     path('safes/<str:address>/all-transactions/', views.AllTransactionsListView.as_view(),
          name='all-transactions'),
     path('safes/<str:address>/incoming-transfers/', views.SafeIncomingTransferListView.as_view(),

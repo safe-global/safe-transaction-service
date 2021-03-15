@@ -12,7 +12,7 @@ from rest_framework.test import APITestCase
 from web3 import Web3
 
 from gnosis.eth.ethereum_client import ParityManager
-from gnosis.safe import Safe
+from gnosis.safe import CannotEstimateGas, Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -1517,3 +1517,31 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:data-decoder'), format='json',
                                     data={'data': add_owner_with_threshold_data.hex()})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @mock.patch.object(Safe, 'estimate_tx_gas', return_value=52000, autospec=True)
+    def test_estimate_multisig_tx_view(self, estimate_tx_gas_mock: MagicMock):
+        safe_address = Account.create().address
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                }
+        response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                    format='json', data={})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {'safe_tx_gas': str(estimate_tx_gas_mock.return_value)})
+
+        estimate_tx_gas_mock.side_effect = CannotEstimateGas
+        response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
