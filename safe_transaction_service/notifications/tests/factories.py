@@ -18,6 +18,17 @@ class FirebaseDeviceFactory(DjangoModelFactory):
     device_type = 0
     version = factory.Sequence(lambda n: f'{n}.0.0')
 
+    @factory.post_generation
+    def safes(self, create, extracted, **kwargs):
+        if not create:
+            # Simple build, do nothing.
+            return
+
+        if extracted:
+            # A list of groups were passed in, use them
+            for safe_contract in extracted:
+                self.safes.add(safe_contract)
+
 
 class FirebaseDeviceOwnerFactory(DjangoModelFactory):
     class Meta:

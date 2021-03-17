@@ -35,12 +35,15 @@ class FirebaseDevice(models.Model):
 
 
 class FirebaseDeviceOwnerManager(models.Manager):
-    def get_devices_for_owners(self, owners: Sequence[str]) -> List[str]:
+    def get_devices_for_safe_and_owners(self, safe_address, owners: Sequence[str]) -> List[str]:
         """
+        :param safe_address:
         :param owners:
-        :return: List of devices for owners (unique)
+        :return: List of cloud messaging tokens for owners (unique) linked to a Safe. If owner is not linked to the
+        Safe it will not be returned
         """
-        return list(FirebaseDeviceOwner.objects.filter(
+        return list(self.filter(
+            firebase_device__safes__address=safe_address,
             owner__in=owners
         ).values_list('firebase_device__cloud_messaging_token', flat=True).distinct())
 

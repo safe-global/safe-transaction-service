@@ -2,7 +2,6 @@ import copyreg
 import logging
 import pickle
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 

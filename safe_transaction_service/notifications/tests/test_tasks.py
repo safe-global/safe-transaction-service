@@ -14,7 +14,7 @@ from safe_transaction_service.history.models import (EthereumTxCallType,
 from safe_transaction_service.history.signals import build_webhook_payload
 from safe_transaction_service.history.tests.factories import (
     InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory,
-    SafeStatusFactory)
+    SafeContractFactory, SafeStatusFactory)
 
 from ..tasks import (DuplicateNotification, filter_notification,
                      send_notification_owner_task, send_notification_task)
@@ -76,7 +76,8 @@ class TestViews(TestCase):
 
     def test_send_notification_owner_task(self):
         from ..tasks import logger as task_logger
-        safe_address = Account.create().address
+        safe_contract = SafeContractFactory()
+        safe_address = safe_contract.address
         threshold = 2
         owners = [Account.create().address for _ in range(2)]
         safe_tx_hash = Web3.keccak(text='hola').hex()
@@ -95,10 +96,12 @@ class TestViews(TestCase):
             self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
             self.assertIn('No cloud messaging tokens found', cm.output[0])
 
-        for owner in owners:
-            FirebaseDeviceOwnerFactory(owner=owner)
+        firebase_device_owner_factories = [FirebaseDeviceOwnerFactory(owner=owner) for owner in owners]
+        # Notification is not sent to both owners as they are not related to the safe address
+        self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
 
-        # Notification was sent to both owners
+        for firebase_device_owner in firebase_device_owner_factories:
+            firebase_device_owner.firebase_device.safes.add(safe_contract)
         self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (2, 0))
 
         # Duplicated notifications are not sent
