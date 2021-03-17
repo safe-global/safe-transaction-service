@@ -17,5 +17,5 @@ class KucoinClient:
         try:
             result = response.json()
             return float(result['data']['price'])
-        except (ValueError, ConnectionError) as e:
+        except (ValueError, IOError) as e:
             raise CannotGetPrice from e
