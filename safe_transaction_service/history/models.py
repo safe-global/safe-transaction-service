@@ -1060,7 +1060,7 @@ class SafeStatus(models.Model):
     internal_tx = models.OneToOneField(InternalTx, on_delete=models.CASCADE, related_name='safe_status',
                                        primary_key=True)
     address = EthereumAddressField(db_index=True)
-    owners = ArrayField(EthereumAddressField(), db_index=True)
+    owners = ArrayField(EthereumAddressField())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
     master_copy = EthereumAddressField()
@@ -1068,7 +1068,10 @@ class SafeStatus(models.Model):
     enabled_modules = ArrayField(EthereumAddressField(), default=list)
 
     class Meta:
-        indexes = [Index(fields=['address', '-nonce'])]  # Index on address and nonce DESC
+        indexes = [
+            Index(fields=['address', '-nonce']),   # Index on address and nonce DESC
+            GinIndex(fields=['owners'])
+        ]
         unique_together = (('internal_tx', 'address'),)
         verbose_name_plural = 'Safe statuses'
 
