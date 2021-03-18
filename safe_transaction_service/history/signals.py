@@ -11,8 +11,9 @@ from hexbytes import HexBytes
 
 from safe_transaction_service.notifications.tasks import send_notification_task
 
-from .models import (EthereumEvent, InternalTx, MultisigConfirmation,
-                     MultisigTransaction, SafeContract, WebHookType)
+from .models import (EthereumEvent, InternalTx, ModuleTransaction,
+                     MultisigConfirmation, MultisigTransaction, SafeContract,
+                     WebHookType)
 from .tasks import send_webhook_task
 
 
@@ -107,6 +108,13 @@ def build_webhook_payload(sender: Type[Model],
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
             'blockNumber': instance.created_block_number,
         }
+    elif sender == ModuleTransaction:
+        payload = {
+            'address': instance.safe,
+            'module': instance.module,
+            'type': WebHookType.MODULE_TRANSACTION.name,
+            'txHash': HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
+        }
 
     return payload
 
@@ -134,6 +142,7 @@ def is_valid_webhook(sender: Type[Model],
     return True
 
 
+@receiver(post_save, sender=ModuleTransaction, dispatch_uid='module_transaction.process_webhook')
 @receiver(post_save, sender=MultisigConfirmation, dispatch_uid='multisig_confirmation.process_webhook')
 @receiver(post_save, sender=MultisigTransaction, dispatch_uid='multisig_transaction.process_webhook')
 @receiver(post_save, sender=EthereumEvent, dispatch_uid='ethereum_event.process_webhook')

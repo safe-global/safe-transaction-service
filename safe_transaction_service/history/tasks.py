@@ -224,19 +224,9 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             return 0
 
         sent_requests = 0
+        webhook_type = WebHookType[payload['type']]
         for webhook in webhooks:
-            webhook_type = WebHookType[payload['type']]
-            if webhook_type == WebHookType.NEW_CONFIRMATION and not webhook.new_confirmation:
-                continue
-            elif webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION and not webhook.pending_outgoing_transaction:
-                continue
-            elif (webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION and not
-                  webhook.new_executed_outgoing_transaction):
-                continue
-            elif webhook_type in (WebHookType.INCOMING_TOKEN,
-                                  WebHookType.INCOMING_ETHER) and not webhook.new_incoming_transaction:
-                continue
-            elif webhook_type == WebHookType.SAFE_CREATED and not webhook.new_safe:
+            if not webhook.is_valid_for_webhook_type(webhook_type):
                 continue
 
             parsed_url = urlparse(webhook.url)
