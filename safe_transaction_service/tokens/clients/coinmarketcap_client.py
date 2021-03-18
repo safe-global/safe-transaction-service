@@ -6,7 +6,6 @@ from urllib.parse import urljoin
 
 import requests
 from eth_utils import to_checksum_address
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class CoinMarketCapClient:
 
         try:
             return self.http_session.get(url, headers=self.headers, params=parameters).json().get('data', [])
-        except (ConnectionError, Timeout, TooManyRedirects):
+        except IOError:
             logger.warning('Problem getting tokens from coinmarketcap', exc_info=True)
             return []
 

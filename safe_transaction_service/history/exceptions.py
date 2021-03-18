@@ -31,5 +31,5 @@ def custom_exception_handler(exc, context):
     return response
 
 
-class NodeConnectionError(Exception):
+class NodeConnectionError(IOError):
     pass

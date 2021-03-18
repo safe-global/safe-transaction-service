@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 from cache_memoize import cache_memoize
 from hexbytes import HexBytes
-from requests import ConnectionError, Timeout
 
 
 class EnsClient:
@@ -28,7 +27,7 @@ class EnsClient:
         """
         try:
             return not self.request_session.get(self.url, timeout=self.request_timeout).ok
-        except (Timeout, ConnectionError):
+        except IOError:
             return False
 
     @staticmethod
@@ -53,7 +52,7 @@ class EnsClient:
                 """.replace('domain_hash', domain_hash_str)
         try:
             r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
-        except (Timeout, ConnectionError):
+        except IOError:
             return None
 
         if not r.ok:
@@ -126,7 +125,7 @@ class EnsClient:
         }'''.replace('account_id', account.lower())
         try:
             r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
-        except (Timeout, ConnectionError):
+        except IOError:
             return None
 
         if not r.ok:
