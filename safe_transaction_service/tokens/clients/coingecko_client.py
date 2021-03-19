@@ -22,7 +22,7 @@ class CoingeckoClient:
                 raise CannotGetPrice
             # Result is returned with lowercased `token_address`
             price = response.json().get(name)
-            if price and 'usd' in price:
+            if price and price.get('usd'):
                 return price['usd']
             else:
                 raise CannotGetPrice(f'Price from url={url} is {price}')
