@@ -42,7 +42,7 @@ def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
         if eth_price:
             redis_expiration_time = 60 * 30  # Expire in 30 minutes
             redis.setex(redis_key, redis_expiration_time, eth_price)
-            if getattr(settings, 'CELERY_ALWAYS_EAGER', False):
+            if not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
                 # Recalculate price before cache expires and prevents recursion checking Celery Eager property
                 calculate_token_eth_price.apply_async((token_address, redis_key), {'force_recalculation': True},
                                                       countdown=redis_expiration_time - 300)
