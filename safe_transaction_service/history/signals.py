@@ -157,4 +157,4 @@ def process_webhook(sender: Type[Model],
         payload = build_webhook_payload(sender, instance)
         if payload and (address := payload.get('address')):
             send_webhook_task.delay(address, payload)
-            send_notification_task.apply_async(args=(address, payload), countdown=2)
+            send_notification_task.apply_async(args=(address, payload), countdown=5)
