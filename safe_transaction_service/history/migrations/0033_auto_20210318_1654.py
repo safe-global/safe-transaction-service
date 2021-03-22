@@ -3,6 +3,7 @@
 import django.contrib.postgres.fields
 import django.contrib.postgres.indexes
 from django.db import migrations
+
 import gnosis.eth.django.models
 
 

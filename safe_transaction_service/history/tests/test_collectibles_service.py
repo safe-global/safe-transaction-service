@@ -146,13 +146,17 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
     @mock.patch.object(Erc721Manager, 'get_token_uris', autospec=True)
     def test_get_token_uris(self, get_token_uris_mock: MagicMock):
-        get_token_uris_mock.return_value = ['http://testing.com/12', None, '']
+        token_uris = ['http://testing.com/12', None, '']
+        get_token_uris_mock.return_value = token_uris
         addresses_with_token_ids = [(Account.create(), i) for i in range(3)]
         collectibles_service = CollectiblesService(self.ethereum_client)
         self.assertFalse(collectibles_service.cache_token_uri)
         collectibles_service.get_token_uris(addresses_with_token_ids)
+
+        # Test cache
         self.assertEqual(len(collectibles_service.cache_token_uri), 3)
-        for address_with_token_id, token_uri in zip(addresses_with_token_ids, get_token_uris_mock.return_value):
+        get_token_uris_mock.return_value = []
+        for address_with_token_id, token_uri in zip(addresses_with_token_ids, token_uris):
             self.assertEqual(collectibles_service.cache_token_uri[address_with_token_id], token_uri)
 
     def test_retrieve_metadata_from_uri(self):
