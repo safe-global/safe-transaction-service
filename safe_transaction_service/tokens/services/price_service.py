@@ -10,11 +10,11 @@ from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
-from gnosis.eth.oracles import (BalancerOracle, CannotGetPriceFromOracle,
-                                CurveOracle, KyberOracle, MooniswapOracle,
-                                OracleException, SushiswapOracle,
-                                UniswapOracle, UniswapV2Oracle)
-from gnosis.eth.oracles.oracles import PriceOracle, PricePoolOracle
+from gnosis.eth.oracles import (BalancerOracle, CurveOracle, KyberOracle,
+                                MooniswapOracle, OracleException, PriceOracle,
+                                PricePoolOracle, SushiswapOracle,
+                                UniswapOracle, UniswapV2Oracle,
+                                UsdPricePoolOracle, YearnOracle)
 
 from safe_transaction_service.history.utils import get_redis
 
@@ -42,13 +42,14 @@ class PriceService:
         self.redis = redis
         self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient()
+        self.curve_oracle = CurveOracle(self.ethereum_client)  # Curve returns price in usd
         self.kraken_client = KrakenClient()
         self.kucoin_client = KucoinClient()
-        self.curve_oracle = CurveOracle(self.ethereum_client)  # Curve returns price in usd
         self.kyber_oracle = KyberOracle(self.ethereum_client)
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.uniswap_oracle = UniswapOracle(self.ethereum_client)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
+        self.yearn_oracle = YearnOracle(self.ethereum_client)
         self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.mooniswap_oracle = MooniswapOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
@@ -64,9 +65,16 @@ class PriceService:
             return self.kyber_oracle, self.uniswap_v2_oracle  # They provide versions in another networks
 
     @cached_property
-    def enabled_pool_price_oracles(self) -> Tuple[PricePoolOracle]:
+    def enabled_price_pool_oracles(self) -> Tuple[PricePoolOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
             return self.uniswap_v2_oracle, self.balancer_oracle, self.mooniswap_oracle
+        else:
+            return tuple()
+
+    @cached_property
+    def enabled_usd_price_pool_oracles(self) -> Tuple[UsdPricePoolOracle]:
+        if self.ethereum_network == EthereumNetwork.MAINNET:
+            return self.curve_oracle, self.yearn_oracle
         else:
             return tuple()
 
@@ -119,7 +127,7 @@ class PriceService:
                             oracle.__class__.__name__)
 
         # Try pool tokens
-        for oracle in self.enabled_pool_price_oracles:
+        for oracle in self.enabled_price_pool_oracles:
             try:
                 return oracle.get_pool_token_price(token_address)
             except OracleException:
@@ -136,12 +144,16 @@ class PriceService:
         :param token_address:
         :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
+        for oracle in self.enabled_usd_price_pool_oracles:
+            try:
+                return oracle.get_pool_token_price(token_address)
+            except OracleException:
+                logger.info('Cannot get eth value for token-address=%s from %s', token_address,
+                            oracle.__class__.__name__)
+
         if self.ethereum_network == EthereumNetwork.MAINNET:
             try:
-                return self.curve_oracle.get_pool_token_price(token_address)
-            except CannotGetPriceFromOracle:
-                try:
-                    return self.coingecko_client.get_token_price(token_address)
-                except CannotGetPrice:
-                    pass
+                return self.coingecko_client.get_token_price(token_address)
+            except CannotGetPrice:
+                pass
         return 0.
