@@ -146,7 +146,7 @@ class PriceService:
         """
         for oracle in self.enabled_usd_price_pool_oracles:
             try:
-                return oracle.get_pool_token_price(token_address)
+                return oracle.get_pool_usd_token_price(token_address)
             except OracleException:
                 logger.info('Cannot get eth value for token-address=%s from %s', token_address,
                             oracle.__class__.__name__)
