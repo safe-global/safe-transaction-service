@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.test import TestCase
+from django.utils import timezone
 
 from eth_account import Account
 
@@ -10,7 +11,8 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ..services import PriceService
-from ..tasks import calculate_token_eth_price, fix_pool_tokens_task
+from ..tasks import (EthValueWithTimestamp, calculate_token_eth_price,
+                     fix_pool_tokens_task)
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,11 @@ class TestTasks(TestCase):
         self.assertIsNone(fix_pool_tokens_task.delay().result)
 
     @mock.patch.object(PriceService, 'get_token_eth_value', autospec=True, return_value=4815)
-    def test_calculate_token_eth_price(self, get_token_eth_value_mock: MagicMock):
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_calculate_token_eth_price(self, timezone_now_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         random_token = Account.create().address
-        self.assertEqual(calculate_token_eth_price.delay('key', random_token).result,
-                         get_token_eth_value_mock.return_value)
+        expected = EthValueWithTimestamp(get_token_eth_value_mock.return_value, timezone_now_mock.return_value)
+        self.assertEqual(expected, calculate_token_eth_price.delay('key', random_token).result)
 
         with self.settings(CELERY_ALWAYS_EAGER=False):
             calculate_token_eth_price.delay('key', random_token)
