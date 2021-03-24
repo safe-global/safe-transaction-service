@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import Optional
 
 from django.conf import settings
+from django.utils import timezone
 
 from celery import app
 from celery.utils.log import get_task_logger
-from django.utils import timezone
 from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider
@@ -40,7 +40,7 @@ class EthValueWithTimestamp(object):
 def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
                               force_recalculation: bool = False) -> Optional[EthValueWithTimestamp]:
     """
-    Do price calculation for token in an async way and store it on redis
+    Do price calculation for token in an async way and store it with its timestamp on redis
     :param token_address: Token address
     :param redis_key: Redis key for token price
     :param force_recalculation: Force a new calculation even if an old one is on cache

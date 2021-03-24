@@ -4,6 +4,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.urls import reverse
+from django.utils import timezone
 
 from eth_account import Account
 from hexbytes import HexBytes
@@ -738,8 +739,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     @mock.patch.object(BalanceService, 'get_token_info', autospec=True)
     @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_safe_balances_usd_view(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock,
-                                    get_token_info_mock: MagicMock):
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_safe_balances_usd_view(self, timezone_now_mock: MagicMock, get_eth_usd_price_mock: MagicMock,
+                                    get_token_eth_value_mock: MagicMock, get_token_info_mock: MagicMock):
+        timestamp_str = timezone_now_mock.return_value.isoformat().replace('+00:00', 'Z')
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:safe-balances-usd', args=(safe_address, )), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -768,11 +771,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         token_dict = asdict(erc20_info)
         del token_dict['address']
+        self.maxDiff = None
         self.assertCountEqual(response.data, [
             {'token_address': None,
              'token': None,
              'balance': str(value),
              'eth_value': '1.0',
+             'timestamp': timestamp_str,
              'fiat_balance': '0.0',
              'fiat_conversion': '123.4',
              'fiat_code': 'USD',
@@ -781,6 +786,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'token': token_dict,
              'balance': str(tokens_value),
              'eth_value': '0.4',
+             'timestamp': timestamp_str,
              'fiat_balance': str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
              'fiat_conversion': str(round(123.4 * 0.4, 4)),
              'fiat_code': 'USD',

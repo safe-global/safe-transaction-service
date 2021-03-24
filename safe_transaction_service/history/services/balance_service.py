@@ -6,10 +6,10 @@ from functools import cached_property
 from typing import Iterator, List, Optional, Sequence
 
 from django.db.models import Q
+from django.utils import timezone
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
-from django.utils import timezone
 from eth_typing import ChecksumAddress
 from redis import Redis
 from web3 import Web3
@@ -19,7 +19,8 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
     PriceService, PriceServiceProvider)
-from safe_transaction_service.tokens.tasks import calculate_token_eth_price, EthValueWithTimestamp
+from safe_transaction_service.tokens.tasks import (EthValueWithTimestamp,
+                                                   calculate_token_eth_price)
 
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
@@ -154,8 +155,8 @@ class BalanceService:
     def get_cached_token_eth_values(self,
                                     token_addresses: Sequence[ChecksumAddress]) -> Iterator[EthValueWithTimestamp]:
         """
-        Get token eth prices if ready on cache. If not, schedule tasks to do the calculation so next time is available
-        on cache and return 0.
+        Get token eth prices with timestamp of calculation if ready on cache. If not, schedule tasks to do
+        the calculation so next time is available on cache and return `0.` and current datetime
         :param token_addresses:
         :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
         """
