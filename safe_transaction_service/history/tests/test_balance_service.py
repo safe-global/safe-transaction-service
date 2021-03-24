@@ -2,6 +2,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.test import TestCase
+from django.utils import timezone
 
 from eth_account import Account
 
@@ -35,7 +36,9 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
     @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
     @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
-    def test_get_usd_balances(self, get_eth_usd_price_mock: MagicMock, get_token_eth_value_mock: MagicMock):
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_get_usd_balances(self, timezone_now_mock: MagicMock, get_eth_usd_price_mock: MagicMock,
+                              get_token_eth_value_mock: MagicMock):
         balance_service = BalanceServiceProvider()
 
         safe_address = Account.create().address
@@ -58,18 +61,18 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(balances, [
             BalanceWithFiat(
-                None, None, value, 1., 0.0, 123.4
+                None, None, value, 1., timezone_now_mock.return_value, 0.0, 123.4
             ),
             BalanceWithFiat(
-                erc20.address, token_info, tokens_value, 0.4, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                round(123.4 * 0.4, 4)
+                erc20.address, token_info, tokens_value, 0.4, timezone_now_mock.return_value,
+                round(123.4 * 0.4 * (tokens_value / 1e18), 4), round(123.4 * 0.4, 4)
             )
         ])
 
         balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
             BalanceWithFiat(
-                None, None, value, 1., 0., 123.4
+                None, None, value, 1., timezone_now_mock.return_value, 0., 123.4
             ),
         ])
 
@@ -77,11 +80,11 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         balances = balance_service.get_usd_balances(safe_address, only_trusted=True)
         self.assertCountEqual(balances, [
             BalanceWithFiat(
-                None, None, value, 1., 0., 123.4
+                None, None, value, 1., timezone_now_mock.return_value, 0., 123.4
             ),
             BalanceWithFiat(
-                erc20.address, token_info, tokens_value, 0.4, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                round(123.4 * 0.4, 4)
+                erc20.address, token_info, tokens_value, 0.4, timezone_now_mock.return_value,
+                round(123.4 * 0.4 * (tokens_value / 1e18), 4), round(123.4 * 0.4, 4)
             )
         ])
 
@@ -97,19 +100,19 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(balances, [
             BalanceWithFiat(
-                None, None, value, 1., 0., 123.4
+                None, None, value, 1., timezone_now_mock.return_value, 0., 123.4
             ),
             BalanceWithFiat(
-                erc20_3.address, token_info_3, tokens_value, 0.4, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                round(123.4 * 0.4, 4)
+                erc20_3.address, token_info_3, tokens_value, 0.4, timezone_now_mock.return_value,
+                round(123.4 * 0.4 * (tokens_value / 1e18), 4), round(123.4 * 0.4, 4)
             ),
             BalanceWithFiat(
-                erc20.address, token_info, tokens_value, 0.4, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                round(123.4 * 0.4, 4)
+                erc20.address, token_info, tokens_value, 0.4, timezone_now_mock.return_value,
+                round(123.4 * 0.4 * (tokens_value / 1e18), 4), round(123.4 * 0.4, 4)
             ),
             BalanceWithFiat(
-                erc20_2.address, token_info_2, tokens_value, 0.4, round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                round(123.4 * 0.4, 4)
+                erc20_2.address, token_info_2, tokens_value, 0.4, timezone_now_mock.return_value,
+                round(123.4 * 0.4 * (tokens_value / 1e18), 4), round(123.4 * 0.4, 4)
             ),
         ])
 

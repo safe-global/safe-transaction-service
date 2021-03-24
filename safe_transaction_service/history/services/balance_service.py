@@ -1,6 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
 from typing import Iterator, List, Optional, Sequence
 
@@ -8,6 +9,7 @@ from django.db.models import Q
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
+from django.utils import timezone
 from eth_typing import ChecksumAddress
 from redis import Redis
 from web3 import Web3
@@ -17,7 +19,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
     PriceService, PriceServiceProvider)
-from safe_transaction_service.tokens.tasks import calculate_token_eth_price
+from safe_transaction_service.tokens.tasks import calculate_token_eth_price, EthValueWithTimestamp
 
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
@@ -57,6 +59,7 @@ class Balance:
 @dataclass
 class BalanceWithFiat(Balance):
     eth_value: float  # Value in ether
+    timestamp: datetime  # Calculated timestamp
     fiat_balance: float
     fiat_conversion: float
     fiat_code: str = 'USD'
@@ -148,26 +151,27 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_cached_token_eth_values(self, token_addresses: Sequence[ChecksumAddress]) -> Iterator[float]:
+    def get_cached_token_eth_values(self,
+                                    token_addresses: Sequence[ChecksumAddress]) -> Iterator[EthValueWithTimestamp]:
         """
         Get token eth prices if ready on cache. If not, schedule tasks to do the calculation so next time is available
         on cache and return 0.
         :param token_addresses:
-        :return: eth prices if ready on cache, `0.` otherwise
+        :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
         """
         cache_keys = [f'balance-service:{token_address}:eth-price' for token_address in token_addresses]
-        eth_values = self.redis.mget(cache_keys)
-        for token_address, cache_key, eth_value in zip(token_addresses, cache_keys, eth_values):
+        results = self.redis.mget(cache_keys)  # eth_value:epoch_timestamp
+        for token_address, cache_key, result in zip(token_addresses, cache_keys, results):
             if not token_address:  # Ether, this will not be used
-                yield 1.  # Even if not used, Ether value in ether is 1 :)
-            elif eth_value:
-                yield float(eth_value)
+                yield EthValueWithTimestamp(1., timezone.now())  # Even if not used, Ether value in ether is 1 :)
+            elif result:
+                yield EthValueWithTimestamp.from_string(result.decode())
             else:
                 task_result = calculate_token_eth_price.delay(token_address, cache_key)
                 if task_result.ready():
-                    yield float(task_result.get())
+                    yield task_result.get()
                 else:
-                    yield 0.
+                    yield EthValueWithTimestamp(0., timezone.now())
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
@@ -196,8 +200,9 @@ class BalanceService:
         eth_price = self.price_service.get_eth_usd_price()
         balances_with_usd = []
         token_addresses = [balance.token_address for balance in balances]
-        token_eth_values = self.get_cached_token_eth_values(token_addresses)
-        for balance, token_eth_value in zip(balances, token_eth_values):
+        token_eth_values_with_timestamp = self.get_cached_token_eth_values(token_addresses)
+        for balance, token_eth_value_with_timestamp in zip(balances, token_eth_values_with_timestamp):
+            token_eth_value = token_eth_value_with_timestamp.eth_value
             token_address = balance.token_address
             if not token_address:  # Ether
                 fiat_conversion = eth_price
@@ -213,6 +218,7 @@ class BalanceService:
                     balance.token,
                     balance.balance,
                     token_eth_value,
+                    token_eth_value_with_timestamp.timestamp,
                     round(fiat_balance, 4),
                     round(fiat_conversion, 4),
                     'USD'

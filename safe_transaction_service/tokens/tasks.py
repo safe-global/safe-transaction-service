@@ -1,10 +1,12 @@
-
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from django.conf import settings
 
 from celery import app
 from celery.utils.log import get_task_logger
+from django.utils import timezone
 from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider
@@ -19,9 +21,24 @@ from .services.price_service import PriceServiceProvider
 logger = get_task_logger(__name__)
 
 
+@dataclass
+class EthValueWithTimestamp(object):
+    eth_value: float
+    timestamp: datetime
+
+    @classmethod
+    def from_string(cls, result: str):
+        eth_value, epoch = result.split(':')
+        epoch_timestamp = datetime.fromtimestamp(float(epoch), timezone.utc)
+        return cls(float(eth_value), epoch_timestamp)
+
+    def __str__(self):
+        return f'{self.eth_value}:{self.timestamp.timestamp()}'
+
+
 @app.shared_task()
 def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
-                              force_recalculation: bool = False) -> Optional[float]:
+                              force_recalculation: bool = False) -> Optional[EthValueWithTimestamp]:
     """
     Do price calculation for token in an async way and store it on redis
     :param token_address: Token address
@@ -30,7 +47,9 @@ def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
     :return: token price (in ether) when calculated
     """
     redis = get_redis()
-    key_was_set = redis.set(redis_key, 0, ex=60, nx=True)
+    now = timezone.now()
+    current_timestamp = int(now.timestamp())
+    key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60, nx=True)
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
         eth_price = price_service.get_token_eth_value(token_address)
@@ -41,16 +60,17 @@ def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
                 eth_price = usd_price / eth_usd_price
         if eth_price:
             redis_expiration_time = 60 * 30  # Expire in 30 minutes
-            redis.setex(redis_key, redis_expiration_time, eth_price)
+            eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
+            redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
             if not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
                 # Recalculate price before cache expires and prevents recursion checking Celery Eager property
                 calculate_token_eth_price.apply_async((token_address, redis_key), {'force_recalculation': True},
                                                       countdown=redis_expiration_time - 300)
         else:
             logger.warning('Cannot calculate eth price for token=%s', token_address)
-        return eth_price
+        return EthValueWithTimestamp(eth_price, now)
     else:
-        float(redis.get(redis_key))
+        return EthValueWithTimestamp.from_string(redis.get(redis_key).decode())
 
 
 @app.shared_task()
