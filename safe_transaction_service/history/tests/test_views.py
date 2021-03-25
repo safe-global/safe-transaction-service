@@ -1371,16 +1371,32 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected = []
         self.assertEqual(response.data, expected)
 
-        safe_master_copy = SafeMasterCopyFactory()
+        deployed_block_number = 2
+        last_indexed_block_number = 5
+        safe_master_copy = SafeMasterCopyFactory(initial_block_number=deployed_block_number,
+                                                 tx_block_number=last_indexed_block_number)
         response = self.client.get(reverse('v1:master-copies'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
+        expected = [
+            {'address': safe_master_copy.address,
+             'version': safe_master_copy.version,
+             'deployed_block_number': deployed_block_number,
+             'last_indexed_block_number': last_indexed_block_number
+             }
+        ]
         self.assertCountEqual(response.data, expected)
 
         safe_master_copy = SafeMasterCopyFactory()
         response = self.client.get(reverse('v1:master-copies'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected += [{'address': safe_master_copy.address, 'version': safe_master_copy.version}]
+        expected += [
+            {'address': safe_master_copy.address,
+             'version': safe_master_copy.version,
+             'deployed_block_number': 0,
+             'last_indexed_block_number': 0,
+             }
+        ]
+
         self.assertCountEqual(response.data, expected)
 
     def test_analytics_multisig_txs_by_origin_view(self):
