@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
 
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import CannotEstimateGas
 
 from safe_transaction_service.tokens.models import Token
@@ -613,13 +614,17 @@ class DataDecoderView(GenericAPIView):
                 return Response(status=status.HTTP_404_NOT_FOUND, data=data_decoded)
 
 
-class SafeMultisigTransactionEstimateView(CreateAPIView):
+class SafeMultisigTransactionEstimateView(GenericAPIView):
     serializer_class = serializers.SafeMultisigTransactionEstimateSerializer
     response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context['safe_address'] = self.kwargs['address']
+        if getattr(self, 'swagger_fake_view', False):
+            # Just for schema generation metadata
+            context['safe_address'] = NULL_ADDRESS
+        else:
+            context['safe_address'] = self.kwargs['address']
         return context
 
     @swagger_auto_schema(responses={200: response_serializer,
@@ -628,7 +633,7 @@ class SafeMultisigTransactionEstimateView(CreateAPIView):
                                     422: 'Tx not valid'})
     def post(self, request, address, *args, **kwargs):
         """
-        Estimates a Safe Multisig Transaction. `operational_gas` and `data_gas` are deprecated, use `base_gas` instead
+        Estimates `safeTxGas` for a Safe Multisig Transaction.
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
