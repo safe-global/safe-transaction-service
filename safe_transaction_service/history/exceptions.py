@@ -8,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def custom_exception_handler(exc, context):
-    # Call REST framework's default exception handler first,
-    # to get the standard error response.
 
     if isinstance(exc, NodeConnectionError):
         response = Response(status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -24,8 +22,11 @@ def custom_exception_handler(exc, context):
         logger.warning('%s - Exception: %s - Data received %s',
                        context['request'].build_absolute_uri(),
                        exception_str,
-                       context['request'].data)
+                       context['request'].data,
+                       exc_info=exc)
     else:
+        # Call REST framework's default exception handler,
+        # to get the standard error response.
         response = exception_handler(exc, context)
 
     return response
