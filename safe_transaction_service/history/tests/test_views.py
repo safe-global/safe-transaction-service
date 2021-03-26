@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from eth_account import Account
 from hexbytes import HexBytes
+from requests import ReadTimeout
 from rest_framework import status
 from rest_framework.test import APITestCase
 from web3 import Web3
@@ -1567,3 +1568,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
                                     format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        estimate_tx_gas_mock.side_effect = ReadTimeout
+        response = self.client.post(reverse('v1:multisig-transaction-estimate', args=(safe_address,)),
+                                    format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
