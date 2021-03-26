@@ -134,9 +134,6 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
     assert safe_tx_hash, 'Safe tx hash was not provided'
 
     try:
-        confirmed_owners = MultisigConfirmation.objects.filter(
-            multisig_transaction_id=safe_tx_hash
-        ).values_list('owner', flat=True)
         safe_status = SafeStatus.objects.last_for_address(address)
 
         if not safe_status:
@@ -147,6 +144,10 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
             logger.info('No need to send confirmation notification for safe=%s with threshold=1', address)
             return 0, 0
 
+        confirmed_owners = MultisigConfirmation.objects.filter(
+            multisig_transaction_id=safe_tx_hash
+        ).values_list('owner', flat=True)
+
         if safe_status.threshold <= len(confirmed_owners):
             # No need for more confirmations
             logger.info('Multisig transaction with safe-tx-hash=%s for safe=%s does not require more confirmations',
@@ -155,6 +156,9 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
 
         # Get cloud messaging token for missing owners
         owners_to_notify = set(safe_status.owners) - set(confirmed_owners)
+        if not owners_to_notify:
+            return 0, 0
+
         tokens = FirebaseDeviceOwner.objects.get_devices_for_safe_and_owners(address, owners_to_notify)
 
         if not tokens:
