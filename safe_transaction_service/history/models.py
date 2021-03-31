@@ -1108,6 +1108,8 @@ class WebHookType(Enum):
     CONFIRMATION_REQUEST = 5
     SAFE_CREATED = 6
     MODULE_TRANSACTION = 7
+    OUTGOING_ETHER = 8
+    OUTGOING_TOKEN = 9
 
 
 class WebHookQuerySet(models.QuerySet):
@@ -1126,6 +1128,7 @@ class WebHook(models.Model):
     new_incoming_transaction = models.BooleanField(default=True)
     new_safe = models.BooleanField(default=True)
     new_module_transaction = models.BooleanField(default=True)
+    new_outgoing_transaction = models.BooleanField(default=True)
 
     class Meta:
         unique_together = (('address', 'url'),)
@@ -1149,6 +1152,9 @@ class WebHook(models.Model):
         elif webhook_type == WebHookType.SAFE_CREATED and not self.new_safe:
             return False
         elif webhook_type == WebHookType.MODULE_TRANSACTION and not self.new_module_transaction:
+            return False
+        elif webhook_type in (WebHookType.OUTGOING_TOKEN,
+                              WebHookType.OUTGOING_ETHER) and not self.new_outgoing_transaction:
             return False
         else:
             return True

@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, List, Type, Union
 
 from django.db.models import Model
 from django.db.models.signals import post_save
@@ -63,15 +63,15 @@ def bind_confirmation(sender: Type[Model],
 
 def build_webhook_payload(sender: Type[Model],
                           instance: Union[EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction]
-                          ) -> Optional[Dict[str, Any]]:
-    payload: Optional[Dict[str, Any]] = None
+                          ) -> List[Dict[str, Any]]:
+    payloads: List[Dict[str, Any]] = []
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        payload = {
+        payloads = [{
             'address': instance.multisig_transaction.safe,  # This could make a db call
             'type': WebHookType.NEW_CONFIRMATION.name,
             'owner': instance.owner,
             'safeTxHash': HexBytes(instance.multisig_transaction.safe_tx_hash).hex()
-        }
+        }]
     elif sender == MultisigTransaction:
         payload = {
             'address': instance.safe,
@@ -84,15 +84,21 @@ def build_webhook_payload(sender: Type[Model],
             payload['txHash'] = HexBytes(instance.ethereum_tx_id).hex()
         else:
             payload['type'] = WebHookType.PENDING_MULTISIG_TRANSACTION.name
+        payloads = [payload]
     elif sender == InternalTx and instance.is_ether_transfer:  # INCOMING_ETHER
-        payload = {
+        incoming_payload = {
             'address': instance.to,
             'type': WebHookType.INCOMING_ETHER.name,
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
             'value': str(instance.value),
         }
-    elif sender == EthereumEvent and 'to' in instance.arguments:  # INCOMING_TOKEN
-        payload = {
+        outgoing_payload = dict(incoming_payload)
+        outgoing_payload['type'] = WebHookType.OUTGOING_ETHER.name
+        outgoing_payload['address'] = instance._from
+        payloads = [incoming_payload, outgoing_payload]
+    elif sender == EthereumEvent and 'to' in instance.arguments and 'from' in instance.arguments:
+        # INCOMING_TOKEN / OUTGOING_TOKEN
+        incoming_payload = {
             'address': instance.arguments['to'],
             'type': WebHookType.INCOMING_TOKEN.name,
             'tokenAddress': instance.address,
@@ -100,23 +106,27 @@ def build_webhook_payload(sender: Type[Model],
         }
         for element in ('tokenId', 'value'):
             if element in instance.arguments:
-                payload[element] = str(instance.arguments[element])
+                incoming_payload[element] = str(instance.arguments[element])
+        outgoing_payload = dict(incoming_payload)
+        outgoing_payload['type'] = WebHookType.OUTGOING_TOKEN.name
+        outgoing_payload['address'] = instance.arguments['from']
+        payloads = [incoming_payload, outgoing_payload]
     elif sender == SafeContract:  # Safe created
-        payload = {
+        payloads = [{
             'address': instance.address,
             'type': WebHookType.SAFE_CREATED.name,
             'txHash': HexBytes(instance.ethereum_tx_id).hex(),
             'blockNumber': instance.created_block_number,
-        }
+        }]
     elif sender == ModuleTransaction:
-        payload = {
+        payloads = [{
             'address': instance.safe,
             'module': instance.module,
             'type': WebHookType.MODULE_TRANSACTION.name,
             'txHash': HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
-        }
+        }]
 
-    return payload
+    return payloads
 
 
 def is_valid_webhook(sender: Type[Model],
@@ -154,7 +164,8 @@ def process_webhook(sender: Type[Model],
     if is_valid_webhook(sender, instance, created):
         # Don't send information for older than 10 minutes transactions
         # This triggers a DB query on EthereumEvent, InternalTx (they are not TimeStampedModel)
-        payload = build_webhook_payload(sender, instance)
-        if payload and (address := payload.get('address')):
-            send_webhook_task.delay(address, payload)
-            send_notification_task.apply_async(args=(address, payload), countdown=5)
+        payloads = build_webhook_payload(sender, instance)
+        for payload in payloads:
+            if address := payload.get('address'):
+                send_webhook_task.delay(address, payload)
+                send_notification_task.apply_async(args=(address, payload), countdown=5)

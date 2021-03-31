@@ -61,6 +61,8 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
 
         # All confirmations are disabled for now
         return False
+    elif payload_type in (WebHookType.OUTGOING_ETHER.name, WebHookType.OUTGOING_TOKEN.name):
+        return False
     elif payload_type in (WebHookType.INCOMING_ETHER.name, WebHookType.INCOMING_TOKEN.name):
         # Only send ETH/token pushes when they weren't triggered by a tx from some account other than the Safe.
         # If Safe triggers a transaction to transfer Ether/Tokens into itself, 2 notifications will be generated, and

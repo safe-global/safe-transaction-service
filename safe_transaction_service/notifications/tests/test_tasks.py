@@ -41,24 +41,24 @@ class TestViews(TestCase):
 
     def test_filter_notification(self):
         multisig_confirmation = MultisigConfirmationFactory()
-        confirmation_notification = build_webhook_payload(MultisigConfirmation, multisig_confirmation)
+        confirmation_notification = build_webhook_payload(MultisigConfirmation, multisig_confirmation)[0]
         # Confirmations for executed transaction should be filtered out
         self.assertFalse(filter_notification(confirmation_notification))
         multisig_confirmation.multisig_transaction.ethereum_tx.block = None
         multisig_confirmation.multisig_transaction.ethereum_tx.save()
-        confirmation_notification = build_webhook_payload(MultisigConfirmation, multisig_confirmation)
+        confirmation_notification = build_webhook_payload(MultisigConfirmation, multisig_confirmation)[0]
         # All confirmations are disabled for now
         # self.assertTrue(filter_notification(confirmation_notification))
         self.assertFalse(filter_notification(confirmation_notification))
 
         # Pending multisig transaction should be filtered out
         multisig_transaction = MultisigTransactionFactory()
-        transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)
+        transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)[0]
         self.assertTrue(filter_notification(transaction_notification))
 
         multisig_transaction.ethereum_tx = None
         multisig_transaction.save()
-        pending_transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)
+        pending_transaction_notification = build_webhook_payload(MultisigTransaction, multisig_transaction)[0]
         self.assertNotEqual(multisig_transaction, pending_transaction_notification)
         self.assertFalse(filter_notification(pending_transaction_notification))
 
@@ -68,11 +68,15 @@ class TestViews(TestCase):
             tx_type=EthereumTxType.CALL.value,
             call_type=EthereumTxCallType.CALL.value
         )
-        internal_tx_payload = build_webhook_payload(InternalTx, internal_tx)
-        self.assertEqual(internal_tx_payload['address'], internal_tx.to)
-        self.assertTrue(filter_notification(internal_tx_payload))
+        incoming_internal_tx_payload, outgoing_internal_tx_payload = build_webhook_payload(InternalTx, internal_tx)
+
+        self.assertEqual(outgoing_internal_tx_payload['address'], internal_tx._from)
+        self.assertFalse(filter_notification(outgoing_internal_tx_payload))
+
+        self.assertEqual(incoming_internal_tx_payload['address'], internal_tx.to)
+        self.assertTrue(filter_notification(incoming_internal_tx_payload))
         MultisigTransactionFactory(safe=internal_tx.to, ethereum_tx=internal_tx.ethereum_tx)
-        self.assertFalse(filter_notification(internal_tx_payload))
+        self.assertFalse(filter_notification(incoming_internal_tx_payload))
 
     def test_send_notification_owner_task(self):
         from ..tasks import logger as task_logger

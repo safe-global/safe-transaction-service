@@ -267,7 +267,7 @@ class WebHookFactory(DjangoModelFactory):
         model = WebHook
 
     address = factory.LazyFunction(lambda: Account.create().address)
-    url = 'http://localhost/test'
+    url = factory.Sequence(lambda n: f'http://localhost/test/{n}')
     # Configurable webhook types to listen to
     new_confirmation = True
     pending_outgoing_transaction = True

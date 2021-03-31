@@ -27,7 +27,9 @@ class TestTasks(TestCase):
         WebHookFactory(address=Account.create().address)
         WebHookFactory(address=to)
         InternalTxFactory(to=to)
-        self.assertEqual(mock_post.call_count, 2)
+        # 3 webhooks: INCOMING_ETHER for Webhook with `to`, and then `INCOMING_ETHER` and `OUTGOING_ETHER`
+        # for the WebHook without address set
+        self.assertEqual(mock_post.call_count, 3)
 
     def test_process_decoded_internal_txs_task(self):
         owner = Account.create().address
