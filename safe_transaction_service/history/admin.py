@@ -281,7 +281,8 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeMasterCopy)
 class SafeMasterCopyAdmin(MonitoredAddressAdmin):
-    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version')
+    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'deployer')
+    list_filter = ('deployer',)
 
 
 @admin.register(ProxyFactory)

@@ -954,6 +954,7 @@ class ProxyFactory(MonitoredAddress):
 
 class SafeMasterCopy(MonitoredAddress):
     version = models.CharField(max_length=20)
+    deployer = models.CharField(max_length=50, default='Gnosis')
 
     class Meta:
         verbose_name_plural = 'Safe master copies'

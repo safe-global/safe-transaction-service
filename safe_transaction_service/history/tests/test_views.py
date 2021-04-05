@@ -1381,6 +1381,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected = [
             {'address': safe_master_copy.address,
              'version': safe_master_copy.version,
+             'deployer': safe_master_copy.deployer,
              'deployed_block_number': deployed_block_number,
              'last_indexed_block_number': last_indexed_block_number
              }
@@ -1393,6 +1394,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected += [
             {'address': safe_master_copy.address,
              'version': safe_master_copy.version,
+             'deployer': safe_master_copy.deployer,
              'deployed_block_number': 0,
              'last_indexed_block_number': 0,
              }
