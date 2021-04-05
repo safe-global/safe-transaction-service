@@ -43,3 +43,6 @@ class KrakenClient:
         :raises: CannotGetPrice
         """
         return self._get_price('ETHUSD')
+
+    def get_ewt_usd_price(self) -> float:
+        return self._get_price('EWTUSD')

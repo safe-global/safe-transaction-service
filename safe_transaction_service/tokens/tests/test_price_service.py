@@ -41,14 +41,20 @@ class TestPriceService(TestCase):
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
-    @mock.patch.object(KucoinClient, 'get_ewt_usd_price', return_value=5.)
     @mock.patch.object(CoingeckoClient, 'get_ewt_usd_price', return_value=3.)
-    def test_get_ewt_usd_price(self, get_ewt_usd_price_coingecko_mock: MagicMock,
-                               get_ewt_usd_price_kucoin_mock: MagicMock):
+    @mock.patch.object(KucoinClient, 'get_ewt_usd_price', return_value=7.)
+    @mock.patch.object(KrakenClient, 'get_ewt_usd_price', return_value=5.)
+    def test_get_ewt_usd_price(self, get_ewt_usd_price_kraken_mock: MagicMock,
+                               get_ewt_usd_price_kucoin_mock: MagicMock,
+                               get_ewt_usd_price_coingecko_mock: MagicMock):
         price_service = PriceServiceProvider()
 
         price = price_service.get_ewt_usd_price()
         self.assertEqual(price, 5.)
+
+        get_ewt_usd_price_kraken_mock.side_effect = CannotGetPrice
+        price = price_service.get_ewt_usd_price()
+        self.assertEqual(price, 7.)
 
         get_ewt_usd_price_kucoin_mock.side_effect = CannotGetPrice
         price = price_service.get_ewt_usd_price()

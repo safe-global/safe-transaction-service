@@ -25,6 +25,15 @@ class TestClients(TestCase):
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 
+    def test_get_ewt_usd_price_kraken(self) -> float:
+        just_test_if_mainnet_node()
+        kraken_client = KrakenClient()
+
+        # Kraken is used
+        price = kraken_client.get_ewt_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
     def test_get_eth_usd_price_binance(self):
         just_test_if_mainnet_node()
         binance_client = BinanceClient()
