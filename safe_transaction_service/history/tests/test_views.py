@@ -202,6 +202,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['safe'], module_transaction.safe)
         self.assertEqual(response.data['results'][0]['module'], module_transaction.module)
+        self.assertEqual(response.data['results'][0]['is_successful'], not module_transaction.failed)
 
         # Add another ModuleTransaction to check filters
         ModuleTransactionFactory(safe=safe_address)

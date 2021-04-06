@@ -342,10 +342,11 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
     data_decoded = serializers.SerializerMethodField()
     transaction_hash = serializers.SerializerMethodField()
     block_number = serializers.SerializerMethodField()
+    is_successful = serializers.SerializerMethodField()
 
     class Meta:
         model = ModuleTransaction
-        fields = ('created', 'execution_date', 'block_number', 'transaction_hash', 'safe',
+        fields = ('created', 'execution_date', 'block_number', 'is_successful', 'transaction_hash', 'safe',
                   'module', 'to', 'value', 'data', 'operation', 'data_decoded')
 
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
@@ -353,6 +354,9 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
         return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b'')
+
+    def get_is_successful(self, obj: ModuleTransaction) -> bool:
+        return not obj.failed
 
     def get_transaction_hash(self, obj: ModuleTransaction) -> str:
         return obj.internal_tx.ethereum_tx_id
