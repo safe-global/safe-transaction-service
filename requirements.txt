@@ -1,4 +1,4 @@
-boto3==1.17.44
+boto3==1.17.45
 cachetools==4.2.1
 celery==5.0.5
 django-authtools==1.7.0
@@ -14,7 +14,7 @@ django-model-utils==4.1.1
 django-redis==4.12.1
 django-storages==1.11.1
 django-timezone-field==4.1.2
-django==3.1.7
+django==3.1.8
 djangorestframework-camel-case==1.2.0
 djangorestframework==3.12.4
 docutils==0.17
