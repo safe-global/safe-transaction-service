@@ -111,7 +111,7 @@ class SafeTxProcessor(TxProcessor):
             if (
                     len(log['topics']) == 2
                     and HexBytes(log['topics'][0]) in self.safe_tx_module_failure_topics
-                    and log['topics'][1][-20:] == HexBytes(module_address)  # 20 is the size in bytes of the address
+                    and HexBytes(log['topics'][1])[-20:] == HexBytes(module_address)  # 20 address size in bytes
             ):
                 return True
         return False
