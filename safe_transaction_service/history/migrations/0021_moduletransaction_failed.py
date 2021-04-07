@@ -10,7 +10,8 @@ def set_failed_for_module_txs(apps, schema_editor):
     ModuleTransaction = apps.get_model('history', 'ModuleTransaction')
     for module_tx in ModuleTransaction.objects.select_related('internal_tx__ethereum_tx').iterator():
         current_failed = module_tx.failed
-        module_tx.failed = safe_tx_processor.is_module_failed(module_tx.internal_tx.ethereum_tx, module_tx.module)
+        module_tx.failed = safe_tx_processor.is_module_failed(module_tx.internal_tx.ethereum_tx, module_tx.module,
+                                                              module_tx.safe)
         if module_tx.failed != current_failed:
             module_tx.save(update_fields=['failed'])
 

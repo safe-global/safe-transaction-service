@@ -99,17 +99,19 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
-    def is_module_failed(self, ethereum_tx: EthereumTx, module_address: str) -> bool:
+    def is_module_failed(self, ethereum_tx: EthereumTx, module_address: str, safe_address: str) -> bool:
         """
         Detects module failure events on a Safe Module Tx
         :param ethereum_tx:
         :param module_address:
+        :param safe_address:
         :return: True if a Module Transaction is failed, False otherwise
         """
         # TODO Refactor this function to `Safe` in gnosis-py, it doesn't belong here
         for log in ethereum_tx.logs:
             if (
                     len(log['topics']) == 2
+                    and log['address'] == safe_address
                     and HexBytes(log['topics'][0]) in self.safe_tx_module_failure_topics
                     and HexBytes(log['topics'][1])[-20:] == HexBytes(module_address)  # 20 address size in bytes
             ):
@@ -253,7 +255,7 @@ class SafeTxProcessor(TxProcessor):
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.enabled_modules.remove(arguments['module'])
             self.store_new_safe_status(safe_status, internal_tx)
-        elif function_name == 'execTransactionFromModule':
+        elif function_name in {'execTransactionFromModule', 'execTransactionFromModuleReturnData'}:
             logger.debug('Executing Tx from Module')
             # TODO Add test with previous traces for processing a module transaction
             ethereum_tx = internal_tx.ethereum_tx
@@ -271,7 +273,7 @@ class SafeTxProcessor(TxProcessor):
             module_internal_tx = InternalTx.objects.build_from_trace(previous_trace, internal_tx.ethereum_tx)
             module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
             module_data = HexBytes(arguments['data'])
-            failed = self.is_module_failed(ethereum_tx, module_address)
+            failed = self.is_module_failed(ethereum_tx, module_address, contract_address)
             ModuleTransaction.objects.get_or_create(
                 internal_tx=internal_tx,
                 defaults={
