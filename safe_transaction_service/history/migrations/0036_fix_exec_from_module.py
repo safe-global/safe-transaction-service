@@ -22,7 +22,7 @@ def fix_ethereum_logs(apps, schema_editor):
     # We need to add `address` to the logs, so we exclude empty logs and logs already containing `address`
     queryset = EthereumTx.objects.exclude(logs__0__has_key='address').exclude(logs=[])
     total = queryset.count()
-    processed = 200
+    processed = 2000
     logger.info('Fixing ethereum logs. %d remaining to be fixed', total)
     while True:
         ethereum_txs = queryset[:processed]
