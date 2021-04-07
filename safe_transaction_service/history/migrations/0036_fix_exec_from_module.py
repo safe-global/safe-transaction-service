@@ -30,13 +30,16 @@ def fix_ethereum_logs(apps, schema_editor):
             break
 
         tx_hashes = [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
-        tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes)
-        for ethereum_tx, tx_receipt in zip(ethereum_txs, tx_receipts):
-            ethereum_tx.logs = [clean_receipt_log(log) for log in tx_receipt['logs']]
-            ethereum_tx.save(update_fields=['logs'])
-            total -= 1
+        try:
+            tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes)
+            for ethereum_tx, tx_receipt in zip(ethereum_txs, tx_receipts):
+                ethereum_tx.logs = [clean_receipt_log(log) for log in tx_receipt['logs']]
+                ethereum_tx.save(update_fields=['logs'])
+                total -= 1
 
-        logger.info('Fixed %d ethereum logs. %d remaining to be fixed', processed, total)
+            logger.info('Fixed %d ethereum logs. %d remaining to be fixed', processed, total)
+        except IOError:
+            logger.warning('Node connection error when retrieving tx receipts')
 
 
 class Migration(migrations.Migration):
