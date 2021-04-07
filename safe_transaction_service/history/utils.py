@@ -65,15 +65,16 @@ def chunks(elements: List[Any], n: int):
         yield elements[i:i + n]
 
 
-def clean_receipt_log(receipt_logs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def clean_receipt_log(receipt_log: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Clean receipt logs and make them JSON compliant
-    :param receipt_logs:
+    Clean receipt log and make them JSON compliant
+    :param receipt_log:
     :return:
     """
-    parsed_logs = {'data': receipt_logs['data'],
-                   'topics': [topic.hex() for topic in receipt_logs['topics']]}
-    return parsed_logs
+    parsed_log = {'address': receipt_log['address'],
+                  'data': receipt_log['data'],
+                  'topics': [topic.hex() for topic in receipt_log['topics']]}
+    return parsed_log
 
 
 def get_redis() -> Redis:
