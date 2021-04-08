@@ -49,6 +49,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(fix_ethereum_logs, reverse_code=migrations.RunPython.noop),
+        #  migrations.RunPython(fix_ethereum_logs, reverse_code=migrations.RunPython.noop),
+        #  Use management command `fix_ethereum_logs`
         migrations.RunPython(fix_module_transactions, reverse_code=migrations.RunPython.noop),
     ]

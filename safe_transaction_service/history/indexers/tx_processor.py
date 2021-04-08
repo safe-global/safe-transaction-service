@@ -111,7 +111,7 @@ class SafeTxProcessor(TxProcessor):
         for log in ethereum_tx.logs:
             if (
                     len(log['topics']) == 2
-                    and log['address'] == safe_address
+                    and (log['address'] == safe_address if 'address' in log else True)
                     and HexBytes(log['topics'][0]) in self.safe_tx_module_failure_topics
                     and HexBytes(log['topics'][1])[-20:] == HexBytes(module_address)  # 20 address size in bytes
             ):
