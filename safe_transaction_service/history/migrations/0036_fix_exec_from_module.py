@@ -5,7 +5,7 @@ from django.db import migrations
 
 from gnosis.eth import EthereumClientProvider
 
-from safe_transaction_service.history.utils import clean_receipt_log
+from ..utils import clean_receipt_log
 
 logger = logging.getLogger(__name__)
 
