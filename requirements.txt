@@ -1,4 +1,4 @@
-boto3==1.17.47
+boto3==1.17.49
 cachetools==4.2.1
 celery==5.0.5
 django-authtools==1.7.0
@@ -21,7 +21,7 @@ docutils==0.17
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
 firebase-admin==4.5.3
-gnosis-py==2.8.5
+gnosis-py==2.8.6
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.1
 packaging>=20.9
