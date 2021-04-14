@@ -13,12 +13,13 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
+from ..utils import get_redis
 
 from ...tokens.constants import ENS_CONTRACTS_WITH_TLD
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
                                              CollectibleWithMetadata,
-                                             Erc721InfoWithLogo)
+                                             Erc721InfoWithLogo, CollectiblesServiceProvider)
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
@@ -29,7 +30,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         mainnet_node = just_test_if_mainnet_node()
         ethereum_client = EthereumClient(mainnet_node)
         EthereumClientProvider.instance = ethereum_client
-        collectibles_service = CollectiblesService(ethereum_client)
+        collectibles_service = CollectiblesService(ethereum_client, get_redis())
 
         # Caches empty
         self.assertFalse(collectibles_service.cache_token_info)
@@ -104,7 +105,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
     @mock.patch.object(Erc721Manager, 'get_info', autospec=True)
     def test_get_token_info(self, get_info_mock: MagicMock):
-        collectibles_service = CollectiblesService(self.ethereum_client)
+        collectibles_service = CollectiblesServiceProvider()
         random_address = Account.create().address
 
         # No DB, no blockchain source
@@ -149,7 +150,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         token_uris = ['http://testing.com/12', None, '']
         get_token_uris_mock.return_value = token_uris
         addresses_with_token_ids = [(Account.create(), i) for i in range(3)]
-        collectibles_service = CollectiblesService(self.ethereum_client)
+        collectibles_service = CollectiblesServiceProvider()
         self.assertFalse(collectibles_service.cache_token_uri)
         collectibles_service.get_token_uris(addresses_with_token_ids)
 
@@ -160,7 +161,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             self.assertEqual(collectibles_service.cache_token_uri[address_with_token_id], token_uri)
 
     def test_retrieve_metadata_from_uri(self):
-        collectibles_service = CollectiblesService(self.ethereum_client)
+        collectibles_service = CollectiblesServiceProvider()
         # Test ipfs
         ipfs_address = 'ipfs://ipfs/Qmc4ZMDNMu5bguGohtGQGx5DQexitnNvf5Rb7Yzbja47bo'
         expected_object = {

@@ -11,6 +11,7 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from redis import Redis
 
 from safe_transaction_service.tokens.constants import (
     CRYPTO_KITTIES_CONTRACT_ADDRESSES, ENS_CONTRACTS_WITH_TLD)
@@ -19,6 +20,7 @@ from safe_transaction_service.tokens.models import Token
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
+from ..utils import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,7 @@ class CollectibleWithMetadata(Collectible):
 class CollectiblesServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
-            cls.instance = CollectiblesService(EthereumClientProvider())
+            cls.instance = CollectiblesService(EthereumClientProvider(), get_redis())
 
         return cls.instance
 
@@ -112,8 +114,9 @@ class CollectiblesService:
     ENS_IMAGE_URL = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
     IPFS_GATEWAY = 'https://cloudflare-ipfs.com/'
 
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
+        self.redis = redis
         self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
 
         self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
@@ -275,14 +278,42 @@ class CollectiblesService:
         :param addresses_with_token_ids:
         :return: List of token_uris in the same orther that `addresses_with_token_ids` were provided
         """
-        not_found = [address_with_token_id for address_with_token_id in addresses_with_token_ids
-                     if address_with_token_id not in self.cache_token_uri]
-        # Find missing in database
+        def get_redis_key(address_with_token_id: Tuple[str, int]):
+            token_address, token_id = address_with_token_id
+            return f'token-uri:{token_address}:{token_id}'
+
+        def get_not_found_cache():
+            return [address_with_token_id for address_with_token_id in addresses_with_token_ids
+                    if address_with_token_id not in self.cache_token_uri]
+
+        # Find uris in local cache
+        not_found_cache = get_not_found_cache()
+
+        # Try finding missing token uris in redis
+        redis_token_uris = self.redis.mget([get_redis_key(address_with_token_id)
+                                            for address_with_token_id in not_found_cache])
+        self.cache_token_uri.update({address_with_token_id: token_uri.decode()
+                                     for address_with_token_id, token_uri
+                                     in zip(not_found_cache, redis_token_uris)
+                                     if token_uri})
+
+        not_found_cache = [address_with_token_id for address_with_token_id in addresses_with_token_ids
+                           if address_with_token_id not in self.cache_token_uri]
+
         try:
-            self.cache_token_uri.update({address_with_token_id: token_uri
-                                        for address_with_token_id, token_uri
-                                        in zip(not_found,
-                                               self.ethereum_client.erc721.get_token_uris(not_found))})
+            # Find missing token uris in blockchain
+            blockchain_token_uris = {address_with_token_id: token_uri
+                                     for address_with_token_id, token_uri
+                                     in zip(not_found_cache,
+                                            self.ethereum_client.erc721.get_token_uris(not_found_cache))}
+            if blockchain_token_uris:
+                pipe = self.redis.pipeline()
+                redis_map_to_store = {get_redis_key(address_with_token_id): token_uri
+                                      for address_with_token_id, token_uri in blockchain_token_uris.items()}
+                pipe.mset(redis_map_to_store)
+                for key in redis_map_to_store.keys():
+                    pipe.expire(key, 60 * 60 * 12)  # 12 hours
+                self.cache_token_uri.update(blockchain_token_uris)
         except IOError as exc:
             raise NodeConnectionError from exc
 
