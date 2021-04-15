@@ -314,7 +314,7 @@ class CollectiblesService:
                                       for address_with_token_id, token_uri in blockchain_token_uris.items()}
                 pipe.mset(redis_map_to_store)
                 for key in redis_map_to_store.keys():
-                    pipe.expire(key, 60 * 60 * 12)  # 12 hours
+                    pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
                 pipe.execute()
         except IOError as exc:
             raise NodeConnectionError from exc
