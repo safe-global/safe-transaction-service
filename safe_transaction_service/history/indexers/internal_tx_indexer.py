@@ -81,7 +81,9 @@ class InternalTxIndexer(EthereumIndexer):
         addresses_set = set(addresses)  # More optimal to use `in`
         try:
             block_numbers = list(range(from_block_number, to_block_number + 1))
-            traces = self.ethereum_client.parity.trace_blocks(block_numbers)
+            traces = []
+            for block_number in block_numbers:
+                traces.extend(self.ethereum_client.parity.trace_block(block_number))
             tx_hashes = []
             for block_number, trace_list in zip(block_numbers, traces):
                 if not trace_list:
@@ -152,9 +154,10 @@ class InternalTxIndexer(EthereumIndexer):
         logger.debug('End prefetching and storing of ethereum txs')
 
         logger.debug('Prefetching of traces(internal txs)')
+        traced_transactions = [self.ethereum_client.parity.trace_transaction(tx_hash) for tx_hash in tx_hashes]
         internal_txs = (InternalTx.objects.build_from_trace(trace, ethereum_tx)
                         for ethereum_tx, traces in zip(ethereum_txs,
-                                                       self.ethereum_client.parity.trace_transactions(tx_hashes))
+                                                       traced_transactions)
                         for trace in self.ethereum_client.parity.filter_out_errored_traces(traces))
         revelant_internal_txs_batch = (trace for trace in internal_txs if trace.is_relevant)
         logger.debug('End prefetching of traces(internal txs)')
