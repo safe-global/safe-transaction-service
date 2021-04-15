@@ -9,9 +9,9 @@ from django.db.models import Q
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
+from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from redis import Redis
 
 from safe_transaction_service.tokens.constants import (
     CRYPTO_KITTIES_CONTRACT_ADDRESSES, ENS_CONTRACTS_WITH_TLD)
@@ -292,28 +292,30 @@ class CollectiblesService:
         # Try finding missing token uris in redis
         redis_token_uris = self.redis.mget([get_redis_key(address_with_token_id)
                                             for address_with_token_id in not_found_cache])
-        self.cache_token_uri.update({address_with_token_id: token_uri.decode()
+        # Redis does not allow `None`, so empty string is used
+        self.cache_token_uri.update({address_with_token_id: token_uri.decode() if token_uri else None
                                      for address_with_token_id, token_uri
                                      in zip(not_found_cache, redis_token_uris)
-                                     if token_uri})
+                                     if token_uri is not None})
 
         not_found_cache = [address_with_token_id for address_with_token_id in addresses_with_token_ids
                            if address_with_token_id not in self.cache_token_uri]
 
         try:
             # Find missing token uris in blockchain
-            blockchain_token_uris = {address_with_token_id: token_uri
+            blockchain_token_uris = {address_with_token_id: token_uri if token_uri else None
                                      for address_with_token_id, token_uri
                                      in zip(not_found_cache,
                                             self.ethereum_client.erc721.get_token_uris(not_found_cache))}
             if blockchain_token_uris:
+                self.cache_token_uri.update(blockchain_token_uris)
                 pipe = self.redis.pipeline()
-                redis_map_to_store = {get_redis_key(address_with_token_id): token_uri
+                redis_map_to_store = {get_redis_key(address_with_token_id): token_uri if token_uri is not None else ''
                                       for address_with_token_id, token_uri in blockchain_token_uris.items()}
                 pipe.mset(redis_map_to_store)
                 for key in redis_map_to_store.keys():
                     pipe.expire(key, 60 * 60 * 12)  # 12 hours
-                self.cache_token_uri.update(blockchain_token_uris)
+                pipe.execute()
         except IOError as exc:
             raise NodeConnectionError from exc
 

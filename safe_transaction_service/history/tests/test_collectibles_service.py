@@ -13,13 +13,14 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
-from ..utils import get_redis
 
 from ...tokens.constants import ENS_CONTRACTS_WITH_TLD
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
+                                             CollectiblesServiceProvider,
                                              CollectibleWithMetadata,
-                                             Erc721InfoWithLogo, CollectiblesServiceProvider)
+                                             Erc721InfoWithLogo)
+from ..utils import get_redis
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
@@ -147,18 +148,29 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
     @mock.patch.object(Erc721Manager, 'get_token_uris', autospec=True)
     def test_get_token_uris(self, get_token_uris_mock: MagicMock):
-        token_uris = ['http://testing.com/12', None, '']
+        redis = get_redis()
+        redis.flushall()
+        token_uris = ['http://testing.com/12', None, '']  # '' will be parsed as None by the service
+        expected_token_uris = ['http://testing.com/12', None, None]
         get_token_uris_mock.return_value = token_uris
-        addresses_with_token_ids = [(Account.create(), i) for i in range(3)]
+        addresses_with_token_ids = [(Account.create().address, i) for i in range(3)]
         collectibles_service = CollectiblesServiceProvider()
         self.assertFalse(collectibles_service.cache_token_uri)
-        collectibles_service.get_token_uris(addresses_with_token_ids)
+        self.assertEqual(collectibles_service.get_token_uris(addresses_with_token_ids), expected_token_uris)
+
+        # Test redis cache
+        redis_keys = redis.keys('token-uri:*')
+        self.assertEqual(len(redis_keys), 3)
 
         # Test cache
         self.assertEqual(len(collectibles_service.cache_token_uri), 3)
         get_token_uris_mock.return_value = []
-        for address_with_token_id, token_uri in zip(addresses_with_token_ids, token_uris):
+        for address_with_token_id, token_uri in zip(addresses_with_token_ids, expected_token_uris):
             self.assertEqual(collectibles_service.cache_token_uri[address_with_token_id], token_uri)
+
+        # Test redis cache working
+        collectibles_service.cache_token_uri = {}
+        self.assertEqual(collectibles_service.get_token_uris(addresses_with_token_ids), expected_token_uris)
 
     def test_retrieve_metadata_from_uri(self):
         collectibles_service = CollectiblesServiceProvider()
