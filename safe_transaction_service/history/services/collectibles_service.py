@@ -283,6 +283,9 @@ class CollectiblesService:
             return f'token-uri:{token_address}:{token_id}'
 
         def get_not_found_cache():
+            """
+            :return: address_with_token_id not found on the local cache
+            """
             return [address_with_token_id for address_with_token_id in addresses_with_token_ids
                     if address_with_token_id not in self.cache_token_uri]
 
@@ -303,10 +306,13 @@ class CollectiblesService:
 
         try:
             # Find missing token uris in blockchain
+            logger.debug('Getting token uris from blockchain for %d addresses with token ids',
+                         len(not_found_cache))
             blockchain_token_uris = {address_with_token_id: token_uri if token_uri else None
                                      for address_with_token_id, token_uri
                                      in zip(not_found_cache,
                                             self.ethereum_client.erc721.get_token_uris(not_found_cache))}
+            logger.debug('Got token uris')
             if blockchain_token_uris:
                 self.cache_token_uri.update(blockchain_token_uris)
                 pipe = self.redis.pipeline()
