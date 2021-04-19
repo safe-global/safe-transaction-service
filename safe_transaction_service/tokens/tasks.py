@@ -46,10 +46,11 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
     :param force_recalculation: Force a new calculation even if an old one is on cache
     :return: token price (in ether) when calculated
     """
+    redis_expiration_time = 60 * 30  # Expire in 30 minutes
     redis = get_redis()
     now = timezone.now()
     current_timestamp = int(now.timestamp())
-    key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60, nx=True)  # Expire in 5 minutes
+    key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60 * 15, nx=True)  # Expire in 15 minutes
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
         eth_price = price_service.get_token_eth_value(token_address)
@@ -59,7 +60,6 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
                 eth_usd_price = price_service.get_eth_usd_price()
                 eth_price = usd_price / eth_usd_price
         if eth_price:
-            redis_expiration_time = 60 * 30  # Expire in 30 minutes
             eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
             redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
             if not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
