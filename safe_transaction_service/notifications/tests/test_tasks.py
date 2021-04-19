@@ -6,8 +6,8 @@ from eth_account import Account
 from web3 import Web3
 
 from safe_transaction_service.history.models import (EthereumTxCallType,
-                                                     EthereumTxType,
                                                      InternalTx,
+                                                     InternalTxType,
                                                      MultisigConfirmation,
                                                      MultisigTransaction,
                                                      WebHookType)
@@ -65,7 +65,7 @@ class TestViews(TestCase):
         # Incoming transaction to a Safe must be filtered out if it was triggered by that same Safe
         internal_tx = InternalTxFactory(
             value=5,
-            tx_type=EthereumTxType.CALL.value,
+            tx_type=InternalTxType.CALL.value,
             call_type=EthereumTxCallType.CALL.value
         )
         incoming_internal_tx_payload, outgoing_internal_tx_payload = build_webhook_payload(InternalTx, internal_tx)

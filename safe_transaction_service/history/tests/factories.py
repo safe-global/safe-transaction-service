@@ -13,11 +13,11 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
-                      EthereumTxCallType, EthereumTxType, InternalTx,
-                      InternalTxDecoded, ModuleTransaction,
-                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                      SafeContract, SafeContractDelegate, SafeMasterCopy,
-                      SafeStatus, WebHook)
+                      EthereumTxCallType, InternalTx, InternalTxDecoded,
+                      InternalTxType, ModuleTransaction, MultisigConfirmation,
+                      MultisigTransaction, ProxyFactory, SafeContract,
+                      SafeContractDelegate, SafeMasterCopy, SafeStatus,
+                      WebHook)
 
 
 class EthereumBlockFactory(DjangoModelFactory):
@@ -84,7 +84,7 @@ class InternalTxFactory(DjangoModelFactory):
     code = None
     output = None
     refund_address = NULL_ADDRESS
-    tx_type = EthereumTxType.CALL.value
+    tx_type = InternalTxType.CALL.value
     call_type = EthereumTxCallType.CALL.value
     trace_address = factory.Sequence(lambda n: str(n))
     error = None

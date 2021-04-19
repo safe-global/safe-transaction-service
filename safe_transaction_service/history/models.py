@@ -58,7 +58,7 @@ class EthereumTxCallType(Enum):
             return None
 
 
-class EthereumTxType(Enum):
+class InternalTxType(Enum):
     CALL = 0
     CREATE = 1
     SELF_DESTRUCT = 2
@@ -68,15 +68,15 @@ class EthereumTxType(Enum):
     def parse(tx_type: str):
         tx_type = tx_type.upper()
         if tx_type == 'CALL':
-            return EthereumTxType.CALL
+            return InternalTxType.CALL
         elif tx_type == 'CREATE':
-            return EthereumTxType.CREATE
-        elif tx_type == 'SUICIDE':
-            return EthereumTxType.SELF_DESTRUCT
+            return InternalTxType.CREATE
+        elif tx_type in ('SUICIDE', 'SELFDESTRUCT'):
+            return InternalTxType.SELF_DESTRUCT
         elif tx_type == 'REWARD':
-            return EthereumTxType.REWARD
+            return InternalTxType.REWARD
         else:
-            raise ValueError(f'{tx_type} is not a valid EthereumTxType')
+            raise ValueError(f'{tx_type} is not a valid InternalTxType')
 
 
 class TransferDict(TypedDict):
@@ -392,7 +392,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         :return: InternalTx not inserted
         """
         data = trace['action'].get('input') or trace['action'].get('init')
-        tx_type = EthereumTxType.parse(trace['type'])
+        tx_type = InternalTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
         trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return InternalTx(
@@ -414,7 +414,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         )
 
     def get_or_create_from_trace(self, trace: Dict[str, Any], ethereum_tx: EthereumTx) -> Tuple['InternalTx', bool]:
-        tx_type = EthereumTxType.parse(trace['type'])
+        tx_type = InternalTxType.parse(trace['type'])
         call_type = EthereumTxCallType.parse_call_type(trace['action'].get('callType'))
         trace_address_str = self._trace_address_to_str(trace['traceAddress'])
         return self.get_or_create(
@@ -523,7 +523,7 @@ class InternalTx(models.Model):
     code = models.BinaryField(null=True)                # Create
     output = models.BinaryField(null=True)              # Call
     refund_address = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT
-    tx_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in EthereumTxType], db_index=True)
+    tx_type = models.PositiveSmallIntegerField(choices=[(tag.value, tag.name) for tag in InternalTxType], db_index=True)
     call_type = models.PositiveSmallIntegerField(null=True,
                                                  choices=[(tag.value, tag.name) for tag in EthereumTxCallType],
                                                  db_index=True)  # Call
@@ -556,11 +556,11 @@ class InternalTx(models.Model):
 
     @property
     def is_call(self):
-        return EthereumTxType(self.tx_type) == EthereumTxType.CALL
+        return InternalTxType(self.tx_type) == InternalTxType.CALL
 
     @property
     def is_create(self):
-        return EthereumTxType(self.tx_type) == EthereumTxType.CREATE
+        return InternalTxType(self.tx_type) == InternalTxType.CREATE
 
     @property
     def is_decoded(self):
