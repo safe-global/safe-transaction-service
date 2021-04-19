@@ -19,8 +19,8 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
     PriceService, PriceServiceProvider)
-from safe_transaction_service.tokens.tasks import (EthValueWithTimestamp,
-                                                   calculate_token_eth_price)
+from safe_transaction_service.tokens.tasks import (
+    EthValueWithTimestamp, calculate_token_eth_price_task)
 
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
@@ -168,7 +168,7 @@ class BalanceService:
             elif result:
                 yield EthValueWithTimestamp.from_string(result.decode())
             else:
-                task_result = calculate_token_eth_price.delay(token_address, cache_key)
+                task_result = calculate_token_eth_price_task.delay(token_address, cache_key)
                 if task_result.ready():
                     yield task_result.get()
                 else:

@@ -11,7 +11,7 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ..services import PriceService
-from ..tasks import (EthValueWithTimestamp, calculate_token_eth_price,
+from ..tasks import (EthValueWithTimestamp, calculate_token_eth_price_task,
                      fix_pool_tokens_task)
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,10 @@ class TestTasks(TestCase):
 
     @mock.patch.object(PriceService, 'get_token_eth_value', autospec=True, return_value=4815)
     @mock.patch.object(timezone, 'now', return_value=timezone.now())
-    def test_calculate_token_eth_price(self, timezone_now_mock: MagicMock, get_token_eth_value_mock: MagicMock):
+    def test_calculate_token_eth_price_task(self, timezone_now_mock: MagicMock, get_token_eth_value_mock: MagicMock):
         random_token = Account.create().address
         expected = EthValueWithTimestamp(get_token_eth_value_mock.return_value, timezone_now_mock.return_value)
-        self.assertEqual(expected, calculate_token_eth_price.delay('key', random_token).result)
+        self.assertEqual(expected, calculate_token_eth_price_task.delay('key', random_token).result)
 
         with self.settings(CELERY_ALWAYS_EAGER=False):
-            calculate_token_eth_price.delay('key', random_token)
+            calculate_token_eth_price_task.delay('key', random_token)

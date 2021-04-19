@@ -37,8 +37,8 @@ class EthValueWithTimestamp(object):
 
 
 @app.shared_task()
-def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
-                              force_recalculation: bool = False) -> Optional[EthValueWithTimestamp]:
+def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: str,
+                                   force_recalculation: bool = False) -> Optional[EthValueWithTimestamp]:
     """
     Do price calculation for token in an async way and store it with its timestamp on redis
     :param token_address: Token address
@@ -49,7 +49,7 @@ def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
     redis = get_redis()
     now = timezone.now()
     current_timestamp = int(now.timestamp())
-    key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60, nx=True)
+    key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60, nx=True)  # Expire in 5 minutes
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
         eth_price = price_service.get_token_eth_value(token_address)
@@ -64,8 +64,8 @@ def calculate_token_eth_price(token_address: ChecksumAddress, redis_key: str,
             redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
             if not getattr(settings, 'CELERY_ALWAYS_EAGER', False):
                 # Recalculate price before cache expires and prevents recursion checking Celery Eager property
-                calculate_token_eth_price.apply_async((token_address, redis_key), {'force_recalculation': True},
-                                                      countdown=redis_expiration_time - 300)
+                calculate_token_eth_price_task.apply_async((token_address, redis_key), {'force_recalculation': True},
+                                                           countdown=redis_expiration_time - 300)
         else:
             logger.warning('Cannot calculate eth price for token=%s', token_address)
         return EthValueWithTimestamp(eth_price, now)
