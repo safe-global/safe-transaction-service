@@ -20,7 +20,7 @@ from safe_transaction_service.tokens.models import Token
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionError
 from ..models import EthereumEvent
-from ..utils import get_redis
+from ..utils import chunks, get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,10 @@ class CollectiblesService:
             return []
 
         logger.debug('Getting token_uris for %s', addresses_with_token_ids)
-        token_uris = self.get_token_uris(addresses_with_token_ids)
+        # Chunk token uris to prevent stressing the node
+        token_uris = []
+        for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 50):
+            token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
         logger.debug('Got token_uris for %s', addresses_with_token_ids)
         collectibles = []
         for (token_address, token_id), token_uri in zip(addresses_with_token_ids, token_uris):
