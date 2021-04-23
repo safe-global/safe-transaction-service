@@ -133,8 +133,9 @@ class CollectiblesService:
             uri = urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', ''))  # Use ipfs gateway
 
         if not uri or not uri.startswith('http'):
-            logger.debug('%s is not an uri', uri)
-            return None
+            message = f'{uri} is not an uri'
+            logger.debug(message)
+            raise ValueError(message)
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
@@ -170,7 +171,10 @@ class CollectiblesService:
                 'description': ('' if label_name else 'Unknown ') + f'.{tld} ENS Domain',
                 'image': self.ENS_IMAGE_URL,
             }
-        metadata = self._retrieve_metadata_from_uri(collectible.uri)
+        try:
+            metadata = self._retrieve_metadata_from_uri(collectible.uri)
+        except ValueError:  # Invalid uri
+            metadata = {}
         if metadata is None:
             metadata = {}
             logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
