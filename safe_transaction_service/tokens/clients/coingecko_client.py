@@ -17,7 +17,7 @@ class CoingeckoClient:
 
     def _get_price(self, url: str, name: str):
         try:
-            response = self.http_session.get(url)
+            response = self.http_session.get(url, timeout=10)
             if not response.ok:
                 raise CannotGetPrice
             # Result is returned with lowercased `token_address`

@@ -14,7 +14,7 @@ class KrakenClient:
     def _get_price(self, symbol: str) -> float:
         url = f'https://api.kraken.com/0/public/Ticker?pair={symbol}'
         try:
-            response = self.http_session.get(url)
+            response = self.http_session.get(url, timeout=10)
             api_json = response.json()
             error = api_json.get('error')
             if not response.ok or error:

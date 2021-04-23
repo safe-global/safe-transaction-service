@@ -15,7 +15,7 @@ class KucoinClient:
 
     def get_ewt_usd_price(self) -> float:
         try:
-            response = self.http_session.get(self.PRICE_URL)
+            response = self.http_session.get(self.PRICE_URL, timeout=10)
             result = response.json()
             return float(result['data']['price'])
         except (ValueError, IOError) as e:
