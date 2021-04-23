@@ -29,6 +29,10 @@ class CollectiblesServiceException(Exception):
     pass
 
 
+class MetadataRetrievalException(CollectiblesServiceException):
+    pass
+
+
 @dataclass
 class Erc721InfoWithLogo:
     address: str
@@ -121,8 +125,10 @@ class CollectiblesService:
         self.http_session = requests.session()
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
-    @cache_memoize(60 * 60 * 24, prefix='collectibles-_retrieve_metadata_from_uri')  # 1 day
-    def _retrieve_metadata_from_uri(self, uri: str) -> Optional[Dict[Any, Any]]:
+    @cache_memoize(60 * 60 * 24,
+                   prefix='collectibles-_retrieve_metadata_from_uri',
+                   cache_exceptions=(MetadataRetrievalException,))  # 1 day
+    def _retrieve_metadata_from_uri(self, uri: str) -> Dict[Any, Any]:
         """
         Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
         supported
@@ -133,22 +139,19 @@ class CollectiblesService:
             uri = urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', ''))  # Use ipfs gateway
 
         if not uri or not uri.startswith('http'):
-            message = f'{uri} is not an uri'
-            logger.debug(message)
-            raise ValueError(message)
+            raise MetadataRetrievalException(uri)
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
-            response = self.http_session.get(uri)
+            response = self.http_session.get(uri, timeout=5)
             if not response.ok:
                 logger.debug('Cannot get metadata for uri=%s', uri)
-                return None
+                raise MetadataRetrievalException(uri)
             else:
                 logger.debug('Got metadata for uri=%s', uri)
                 return response.json()
-        except (IOError, ValueError):
-            logger.warning('Cannot get metadata for uri=%s', uri, exc_info=True)
-            return None
+        except (requests.RequestException, ValueError) as e:
+            raise MetadataRetrievalException(uri) from e
 
     def build_collectible(self, token_info: Optional[Erc721InfoWithLogo], token_address: str, token_id: int,
                           token_metadata_uri: Optional[str]) -> Collectible:
@@ -171,15 +174,8 @@ class CollectiblesService:
                 'description': ('' if label_name else 'Unknown ') + f'.{tld} ENS Domain',
                 'image': self.ENS_IMAGE_URL,
             }
-        try:
-            metadata = self._retrieve_metadata_from_uri(collectible.uri)
-        except ValueError:  # Invalid uri
-            metadata = {}
-        if metadata is None:
-            metadata = {}
-            logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
-                           f'for token-address={collectible.address}')
-        return metadata
+
+        return self._retrieve_metadata_from_uri(collectible.uri)
 
     def _filter_addresses(self, addresses_with_token_ids: Sequence[Tuple[str, int]],
                           only_trusted: bool = False, exclude_spam: bool = False):
@@ -254,7 +250,13 @@ class CollectiblesService:
         """
         collectibles_with_metadata = []
         for collectible in self.get_collectibles(safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam):
-            metadata = self.get_metadata(collectible)
+            try:
+                metadata = self.get_metadata(collectible)
+            except MetadataRetrievalException:
+                metadata = {}
+                logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
+                               f'for token-address={collectible.address}')
+
             collectibles_with_metadata.append(
                 CollectibleWithMetadata(collectible.token_name, collectible.token_symbol, collectible.logo_uri,
                                         collectible.address, collectible.id, collectible.uri, metadata)
