@@ -13,7 +13,7 @@ class CoingeckoClient:
     base_url = 'https://api.coingecko.com/'
 
     def __init__(self):
-        self.http_session = requests.session()
+        self.http_session = requests.Session()
 
     def _get_price(self, url: str, name: str):
         try:

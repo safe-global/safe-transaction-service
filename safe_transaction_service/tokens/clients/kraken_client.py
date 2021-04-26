@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class KrakenClient:
     def __init__(self):
-        self.http_session = requests.session()
+        self.http_session = requests.Session()
 
     def _get_price(self, symbol: str) -> float:
         url = f'https://api.kraken.com/0/public/Ticker?pair={symbol}'

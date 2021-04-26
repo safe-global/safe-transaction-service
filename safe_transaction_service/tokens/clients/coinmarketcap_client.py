@@ -29,7 +29,7 @@ class CoinMarketCapClient:
             'Accepts': 'application/json',
             'X-CMC_PRO_API_KEY': api_token,
         }
-        self.http_session = requests.session()
+        self.http_session = requests.Session()
 
     def download_file(self, url: str, taget_folder: str, local_filename: str) -> str:
         if not os.path.exists(taget_folder):

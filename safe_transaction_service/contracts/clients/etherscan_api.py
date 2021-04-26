@@ -23,7 +23,7 @@ class EtherscanApi:
         self.base_url = self.get_base_url(network)
         if self.base_url is None:
             raise EtherscanApiConfigurationError(f'Network {network.name} - {network.value} not supported')
-        self.http_session = requests.session()
+        self.http_session = requests.Session()
 
     def build_url(self, path: str):
         url = urljoin(self.base_url, path)

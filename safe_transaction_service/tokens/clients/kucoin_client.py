@@ -11,7 +11,7 @@ class KucoinClient:
     PRICE_URL = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
 
     def __init__(self):
-        self.http_session = requests.session()
+        self.http_session = requests.Session()
 
     def get_ewt_usd_price(self) -> float:
         try:

@@ -1,3 +1,4 @@
+import concurrent
 import logging
 import operator
 from dataclasses import dataclass, field
@@ -122,7 +123,6 @@ class CollectiblesService:
         self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
         self.cache_token_info: Dict[str, Tuple[str, str]] = {}
         self.cache_token_uri: Dict[Tuple[str, int], str] = {}
-        self.http_session = requests.session()
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24,
@@ -143,7 +143,7 @@ class CollectiblesService:
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
-            response = self.http_session.get(uri, timeout=5)
+            response = requests.get(uri, timeout=5)
             if not response.ok:
                 logger.debug('Cannot get metadata for uri=%s', uri)
                 raise MetadataRetrievalException(uri)
@@ -248,20 +248,30 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return:
         """
-        collectibles_with_metadata = []
-        for collectible in self.get_collectibles(safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam):
-            try:
-                metadata = self.get_metadata(collectible)
-            except MetadataRetrievalException:
-                metadata = {}
-                logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
-                               f'for token-address={collectible.address}')
+        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = dict()
+        collectibles = self.get_collectibles(safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_collectible = {executor.submit(self.get_metadata, collectible): collectible
+                                     for collectible in collectibles}
+            for future in concurrent.futures.as_completed(future_to_collectible):
+                collectible = future_to_collectible[future]
+                try:
+                    metadata = future.result()
+                except MetadataRetrievalException:
+                    metadata = {}
+                    logger.warning(f'Cannot retrieve token-uri={collectible.uri} '
+                                   f'for token-address={collectible.address}')
 
-            collectibles_with_metadata.append(
-                CollectibleWithMetadata(collectible.token_name, collectible.token_symbol, collectible.logo_uri,
-                                        collectible.address, collectible.id, collectible.uri, metadata)
-            )
-        return collectibles_with_metadata
+                collectibles_with_metadata[collectible.address, collectible.id] = CollectibleWithMetadata(
+                    collectible.token_name,
+                    collectible.token_symbol,
+                    collectible.logo_uri,
+                    collectible.address,
+                    collectible.id,
+                    collectible.uri,
+                    metadata
+                )
+        return [collectibles_with_metadata[collectible.address, collectible.id] for collectible in collectibles]
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60 * 24, prefix='collectibles-get_token_info')  # 1 day
