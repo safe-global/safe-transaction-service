@@ -250,7 +250,7 @@ class CollectiblesService:
         """
         collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = dict()
         collectibles = self.get_collectibles(safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
             future_to_collectible = {executor.submit(self.get_metadata, collectible): collectible
                                      for collectible in collectibles}
             for future in concurrent.futures.as_completed(future_to_collectible):
