@@ -26,7 +26,7 @@ class FirebaseDeviceCreateView(CreateAPIView):
     @swagger_auto_schema(responses={200: response_serializer_class(),
                                     400: 'Invalid data'})
     def post(self, request, *args, **kwargs):
-        super().post(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
