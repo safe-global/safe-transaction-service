@@ -219,6 +219,8 @@ class SafeTxDecoder:
         :param data:
         :return:
         """
+        if not data:
+            return None
         try:
             fn_name, parameters = self.decode_transaction_with_types(data)
             return {'method': fn_name,
@@ -249,7 +251,7 @@ class TxDecoder(SafeTxDecoder):
             return [{'operation': multisend_tx.operation.value,
                      'to': multisend_tx.to,
                      'value': str(multisend_tx.value),
-                     'data': multisend_tx.data.hex(),
+                     'data': multisend_tx.data.hex() if multisend_tx.data else None,
                      'data_decoded': self.get_data_decoded(multisend_tx.data),
                      } for multisend_tx in multisend_txs]
         except ValueError:
