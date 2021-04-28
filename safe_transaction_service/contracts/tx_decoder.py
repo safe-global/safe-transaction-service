@@ -17,6 +17,7 @@ from gnosis.eth.contracts import (get_erc20_contract, get_erc721_contract,
                                   get_multi_send_contract, get_safe_contract,
                                   get_safe_V0_0_1_contract,
                                   get_safe_V1_0_0_contract,
+                                  get_safe_V1_3_0_contract,
                                   get_uniswap_exchange_contract)
 from gnosis.safe.multi_send import MultiSend
 
@@ -207,6 +208,7 @@ class SafeTxDecoder:
     def get_supported_abis(self) -> List[ABI]:
         safe_abis = [get_safe_V0_0_1_contract(self.dummy_w3).abi,
                      get_safe_V1_0_0_contract(self.dummy_w3).abi,
+                     get_safe_V1_3_0_contract(self.dummy_w3).abi,
                      get_safe_contract(self.dummy_w3).abi]
 
         # Order is important. If signature is the same (e.g. renaming of `baseGas`) last elements in the list

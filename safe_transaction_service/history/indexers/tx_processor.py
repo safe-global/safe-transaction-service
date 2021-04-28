@@ -245,6 +245,14 @@ class SafeTxProcessor(TxProcessor):
             safe_status = self.get_last_safe_status_for_address(contract_address)
             safe_status.fallback_handler = arguments['handler']
             self.store_new_safe_status(safe_status, internal_tx)
+        elif function_name == 'setGuard':
+            safe_status = self.get_last_safe_status_for_address(contract_address)
+            safe_status.guard = arguments['guard'] if arguments['guard'] != NULL_ADDRESS else None
+            if safe_status.guard:
+                logger.debug('Setting Guard')
+            else:
+                logger.debug('Unsetting Guard')
+            self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'enableModule':
             logger.debug('Enabling Module')
             safe_status = self.get_last_safe_status_for_address(contract_address)

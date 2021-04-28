@@ -1066,6 +1066,7 @@ class SafeStatus(models.Model):
     nonce = Uint256Field(default=0)
     master_copy = EthereumAddressField()
     fallback_handler = EthereumAddressField()
+    guard = EthereumAddressField(default=None, null=True)
     enabled_modules = ArrayField(EthereumAddressField(), default=list)
 
     class Meta:

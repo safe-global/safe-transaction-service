@@ -374,8 +374,8 @@ class SafeStatusAdmin(admin.ModelAdmin):
     readonly_fields = ('function_name', 'arguments')
     list_display = ('block_number', 'internal_tx_id', 'function_name',
                     'address', 'owners', 'threshold', 'nonce', 'master_copy',
-                    'fallback_handler', 'enabled_modules')
-    list_filter = ('threshold', 'master_copy', 'fallback_handler', SafeStatusModulesListFilter)
+                    'fallback_handler', 'guard', 'enabled_modules')
+    list_filter = ('threshold', 'master_copy', 'fallback_handler', 'guard', SafeStatusModulesListFilter)
     list_select_related = ('internal_tx__ethereum_tx', 'internal_tx__decoded_tx')
     ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
     raw_id_fields = ('internal_tx',)
