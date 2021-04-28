@@ -1,6 +1,9 @@
 import logging
 
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
 from rest_framework.generics import CreateAPIView, DestroyAPIView
+from rest_framework.response import Response
 
 from safe_transaction_service.history.models import SafeContract
 
@@ -18,6 +21,21 @@ class FirebaseDeviceCreateView(CreateAPIView):
     Safes provided on the request are always added and never removed/replaced
     """
     serializer_class = serializers.FirebaseDeviceSerializer
+    response_serializer_class = serializers.FirebaseDeviceSerializerWithOwnersResponseSerializer
+
+    @swagger_auto_schema(responses={200: response_serializer_class(),
+                                    400: 'Invalid data'})
+    def post(self, request, *args, **kwargs):
+        super().post(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        response_serializer = self.response_serializer_class(data=serializer.validated_data)
+        response_serializer.is_valid(raise_exception=True)
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class FirebaseDeviceDeleteView(DestroyAPIView):

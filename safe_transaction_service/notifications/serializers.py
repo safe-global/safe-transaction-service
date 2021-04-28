@@ -61,6 +61,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
     def validate(self, data: Dict[str, Any]):
         data = super().validate(data)
         signature_owners = []
+        owners_without_safe = []
         signatures = data.get('signatures') or []
         if signatures:
             current_owners = {owner for safe in data['safes'] for owner in get_safe_owners(safe)}
@@ -76,17 +77,19 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                     if safe_signature.signature_type != SafeSignatureType.EOA or not safe_signature.is_valid():
                         raise ValidationError('An externally owned account signature was expected')
                     owner = safe_signature.owner
-                    if owner in signature_owners:
+                    if owner in (signature_owners + owners_without_safe):
                         raise ValidationError(f'Signature for owner={owner} is duplicated')
                     elif owner not in current_owners:
-                        raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
-                                              f'Expected hash to sign {hash_to_sign.hex()}')
+                        owners_without_safe.append(owner)
+                        # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
+                        #                       f'Expected hash to sign {hash_to_sign.hex()}')
                     else:
                         signature_owners.append(owner)
-            if len(signatures) > len(signature_owners):
+            if len(signatures) > len(signature_owners + owners_without_safe):
                 raise ValidationError('Number of signatures is less than the number of owners detected')
 
-        data['owners'] = signature_owners
+        data['owners_registered'] = signature_owners
+        data['owners_not_registered'] = owners_without_safe
         return data
 
     def save(self, **kwargs):
@@ -107,7 +110,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
         # Remove every owner registered for the device and add the provided ones
         firebase_device.owners.all().delete()
-        for owner in self.validated_data['owners']:
+        for owner in self.validated_data['owners_registered']:
             FirebaseDeviceOwner.objects.create(
                 firebase_device=firebase_device,
                 owner=owner
@@ -118,3 +121,8 @@ class FirebaseDeviceSerializer(serializers.Serializer):
         safe_contracts = SafeContract.objects.filter(address__in=self.validated_data['safes'])
         firebase_device.safes.add(*safe_contracts)
         return firebase_device
+
+
+class FirebaseDeviceSerializerWithOwnersResponseSerializer(FirebaseDeviceSerializer):
+    owners_registered = serializers.ListField(allow_empty=True, child=EthereumAddressField())
+    owners_not_registered = serializers.ListField(allow_empty=True, child=EthereumAddressField())

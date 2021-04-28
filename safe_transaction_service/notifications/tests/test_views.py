@@ -122,8 +122,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'signatures': signatures,
         }
         response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
-        self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['owners_registered'], [])
+        self.assertEqual(response.data['owners_not_registered'], [owner_account.address])
 
         with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address]):
@@ -137,13 +139,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             # Add another signature
             signatures.append(owner_account_2.signHash(hash_to_sign)['signature'].hex())
             response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
-            self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            # self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data['owners_registered'], [owner_account.address])
+            self.assertEqual(response.data['owners_not_registered'], [owner_account_2.address])
 
         with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address, owner_account_2.address]):
             response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data['owners_registered'], [owner_account.address, owner_account_2.address])
+            self.assertEqual(response.data['owners_not_registered'], [])
             self.assertEqual(FirebaseDevice.objects.count(), 1)
             self.assertCountEqual(FirebaseDeviceOwner.objects.values_list('owner', flat=True),
                                   [owner_account.address, owner_account_2.address])
