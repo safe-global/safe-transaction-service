@@ -114,6 +114,7 @@ class CollectiblesServiceProvider:
 class CollectiblesService:
     ENS_IMAGE_URL = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
     IPFS_GATEWAY = 'https://cloudflare-ipfs.com/'
+    METDATA_MAX_CONTENT_LENGTH = int(0.2 * 1024 * 1024)  # 0.2Mb is the maximum metadata size allowed
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
@@ -143,14 +144,22 @@ class CollectiblesService:
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
-            response = requests.get(uri, timeout=5)
+            response = requests.get(uri, timeout=5, stream=True)
             if not response.ok:
                 logger.debug('Cannot get metadata for uri=%s', uri)
                 raise MetadataRetrievalException(uri)
+
+            content_length = response.headers.get('content-length', 0)
+            content_type = response.headers.get('content-type', '')
+            if int(content_length) > self.METDATA_MAX_CONTENT_LENGTH:
+                raise MetadataRetrievalException(f'Content-length={content_length} for uri={uri} is too big')
+            elif 'application/json' not in content_type:
+                raise MetadataRetrievalException(f'Content-type={content_type} for uri={uri} is not valid, expected '
+                                                 f'"application/json"')
             else:
                 logger.debug('Got metadata for uri=%s', uri)
                 return response.json()
-        except (requests.RequestException, ValueError) as e:
+        except (IOError, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
 
     def build_collectible(self, token_info: Optional[Erc721InfoWithLogo], token_address: str, token_id: int,
