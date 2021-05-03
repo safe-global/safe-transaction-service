@@ -234,7 +234,7 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
 class SafeMultisigTransactionListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
     filterset_class = filters.MultisigTransactionFilter
-    ordering_fields = ['nonce', 'created']
+    ordering_fields = ['nonce', 'created', 'modified']
     pagination_class = pagination.DefaultPagination
 
     def get_queryset(self):
