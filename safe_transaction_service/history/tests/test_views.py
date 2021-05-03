@@ -287,8 +287,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                                     format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
+        modified = multisig_transaction.modified
         multisig_transaction.refresh_from_db()
         self.assertTrue(multisig_transaction.trusted)
+        self.assertGreater(multisig_transaction.modified, modified)  # Modified should be updated
 
         # Add multiple signatures
         data = {
@@ -455,8 +457,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         data['signature'] = safe_owner_1.signHash(safe_tx.safe_tx_hash)['signature'].hex()
         response = self.client.post(reverse('v1:multisig-transactions', args=(safe_address,)), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        modified = multisig_transaction_db.modified
         multisig_transaction_db.refresh_from_db()
         self.assertTrue(multisig_transaction_db.trusted)  # Now it should be trusted
+        self.assertGreater(multisig_transaction_db.modified, modified)  # Modified should be updated
 
         response = self.client.get(reverse('v1:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
