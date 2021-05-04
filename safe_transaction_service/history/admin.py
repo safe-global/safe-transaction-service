@@ -392,7 +392,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
         return False
 
     def remove_and_index(self, request, queryset):
-        safe_addresses = queryset.distinct().values('address')
+        safe_addresses = queryset.distinct().values_list('address', flat=True)
         IndexServiceProvider().reindex_addresses(safe_addresses)
     remove_and_index.short_description = "Remove and index again"
 

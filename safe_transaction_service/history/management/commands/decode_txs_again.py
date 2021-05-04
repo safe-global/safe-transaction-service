@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 
-from ...indexers.tx_decoder import CannotDecode, get_safe_tx_decoder
+from safe_transaction_service.contracts.tx_decoder import (CannotDecode,
+                                                           get_safe_tx_decoder)
+
 from ...models import InternalTx, InternalTxDecoded
 
 
