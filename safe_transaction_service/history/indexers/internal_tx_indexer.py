@@ -11,7 +11,8 @@ from gnosis.eth import EthereumClient
 from safe_transaction_service.contracts.tx_decoder import (CannotDecode,
                                                            get_safe_tx_decoder)
 
-from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy, MonitoredAddress
+from ..models import (InternalTx, InternalTxDecoded, MonitoredAddress,
+                      SafeMasterCopy)
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)

@@ -19,7 +19,7 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
                                       Sha3HashField, Uint256Field)
 from gnosis.safe import SafeOperation
-from gnosis.safe.safe_signature import SafeSignatureType
+from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.contracts.models import Contract
 
@@ -818,12 +818,14 @@ class MultisigTransaction(TimeStampedModel):
     def executed(self) -> bool:
         return bool(self.ethereum_tx_id and (self.ethereum_tx.block_id is not None))
 
+    @property
     def owners(self) -> Optional[List[str]]:
         if not self.signatures:
             return None
         else:
-            # TODO Get owners from signatures. Not very trivial
-            return []
+            signatures = bytes(self.signatures)
+            safe_signatures = SafeSignature.parse_signature(signatures, self.safe_tx_hash)
+            return [safe_signature.owner for safe_signature in safe_signatures]
 
 
 class ModuleTransaction(TimeStampedModel):

@@ -90,6 +90,17 @@ class TestModelMixins(TestCase):
         self.assertEqual(InternalTx.objects.bulk_create_from_generator(another_generator, batch_size=2), number)
 
 
+class TestMultisigTransaction(TestCase):
+    def test_multisig_transaction_owners(self):
+        multisig_transaction = MultisigTransactionFactory(signatures=None)
+        self.assertIsNone(multisig_transaction.owners)
+
+        account = Account.create()
+        multisig_transaction.signatures = account.signHash(multisig_transaction.safe_tx_hash)['signature']
+        multisig_transaction.save()
+        self.assertEqual(multisig_transaction.owners, [account.address])
+
+
 class TestSafeMasterCopy(TestCase):
     def test_safe_master_copy_sorting(self):
         SafeMasterCopy.objects.create(address=Account.create().address,
