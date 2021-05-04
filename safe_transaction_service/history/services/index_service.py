@@ -159,8 +159,6 @@ class IndexService:
         MultisigTransaction.objects.exclude(
             ethereum_tx=None
         ).filter(
-            origin=None
-        ).filter(
             safe__in=addresses
         ).delete()  # Remove not indexed transactions
         ModuleTransaction.objects.filter(safe__in=addresses).delete()
@@ -171,7 +169,7 @@ class IndexService:
         logger.info('Remove onchain confirmations')
         MultisigConfirmation.objects.filter(signature=None).delete()
         logger.info('Remove transactions automatically indexed')
-        MultisigTransaction.objects.exclude(ethereum_tx=None).filter(origin=None).delete()
+        MultisigTransaction.objects.exclude(ethereum_tx=None).delete()
         logger.info('Remove module transactions')
         ModuleTransaction.objects.all().delete()
         logger.info('Remove Safe statuses')
