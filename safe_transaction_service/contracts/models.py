@@ -74,9 +74,12 @@ def get_contract_logo_path(instance: 'Contract', filename):
 
 
 class ContractManager(models.Manager):
-    def create_from_address(self, address: str, network_id: int = 1) -> Contract:
+    def create_from_address(self, address: str, network_id: int = 1) -> Optional[Contract]:
         sourcify = Sourcify()
-        contract_metadata = sourcify.get_contract_metadata(address, network_id=network_id)
+        try:
+            contract_metadata = sourcify.get_contract_metadata(address, network_id=network_id)
+        except IOError:
+            return
         if contract_metadata:
             if contract_metadata.abi:
                 contract_abi, _ = ContractAbi.objects.update_or_create(abi=contract_metadata.abi,
