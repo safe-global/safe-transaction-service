@@ -11,7 +11,7 @@ from gnosis.eth import EthereumClient
 from safe_transaction_service.contracts.tx_decoder import (CannotDecode,
                                                            get_safe_tx_decoder)
 
-from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
+from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy, MonitoredAddress
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
@@ -25,7 +25,7 @@ class InternalTxIndexerProvider:
             if settings.ETH_INTERNAL_NO_FILTER:
                 cls.instance = InternalTxIndexerWithTraceBlock(
                     EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=block_process_limit
+                    block_process_limit=min(block_process_limit, 500)
                 )
             else:
                 cls.instance = InternalTxIndexer(
@@ -78,7 +78,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def _find_relevant_elements_using_trace_block(self, addresses: Sequence[str], from_block_number: int,
                                                   to_block_number: int) -> Set[str]:
-        addresses_set = set(addresses)  # More optimal to use `in`
+        addresses_set = set(addresses)  # More optimal to use with `in`
         try:
             block_numbers = list(range(from_block_number, to_block_number + 1))
             traces = self.ethereum_client.parity.trace_blocks(block_numbers)
@@ -180,7 +180,14 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.updated_blocks_behind: int = 5000000  # Hack to process all the addresses together
+
+    def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
+        """
+        Return every address. As we are using `trace_block` every master copy should be processed together
+        :param current_block_number:
+        :return:
+        """
+        return self.get_not_updated_addresses(current_block_number)
 
     def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
                                to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:
