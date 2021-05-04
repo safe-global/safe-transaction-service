@@ -1138,7 +1138,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         InternalTxFactory(to=safe_address, value=0)
         internal_tx = InternalTxFactory(to=safe_address, value=value)
         InternalTxFactory(to=Account.create().address, value=value)
-        response = self.client.get(reverse('v1:incoming-transfers', args=(safe_address,)), format='json')
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['value'], str(value))
@@ -1269,6 +1269,37 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'tokenInfo': None,
         }] + expected_results
         self.assertEqual(response.json()['results'], expected_results)
+
+        # Test ether, erc20 and erc721 filters
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?erc20=true', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertEqual(result['type'], TransferType.ERC20_TRANSFER.name)
+
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?erc20=false', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertNotEqual(result['type'], TransferType.ERC20_TRANSFER.name)
+
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?erc721=true', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertEqual(result['type'], TransferType.ERC721_TRANSFER.name)
+
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?erc721=false', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertNotEqual(result['type'], TransferType.ERC721_TRANSFER.name)
+
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?ether=true', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertEqual(result['type'], TransferType.ETHER_TRANSFER.name)
+
+        response = self.client.get(reverse('v1:transfers', args=(safe_address,)) + '?ether=false', format='json')
+        self.assertGreater(len(response.data['results']), 0)
+        for result in response.data['results']:
+            self.assertNotEqual(result['type'], TransferType.ETHER_TRANSFER.name)
 
     def test_safe_creation_view(self):
         invalid_address = '0x2A'

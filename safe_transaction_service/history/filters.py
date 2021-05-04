@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 import django_filters
 from django_filters import rest_framework as filters
 
@@ -22,6 +24,30 @@ class TransferListFilter(filters.FilterSet):
     value = django_filters.NumberFilter(field_name='value')
     value__gt = django_filters.NumberFilter(field_name='value', lookup_expr='gt')
     value__lt = django_filters.NumberFilter(field_name='value', lookup_expr='lt')
+    erc20 = django_filters.BooleanFilter(method='filter_erc20')
+    erc721 = django_filters.BooleanFilter(method='filter_erc721')
+    ether = django_filters.BooleanFilter(method='filter_ether')
+
+    def filter_erc20(self, queryset, name: str, value: bool):
+        query = ~Q(value=None) & ~Q(token_address=None)
+        if value:
+            return queryset.filter(query)
+        else:
+            return queryset.exclude(query)
+
+    def filter_erc721(self, queryset, name: str, value: bool):
+        query = ~Q(token_id=None)
+        if value:
+            return queryset.filter(query)
+        else:
+            return queryset.exclude(query)
+
+    def filter_ether(self, queryset, name: str, value: bool):
+        query = ~Q(value=None) & Q(token_address=None)
+        if value:
+            return queryset.filter(query)
+        else:
+            return queryset.exclude(query)
 
 
 class MultisigTransactionFilter(filters.FilterSet):
