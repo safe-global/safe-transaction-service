@@ -83,7 +83,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         for _ in range(5):
             safe_status = SafeStatusFactory()
             MultisigTransactionFactory(safe=safe_status.address)
-        MultisigTransactionFactory(ethereum_tx=None)  # It should be deleted
+        MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
 
         self.assertIsNone(index_service.reindex_all())
         self.assertEqual(SafeStatus.objects.count(), 0)

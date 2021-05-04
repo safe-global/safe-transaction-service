@@ -144,6 +144,42 @@ class IndexService:
                 ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
         return list(ethereum_txs_dict.values())
 
+    def _reindex(self, addresses: List[str]):
+        """
+        Trigger processing of traces again. If addresses is empty, everything is reprocessed
+        :param addresses:
+        :return:
+        """
+        queryset = MultisigConfirmation.objects.filter(signature=None)
+        if not addresses:
+            logger.info('Remove onchain confirmations')
+            queryset.delete()
+
+        logger.info('Remove transactions automatically indexed')
+        queryset = MultisigTransaction.objects.exclude(ethereum_tx=None)
+        if addresses:
+            queryset = queryset.filter(safe__in=addresses)
+        queryset.delete()
+
+        logger.info('Remove module transactions')
+        queryset = ModuleTransaction.objects.all()
+        if addresses:
+            queryset = queryset.filter(safe__in=addresses)
+        queryset.delete()
+
+        logger.info('Remove Safe statuses')
+
+        queryset = SafeStatus.objects.all()
+        if addresses:
+            queryset = queryset.filter(address__in=addresses)
+        queryset.delete()
+
+        logger.info('Mark all internal txs decoded as not processed')
+        queryset = InternalTxDecoded.objects.all()
+        if addresses:
+            queryset = queryset.filter(internal_tx___from__in=addresses)
+        queryset.update(processed=False)
+
     @transaction.atomic
     def reindex_addresses(self, addresses: List[str]):
         """
@@ -155,24 +191,8 @@ class IndexService:
         if not addresses:
             return
 
-        SafeStatus.objects.filter(address__in=addresses).delete()
-        MultisigTransaction.objects.exclude(
-            ethereum_tx=None
-        ).filter(
-            safe__in=addresses
-        ).delete()  # Remove not indexed transactions
-        ModuleTransaction.objects.filter(safe__in=addresses).delete()
-        InternalTxDecoded.objects.filter(internal_tx___from__in=addresses).update(processed=False)
+        return self._reindex(addresses)
 
     @transaction.atomic
     def reindex_all(self):
-        logger.info('Remove onchain confirmations')
-        MultisigConfirmation.objects.filter(signature=None).delete()
-        logger.info('Remove transactions automatically indexed')
-        MultisigTransaction.objects.exclude(ethereum_tx=None).delete()
-        logger.info('Remove module transactions')
-        ModuleTransaction.objects.all().delete()
-        logger.info('Remove Safe statuses')
-        SafeStatus.objects.all().delete()
-        logger.info('Mark all internal txs decoded as not processed')
-        InternalTxDecoded.objects.update(processed=False)
+        return self._reindex(None)
