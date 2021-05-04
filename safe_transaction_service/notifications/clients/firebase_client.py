@@ -5,7 +5,8 @@ from typing import Any, Dict, Sequence, Tuple
 from django.conf import settings
 
 from firebase_admin import App, credentials, initialize_app, messaging
-from firebase_admin.messaging import BatchResponse, UnregisteredError
+from firebase_admin.messaging import (BatchResponse, SendResponse,
+                                      UnregisteredError)
 
 logger = getLogger(__name__)
 
@@ -167,7 +168,7 @@ class FirebaseClient(MessagingClient):
         )
         batch_response: BatchResponse = messaging.send_multicast(message, app=self.app)
         # Check if there are invalid tokens
-        invalid_tokens = [response for response in batch_response.responses
+        invalid_tokens = [token for token, response in zip(tokens, batch_response.responses)
                           if not response.success and isinstance(response.exception, messaging.UnregisteredError)]
         return batch_response.success_count, batch_response.failure_count, invalid_tokens
 
