@@ -141,9 +141,10 @@ class AllTransactionsListView(ListAPIView):
         """
         address = kwargs['address']
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
-                                                                               'message': 'Checksum address validation failed',
-                                                                               'arguments': [address]})
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         response = super().get(request, *args, **kwargs)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -173,7 +174,10 @@ class SafeModuleTransactionListView(ListAPIView):
         Returns the module transaction of a Safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -270,7 +274,10 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         address = kwargs['address']
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         response = super().get(request, *args, **kwargs)
         response.data['count_unique_nonce'] = self.get_unique_nonce(address) if response.data['count'] else 0
@@ -286,7 +293,10 @@ class SafeMultisigTransactionListView(ListAPIView):
         Creates a Multisig Transaction with its confirmations and retrieves all the information related.
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         request.data['safe'] = address
         serializer = self.get_serializer(data=request.data)
@@ -401,7 +411,10 @@ class SafeDelegateListView(ListCreateAPIView):
         Get the list of delegates for a Safe address
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         return super().get(request, address, **kwargs)
 
@@ -421,7 +434,10 @@ class SafeDelegateListView(ListCreateAPIView):
              - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         request.data['safe'] = address
         return super().post(request, address, **kwargs)
@@ -447,7 +463,10 @@ class SafeDelegateDestroyView(DestroyAPIView):
         Check `POST /delegates/`
         """
         if not Web3.isChecksumAddress(address) or not Web3.isChecksumAddress(delegate_address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address, delegate_address]})
 
         request.data['safe'] = address
         request.data['delegate'] = delegate_address
@@ -499,7 +518,11 @@ class SafeTransferListView(ListAPIView):
         Returns the history of a multisig tx (safe)
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data='Invalid ethereum address')
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]}
+                            )
 
         response = super().get(request, address)
         response.setdefault('ETag', 'W/' + hashlib.md5(str(response.data['results']).encode()).hexdigest())
@@ -527,7 +550,10 @@ class SafeCreationView(APIView):
         """
 
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         safe_creation_info = SafeServiceProvider().get_safe_creation_info(address)
         if not safe_creation_info:
@@ -548,9 +574,10 @@ class SafeInfoView(APIView):
         Get status of the safe
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY, data={'code': 1,
-                                                                               'message': 'Checksum address validation failed',
-                                                                               'arguments': [address]})
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         if not SafeContract.objects.filter(address=address).exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -581,7 +608,10 @@ class OwnersView(APIView):
         Return Safes where the address provided is an owner
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
         serializer = self.serializer_class(data={'safes': safes_for_owner})
@@ -635,7 +665,10 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
         Estimates `safeTxGas` for a Safe Multisig Transaction.
         """
         if not Web3.isChecksumAddress(address):
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
 
         if not SafeContract.objects.filter(address=address).exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
