@@ -39,13 +39,19 @@ class FirebaseDeviceOwnerManager(models.Manager):
         """
         :param safe_address:
         :param owners:
-        :return: List of cloud messaging tokens for owners (unique) linked to a Safe. If owner is not linked to the
-        Safe it will not be returned
+        :return: List of cloud messaging tokens for owners (unique and not empty) linked to a Safe. If owner is not
+        linked to the Safe it will not be returned.
         """
-        return list(self.filter(
-            firebase_device__safes__address=safe_address,
-            owner__in=owners
-        ).values_list('firebase_device__cloud_messaging_token', flat=True).distinct())
+        return list(
+            self.filter(
+                firebase_device__safes__address=safe_address,
+                owner__in=owners
+            ).exclude(
+                firebase_device__cloud_messaging_token=None
+            ).values_list(
+                'firebase_device__cloud_messaging_token', flat=True
+            ).distinct()
+        )
 
 
 class FirebaseDeviceOwner(models.Model):
