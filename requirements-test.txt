@@ -1,8 +1,8 @@
 -r requirements.txt
 coverage==5.5
 factory-boy==3.2.0
-faker==8.1.0
+faker==8.1.2
 pytest-celery==0.0.0a1
 pytest-django==4.2.0
 pytest-sugar==0.9.4
-pytest==6.2.3
+pytest==6.2.4
