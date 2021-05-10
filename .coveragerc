@@ -2,4 +2,4 @@
 omit = 
      *tests*
      */migrations/*
-     taskapp/celery.py
+     */taskapp/celery.py
