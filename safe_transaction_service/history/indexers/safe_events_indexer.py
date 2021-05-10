@@ -240,20 +240,10 @@ class SafeEventsIndexer(EthereumIndexer):
         elif event_name == 'ApproveHash':
             internal_tx_decoded.function_name = 'approveHash'
             args['hashToApprove'] = args.pop('approvedHash')
-        # elif event_name == 'SignMsg':
-        #     internal_tx_decoded = None
-        # elif event_name == 'ExecutionFailure':
-        #     internal_tx_decoded = None
-        # elif event_name == 'ExecutionSuccess':
-        #     internal_tx_decoded = None
         elif event_name == 'EnabledModule':
             internal_tx_decoded.function_name = 'enableModule'
         elif event_name == 'DisabledModule':
             internal_tx_decoded.function_name = 'disableModule'
-        # elif event_name == 'ExecutionFromModuleSuccess':
-        #     internal_tx_decoded = None
-        # elif event_name == 'ExecutionFromModuleFailure':
-        #     internal_tx_decoded = None
         elif event_name == 'AddedOwner':
             internal_tx_decoded.function_name = 'addOwnerWithThreshold'
             args['_threshold'] = None
@@ -272,6 +262,10 @@ class SafeEventsIndexer(EthereumIndexer):
             internal_tx._from = args['sender']
             internal_tx.to = safe_address
             internal_tx.value = args['value']
+            internal_tx_decoded = None
+        else:
+            # 'SignMsg', 'ExecutionFailure', 'ExecutionSuccess',
+            # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'
             internal_tx_decoded = None
 
         with transaction.atomic():
