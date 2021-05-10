@@ -8,7 +8,8 @@ from gnosis.eth.contracts import get_safe_V1_3_0_contract
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..indexers.safe_events_indexer import SafeEventsIndexer
+from ..indexers.safe_events_indexer import (SafeEventsIndexer,
+                                            SafeEventsIndexerProvider)
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, SafeStatus)
@@ -21,6 +22,12 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         super().setUpClass()
         cls.safe_events_indexer = SafeEventsIndexer(cls.ethereum_client, confirmations=0)
         cls.safe_tx_processor = SafeTxProcessor(cls.ethereum_client)
+
+    def test_safe_events_indexer_provider(self):
+        SafeEventsIndexerProvider()
+        self.assertIsNotNone(SafeEventsIndexerProvider.instance)
+        SafeEventsIndexerProvider.del_singleton()
+        self.assertIsNone(getattr(SafeEventsIndexerProvider, 'instance', None))
 
     def test_safe_events_indexer(self):
         owner_account_1 = self.ethereum_test_account
