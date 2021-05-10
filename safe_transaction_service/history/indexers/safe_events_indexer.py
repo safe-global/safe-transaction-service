@@ -239,7 +239,7 @@ class SafeEventsIndexer(EthereumIndexer):
             args['_owners'] = args.pop('owners')
         elif event_name == 'ApproveHash':
             internal_tx_decoded.function_name = 'approveHash'
-            args['hashToApprove'] = args.pop('approvedHash')
+            args['hashToApprove'] = args.pop('approvedHash').hex()
         elif event_name == 'EnabledModule':
             internal_tx_decoded.function_name = 'enableModule'
         elif event_name == 'DisabledModule':

@@ -92,13 +92,16 @@ jobs:
       run: bash scripts/deploy_docker_github.sh staging
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
+        DOCKER_BUILDKIT: 1
     - name: Deploy Develop
       if: github.ref == 'refs/heads/develop'
       run: bash scripts/deploy_docker_github.sh develop
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
+        DOCKER_BUILDKIT: 1
     - name: Deploy Tag
       if: startsWith(github.ref, 'refs/tags/')
       run: bash scripts/deploy_docker_github.sh ${GITHUB_REF##*/}
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
+        DOCKER_BUILDKIT: 1

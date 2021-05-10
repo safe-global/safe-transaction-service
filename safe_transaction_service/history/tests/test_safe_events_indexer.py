@@ -12,7 +12,7 @@ from ..indexers.safe_events_indexer import (SafeEventsIndexer,
                                             SafeEventsIndexerProvider)
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
-                      InternalTxType, SafeStatus)
+                      InternalTxType, SafeStatus, MultisigConfirmation, MultisigTransaction)
 from .factories import SafeL2MasterCopyFactory
 
 
@@ -244,7 +244,23 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 6)
         self.assertEqual(safe_status.enabled_modules, [module_address])
 
-        # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
+        # ApproveHash (no nonce) ------------------------------------------------------------------------------------
+        random_hash = self.w3.sha3(text='Get schwifty')
+        tx = safe.get_contract().functions.approveHash(
+            random_hash
+        ).buildTransaction({'from': owner_account_1.address,
+                            'nonce': self.ethereum_client.get_nonce_for_account(owner_account_1.address)})
+        tx = owner_account_1.signTransaction(tx)
+        self.w3.eth.sendRawTransaction(tx['rawTransaction'])
+        # Process events: ApproveHash
+        self.assertEqual(self.safe_events_indexer.start(), 1)
+        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        # No SafeStatus was added
+        self.assertEqual(SafeStatus.objects.count(), 14)
+        # Check a MultisigConfirmation was created
+        self.assertTrue(MultisigConfirmation.objects.filter(multisig_transaction_hash=random_hash.hex()).exists())
+
+        # Set guard (nonce: 6) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
         guard_address = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.setGuard(
@@ -254,7 +270,6 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.sign(owner_account_2.key)
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), 3)
@@ -262,9 +277,11 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Add one SafeStatus increasing the nonce and another one changing the guard
         self.assertEqual(SafeStatus.objects.count(), 16)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setGuard
-        self.assertEqual(safe_status.guard, guard_address)
         self.assertEqual(safe_status.nonce, 7)
+        self.assertEqual(safe_status.guard, guard_address)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 7)
         self.assertIsNone(safe_status.guard)
+
+        self.assertEqual(MultisigTransaction.objects.count(), 7)
