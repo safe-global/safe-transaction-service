@@ -74,7 +74,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.enabled_modules, [])
         self.assertIsNone(safe_status.guard)
 
-        # Add an owner but don't update the threshold (nonce: 0)
+        # Add an owner but don't update the threshold (nonce: 0) --------------------------------------------------
         owner_account_2 = Account.create()
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.addOwnerWithThreshold(
@@ -99,7 +99,30 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertCountEqual(safe_status.owners, [owner_account_1.address])
         self.assertEqual(safe_status.nonce, 1)
 
-        # Remove an owner (nonce: 1)
+        # Change threshold (nonce: 1) ------------------------------------------------------------------------------
+        data = HexBytes(
+            self.safe_contract_V1_3_0.functions.changeThreshold(
+                2
+            ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
+        )
+
+        multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
+        multisig_tx.sign(owner_account_1.key)
+        multisig_tx.execute(self.ethereum_test_account.key)
+        # Process events: SafeMultiSigTransaction, ChangedThreshold, ExecutionSuccess
+        self.assertEqual(self.safe_events_indexer.start(), 3)
+        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        # Add one SafeStatus increasing the nonce and another one changing the threshold
+        self.assertEqual(SafeStatus.objects.count(), 5)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and changeThreshold
+        self.assertEqual(safe_status.nonce, 2)
+        self.assertEqual(safe_status.threshold, 2)
+
+        safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
+        self.assertEqual(safe_status.nonce, 2)
+        self.assertEqual(safe_status.threshold, 1)
+
+        # Remove an owner and change threshold back to 1 (nonce: 2) --------------------------------------------------
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.removeOwner(
                 SENTINEL_ADDRESS,
@@ -110,21 +133,29 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
+        multisig_tx.sign(owner_account_2.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        # Process events: SafeMultiSigTransaction, RemovedOwner, ExecutionSuccess
-        self.assertEqual(self.safe_events_indexer.start(), 3)
+        # Process events: SafeMultiSigTransaction, RemovedOwner, ChangedThreshold, ExecutionSuccess
+        self.assertEqual(self.safe_events_indexer.start(), 4)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one removing the owner
-        self.assertEqual(SafeStatus.objects.count(), 5)
-        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and addOwner
-        self.assertCountEqual(safe_status.owners, [owner_account_1.address])
-        self.assertEqual(safe_status.nonce, 2)
+        self.assertEqual(SafeStatus.objects.count(), 8)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction, removeOwner and changeThreshold
+        self.assertEqual(safe_status.nonce, 3)
+        self.assertEqual(safe_status.threshold, 1)
+        self.assertEqual(safe_status.owners, [owner_account_1.address])
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
+        safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Processed execTransaction and removeOwner
+        self.assertEqual(safe_status.nonce, 3)
+        self.assertEqual(safe_status.threshold, 2)
+        self.assertEqual(safe_status.owners, [owner_account_1.address])
+
+        safe_status = SafeStatus.objects.sorted_by_internal_tx()[2]  # Just processed execTransaction
+        self.assertEqual(safe_status.nonce, 3)
+        self.assertEqual(safe_status.threshold, 2)
         self.assertCountEqual(safe_status.owners, [owner_account_1.address, owner_account_2.address])
-        self.assertEqual(safe_status.nonce, 2)
 
-        # Enable module (nonce: 2)
+        # Enable module (nonce: 3) ---------------------------------------------------------------------
         module_address = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.enableModule(
@@ -139,16 +170,16 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(self.safe_events_indexer.start(), 3)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one enabling the module
-        self.assertEqual(SafeStatus.objects.count(), 7)
+        self.assertEqual(SafeStatus.objects.count(), 10)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and enableModule
         self.assertEqual(safe_status.enabled_modules, [module_address])
-        self.assertEqual(safe_status.nonce, 3)
+        self.assertEqual(safe_status.nonce, 4)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.enabled_modules, [])
-        self.assertEqual(safe_status.nonce, 3)
+        self.assertEqual(safe_status.nonce, 4)
 
-        # Check SafeReceived (ether received) on Safe
+        # Check SafeReceived (ether received) on Safe -----------------------------------------------------------------
         value = 1256
         self.ethereum_client.get_transaction_receipt(self.send_ether(safe_address, value))
         # Process events: SafeReceived
@@ -163,7 +194,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertTrue(internal_tx_queryset.exists())
         self.assertTrue(internal_tx_queryset.get().is_ether_transfer)
 
-        # Set fallback handler (nonce: 3)
+        # Set fallback handler (nonce: 4) --------------------------------------------------------------------------
         new_fallback_handler = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.setFallbackHandler(
@@ -178,16 +209,42 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(self.safe_events_indexer.start(), 3)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one changing the fallback handler
-        self.assertEqual(SafeStatus.objects.count(), 9)
+        self.assertEqual(SafeStatus.objects.count(), 12)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setFallbackHandler
         self.assertEqual(safe_status.fallback_handler, new_fallback_handler)
-        self.assertEqual(safe_status.nonce, 4)
+        self.assertEqual(safe_status.enabled_modules, [module_address])
+        self.assertEqual(safe_status.nonce, 5)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.fallback_handler, fallback_handler)
-        self.assertEqual(safe_status.nonce, 4)
+        self.assertEqual(safe_status.enabled_modules, [module_address])
+        self.assertEqual(safe_status.nonce, 5)
 
-        # Set guard (nonce: 4) INVALIDATES SAFE, as no more transactions can be done
+        # Disable Module (nonce: 5) ----------------------------------------------------------------------------------
+        data = HexBytes(
+            self.safe_contract_V1_3_0.functions.disableModule(
+                SENTINEL_ADDRESS,
+                module_address
+            ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
+        )
+
+        multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
+        multisig_tx.sign(owner_account_1.key)
+        multisig_tx.execute(self.ethereum_test_account.key)
+        # Process events: SafeMultiSigTransaction, DisabledModule, ExecutionSuccess
+        self.assertEqual(self.safe_events_indexer.start(), 3)
+        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        # Add one SafeStatus increasing the nonce and another one disabling the module
+        self.assertEqual(SafeStatus.objects.count(), 14)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and disableModule
+        self.assertEqual(safe_status.nonce, 6)
+        self.assertEqual(safe_status.enabled_modules, [])
+
+        safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
+        self.assertEqual(safe_status.nonce, 6)
+        self.assertEqual(safe_status.enabled_modules, [module_address])
+
+        # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
         guard_address = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.setGuard(
@@ -197,16 +254,17 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
+        multisig_tx.sign(owner_account_2.key)
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), 3)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one changing the guard
-        self.assertEqual(SafeStatus.objects.count(), 11)
+        self.assertEqual(SafeStatus.objects.count(), 16)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setGuard
         self.assertEqual(safe_status.guard, guard_address)
-        self.assertEqual(safe_status.nonce, 5)
+        self.assertEqual(safe_status.nonce, 7)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
-        self.assertEqual(safe_status.nonce, 5)
+        self.assertEqual(safe_status.nonce, 7)
         self.assertIsNone(safe_status.guard)

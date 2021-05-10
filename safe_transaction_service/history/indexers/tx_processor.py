@@ -267,9 +267,9 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Executing Tx from Module')
             # TODO Add test with previous traces for processing a module transaction
             ethereum_tx = internal_tx.ethereum_tx
-            if 'module' in arguments:  # L2 Safe with event SafeModuleTransaction
+            if 'module' in arguments:  # L2 Safe with event SafeModuleTransaction indexed using events
                 module_address = arguments['module']
-            else:
+            else:  # Regular Safe indexed using tracing
                 # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                 # The trace that is been processed is the last one, so indexer needs to go at least 2 traces back
                 previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
@@ -283,8 +283,8 @@ class SafeTxProcessor(TxProcessor):
                     raise ValueError(message)
                 module_internal_tx = InternalTx.objects.build_from_trace(previous_trace, internal_tx.ethereum_tx)
                 module_address = module_internal_tx.to if module_internal_tx else NULL_ADDRESS
-            module_data = HexBytes(arguments['data'])
             failed = self.is_module_failed(ethereum_tx, module_address, contract_address)
+            module_data = HexBytes(arguments['data'])
             ModuleTransaction.objects.get_or_create(
                 internal_tx=internal_tx,
                 defaults={
