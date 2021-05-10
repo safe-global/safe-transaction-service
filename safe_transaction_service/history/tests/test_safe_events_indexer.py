@@ -154,16 +154,40 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Process events: SafeReceived
         self.assertEqual(self.safe_events_indexer.start(), 1)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
-        # Add one SafeStatus increasing the nonce and another one changing the guard
-        self.assertTrue(
-            InternalTx.objects.filter(
+        # Check there's an ether transaction
+        internal_tx_queryset = InternalTx.objects.filter(
                 value=value,
                 tx_type=InternalTxType.CALL.value,
                 call_type=EthereumTxCallType.CALL.value
-            ).exists()
+            )
+        self.assertTrue(internal_tx_queryset.exists())
+        self.assertTrue(internal_tx_queryset.get().is_ether_transfer)
+
+        # Set fallback handler (nonce: 3)
+        new_fallback_handler = Account.create().address
+        data = HexBytes(
+            self.safe_contract_V1_3_0.functions.setFallbackHandler(
+                new_fallback_handler
+            ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
 
-        # Set guard (nonce: 3) INVALIDATES SAFE, as no more transactions can be done
+        multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
+        multisig_tx.sign(owner_account_1.key)
+        multisig_tx.execute(self.ethereum_test_account.key)
+        # Process events: SafeMultiSigTransaction, ChangedFallbackHandler, ExecutionSuccess
+        self.assertEqual(self.safe_events_indexer.start(), 3)
+        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        # Add one SafeStatus increasing the nonce and another one changing the fallback handler
+        self.assertEqual(SafeStatus.objects.count(), 9)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setFallbackHandler
+        self.assertEqual(safe_status.fallback_handler, new_fallback_handler)
+        self.assertEqual(safe_status.nonce, 4)
+
+        safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
+        self.assertEqual(safe_status.fallback_handler, fallback_handler)
+        self.assertEqual(safe_status.nonce, 4)
+
+        # Set guard (nonce: 4) INVALIDATES SAFE, as no more transactions can be done
         guard_address = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.setGuard(
@@ -178,11 +202,11 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(self.safe_events_indexer.start(), 3)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one changing the guard
-        self.assertEqual(SafeStatus.objects.count(), 9)
+        self.assertEqual(SafeStatus.objects.count(), 11)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setGuard
         self.assertEqual(safe_status.guard, guard_address)
-        self.assertEqual(safe_status.nonce, 4)
+        self.assertEqual(safe_status.nonce, 5)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
-        self.assertEqual(safe_status.nonce, 4)
+        self.assertEqual(safe_status.nonce, 5)
         self.assertIsNone(safe_status.guard)
