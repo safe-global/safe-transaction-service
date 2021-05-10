@@ -12,7 +12,8 @@ from ..indexers.safe_events_indexer import (SafeEventsIndexer,
                                             SafeEventsIndexerProvider)
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
-                      InternalTxType, SafeStatus, MultisigConfirmation, MultisigTransaction)
+                      InternalTxType, MultisigConfirmation,
+                      MultisigTransaction, SafeStatus)
 from .factories import SafeL2MasterCopyFactory
 
 
@@ -73,6 +74,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 0)
         self.assertEqual(safe_status.enabled_modules, [])
         self.assertIsNone(safe_status.guard)
+        self.assertEqual(MultisigTransaction.objects.count(), 0)
+        self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
         # Add an owner but don't update the threshold (nonce: 0) --------------------------------------------------
         owner_account_2 = Account.create()
@@ -99,6 +102,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertCountEqual(safe_status.owners, [owner_account_1.address])
         self.assertEqual(safe_status.nonce, 1)
 
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+
         # Change threshold (nonce: 1) ------------------------------------------------------------------------------
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.changeThreshold(
@@ -121,6 +127,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 2)
         self.assertEqual(safe_status.threshold, 1)
+
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
         # Remove an owner and change threshold back to 1 (nonce: 2) --------------------------------------------------
         data = HexBytes(
@@ -155,6 +164,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.threshold, 2)
         self.assertCountEqual(safe_status.owners, [owner_account_1.address, owner_account_2.address])
 
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertEqual(MultisigConfirmation.objects.count(), 4)
+
         # Enable module (nonce: 3) ---------------------------------------------------------------------
         module_address = Account.create().address
         data = HexBytes(
@@ -178,6 +190,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.enabled_modules, [])
         self.assertEqual(safe_status.nonce, 4)
+
+        self.assertEqual(MultisigTransaction.objects.count(), 4)
+        self.assertEqual(MultisigConfirmation.objects.count(), 5)
 
         # Check SafeReceived (ether received) on Safe -----------------------------------------------------------------
         value = 1256
@@ -220,6 +235,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.enabled_modules, [module_address])
         self.assertEqual(safe_status.nonce, 5)
 
+        self.assertEqual(MultisigTransaction.objects.count(), 5)
+        self.assertEqual(MultisigConfirmation.objects.count(), 6)
+
         # Disable Module (nonce: 5) ----------------------------------------------------------------------------------
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.disableModule(
@@ -244,6 +262,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 6)
         self.assertEqual(safe_status.enabled_modules, [module_address])
 
+        self.assertEqual(MultisigTransaction.objects.count(), 6)
+        self.assertEqual(MultisigConfirmation.objects.count(), 7)
+
         # ApproveHash (no nonce) ------------------------------------------------------------------------------------
         random_hash = self.w3.sha3(text='Get schwifty')
         tx = safe.get_contract().functions.approveHash(
@@ -259,6 +280,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(SafeStatus.objects.count(), 14)
         # Check a MultisigConfirmation was created
         self.assertTrue(MultisigConfirmation.objects.filter(multisig_transaction_hash=random_hash.hex()).exists())
+        self.assertEqual(MultisigTransaction.objects.count(), 6)  # No MultisigTransaction was created
+        self.assertEqual(MultisigConfirmation.objects.count(), 8)  # A MultisigConfirmation was created
 
         # Set guard (nonce: 6) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
         guard_address = Account.create().address
@@ -270,6 +293,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
+        multisig_tx.sign(owner_account_2.key)  # Use 2 signatures to test multiple confirmations parsing
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), 3)
@@ -285,3 +309,4 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertIsNone(safe_status.guard)
 
         self.assertEqual(MultisigTransaction.objects.count(), 7)
+        self.assertEqual(MultisigConfirmation.objects.count(), 10)
