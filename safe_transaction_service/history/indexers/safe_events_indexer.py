@@ -270,9 +270,7 @@ class SafeEventsIndexer(EthereumIndexer):
 
         with transaction.atomic():
             internal_tx.save()
-            print('Processed event', event_name, 'log index', log_index)
             if internal_tx_decoded:
-                print(internal_tx_decoded.function_name, internal_tx_decoded.arguments)
                 internal_tx_decoded.save()
         return internal_tx
 
