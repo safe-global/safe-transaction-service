@@ -12,10 +12,11 @@ from web3.types import EventData, FilterParams, LogReceipt
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_safe_V1_3_0_contract
+from gnosis.eth.contracts import get_safe_contract as get_safe_V1_2_0_contract
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, SafeL2MasterCopy)
+from .abis.gnosis import gnosis_safe_l2_v1_3_0
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
@@ -114,30 +115,33 @@ class SafeEventsIndexer(EthereumIndexer):
 
         :return:
         """
-        safe_contract = get_safe_V1_3_0_contract(self.ethereum_client.w3)
+        l2_contract = self.ethereum_client.w3.eth.contract(abi=gnosis_safe_l2_v1_3_0)
+        old_contract = get_safe_V1_2_0_contract(self.ethereum_client.w3)
         events = [
-            safe_contract.events.SafeMultiSigTransaction(),
-            safe_contract.events.SafeModuleTransaction(),
-            safe_contract.events.SafeSetup(),
-            safe_contract.events.ApproveHash(),
-            safe_contract.events.SignMsg(),
-            safe_contract.events.ExecutionFailure(),
-            safe_contract.events.ExecutionSuccess(),
+            l2_contract.events.SafeMultiSigTransaction(),
+            l2_contract.events.SafeModuleTransaction(),
+            l2_contract.events.SafeSetup(),
+            l2_contract.events.ApproveHash(),
+            l2_contract.events.SignMsg(),
+            l2_contract.events.ExecutionFailure(),
+            l2_contract.events.ExecutionSuccess(),
             # Modules
-            safe_contract.events.EnabledModule(),
-            safe_contract.events.DisabledModule(),
-            safe_contract.events.ExecutionFromModuleSuccess(),
-            safe_contract.events.ExecutionFromModuleFailure(),
+            l2_contract.events.EnabledModule(),
+            l2_contract.events.DisabledModule(),
+            l2_contract.events.ExecutionFromModuleSuccess(),
+            l2_contract.events.ExecutionFromModuleFailure(),
             # Owners
-            safe_contract.events.AddedOwner(),
-            safe_contract.events.RemovedOwner(),
-            safe_contract.events.ChangedThreshold(),
+            l2_contract.events.AddedOwner(),
+            l2_contract.events.RemovedOwner(),
+            l2_contract.events.ChangedThreshold(),
             # Incoming Ether
-            safe_contract.events.SafeReceived(),
+            l2_contract.events.SafeReceived(),
             # Changed FallbackHandler
-            safe_contract.events.ChangedFallbackHandler(),
+            l2_contract.events.ChangedFallbackHandler(),
             # Changed Guard
-            safe_contract.events.ChangedGuard(),
+            l2_contract.events.ChangedGuard(),
+            # Change Master Copy
+            old_contract.events.ChangedMasterCopy(),
         ]
         return {HexBytes(event_abi_to_log_topic(event.abi)).hex(): event for event in events}
 
@@ -263,6 +267,11 @@ class SafeEventsIndexer(EthereumIndexer):
             internal_tx.to = safe_address
             internal_tx.value = args['value']
             internal_tx_decoded = None
+        elif event_name == 'ChangedMasterCopy':
+            internal_tx_decoded.function_name = 'changeMasterCopy'
+            internal_tx.arguments = {
+                '_masterCopy': args.get('singleton') or args.get('masterCopy')
+            }
         else:
             # 'SignMsg', 'ExecutionFailure', 'ExecutionSuccess',
             # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'

@@ -15,6 +15,7 @@ from safe_transaction_service.contracts.tasks import \
 
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
+from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import (InternalTxDecoded, MultisigTransaction, SafeStatus,
                      WebHook, WebHookType)
@@ -122,6 +123,24 @@ def index_internal_txs_task(self) -> Optional[int]:
                 logger.info('Calling task to process decoded traces')
                 process_decoded_internal_txs_task.delay()
             return number_traces
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+def index_safe_events_task(self) -> Optional[int]:
+    """
+    Find and process for monitored addresses
+    :return: Number of addresses processed
+    """
+
+    with contextlib.suppress(LockError):
+        with ony_one_running_task(self):
+            logger.info('Start indexing of safe events')
+            number = SafeEventsIndexerProvider().start()
+            logger.info('Find safe events processed %d events', number)
+            if number:
+                logger.info('Calling task to process decoded traces')
+                process_decoded_internal_txs_task.delay()
+            return number
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)

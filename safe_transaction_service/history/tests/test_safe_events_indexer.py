@@ -202,10 +202,10 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Check there's an ether transaction
         internal_tx_queryset = InternalTx.objects.filter(
-                value=value,
-                tx_type=InternalTxType.CALL.value,
-                call_type=EthereumTxCallType.CALL.value
-            )
+            value=value,
+            tx_type=InternalTxType.CALL.value,
+            call_type=EthereumTxCallType.CALL.value
+        )
         self.assertTrue(internal_tx_queryset.exists())
         self.assertTrue(internal_tx_queryset.get().is_ether_transfer)
 
