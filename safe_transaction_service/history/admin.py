@@ -12,7 +12,7 @@ from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
                      SafeContract, SafeContractDelegate, SafeMasterCopy,
-                     SafeStatus, WebHook)
+                     SafeStatus, WebHook, SafeL2MasterCopy)
 from .services import IndexServiceProvider
 
 
@@ -283,6 +283,11 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 class SafeMasterCopyAdmin(MonitoredAddressAdmin):
     list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'deployer')
     list_filter = ('deployer',)
+
+
+@admin.register(SafeL2MasterCopy)
+class SafeMasterCopyAdmin(SafeMasterCopyAdmin):
+    pass
 
 
 @admin.register(ProxyFactory)

@@ -34,7 +34,9 @@ class SafeTxProcessorProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = SafeTxProcessor(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL))
+            node_url = settings.ETHEREUM_TRACING_NODE_URL if settings.ETHEREUM_TRACING_NODE_URL \
+                else settings.ETHEREUM_NODE_URL
+            cls.instance = SafeTxProcessor(EthereumClient(node_url))
         return cls.instance
 
     @classmethod
