@@ -11,8 +11,8 @@ from gnosis.eth import EthereumClientProvider
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                     SafeContract, SafeContractDelegate, SafeMasterCopy,
-                     SafeStatus, WebHook, SafeL2MasterCopy)
+                     SafeContract, SafeContractDelegate, SafeL2MasterCopy,
+                     SafeMasterCopy, SafeStatus, WebHook)
 from .services import IndexServiceProvider
 
 

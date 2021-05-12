@@ -2,7 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import Dict, List, Optional, Sequence
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from eth_abi import decode_abi
 from eth_utils import event_abi_to_log_topic
@@ -278,9 +278,13 @@ class SafeEventsIndexer(EthereumIndexer):
             internal_tx_decoded = None
 
         with transaction.atomic():
-            internal_tx.save()
-            if internal_tx_decoded:
-                internal_tx_decoded.save()
+            try:
+                internal_tx.save()
+                if internal_tx_decoded:
+                    internal_tx_decoded.save()
+            except IntegrityError:
+                logger.error('Problem inserting internal_tx', exc_info=True)
+
         return internal_tx
 
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[InternalTx]:
