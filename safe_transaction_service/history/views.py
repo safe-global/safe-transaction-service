@@ -56,11 +56,14 @@ class AboutView(APIView):
             'settings': {
                 'AWS_CONFIGURED': settings.AWS_CONFIGURED,
                 'AWS_S3_CUSTOM_DOMAIN': settings.AWS_S3_CUSTOM_DOMAIN,
+                'AWS_STORAGE_BUCKET_NAME': settings.AWS_STORAGE_BUCKET_NAME,
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
-                'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
                 'ETH_INTERNAL_NO_FILTER': settings.ETH_INTERNAL_NO_FILTER,
+                'ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT': settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
+                'ETH_L2_NETWORK': settings.ETH_L2_NETWORK,
                 'ETH_REORG_BLOCKS': settings.ETH_REORG_BLOCKS,
+                'NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH': settings.NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH,
                 'TOKENS_LOGO_BASE_URI': settings.TOKENS_LOGO_BASE_URI,
                 'TOKENS_LOGO_EXTENSION': settings.TOKENS_LOGO_EXTENSION,
             }

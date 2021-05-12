@@ -94,7 +94,6 @@ jobs:
         DOCKERHUB_PROJECT: safe-transaction-service
         DOCKER_BUILDKIT: 1
     - name: Deploy Develop
-      if: github.ref == 'refs/heads/develop'
       run: bash scripts/deploy_docker_github.sh develop
       env:
         DOCKERHUB_PROJECT: safe-transaction-service
