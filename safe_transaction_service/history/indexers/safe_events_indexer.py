@@ -235,6 +235,7 @@ class SafeEventsIndexer(EthereumIndexer):
             args['data'] = HexBytes(args['data']).hex()
         elif event_name == 'SafeSetup':
             internal_tx_decoded.function_name = 'setup'
+            internal_tx.contract_address = safe_address
             args['_from'] = safe_address  # TODO ProxyFactory
             args['to'] = NULL_ADDRESS
             args['payment'] = 0

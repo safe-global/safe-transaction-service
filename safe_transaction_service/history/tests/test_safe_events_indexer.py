@@ -61,6 +61,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
         self.assertEqual(self.safe_events_indexer.start(), 1)
         self.assertEqual(InternalTx.objects.count(), 1)
+        self.assertEqual(InternalTx.objects.get().contract_address, safe_address)
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
 
         txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safes()
