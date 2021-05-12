@@ -22,12 +22,18 @@ class CeleryTaskConfiguration:
 
     def create_task(self) -> Tuple[PeriodicTask, bool]:
         interval_schedule, _ = IntervalSchedule.objects.get_or_create(every=self.interval, period=self.period)
-        periodic_task, created = PeriodicTask.objects.update_or_create(task=self.name,
-                                                                       defaults={
-                                                                           'name': self.description,
-                                                                           'interval': interval_schedule,
-                                                                           'enabled': self.enabled,
-                                                                       })
+        periodic_task, created = PeriodicTask.objects.get_or_create(task=self.name,
+                                                                    defaults={
+                                                                        'name': self.description,
+                                                                        'interval': interval_schedule,
+                                                                        'enabled': self.enabled,
+                                                                    })
+        if not created:
+            periodic_task.name = self.description
+            periodic_task.interval = interval_schedule
+            periodic_task.enabled = self.enabled
+            periodic_task.save()
+
         return periodic_task, created
 
 
