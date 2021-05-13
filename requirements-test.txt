@@ -1,8 +1,14 @@
 -r requirements.txt
 coverage==5.5
 factory-boy==3.2.0
+<<<<<<< HEAD
 faker==8.2.1
 pytest-celery==0.0.0
 pytest-django==4.3.0
+=======
+faker==8.1.3
+pytest-celery==0.0.0
+pytest-django==4.2.0
+>>>>>>> e936ee0 (Update dependencies)
 pytest-sugar==0.9.4
 pytest==6.2.4
