@@ -1,8 +1,9 @@
 from functools import cached_property
 from logging import getLogger
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, OrderedDict
 
 from django.db import IntegrityError, transaction
+from django.db.models import F
 
 from eth_abi import decode_abi
 from eth_utils import event_abi_to_log_topic
@@ -16,7 +17,7 @@ from gnosis.eth.contracts import get_safe_contract as get_safe_V1_2_0_contract
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, SafeL2MasterCopy)
-from .abis.gnosis import gnosis_safe_l2_v1_3_0
+from .abis.gnosis import gnosis_safe_l2_v1_3_0_abi, proxy_factory_v1_3_0_abi
 from .ethereum_indexer import EthereumIndexer
 
 logger = getLogger(__name__)
@@ -115,7 +116,8 @@ class SafeEventsIndexer(EthereumIndexer):
 
         :return:
         """
-        l2_contract = self.ethereum_client.w3.eth.contract(abi=gnosis_safe_l2_v1_3_0)
+        l2_contract = self.ethereum_client.w3.eth.contract(abi=gnosis_safe_l2_v1_3_0_abi)
+        proxy_factory_contract = self.ethereum_client.w3.eth.contract(abi=proxy_factory_v1_3_0_abi)
         old_contract = get_safe_V1_2_0_contract(self.ethereum_client.w3)
         events = [
             l2_contract.events.SafeMultiSigTransaction(),
@@ -142,6 +144,8 @@ class SafeEventsIndexer(EthereumIndexer):
             l2_contract.events.ChangedGuard(),
             # Change Master Copy
             old_contract.events.ChangedMasterCopy(),
+            # Proxy creation
+            proxy_factory_contract.events.ProxyCreation(),
         ]
         return {HexBytes(event_abi_to_log_topic(event.abi)).hex(): event for event in events}
 
@@ -214,7 +218,7 @@ class SafeEventsIndexer(EthereumIndexer):
             refund_address=None,
             tx_type=InternalTxType.CALL.value,
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
-            trace_address=f'[{log_index}]',
+            trace_address=str(log_index),
             error=None
         )
         internal_tx_decoded = InternalTxDecoded(
@@ -222,7 +226,25 @@ class SafeEventsIndexer(EthereumIndexer):
             function_name='',
             arguments=args,
         )
-        if event_name == 'SafeMultiSigTransaction':
+        if event_name == 'ProxyCreation':
+            # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
+            # the master copy used
+            safe_address = args.pop('proxy')
+            internal_tx = InternalTx.objects.filter(
+                ethereum_tx_id=F('ethereum_tx_id'),
+                contract_address=safe_address
+            ).update(
+                to=args.pop('singleton')
+            )
+            internal_tx = None
+        elif event_name == 'SafeSetup':
+            internal_tx_decoded.function_name = 'setup'
+            internal_tx.contract_address = safe_address
+            args['payment'] = 0
+            args['paymentReceiver'] = NULL_ADDRESS
+            args['_threshold'] = args.pop('threshold')
+            args['_owners'] = args.pop('owners')
+        elif event_name == 'SafeMultiSigTransaction':
             internal_tx_decoded.function_name = 'execTransaction'
             args['data'] = HexBytes(args['data']).hex()
             args['signatures'] = HexBytes(args['signatures']).hex()
@@ -233,15 +255,6 @@ class SafeEventsIndexer(EthereumIndexer):
         elif event_name == 'SafeModuleTransaction':
             internal_tx_decoded.function_name = 'execTransactionFromModule'
             args['data'] = HexBytes(args['data']).hex()
-        elif event_name == 'SafeSetup':
-            internal_tx_decoded.function_name = 'setup'
-            internal_tx.contract_address = safe_address
-            args['_from'] = safe_address  # TODO ProxyFactory
-            args['to'] = NULL_ADDRESS
-            args['payment'] = 0
-            args['paymentReceiver'] = NULL_ADDRESS
-            args['_threshold'] = args.pop('threshold')
-            args['_owners'] = args.pop('owners')
         elif event_name == 'ApproveHash':
             internal_tx_decoded.function_name = 'approveHash'
             args['hashToApprove'] = args.pop('approvedHash').hex()
@@ -280,9 +293,10 @@ class SafeEventsIndexer(EthereumIndexer):
 
         with transaction.atomic():
             try:
-                internal_tx.save()
-                if internal_tx_decoded:
-                    internal_tx_decoded.save()
+                if internal_tx:
+                    internal_tx.save()
+                    if internal_tx_decoded:
+                        internal_tx_decoded.save()
             except IntegrityError:
                 logger.error('Problem inserting internal_tx', exc_info=True)
 
@@ -294,9 +308,11 @@ class SafeEventsIndexer(EthereumIndexer):
         :param log_receipts: Events to store in database
         :return: List of `EthereumEvent` already stored in database
         """
-        decoded_elements: List[EventData] = [self.events_to_listen[log_receipt['topics'][0].hex()].processLog(log_receipt)
-                                             for log_receipt in log_receipts]
-        tx_hashes = [log_receipt['transactionHash'] for log_receipt in log_receipts]
+        decoded_elements: List[EventData] = [
+            self.events_to_listen[log_receipt['topics'][0].hex()].processLog(log_receipt)
+            for log_receipt in log_receipts
+        ]
+        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in log_receipts]).keys()
         logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug('End prefetching and storing of ethereum txs')

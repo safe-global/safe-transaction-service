@@ -1369,11 +1369,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z')
                 self.assertEqual(response.data, {'created': created_iso,
                                                  'creator': another_trace_2['action']['from'],
+                                                 'transaction_hash': internal_tx.ethereum_tx_id,
                                                  'factory_address': internal_tx._from,
                                                  'master_copy': test_data['master_copy'],
                                                  'setup_data': test_data['setup_data'],
                                                  'data_decoded': data_decoded,
-                                                 'transaction_hash': internal_tx.ethereum_tx_id})
+                                                 })
 
     def test_safe_info_view(self):
         invalid_address = '0x2A'

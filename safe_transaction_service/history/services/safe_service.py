@@ -70,10 +70,10 @@ class SafeService:
 
             created = creation_internal_tx.ethereum_tx.block.timestamp
 
-            if self.tracing_enabled:
-                previous_internal_tx = self._get_previous_internal_tx(creation_internal_tx)
-            else:
-                previous_internal_tx = None
+            previous_internal_tx = self._get_previous_internal_tx(
+                creation_internal_tx
+            ) if self.tracing_enabled else None
+
             creator = (previous_internal_tx or creation_internal_tx)._from
             proxy_factory = creation_internal_tx._from
 
@@ -85,7 +85,7 @@ class SafeService:
                 if result:
                     master_copy, setup_data = result
             if not (master_copy and setup_data):
-                if self.tracing_enabled and (next_internal_tx := self._get_next_internal_tx(creation_internal_tx)):
+                if next_internal_tx := self._get_next_internal_tx(creation_internal_tx):
                     master_copy = next_internal_tx.to
                     setup_data = next_internal_tx.data
         except InternalTx.DoesNotExist:
@@ -108,9 +108,14 @@ class SafeService:
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
             _, data_decoded = self.proxy_factory_contract.decode_function_input(data)
-            master_copy = data_decoded.get('masterCopy', data_decoded.get('_mastercopy'))
-            setup_data = data_decoded.get('data', data_decoded.get('initializer'))
-            return master_copy, setup_data
+            master_copy = (data_decoded.get('masterCopy') or data_decoded.get('_mastercopy')
+                           or data_decoded.get('_singleton') or data_decoded.get('singleton'))
+            setup_data = data_decoded.get('data') or data_decoded.get('initializer')
+            if master_copy and setup_data:
+                return master_copy, setup_data
+            else:
+                logger.error('Problem decoding proxy factory, data_decoded=%s', data_decoded)
+                return None
         except ValueError:
             return None
 
@@ -123,16 +128,22 @@ class SafeService:
         except ValueError:
             return None
 
-    def _get_next_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
-        next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
-                                                                  internal_tx.trace_address_as_list,
-                                                                  remove_calls=True)
-        return next_traces and InternalTx.objects.build_from_trace(next_traces[0],
-                                                                   internal_tx.ethereum_tx)
+    def _get_next_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
+        try:
+            next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
+                                                                      internal_tx.trace_address_as_list,
+                                                                      remove_calls=True)
+            return next_traces and InternalTx.objects.build_from_trace(next_traces[0],
+                                                                       internal_tx.ethereum_tx)
+        except ValueError:
+            return None
 
     def _get_previous_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
-        previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
-                                                                        internal_tx.trace_address_as_list,
-                                                                        skip_delegate_calls=True)
-        return previous_trace and InternalTx.objects.build_from_trace(previous_trace,
-                                                                      internal_tx.ethereum_tx)
+        try:
+            previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
+                                                                            internal_tx.trace_address_as_list,
+                                                                            skip_delegate_calls=True)
+            return previous_trace and InternalTx.objects.build_from_trace(previous_trace,
+                                                                          internal_tx.ethereum_tx)
+        except ValueError:
+            return None

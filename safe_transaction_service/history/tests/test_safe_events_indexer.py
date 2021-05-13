@@ -59,7 +59,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
-        self.assertEqual(self.safe_events_indexer.start(), 1)
+        self.assertEqual(self.safe_events_indexer.start(), 2)
         self.assertEqual(InternalTx.objects.count(), 1)
         self.assertEqual(InternalTx.objects.get().contract_address, safe_address)
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
@@ -69,7 +69,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         self.assertEqual(SafeStatus.objects.count(), 1)
         safe_status = SafeStatus.objects.get()
-        self.assertEqual(safe_status.master_copy, NULL_ADDRESS)
+        self.assertEqual(safe_status.master_copy, self.safe_contract_V1_3_0.address)
         self.assertEqual(safe_status.owners, owners)
         self.assertEqual(safe_status.threshold, threshold)
         self.assertEqual(safe_status.nonce, 0)
@@ -308,6 +308,10 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 7)
         self.assertIsNone(safe_status.guard)
+
+        # Check master copy did not change during the execution
+        self.assertEqual(SafeStatus.objects.last_for_address(safe_address).master_copy,
+                         self.safe_contract_V1_3_0.address)
 
         self.assertEqual(MultisigTransaction.objects.count(), 7)
         self.assertEqual(MultisigConfirmation.objects.count(), 10)
