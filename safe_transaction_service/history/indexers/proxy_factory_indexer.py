@@ -1,14 +1,16 @@
 from collections import OrderedDict
+from functools import cached_property
 from logging import getLogger
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Dict, List, Optional, Set, Sequence
 
+from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
-from web3 import Web3
-from web3._utils.events import construct_event_topic_set
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_proxy_factory_contract
+from gnosis.eth.contracts import get_proxy_factory_contract, get_proxy_factory_V1_1_1_contract
+from web3.contract import ContractEvent
+from web3.types import EventData, LogReceipt
 
 from ..models import EthereumTx, ProxyFactory, SafeContract
 from .ethereum_indexer import EthereumIndexer
@@ -32,10 +34,18 @@ class ProxyFactoryIndexerProvider:
 
 class ProxyFactoryIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
+        kwargs['first_block_threshold'] = 0
         super().__init__(*args, **kwargs)
-        self.proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)
-        self.proxy_creation_topic = construct_event_topic_set(self.proxy_factory_contract.events.ProxyCreation().abi,
-                                                              None)[0]
+
+    @cached_property
+    def events_to_listen(self) -> Dict[bytes, ContractEvent]:
+        old_proxy_factory_contract = get_proxy_factory_V1_1_1_contract(self.ethereum_client.w3)
+        proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)
+        events = [
+            old_proxy_factory_contract.events.ProxyCreation(),
+            proxy_factory_contract.events.ProxyCreation(),
+        ]
+        return {HexBytes(event_abi_to_log_topic(event.abi)).hex(): event for event in events}
 
     @property
     def database_field(self):
@@ -78,10 +88,14 @@ class ProxyFactoryIndexer(EthereumIndexer):
         logger.debug('Searching for Proxy deployments from block-number=%d to block-number=%d - Proxies=%s',
                      from_block_number, to_block_number, addresses)
 
-        logs = self.ethereum_client.w3.eth.getLogs({'address': addresses,
-                                                    'topics': [self.proxy_creation_topic],
-                                                    'fromBlock': from_block_number,
-                                                    'toBlock': to_block_number})
+        filter_topics = list(self.events_to_listen.keys())
+        try:
+            logs = self.ethereum_client.slow_w3.eth.getLogs({'address': addresses,
+                                                             'topics': [filter_topics],
+                                                             'fromBlock': from_block_number,
+                                                             'toBlock': to_block_number})
+        except IOError as e:
+            raise self.FindRelevantElementsException('Request error retrieving Safe L2 events') from e
 
         # Log INFO if erc events found, DEBUG otherwise
         logger_fn = logger.info if logs else logger.debug
@@ -89,30 +103,36 @@ class ProxyFactoryIndexer(EthereumIndexer):
                   len(logs), from_block_number, to_block_number)
         return logs
 
-    def process_elements(self, events: Iterable[Dict[str, Any]]):
+    def _process_decoded_element(self, decoded_element: EventData) -> Optional[SafeContract]:
+        contract_address = decoded_element['args']['proxy']
+        if contract_address != NULL_ADDRESS:
+            if (block_number := decoded_element['blockNumber']) == 0:
+                transaction_hash = decoded_element['transactionHash'].hex()
+                log_msg = f'Events are reporting blockNumber=0 for tx-hash={transaction_hash}'
+                logger.error(log_msg)
+                raise ValueError(log_msg)
+
+            blocks_one_day = int(24 * 60 * 60 / 15)  # 15 seconds block
+            return SafeContract(address=contract_address,
+                                ethereum_tx_id=decoded_element['transactionHash'],
+                                erc20_block_number=max(block_number - blocks_one_day, 0))
+
+    def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[SafeContract]:
         """
         Process all logs
-        :param events: Iterable of Events fetched using `web3.eth.getLogs`
+        :param log_receipts: Iterable of Events fetched using `web3.eth.getLogs`
         :return: List of `SafeContract` already stored in database
         """
-        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in events]).keys()
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes) # noqa F841
-        safe_contracts = []
-        for event in events:
-            int_contract_address = int.from_bytes(HexBytes(event['data']), byteorder='big')
-            contract_address = Web3.toChecksumAddress('{:#042x}'.format(int_contract_address))
-            if contract_address != NULL_ADDRESS:
-                if event['blockNumber'] == 0:
-                    logger.error('Events are reporting blockNumber=0 for tx-hash=%s', event['transactionHash'].hex())
-                    ethereum_tx = EthereumTx.objects.get(event['transactionHash'])
-                    block_number = ethereum_tx.block_id
-                else:
-                    block_number = event['blockNumber']
-
-                blocks_one_day = int(24 * 60 * 60 / 15)  # 15 seconds block
-                safe_contracts.append(SafeContract(address=contract_address,
-                                                   ethereum_tx_id=event['transactionHash'],
-                                                   erc20_block_number=max(block_number - blocks_one_day, 0)))
+        decoded_elements: List[EventData] = [
+            self.events_to_listen[log_receipt['topics'][0].hex()].processLog(log_receipt)
+            for log_receipt in log_receipts
+        ]
+        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in log_receipts]).keys()
+        logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
+        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+        logger.debug('End prefetching and storing of ethereum txs')
+        safe_contracts = [self._process_decoded_element(decoded_element) for decoded_element in decoded_elements]
+        safe_contracts = [safe_contract for safe_contract in safe_contracts if safe_contract]
         if safe_contracts:
             SafeContract.objects.bulk_create(safe_contracts, ignore_conflicts=True)
         return safe_contracts
