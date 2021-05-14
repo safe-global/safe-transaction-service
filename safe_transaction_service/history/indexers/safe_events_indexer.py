@@ -1,15 +1,14 @@
 from functools import cached_property
 from logging import getLogger
-from typing import Dict, List, Optional, Sequence, OrderedDict
+from typing import List
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
 
 from eth_abi import decode_abi
-from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from web3.contract import ContractEvent
-from web3.types import EventData, FilterParams, LogReceipt
+from web3.types import EventData
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
@@ -18,7 +17,7 @@ from gnosis.eth.contracts import get_safe_contract as get_safe_V1_2_0_contract
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, SafeL2MasterCopy)
 from .abis.gnosis import gnosis_safe_l2_v1_3_0_abi, proxy_factory_v1_3_0_abi
-from .ethereum_indexer import EthereumIndexer
+from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
 
@@ -36,17 +35,15 @@ class SafeEventsIndexerProvider:
             del cls.instance
 
 
-class SafeEventsIndexer(EthereumIndexer):
+class SafeEventsIndexer(EventsIndexer):
     """
     Indexes Gnosis Safe L2 events
     """
 
-    def __init__(self, *args, **kwargs):
-        kwargs['first_block_threshold'] = 0
-        super().__init__(*args, **kwargs)
+    IGNORE_ADDRESSES_ON_LOG_FILTER = True
 
     @cached_property
-    def events_to_listen(self) -> Dict[bytes, ContractEvent]:
+    def contract_events(self) -> List[ContractEvent]:
         """
         event SafeMultiSigTransaction(
             address to,
@@ -119,7 +116,7 @@ class SafeEventsIndexer(EthereumIndexer):
         l2_contract = self.ethereum_client.w3.eth.contract(abi=gnosis_safe_l2_v1_3_0_abi)
         proxy_factory_contract = self.ethereum_client.w3.eth.contract(abi=proxy_factory_v1_3_0_abi)
         old_contract = get_safe_V1_2_0_contract(self.ethereum_client.w3)
-        events = [
+        return [
             l2_contract.events.SafeMultiSigTransaction(),
             l2_contract.events.SafeModuleTransaction(),
             l2_contract.events.SafeSetup(),
@@ -147,7 +144,6 @@ class SafeEventsIndexer(EthereumIndexer):
             # Proxy creation
             proxy_factory_contract.events.ProxyCreation(),
         ]
-        return {HexBytes(event_abi_to_log_topic(event.abi)).hex(): event for event in events}
 
     @property
     def database_model(self):
@@ -156,46 +152,6 @@ class SafeEventsIndexer(EthereumIndexer):
     @property
     def database_field(self):
         return 'tx_block_number'
-
-    def find_relevant_elements(self, addresses: List[str], from_block_number: int,
-                               to_block_number: int,
-                               current_block_number: Optional[int] = None) -> List[LogReceipt]:
-        """
-        Search for log receipts for Safe events
-        :param addresses: Not used
-        :param from_block_number: Starting block number
-        :param to_block_number: Ending block number
-        :param current_block_number: Current block number (for cache purposes)
-        :return: LogReceipt for matching events
-        """
-        logger.debug('Filtering for Safe events from block-number=%d to block-number=%d', from_block_number,
-                     to_block_number)
-        log_receipts = self._find_elements_using_topics(from_block_number, to_block_number)
-
-        len_events = len(log_receipts)
-        logger_fn = logger.info if len_events else logger.debug
-        logger_fn('Found %d Safe events between block-number=%d and block-number=%d',
-                  len_events, from_block_number, to_block_number)
-        return log_receipts
-
-    def _find_elements_using_topics(self, from_block_number: int, to_block_number: int) -> List[LogReceipt]:
-        """
-        It will get Safe events using all the Gnosis Safe topics for filtering.
-        :param from_block_number:
-        :param to_block_number:
-        :return: LogReceipt for matching events
-        """
-        filter_topics = list(self.events_to_listen.keys())
-        parameters: FilterParams = {
-            'fromBlock': from_block_number,
-            'toBlock': to_block_number,
-            'topics': [filter_topics]
-        }
-
-        try:
-            return self.ethereum_client.slow_w3.eth.get_logs(parameters)
-        except IOError as e:
-            raise self.FindRelevantElementsException('Request error retrieving Safe L2 events') from e
 
     def _process_decoded_element(self, decoded_element: EventData):
         safe_address = decoded_element['address']
@@ -301,22 +257,3 @@ class SafeEventsIndexer(EthereumIndexer):
                 logger.error('Problem inserting internal_tx', exc_info=True)
 
         return internal_tx
-
-    def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[InternalTx]:
-        """
-        Process all events found by `find_relevant_elements`
-        :param log_receipts: Events to store in database
-        :return: List of `EthereumEvent` already stored in database
-        """
-        decoded_elements: List[EventData] = [
-            self.events_to_listen[log_receipt['topics'][0].hex()].processLog(log_receipt)
-            for log_receipt in log_receipts
-        ]
-        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in log_receipts]).keys()
-        logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.debug('End prefetching and storing of ethereum txs')
-        logger.debug('Processing %d Safe decoded events', len(decoded_elements))
-        internal_txs = [self._process_decoded_element(decoded_element) for decoded_element in decoded_elements]
-        logger.debug('End processing Safe decoded events', len(decoded_elements))
-        return internal_txs
