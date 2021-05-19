@@ -6,14 +6,18 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 from django.db.models import Case, Count, Index, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
+from django.utils.translation import gettext_lazy as _
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
+from packaging.version import Version
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
@@ -955,8 +959,29 @@ class ProxyFactory(MonitoredAddress):
         ordering = ['tx_block_number']
 
 
+def validate_version(value: str):
+    try:
+        if not value:
+            raise ValueError('Empty version not allowed')
+        Version(value)
+    except ValueError as exc:
+        raise ValidationError(
+            _('%(value)s is not a valid version: %(reason)s'),
+            params={'value': value, 'reason': str(exc)},
+        )
+
+
+class SafeMasterCopyManager(models.Manager):
+    def get_version_for_address(self, address: ChecksumAddress) -> Optional[str]:
+        try:
+            return self.filter(address=address).only('version').get().version
+        except self.model.DoesNotExist:
+            return None
+
+
 class SafeMasterCopy(MonitoredAddress):
-    version = models.CharField(max_length=20)
+    custom_manager = SafeMasterCopyManager()
+    version = models.CharField(max_length=20, validators=[validate_version])
     deployer = models.CharField(max_length=50, default='Gnosis')
 
     class Meta:
