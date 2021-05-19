@@ -254,6 +254,6 @@ class SafeEventsIndexer(EventsIndexer):
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
             except IntegrityError:
-                logger.error('Problem inserting internal_tx', exc_info=True)
+                logger.warning('Problem inserting internal_tx', exc_info=True)
 
         return internal_tx
