@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+from functools import cache
 from logging import getLogger
 from typing import Dict, List, Optional, Sequence, Union
 
 from django.db import transaction
 
+from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from web3 import Web3
@@ -17,7 +19,8 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       ModuleTransaction, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeStatus)
+                      MultisigTransaction, SafeContract, SafeL2MasterCopy,
+                      SafeMasterCopy, SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -121,7 +124,19 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
-    def get_last_safe_status_for_address(self, address: str) -> SafeStatus:
+    @cache
+    def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> str:
+        for MasterCopyModel in (SafeMasterCopy, SafeL2MasterCopy):
+            version = MasterCopyModel.custom_manager.get_version_for_address(master_copy)
+            if version:
+                return version
+        return '1.0.0'
+
+    @cache
+    def get_chain_id(self) -> int:
+        return self.ethereum_client.w3.eth.chain_id
+
+    def get_last_safe_status_for_address(self, address: ChecksumAddress) -> SafeStatus:
         safe_status = self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
         if not safe_status:
             logger.error('SafeStatus not found for address=%s', address)
@@ -335,17 +350,19 @@ class SafeTxProcessor(TxProcessor):
         elif function_name == 'execTransaction':
             logger.debug('Processing transaction execution')
             safe_status = self.get_last_safe_status_for_address(contract_address)
-            nonce = safe_status.nonce
+            # Events for L2 Safes store information about nonce
+            nonce = arguments['nonce'] if 'nonce' in arguments else safe_status.nonce
             if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
                 base_gas = arguments['baseGas']
-                safe_version = '1.0.0'
+                safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
             else:
                 base_gas = arguments['dataGas']
                 safe_version = '0.0.1'
-            safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'], arguments['data'],
-                             arguments['operation'], arguments['safeTxGas'], base_gas,
+            safe_tx = SafeTx(None, contract_address, arguments['to'], arguments['value'],
+                             arguments['data'], arguments['operation'], arguments['safeTxGas'], base_gas,
                              arguments['gasPrice'], arguments['gasToken'], arguments['refundReceiver'],
-                             HexBytes(arguments['signatures']), safe_nonce=nonce, safe_version=safe_version)
+                             HexBytes(arguments['signatures']), safe_nonce=nonce, safe_version=safe_version,
+                             chain_id=self.get_chain_id())
             safe_tx_hash = safe_tx.safe_tx_hash
 
             ethereum_tx = internal_tx.ethereum_tx

@@ -47,7 +47,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
         block_number = self.ethereum_client.current_block_number
-        SafeL2MasterCopyFactory(initial_block_number=block_number, tx_block_number=block_number)
+        SafeL2MasterCopyFactory(address=self.safe_contract_V1_3_0.address,
+                                initial_block_number=block_number, tx_block_number=block_number, version='1.3.0')
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
             self.ethereum_test_account, self.safe_contract_V1_3_0.address,
             initializer=initializer
@@ -104,6 +105,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 1)
 
         self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(MultisigTransaction.objects.get().safe_tx_hash, multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
 
         # Change threshold (nonce: 1) ------------------------------------------------------------------------------
@@ -130,6 +132,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.threshold, 1)
 
         self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
         # Remove an owner and change threshold back to 1 (nonce: 2) --------------------------------------------------
@@ -166,6 +170,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertCountEqual(safe_status.owners, [owner_account_1.address, owner_account_2.address])
 
         self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 4)
 
         # Enable module (nonce: 3) ---------------------------------------------------------------------
@@ -193,6 +199,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 4)
 
         self.assertEqual(MultisigTransaction.objects.count(), 4)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 5)
 
         # Check SafeReceived (ether received) on Safe -----------------------------------------------------------------
@@ -237,6 +245,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 5)
 
         self.assertEqual(MultisigTransaction.objects.count(), 5)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 6)
 
         # Disable Module (nonce: 5) ----------------------------------------------------------------------------------
@@ -264,6 +274,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.enabled_modules, [module_address])
 
         self.assertEqual(MultisigTransaction.objects.count(), 6)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 7)
 
         # ApproveHash (no nonce) ------------------------------------------------------------------------------------
@@ -314,4 +326,6 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
                          self.safe_contract_V1_3_0.address)
 
         self.assertEqual(MultisigTransaction.objects.count(), 7)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
         self.assertEqual(MultisigConfirmation.objects.count(), 10)
