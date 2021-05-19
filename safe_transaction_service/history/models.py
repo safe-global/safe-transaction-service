@@ -971,7 +971,7 @@ def validate_version(value: str):
         )
 
 
-class SafeMasterCopyManager(models.Manager):
+class SafeMasterCopyBaseManager(models.Manager):
     def get_version_for_address(self, address: ChecksumAddress) -> Optional[str]:
         try:
             return self.filter(address=address).only('version').get().version
@@ -979,17 +979,22 @@ class SafeMasterCopyManager(models.Manager):
             return None
 
 
-class SafeMasterCopy(MonitoredAddress):
-    custom_manager = SafeMasterCopyManager()
+class SafeMasterCopyBase(MonitoredAddress):
+    custom_manager = SafeMasterCopyBaseManager()
     version = models.CharField(max_length=20, validators=[validate_version])
     deployer = models.CharField(max_length=50, default='Gnosis')
 
+    class Meta:
+        abstract = True
+
+
+class SafeMasterCopy(SafeMasterCopyBase):
     class Meta:
         verbose_name_plural = 'Safe master copies'
         ordering = ['tx_block_number']
 
 
-class SafeL2MasterCopy(SafeMasterCopy):
+class SafeL2MasterCopy(SafeMasterCopyBase):
     class Meta:
         verbose_name_plural = 'Safe L2 master copies'
         ordering = ['tx_block_number']

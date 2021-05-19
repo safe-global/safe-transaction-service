@@ -436,5 +436,7 @@ class SafeTxProcessor(TxProcessor):
             # No side effects or nonce increasing, but trace will be set as processed
         else:
             processed_successfully = False
+            logger.warning('Cannot process InternalTxDecoded function_name=%s and arguments=%s',
+                           function_name, arguments)
         logger.debug('End processing')
         return processed_successfully
