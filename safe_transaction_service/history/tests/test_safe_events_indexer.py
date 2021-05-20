@@ -61,9 +61,17 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
         self.assertEqual(self.safe_events_indexer.start(), 2)
-        self.assertEqual(InternalTx.objects.count(), 1)
-        self.assertEqual(InternalTx.objects.get().contract_address, safe_address)
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
+        self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory and setup
+        create_internal_tx = InternalTx.objects.filter(contract_address=safe_address).get()
+        setup_internal_tx = InternalTx.objects.filter(contract_address=None).get()
+
+        self.assertEqual(create_internal_tx.trace_address, '1')
+        self.assertEqual(create_internal_tx.tx_type, InternalTxType.CREATE.value)
+        self.assertIsNone(create_internal_tx.call_type)
+        self.assertTrue(create_internal_tx.is_relevant)
+
+        self.assertEqual(setup_internal_tx.trace_address, '1,0')
 
         txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(SafeStatus.objects.count(), 0)
@@ -93,6 +101,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, AddedOwner, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), 3)
+        self.assertEqual(InternalTx.objects.count(), 5)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one adding the owner
         self.assertEqual(SafeStatus.objects.count(), 3)

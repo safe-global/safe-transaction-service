@@ -84,6 +84,10 @@ class EventsIndexer(EthereumIndexer):
         except IOError as e:
             raise self.FindRelevantElementsException('Request error retrieving Safe L2 events') from e
 
+    @abstractmethod
+    def _process_decoded_element(self, decoded_element: EventData) -> Any:
+        pass
+
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
         """
         Process all events found by `find_relevant_elements`

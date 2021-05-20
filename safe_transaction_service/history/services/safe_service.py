@@ -68,7 +68,7 @@ class SafeService:
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
 
-            created = creation_internal_tx.ethereum_tx.block.timestamp
+            created_time = creation_internal_tx.ethereum_tx.block.timestamp
 
             previous_internal_tx = self._get_previous_internal_tx(
                 creation_internal_tx
@@ -93,7 +93,7 @@ class SafeService:
         except IOError as exc:
             raise NodeConnectionError from exc
 
-        return SafeCreationInfo(created, creator, proxy_factory, master_copy, setup_data,
+        return SafeCreationInfo(created_time, creator, proxy_factory, master_copy, setup_data,
                                 creation_internal_tx.ethereum_tx_id)
 
     def get_safe_info(self, safe_address: str) -> SafeInfo:

@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import List
+from typing import List, Optional
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
@@ -153,17 +153,18 @@ class SafeEventsIndexer(EventsIndexer):
     def database_field(self):
         return 'tx_block_number'
 
-    def _process_decoded_element(self, decoded_element: EventData):
+    def _process_decoded_element(self, decoded_element: EventData) -> Optional[InternalTx]:
         safe_address = decoded_element['address']
         event_name = decoded_element['event']
         # As log
         log_index = decoded_element['logIndex']
+        trace_address = str(log_index)
         args = dict(decoded_element['args'])
 
         internal_tx = InternalTx(
             ethereum_tx_id=decoded_element['transactionHash'],
             _from=safe_address,
-            gas=1,
+            gas=50000,
             data=b'',
             to=NULL_ADDRESS,  # It should be Master copy address but we cannot detect it
             value=0,
@@ -174,7 +175,7 @@ class SafeEventsIndexer(EventsIndexer):
             refund_address=None,
             tx_type=InternalTxType.CALL.value,
             call_type=EthereumTxCallType.DELEGATE_CALL.value,
-            trace_address=str(log_index),
+            trace_address=trace_address,
             error=None
         )
         internal_tx_decoded = InternalTxDecoded(
@@ -186,13 +187,19 @@ class SafeEventsIndexer(EventsIndexer):
             # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
             # the master copy used
             safe_address = args.pop('proxy')
-            internal_tx = InternalTx.objects.filter(
+            InternalTx.objects.filter(
                 ethereum_tx_id=F('ethereum_tx_id'),
                 contract_address=safe_address
             ).update(
-                to=args.pop('singleton')
+                to=args.pop('singleton'),
+                contract_address=None,
+                trace_address=f'{trace_address},0'
             )
-            internal_tx = None
+            # Add creation internal tx. _from is the address of the proxy instead of the safe_address
+            internal_tx.contract_address = safe_address
+            internal_tx.tx_type = InternalTxType.CREATE.value
+            internal_tx.call_type = None
+            internal_tx_decoded = None
         elif event_name == 'SafeSetup':
             internal_tx_decoded.function_name = 'setup'
             internal_tx.contract_address = safe_address
@@ -247,13 +254,13 @@ class SafeEventsIndexer(EventsIndexer):
             # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'
             internal_tx_decoded = None
 
-        with transaction.atomic():
-            try:
-                if internal_tx:
+        if internal_tx:
+            with transaction.atomic():
+                try:
                     internal_tx.save()
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
-            except IntegrityError:
-                logger.warning('Problem inserting internal_tx', exc_info=True)
+                except IntegrityError:
+                    logger.warning('Problem inserting internal_tx', exc_info=True)
 
         return internal_tx
