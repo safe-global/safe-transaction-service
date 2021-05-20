@@ -57,7 +57,7 @@ class ContractAbi(models.Model):
 
     def clean(self):
         try:
-            contract_abi = ContractAbi.objects.get(abi=self.abi)
+            contract_abi = ContractAbi.objects.exclude(pk=self.pk).get(abi=self.abi)
             raise ValidationError(_(f'Abi cannot be duplicated. Already exists: '
                                     f'{contract_abi.pk} - {contract_abi.description}'))
         except ContractAbi.DoesNotExist:

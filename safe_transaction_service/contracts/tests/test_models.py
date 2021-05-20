@@ -10,8 +10,27 @@ from gnosis.eth.clients import Sourcify
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ..clients import EtherscanApi
-from ..models import Contract, validate_abi
+from ..models import Contract, ContractAbi, validate_abi
 from .mocks import sourcify_safe_metadata
+
+
+class TestContractAbi(TestCase):
+    def test_unique_abi(self):
+        """
+        Abi cannot be unique as it's a very big field
+        """
+        abi = sourcify_safe_metadata['output']['abi']
+        contract_abi = ContractAbi(abi=abi, description='testing')
+        contract_abi.full_clean()
+        contract_abi.save()
+
+        contract_abi.description = 'testing 2'
+        contract_abi.full_clean()
+        contract_abi.save()
+
+        contract_abi_2 = ContractAbi(abi=abi, description='whatever')
+        with self.assertRaisesMessage(ValidationError, 'Abi cannot be duplicated'):
+            contract_abi_2.full_clean()
 
 
 class TestContract(TestCase):
