@@ -155,7 +155,7 @@ class SafeTxDecoder:
             value_decoded = HexBytes(value_decoded).hex()
         return value_decoded
 
-    def load_abi(self, abi: ABI) -> bool:
+    def add_abi(self, abi: ABI) -> bool:
         """
         Add a new abi without rebuilding the entire decoder
         :return: True if decoder updated, False otherwise
