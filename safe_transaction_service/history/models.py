@@ -596,6 +596,28 @@ class InternalTx(models.Model):
         else:
             return [int(x) for x in self.trace_address.split(',')]
 
+    def get_parent(self) -> Optional['InternalTx']:
+        if ',' not in self.trace_address:  # We are expecting something like 0,0,1 or 1,1
+            return None
+        parent_trace_address = ','.join(self.trace_address.split(',')[:-1])
+        try:
+            return InternalTx.objects.filter(
+                ethereum_tx_id=self.ethereum_tx_id,
+                trace_address=parent_trace_address
+            ).get()
+        except InternalTx.DoesNotExist:
+            return None
+
+    def get_child(self, index: int) -> Optional['InternalTx']:
+        child_trace_address = f'{self.trace_address},{index}'
+        try:
+            return InternalTx.objects.filter(
+                ethereum_tx_id=self.ethereum_tx_id,
+                trace_address=child_trace_address
+            ).get()
+        except InternalTx.DoesNotExist:
+            return None
+
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
     pass

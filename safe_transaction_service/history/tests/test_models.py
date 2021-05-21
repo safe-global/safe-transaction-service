@@ -284,6 +284,20 @@ class TestInternalTx(TestCase):
         with self.assertRaises(IntegrityError):
             InternalTx.objects.bulk_create(internal_txs)  # Cannot bulk create again first 2 transactions
 
+    def test_get_parent_child(self):
+        i = InternalTxFactory(trace_address='0')
+        self.assertIsNone(i.get_parent())
+        i_2 = InternalTxFactory(trace_address='0,0')
+        self.assertIsNone(i_2.get_parent())  # They must belong to the same ethereum transaction
+        self.assertIsNone(i.get_child(0))  # They must belong to the same ethereum transaction
+        i_2.ethereum_tx = i.ethereum_tx
+        i_2.save()
+
+        self.assertEqual(i_2.get_parent(), i)
+        self.assertEqual(i.get_child(0), i_2)
+        self.assertIsNone(i.get_child(1))
+        self.assertIsNone(i_2.get_child(0))
+
 
 class TestInternalTxDecoded(TestCase):
     def test_safes_pending_to_be_processed(self):

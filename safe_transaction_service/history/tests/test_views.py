@@ -1317,7 +1317,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace('+00:00', 'Z')
             expected = {'created': created_iso,
-                        'creator': internal_tx._from,
+                        'creator': internal_tx.ethereum_tx._from,
                         'factory_address': internal_tx._from,
                         'master_copy': None,
                         'setup_data': None,

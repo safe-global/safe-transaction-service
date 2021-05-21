@@ -67,27 +67,27 @@ class SafeService:
             creation_internal_tx = InternalTx.objects.filter(
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
+            creation_ethereum_tx = creation_internal_tx.ethereum_tx
 
-            created_time = creation_internal_tx.ethereum_tx.block.timestamp
+            created_time = creation_ethereum_tx.block.timestamp
 
-            previous_internal_tx = self._get_previous_internal_tx(
+            parent_internal_tx = self._get_parent_internal_tx(
                 creation_internal_tx
-            ) if self.tracing_enabled else None
+            )
 
-            creator = (previous_internal_tx or creation_internal_tx)._from
+            creator = (parent_internal_tx or creation_ethereum_tx)._from
             proxy_factory = creation_internal_tx._from
 
             master_copy: Optional[str] = None
             setup_data: Optional[bytes] = None
-            if previous_internal_tx:
-                data = previous_internal_tx.data
-                result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
-                if result:
-                    master_copy, setup_data = result
+            data = bytes((parent_internal_tx or creation_ethereum_tx).data)
+            result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
+            if result:
+                master_copy, setup_data = result
             if not (master_copy and setup_data):
-                if next_internal_tx := self._get_next_internal_tx(creation_internal_tx):
-                    master_copy = next_internal_tx.to
-                    setup_data = next_internal_tx.data
+                if setup_internal_tx := self._get_next_internal_tx(creation_internal_tx):
+                    master_copy = setup_internal_tx.to
+                    setup_data = setup_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
         except IOError as exc:
@@ -129,6 +129,10 @@ class SafeService:
             return None
 
     def _get_next_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
+        if child_trace := internal_tx.get_child(0):
+            return child_trace
+        if not self.tracing_enabled:
+            return None
         try:
             next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
                                                                       internal_tx.trace_address_as_list,
@@ -138,7 +142,11 @@ class SafeService:
         except ValueError:
             return None
 
-    def _get_previous_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
+    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
+        if parent_trace := internal_tx.get_parent():
+            return parent_trace
+        if not self.tracing_enabled:
+            return None
         try:
             previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
                                                                             internal_tx.trace_address_as_list,
