@@ -111,30 +111,31 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
 
 L2_MASTER_COPIES = {
     EthereumNetwork.MAINNET: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ],
     EthereumNetwork.RINKEBY: [
         ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 8527380, '1.3.0')
     ],
     EthereumNetwork.GOERLI: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ],
     EthereumNetwork.KOVAN: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ],
     EthereumNetwork.XDAI: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ],
     EthereumNetwork.ENERGY_WEB_CHAIN: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ],
     EthereumNetwork.VOLTA: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
+        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
     ]
 }
 
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     EthereumNetwork.MAINNET: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 9084508),  # v1.1.1
         ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 8915731),  # v1.1.0
         ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 7450116),  # v1.0.0
@@ -146,22 +147,27 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
         ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 4110083),
     ],
     EthereumNetwork.GOERLI: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 1798666),
         ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 1631491),
         ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 312509),
     ],
     EthereumNetwork.KOVAN: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 15366151),
         ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 14740731),
         ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 10629898),
     ],
     EthereumNetwork.XDAI: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 10045327),
     ],
     EthereumNetwork.ENERGY_WEB_CHAIN: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 6399239),
     ],
     EthereumNetwork.VOLTA: [
+        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 6876681),
     ]
 }
