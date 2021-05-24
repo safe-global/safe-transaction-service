@@ -44,8 +44,9 @@ TASKS = [
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_safe_events_task',
                             'Index Safe events (L2)', 13, IntervalSchedule.SECONDS,
                             enabled=settings.ETH_L2_NETWORK),
-    # CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
-    #                        'Index new Proxies', 15, IntervalSchedule.SECONDS),
+    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
+                            'Index new Proxies', 15, IntervalSchedule.SECONDS,
+                            enabled=False),
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
                             'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
@@ -190,7 +191,7 @@ class Command(BaseCommand):
         if ethereum_network in MASTER_COPIES:
             self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} safe addresses'))
             self._setup_safe_master_copies(MASTER_COPIES[ethereum_network])
-        if ethereum_network in MASTER_COPIES:
+        if ethereum_network in L2_MASTER_COPIES:
             self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} l2 safe addresses'))
             self._setup_safe_l2_master_copies(L2_MASTER_COPIES[ethereum_network])
         if ethereum_network in PROXY_FACTORIES:
