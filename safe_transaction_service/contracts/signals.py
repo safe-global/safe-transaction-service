@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=ContractAbi, dispatch_uid='contract_abi.add_abi_to_tx_decoder')
 def add_abi_in_tx_decoder(sender: Type[Model],
-                           instance: ContractAbi,
-                           created: bool, **kwargs) -> None:
+                          instance: ContractAbi,
+                          created: bool, **kwargs) -> None:
     """
     When a `ContractAbi` is saved, TxDecoder must be updated
     :param sender: ContractAbi
