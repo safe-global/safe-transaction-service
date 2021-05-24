@@ -1,6 +1,6 @@
-boto3==1.17.67
+boto3==1.17.78
 cachetools==4.2.2
-celery==5.0.5
+celery==5.1.0
 django-authtools==1.7.0
 django-cache-memoize==0.1.9
 django-celery-beat==2.2.0
@@ -14,14 +14,14 @@ django-model-utils==4.1.1
 django-redis==4.12.1
 django-storages==1.11.1
 django-timezone-field==4.1.2
-django==3.1.10
+django==3.1.11
 djangorestframework-camel-case==1.2.0
 djangorestframework==3.12.4
 docutils==0.17.1
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
 firebase-admin==5.0.0
-gnosis-py==2.9.2
+gnosis-py==3.0.2
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.1
 packaging>=20.9
