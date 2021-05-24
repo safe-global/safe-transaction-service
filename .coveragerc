@@ -1,5 +1,6 @@
 [run]
 omit = 
+     *__init__.py*
      *tests*
      */migrations/*
-     taskapp/celery.py
+     */taskapp/celery.py

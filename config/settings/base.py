@@ -334,6 +334,7 @@ ETHEREUM_NODE_URL = env('ETHEREUM_NODE_URL', default=None)
 ETHEREUM_TRACING_NODE_URL = env('ETHEREUM_TRACING_NODE_URL', default=None)
 ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env('ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT', default=10000)
 ETH_INTERNAL_NO_FILTER = env.bool('ETH_INTERNAL_NO_FILTER', default=False)
+ETH_L2_NETWORK = env.bool('ETH_L2_NETWORK', default=not ETHEREUM_TRACING_NODE_URL)  # Use L2 event indexing
 
 # Safe
 # ------------------------------------------------------------------------------

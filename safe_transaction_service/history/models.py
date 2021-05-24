@@ -6,14 +6,18 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
 
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 from django.db.models import Case, Count, Index, JSONField, Q, QuerySet, Sum
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
 from django.db.models.signals import post_save
+from django.utils.translation import gettext_lazy as _
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
+from packaging.version import Version
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (EthereumAddressField, HexField,
@@ -248,6 +252,7 @@ class EthereumEventQuerySet(models.QuerySet):
                                          address=address).filter(arguments__has_key='value')
 
     def erc721_events(self, token_address: Optional[str] = None, address: Optional[str] = None):
+        # TODO Sql with tokens registered as NFT
         return self.erc20_and_721_events(token_address=token_address,
                                          address=address).filter(arguments__has_key='tokenId')
 
@@ -590,6 +595,28 @@ class InternalTx(models.Model):
             return []
         else:
             return [int(x) for x in self.trace_address.split(',')]
+
+    def get_parent(self) -> Optional['InternalTx']:
+        if ',' not in self.trace_address:  # We are expecting something like 0,0,1 or 1,1
+            return None
+        parent_trace_address = ','.join(self.trace_address.split(',')[:-1])
+        try:
+            return InternalTx.objects.filter(
+                ethereum_tx_id=self.ethereum_tx_id,
+                trace_address=parent_trace_address
+            ).get()
+        except InternalTx.DoesNotExist:
+            return None
+
+    def get_child(self, index: int) -> Optional['InternalTx']:
+        child_trace_address = f'{self.trace_address},{index}'
+        try:
+            return InternalTx.objects.filter(
+                ethereum_tx_id=self.ethereum_tx_id,
+                trace_address=child_trace_address
+            ).get()
+        except InternalTx.DoesNotExist:
+            return None
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
@@ -954,12 +981,44 @@ class ProxyFactory(MonitoredAddress):
         ordering = ['tx_block_number']
 
 
-class SafeMasterCopy(MonitoredAddress):
-    version = models.CharField(max_length=20)
+def validate_version(value: str):
+    try:
+        if not value:
+            raise ValueError('Empty version not allowed')
+        Version(value)
+    except ValueError as exc:
+        raise ValidationError(
+            _('%(value)s is not a valid version: %(reason)s'),
+            params={'value': value, 'reason': str(exc)},
+        )
+
+
+class SafeMasterCopyBaseManager(models.Manager):
+    def get_version_for_address(self, address: ChecksumAddress) -> Optional[str]:
+        try:
+            return self.filter(address=address).only('version').get().version
+        except self.model.DoesNotExist:
+            return None
+
+
+class SafeMasterCopyBase(MonitoredAddress):
+    custom_manager = SafeMasterCopyBaseManager()
+    version = models.CharField(max_length=20, validators=[validate_version])
     deployer = models.CharField(max_length=50, default='Gnosis')
 
     class Meta:
+        abstract = True
+
+
+class SafeMasterCopy(SafeMasterCopyBase):
+    class Meta:
         verbose_name_plural = 'Safe master copies'
+        ordering = ['tx_block_number']
+
+
+class SafeL2MasterCopy(SafeMasterCopyBase):
+    class Meta:
+        verbose_name_plural = 'Safe L2 master copies'
         ordering = ['tx_block_number']
 
 
@@ -1017,9 +1076,9 @@ class SafeStatusManager(models.Manager):
 class SafeStatusQuerySet(models.QuerySet):
     def sorted_by_internal_tx(self):
         """
-        Last SafeStatus first. Usually ordering by `nonce` it should be enough, but in some cases (MultiSend)
-        there could be multiple transactions with the same nonce. `address` must be part of the expression to use
-        `distinct()` later
+        Last SafeStatus first. Usually ordering by `nonce` it should be enough, but in some cases
+        (MultiSend, calling functions inside the Safe like adding/removing owners...) there could be multiple
+        transactions with the same nonce. `address` must be part of the expression to use `distinct()` later
         :return: SafeStatus QuerySet sorted
         """
         return self.order_by(

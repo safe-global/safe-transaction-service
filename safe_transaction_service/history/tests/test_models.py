@@ -1,5 +1,6 @@
 import logging
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.test import TestCase
@@ -19,7 +20,7 @@ from .factories import (EthereumBlockFactory, EthereumEventFactory,
                         InternalTxFactory, MultisigConfirmationFactory,
                         MultisigTransactionFactory,
                         SafeContractDelegateFactory, SafeContractFactory,
-                        SafeStatusFactory)
+                        SafeMasterCopyFactory, SafeStatusFactory)
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,28 @@ class TestSafeMasterCopy(TestCase):
                                  for safe_master_copy in SafeMasterCopy.objects.all()]
 
         self.assertEqual(initial_block_numbers, [2, 6, 3])
+
+    def test_get_version_for_address(self):
+        random_address = Account.create().address
+        self.assertIsNone(SafeMasterCopy.custom_manager.get_version_for_address(random_address))
+
+        safe_master_copy = SafeMasterCopyFactory(address=random_address)
+        self.assertTrue(safe_master_copy.version)
+        self.assertEqual(SafeMasterCopy.custom_manager.get_version_for_address(random_address),
+                         safe_master_copy.version)
+
+    def test_validate_version(self):
+        safe_master_copy = SafeMasterCopyFactory()
+        safe_master_copy.version = ''
+        with self.assertRaisesMessage(ValidationError, 'cannot be blank'):
+            safe_master_copy.full_clean()
+
+        safe_master_copy.version = 'not_a_version'
+        with self.assertRaisesMessage(ValidationError, 'is not a valid version'):
+            safe_master_copy.full_clean()
+
+        safe_master_copy.version = '2.0.1'
+        self.assertIsNone(safe_master_copy.full_clean())
 
 
 class TestEthereumTx(TestCase):
@@ -260,6 +283,20 @@ class TestInternalTx(TestCase):
         InternalTx.objects.bulk_create(internal_txs[:3])
         with self.assertRaises(IntegrityError):
             InternalTx.objects.bulk_create(internal_txs)  # Cannot bulk create again first 2 transactions
+
+    def test_get_parent_child(self):
+        i = InternalTxFactory(trace_address='0')
+        self.assertIsNone(i.get_parent())
+        i_2 = InternalTxFactory(trace_address='0,0')
+        self.assertIsNone(i_2.get_parent())  # They must belong to the same ethereum transaction
+        self.assertIsNone(i.get_child(0))  # They must belong to the same ethereum transaction
+        i_2.ethereum_tx = i.ethereum_tx
+        i_2.save()
+
+        self.assertEqual(i_2.get_parent(), i)
+        self.assertEqual(i.get_child(0), i_2)
+        self.assertIsNone(i.get_child(1))
+        self.assertIsNone(i_2.get_child(0))
 
 
 class TestInternalTxDecoded(TestCase):

@@ -43,7 +43,9 @@ class SafeServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = SafeService(EthereumClient(settings.ETHEREUM_TRACING_NODE_URL))
+            tracing_enabled = bool(settings.ETHEREUM_TRACING_NODE_URL)
+            node_url = settings.ETHEREUM_TRACING_NODE_URL if tracing_enabled else settings.ETHEREUM_NODE_URL
+            cls.instance = SafeService(EthereumClient(node_url), tracing_enabled)
         return cls.instance
 
     @classmethod
@@ -53,8 +55,9 @@ class SafeServiceProvider:
 
 
 class SafeService:
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(self, ethereum_client: EthereumClient, tracing_enabled: bool):
         self.ethereum_client = ethereum_client
+        self.tracing_enabled = tracing_enabled
         dummy_w3 = Web3()  # Not needed, just used to decode contracts
         self.proxy_factory_contract = get_proxy_factory_contract(dummy_w3)
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
@@ -64,30 +67,33 @@ class SafeService:
             creation_internal_tx = InternalTx.objects.filter(
                 ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
             ).select_related('ethereum_tx__block').get(contract_address=safe_address)
+            creation_ethereum_tx = creation_internal_tx.ethereum_tx
 
-            previous_internal_tx = self._get_previous_internal_tx(creation_internal_tx)
+            created_time = creation_ethereum_tx.block.timestamp
 
-            created = creation_internal_tx.ethereum_tx.block.timestamp
-            creator = (previous_internal_tx or creation_internal_tx)._from
+            parent_internal_tx = self._get_parent_internal_tx(
+                creation_internal_tx
+            )
+
+            creator = (parent_internal_tx or creation_ethereum_tx)._from
             proxy_factory = creation_internal_tx._from
 
             master_copy: Optional[str] = None
             setup_data: Optional[bytes] = None
-            if previous_internal_tx:
-                data = previous_internal_tx.data
-                result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
-                if result:
-                    master_copy, setup_data = result
+            data = bytes((parent_internal_tx or creation_ethereum_tx).data)
+            result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
+            if result:
+                master_copy, setup_data = result
             if not (master_copy and setup_data):
-                if next_internal_tx := self._get_next_internal_tx(creation_internal_tx):
-                    master_copy = next_internal_tx.to
-                    setup_data = next_internal_tx.data
+                if setup_internal_tx := self._get_next_internal_tx(creation_internal_tx):
+                    master_copy = setup_internal_tx.to
+                    setup_data = setup_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
         except IOError as exc:
             raise NodeConnectionError from exc
 
-        return SafeCreationInfo(created, creator, proxy_factory, master_copy, setup_data,
+        return SafeCreationInfo(created_time, creator, proxy_factory, master_copy, setup_data,
                                 creation_internal_tx.ethereum_tx_id)
 
     def get_safe_info(self, safe_address: str) -> SafeInfo:
@@ -102,9 +108,14 @@ class SafeService:
     def _decode_proxy_factory(self, data: Union[bytes, str]) -> Optional[Tuple[str, bytes]]:
         try:
             _, data_decoded = self.proxy_factory_contract.decode_function_input(data)
-            master_copy = data_decoded.get('masterCopy', data_decoded.get('_mastercopy'))
-            setup_data = data_decoded.get('data', data_decoded.get('initializer'))
-            return master_copy, setup_data
+            master_copy = (data_decoded.get('masterCopy') or data_decoded.get('_mastercopy')
+                           or data_decoded.get('_singleton') or data_decoded.get('singleton'))
+            setup_data = data_decoded.get('data') or data_decoded.get('initializer')
+            if master_copy and setup_data:
+                return master_copy, setup_data
+            else:
+                logger.error('Problem decoding proxy factory, data_decoded=%s', data_decoded)
+                return None
         except ValueError:
             return None
 
@@ -117,16 +128,30 @@ class SafeService:
         except ValueError:
             return None
 
-    def _get_next_internal_tx(self, internal_tx: InternalTx):
-        next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
-                                                                  internal_tx.trace_address_as_list,
-                                                                  remove_calls=True)
-        return next_traces and InternalTx.objects.build_from_trace(next_traces[0],
-                                                                   internal_tx.ethereum_tx)
+    def _get_next_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
+        if child_trace := internal_tx.get_child(0):
+            return child_trace
+        if not self.tracing_enabled:
+            return None
+        try:
+            next_traces = self.ethereum_client.parity.get_next_traces(internal_tx.ethereum_tx_id,
+                                                                      internal_tx.trace_address_as_list,
+                                                                      remove_calls=True)
+            return next_traces and InternalTx.objects.build_from_trace(next_traces[0],
+                                                                       internal_tx.ethereum_tx)
+        except ValueError:
+            return None
 
-    def _get_previous_internal_tx(self, internal_tx: InternalTx):
-        previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
-                                                                        internal_tx.trace_address_as_list,
-                                                                        skip_delegate_calls=True)
-        return previous_trace and InternalTx.objects.build_from_trace(previous_trace,
-                                                                      internal_tx.ethereum_tx)
+    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
+        if parent_trace := internal_tx.get_parent():
+            return parent_trace
+        if not self.tracing_enabled:
+            return None
+        try:
+            previous_trace = self.ethereum_client.parity.get_previous_trace(internal_tx.ethereum_tx_id,
+                                                                            internal_tx.trace_address_as_list,
+                                                                            skip_delegate_calls=True)
+            return previous_trace and InternalTx.objects.build_from_trace(previous_trace,
+                                                                          internal_tx.ethereum_tx)
+        except ValueError:
+            return None
