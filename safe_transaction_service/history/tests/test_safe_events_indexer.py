@@ -288,13 +288,13 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 7)
 
         # ApproveHash (no nonce) ------------------------------------------------------------------------------------
-        random_hash = self.w3.sha3(text='Get schwifty')
+        random_hash = self.w3.keccak(text='Get schwifty')
         tx = safe.get_contract().functions.approveHash(
             random_hash
         ).buildTransaction({'from': owner_account_1.address,
                             'nonce': self.ethereum_client.get_nonce_for_account(owner_account_1.address)})
-        tx = owner_account_1.signTransaction(tx)
-        self.w3.eth.sendRawTransaction(tx['rawTransaction'])
+        tx = owner_account_1.sign_transaction(tx)
+        self.w3.eth.send_raw_transaction(tx['rawTransaction'])
         # Process events: ApproveHash
         self.assertEqual(self.safe_events_indexer.start(), 1)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
