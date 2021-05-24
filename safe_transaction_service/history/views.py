@@ -690,6 +690,7 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
                                exc_info=True)
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data={'code': 30,
-                                      'message': f'Gas estimation failed: {exc}'})
+                                      'message': 'Gas estimation failed',
+                                      'arguments': [str(exc)]})
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
