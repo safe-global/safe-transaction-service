@@ -26,7 +26,7 @@ class EnsClient:
         :return: True if service is available, False if it's down
         """
         try:
-            return not self.request_session.get(self.url, timeout=self.request_timeout).ok
+            return self.request_session.get(self.url, timeout=self.request_timeout).ok
         except IOError:
             return False
 
