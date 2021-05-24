@@ -22,7 +22,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
-from ..exceptions import NodeConnectionError
+from ..exceptions import NodeConnectionException
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
@@ -1399,7 +1399,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'fallback_handler': safe_create_tx.fallback_handler,
             'version': '1.1.1'})
 
-        with mock.patch.object(SafeService, 'get_safe_info', side_effect=NodeConnectionError, autospec=True):
+        with mock.patch.object(SafeService, 'get_safe_info', side_effect=NodeConnectionException, autospec=True):
             response = self.client.get(reverse('v1:safe-info', args=(safe_address,)), format='json')
             self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
 

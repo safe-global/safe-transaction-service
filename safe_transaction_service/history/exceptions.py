@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def custom_exception_handler(exc, context):
 
-    if isinstance(exc, NodeConnectionError):
+    if isinstance(exc, NodeConnectionException):
         response = Response(status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         if str(exc):
@@ -32,5 +32,5 @@ def custom_exception_handler(exc, context):
     return response
 
 
-class NodeConnectionError(IOError):
+class NodeConnectionException(IOError):
     pass

@@ -19,7 +19,7 @@ from safe_transaction_service.tokens.constants import (
 from safe_transaction_service.tokens.models import Token
 
 from ..clients import EnsClient
-from ..exceptions import NodeConnectionError
+from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
 from ..utils import chunks, get_redis
 
@@ -347,7 +347,7 @@ class CollectiblesService:
                     pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
                 pipe.execute()
         except IOError as exc:
-            raise NodeConnectionError from exc
+            raise NodeConnectionException from exc
 
         return [self.cache_token_uri[address_with_token_id]
                 for address_with_token_id in addresses_with_token_ids]

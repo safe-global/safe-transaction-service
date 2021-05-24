@@ -17,7 +17,7 @@ from safe_transaction_service.contracts.tx_decoder import (TxDecoderException,
 from safe_transaction_service.tokens.serializers import \
     TokenInfoResponseSerializer
 
-from .exceptions import NodeConnectionError
+from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper
 from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
@@ -245,7 +245,7 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
             safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
                                                self.validated_data['data'], self.validated_data['operation'])
         except IOError as exc:
-            raise NodeConnectionError(f'Node connection error when estimating gas for safe {safe_address}') from exc
+            raise NodeConnectionException(f'Node connection error when estimating gas for safe {safe_address}') from exc
         return {'safe_tx_gas': safe_tx_gas}
 
 

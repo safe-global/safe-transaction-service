@@ -22,7 +22,7 @@ from safe_transaction_service.tokens.services.price_service import (
 from safe_transaction_service.tokens.tasks import (
     EthValueWithTimestamp, calculate_token_eth_price_task)
 
-from ..exceptions import NodeConnectionError
+from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
 from ..utils import get_redis
 
@@ -137,7 +137,7 @@ class BalanceService:
         try:
             raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
         except IOError as exc:
-            raise NodeConnectionError from exc
+            raise NodeConnectionException from exc
 
         balances = []
         for balance in raw_balances:
