@@ -125,7 +125,7 @@ class InternalTxAdmin(admin.ModelAdmin):
                 '-ethereum_tx__transaction_index',
                 '-trace_address']
     raw_id_fields = ('ethereum_tx',)
-    search_fields = ['=ethereum_tx__block_id', '=_from', '=to', '=ethereum_tx__tx_hash']
+    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
 
 
 class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
@@ -156,7 +156,7 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
                 '-internal_tx__trace_address']
     raw_id_fields = ('internal_tx',)
     search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
-                     '=internal_tx__ethereum_tx__tx_hash', '=internal_tx__ethereum_tx__block_id']
+                     '=internal_tx__ethereum_tx__tx_hash', '=internal_tx__ethereum_tx__block__number']
 
     def process_again(self, request, queryset):
         queryset.filter(processed=True).update(processed=False)
