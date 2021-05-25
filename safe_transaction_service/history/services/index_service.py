@@ -101,9 +101,10 @@ class IndexService:
                 tx_receipts.append(tx_receipt)
 
         # Get transactions for hashes not in db
-        txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
+        fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_numbers = set()
-        for tx_hash, tx in zip(tx_hashes_not_in_db, txs):
+        txs = []
+        for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs):
             tx = tx or self.ethereum_client.get_transaction(tx_hash)  # Retry fetching if failed
             if not tx:
                 raise TransactionNotFoundException(f'Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}')
@@ -111,6 +112,7 @@ class IndexService:
                 raise TransactionWithoutBlockException(f'Cannot find blockNumber for tx with '
                                                        f'tx-hash={HexBytes(tx_hash).hex()}')
             block_numbers.add(tx['blockNumber'])
+            txs.append(tx)
 
         blocks = self.ethereum_client.get_blocks(block_numbers)
         block_dict = {}
