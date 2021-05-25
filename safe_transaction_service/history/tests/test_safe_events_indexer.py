@@ -305,7 +305,28 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 6)  # No MultisigTransaction was created
         self.assertEqual(MultisigConfirmation.objects.count(), 8)  # A MultisigConfirmation was created
 
-        # Set guard (nonce: 6) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
+        # Send ether (nonce: 6) ----------------------------------------------------------------------------------
+        data = b''
+        value = 122
+        to = Account.create().address
+        multisig_tx = safe.build_multisig_tx(to, value, data)
+        multisig_tx.sign(owner_account_1.key)
+        multisig_tx.execute(self.ethereum_test_account.key)
+        # Process events: SafeMultiSigTransaction, ExecutionSuccess
+        self.assertEqual(self.safe_events_indexer.start(), 2)
+        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        # Add one SafeStatus increasing the nonce
+        self.assertEqual(SafeStatus.objects.count(), 15)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction
+        self.assertEqual(safe_status.nonce, 7)
+        self.assertTrue(InternalTx.objects.filter(value=value, to=to).get().is_ether_transfer)
+
+        self.assertEqual(MultisigTransaction.objects.count(), 7)
+        self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
+                         multisig_tx.safe_tx_hash.hex())
+        self.assertEqual(MultisigConfirmation.objects.count(), 9)
+
+        # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
         guard_address = Account.create().address
         data = HexBytes(
             self.safe_contract_V1_3_0.functions.setGuard(
@@ -321,20 +342,20 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(self.safe_events_indexer.start(), 3)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one changing the guard
-        self.assertEqual(SafeStatus.objects.count(), 16)
+        self.assertEqual(SafeStatus.objects.count(), 17)
         safe_status = SafeStatus.objects.last_for_address(safe_address)  # Processed execTransaction and setGuard
-        self.assertEqual(safe_status.nonce, 7)
+        self.assertEqual(safe_status.nonce, 8)
         self.assertEqual(safe_status.guard, guard_address)
 
         safe_status = SafeStatus.objects.sorted_by_internal_tx()[1]  # Just processed execTransaction
-        self.assertEqual(safe_status.nonce, 7)
+        self.assertEqual(safe_status.nonce, 8)
         self.assertIsNone(safe_status.guard)
 
         # Check master copy did not change during the execution
         self.assertEqual(SafeStatus.objects.last_for_address(safe_address).master_copy,
                          self.safe_contract_V1_3_0.address)
 
-        self.assertEqual(MultisigTransaction.objects.count(), 7)
+        self.assertEqual(MultisigTransaction.objects.count(), 8)
         self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
                          multisig_tx.safe_tx_hash.hex())
-        self.assertEqual(MultisigConfirmation.objects.count(), 10)
+        self.assertEqual(MultisigConfirmation.objects.count(), 11)

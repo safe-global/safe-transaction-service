@@ -178,6 +178,7 @@ class SafeEventsIndexer(EventsIndexer):
             trace_address=trace_address,
             error=None
         )
+        child_internal_tx = None  # For Ether transfers
         internal_tx_decoded = InternalTxDecoded(
             internal_tx=internal_tx,
             function_name='',
@@ -185,7 +186,7 @@ class SafeEventsIndexer(EventsIndexer):
         )
         if event_name == 'ProxyCreation':
             # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
-            # the master copy used
+            # the master copy used. Without tracing it cannot be detected otherwise
             safe_address = args.pop('proxy')
             InternalTx.objects.filter(
                 ethereum_tx_id=F('ethereum_tx_id'),
@@ -209,12 +210,31 @@ class SafeEventsIndexer(EventsIndexer):
             args['_owners'] = args.pop('owners')
         elif event_name == 'SafeMultiSigTransaction':
             internal_tx_decoded.function_name = 'execTransaction'
-            args['data'] = HexBytes(args['data']).hex()
+            data = HexBytes(args['data'])
+            args['data'] = data.hex()
             args['signatures'] = HexBytes(args['signatures']).hex()
             args['nonce'], args['sender'], args['threshold'] = decode_abi(
                 ['uint256', 'address', 'uint256'],
                 internal_tx_decoded.arguments.pop('additionalInfo')
             )
+            if args['value'] and not data:  # Simulate ether transfer
+                child_internal_tx = InternalTx(
+                    ethereum_tx_id=decoded_element['transactionHash'],
+                    _from=safe_address,
+                    gas=23000,
+                    data=b'',
+                    to=args['to'],
+                    value=args['value'],
+                    gas_used=23000,
+                    contract_address=None,
+                    code=None,
+                    output=None,
+                    refund_address=None,
+                    tx_type=InternalTxType.CALL.value,
+                    call_type=EthereumTxCallType.CALL.value,
+                    trace_address=f'{trace_address},0',
+                    error=None
+                )
         elif event_name == 'SafeModuleTransaction':
             internal_tx_decoded.function_name = 'execTransactionFromModule'
             args['data'] = HexBytes(args['data']).hex()
@@ -258,6 +278,8 @@ class SafeEventsIndexer(EventsIndexer):
             with transaction.atomic():
                 try:
                     internal_tx.save()
+                    if child_internal_tx:
+                        child_internal_tx.save()
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
                 except IntegrityError:
