@@ -59,7 +59,8 @@ TASKS = [
 
 MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
     EthereumNetwork.MAINNET: [
-        # ('0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552', 0, '1.3.0'),
+        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 12504423, '1.3.0+L2'),
+        ('0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552', 12504268, '1.3.0'),
         ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 10329734, '1.2.0'),
         ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 9084503, '1.1.1'),
         ('0xaE32496491b53841efb51829d6f886387708F99B', 8915728, '1.1.0'),
@@ -68,6 +69,7 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ('0xAC6072986E985aaBE7804695EC2d8970Cf7541A2', 6569433, '0.0.2'),
     ],
     EthereumNetwork.RINKEBY: [
+        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 8527380, '1.3.0+L2'),
         ('0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552', 8527381, '1.3.0'),
         ('0x6851D6fDFAfD08c0295C392436245E5bc78B0185', 6723632, '1.2.0'),
         ('0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F', 5590754, '1.1.1'),
@@ -110,33 +112,9 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
     ]
 }
 
-L2_MASTER_COPIES = {
-    EthereumNetwork.MAINNET: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ],
-    EthereumNetwork.RINKEBY: [
-        ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 8527380, '1.3.0')
-    ],
-    EthereumNetwork.GOERLI: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ],
-    EthereumNetwork.KOVAN: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ],
-    EthereumNetwork.XDAI: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ],
-    EthereumNetwork.ENERGY_WEB_CHAIN: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ],
-    EthereumNetwork.VOLTA: [
-        # ('0x3E5c63644E683549055b9Be8653de26E0B4CD36E', 0, '1.3.0')
-    ]
-}
-
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     EthereumNetwork.MAINNET: [
-        # ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 0),  # v1.3.0
+        ('0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2', 12504126),  # v1.3.0
         ('0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B', 9084508),  # v1.1.1
         ('0x50e55Af101C777bA7A1d560a774A82eF002ced9F', 8915731),  # v1.1.0
         ('0x12302fE9c02ff50939BaAaaf415fc226C078613C', 7450116),  # v1.0.0
@@ -191,9 +169,6 @@ class Command(BaseCommand):
         if ethereum_network in MASTER_COPIES:
             self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} safe addresses'))
             self._setup_safe_master_copies(MASTER_COPIES[ethereum_network])
-        if ethereum_network in L2_MASTER_COPIES:
-            self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} l2 safe addresses'))
-            self._setup_safe_l2_master_copies(L2_MASTER_COPIES[ethereum_network])
         if ethereum_network in PROXY_FACTORIES:
             self.stdout.write(self.style.SUCCESS(f'Setting up {ethereum_network.name} proxy factory addresses'))
             self._setup_safe_proxy_factories(PROXY_FACTORIES[ethereum_network])
@@ -203,32 +178,20 @@ class Command(BaseCommand):
 
     def _setup_safe_master_copies(self, safe_master_copies: Sequence[Tuple[str, int, str]]):
         for address, initial_block_number, version in safe_master_copies:
-            safe_master_copy, _ = SafeMasterCopy.objects.get_or_create(
-                address=address,
-                defaults={
-                    'initial_block_number': initial_block_number,
-                    'tx_block_number': initial_block_number,
-                    'version': version,
-                }
-            )
-            if safe_master_copy.version != version:
-                safe_master_copy.version = version
-                safe_master_copy.save(update_fields=['version'])
-
-    def _setup_safe_l2_master_copies(self, safe_master_copies: Sequence[Tuple[str, int, str]]):
-        # TODO Refactor  _setup_safe_master_copies and _setup_safe_l2_master_copies into one method
-        for address, initial_block_number, version in safe_master_copies:
-            safe_master_copy, _ = SafeL2MasterCopy.objects.get_or_create(
-                address=address,
-                defaults={
-                    'initial_block_number': initial_block_number,
-                    'tx_block_number': initial_block_number,
-                    'version': version,
-                }
-            )
-            if safe_master_copy.version != version:
-                safe_master_copy.version = version
-                safe_master_copy.save(update_fields=['version'])
+            ModelsToInsert = (SafeL2MasterCopy, SafeMasterCopy) if version.endswith('+L2') else (SafeMasterCopy,)
+            for ModelToInsert in ModelsToInsert:
+                safe_master_copy, _ = ModelToInsert.objects.get_or_create(
+                    address=address,
+                    defaults={
+                        'initial_block_number': initial_block_number,
+                        'tx_block_number': initial_block_number,
+                        'version': version,
+                    }
+                )
+                if safe_master_copy.version != version or safe_master_copy.initial_block_number != initial_block_number:
+                    safe_master_copy.version = initial_block_number
+                    safe_master_copy.version = version
+                    safe_master_copy.save(update_fields=['initial_block_number', 'version'])
 
     def _setup_safe_proxy_factories(self, safe_proxy_factories: Sequence[Tuple[str, int]]):
         for address, initial_block_number in safe_proxy_factories:
