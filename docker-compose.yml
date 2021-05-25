@@ -5,7 +5,7 @@ volumes:
 
 services:
   nginx:
-    image: nginx:1.19-alpine
+    image: nginx:1.20-alpine
     hostname: nginx
     ports:
       - "8000:8000"
@@ -16,12 +16,12 @@ services:
       - web
 
   redis:
-    image: redis:6-alpine
+    image: redis:alpine
     ports:
       - "6379:6379"
 
   db:
-    image: postgres:10-alpine
+    image: postgres:11-alpine
     ports:
       - "5432:5432"
     environment:
