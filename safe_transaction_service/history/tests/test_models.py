@@ -94,7 +94,7 @@ class TestModelMixins(TestCase):
 class TestMultisigTransaction(TestCase):
     def test_multisig_transaction_owners(self):
         multisig_transaction = MultisigTransactionFactory(signatures=None)
-        self.assertIsNone(multisig_transaction.owners)
+        self.assertEqual(multisig_transaction.owners, [])
 
         account = Account.create()
         multisig_transaction.signatures = account.signHash(multisig_transaction.safe_tx_hash)['signature']

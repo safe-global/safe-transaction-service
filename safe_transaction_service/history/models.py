@@ -848,7 +848,7 @@ class MultisigTransaction(TimeStampedModel):
     @property
     def owners(self) -> Optional[List[str]]:
         if not self.signatures:
-            return None
+            return []
         else:
             signatures = bytes(self.signatures)
             safe_signatures = SafeSignature.parse_signature(signatures, self.safe_tx_hash)
