@@ -1,6 +1,6 @@
 boto3==1.17.77
 cachetools==4.2.2
-celery==5.0.5
+celery==5.1.0
 django-authtools==1.7.0
 django-cache-memoize==0.1.9
 django-celery-beat==2.2.0
