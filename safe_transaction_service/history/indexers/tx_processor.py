@@ -154,8 +154,12 @@ class SafeTxProcessor(TxProcessor):
         :return: `True` if migrating from a Master Copy old version to a new version breaks signatures,
         `False` otherwise
         """
+        old_version = Version(Version(old_safe_version).base_version)  # Remove things like -alpha or +L2
+        new_version = Version(Version(new_safe_version).base_version)
+        if new_version < old_version:
+            new_version, old_version = old_version, new_version
         for breaking_version in self.signature_breaking_versions:
-            if Version(old_safe_version) < breaking_version <= Version(new_safe_version):
+            if old_version < breaking_version <= new_version:
                 return True
         return False
 

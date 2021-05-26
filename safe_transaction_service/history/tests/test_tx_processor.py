@@ -226,6 +226,18 @@ class TestSafeTxProcessor(TestCase):
         self.assertFalse(tx_processor.is_version_breaking_signatures('1.1.0', '1.2.0'))
         self.assertFalse(tx_processor.is_version_breaking_signatures('0.0.1', '0.9.0'))
 
+        # Reversed
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.1.1', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.0.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.1.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.2.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.4.0', '1.2.1'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.2.2', '1.0.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.2.0', '1.1.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('0.9.0', '0.0.1'))
+
     def test_tx_processor_change_master_copy(self):
         tx_processor = SafeTxProcessorProvider()
         owner = Account.create().address
