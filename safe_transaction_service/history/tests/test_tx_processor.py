@@ -245,11 +245,26 @@ class TestSafeTxProcessor(TestCase):
             [
                 InternalTxDecodedFactory(function_name='execTransaction',
                                          internal_tx___from=safe_address),
-                InternalTxDecodedFactory(function_name='changeMasterCopy', master_copy=safe_1_2_0_master_copy,
+                InternalTxDecodedFactory(function_name='changeMasterCopy', master_copy=safe_1_2_0_master_copy.address,
                                          internal_tx___from=safe_address)
             ])
         self.assertEqual(MultisigTransaction.objects.get().nonce, 0)
-        MultisigTransactionFactory(nonce=1,
+        MultisigTransactionFactory(safe=safe_address,
+                                   nonce=1,
                                    ethereum_tx=None)  # This will not be deleted as execTransaction will insert a tx with nonce=1
-        MultisigTransactionFactory(nonce=2,
-                                   ethereum_tx=none)  # This will be deleted
+        MultisigTransactionFactory(safe=safe_address,
+                                   nonce=2,
+                                   ethereum_tx=None)  # This will be deleted when migrating to the 1.3.0 master copy
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=2).count(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        tx_processor.process_decoded_transactions(
+            [
+                InternalTxDecodedFactory(function_name='execTransaction',
+                                         internal_tx___from=safe_address),
+                InternalTxDecodedFactory(function_name='changeMasterCopy', master_copy=safe_1_3_0_master_copy.address,
+                                         internal_tx___from=safe_address)
+            ])
+
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=1).count(), 2)
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=2).count(), 0)  # It was deleted
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
