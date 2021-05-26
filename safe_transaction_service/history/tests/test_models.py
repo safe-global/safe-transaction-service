@@ -101,6 +101,30 @@ class TestMultisigTransaction(TestCase):
         multisig_transaction.save()
         self.assertEqual(multisig_transaction.owners, [account.address])
 
+    def test_queued(self):
+        safe_address = Account.create().address
+        queryset = MultisigTransaction.objects.queued(safe_address)
+        self.assertEqual(queryset.count(), 0)
+        MultisigTransactionFactory(safe=safe_address, nonce=0, ethereum_tx=None)
+        self.assertEqual(queryset.all().count(), 1)
+        MultisigTransactionFactory(safe=safe_address, nonce=0)
+        self.assertEqual(queryset.all().count(), 0)
+        MultisigTransactionFactory(safe=safe_address, nonce=1, ethereum_tx=None)
+        self.assertEqual(queryset.all().count(), 1)
+        MultisigTransactionFactory(safe=safe_address, nonce=2, ethereum_tx=None)
+        self.assertEqual(queryset.all().count(), 2)
+        MultisigTransactionFactory(nonce=10)  # Other Safe, it must not affect
+        self.assertEqual(queryset.all().count(), 2)
+        MultisigTransactionFactory(safe=safe_address, nonce=10)  # Last executed tx
+        self.assertEqual(queryset.all().count(), 0)
+        MultisigTransactionFactory(safe=safe_address, nonce=7, ethereum_tx=None)  # Not queued (7 < 10)
+        MultisigTransactionFactory(safe=safe_address, nonce=22, ethereum_tx=None)  # Queued (22 > 10)
+        MultisigTransactionFactory(safe=safe_address, nonce=22, ethereum_tx=None)  # Queued (22 > 10)
+        MultisigTransactionFactory(safe=safe_address, nonce=57, ethereum_tx=None)  # Queued (22 > 10)
+        self.assertEqual(queryset.all().count(), 3)
+        MultisigTransactionFactory(safe=safe_address, nonce=22)  # only nonce=57 will be queued
+        self.assertEqual(queryset.all().count(), 1)
+
 
 class TestSafeMasterCopy(TestCase):
     def test_safe_master_copy_sorting(self):

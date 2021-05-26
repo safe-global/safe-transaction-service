@@ -8,9 +8,11 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
-from django.db.models import Case, Count, Index, JSONField, Q, QuerySet, Sum
+from django.db.models import (Case, Count, Index, JSONField, Max, Q, QuerySet,
+                              Sum)
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
                                           When)
+from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
 from django.utils.translation import gettext_lazy as _
 
@@ -768,7 +770,7 @@ class MultisigTransactionManager(models.Manager):
 
     def not_indexed_metadata_contract_addresses(self):
         """
-        Find contracts with metadata not indexed
+        Find contracts with metadata (abi, contract name) not indexed
         :return:
         """
         return MultisigTransaction.objects.exclude(
@@ -809,6 +811,25 @@ class MultisigTransactionQuerySet(models.QuerySet):
         ).sorted_reverse_by_internal_tx().values('threshold')
 
         return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
+
+    def queued(self, safe_address: str):
+        """
+        :return: Transactions not executed with safe-nonce greater than the last executed nonce. If no transaction is
+        executed every transaction is returned
+        """
+        subquery = self.executed().filter(
+            safe=safe_address
+        ).values(
+            'safe'
+        ).annotate(
+            max_nonce=Max('nonce')
+        ).values('max_nonce')
+        return self.not_executed().annotate(
+            max_executed_nonce=Coalesce(Subquery(subquery), Value(-1), output_field=Uint256Field())
+        ).filter(
+            nonce__gt=F('max_executed_nonce'),
+            safe=safe_address
+        )
 
 
 class MultisigTransaction(TimeStampedModel):
@@ -1159,7 +1180,7 @@ class SafeStatus(models.Model):
 
     def store_new(self, internal_tx: InternalTx) -> None:
         self.internal_tx = internal_tx
-        return self.save()
+        return self.save(force_insert=True)
 
 
 class WebHookType(Enum):
