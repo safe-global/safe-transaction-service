@@ -659,7 +659,7 @@ class AnalyticsMultisigTxsBySafeResponseSerializer(serializers.Serializer):
     transactions = serializers.IntegerField()
 
 
-class _AllTransactionsSchemaSerializer(serializers.Serializer):
+class AllTransactionsSchemaSerializer(serializers.Serializer):
     """
     Just for the purpose of documenting, don't use it
     """

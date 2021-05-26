@@ -89,10 +89,10 @@ class AnalyticsMultisigTxsBySafeListView(ListAPIView):
 class AllTransactionsListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend, OrderingFilter)
     pagination_class = pagination.SmallPagination
-    serializer_class = serializers._AllTransactionsSchemaSerializer  # Just for docs, not used
+    serializer_class = serializers.AllTransactionsSchemaSerializer  # Just for docs, not used
 
-    _schema_queued_param = openapi.Parameter('executed', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
-                                             description='If `True` only executed transactions are returned')
+    _schema_executed_param = openapi.Parameter('executed', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=False,
+                                               description='If `True` only executed transactions are returned')
     _schema_queued_param = openapi.Parameter('queued', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, default=True,
                                              description='If `True` transactions with `nonce >= Safe current nonce` '
                                                          'are also returned')
@@ -100,7 +100,7 @@ class AllTransactionsListView(ListAPIView):
                                               description='If `True` just trusted transactions are shown (indexed, '
                                                           'added by a delegate or with at least one confirmation)')
     _schema_200_response = openapi.Response('A list with every element with the structure of one of these transaction'
-                                            'types', serializers._AllTransactionsSchemaSerializer)
+                                            'types', serializers.AllTransactionsSchemaSerializer)
 
     def get_parameters(self) -> Tuple[bool, bool, bool]:
         """
@@ -133,7 +133,7 @@ class AllTransactionsListView(ListAPIView):
 
     @swagger_auto_schema(responses={200: _schema_200_response,
                                     422: 'code = 1: Checksum address validation failed'},
-                         manual_parameters=[_schema_queued_param, _schema_trusted_param])
+                         manual_parameters=[_schema_executed_param, _schema_queued_param, _schema_trusted_param])
     def get(self, request, *args, **kwargs):
         """
         Returns a paginated list of transactions for a Safe. The list has different structures depending on the
