@@ -130,12 +130,12 @@ class SafeTxProcessor(TxProcessor):
         return False
 
     @cache
-    def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> str:
+    def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> Optional[str]:
         for MasterCopyModel in (SafeMasterCopy, SafeL2MasterCopy):
             version = MasterCopyModel.custom_manager.get_version_for_address(master_copy)
             if version:
                 return version
-        return '1.0.0'
+        return None
 
     @cache
     def get_chain_id(self) -> int:
@@ -280,7 +280,8 @@ class SafeTxProcessor(TxProcessor):
             old_safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
             safe_status.master_copy = arguments['_masterCopy']
             new_safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
-            if self.is_version_breaking_signatures(old_safe_version, new_safe_version):
+            if old_safe_version and new_safe_version and self.is_version_breaking_signatures(old_safe_version,
+                                                                                             new_safe_version):
                 # Transactions queued not executed are not valid anymore
                 MultisigTransaction.objects.queued(contract_address).delete()
             self.store_new_safe_status(safe_status, internal_tx)
@@ -380,7 +381,7 @@ class SafeTxProcessor(TxProcessor):
             nonce = arguments['nonce'] if 'nonce' in arguments else safe_status.nonce
             if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
                 base_gas = arguments['baseGas']
-                safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
+                safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy) or '1.0.0'
             else:
                 base_gas = arguments['dataGas']
                 safe_version = '0.0.1'
