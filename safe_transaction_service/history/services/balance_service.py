@@ -22,6 +22,7 @@ from safe_transaction_service.tokens.services.price_service import (
 from safe_transaction_service.tokens.tasks import (
     EthValueWithTimestamp, calculate_token_eth_price_task)
 
+from ...tokens.clients import CannotGetPrice
 from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
 from ..utils import get_redis
@@ -198,7 +199,11 @@ class BalanceService:
         :return: List of BalanceWithFiat
         """
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
-        eth_price = self.price_service.get_eth_usd_price()
+        try:
+            eth_price = self.price_service.get_eth_usd_price()
+        except CannotGetPrice:
+            logger.warning('Cannot get network ether price', exc_info=True)
+            eth_price = 0
         balances_with_usd = []
         token_addresses = [balance.token_address for balance in balances]
         token_eth_values_with_timestamp = self.get_cached_token_eth_values(token_addresses)
