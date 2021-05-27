@@ -29,7 +29,14 @@ class BinanceClient:
 
     def get_eth_usd_price(self) -> float:
         """
-        :return: current USD price for ethereum using Kraken
+        :return: current USD price for Ethereum
         :raises: CannotGetPrice
         """
         return self._get_price('ETHUSDT')
+
+    def get_matic_usd_price(self) -> float:
+        """
+        :return: current USD price for MATIC
+        :raises: CannotGetPrice
+        """
+        return self._get_price('MATICUSDT')

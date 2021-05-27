@@ -44,5 +44,8 @@ class KrakenClient:
         """
         return self._get_price('ETHUSD')
 
+    def get_matic_usd_price(self):
+        return self._get_price('MATICUSD')
+
     def get_ewt_usd_price(self) -> float:
         return self._get_price('EWTUSD')

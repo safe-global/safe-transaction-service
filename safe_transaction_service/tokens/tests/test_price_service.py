@@ -60,6 +60,25 @@ class TestPriceService(TestCase):
         price = price_service.get_ewt_usd_price()
         self.assertEqual(price, 3.)
 
+    @mock.patch.object(CoingeckoClient, 'get_matic_usd_price', return_value=3.)
+    @mock.patch.object(BinanceClient, 'get_matic_usd_price', return_value=7.)
+    @mock.patch.object(KrakenClient, 'get_matic_usd_price', return_value=5.)
+    def test_get_matic_usd_price(self, get_matic_usd_price_kraken_mock: MagicMock,
+                                 get_matic_usd_price_binance_mock: MagicMock,
+                                 get_matic_usd_price_coingecko_mock: MagicMock):
+        price_service = PriceServiceProvider()
+
+        price = price_service.get_matic_usd_price()
+        self.assertEqual(price, 5.)
+
+        get_matic_usd_price_kraken_mock.side_effect = CannotGetPrice
+        price = price_service.get_matic_usd_price()
+        self.assertEqual(price, 7.)
+
+        get_matic_usd_price_binance_mock.side_effect = CannotGetPrice
+        price = price_service.get_matic_usd_price()
+        self.assertEqual(price, 3.)
+
     def test_token_eth_value(self):
         mainnet_node = just_test_if_mainnet_node()
         price_service = PriceService(EthereumClient(mainnet_node), PriceServiceProvider().redis)

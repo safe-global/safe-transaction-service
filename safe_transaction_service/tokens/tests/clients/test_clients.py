@@ -43,6 +43,24 @@ class TestClients(TestCase):
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 
+    def test_get_matic_usd_price(self) -> float:
+        just_test_if_mainnet_node()
+        binance_client = BinanceClient()
+        kraken_client = KrakenClient()
+        coingecko_client = CoingeckoClient()
+
+        price = binance_client.get_matic_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
+        price = kraken_client.get_matic_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
+        price = coingecko_client.get_matic_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
     def test_get_ewt_usd_price_coingecko(self) -> float:
         just_test_if_mainnet_node()
         coingecko_client = CoingeckoClient()
