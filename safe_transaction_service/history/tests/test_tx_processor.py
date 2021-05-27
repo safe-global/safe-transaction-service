@@ -15,7 +15,8 @@ from ..models import (InternalTxDecoded, ModuleTransaction,
                       MultisigConfirmation, MultisigTransaction, SafeContract,
                       SafeStatus)
 from .factories import (EthereumTxFactory, InternalTxDecodedFactory,
-                        MultisigConfirmationFactory)
+                        MultisigConfirmationFactory,
+                        MultisigTransactionFactory, SafeMasterCopyFactory)
 from .mocks.traces import call_trace
 
 logger = logging.getLogger(__name__)
@@ -211,3 +212,71 @@ class TestSafeTxProcessor(TestCase):
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertTrue(tx_processor.is_failed(ethereum_tx, safe_tx_hash))
         self.assertFalse(tx_processor.is_failed(ethereum_tx, Web3.keccak(text='hola').hex()))
+
+    def test_tx_is_version_breaking_signatures(self):
+        tx_processor = SafeTxProcessorProvider()
+        self.assertTrue(tx_processor.is_version_breaking_signatures('0.0.1', '1.1.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('0.0.1', '1.3.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('0.0.1', '1.4.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.0.0', '1.3.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.1.1', '1.3.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.2.0', '1.3.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.2.1', '1.4.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.0.0', '1.2.2'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.1.0', '1.2.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('0.0.1', '0.9.0'))
+
+        # Reversed
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.1.1', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '0.0.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.0.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.1.1'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.3.0', '1.2.0'))
+        self.assertTrue(tx_processor.is_version_breaking_signatures('1.4.0', '1.2.1'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.2.2', '1.0.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('1.2.0', '1.1.0'))
+        self.assertFalse(tx_processor.is_version_breaking_signatures('0.9.0', '0.0.1'))
+
+    def test_tx_processor_change_master_copy(self):
+        tx_processor = SafeTxProcessorProvider()
+        owner = Account.create().address
+        safe_address = Account.create().address
+        fallback_handler = Account.create().address
+        threshold = 1
+        safe_1_1_0_master_copy = SafeMasterCopyFactory(version='1.1.0')
+        safe_1_2_0_master_copy = SafeMasterCopyFactory(version='1.2.0')
+        safe_1_3_0_master_copy = SafeMasterCopyFactory(version='1.3.0')
+        tx_processor.process_decoded_transaction(
+            InternalTxDecodedFactory(function_name='setup', owner=owner, threshold=threshold,
+                                     fallback_handler=fallback_handler,
+                                     internal_tx__to=safe_1_1_0_master_copy.address,
+                                     internal_tx___from=safe_address)
+        )
+        tx_processor.process_decoded_transactions(
+            [
+                InternalTxDecodedFactory(function_name='execTransaction',
+                                         internal_tx___from=safe_address),
+                InternalTxDecodedFactory(function_name='changeMasterCopy', master_copy=safe_1_2_0_master_copy.address,
+                                         internal_tx___from=safe_address)
+            ])
+        self.assertEqual(MultisigTransaction.objects.get().nonce, 0)
+        MultisigTransactionFactory(safe=safe_address,
+                                   nonce=1,
+                                   ethereum_tx=None)  # This will not be deleted as execTransaction will insert a tx with nonce=1
+        MultisigTransactionFactory(safe=safe_address,
+                                   nonce=2,
+                                   ethereum_tx=None)  # This will be deleted when migrating to the 1.3.0 master copy
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=2).count(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        tx_processor.process_decoded_transactions(
+            [
+                InternalTxDecodedFactory(function_name='execTransaction',
+                                         internal_tx___from=safe_address),
+                InternalTxDecodedFactory(function_name='changeMasterCopy', master_copy=safe_1_3_0_master_copy.address,
+                                         internal_tx___from=safe_address)
+            ])
+
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=1).count(), 2)
+        self.assertEqual(MultisigTransaction.objects.filter(safe=safe_address, nonce=2).count(), 0)  # It was deleted
+        self.assertEqual(MultisigTransaction.objects.count(), 3)

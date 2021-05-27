@@ -8,6 +8,7 @@ from django.db import transaction
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
+from packaging.version import Version
 from web3 import Web3
 
 from gnosis.eth import EthereumClient
@@ -81,6 +82,10 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi) for event in self.safe_tx_module_failure_events
         }
         self.safe_status_cache: Dict[str, SafeStatus] = {}
+        self.signature_breaking_versions = (  # Versions where signing changed
+            Version('1.0.0'),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
+            Version('1.3.0'),  # ChainId was included
+        )
 
     def clear_cache(self, safe_address: Optional[str] = None):
         if safe_address:
@@ -125,12 +130,12 @@ class SafeTxProcessor(TxProcessor):
         return False
 
     @cache
-    def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> str:
+    def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> Optional[str]:
         for MasterCopyModel in (SafeMasterCopy, SafeL2MasterCopy):
             version = MasterCopyModel.custom_manager.get_version_for_address(master_copy)
             if version:
                 return version
-        return '1.0.0'
+        return None
 
     @cache
     def get_chain_id(self) -> int:
@@ -141,6 +146,22 @@ class SafeTxProcessor(TxProcessor):
         if not safe_status:
             logger.error('SafeStatus not found for address=%s', address)
         return safe_status
+
+    def is_version_breaking_signatures(self, old_safe_version: str, new_safe_version: str) -> bool:
+        """
+        :param old_safe_version:
+        :param new_safe_version:
+        :return: `True` if migrating from a Master Copy old version to a new version breaks signatures,
+        `False` otherwise
+        """
+        old_version = Version(Version(old_safe_version).base_version)  # Remove things like -alpha or +L2
+        new_version = Version(Version(new_safe_version).base_version)
+        if new_version < old_version:
+            new_version, old_version = old_version, new_version
+        for breaking_version in self.signature_breaking_versions:
+            if old_version < breaking_version <= new_version:
+                return True
+        return False
 
     def remove_owner(self, internal_tx: InternalTx, safe_status: SafeStatus, owner: str):
         """
@@ -256,7 +277,13 @@ class SafeTxProcessor(TxProcessor):
             logger.debug('Processing master copy change')
             # TODO Ban address if it doesn't have a valid master copy
             safe_status = self.get_last_safe_status_for_address(contract_address)
+            old_safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
             safe_status.master_copy = arguments['_masterCopy']
+            new_safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
+            if old_safe_version and new_safe_version and self.is_version_breaking_signatures(old_safe_version,
+                                                                                             new_safe_version):
+                # Transactions queued not executed are not valid anymore
+                MultisigTransaction.objects.queued(contract_address).delete()
             self.store_new_safe_status(safe_status, internal_tx)
         elif function_name == 'setFallbackHandler':
             logger.debug('Setting FallbackHandler')
@@ -354,7 +381,7 @@ class SafeTxProcessor(TxProcessor):
             nonce = arguments['nonce'] if 'nonce' in arguments else safe_status.nonce
             if 'baseGas' in arguments:  # `dataGas` was renamed to `baseGas` in v1.0.0
                 base_gas = arguments['baseGas']
-                safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy)
+                safe_version = self.get_safe_version_from_master_copy(safe_status.master_copy) or '1.0.0'
             else:
                 base_gas = arguments['dataGas']
                 safe_version = '0.0.1'
