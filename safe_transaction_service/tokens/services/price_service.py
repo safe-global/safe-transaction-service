@@ -91,6 +91,15 @@ class PriceService:
             except CannotGetPrice:
                 return self.coingecko_client.get_ewt_usd_price()
 
+    def get_matic_usd_price(self) -> float:
+        try:
+            return self.kraken_client.get_matic_usd_price()
+        except CannotGetPrice:
+            try:
+                return self.binance_client.get_matic_usd_price()
+            except CannotGetPrice:
+                return self.coingecko_client.get_matic_usd_price()
+
     @cachedmethod(cache=operator.attrgetter('cache_eth_price'))
     @cache_memoize(60 * 30, prefix='balances-get_eth_usd_price')  # 30 minutes
     def get_eth_usd_price(self) -> float:
@@ -108,6 +117,8 @@ class PriceService:
                 return 1  # DAI/USD should be close to 1
         elif self.ethereum_network in (EthereumNetwork.ENERGY_WEB_CHAIN, EthereumNetwork.VOLTA):
             return self.get_ewt_usd_price()
+        elif self.ethereum_network in (EthereumNetwork.MATIC, EthereumNetwork.MUMBAI):
+            return self.get_matic_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
