@@ -361,7 +361,7 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
 # AWS S3 https://github.com/etianen/django-s3-storage
 # AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
-AWS_S3_PUBLIC_URL = env('AWS_S3_CUSTOM_DOMAIN', default=None)  # Set custom domain for file urls (like cloudfront)
+AWS_S3_PUBLIC_URL = env('AWS_S3_PUBLIC_URL', default=None)  # Set custom domain for file urls (like cloudfront)
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default=None)
 AWS_S3_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default=None)
 AWS_S3_FILE_OVERWRITE = True

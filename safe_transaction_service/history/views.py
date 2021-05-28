@@ -55,8 +55,8 @@ class AboutView(APIView):
             'secure': self.request.is_secure(),
             'settings': {
                 'AWS_CONFIGURED': settings.AWS_CONFIGURED,
-                'AWS_S3_CUSTOM_DOMAIN': settings.AWS_S3_CUSTOM_DOMAIN,
-                'AWS_STORAGE_BUCKET_NAME': settings.AWS_STORAGE_BUCKET_NAME,
+                'AWS_S3_BUCKET_NAME': settings.AWS_S3_BUCKET_NAME,
+                'AWS_S3_PUBLIC_URL': settings.AWS_S3_PUBLIC_URL,
                 'ETHEREUM_NODE_URL': settings.ETHEREUM_NODE_URL,
                 'ETHEREUM_TRACING_NODE_URL': settings.ETHEREUM_TRACING_NODE_URL,
                 'ETH_INTERNAL_NO_FILTER': settings.ETH_INTERNAL_NO_FILTER,
