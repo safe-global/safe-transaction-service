@@ -25,8 +25,8 @@ logger = getLogger(__name__)
 
 def get_file_storage():
     if settings.AWS_CONFIGURED:
-        from storages.backends.s3boto3 import S3Boto3Storage
-        return S3Boto3Storage()
+        from django_s3_storage.storage import S3Storage
+        return S3Storage()
     else:
         return default_storage
 

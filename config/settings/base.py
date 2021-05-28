@@ -74,6 +74,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'rest_framework',
     'drf_yasg',
+    'django_s3_storage',
 ]
 LOCAL_APPS = [
     'safe_transaction_service.contracts.apps.ContractsConfig',
@@ -357,12 +358,13 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
     )
 
 
-# AWS S3 https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html
+# AWS S3 https://github.com/etianen/django-s3-storage
+# AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
-AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
-AWS_S3_CUSTOM_DOMAIN = env('AWS_S3_CUSTOM_DOMAIN', default=None)  # Set custom domain for file urls (like cloudfront)
+AWS_S3_PUBLIC_URL = env('AWS_S3_CUSTOM_DOMAIN', default=None)  # Set custom domain for file urls (like cloudfront)
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default=None)
-AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default=None)
-AWS_CONFIGURED = bool(AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME)
+AWS_S3_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default=None)
+AWS_S3_FILE_OVERWRITE = True
+AWS_CONFIGURED = bool(AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET_NAME)
 
 ETHERSCAN_API_KEY = env('ETHERSCAN_API_KEY', default=None)
