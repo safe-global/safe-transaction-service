@@ -336,7 +336,6 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.sign(owner_account_2.key)  # Use 2 signatures to test multiple confirmations parsing
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), 3)
@@ -358,4 +357,4 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 8)
         self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
                          multisig_tx.safe_tx_hash.hex())
-        self.assertEqual(MultisigConfirmation.objects.count(), 11)
+        self.assertEqual(MultisigConfirmation.objects.count(), 10)
