@@ -5,7 +5,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from web3.exceptions import BadFunctionCallOutput
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField, Sha3HashField)
 from gnosis.safe import Safe
@@ -254,9 +254,12 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
     delegate = EthereumAddressField()
     signature = HexadecimalField(min_length=65)
 
-    def check_signature(self, signature: bytes, operation_hash: bytes, safe_owners: List[str]) -> Optional[str]:
+    def check_signature(self, ethereum_client: EthereumClient, safe_address: str,
+                        signature: bytes, operation_hash: bytes, safe_owners: List[str]) -> Optional[str]:
         """
         Checks signature and returns a valid owner if found, None otherwise
+        :param ethereum_client:
+        :param safe_address:
         :param signature:
         :param operation_hash:
         :param safe_owners:
@@ -271,7 +274,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         safe_signature = safe_signatures[0]
         delegator = safe_signature.owner
         if delegator in safe_owners:
-            if not safe_signature.is_valid():
+            if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(f'Signature of type={safe_signature.signature_type.name} '
                                       f'for delegator={delegator} is not valid')
             return delegator
@@ -279,11 +282,12 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
     def validate(self, data):
         super().validate(data)
 
-        if not SafeContract.objects.filter(address=data['safe']).exists():
-            raise ValidationError(f"Safe={data['safe']} does not exist or it's still not indexed")
+        safe_address = data['safe']
+        if not SafeContract.objects.filter(address=safe_address).exists():
+            raise ValidationError(f"Safe={safe_address} does not exist or it's still not indexed")
 
         ethereum_client = EthereumClientProvider()
-        safe = Safe(data['safe'], ethereum_client)
+        safe = Safe(safe_address, ethereum_client)
 
         # Check owners and pending owners
         try:
@@ -299,7 +303,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
                                DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
                                DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
                                DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
-            delegator = self.check_signature(signature, operation_hash, safe_owners)
+            delegator = self.check_signature(ethereum_client, safe_address, signature, operation_hash, safe_owners)
             if delegator:
                 break
 

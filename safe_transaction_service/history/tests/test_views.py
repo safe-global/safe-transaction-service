@@ -15,7 +15,9 @@ from web3 import Web3
 
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe import CannotEstimateGas, Safe
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
+from gnosis.safe.safe_signature import (SafeSignature, SafeSignatureContract,
+                                        SafeSignatureType)
+from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
@@ -927,6 +929,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         }
         response = self.client.post(reverse('v1:safe-delegates', args=(safe_address, )), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Test not internal server error on contract signature
+        signature = signature_to_bytes((0, int(owner_account.address, 16), 65)) + HexBytes('0' * 65)
+        data['signature'] = signature.hex()
+        response = self.client.post(reverse('v1:safe-delegates', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         response = self.client.get(reverse('v1:safe-delegates', args=(safe_address,)), format='json')
         self.assertCountEqual(response.data['results'], [
