@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from drf_yasg.utils import swagger_serializer_method
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from web3.exceptions import BadFunctionCallOutput
@@ -19,9 +20,8 @@ from safe_transaction_service.tokens.serializers import \
 
 from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper
-from .models import (ConfirmationType, EthereumTx, ModuleTransaction,
-                     MultisigConfirmation, MultisigTransaction, SafeContract,
-                     SafeContractDelegate)
+from .models import (EthereumTx, ModuleTransaction, MultisigConfirmation,
+                     MultisigTransaction, SafeContract, SafeContractDelegate)
 from .services.safe_service import SafeCreationInfo
 
 
@@ -368,18 +368,13 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
 
 class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
     submission_date = serializers.DateTimeField(source='created')
-    confirmation_type = serializers.SerializerMethodField()
     transaction_hash = serializers.SerializerMethodField()
     signature = HexadecimalField()
     signature_type = serializers.SerializerMethodField()
 
     class Meta:
         model = MultisigConfirmation
-        fields = ('owner', 'submission_date', 'transaction_hash', 'confirmation_type', 'signature', 'signature_type')
-
-    def get_confirmation_type(self, obj: MultisigConfirmation) -> str:
-        # TODO Remove this field
-        return ConfirmationType.CONFIRMATION.name
+        fields = ('owner', 'submission_date', 'transaction_hash', 'signature', 'signature_type')
 
     def get_transaction_hash(self, obj: MultisigConfirmation) -> str:
         return obj.ethereum_tx_id
@@ -413,6 +408,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
         if obj.ethereum_tx_id:
             return obj.ethereum_tx.block_id
 
+    @swagger_serializer_method(serializer_or_field=SafeMultisigConfirmationResponseSerializer)
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
         Filters confirmations queryset
@@ -637,7 +633,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     transfers = TransferWithTokenInfoResponseSerializer(many=True)
     tx_type = serializers.SerializerMethodField()
 
-    def get_tx_type(self, obj):
+    def get_tx_type(self, obj) -> str:
         return TxType.ETHEREUM_TRANSACTION.name
 
     def get_fields(self):
@@ -647,7 +643,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
         result['from'] = _from
         return result
 
-    def get_block_number(self, obj: EthereumTx):
+    def get_block_number(self, obj: EthereumTx) -> Optional[int]:
         if obj.block_id:
             return obj.block_id
 

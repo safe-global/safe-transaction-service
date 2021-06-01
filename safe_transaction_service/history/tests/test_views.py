@@ -15,8 +15,7 @@ from web3 import Web3
 
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe import CannotEstimateGas, Safe
-from gnosis.safe.safe_signature import (SafeSignature, SafeSignatureContract,
-                                        SafeSignatureType)
+from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
