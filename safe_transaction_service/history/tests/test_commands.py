@@ -1,3 +1,5 @@
+import os.path
+import tempfile
 from io import StringIO
 from unittest import mock
 from unittest.mock import MagicMock
@@ -10,6 +12,7 @@ from django_celery_beat.models import PeriodicTask
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 
 from ..models import ProxyFactory, SafeL2MasterCopy, SafeMasterCopy
+from .factories import MultisigTransactionFactory
 
 
 class TestCommands(TestCase):
@@ -88,3 +91,18 @@ class TestCommands(TestCase):
             buf = StringIO()
             call_command(command, stdout=buf)
             self.assertIn('Cannot detect a valid ethereum-network', buf.getvalue())
+
+    def test_export_multisig_tx_data(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            command = 'export_multisig_tx_data'
+            arguments = '--file-name=' + os.path.join(tmpdirname, 'result.csv')
+            buf = StringIO()
+            call_command(command, arguments, stdout=buf)
+            self.assertIn('Start exporting of 0', buf.getvalue())
+
+            MultisigTransactionFactory(origin='something')
+            MultisigTransactionFactory(origin='another-something', ethereum_tx=None)  # Will not be exported
+            MultisigTransactionFactory(origin=None)  # Will not be exported
+            buf = StringIO()
+            call_command(command, arguments, stdout=buf)
+            self.assertIn('Start exporting of 1', buf.getvalue())
