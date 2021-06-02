@@ -25,6 +25,6 @@ RUN set -ex \
         -exec rm -rf '{}' +
 
 COPY . .
-RUN DJANGO_SETTINGS_MODULE=config.settings.local DJANGO_DOT_ENV_FILE=.env_local python manage.py collectstatic --noinput
+RUN DJANGO_SETTINGS_MODULE=config.settings.local DJANGO_DOT_ENV_FILE=.env.local python manage.py collectstatic --noinput
 
 ENTRYPOINT ["/tini", "--"]
