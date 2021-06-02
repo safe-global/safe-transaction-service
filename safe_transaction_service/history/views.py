@@ -625,6 +625,14 @@ class OwnersView(APIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+class OwnersDeprecatedView(OwnersView):
+    @swagger_auto_schema(deprecated=True,
+                         responses={200: serializers.OwnerResponseSerializer(),
+                                    422: 'Owner address checksum not valid'})
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
+
+
 class DataDecoderView(GenericAPIView):
     def get_serializer_class(self):
         return serializers.DataDecoderSerializer

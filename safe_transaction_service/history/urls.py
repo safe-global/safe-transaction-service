@@ -52,8 +52,10 @@ urlpatterns = [
          name='multisig-transaction'),
     path('multisig-transactions/<str:safe_tx_hash>/confirmations/', views.SafeMultisigConfirmationsView.as_view(),
          name='multisig-transaction-confirmations'),
-    path('owners/<str:address>/', views.OwnersView.as_view(),
+    path('owners/<str:address>/safes/', views.OwnersView.as_view(),
          name='owners'),
+    path('owners/<str:address>/', views.OwnersDeprecatedView.as_view(),
+         name='owners-alias'),
     path('data-decoder/', views.DataDecoderView.as_view(),
          name='data-decoder'),
 
