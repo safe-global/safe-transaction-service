@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import List, Optional
 
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import Exists
 
 from eth_abi import decode_abi
 from hexbytes import HexBytes
@@ -188,13 +188,16 @@ class SafeEventsIndexer(EventsIndexer):
             # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
             # the master copy used. Without tracing it cannot be detected otherwise
             safe_address = args.pop('proxy')
+            new_trace_address = f'{trace_address},0'
+
             InternalTx.objects.filter(
-                ethereum_tx_id=F('ethereum_tx_id'),
-                contract_address=safe_address
+                contract_address=safe_address,
+            ).exclude(
+                Exists(InternalTx.objects.filter(trace_address=new_trace_address))
             ).update(
                 to=args.pop('singleton'),
                 contract_address=None,
-                trace_address=f'{trace_address},0'
+                trace_address=new_trace_address
             )
             # Add creation internal tx. _from is the address of the proxy instead of the safe_address
             internal_tx.contract_address = safe_address
@@ -202,6 +205,9 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx.call_type = None
             internal_tx_decoded = None
         elif event_name == 'SafeSetup':
+            # Usually ProxyCreation is called before SafeSetup, but it can be the opposite if someone creates a Safe
+            # and configure it in the next transaction. Remove it if that's the case
+            InternalTx.objects.filter(contract_address=safe_address).delete()
             internal_tx_decoded.function_name = 'setup'
             internal_tx.contract_address = safe_address
             args['payment'] = 0

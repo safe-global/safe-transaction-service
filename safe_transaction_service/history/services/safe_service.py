@@ -80,7 +80,7 @@ class SafeService:
 
             master_copy: Optional[str] = None
             setup_data: Optional[bytes] = None
-            data = bytes((parent_internal_tx or creation_ethereum_tx).data)
+            data = bytes(parent_internal_tx.data) if parent_internal_tx else bytes(creation_ethereum_tx.data)
             result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(data)
             if result:
                 master_copy, setup_data = result
