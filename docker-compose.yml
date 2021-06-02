@@ -5,7 +5,7 @@ volumes:
 
 services:
   nginx:
-    image: nginx:1.20-alpine
+    image: nginx:alpine
     hostname: nginx
     ports:
       - "8000:8000"
