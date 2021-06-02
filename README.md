@@ -20,7 +20,7 @@ a transaction that is pending to be sent to the blockchain.
 
 - [Docs](https://docs.gnosis.io/safe/docs/services_transactions/)
 
-## Setup for production
+## Setup for production (tracing mode)
 This is the recommended configuration for running a production Transaction service. `docker-compose` is required
 for running the project.
 
@@ -65,6 +65,29 @@ docker-compose build --force-rm
 docker-compose up
 ```
 
+## Setup for production (event indexing)
+Since **version 3.0.0** transaction service can be configured to rely on **event indexing**
+when [SafeL2 version](https://github.com/gnosis/safe-contracts/blob/v1.3.0/contracts/GnosisSafeL2.sol) is used. Only
+contracts from v1.3.0 onwards with L2 events will be indexed.
+
+An example environment file can be used for the L2 setup:
+```bash
+cp .env.l2.sample .env
+```
+
+Edit `.env` file to add `ETHEREUM_NODE_URL`. The rest of the configuration does not need to be modified. Then:
+```bash
+docker-compose build --force-rm
+docker-compose up
+```
+
+If the network is not supported yet [contracts can be deployed using the deployment instructions
+](https://github.com/gnosis/safe-contracts/tree/v1.3.0/contracts)
+and then a PR should be provided to this service [adding the deployment block number and the address (it will be the
+same for every network)](safe_transaction_service/history/management/commands/setup_service.py). Only
+`ProxyFactory` and `GnosisSafeL2` must be configured. `+L2` must be added to the Safe contract version, so the service
+knows the contract can be indexed using events.
+
 ## Setup for private network
 Instructions for production still apply, but some additional steps are required:
 - Deploy the last version of the [Safe Contracts](https://github.com/gnosis/safe-contracts) on your private network.
@@ -77,35 +100,8 @@ the `network id` instead of the `Enum`.
 - Only contracts that need to be configured are the **ProxyFactory** that will be used to deploy the contracts and
 the **GnosisSafe**.
 
-
-Add a new method using the addresses and block numbers for your network.
-```python
-def setup_my_network(self):
-    SafeMasterCopy.objects.get_or_create(address='0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F',
-                                             defaults={
-                                                 'initial_block_number': 9084503,
-                                                 'tx_block_number': 9084503,
-                                             })
-    ProxyFactory.objects.get_or_create(address='0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B',
-                                           defaults={
-                                               'initial_block_number': 9084508,
-                                               'tx_block_number': 9084508,
-                                           })
-```
-
-Replace `handle` method for:
-```python
-    def handle(self, *args, **options):
-        for task in self.tasks:
-            _, created = task.create_task()
-            if created:
-                self.stdout.write(self.style.SUCCESS('Created Periodic Task %s' % task.name))
-            else:
-                self.stdout.write(self.style.SUCCESS('Task %s was already created' % task.name))
-
-        self.stdout.write(self.style.SUCCESS('Setting up Safe Contract Addresses'))
-        self.setup_my_network()
-```
+Update `safe_transaction_service/history/management/commands/setup_service.py` to add the addresses and block numbers
+for your network
 
 ## Use admin interface
 Services come with a basic administration web ui (provided by Django). A user must be created first to
