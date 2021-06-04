@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from eth_account import Account
 
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -81,3 +82,5 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_info.address, safe_create_tx.safe_address)
         self.assertEqual(safe_info.owners, safe_create_tx.owners)
         self.assertEqual(safe_info.threshold, safe_create_tx.threshold)
+        self.assertEqual(safe_info.fallback_handler, NULL_ADDRESS)
+        self.assertEqual(safe_info.guard, NULL_ADDRESS)

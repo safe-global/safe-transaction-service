@@ -13,6 +13,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from web3 import Web3
 
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe import CannotEstimateGas, Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
@@ -1404,6 +1405,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'master_copy': safe_create_tx.master_copy_address,
             'modules': [],
             'fallback_handler': safe_create_tx.fallback_handler,
+            'guard': NULL_ADDRESS,
             'version': '1.1.1'})
 
         with mock.patch.object(SafeService, 'get_safe_info', side_effect=NodeConnectionException, autospec=True):

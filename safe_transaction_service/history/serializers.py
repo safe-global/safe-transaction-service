@@ -509,6 +509,7 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     master_copy = EthereumAddressField()
     modules = serializers.ListField(child=EthereumAddressField())
     fallback_handler = EthereumAddressField()
+    guard = EthereumAddressField()
     version = serializers.CharField()
 
 
