@@ -931,7 +931,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Test not internal server error on contract signature
-        signature = signature_to_bytes((0, int(owner_account.address, 16), 65)) + HexBytes('0' * 65)
+        signature = signature_to_bytes(0, int(owner_account.address, 16), 65) + HexBytes('0' * 65)
         data['signature'] = signature.hex()
         response = self.client.post(reverse('v1:safe-delegates', args=(safe_address,)), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
