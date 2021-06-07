@@ -178,11 +178,15 @@ class Contract(models.Model):
         if abi:
             contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
         else:  # Try sourcify
+            #TODO Test this
             sourcify = Sourcify()
             try:
                 contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
-                contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi,
-                                                                       defaults={'description': contract_metadata.name})
+                if contract_metadata:
+                    contract_abi, _ = ContractAbi.objects.update_or_create(
+                        abi=abi,
+                        defaults={'description': contract_metadata.name}
+                    )
             except IOError:
                 pass
 
