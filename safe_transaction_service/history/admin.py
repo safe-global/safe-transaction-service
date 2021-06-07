@@ -95,15 +95,13 @@ class EthereumEventAdmin(admin.ModelAdmin):
     def to(self, obj: EthereumEvent):
         return obj.arguments.get('to')
 
+    @admin.display(boolean=True)
     def erc20(self, obj: EthereumEvent):
         return obj.is_erc20()
 
+    @admin.display(boolean=True)
     def erc721(self, obj: EthereumEvent):
         return obj.is_erc721()
-
-    # Fancy icons
-    erc20.boolean = True
-    erc721.boolean = True
 
 
 @admin.register(EthereumTx)
@@ -190,9 +188,9 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
     raw_id_fields = ('ethereum_tx', 'multisig_transaction')
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 
+    @admin.display(boolean=True)
     def has_multisig_tx(self, obj: MultisigConfirmation) -> bool:
         return bool(obj.multisig_transaction_id)
-    has_multisig_tx.boolean = True
 
     def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
         if obj.ethereum_tx:
@@ -228,13 +226,13 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     raw_id_fields = ('ethereum_tx',)
     search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to', 'safe_tx_hash']
 
+    @admin.display(boolean=True)
     def executed(self, obj: MultisigTransaction):
         return obj.executed
-    executed.boolean = True
 
+    @admin.display(boolean=True)
     def successful(self, obj: MultisigTransaction):
         return not obj.failed
-    successful.boolean = True
 
 
 @admin.register(ModuleTransaction)
