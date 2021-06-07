@@ -267,15 +267,15 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
     reindex.short_description = "Reindex from initial block"
 
     def reindex_last_day(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, 0))
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, F('initial_block_number')))
     reindex_last_day.short_description = "Reindex last 24 hours"
 
     def reindex_last_week(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, 0))
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, F('initial_block_number')))
     reindex_last_week.short_description = "Reindex last week"
 
     def reindex_last_month(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, 0))
+        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, F('initial_block_number')))
     reindex_last_month.short_description = "Reindex last month"
 
 
