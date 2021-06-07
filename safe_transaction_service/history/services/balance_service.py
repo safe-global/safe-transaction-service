@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from cache_memoize import cache_memoize
-from cachetools import cachedmethod
+from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
 from web3 import Web3
@@ -84,7 +84,7 @@ class BalanceService:
         self.ethereum_client = ethereum_client
         self.price_service = price_service
         self.redis = redis
-        self.cache_token_info = {}
+        self.cache_token_info = TTLCache(maxsize=4096, ttl=60 * 30)  # 2 hours of caching
 
     @cached_property
     def ethereum_network(self):
@@ -176,7 +176,7 @@ class BalanceService:
                     yield EthValueWithTimestamp(0., timezone.now())
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    @cache_memoize(60 * 60 * 24, prefix='balances-get_token_info')  # 1 day
+    @cache_memoize(60 * 60, prefix='balances-get_token_info')  # 1 hour
     def get_token_info(self, token_address: ChecksumAddress) -> Optional[Erc20InfoWithLogo]:
         try:
             token = Token.objects.get(address=token_address)

@@ -64,10 +64,10 @@ def shutdown_worker():
 
 
 @contextlib.contextmanager
-def ony_one_running_task(task: CeleryTask,
-                         lock_name_suffix: Optional[str] = None,
-                         blocking_timeout: int = 1,
-                         lock_timeout: Optional[int] = LOCK_TIMEOUT):
+def only_one_running_task(task: CeleryTask,
+                          lock_name_suffix: Optional[str] = None,
+                          blocking_timeout: int = 1,
+                          lock_timeout: Optional[int] = LOCK_TIMEOUT):
     """
     Ensures one running task at the same, using `task` name as a unique key
     :param task: CeleryTask
@@ -99,7 +99,7 @@ def index_new_proxies_task(self) -> Optional[int]:
     :return: Number of proxies created
     """
     with contextlib.suppress(LockError):
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             logger.info('Start indexing of new proxies')
             number_proxies = ProxyFactoryIndexerProvider().start()
             if number_proxies:
@@ -115,7 +115,7 @@ def index_internal_txs_task(self) -> Optional[int]:
     """
 
     with contextlib.suppress(LockError):
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             logger.info('Start indexing of internal txs')
             number_traces = InternalTxIndexerProvider().start()
             logger.info('Find internal txs task processed %d traces', number_traces)
@@ -133,7 +133,7 @@ def index_safe_events_task(self) -> Optional[int]:
     """
 
     with contextlib.suppress(LockError):
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             logger.info('Start indexing of safe events')
             number = SafeEventsIndexerProvider().start()
             logger.info('Find safe events processed %d events', number)
@@ -150,7 +150,7 @@ def index_erc20_events_task(self) -> Optional[int]:
     :return: Number of addresses processed
     """
     with contextlib.suppress(LockError):
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             logger.info('Start indexing of erc20/721 events')
             number_events = Erc20EventsIndexerProvider().start()
             logger.info('Indexing of erc20/721 events task processed %d events', number_events)
@@ -160,7 +160,7 @@ def index_erc20_events_task(self) -> Optional[int]:
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     try:
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             count = InternalTxDecoded.objects.pending_for_safes().count()
             if not count:
                 logger.info('No decoded internal txs to process')
@@ -181,7 +181,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
     :return:
     """
     try:
-        with ony_one_running_task(self, lock_name_suffix=safe_address):
+        with only_one_running_task(self, lock_name_suffix=safe_address):
             logger.info('Start processing decoded internal txs for safe %s', safe_address)
             number_processed = 0
             batch = 100  # Process at most 100 decoded transactions for a single Safe
@@ -221,7 +221,7 @@ def check_reorgs_task(self) -> Optional[int]:
     :return: Number of oldest block with reorg detected. `None` if not reorg found
     """
     try:
-        with ony_one_running_task(self):
+        with only_one_running_task(self):
             logger.info('Start checking of reorgs')
             reorg_service: ReorgService = ReorgServiceProvider()
             first_reorg_block_number = reorg_service.check_reorgs()

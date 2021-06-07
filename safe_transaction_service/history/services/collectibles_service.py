@@ -121,8 +121,10 @@ class CollectiblesService:
         self.redis = redis
         self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
 
-        self.cache_uri_metadata = TTLCache(maxsize=1024, ttl=60 * 60 * 24)  # 1 day of caching
-        self.cache_token_info: Dict[str, Tuple[str, str]] = {}
+        self.cache_uri_metadata = TTLCache(maxsize=4096,
+                                           ttl=60 * 60 * 24)  # 1 day of caching
+        self.cache_token_info: TTLCache[str, Erc721InfoWithLogo] = TTLCache(maxsize=4096,
+                                                                            ttl=60 * 30)  # 2 hours of caching
         self.cache_token_uri: Dict[Tuple[str, int], str] = {}
 
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
@@ -283,7 +285,7 @@ class CollectiblesService:
         return [collectibles_with_metadata[collectible.address, collectible.id] for collectible in collectibles]
 
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
-    @cache_memoize(60 * 60 * 24, prefix='collectibles-get_token_info')  # 1 day
+    @cache_memoize(60 * 60, prefix='collectibles-get_token_info')  # 1 hour
     def get_token_info(self, token_address: str) -> Optional[Erc721InfoWithLogo]:
         """
         :param token_address:
@@ -300,7 +302,7 @@ class CollectiblesService:
         """
         Cache token_uris, as they shouldn't change
         :param addresses_with_token_ids:
-        :return: List of token_uris in the same orther that `addresses_with_token_ids` were provided
+        :return: List of token_uris in the same other that `addresses_with_token_ids` were provided
         """
         def get_redis_key(address_with_token_id: Tuple[str, int]):
             token_address, token_id = address_with_token_id
