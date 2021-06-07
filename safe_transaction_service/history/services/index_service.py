@@ -146,6 +146,7 @@ class IndexService:
                 ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
         return list(ethereum_txs_dict.values())
 
+    @transaction.atomic
     def _reindex(self, addresses: List[str]):
         """
         Trigger processing of traces again. If addresses is empty, everything is reprocessed
@@ -182,7 +183,6 @@ class IndexService:
             queryset = queryset.filter(internal_tx___from__in=addresses)
         queryset.update(processed=False)
 
-    @transaction.atomic
     def reindex_addresses(self, addresses: List[str]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
@@ -195,6 +195,5 @@ class IndexService:
 
         return self._reindex(addresses)
 
-    @transaction.atomic
     def reindex_all(self):
         return self._reindex(None)
