@@ -65,10 +65,10 @@ class ContractAdmin(admin.ModelAdmin):
         if obj.contract_abi_id:
             return obj.contract_abi.relevance
 
+    @admin.display(boolean=True)
     def has_abi(self, obj: Contract) -> bool:
         return obj.contract_abi_id is not None
-    has_abi.boolean = True
 
+    @admin.display(boolean=True)
     def has_logo(self, obj: Contract) -> bool:
         return bool(obj.logo)
-    has_logo.boolean = True
