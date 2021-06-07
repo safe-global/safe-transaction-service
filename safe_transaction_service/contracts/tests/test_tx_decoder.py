@@ -13,7 +13,7 @@ from safe_transaction_service.contracts.tests.factories import \
 
 from ..tx_decoder import (CannotDecode, DbTxDecoder, SafeTxDecoder, TxDecoder,
                           get_db_tx_decoder, get_safe_tx_decoder,
-                          get_tx_decoder)
+                          get_tx_decoder, is_db_tx_decoder_loaded)
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,9 @@ class TestTxDecoder(TestCase):
     def test_singleton(self):
         self.assertTrue(isinstance(get_tx_decoder(), TxDecoder))
         self.assertTrue(isinstance(get_safe_tx_decoder(), SafeTxDecoder))
+        self.assertFalse(is_db_tx_decoder_loaded())
         self.assertTrue(isinstance(get_db_tx_decoder(), DbTxDecoder))
+        self.assertTrue(is_db_tx_decoder_loaded())
 
     def test_decode_execute_transaction(self):
         data = HexBytes('0x6a761202000000000000000000000000d9ab7371432d7cc74503290412618c948cddacf200000000000000000'

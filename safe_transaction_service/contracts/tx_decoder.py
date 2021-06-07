@@ -71,6 +71,10 @@ def get_db_tx_decoder() -> 'DbTxDecoder':
     return get_db_tx_decoder.instance
 
 
+def is_db_tx_decoder_loaded() -> bool:
+    return hasattr(get_db_tx_decoder, 'instance')
+
+
 def get_tx_decoder() -> 'TxDecoder':
     if not hasattr(get_tx_decoder, 'instance'):
         get_tx_decoder.instance = TxDecoder()

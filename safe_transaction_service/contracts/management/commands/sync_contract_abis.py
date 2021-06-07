@@ -12,7 +12,7 @@ from ...models import Contract, ContractAbi
 
 
 class Command(BaseCommand):
-    help = 'Sync contract names/ABIS scraping from etherscan'
+    help = 'Sync contract names/ABIS scraping from etherscan/sourcify'
 
     def add_arguments(self, parser):
         parser.add_argument('--all', help="Sync contract names/ABIS for contracts already synced", action='store_true',
@@ -23,8 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         every_contract = options['all']
         scraper = options['scraper']
-        if scraper:
-            etherscan_client = EtherscanClient()
+        etherscan_client = EtherscanClient() if scraper else None
 
         ethereum_client = EthereumClientProvider()
         network = ethereum_client.get_network()
@@ -34,10 +33,10 @@ class Command(BaseCommand):
             contract_queryset = contract_queryset.filter(contract_abi=None)
 
         for contract in contract_queryset:
-            if not scraper:
+            if not etherscan_client:
                 if contract.sync_abi_from_api(network=network):
                     self.stdout.write(self.style.SUCCESS(f'Synced contract {contract.address} - {contract.name}'))
-            else:
+            else:  # Use etherscan scraper
                 try:
                     contract_info = etherscan_client.get_contract_info(contract.address)
                     if contract_info:

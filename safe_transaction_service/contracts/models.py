@@ -170,10 +170,24 @@ class Contract(models.Model):
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
         etherscan_api = EtherscanApi(network)
-        abi = etherscan_api.get_contract_abi(self.address)
+        try:
+            abi = etherscan_api.get_contract_abi(self.address)
+        except IOError:
+            abi = None
+        contract_abi = None
         if abi:
             contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
+        else:  # Try sourcify
+            sourcify = Sourcify()
+            try:
+                contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
+                contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi,
+                                                                       defaults={'description': contract_metadata.name})
+            except IOError:
+                pass
+
+        if contract_abi:
             self.contract_abi = contract_abi
             self.save(update_fields=['contract_abi'])
-            return True
-        return False
+
+        return bool(contract_abi)

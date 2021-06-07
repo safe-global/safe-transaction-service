@@ -6,7 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import ContractAbi
-from .tx_decoder import get_db_tx_decoder
+from .tx_decoder import get_db_tx_decoder, is_db_tx_decoder_loaded
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ def add_abi_in_tx_decoder(sender: Type[Model],
     """
 
     if instance.abi:
-        db_tx_decoder = get_db_tx_decoder()
-        if db_tx_decoder.add_abi(instance.abi):
-            logger.info('ABI for ContractAbi %s was loaded on the TxDecoder', instance)
+        if is_db_tx_decoder_loaded():
+            db_tx_decoder = get_db_tx_decoder()
+            if db_tx_decoder.add_abi(instance.abi):
+                logger.info('ABI for ContractAbi %s was loaded on the TxDecoder', instance)
