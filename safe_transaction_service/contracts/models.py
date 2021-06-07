@@ -163,30 +163,29 @@ class Contract(models.Model):
 
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """
-        Sync ABI from EtherScan
+        Sync ABI from Sourcify, then from EtherScan
         :param network: Can be provided to save requests to the node
         :return: True if updated, False otherwise
         """
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
-        etherscan_api = EtherscanApi(network)
-        try:
-            abi = etherscan_api.get_contract_abi(self.address)
-        except IOError:
-            abi = None
+        sourcify = Sourcify()
         contract_abi = None
-        if abi:
-            contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
-        else:  # Try sourcify
-            #TODO Test this
-            sourcify = Sourcify()
+        try:
+            contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
+            if contract_metadata:
+                contract_abi, _ = ContractAbi.objects.update_or_create(
+                    abi=contract_metadata.abi,
+                    defaults={'description': contract_metadata.name}
+                )
+        except IOError:
+            pass
+
+        if not contract_abi:
+            etherscan_api = EtherscanApi(network)
             try:
-                contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
-                if contract_metadata:
-                    contract_abi, _ = ContractAbi.objects.update_or_create(
-                        abi=abi,
-                        defaults={'description': contract_metadata.name}
-                    )
+                if abi := etherscan_api.get_contract_abi(self.address):
+                    contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
             except IOError:
                 pass
 

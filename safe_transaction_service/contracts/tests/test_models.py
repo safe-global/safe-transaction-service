@@ -7,6 +7,7 @@ from django.db.transaction import atomic
 from django.test import TestCase
 
 from gnosis.eth.clients import Sourcify
+from gnosis.eth.clients.sourcify import ContractMetadata
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ..clients import EtherscanApi
@@ -77,12 +78,34 @@ class TestContract(TestCase):
 
     @mock.patch.object(EtherscanApi, 'get_contract_abi', autospec=True,
                        return_value=sourcify_safe_metadata['output']['abi'])
-    def test_sync_abi_from_api(self, get_contract_abi_mock: MagicMock):
+    @mock.patch.object(Sourcify, 'get_contract_metadata', autospec=True,
+                       return_value=ContractMetadata('Uxio Contract', [{'anonymous': False,
+                                                                        'inputs': [{'indexed': False,
+                                                                                    'internalType': 'address',
+                                                                                    'name': 'owner',
+                                                                                    'type': 'address'}],
+                                                                        'name': 'AddedOwner',
+                                                                        'type': 'event'}], False))
+    def test_sync_abi_from_api(self, sourcify_get_contract_metadata_mock: MagicMock,
+                               etherscan_get_contract_abi_mock: MagicMock):
         contract_name = 'Hello'
         contract = Contract.objects.create(address='0xaE32496491b53841efb51829d6f886387708F99B', name=contract_name,
                                            contract_abi=None)
         network = EthereumNetwork.MAINNET
         self.assertIsNone(contract.contract_abi)
-        contract.sync_abi_from_api(network=network)
+        self.assertEqual(ContractAbi.objects.count(), 0)
+        self.assertTrue(contract.sync_abi_from_api(network=network))
         self.assertIsNotNone(contract.contract_abi)
         self.assertEqual(contract.name, contract_name)
+        contract_abi = contract.contract_abi
+        self.assertEqual(contract_abi.description, sourcify_get_contract_metadata_mock.return_value.name)
+        self.assertEqual(contract_abi.abi, sourcify_get_contract_metadata_mock.return_value.abi)
+        self.assertNotEqual(sourcify_get_contract_metadata_mock.return_value.abi,
+                            etherscan_get_contract_abi_mock.return_value)
+        sourcify_get_contract_metadata_mock.side_effect = IOError  # Now etherscan should be used
+        self.assertTrue(contract.sync_abi_from_api(network=network))
+        self.assertEqual(ContractAbi.objects.count(), 2)  # A new ABI was inserted
+        self.assertNotEqual(contract.contract_abi, contract_abi)  # Contract_abi was changed
+
+        etherscan_get_contract_abi_mock.side_effect = IOError
+        self.assertFalse(contract.sync_abi_from_api(network=network))
