@@ -111,7 +111,7 @@ class SafeService:
             master_copy = (data_decoded.get('masterCopy') or data_decoded.get('_mastercopy')
                            or data_decoded.get('_singleton') or data_decoded.get('singleton'))
             setup_data = data_decoded.get('data') or data_decoded.get('initializer')
-            if master_copy and setup_data:
+            if master_copy and setup_data is not None:
                 return master_copy, setup_data
             else:
                 logger.error('Problem decoding proxy factory, data_decoded=%s', data_decoded)
