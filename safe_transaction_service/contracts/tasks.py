@@ -1,12 +1,16 @@
-from typing import Sequence
+from functools import cache
+from typing import Optional
 
 from django.db import IntegrityError, transaction
 
 from celery import app
 from celery.utils.log import get_task_logger
+from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.ethereum_client import EthereumNetwork
 
+from safe_transaction_service.history.models import MultisigTransaction
 from safe_transaction_service.history.utils import close_gevent_db_connection
 
 from .models import Contract
@@ -14,20 +18,59 @@ from .models import Contract
 logger = get_task_logger(__name__)
 
 
+@cache
+def get_ethereum_network() -> EthereumNetwork:
+    return EthereumClientProvider().get_network()
+
+
 @app.shared_task()
-def index_contracts_metadata_task(addresses: Sequence[str]):
-    ethereum_client = EthereumClientProvider()
-    ethereum_network = ethereum_client.get_network()
+def create_missing_contracts_with_metadata_task() -> int:
+    """
+    Insert detected contracts the users are interacting with on database and retrieve metadata (name, abi) if possible
+    :return: Number of contracts missing
+    """
     try:
-        for address in addresses:
-            try:
-                with transaction.atomic():
-                    if contract := Contract.objects.create_from_address(address, network_id=ethereum_network.value):
-                        logger.info('Indexed contract with address=%s name=%s abi-present=%s',
-                                    address, contract.name, bool(contract.contract_abi.abi))
-                    else:
-                        Contract.objects.create(address=address)
-            except IntegrityError:
-                logger.warning('Contract with address=%s was already created', address)
+        i = 0
+        for address in MultisigTransaction.objects.not_indexed_metadata_contract_addresses():
+            create_or_update_contract_with_metadata_task.delay(address)
+            i += 1
+        return i
     finally:
+        close_gevent_db_connection()
+
+
+@app.shared_task()
+def reindex_contracts_without_metadata() -> int:
+    """
+    Try to reindex existing contracts without metadata
+    :return: Number of contracts missing
+    """
+    try:
+        i = 0
+        for address in Contract.objects.without_metadata().values_list('address', flat=True):
+            create_or_update_contract_with_metadata_task.delay(address)
+            i += 1
+        return i
+    finally:
+        close_gevent_db_connection()
+
+
+@app.shared_task()
+def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
+    ethereum_network = get_ethereum_network()
+    action: Optional[str] = None
+    try:
+        with transaction.atomic():
+            contract = Contract.objects.create_from_address(address, network=ethereum_network)
+            action = 'Created'
+    except IntegrityError:
+        contract = Contract.objects.get(address=address)
+        if contract.sync_abi_from_api():
+            action = 'Updated'
+        else:
+            action = 'Not modified'
+    finally:
+        if action:
+            logger.info('%s contract with address=%s name=%s abi-found=%s',
+                        action, address, contract.name, bool(contract.contract_abi.abi))
         close_gevent_db_connection()

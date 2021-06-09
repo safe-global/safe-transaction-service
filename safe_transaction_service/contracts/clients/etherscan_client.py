@@ -3,12 +3,14 @@ import time
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
+from django.conf import settings
+
 import requests
 
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 
-class EtherscanClientConfigurationError(Exception):
+class EtherscanClientConfigurationProblem(Exception):
     pass
 
 
@@ -17,12 +19,12 @@ class RateLimitError(Exception):
 
 
 class EtherscanClient:
-    def __init__(self, network: EthereumNetwork, api_key: Optional[str] = None):
+    def __init__(self, network: EthereumNetwork, api_key: Optional[str] = settings.ETHERSCAN_API_KEY):
         self.network = network
         self.api_key = api_key
         self.base_url = self.get_base_url(network)
         if self.base_url is None:
-            raise EtherscanClientConfigurationError(f'Network {network.name} - {network.value} not supported')
+            raise EtherscanClientConfigurationProblem(f'Network {network.name} - {network.value} not supported')
         self.http_session = requests.Session()
 
     def build_url(self, path: str):

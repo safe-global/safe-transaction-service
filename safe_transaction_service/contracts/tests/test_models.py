@@ -6,6 +6,8 @@ from django.db import IntegrityError
 from django.db.transaction import atomic
 from django.test import TestCase
 
+from eth_account import Account
+
 from gnosis.eth.clients import Sourcify
 from gnosis.eth.clients.sourcify import ContractMetadata
 from gnosis.eth.ethereum_client import EthereumNetwork
@@ -40,29 +42,34 @@ class TestContract(TestCase):
                        return_value=sourcify_safe_metadata['output']['abi'])
     def test_contract_create_from_address(self, get_contract_abi_mock: MagicMock, do_request_mock: MagicMock):
         safe_contract_address = '0x6851D6fDFAfD08c0295C392436245E5bc78B0185'
-        contract = Contract.objects.create_from_address(safe_contract_address)
+        network = EthereumNetwork.MAINNET
+        contract = Contract.objects.create_from_address(safe_contract_address, network=network)
         self.assertEqual(contract.name, 'GnosisSafe')
         self.assertTrue(contract.contract_abi.abi)
         self.assertEqual(len(contract.contract_abi.abi_functions()), 31)
 
         with self.assertRaises(IntegrityError):
             with atomic():
-                Contract.objects.create_from_address(safe_contract_address)
+                Contract.objects.create_from_address(safe_contract_address, network=network)
 
         do_request_mock.return_value = None
+
         # Use etherscan API
         with self.assertRaises(IntegrityError):
             with atomic():
-                Contract.objects.create_from_address(safe_contract_address)
+                Contract.objects.create_from_address(safe_contract_address, network=network)
 
         contract.delete()
-        contract = Contract.objects.create_from_address(safe_contract_address)
+        contract = Contract.objects.create_from_address(safe_contract_address, network=network)
         self.assertEqual(contract.name, '')
         self.assertTrue(contract.contract_abi.abi)
         self.assertEqual(len(contract.contract_abi.abi_functions()), 31)
 
         get_contract_abi_mock.return_value = None
-        self.assertIsNone(Contract.objects.create_from_address(safe_contract_address))
+        new_safe_contract_address = Account.create().address
+        contract_without_metadata = Contract.objects.create_from_address(new_safe_contract_address, network=network)
+        self.assertEqual(contract_without_metadata.name, '')
+        self.assertIsNone(contract_without_metadata.contract_abi)
 
     def test_validate_abi(self):
         with self.assertRaises(ValidationError):

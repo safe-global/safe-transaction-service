@@ -36,6 +36,9 @@ class EtherscanToken:
 
 
 class EtherscanScraper:
+    """
+    Etherscan scraper. Requires node.js and python library `cfscrape` to be installed
+    """
     address_url: ClassVar[str] = 'https://etherscan.io/address'
     tokens_url: ClassVar[str] = 'https://etherscan.io/tokens'
 

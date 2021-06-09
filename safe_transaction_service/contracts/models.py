@@ -17,8 +17,10 @@ from gnosis.eth.clients import Sourcify
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
+from ..tokens.clients import EtherscanScraper
+from ..tokens.clients.etherscan_scraper import EtherscanScraperException
 from .clients import EtherscanClient
-from .clients.etherscan_client import EtherscanClientConfigurationError
+from .clients.etherscan_client import EtherscanClientConfigurationProblem
 
 logger = getLogger(__name__)
 
@@ -74,41 +76,16 @@ def get_contract_logo_path(instance: 'Contract', filename):
 
 
 class ContractManager(models.Manager):
-    def create_from_address(self, address: str, network_id: int = 1) -> Optional[Contract]:
-        sourcify = Sourcify(EthereumNetwork(network_id))
-        try:
-            contract_metadata = sourcify.get_contract_metadata(address)
-        except IOError:
-            return
-        if contract_metadata:
-            if contract_metadata.abi:
-                contract_abi, _ = ContractAbi.objects.update_or_create(abi=contract_metadata.abi,
-                                                                       defaults={
-                                                                           'description': contract_metadata.name,
-                                                                       })
-            else:
-                contract_abi = None
-            return super().create(
-                address=address,
-                name=contract_metadata.name,
-                contract_abi=contract_abi,
-            )
-        else:  # Fallback to etherscan API (no name for contract)
-            try:
-                etherscan = EtherscanClient(EthereumNetwork(network_id), api_key=settings.ETHERSCAN_API_KEY)
-                abi = etherscan.get_contract_abi(address)
-                if abi:
-                    try:
-                        contract_abi = ContractAbi.objects.get(abi=abi)
-                    except ContractAbi.DoesNotExist:
-                        contract_abi = ContractAbi.objects.create(abi=abi, description='')
-                    return super().create(
-                        address=address,
-                        name='',
-                        contract_abi=contract_abi,
-                    )
-            except EtherscanClientConfigurationError:
-                return
+    def create_from_address(self, address: str, network: Optional[EthereumNetwork] = None) -> Contract:
+        """
+        Create contract and try to fetch information from APIs
+        :param address:
+        :param network:
+        :return: Contract instance populated with all the information found
+        """
+        contract = super().create(address=address)
+        contract.sync_abi_from_api(network=network)
+        return contract
 
     def fix_missing_logos(self) -> int:
         """
@@ -139,8 +116,11 @@ class ContractQuerySet(models.QuerySet):
     def without_logo(self):
         return self.filter(self.no_logo_query)
 
+    def without_metadata(self):
+        return self.filter(contract_abi=None)
 
-class Contract(models.Model):
+
+class Contract(models.Model):  # Known addresses by the service
     objects = ContractManager.from_queryset(ContractQuerySet)()
     address = EthereumAddressField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default='')
@@ -161,19 +141,44 @@ class Contract(models.Model):
         """
         return self.display_name if self.display_name else self.name
 
+    def sync_abi_from_scraper(self, network: Optional[EthereumNetwork] = None) -> bool:
+        """
+        Sync abi from etherscan scraper. Requires node.js and installed
+        :param network:
+        :return:
+        """
+        etherscan_scraper = EtherscanScraper()
+        try:
+            contract_info = etherscan_scraper.get_contract_info(self.address)
+            if contract_info:
+                contract_abi, _ = ContractAbi.objects.update_or_create(abi=contract_info.abi,
+                                                                       defaults={
+                                                                           'description': contract_info.name
+                                                                       })
+                if not self.name:
+                    self.name = contract_info.name
+                self.contract_abi = contract_abi
+                self.save(update_fields=['name', 'contract_abi'])
+                return True
+        except EtherscanScraperException:
+            pass
+        return False
+
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """
-        Sync ABI from Sourcify, then from EtherScan
+        Sync ABI from Sourcify, then from EtherScan if not found
         :param network: Can be provided to save requests to the node
         :return: True if updated, False otherwise
         """
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
-        sourcify = Sourcify(EthereumNetwork(network))
-        contract_abi = None
+        sourcify = Sourcify()
+        contract_abi: Optional[ContractAbi] = None
         try:
-            contract_metadata = sourcify.get_contract_metadata(self.address)
+            contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
             if contract_metadata:
+                if not self.name:
+                    self.name = contract_metadata.name
                 contract_abi, _ = ContractAbi.objects.update_or_create(
                     abi=contract_metadata.abi,
                     defaults={'description': contract_metadata.name}
@@ -182,15 +187,17 @@ class Contract(models.Model):
             pass
 
         if not contract_abi:
-            etherscan_api = EtherscanClient(network)
             try:
+                etherscan_api = EtherscanClient(network)
                 if abi := etherscan_api.get_contract_abi(self.address):
                     contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
+            except EtherscanClientConfigurationProblem:
+                logger.error('Etherscan client is not available for current network %s', network)
             except IOError:
                 pass
 
         if contract_abi:
             self.contract_abi = contract_abi
-            self.save(update_fields=['contract_abi'])
+            self.save(update_fields=['name', 'contract_abi'])
 
         return bool(contract_abi)
