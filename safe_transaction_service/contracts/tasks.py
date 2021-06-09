@@ -72,5 +72,5 @@ def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
     finally:
         if action:
             logger.info('%s contract with address=%s name=%s abi-found=%s',
-                        action, address, contract.name, bool(contract.contract_abi.abi))
+                        action, address, contract.name, contract.contract_abi is not None)
         close_gevent_db_connection()
