@@ -8,7 +8,7 @@ import requests
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 
-class EtherscanApiConfigurationError(Exception):
+class EtherscanClientConfigurationError(Exception):
     pass
 
 
@@ -16,13 +16,13 @@ class RateLimitError(Exception):
     pass
 
 
-class EtherscanApi:
+class EtherscanClient:
     def __init__(self, network: EthereumNetwork, api_key: Optional[str] = None):
         self.network = network
         self.api_key = api_key
         self.base_url = self.get_base_url(network)
         if self.base_url is None:
-            raise EtherscanApiConfigurationError(f'Network {network.name} - {network.value} not supported')
+            raise EtherscanClientConfigurationError(f'Network {network.name} - {network.value} not supported')
         self.http_session = requests.Session()
 
     def build_url(self, path: str):

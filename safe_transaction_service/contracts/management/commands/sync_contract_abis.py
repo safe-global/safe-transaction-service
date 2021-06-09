@@ -4,9 +4,9 @@ from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClientProvider
 
-from safe_transaction_service.tokens.clients import EtherscanClient
-from safe_transaction_service.tokens.clients.etherscan_client import \
-    EtherscanClientException
+from safe_transaction_service.tokens.clients import EtherscanScraper
+from safe_transaction_service.tokens.clients.etherscan_scraper import \
+    EtherscanScraperException
 
 from ...models import Contract, ContractAbi
 
@@ -23,7 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         every_contract = options['all']
         scraper = options['scraper']
-        etherscan_client = EtherscanClient() if scraper else None
+        etherscan_client = EtherscanScraper() if scraper else None
 
         ethereum_client = EthereumClientProvider()
         network = ethereum_client.get_network()
@@ -50,7 +50,7 @@ class Command(BaseCommand):
                                                                             'abi': contract_abi
                                                                         })
                         updated = True
-                except EtherscanClientException:
+                except EtherscanScraperException:
                     time.sleep(5)
 
             if updated:

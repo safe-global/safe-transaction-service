@@ -17,8 +17,8 @@ from gnosis.eth.clients import Sourcify
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
-from .clients import EtherscanApi
-from .clients.etherscan_api import EtherscanApiConfigurationError
+from .clients import EtherscanClient
+from .clients.etherscan_client import EtherscanClientConfigurationError
 
 logger = getLogger(__name__)
 
@@ -95,7 +95,7 @@ class ContractManager(models.Manager):
             )
         else:  # Fallback to etherscan API (no name for contract)
             try:
-                etherscan = EtherscanApi(EthereumNetwork(network_id), api_key=settings.ETHERSCAN_API_KEY)
+                etherscan = EtherscanClient(EthereumNetwork(network_id), api_key=settings.ETHERSCAN_API_KEY)
                 abi = etherscan.get_contract_abi(address)
                 if abi:
                     try:
@@ -107,7 +107,7 @@ class ContractManager(models.Manager):
                         name='',
                         contract_abi=contract_abi,
                     )
-            except EtherscanApiConfigurationError:
+            except EtherscanClientConfigurationError:
                 return
 
     def fix_missing_logos(self) -> int:
@@ -182,7 +182,7 @@ class Contract(models.Model):
             pass
 
         if not contract_abi:
-            etherscan_api = EtherscanApi(network)
+            etherscan_api = EtherscanClient(network)
             try:
                 if abi := etherscan_api.get_contract_abi(self.address):
                     contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
