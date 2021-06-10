@@ -10,6 +10,10 @@ import requests
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 
+class EtherscanClientException(Exception):
+    pass
+
+
 class EtherscanClientConfigurationProblem(Exception):
     pass
 
@@ -19,10 +23,16 @@ class RateLimitError(Exception):
 
 
 class EtherscanClient:
+    NETWORK_WITH_URL = {
+        EthereumNetwork.MAINNET: 'https://api.etherscan.io',
+        EthereumNetwork.RINKEBY: 'https://api-rinkeby.etherscan.io',
+        EthereumNetwork.BINANCE: 'https://api.bscscan.com',
+    }
+
     def __init__(self, network: EthereumNetwork, api_key: Optional[str] = settings.ETHERSCAN_API_KEY):
         self.network = network
         self.api_key = api_key
-        self.base_url = self.get_base_url(network)
+        self.base_url = self.NETWORK_WITH_URL.get(network)
         if self.base_url is None:
             raise EtherscanClientConfigurationProblem(f'Network {network.name} - {network.value} not supported')
         self.http_session = requests.Session()
@@ -32,18 +42,6 @@ class EtherscanClient:
         if self.api_key:
             url += f'&apikey={self.api_key}'
         return url
-
-    def get_base_url(self, network: EthereumNetwork):
-        if network == EthereumNetwork.MAINNET:
-            return 'https://api.etherscan.io'
-        elif network == EthereumNetwork.RINKEBY:
-            return 'https://api-rinkeby.etherscan.io'
-        elif network == EthereumNetwork.XDAI:
-            return 'https://blockscout.com/poa/xdai'
-        elif network == EthereumNetwork.ENERGY_WEB_CHAIN:
-            return 'https://explorer.energyweb.org'
-        elif network == EthereumNetwork.VOLTA:
-            return 'https://volta-explorer.energyweb.org'
 
     def _get_contract_abi(self, contract_address: str) -> Optional[Dict[str, Any]]:
         url = self.build_url(f'api?module=contract&action=getabi&address={contract_address}')
