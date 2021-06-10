@@ -1,2 +1,6 @@
 # flake8: noqa F401
-from .etherscan_client import EtherscanClient
+from .blockscout_client import (BlockscoutClient, BlockscoutClientException,
+                                BlockScoutConfigurationProblem)
+from .etherscan_client import (EtherscanClient,
+                               EtherscanClientConfigurationProblem,
+                               EtherscanClientException)

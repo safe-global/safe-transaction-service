@@ -7,6 +7,7 @@ from django.conf import settings
 
 import requests
 
+from gnosis.eth.clients.sourcify import ContractMetadata
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 
@@ -54,6 +55,11 @@ class EtherscanClient:
                 raise RateLimitError
             if response_json['status'] == '1':
                 return json.loads(result)
+
+    def get_contract_metadata(self, contract_address: str, retry: bool = True) -> Optional[ContractMetadata]:
+        contract_abi = self.get_contract_abi(contract_address, retry=retry)
+        if contract_abi:
+            return ContractMetadata(None, contract_abi, False)
 
     def get_contract_abi(self, contract_address: str, retry: bool = True):
         for _ in range(3):

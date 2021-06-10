@@ -19,8 +19,8 @@ from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
 from ..tokens.clients import EtherscanScraper
 from ..tokens.clients.etherscan_scraper import EtherscanScraperException
-from .clients import EtherscanClient
-from .clients.etherscan_client import EtherscanClientConfigurationProblem
+from .clients import (BlockscoutClient, BlockScoutConfigurationProblem,
+                      EtherscanClient, EtherscanClientConfigurationProblem)
 
 logger = getLogger(__name__)
 
@@ -166,38 +166,47 @@ class Contract(models.Model):  # Known addresses by the service
 
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """
-        Sync ABI from Sourcify, then from EtherScan if not found
+        Sync ABI from Sourcify, then from Etherscan and blockscout if available
         :param network: Can be provided to save requests to the node
         :return: True if updated, False otherwise
         """
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
         sourcify = Sourcify()
-        contract_abi: Optional[ContractAbi] = None
-        try:
-            contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
-            if contract_metadata:
-                if not self.name:
-                    self.name = contract_metadata.name
-                contract_abi, _ = ContractAbi.objects.update_or_create(
-                    abi=contract_metadata.abi,
-                    defaults={'description': contract_metadata.name}
-                )
-        except IOError:
-            pass
 
-        if not contract_abi:
+        try:
+            etherscan_client = EtherscanClient(network)
+        except EtherscanClientConfigurationProblem:
+            logger.info('Etherscan client is not available for current network %s', network)
+            etherscan_client = None
+
+        try:
+            blockscout_client = BlockscoutClient(network)
+        except BlockScoutConfigurationProblem:
+            logger.info('Blockscout client is not available for current network %s', network)
+            blockscout_client = None
+
+        contract_abi: Optional[ContractAbi] = None
+        for client in (sourcify, etherscan_client, blockscout_client):
+            if not client:
+                continue
             try:
-                etherscan_api = EtherscanClient(network)
-                if abi := etherscan_api.get_contract_abi(self.address):
-                    contract_abi, _ = ContractAbi.objects.update_or_create(abi=abi)
-            except EtherscanClientConfigurationProblem:
-                logger.error('Etherscan client is not available for current network %s', network)
+                if isinstance(client, Sourcify):
+                    # TODO Fix this method when refactoring on gnosis-py
+                    contract_metadata = client.get_contract_metadata(self.address, network_id=network.value)
+                else:
+                    contract_metadata = client.get_contract_metadata(self.address)
+                if contract_metadata:
+                    name = contract_metadata.name or ''
+                    if not self.name and name:
+                        self.name = name
+                    contract_abi, _ = ContractAbi.objects.update_or_create(
+                        abi=contract_metadata.abi,
+                        defaults={'description': name}
+                    )
+                    self.contract_abi = contract_abi
+                    self.save(update_fields=['name', 'contract_abi'])
             except IOError:
                 pass
-
-        if contract_abi:
-            self.contract_abi = contract_abi
-            self.save(update_fields=['name', 'contract_abi'])
 
         return bool(contract_abi)
