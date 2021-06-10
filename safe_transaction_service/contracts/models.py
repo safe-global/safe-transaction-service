@@ -13,14 +13,15 @@ from botocore.exceptions import ClientError
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
 
-from gnosis.eth.clients import Sourcify
+from gnosis.eth.clients import (BlockscoutClient,
+                                BlockScoutConfigurationProblem,
+                                EtherscanClient,
+                                EtherscanClientConfigurationProblem, Sourcify)
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
 from ..tokens.clients import EtherscanScraper
 from ..tokens.clients.etherscan_scraper import EtherscanScraperException
-from .clients import (BlockscoutClient, BlockScoutConfigurationProblem,
-                      EtherscanClient, EtherscanClientConfigurationProblem)
 
 logger = getLogger(__name__)
 
@@ -172,7 +173,7 @@ class Contract(models.Model):  # Known addresses by the service
         """
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
-        sourcify = Sourcify()
+        sourcify = Sourcify(network)
 
         try:
             etherscan_client = EtherscanClient(network)
@@ -191,11 +192,7 @@ class Contract(models.Model):  # Known addresses by the service
             if not client:
                 continue
             try:
-                if isinstance(client, Sourcify):
-                    # TODO Fix this method when refactoring on gnosis-py
-                    contract_metadata = client.get_contract_metadata(self.address, network_id=network.value)
-                else:
-                    contract_metadata = client.get_contract_metadata(self.address)
+                contract_metadata = client.get_contract_metadata(self.address)
                 if contract_metadata:
                     name = contract_metadata.name or ''
                     contract_abi, _ = ContractAbi.objects.get_or_create(
