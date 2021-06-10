@@ -198,14 +198,19 @@ class Contract(models.Model):  # Known addresses by the service
                     contract_metadata = client.get_contract_metadata(self.address)
                 if contract_metadata:
                     name = contract_metadata.name or ''
-                    if not self.name and name:
-                        self.name = name
-                    contract_abi, _ = ContractAbi.objects.update_or_create(
+                    contract_abi, _ = ContractAbi.objects.get_or_create(
                         abi=contract_metadata.abi,
                         defaults={'description': name}
                     )
+                    if name:
+                        if not contract_abi.description:
+                            contract_abi.description = name
+                            contract_abi.save(update_fields=['description'])
+                        if not self.name:
+                            self.name = name
                     self.contract_abi = contract_abi
                     self.save(update_fields=['name', 'contract_abi'])
+                    break
             except IOError:
                 pass
 

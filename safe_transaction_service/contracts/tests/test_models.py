@@ -12,7 +12,7 @@ from gnosis.eth.clients import Sourcify
 from gnosis.eth.clients.sourcify import ContractMetadata
 from gnosis.eth.ethereum_client import EthereumNetwork
 
-from ..clients import EtherscanClient
+from ..clients import BlockscoutClient, EtherscanClient
 from ..models import Contract, ContractAbi, validate_abi
 from .mocks import sourcify_safe_metadata
 
@@ -85,6 +85,7 @@ class TestContract(TestCase):
 
     @mock.patch.object(EtherscanClient, 'get_contract_abi', autospec=True,
                        return_value=sourcify_safe_metadata['output']['abi'])
+    @mock.patch.object(BlockscoutClient, 'get_contract_metadata', autospec=True, side_effect=IOError)
     @mock.patch.object(Sourcify, 'get_contract_metadata', autospec=True,
                        return_value=ContractMetadata('Uxio Contract', [{'anonymous': False,
                                                                         'inputs': [{'indexed': False,
@@ -93,7 +94,9 @@ class TestContract(TestCase):
                                                                                     'type': 'address'}],
                                                                         'name': 'AddedOwner',
                                                                         'type': 'event'}], False))
-    def test_sync_abi_from_api(self, sourcify_get_contract_metadata_mock: MagicMock,
+    def test_sync_abi_from_api(self,
+                               sourcify_get_contract_metadata_mock: MagicMock,
+                               blockscout_client_mock: MagicMock,
                                etherscan_get_contract_abi_mock: MagicMock):
         contract_name = 'Hello'
         contract = Contract.objects.create(address='0xaE32496491b53841efb51829d6f886387708F99B', name=contract_name,
