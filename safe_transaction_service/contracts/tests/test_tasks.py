@@ -5,6 +5,7 @@ from django.test import TestCase
 from eth_account import Account
 
 from gnosis.eth.clients import Sourcify
+from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
 
 from safe_transaction_service.history.tests.factories import \
     MultisigTransactionFactory
@@ -12,7 +13,6 @@ from safe_transaction_service.history.tests.factories import \
 from ..models import Contract
 from ..tasks import (create_missing_contracts_with_metadata_task,
                      reindex_contracts_without_metadata)
-from .mocks import sourcify_safe_metadata
 
 
 class TestTasks(TestCase):

@@ -8,13 +8,12 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from gnosis.eth.clients import Sourcify
-from gnosis.eth.clients.sourcify import ContractMetadata
+from gnosis.eth.clients import (BlockscoutClient, ContractMetadata,
+                                EtherscanClient, Sourcify)
 from gnosis.eth.ethereum_client import EthereumNetwork
+from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
 
-from ..clients import BlockscoutClient, EtherscanClient
 from ..models import Contract, ContractAbi, validate_abi
-from .mocks import sourcify_safe_metadata
 
 
 class TestContractAbi(TestCase):
