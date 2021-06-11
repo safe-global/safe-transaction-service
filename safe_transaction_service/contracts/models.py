@@ -75,9 +75,9 @@ def get_contract_logo_path(instance: 'Contract', filename):
 
 class ContractManager(models.Manager):
     def create_from_address(self, address: str, network_id: int = 1) -> Optional[Contract]:
-        sourcify = Sourcify()
+        sourcify = Sourcify(EthereumNetwork(network_id))
         try:
-            contract_metadata = sourcify.get_contract_metadata(address, network_id=network_id)
+            contract_metadata = sourcify.get_contract_metadata(address)
         except IOError:
             return
         if contract_metadata:
@@ -169,10 +169,10 @@ class Contract(models.Model):
         """
         ethereum_client = EthereumClientProvider()
         network = network or ethereum_client.get_network()
-        sourcify = Sourcify()
+        sourcify = Sourcify(EthereumNetwork(network))
         contract_abi = None
         try:
-            contract_metadata = sourcify.get_contract_metadata(self.address, network_id=network.value)
+            contract_metadata = sourcify.get_contract_metadata(self.address)
             if contract_metadata:
                 contract_abi, _ = ContractAbi.objects.update_or_create(
                     abi=contract_metadata.abi,
