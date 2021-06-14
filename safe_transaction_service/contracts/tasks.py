@@ -1,5 +1,4 @@
 from functools import cache
-from typing import Optional
 
 from django.db import IntegrityError, transaction
 
