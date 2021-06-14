@@ -20,9 +20,6 @@ from gnosis.eth.clients import (BlockscoutClient,
 from gnosis.eth.django.models import EthereumAddressField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
-from ..tokens.clients import EtherscanScraper
-from ..tokens.clients.etherscan_scraper import EtherscanScraperException
-
 logger = getLogger(__name__)
 
 
@@ -141,29 +138,6 @@ class Contract(models.Model):  # Known addresses by the service
         :return: `display_name` if available, else use scraped `name`
         """
         return self.display_name if self.display_name else self.name
-
-    def sync_abi_from_scraper(self, network: Optional[EthereumNetwork] = None) -> bool:
-        """
-        Sync abi from etherscan scraper. Requires node.js and installed
-        :param network:
-        :return:
-        """
-        etherscan_scraper = EtherscanScraper()
-        try:
-            contract_info = etherscan_scraper.get_contract_info(self.address)
-            if contract_info:
-                contract_abi, _ = ContractAbi.objects.update_or_create(abi=contract_info.abi,
-                                                                       defaults={
-                                                                           'description': contract_info.name
-                                                                       })
-                if not self.name:
-                    self.name = contract_info.name
-                self.contract_abi = contract_abi
-                self.save(update_fields=['name', 'contract_abi'])
-                return True
-        except EtherscanScraperException:
-            pass
-        return False
 
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """
