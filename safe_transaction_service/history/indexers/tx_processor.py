@@ -175,8 +175,10 @@ class SafeTxProcessor(TxProcessor):
             safe_status.owners.remove(owner)
             MultisigConfirmation.objects.remove_unused_confirmations(contract_address, safe_status.nonce, owner)
         except ValueError as e:
-            logger.error('Error processing trace=%s for contract=%s with tx-hash=%s. Cannot remove owner=%s',
-                         internal_tx.trace_address, contract_address, internal_tx.ethereum_tx_id, owner)
+            logger.error('Error processing trace=%s for contract=%s with tx-hash=%s. Cannot remove owner=%s . '
+                         'Current owners=%s',
+                         internal_tx.trace_address, contract_address, internal_tx.ethereum_tx_id, owner,
+                         safe_status.owners)
             raise OwnerCannotBeRemoved() from e
 
     def store_new_safe_status(self, safe_status: SafeStatus, internal_tx: InternalTx) -> SafeStatus:
