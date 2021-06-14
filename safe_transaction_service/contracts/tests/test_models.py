@@ -15,6 +15,7 @@ from gnosis.eth.tests.clients.mocks import (etherscan_source_code_mock,
                                             sourcify_safe_metadata)
 
 from ..models import Contract, ContractAbi, validate_abi
+from .factories import ContractFactory
 
 
 class TestContractAbi(TestCase):
@@ -70,18 +71,6 @@ class TestContract(TestCase):
         self.assertEqual(contract_without_metadata.name, '')
         self.assertIsNone(contract_without_metadata.contract_abi)
 
-    def test_validate_abi(self):
-        with self.assertRaises(ValidationError):
-            validate_abi([])
-
-        with self.assertRaises(ValidationError):
-            validate_abi([1])
-
-        with self.assertRaises(ValidationError):
-            validate_abi(['a'])
-
-        validate_abi(sourcify_safe_metadata['output']['abi'])
-
     @mock.patch.object(EtherscanClient, 'get_contract_metadata', autospec=True)
     @mock.patch.object(BlockscoutClient, 'get_contract_metadata', autospec=True, side_effect=IOError)
     @mock.patch.object(Sourcify, 'get_contract_metadata', autospec=True)
@@ -127,3 +116,22 @@ class TestContract(TestCase):
 
         etherscan_get_contract_abi_mock.side_effect = IOError
         self.assertFalse(contract.sync_abi_from_api(network=network))
+
+    def test_without_metadata(self):
+        contract_without_abi = ContractFactory(name='aloha', contract_abi=None)
+        contract_without_name = ContractFactory(name='')
+        self.assertEqual(Contract.objects.without_metadata().count(), 2)
+        contract_with_everything = ContractFactory()
+        self.assertEqual(Contract.objects.without_metadata().count(), 2)
+
+    def test_validate_abi(self):
+        with self.assertRaises(ValidationError):
+            validate_abi([])
+
+        with self.assertRaises(ValidationError):
+            validate_abi([1])
+
+        with self.assertRaises(ValidationError):
+            validate_abi(['a'])
+
+        validate_abi(sourcify_safe_metadata['output']['abi'])

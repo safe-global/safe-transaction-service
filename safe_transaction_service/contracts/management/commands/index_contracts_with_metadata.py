@@ -14,10 +14,10 @@ class Command(BaseCommand):
                             action='store_true', default=False)
 
     def handle(self, *args, **options):
-        every_contract = options['all']
+        reindex = options['reindex']
         sync = options['sync']
 
-        if every_contract:
+        if reindex:
             task = reindex_contracts_without_metadata
         else:
             task = create_missing_contracts_with_metadata_task

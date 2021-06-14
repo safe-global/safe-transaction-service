@@ -115,7 +115,7 @@ class ContractQuerySet(models.QuerySet):
         return self.filter(self.no_logo_query)
 
     def without_metadata(self):
-        return self.filter(contract_abi=None)
+        return self.filter(Q(contract_abi=None) | Q(name=''))
 
 
 class Contract(models.Model):  # Known addresses by the service
