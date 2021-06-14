@@ -58,7 +58,6 @@ def reindex_contracts_without_metadata() -> int:
 @app.shared_task()
 def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
     ethereum_network = get_ethereum_network()
-    action: Optional[str] = None
     try:
         with transaction.atomic():
             contract = Contract.objects.create_from_address(address, network=ethereum_network)
@@ -70,7 +69,8 @@ def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
         else:
             action = 'Not modified'
     finally:
-        if action:
-            logger.info('%s contract with address=%s name=%s abi-found=%s',
-                        action, address, contract.name, contract.contract_abi is not None)
         close_gevent_db_connection()
+
+    if action:
+        logger.info('%s contract with address=%s name=%s abi-found=%s',
+                    action, address, contract.name, contract.contract_abi is not None)

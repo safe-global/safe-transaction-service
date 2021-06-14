@@ -150,7 +150,7 @@ class Contract(models.Model):  # Known addresses by the service
         sourcify = Sourcify(network)
 
         try:
-            etherscan_client = EtherscanClient(network)
+            etherscan_client = EtherscanClient(network, api_key=settings.ETHERSCAN_API_KEY)
         except EtherscanClientConfigurationProblem:
             logger.info('Etherscan client is not available for current network %s', network)
             etherscan_client = None
