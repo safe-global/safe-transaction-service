@@ -694,8 +694,7 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
                 response_serializer.is_valid(raise_exception=True)
                 return Response(status=status.HTTP_200_OK, data=response_serializer.data)
             except CannotEstimateGas as exc:
-                logger.warning('Cannot estimate gas for safe=%s data=%s', address, serializer.validated_data,
-                               exc_info=True)
+                logger.warning('Cannot estimate gas for safe=%s data=%s', address, serializer.validated_data)
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 data={'code': 30,
                                       'message': 'Gas estimation failed',
