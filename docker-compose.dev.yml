@@ -30,6 +30,6 @@ services:
 
   ganache:
     image: trufflesuite/ganache-cli:latest
-    command: -d --defaultBalanceEther 10000 -a 10 --noVMErrorsOnRPCResponse --gasLimit 10000000 --host 0.0.0.0 --chainId 1337
+    command: -d --defaultBalanceEther 10000 -a 10 --noVMErrorsOnRPCResponse --gasLimit 10000000 --host 0.0.0.0 --chainId 1337 --networkId 1337
     ports:
       - "8545:8545"
