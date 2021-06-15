@@ -26,6 +26,15 @@ from .utils import just_test_if_mainnet_node
 
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
+    def test_ipfs_to_http(self):
+        collectibles_service = CollectiblesServiceProvider()
+        regular_url = 'http://testing-url/path/?arguments'
+        self.assertEqual(collectibles_service.ipfs_to_http(regular_url), regular_url)
+        ipfs_url = 'ipfs://testing-url/path/?arguments'
+        result = collectibles_service.ipfs_to_http(ipfs_url)
+        self.assertTrue(result.startswith('http'))
+        self.assertIn('testing-url/path/?arguments', result)
+
     def test_get_collectibles(self):
         self.maxDiff = None
         mainnet_node = just_test_if_mainnet_node()

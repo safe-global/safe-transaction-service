@@ -127,6 +127,12 @@ class CollectiblesService:
                                                                             ttl=60 * 30)  # 2 hours of caching
         self.cache_token_uri: Dict[Tuple[str, int], str] = {}
 
+    def ipfs_to_http(self, uri: Optional[str]) -> Optional[str]:
+        if uri and uri.startswith('ipfs://'):
+            return urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', '', 1))  # Use ipfs gateway
+        else:
+            return uri
+
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24,
                    prefix='collectibles-_retrieve_metadata_from_uri',
@@ -138,8 +144,7 @@ class CollectiblesService:
         :param uri: Uri starting with the protocol, like http://example.org/token/3
         :return: Metadata as a decoded json
         """
-        if uri and uri.startswith('ipfs://'):
-            uri = urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', ''))  # Use ipfs gateway
+        uri = self.ipfs_to_http(uri)
 
         if not uri or not uri.startswith('http'):
             raise MetadataRetrievalException(uri)
@@ -276,7 +281,7 @@ class CollectiblesService:
                 collectibles_with_metadata[collectible.address, collectible.id] = CollectibleWithMetadata(
                     collectible.token_name,
                     collectible.token_symbol,
-                    collectible.logo_uri,
+                    self.ipfs_to_http(collectible.logo_uri),
                     collectible.address,
                     collectible.id,
                     collectible.uri,
