@@ -7,6 +7,7 @@ from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.clients import EtherscanRateLimitError
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from safe_transaction_service.history.models import MultisigTransaction
@@ -31,6 +32,7 @@ def create_missing_contracts_with_metadata_task() -> int:
     try:
         i = 0
         for address in MultisigTransaction.objects.not_indexed_metadata_contract_addresses():
+            logger.info('Detected missing contract %s', address)
             create_or_update_contract_with_metadata_task.delay(address)
             i += 1
         return i
@@ -47,6 +49,7 @@ def reindex_contracts_without_metadata() -> int:
     try:
         i = 0
         for address in Contract.objects.without_metadata().values_list('address', flat=True):
+            logger.info('Reindexing contract %s', address)
             create_or_update_contract_with_metadata_task.delay(address)
             i += 1
         return i
@@ -54,7 +57,8 @@ def reindex_contracts_without_metadata() -> int:
         close_gevent_db_connection()
 
 
-@app.shared_task()
+@app.shared_task(autoretry_for=(EtherscanRateLimitError,), retry_backoff=10,
+                 retry_kwargs={'max_retries': 5})
 def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
     ethereum_network = get_ethereum_network()
     try:
