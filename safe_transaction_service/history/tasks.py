@@ -230,7 +230,7 @@ def check_reorgs_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task()
+@app.shared_task(autoretry_for=(IOError,), default_retry_delay=30, retry_kwargs={'max_retries': 3})
 def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
         return 0
