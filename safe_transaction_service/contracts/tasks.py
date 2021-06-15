@@ -60,6 +60,7 @@ def reindex_contracts_without_metadata() -> int:
 @app.shared_task(autoretry_for=(EtherscanRateLimitError,), retry_backoff=10,
                  retry_kwargs={'max_retries': 5})
 def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
+    logger.info('Searching metadata for contract %s', address)
     ethereum_network = get_ethereum_network()
     try:
         with transaction.atomic():
@@ -77,3 +78,5 @@ def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
     if action:
         logger.info('%s contract with address=%s name=%s abi-found=%s',
                     action, address, contract.name, contract.contract_abi is not None)
+    else:
+        logger.info('Metadata not found for contract %s', address)
