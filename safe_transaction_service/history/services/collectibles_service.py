@@ -118,8 +118,9 @@ class CollectiblesService:
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
+        self.ethereum_network = ethereum_client.get_network()
         self.redis = redis
-        self.ens_service: EnsClient = EnsClient(ethereum_client.get_network().value)
+        self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
         self.cache_uri_metadata = TTLCache(maxsize=4096,
                                            ttl=60 * 60 * 24)  # 1 day of caching

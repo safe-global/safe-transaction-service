@@ -39,6 +39,7 @@ class PriceServiceProvider:
 class PriceService:
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
+        self.ethereum_network = self.ethereum_client.get_network()
         self.redis = redis
         self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient()
@@ -77,10 +78,6 @@ class PriceService:
             return self.curve_oracle, self.yearn_oracle
         else:
             return tuple()
-
-    @cached_property
-    def ethereum_network(self):
-        return self.ethereum_client.get_network()
 
     def get_ewt_usd_price(self) -> float:
         try:

@@ -2,7 +2,6 @@ import logging
 import operator
 from dataclasses import dataclass
 from datetime import datetime
-from functools import cached_property
 from typing import Iterator, List, Optional, Sequence
 
 from django.db.models import Q
@@ -82,13 +81,10 @@ class BalanceServiceProvider:
 class BalanceService:
     def __init__(self, ethereum_client: EthereumClient, price_service: PriceService, redis: Redis):
         self.ethereum_client = ethereum_client
+        self.ethereum_network = self.ethereum_client.get_network()
         self.price_service = price_service
         self.redis = redis
         self.cache_token_info = TTLCache(maxsize=4096, ttl=60 * 30)  # 2 hours of caching
-
-    @cached_property
-    def ethereum_network(self):
-        return self.ethereum_client.get_network()
 
     def _filter_addresses(self, erc20_addresses: Sequence[ChecksumAddress],
                           only_trusted: bool, exclude_spam: bool) -> List[ChecksumAddress]:

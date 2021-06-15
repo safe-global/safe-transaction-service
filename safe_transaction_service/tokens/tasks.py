@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cache
 from typing import Optional
 
 from django.conf import settings
@@ -21,8 +22,16 @@ from .services.price_service import PriceServiceProvider
 logger = get_task_logger(__name__)
 
 
+@cache
+def get_ethereum_network() -> EthereumNetwork:
+    return EthereumClientProvider().get_network()
+
+
 @dataclass
 class EthValueWithTimestamp(object):
+    """
+    Contains ethereum value for a token and the timestamp on when it was calculated
+    """
     eth_value: float
     timestamp: datetime
 
@@ -79,8 +88,7 @@ def fix_pool_tokens_task() -> Optional[int]:
     Fix names for generic pool tokens, like Balancer or Uniswap
     :return: Number of pool token names updated
     """
-    ethereum_client = EthereumClientProvider()
-    ethereum_network = ethereum_client.get_network()
+    ethereum_network = get_ethereum_network()
     if ethereum_network == EthereumNetwork.MAINNET:
         try:
             number = Token.pool_tokens.fix_all_pool_tokens()
