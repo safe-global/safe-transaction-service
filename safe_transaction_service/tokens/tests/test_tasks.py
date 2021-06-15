@@ -7,7 +7,6 @@ from django.utils import timezone
 
 from eth_account import Account
 
-from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ..services import PriceService
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestTasks(TestCase):
-    @mock.patch.object(EthereumClient, 'get_network', autospec=True, return_value=EthereumNetwork.MAINNET)
+    @mock.patch('safe_transaction_service.tokens.tasks.get_ethereum_network', return_value=EthereumNetwork.MAINNET)
     def test_fix_pool_tokens_task(self, get_network_mock: MagicMock):
         self.assertEqual(fix_pool_tokens_task.delay().result, 0)
 

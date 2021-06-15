@@ -89,7 +89,8 @@ def only_one_running_task(task: CeleryTask,
         close_gevent_db_connection()  # Need for django-db-geventpool
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_new_proxies_task(self) -> Optional[int]:
     """
     :return: Number of proxies created
@@ -103,7 +104,8 @@ def index_new_proxies_task(self) -> Optional[int]:
                 return number_proxies
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_internal_txs_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
@@ -121,7 +123,8 @@ def index_internal_txs_task(self) -> Optional[int]:
             return number_traces
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_safe_events_task(self) -> Optional[int]:
     """
     Find and process for monitored addresses
@@ -139,7 +142,8 @@ def index_safe_events_task(self) -> Optional[int]:
             return number
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_erc20_events_task(self) -> Optional[int]:
     """
     Find and process internal txs for monitored addresses
