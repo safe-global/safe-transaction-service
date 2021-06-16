@@ -1,7 +1,5 @@
 import os
 
-import django.conf
-
 from celery import Celery
 
 # set the default Django settings module for the 'celery' program.
@@ -13,9 +11,6 @@ app = Celery("safe_transaction_service")
 # the configuration object to child processes.
 # - namespace='CELERY' means all celery-related configuration keys
 #   should have a `CELERY_` prefix.
-for k in dir(django.conf.settings):
-    print(k, getattr(django.conf.settings, k))
-print(django.conf.settings.CELERY_ALWAYS_EAGER)
 app.config_from_object("django.conf:settings")
 # app.config_from_object("django.conf:settings", namespace="CELERY")
 
