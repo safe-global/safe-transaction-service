@@ -19,9 +19,9 @@ from ..utils import calculate_device_registration_hash
 from .factories import FirebaseDeviceFactory, FirebaseDeviceOwnerFactory
 
 
-class TestViews(SafeTestCaseMixin, APITestCase):
+class TestNotificationViews(SafeTestCaseMixin, APITestCase):
     def test_notifications_devices_create_view(self):
-        response = self.client.post(reverse('v1:notifications-devices'))
+        response = self.client.post(reverse('v1:notifications:devices'))
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         safe_address = Account.create().address
@@ -36,25 +36,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'deviceType': 'WEB',
             'version': '2.0.1',
         }
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(FirebaseDevice.objects.count(), 1)
         device_uuid = response.data['uuid']
         self.assertTrue(uuid.UUID(device_uuid))
 
         # Same request should return a 400 because a new device with same push token cannot be created
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         # Request with `uuid` should not create a new object
         data['uuid'] = device_uuid
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(FirebaseDevice.objects.count(), 1)
 
         # Changing the token and using the uuid will change the cloud messaging token
         data['cloudMessagingToken'] = 'B' * 163
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(FirebaseDevice.objects.count(), 1)
         self.assertEqual(FirebaseDevice.objects.first().cloud_messaging_token, data['cloudMessagingToken'])
@@ -62,7 +62,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Add the same FirebaseDevice to another Safe
         safe_contract_2 = SafeContractFactory()
         data['safes'].append(safe_contract_2.address)
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(safe_contract.firebase_devices.count(), 1)
         self.assertEqual(safe_contract_2.firebase_devices.count(), 1)
@@ -72,7 +72,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Use not valid deviceType
         previous_device_type = data['deviceType']
         data['deviceType'] = 'RANGER-MORPHER'
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertIn('is not a valid choice', response.content.decode())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(safe_contract.firebase_devices.count(), 1)
@@ -81,7 +81,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Use not valid version
         previous_version = data['version']
         data['version'] = 'Megazord'
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertIn('Semantic version was expected', response.content.decode())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(safe_contract.firebase_devices.count(), 1)
@@ -89,7 +89,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Remove one of the Safes
         data['safes'] = [safe_contract_2.address]
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(safe_contract.firebase_devices.count(), 0)
         self.assertEqual(safe_contract_2.firebase_devices.count(), 1)
@@ -121,7 +121,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             'timestamp': timestamp,
             'signatures': signatures,
         }
-        response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
         # self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['owners_registered'], [])
@@ -129,7 +129,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address]):
-            response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+            response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             self.assertEqual(response.data['uuid'], str(unique_id))
             self.assertEqual(FirebaseDevice.objects.count(), 1)
@@ -138,7 +138,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
             # Add another signature
             signatures.append(owner_account_2.signHash(hash_to_sign)['signature'].hex())
-            response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+            response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
             # self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             self.assertEqual(response.data['owners_registered'], [owner_account.address])
@@ -146,7 +146,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address, owner_account_2.address]):
-            response = self.client.post(reverse('v1:notifications-devices'), format='json', data=data)
+            response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             self.assertEqual(response.data['owners_registered'], [owner_account.address, owner_account_2.address])
             self.assertEqual(response.data['owners_not_registered'], [])
@@ -163,13 +163,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         self.assertEqual(FirebaseDevice.objects.count(), 1)
         self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
-        response = self.client.delete(reverse('v1:notifications-devices-delete', args=(device_id,)), format='json')
+        response = self.client.delete(reverse('v1:notifications:devices-delete', args=(device_id,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(FirebaseDevice.objects.count(), 0)
         self.assertEqual(FirebaseDeviceOwner.objects.count(), 0)
 
         # Try to delete again if not exists
-        response = self.client.delete(reverse('v1:notifications-devices-delete', args=(device_id,)), format='json')
+        response = self.client.delete(reverse('v1:notifications:devices-delete', args=(device_id,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_notifications_devices_safe_delete_view(self):
@@ -184,14 +184,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         random_safe_address = Account.create().address
         self.assertEqual(firebase_device.safes.count(), 1)
         self.assertEqual(FirebaseDeviceOwner.objects.count(), 2)
-        response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
+        response = self.client.delete(reverse('v1:notifications:devices-safes-delete',
                                               args=(device_id, random_safe_address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(firebase_device.safes.count(), 1)
         self.assertEqual(FirebaseDeviceOwner.objects.count(), 2)
 
         # Happy path
-        response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
+        response = self.client.delete(reverse('v1:notifications:devices-safes-delete',
                                               args=(device_id, safe_contract.address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(firebase_device.safes.count(), 0)
@@ -199,14 +199,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(FirebaseDeviceOwner.objects.get(), not_related_firebase_device_owner)
 
         # Try to delete again and get the same result even if the Safe is not linked
-        response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
+        response = self.client.delete(reverse('v1:notifications:devices-safes-delete',
                                               args=(device_id, safe_contract.address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(firebase_device.safes.count(), 0)
         self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
 
         # Remove not existing Safe should not trigger an error
-        response = self.client.delete(reverse('v1:notifications-devices-safes-delete',
+        response = self.client.delete(reverse('v1:notifications:devices-safes-delete',
                                               args=(device_id, Account.create().address)), format='json')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(firebase_device.safes.count(), 0)

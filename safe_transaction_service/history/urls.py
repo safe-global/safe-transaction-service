@@ -1,14 +1,8 @@
 from django.urls import path
 
-from safe_transaction_service.contracts import views as contract_views
-from safe_transaction_service.notifications import views as notification_views
-from safe_transaction_service.tokens import views as token_views
-
 from . import views
 
-app_name = "safe"
-
-timestamp_regex = '\\d{4}[-]?\\d{1,2}[-]?\\d{1,2} \\d{1,2}:\\d{1,2}:\\d{1,2}'
+app_name = "history"
 
 urlpatterns = [
     path('about/', views.AboutView.as_view(), name='about'),
@@ -58,21 +52,4 @@ urlpatterns = [
          name='owners-alias'),
     path('data-decoder/', views.DataDecoderView.as_view(),
          name='data-decoder'),
-
-    # Contracts
-    path('contracts/', contract_views.ContractsView.as_view(), name='contracts'),
-    path('contracts/<str:address>/', contract_views.ContractView.as_view(), name='contract'),
-
-    # Tokens
-    path('tokens/', token_views.TokensView.as_view(), name='tokens'),
-    path('tokens/<str:address>/', token_views.TokenView.as_view(), name='token'),
-
-    # Notifications
-    path('notifications/devices/', notification_views.FirebaseDeviceCreateView.as_view(),
-         name='notifications-devices'),
-    path('notifications/devices/<uuid:pk>/', notification_views.FirebaseDeviceDeleteView.as_view(),
-         name='notifications-devices-delete'),
-    path('notifications/devices/<uuid:pk>/safes/<str:address>/',
-         notification_views.FirebaseDeviceSafeDeleteView.as_view(), name='notifications-devices-safes-delete'),
-
 ]

@@ -18,11 +18,11 @@ class TestContractViews(APITestCase):
 
     def test_contract_view(self):
         contract_address = Account.create().address
-        response = self.client.get(reverse('v1:contract', args=(contract_address,)))
+        response = self.client.get(reverse('v1:contracts:detail', args=(contract_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         contract = ContractFactory(address=contract_address)
-        response = self.client.get(reverse('v1:contract', args=(contract_address,)))
+        response = self.client.get(reverse('v1:contracts:detail', args=(contract_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {
             'address': contract.address,
@@ -41,7 +41,7 @@ class TestContractViews(APITestCase):
         contract.display_name = display_name
         contract.logo = None
         contract.save()
-        response = self.client.get(reverse('v1:contract', args=(contract_address,)))
+        response = self.client.get(reverse('v1:contracts:detail', args=(contract_address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {
             'address': contract.address,
@@ -53,13 +53,13 @@ class TestContractViews(APITestCase):
 
     def test_contracts_view(self):
         contract_address = Account.create().address
-        response = self.client.get(reverse('v1:contracts'))
+        response = self.client.get(reverse('v1:contracts:list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
         self.assertEqual(response.data['results'], [])
 
         contract = ContractFactory(address=contract_address)
-        response = self.client.get(reverse('v1:contracts'))
+        response = self.client.get(reverse('v1:contracts:list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['results'], [{
             'address': contract.address,
@@ -74,6 +74,6 @@ class TestContractViews(APITestCase):
         }])
 
         ContractFactory(contract_abi__abi=[])
-        response = self.client.get(reverse('v1:contracts'))
+        response = self.client.get(reverse('v1:contracts:list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
