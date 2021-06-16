@@ -38,26 +38,26 @@ class CeleryTaskConfiguration:
 
 
 TASKS = [
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_internal_txs_task',
+    CeleryTaskConfiguration('history.tasks.index_internal_txs_task',
                             'Index Internal Txs', 13, IntervalSchedule.SECONDS,
                             enabled=not settings.ETH_L2_NETWORK),
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_safe_events_task',
+    CeleryTaskConfiguration('history.tasks.index_safe_events_task',
                             'Index Safe events (L2)', 13, IntervalSchedule.SECONDS,
                             enabled=settings.ETH_L2_NETWORK),
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
+    CeleryTaskConfiguration('history.tasks.index_new_proxies_task',
                             'Index new Proxies', 15, IntervalSchedule.SECONDS,
                             enabled=False),
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
+    CeleryTaskConfiguration('history.tasks.index_erc20_events_task',
                             'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
+    CeleryTaskConfiguration('history.tasks.process_decoded_internal_txs_task',
                             'Process Internal Txs', 2, IntervalSchedule.MINUTES),
-    CeleryTaskConfiguration('safe_transaction_service.history.tasks.check_reorgs_task',
+    CeleryTaskConfiguration('history.tasks.check_reorgs_task',
                             'Check Reorgs', 3, IntervalSchedule.MINUTES),
-    CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.create_missing_contracts_with_metadata_task',
+    CeleryTaskConfiguration('contracts.tasks.create_missing_contracts_with_metadata_task',
                             'Index contract names and ABIs', 1, IntervalSchedule.HOURS),
-    CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata',
+    CeleryTaskConfiguration('contracts.tasks.reindex_contracts_without_metadata',
                             'Reindex contracts with missing names or ABIs', 8, IntervalSchedule.HOURS),
-    CeleryTaskConfiguration('safe_transaction_service.tokens.tasks.fix_pool_tokens_task',
+    CeleryTaskConfiguration('tokens.tasks.fix_pool_tokens_task',
                             'Fix Pool Token Names', 1, IntervalSchedule.HOURS),
 ]
 
@@ -179,6 +179,10 @@ class Command(BaseCommand):
     help = 'Setup Transaction Service Required Tasks'
 
     def handle(self, *args, **options):
+        self.stdout.write(self.style.SUCCESS('Removing old tasks'))
+        PeriodicTask.objects.filter(name__startswith='safe_transaction_service').delete()
+        self.stdout.write(self.style.SUCCESS('Old tasks were removed'))
+
         for task in TASKS:
             _, created = task.create_task()
             if created:

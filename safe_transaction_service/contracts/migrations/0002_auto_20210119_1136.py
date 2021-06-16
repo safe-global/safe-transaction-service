@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import safe_transaction_service.contracts.models
+import contracts.models
 
 
 class Migration(migrations.Migration):
@@ -20,6 +20,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='contract',
             name='logo',
-            field=models.ImageField(default=None, null=True, upload_to=safe_transaction_service.contracts.models.get_contract_logo_path),
+            field=models.ImageField(default=None, null=True, upload_to=contracts.models.get_contract_logo_path),
         ),
     ]

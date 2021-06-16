@@ -7,8 +7,7 @@ from eth_account import Account
 from gnosis.eth.clients import Sourcify
 from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
 
-from safe_transaction_service.history.tests.factories import \
-    MultisigTransactionFactory
+from history.tests.factories import MultisigTransactionFactory
 
 from ..models import Contract
 from ..tasks import (create_missing_contracts_with_metadata_task,

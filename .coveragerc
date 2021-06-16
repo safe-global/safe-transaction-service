@@ -3,4 +3,3 @@ omit =
      *__init__.py*
      *tests*
      */migrations/*
-     */taskapp/celery.py

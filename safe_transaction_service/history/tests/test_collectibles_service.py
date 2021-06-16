@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from eth_account import Account
+from utils.redis import get_redis
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import (Erc721Info, Erc721Manager,
@@ -11,16 +12,15 @@ from gnosis.eth.ethereum_client import (Erc721Info, Erc721Manager,
                                         InvalidERC721Info)
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.tests.factories import TokenFactory
+from tokens.constants import ENS_CONTRACTS_WITH_TLD
+from tokens.models import Token
+from tokens.tests.factories import TokenFactory
 
-from ...tokens.constants import ENS_CONTRACTS_WITH_TLD
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
                                              CollectiblesServiceProvider,
                                              CollectibleWithMetadata,
                                              Erc721InfoWithLogo)
-from ..utils import get_redis
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 

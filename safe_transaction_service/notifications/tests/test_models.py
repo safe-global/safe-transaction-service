@@ -2,8 +2,7 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from safe_transaction_service.history.tests.factories import \
-    SafeContractFactory
+from history.tests.factories import SafeContractFactory
 
 from ..models import FirebaseDeviceOwner
 from .factories import FirebaseDeviceOwnerFactory

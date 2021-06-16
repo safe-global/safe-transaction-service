@@ -8,8 +8,7 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe.multi_send import MultiSendOperation
 
-from safe_transaction_service.contracts.tests.factories import \
-    ContractAbiFactory
+from contracts.tests.factories import ContractAbiFactory
 
 from ..tx_decoder import (CannotDecode, DbTxDecoder, SafeTxDecoder, TxDecoder,
                           get_db_tx_decoder, get_safe_tx_decoder,

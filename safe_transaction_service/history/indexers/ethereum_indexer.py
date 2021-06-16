@@ -6,13 +6,13 @@ from typing import Any, List, Optional, Sequence, Tuple
 from django.db.models import Min
 
 from billiard.exceptions import SoftTimeLimitExceeded
+from utils.utils import chunks
 from web3 import Web3
 
 from gnosis.eth import EthereumClient
 
 from ..models import MonitoredAddress
 from ..services import IndexService, IndexServiceProvider
-from ..utils import chunks
 
 logger = getLogger(__name__)
 

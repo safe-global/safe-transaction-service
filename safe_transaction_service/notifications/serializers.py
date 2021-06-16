@@ -12,7 +12,7 @@ from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField)
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
-from safe_transaction_service.history.models import SafeContract
+from history.models import SafeContract
 
 from .models import DeviceTypeEnum, FirebaseDevice, FirebaseDeviceOwner
 from .utils import calculate_device_registration_hash, get_safe_owners

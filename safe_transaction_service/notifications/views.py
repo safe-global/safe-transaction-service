@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.generics import CreateAPIView, DestroyAPIView
 from rest_framework.response import Response
 
-from safe_transaction_service.history.models import SafeContract
+from history.models import SafeContract
 
 from . import serializers
 from .models import FirebaseDevice

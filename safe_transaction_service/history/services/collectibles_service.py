@@ -11,17 +11,18 @@ import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from redis import Redis
+from utils.redis import get_redis
+from utils.utils import chunks
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from safe_transaction_service.tokens.constants import (
-    CRYPTO_KITTIES_CONTRACT_ADDRESSES, ENS_CONTRACTS_WITH_TLD)
-from safe_transaction_service.tokens.models import Token
+from tokens.constants import (CRYPTO_KITTIES_CONTRACT_ADDRESSES,
+                              ENS_CONTRACTS_WITH_TLD)
+from tokens.models import Token
 
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
-from ..utils import chunks, get_redis
 
 logger = logging.getLogger(__name__)
 

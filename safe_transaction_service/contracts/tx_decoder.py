@@ -22,7 +22,7 @@ from gnosis.eth.contracts import (get_safe_V0_0_1_contract,
                                   get_uniswap_exchange_contract)
 from gnosis.safe.multi_send import MultiSend
 
-from safe_transaction_service.contracts.models import ContractAbi
+from contracts.models import ContractAbi
 
 from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_addresses_provider,

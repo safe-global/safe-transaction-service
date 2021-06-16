@@ -9,9 +9,9 @@ from eth_account import Account
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
 
-from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import PriceService
-from safe_transaction_service.tokens.tests.factories import TokenFactory
+from tokens.models import Token
+from tokens.services.price_service import PriceService
+from tokens.tests.factories import TokenFactory
 
 from ..services import BalanceServiceProvider
 from ..services.balance_service import BalanceWithFiat

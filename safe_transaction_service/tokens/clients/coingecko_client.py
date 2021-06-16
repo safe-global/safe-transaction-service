@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 import requests
 from eth_typing import ChecksumAddress
 
-from safe_transaction_service.tokens.clients.exceptions import CannotGetPrice
+from tokens.clients.exceptions import CannotGetPrice
 
 logger = logging.getLogger(__name__)
 

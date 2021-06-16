@@ -11,20 +11,18 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
+from utils.redis import get_redis
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import (
-    PriceService, PriceServiceProvider)
-from safe_transaction_service.tokens.tasks import (
-    EthValueWithTimestamp, calculate_token_eth_price_task)
+from tokens.clients import CannotGetPrice
+from tokens.models import Token
+from tokens.services.price_service import PriceService, PriceServiceProvider
+from tokens.tasks import EthValueWithTimestamp, calculate_token_eth_price_task
 
-from ...tokens.clients import CannotGetPrice
 from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
-from ..utils import get_redis
 
 logger = logging.getLogger(__name__)
 

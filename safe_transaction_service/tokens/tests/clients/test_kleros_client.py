@@ -4,8 +4,7 @@ from eth_utils import is_checksum_address
 
 from gnosis.eth import EthereumClient
 
-from safe_transaction_service.history.tests.utils import \
-    just_test_if_mainnet_node
+from history.tests.utils import just_test_if_mainnet_node
 
 from ...clients.kleros_client import KlerosClient
 

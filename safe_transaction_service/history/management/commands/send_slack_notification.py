@@ -4,10 +4,9 @@ from django.core.management.base import BaseCommand
 
 import requests
 from requests import RequestException
+from utils.version import __version__
 
 from gnosis.eth import EthereumClientProvider
-
-from ....version import __version__
 
 
 class Command(BaseCommand):

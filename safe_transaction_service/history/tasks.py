@@ -9,6 +9,8 @@ from celery.app.task import Task as CeleryTask
 from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
+from utils.redis import get_redis
+from utils.utils import close_gevent_db_connection
 
 from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
                        ProxyFactoryIndexerProvider)
@@ -16,7 +18,6 @@ from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import InternalTxDecoded, SafeStatus, WebHook, WebHookType
 from .services import IndexServiceProvider, ReorgService, ReorgServiceProvider
-from .utils import close_gevent_db_connection, get_redis
 
 logger = get_task_logger(__name__)
 

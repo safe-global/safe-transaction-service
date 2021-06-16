@@ -2,7 +2,7 @@ import json
 
 from django.core.management.base import BaseCommand
 
-from safe_transaction_service.contracts.tx_decoder import get_db_tx_decoder
+from contracts.tx_decoder import get_db_tx_decoder
 
 from ...models import MultisigTransaction
 

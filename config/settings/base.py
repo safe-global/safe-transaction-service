@@ -79,10 +79,10 @@ THIRD_PARTY_APPS = [
     'django_s3_storage',
 ]
 LOCAL_APPS = [
-    'safe_transaction_service.contracts.apps.ContractsConfig',
-    'safe_transaction_service.history.apps.HistoryConfig',
-    'safe_transaction_service.notifications.apps.NotificationsConfig',
-    'safe_transaction_service.tokens.apps.TokensConfig',
+    'contracts.apps.ContractsConfig',
+    'history.apps.HistoryConfig',
+    'notifications.apps.NotificationsConfig',
+    'tokens.apps.TokensConfig',
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -91,7 +91,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
-    'safe_transaction_service.history.utils.LoggingMiddleware',
+    'utils.loggers.LoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -191,7 +191,6 @@ MANAGERS = ADMINS
 # Celery
 # ------------------------------------------------------------------------------
 INSTALLED_APPS += [
-    'safe_transaction_service.taskapp.celery.CeleryConfig',
     'django_celery_beat',
 ]
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-broker_url
@@ -223,7 +222,7 @@ REST_FRAMEWORK = {
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.NamespaceVersioning',
-    'EXCEPTION_HANDLER': 'safe_transaction_service.history.exceptions.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'history.exceptions.custom_exception_handler',
 }
 
 # LOGGING
@@ -242,7 +241,7 @@ LOGGING = {
             '()': 'django.utils.log.RequireDebugFalse'
         },
         'ignore_succeeded_none': {
-            '()': 'safe_transaction_service.taskapp.celery.IgnoreSucceededNone'
+            '()': 'utils.celery.IgnoreSucceededNone'
         },
     },
     'formatters': {
@@ -253,7 +252,7 @@ LOGGING = {
             'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s'
         },
         'celery_verbose': {
-            'class': 'safe_transaction_service.taskapp.celery.PatchedCeleryFormatter',
+            'class': 'utils.celery.PatchedCeleryFormatter',
             'format': '%(asctime)s [%(levelname)s] [%(task_id)s/%(task_name)s] %(message)s',
             # 'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
         },
@@ -291,19 +290,19 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'safe_transaction_service.history.indexers.internal_tx_indexer': {
+        'history.indexers.internal_tx_indexer': {
             'level': 'INFO',
         },
-        'safe_transaction_service.history.indexers.erc20_events_indexer': {
+        'history.indexers.erc20_events_indexer': {
             'level': 'INFO',
         },
-        'safe_transaction_service.history.indexers.tx_processor': {
+        'history.indexers.tx_processor': {
             'level': 'INFO',
         },
-        'safe_transaction_service.history.services.balance_service': {
+        'history.services.balance_service': {
             'level': 'WARNING',
         },
-        'safe_transaction_service.history.services.collectibles_service': {
+        'history.services.collectibles_service': {
             'level': 'WARNING',
         },
         'celery': {

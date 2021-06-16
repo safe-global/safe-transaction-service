@@ -7,6 +7,7 @@ from cachetools import TTLCache, cachedmethod
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from redis import Redis
+from utils.redis import get_redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
@@ -15,8 +16,6 @@ from gnosis.eth.oracles import (BalancerOracle, CurveOracle, KyberOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UniswapOracle, UniswapV2Oracle,
                                 UsdPricePoolOracle, YearnOracle)
-
-from safe_transaction_service.history.utils import get_redis
 
 from ..clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
                        KrakenClient, KucoinClient)
