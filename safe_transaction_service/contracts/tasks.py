@@ -1,26 +1,18 @@
-from functools import cache
-
 from django.db import IntegrityError, transaction
 
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 
-from gnosis.eth import EthereumClientProvider
 from gnosis.eth.clients import EtherscanRateLimitError
-from gnosis.eth.ethereum_client import EthereumNetwork
 
 from safe_transaction_service.history.models import MultisigTransaction
+from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection
 
 from .models import Contract
 
 logger = get_task_logger(__name__)
-
-
-@cache
-def get_ethereum_network() -> EthereumNetwork:
-    return EthereumClientProvider().get_network()
 
 
 @app.shared_task()

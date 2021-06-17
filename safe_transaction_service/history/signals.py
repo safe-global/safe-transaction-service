@@ -10,6 +10,7 @@ from django.utils import timezone
 from hexbytes import HexBytes
 
 from safe_transaction_service.notifications.tasks import send_notification_task
+from safe_transaction_service.utils.ethereum import get_ethereum_network
 
 from .models import (EthereumEvent, InternalTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,
@@ -130,6 +131,10 @@ def build_webhook_payload(sender: Type[Model],
             'type': WebHookType.MODULE_TRANSACTION.name,
             'txHash': HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
         }]
+
+    # Add chainId to every payload
+    for payload in payloads:
+        payload['chainId'] = get_ethereum_network().value
 
     return payloads
 

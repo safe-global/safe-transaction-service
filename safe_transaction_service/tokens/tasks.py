@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from functools import cache
 from typing import Optional
 
 from django.conf import settings
@@ -10,9 +9,9 @@ from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 
-from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
 
+from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection
 
@@ -20,11 +19,6 @@ from .models import Token
 from .services.price_service import PriceServiceProvider
 
 logger = get_task_logger(__name__)
-
-
-@cache
-def get_ethereum_network() -> EthereumNetwork:
-    return EthereumClientProvider().get_network()
 
 
 @dataclass
@@ -88,8 +82,7 @@ def fix_pool_tokens_task() -> Optional[int]:
     Fix names for generic pool tokens, like Balancer or Uniswap
     :return: Number of pool token names updated
     """
-    ethereum_network = get_ethereum_network()
-    if ethereum_network == EthereumNetwork.MAINNET:
+    if get_ethereum_network() == EthereumNetwork.MAINNET:
         try:
             number = Token.pool_tokens.fix_all_pool_tokens()
             if number:
