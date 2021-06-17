@@ -4,11 +4,6 @@ ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 ENV PYTHONUNBUFFERED 1
 
-# Signal handling for PID1 https://github.com/krallin/tini
-ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
-RUN chmod +x /tini
-
 COPY requirements.txt ./
 RUN set -ex \
 	&& buildDeps=" \
@@ -27,5 +22,3 @@ RUN set -ex \
 
 COPY . .
 RUN DJANGO_SETTINGS_MODULE=config.settings.local DJANGO_DOT_ENV_FILE=.env.local python manage.py collectstatic --noinput
-
-ENTRYPOINT ["/tini", "--"]
