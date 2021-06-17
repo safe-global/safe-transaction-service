@@ -9,11 +9,12 @@ from django.utils import timezone
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
-from utils.redis import get_redis
-from utils.utils import close_gevent_db_connection
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
+
+from utils.redis import get_redis
+from utils.utils import close_gevent_db_connection
 
 from .models import Token
 from .services.price_service import PriceServiceProvider

@@ -10,12 +10,12 @@ from django.db.models import (Case, F, OuterRef, Q, QuerySet, Subquery, Value,
 from django.utils import timezone
 
 from redis import Redis
-from utils.redis import get_redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
 
 from tokens.models import Token
+from utils.redis import get_redis
 
 from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
                       InternalTx, ModuleTransaction, MultisigTransaction,

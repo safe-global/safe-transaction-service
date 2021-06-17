@@ -5,13 +5,13 @@ from django.db import IntegrityError, transaction
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
-from utils.utils import close_gevent_db_connection
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.clients import EtherscanRateLimitError
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from history.models import MultisigTransaction
+from utils.utils import close_gevent_db_connection
 
 from .models import Contract
 

@@ -3,11 +3,11 @@ from typing import Any, Dict, Optional, Tuple
 
 from celery import app
 from celery.utils.log import get_task_logger
-from utils.redis import get_redis
-from utils.utils import close_gevent_db_connection
 
 from history.models import (MultisigConfirmation, MultisigTransaction,
                             SafeStatus, WebHookType)
+from utils.redis import get_redis
+from utils.utils import close_gevent_db_connection
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice, FirebaseDeviceOwner

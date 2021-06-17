@@ -18,14 +18,14 @@ from rest_framework.generics import (DestroyAPIView, GenericAPIView,
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from utils.utils import parse_boolean_query_param
-from utils.version import __version__
 from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import CannotEstimateGas
 
 from tokens.models import Token
+from utils.utils import parse_boolean_query_param
+from utils.version import __version__
 
 from . import filters, pagination, serializers
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,

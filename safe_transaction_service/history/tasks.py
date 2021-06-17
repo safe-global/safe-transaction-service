@@ -9,6 +9,7 @@ from celery.app.task import Task as CeleryTask
 from celery.signals import celeryd_init, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
+
 from utils.redis import get_redis
 from utils.utils import close_gevent_db_connection
 
