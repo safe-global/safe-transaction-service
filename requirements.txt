@@ -1,5 +1,5 @@
 cachetools==4.2.2
-celery==5.1.0
+celery==5.1.1
 django-authtools==1.7.0
 django-cache-memoize==0.1.9
 django-celery-beat==2.2.0
@@ -26,7 +26,7 @@ hexbytes==0.2.1
 packaging>=20.9
 pillow==8.2.0
 psycogreen==1.0.2
-psycopg2-binary==2.8.6
+psycopg2-binary==2.9.1
 redis==3.5.3
 requests==2.25.1
 web3==5.19.0
