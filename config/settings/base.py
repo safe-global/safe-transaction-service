@@ -2,11 +2,13 @@
 Base settings to build other settings files upon.
 """
 
+from pathlib import Path
+
 import environ
 from corsheaders.defaults import default_headers as default_cors_headers
 
-ROOT_DIR = environ.Path(__file__) - 3  # (safe_transaction_service/config/settings/base.py - 3 = safe-transaction-service/)
-APPS_DIR = ROOT_DIR.path('safe_transaction_service')
+ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
+APPS_DIR = ROOT_DIR / 'safe_transaction_service'
 
 env = environ.Env()
 
@@ -15,7 +17,7 @@ DOT_ENV_FILE = env('DJANGO_DOT_ENV_FILE', default=None)
 if READ_DOT_ENV_FILE or DOT_ENV_FILE:
     DOT_ENV_FILE = DOT_ENV_FILE or '.env'
     # OS environment variables take precedence over variables from .env
-    env.read_env(str(ROOT_DIR.path(DOT_ENV_FILE)))
+    env.read_env(str(ROOT_DIR / DOT_ENV_FILE))
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -79,10 +81,10 @@ THIRD_PARTY_APPS = [
     'django_s3_storage',
 ]
 LOCAL_APPS = [
-    'contracts.apps.ContractsConfig',
-    'history.apps.HistoryConfig',
-    'notifications.apps.NotificationsConfig',
-    'tokens.apps.TokensConfig',
+    'safe_transaction_service.contracts.apps.ContractsConfig',
+    'safe_transaction_service.history.apps.HistoryConfig',
+    'safe_transaction_service.notifications.apps.NotificationsConfig',
+    'safe_transaction_service.tokens.apps.TokensConfig',
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -91,7 +93,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
-    'utils.loggers.LoggingMiddleware',
+    'safe_transaction_service.utils.loggers.LoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -105,12 +107,13 @@ MIDDLEWARE = [
 # STATIC
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#static-root
-STATIC_ROOT = env('STATIC_ROOT', default=str(ROOT_DIR('staticfiles')))
+STATIC_ROOT = str(ROOT_DIR / "staticfiles")
+
 # https://docs.djangoproject.com/en/dev/ref/settings/#static-url
 STATIC_URL = '/static/'
 # https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#std:setting-STATICFILES_DIRS
 STATICFILES_DIRS = [
-    str(APPS_DIR.path('static')),
+    str(APPS_DIR / 'static'),
 ]
 # https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#staticfiles-finders
 STATICFILES_FINDERS = [
@@ -121,7 +124,7 @@ STATICFILES_FINDERS = [
 # MEDIA
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#media-root
-MEDIA_ROOT = str(APPS_DIR('media'))
+MEDIA_ROOT = str(APPS_DIR / 'media')
 # https://docs.djangoproject.com/en/dev/ref/settings/#media-url
 MEDIA_URL = '/media/'
 
@@ -134,7 +137,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         # https://docs.djangoproject.com/en/dev/ref/settings/#template-dirs
         'DIRS': [
-            str(APPS_DIR.path('templates')),
+            str(APPS_DIR / 'templates'),
         ],
         'OPTIONS': {
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-debug
@@ -169,7 +172,7 @@ CORS_EXPOSE_HEADERS = ['etag']
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#fixture-dirs
 FIXTURE_DIRS = (
-    str(APPS_DIR.path('fixtures')),
+    str(APPS_DIR / 'fixtures'),
 )
 
 # EMAIL
@@ -222,7 +225,7 @@ REST_FRAMEWORK = {
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.NamespaceVersioning',
-    'EXCEPTION_HANDLER': 'history.exceptions.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'safe_transaction_service.history.exceptions.custom_exception_handler',
 }
 
 # LOGGING
@@ -241,7 +244,7 @@ LOGGING = {
             '()': 'django.utils.log.RequireDebugFalse'
         },
         'ignore_succeeded_none': {
-            '()': 'utils.celery.IgnoreSucceededNone'
+            '()': 'safe_transaction_service.utils.celery.IgnoreSucceededNone'
         },
     },
     'formatters': {
@@ -252,7 +255,7 @@ LOGGING = {
             'format': '%(asctime)s [%(levelname)s] [%(processName)s] %(message)s'
         },
         'celery_verbose': {
-            'class': 'utils.celery.PatchedCeleryFormatter',
+            'class': 'safe_transaction_service.utils.celery.PatchedCeleryFormatter',
             'format': '%(asctime)s [%(levelname)s] [%(task_id)s/%(task_name)s] %(message)s',
             # 'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
         },
@@ -290,19 +293,19 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'history.indexers.internal_tx_indexer': {
+        'safe_transaction_service.history.indexers.internal_tx_indexer': {
             'level': 'INFO',
         },
-        'history.indexers.erc20_events_indexer': {
+        'safe_transaction_service.history.indexers.erc20_events_indexer': {
             'level': 'INFO',
         },
-        'history.indexers.tx_processor': {
+        'safe_transaction_service.history.indexers.tx_processor': {
             'level': 'INFO',
         },
-        'history.services.balance_service': {
+        'safe_transaction_service.history.services.balance_service': {
             'level': 'WARNING',
         },
-        'history.services.collectibles_service': {
+        'safe_transaction_service.history.services.collectibles_service': {
             'level': 'WARNING',
         },
         'celery': {

@@ -16,7 +16,7 @@ from gnosis.eth.oracles import (BalancerOracle, CurveOracle, KyberOracle,
                                 UniswapOracle, UniswapV2Oracle,
                                 UsdPricePoolOracle, YearnOracle)
 
-from utils.redis import get_redis
+from safe_transaction_service.utils.redis import get_redis
 
 from ..clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
                        KrakenClient, KucoinClient)

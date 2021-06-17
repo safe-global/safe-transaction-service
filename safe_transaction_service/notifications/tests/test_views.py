@@ -10,8 +10,10 @@ from rest_framework.test import APITestCase
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from history.tests.factories import SafeContractFactory
-from notifications.models import FirebaseDevice, FirebaseDeviceOwner
+from safe_transaction_service.history.tests.factories import \
+    SafeContractFactory
+from safe_transaction_service.notifications.models import (FirebaseDevice,
+                                                           FirebaseDeviceOwner)
 
 from ..utils import calculate_device_registration_hash
 from .factories import FirebaseDeviceFactory, FirebaseDeviceOwnerFactory
@@ -125,7 +127,7 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data['owners_registered'], [])
         self.assertEqual(response.data['owners_not_registered'], [owner_account.address])
 
-        with mock.patch('notifications.serializers.get_safe_owners',
+        with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address]):
             response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -142,7 +144,7 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(response.data['owners_registered'], [owner_account.address])
             self.assertEqual(response.data['owners_not_registered'], [owner_account_2.address])
 
-        with mock.patch('notifications.serializers.get_safe_owners',
+        with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
                         return_value=[owner_account.address, owner_account_2.address]):
             response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)

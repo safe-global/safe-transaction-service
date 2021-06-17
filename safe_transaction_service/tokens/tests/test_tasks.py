@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestTasks(TestCase):
-    @mock.patch('tokens.tasks.get_ethereum_network', return_value=EthereumNetwork.MAINNET)
+    @mock.patch('safe_transaction_service.tokens.tasks.get_ethereum_network', return_value=EthereumNetwork.MAINNET)
     def test_fix_pool_tokens_task(self, get_network_mock: MagicMock):
         self.assertEqual(fix_pool_tokens_task.delay().result, 0)
 

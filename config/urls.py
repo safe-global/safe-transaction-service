@@ -37,10 +37,10 @@ swagger_urlpatterns = [
 ]
 
 urlpatterns_v1 = [
-    path('', include('history.urls', namespace='history')),
-    path('contracts/', include('contracts.urls', namespace='contracts')),
-    path('notifications/', include('notifications.urls', namespace='notifications')),
-    path('tokens/', include('tokens.urls', namespace='tokens')),
+    path('', include('safe_transaction_service.history.urls', namespace='history')),
+    path('contracts/', include('safe_transaction_service.contracts.urls', namespace='contracts')),
+    path('notifications/', include('safe_transaction_service.notifications.urls', namespace='notifications')),
+    path('tokens/', include('safe_transaction_service.tokens.urls', namespace='tokens')),
 ]
 
 urlpatterns = swagger_urlpatterns + [

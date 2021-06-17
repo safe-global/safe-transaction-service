@@ -2,7 +2,7 @@ from django.apps import AppConfig
 
 
 class ContractsConfig(AppConfig):
-    name = 'contracts'
+    name = 'safe_transaction_service.contracts'
     verbose_name = 'Ethereum Contracts app'
 
     def ready(self):

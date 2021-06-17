@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from hexbytes import HexBytes
 
-from notifications.tasks import send_notification_task
+from safe_transaction_service.notifications.tasks import send_notification_task
 
 from .models import (EthereumEvent, InternalTx, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, SafeContract,

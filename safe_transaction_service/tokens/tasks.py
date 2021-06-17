@@ -13,8 +13,8 @@ from eth_typing import ChecksumAddress
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
 
-from utils.redis import get_redis
-from utils.utils import close_gevent_db_connection
+from safe_transaction_service.utils.redis import get_redis
+from safe_transaction_service.utils.utils import close_gevent_db_connection
 
 from .models import Token
 from .services.price_service import PriceServiceProvider

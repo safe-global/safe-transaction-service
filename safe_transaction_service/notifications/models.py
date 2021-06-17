@@ -6,7 +6,7 @@ from django.db import models
 
 from gnosis.eth.django.models import EthereumAddressField
 
-from history.models import SafeContract
+from safe_transaction_service.history.models import SafeContract
 
 
 class DeviceTypeEnum(Enum):

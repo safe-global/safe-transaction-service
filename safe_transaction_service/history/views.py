@@ -23,9 +23,9 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import CannotEstimateGas
 
-from tokens.models import Token
-from utils.utils import parse_boolean_query_param
-from utils.version import __version__
+from safe_transaction_service import __version__
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
 from .models import (InternalTx, ModuleTransaction, MultisigConfirmation,

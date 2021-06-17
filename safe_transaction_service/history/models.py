@@ -27,7 +27,7 @@ from gnosis.eth.django.models import (EthereumAddressField, HexField,
 from gnosis.safe import SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
-from contracts.models import Contract
+from safe_transaction_service.contracts.models import Contract
 
 from .utils import clean_receipt_log
 

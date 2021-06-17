@@ -7,7 +7,7 @@ from requests import RequestException
 
 from gnosis.eth import EthereumClientProvider
 
-from utils.version import __version__
+from safe_transaction_service import __version__
 
 
 class Command(BaseCommand):

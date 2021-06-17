@@ -2,7 +2,8 @@
 
 from django.db import migrations, models
 
-from history.indexers.tx_processor import SafeTxProcessorProvider
+from safe_transaction_service.history.indexers.tx_processor import \
+    SafeTxProcessorProvider
 
 
 def set_failed_for_multisig_txs(apps, schema_editor):

@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 import gnosis.eth.django.models
 
-import contracts.models
+import safe_transaction_service.contracts.models
 
 
 class Migration(migrations.Migration):
@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
             name='ContractAbi',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('abi', models.JSONField(validators=[contracts.models.validate_abi])),
+                ('abi', models.JSONField(validators=[safe_transaction_service.contracts.models.validate_abi])),
                 ('description', models.CharField(blank=True, max_length=200)),
                 ('relevance', models.SmallIntegerField(default=100)),
             ],

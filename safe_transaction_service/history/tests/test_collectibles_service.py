@@ -11,10 +11,10 @@ from gnosis.eth.ethereum_client import (Erc721Info, Erc721Manager,
                                         InvalidERC721Info)
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from tokens.constants import ENS_CONTRACTS_WITH_TLD
-from tokens.models import Token
-from tokens.tests.factories import TokenFactory
-from utils.redis import get_redis
+from safe_transaction_service.tokens.constants import ENS_CONTRACTS_WITH_TLD
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.tests.factories import TokenFactory
+from safe_transaction_service.utils.redis import get_redis
 
 from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,

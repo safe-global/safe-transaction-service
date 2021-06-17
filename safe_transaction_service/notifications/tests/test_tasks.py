@@ -5,14 +5,16 @@ from django.test import TestCase
 from eth_account import Account
 from web3 import Web3
 
-from history.models import (EthereumTxCallType, InternalTx, InternalTxType,
-                            MultisigConfirmation, MultisigTransaction,
-                            WebHookType)
-from history.signals import build_webhook_payload
-from history.tests.factories import (InternalTxFactory,
-                                     MultisigConfirmationFactory,
-                                     MultisigTransactionFactory,
-                                     SafeContractFactory, SafeStatusFactory)
+from safe_transaction_service.history.models import (EthereumTxCallType,
+                                                     InternalTx,
+                                                     InternalTxType,
+                                                     MultisigConfirmation,
+                                                     MultisigTransaction,
+                                                     WebHookType)
+from safe_transaction_service.history.signals import build_webhook_payload
+from safe_transaction_service.history.tests.factories import (
+    InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory,
+    SafeContractFactory, SafeStatusFactory)
 
 from ..tasks import (DuplicateNotification, filter_notification,
                      send_notification_owner_task, send_notification_task)
@@ -140,7 +142,7 @@ class TestViews(TestCase):
         }
 
         with mock.patch(
-                'notifications.tasks.send_notification_owner_task.delay'
+                'safe_transaction_service.notifications.tasks.send_notification_owner_task.delay'
         ) as send_notification_owner_task_mock:
             send_notification_owner_task_mock.assert_not_called()
             send_notification_task.delay(safe_address, payload)

@@ -13,8 +13,10 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
-from contracts.tx_decoder import TxDecoderException, get_db_tx_decoder
-from tokens.serializers import TokenInfoResponseSerializer
+from safe_transaction_service.contracts.tx_decoder import (TxDecoderException,
+                                                           get_db_tx_decoder)
+from safe_transaction_service.tokens.serializers import \
+    TokenInfoResponseSerializer
 
 from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper

@@ -14,8 +14,8 @@ from redis import Redis
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
 
-from tokens.models import Token
-from utils.redis import get_redis
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.redis import get_redis
 
 from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
                       InternalTx, ModuleTransaction, MultisigTransaction,

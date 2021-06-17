@@ -9,9 +9,13 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
                                 UniswapV2Oracle)
 
-from history.tests.utils import just_test_if_mainnet_node
-from tokens.clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
-                            KrakenClient, KucoinClient)
+from safe_transaction_service.history.tests.utils import \
+    just_test_if_mainnet_node
+from safe_transaction_service.tokens.clients import (BinanceClient,
+                                                     CannotGetPrice,
+                                                     CoingeckoClient,
+                                                     KrakenClient,
+                                                     KucoinClient)
 
 from ..services.price_service import PriceService, PriceServiceProvider
 

@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 import gnosis.eth.django.models
 
-import history.models
+import safe_transaction_service.history.models
 
 
 class Migration(migrations.Migration):
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('address', gnosis.eth.django.models.EthereumAddressField(primary_key=True, serialize=False)),
                 ('initial_block_number', models.IntegerField(default=0)),
                 ('tx_block_number', models.IntegerField(db_index=True, default=None, null=True)),
-                ('version', models.CharField(max_length=20, validators=[history.models.validate_version])),
+                ('version', models.CharField(max_length=20, validators=[safe_transaction_service.history.models.validate_version])),
                 ('deployer', models.CharField(default='Gnosis', max_length=50)),
             ],
             options={
@@ -44,6 +44,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='safemastercopy',
             name='version',
-            field=models.CharField(max_length=20, validators=[history.models.validate_version]),
+            field=models.CharField(max_length=20, validators=[safe_transaction_service.history.models.validate_version]),
         ),
     ]

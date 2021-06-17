@@ -20,9 +20,9 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from tokens.models import Token
-from tokens.services.price_service import PriceService
-from tokens.tests.factories import TokenFactory
+from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.tokens.services.price_service import PriceService
+from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..exceptions import NodeConnectionException
 from ..helpers import DelegateSignatureHelper

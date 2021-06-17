@@ -4,7 +4,8 @@ from eth_account import Account
 
 from gnosis.eth import EthereumClient
 
-from history.tests.utils import just_test_if_mainnet_node
+from safe_transaction_service.history.tests.utils import \
+    just_test_if_mainnet_node
 
 from ...clients.zerion_client import (UniswapComponent, ZerionPoolMetadata,
                                       ZerionUniswapV2TokenAdapterClient)
