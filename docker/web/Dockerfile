@@ -1,7 +1,8 @@
 FROM python:3.9-slim
 
+ARG APP_HOME=/app
+WORKDIR ${APP_HOME}
 ENV PYTHONUNBUFFERED 1
-WORKDIR /app
 
 # Signal handling for PID1 https://github.com/krallin/tini
 ENV TINI_VERSION v0.19.0
