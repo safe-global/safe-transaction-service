@@ -11,7 +11,7 @@ from gnosis.eth.clients import EtherscanRateLimitError
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from safe_transaction_service.history.models import MultisigTransaction
-from safe_transaction_service.history.utils import close_gevent_db_connection
+from safe_transaction_service.utils.utils import close_gevent_db_connection
 
 from .models import Contract
 

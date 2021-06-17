@@ -10,7 +10,8 @@ from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
 
-from ...contracts.tests.factories import ContractFactory
+from safe_transaction_service.contracts.tests.factories import ContractFactory
+
 from ..models import (EthereumEvent, EthereumTxCallType, InternalTx,
                       InternalTxDecoded, MultisigConfirmation,
                       MultisigTransaction, SafeContractDelegate,

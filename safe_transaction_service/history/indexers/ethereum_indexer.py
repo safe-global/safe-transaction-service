@@ -10,9 +10,10 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient
 
+from safe_transaction_service.utils.utils import chunks
+
 from ..models import MonitoredAddress
 from ..services import IndexService, IndexServiceProvider
-from ..utils import chunks
 
 logger = getLogger(__name__)
 

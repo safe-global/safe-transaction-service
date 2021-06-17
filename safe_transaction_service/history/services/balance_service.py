@@ -15,16 +15,16 @@ from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
+from safe_transaction_service.tokens.clients import CannotGetPrice
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
     PriceService, PriceServiceProvider)
 from safe_transaction_service.tokens.tasks import (
     EthValueWithTimestamp, calculate_token_eth_price_task)
+from safe_transaction_service.utils.redis import get_redis
 
-from ...tokens.clients import CannotGetPrice
 from ..exceptions import NodeConnectionException
 from ..models import EthereumEvent
-from ..utils import get_redis
 
 logger = logging.getLogger(__name__)
 

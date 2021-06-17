@@ -15,6 +15,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
 
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.redis import get_redis
 
 from ..models import (EthereumEvent, EthereumTx, EthereumTxCallType,
                       InternalTx, ModuleTransaction, MultisigTransaction,
@@ -23,7 +24,6 @@ from ..serializers import (
     EthereumTxWithTransfersResponseSerializer,
     SafeModuleTransactionWithTransfersResponseSerializer,
     SafeMultisigTransactionWithTransfersResponseSerializer)
-from ..utils import get_redis
 
 logger = logging.getLogger(__name__)
 

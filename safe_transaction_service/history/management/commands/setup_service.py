@@ -56,7 +56,7 @@ TASKS = [
     CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.create_missing_contracts_with_metadata_task',
                             'Index contract names and ABIs', 1, IntervalSchedule.HOURS),
     CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata',
-                            'Reindex contracts with missing names or ABIs', 8, IntervalSchedule.HOURS),
+                            'Reindex contracts with missing names or ABIs', 7, IntervalSchedule.DAYS),
     CeleryTaskConfiguration('safe_transaction_service.tokens.tasks.fix_pool_tokens_task',
                             'Fix Pool Token Names', 1, IntervalSchedule.HOURS),
 ]
@@ -179,6 +179,10 @@ class Command(BaseCommand):
     help = 'Setup Transaction Service Required Tasks'
 
     def handle(self, *args, **options):
+        self.stdout.write(self.style.SUCCESS('Removing old tasks'))
+        PeriodicTask.objects.filter(name__startswith='safe_transaction_service').delete()
+        self.stdout.write(self.style.SUCCESS('Old tasks were removed'))
+
         for task in TASKS:
             _, created = task.create_task()
             if created:
