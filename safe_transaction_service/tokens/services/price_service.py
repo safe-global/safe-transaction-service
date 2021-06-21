@@ -79,6 +79,12 @@ class PriceService:
         else:
             return tuple()
 
+    def get_binance_usd_price(self) -> float:
+        try:
+            return self.binance_client.get_bnb_usd_price()
+        except CannotGetPrice:
+            return self.coingecko_client.get_bnb_usd_price()
+
     def get_ewt_usd_price(self) -> float:
         try:
             return self.kraken_client.get_ewt_usd_price()
@@ -116,6 +122,8 @@ class PriceService:
             return self.get_ewt_usd_price()
         elif self.ethereum_network in (EthereumNetwork.MATIC, EthereumNetwork.MUMBAI):
             return self.get_matic_usd_price()
+        elif self.ethereum_network == EthereumNetwork.BINANCE:
+            return self.get_binance_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()

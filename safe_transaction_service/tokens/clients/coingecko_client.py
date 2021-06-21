@@ -50,6 +50,9 @@ class CoingeckoClient:
                       f'api/v3/simple/token_price/ethereum?contract_addresses={token_address}&vs_currencies=usd')
         return self._get_price(url, token_address)
 
+    def get_bnb_usd_price(self) -> float:
+        return self.get_price('binancecoin')
+
     def get_matic_usd_price(self) -> float:
         return self.get_price('matic-network')
 

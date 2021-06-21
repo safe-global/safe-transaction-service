@@ -7,6 +7,19 @@ from ...clients import (BinanceClient, CoingeckoClient, KrakenClient,
 
 
 class TestClients(TestCase):
+    def test_get_bnb_usd_price(self) -> float:
+        just_test_if_mainnet_node()
+        binance_client = BinanceClient()
+        coingecko_client = CoingeckoClient()
+
+        price = binance_client.get_bnb_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
+        price = coingecko_client.get_bnb_usd_price()
+        self.assertIsInstance(price, float)
+        self.assertGreater(price, 0)
+
     def test_get_dai_usd_price_kraken(self) -> float:
         just_test_if_mainnet_node()
         kraken_client = KrakenClient()
