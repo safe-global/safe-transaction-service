@@ -46,7 +46,7 @@ TASKS = [
                             enabled=settings.ETH_L2_NETWORK),
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_new_proxies_task',
                             'Index new Proxies', 15, IntervalSchedule.SECONDS,
-                            enabled=False),
+                            enabled=settings.ETH_L2_NETWORK),
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.index_erc20_events_task',
                             'Index ERC20 Events', 14, IntervalSchedule.SECONDS),
     CeleryTaskConfiguration('safe_transaction_service.history.tasks.process_decoded_internal_txs_task',
