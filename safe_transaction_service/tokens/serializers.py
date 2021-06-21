@@ -31,3 +31,8 @@ class TokenInfoResponseSerializer(serializers.Serializer):
 
     def get_logo_uri(self, obj: Token) -> str:
         return obj.get_full_logo_uri()
+
+
+class TokenPriceResponseSerializer(serializers.Serializer):
+    fiat_code = serializers.CharField()
+    fiat_price = serializers.CharField()
