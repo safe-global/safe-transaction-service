@@ -19,7 +19,7 @@ class EventsIndexer(EthereumIndexer):
     Indexes Ethereum events
     """
 
-    IGNORE_ADDRESSES_ON_LOG_FILTER: Optional[bool] = None  # Don't use addresses to filter logs
+    IGNORE_ADDRESSES_ON_LOG_FILTER: bool = False  # If True, don't use addresses to filter logs
 
     def __init__(self, *args, **kwargs):
         kwargs['first_block_threshold'] = 0
@@ -83,6 +83,10 @@ class EventsIndexer(EthereumIndexer):
             return self.ethereum_client.slow_w3.eth.get_logs(parameters)
         except IOError as e:
             raise self.FindRelevantElementsException('Request error retrieving Safe L2 events') from e
+        except ValueError as e:
+            # For example, Polygon returns:
+            #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
+            raise self.FindRelevantElementsException('Value error retrieving Safe L2 events') from e
 
     @abstractmethod
     def _process_decoded_element(self, decoded_element: EventData) -> Any:

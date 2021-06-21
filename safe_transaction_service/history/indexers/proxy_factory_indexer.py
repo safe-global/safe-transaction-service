@@ -31,8 +31,6 @@ class ProxyFactoryIndexerProvider:
 
 
 class ProxyFactoryIndexer(EventsIndexer):
-    IGNORE_ADDRESSES_ON_LOG_FILTER = False
-
     @cached_property
     def contract_events(self) -> List[ContractEvent]:
         old_proxy_factory_contract = get_proxy_factory_V1_1_1_contract(self.ethereum_client.w3)
