@@ -6,7 +6,6 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
-from requests import RequestException
 from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient
@@ -48,12 +47,12 @@ class Erc20EventsIndexer(EthereumIndexer):
         self._cache_is_erc20 = {}
 
     @property
-    def database_model(self):
-        return SafeContract
-
-    @property
     def database_field(self):
         return 'erc20_block_number'
+
+    @property
+    def database_model(self):
+        return SafeContract
 
     def find_relevant_elements(self, addresses: List[str], from_block_number: int,
                                to_block_number: int,
@@ -100,8 +99,12 @@ class Erc20EventsIndexer(EthereumIndexer):
             return self.ethereum_client.erc20.get_total_transfer_history(addresses,
                                                                          from_block=from_block_number,
                                                                          to_block=to_block_number)
-        except RequestException as e:
+        except IOError as e:
             raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
+        except ValueError as e:
+            # For example, BSC returns:
+            #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
+            raise self.FindRelevantElementsException('Value error retrieving erc20 events') from e
 
     def _find_elements_without_transfer_topics(self, addresses: Sequence[str], from_block_number: int,
                                                to_block_number: int) -> List[Dict[str, Any]]:
@@ -116,8 +119,12 @@ class Erc20EventsIndexer(EthereumIndexer):
         try:
             erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(from_block=from_block_number,
                                                                                           to_block=to_block_number)
-        except RequestException as e:
+        except IOError as e:
             raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
+        except ValueError as e:
+            # For example, BSC returns:
+            #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
+            raise self.FindRelevantElementsException('Value error retrieving erc20 events') from e
 
         filtered_events = []
         addresses_set = set(addresses)  # Linear time `in` filtering
