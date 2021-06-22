@@ -20,18 +20,17 @@ from ..services import CollectiblesService
 from ..services.collectibles_service import (Collectible,
                                              CollectiblesServiceProvider,
                                              CollectibleWithMetadata,
-                                             Erc721InfoWithLogo)
+                                             Erc721InfoWithLogo, ipfs_to_http)
 from .factories import EthereumEventFactory
 from .utils import just_test_if_mainnet_node
 
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
     def test_ipfs_to_http(self):
-        collectibles_service = CollectiblesServiceProvider()
         regular_url = 'http://testing-url/path/?arguments'
-        self.assertEqual(collectibles_service.ipfs_to_http(regular_url), regular_url)
+        self.assertEqual(ipfs_to_http(regular_url), regular_url)
         ipfs_url = 'ipfs://testing-url/path/?arguments'
-        result = collectibles_service.ipfs_to_http(ipfs_url)
+        result = ipfs_to_http(ipfs_url)
         self.assertTrue(result.startswith('http'))
         self.assertIn('testing-url/path/?arguments', result)
 

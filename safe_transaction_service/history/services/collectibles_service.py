@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin
 
+from django.conf import settings
 from django.db.models import Q
 
 import requests
@@ -33,6 +34,13 @@ class CollectiblesServiceException(Exception):
 
 class MetadataRetrievalException(CollectiblesServiceException):
     pass
+
+
+def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
+    if uri and uri.startswith('ipfs://'):
+        return urljoin(settings.IPFS_GATEWAY, uri.replace('ipfs://', '', 1))  # Use ipfs gateway
+    else:
+        return uri
 
 
 @dataclass
@@ -96,7 +104,7 @@ class CollectibleWithMetadata(Collectible):
     def __post_init__(self):
         self.name = self.get_name()
         self.description = self.get_description()
-        self.image_uri = self.get_metadata_image()
+        self.image_uri = ipfs_to_http(self.get_metadata_image())
 
 
 class CollectiblesServiceProvider:
@@ -114,7 +122,6 @@ class CollectiblesServiceProvider:
 
 class CollectiblesService:
     ENS_IMAGE_URL = 'https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png'
-    IPFS_GATEWAY = 'https://cloudflare-ipfs.com/'
     METDATA_MAX_CONTENT_LENGTH = int(0.2 * 1024 * 1024)  # 0.2Mb is the maximum metadata size allowed
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
@@ -129,12 +136,6 @@ class CollectiblesService:
                                                                             ttl=60 * 30)  # 2 hours of caching
         self.cache_token_uri: Dict[Tuple[str, int], str] = {}
 
-    def ipfs_to_http(self, uri: Optional[str]) -> Optional[str]:
-        if uri and uri.startswith('ipfs://'):
-            return urljoin(self.IPFS_GATEWAY, uri.replace('ipfs://', '', 1))  # Use ipfs gateway
-        else:
-            return uri
-
     @cachedmethod(cache=operator.attrgetter('cache_uri_metadata'))
     @cache_memoize(60 * 60 * 24,
                    prefix='collectibles-_retrieve_metadata_from_uri',
@@ -146,7 +147,7 @@ class CollectiblesService:
         :param uri: Uri starting with the protocol, like http://example.org/token/3
         :return: Metadata as a decoded json
         """
-        uri = self.ipfs_to_http(uri)
+        uri = ipfs_to_http(uri)
 
         if not uri or not uri.startswith('http'):
             raise MetadataRetrievalException(uri)
@@ -283,7 +284,7 @@ class CollectiblesService:
                 collectibles_with_metadata[collectible.address, collectible.id] = CollectibleWithMetadata(
                     collectible.token_name,
                     collectible.token_symbol,
-                    self.ipfs_to_http(collectible.logo_uri),
+                    collectible.logo_uri,
                     collectible.address,
                     collectible.id,
                     collectible.uri,
