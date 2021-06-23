@@ -4,7 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-      day: sunday
+      day: monday
     reviewers:
       - "uxio0"
 
@@ -12,7 +12,7 @@ updates:
     directory: "/docker/web"
     schedule:
       interval: weekly
-      day: sunday
+      day: monday
     reviewers:
       - "uxio0"
 
@@ -20,6 +20,6 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-      day: sunday
+      day: monday
     reviewers:
       - "uxio0"
