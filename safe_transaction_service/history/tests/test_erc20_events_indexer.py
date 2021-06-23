@@ -1,10 +1,11 @@
 import copy
+from unittest import mock
 
 from django.test import TestCase
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..indexers import Erc20EventsIndexerProvider
+from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
 from ..models import EthereumEvent, EthereumTx
 from .factories import SafeContractFactory
 
@@ -48,3 +49,15 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         event['args']['unknown'] = original_event['args']['value']
 
         self.assertEqual(erc20_events_indexer._process_decoded_element(event), original_event)
+
+        # Test ERC721
+        event = self.ethereum_client.erc20.get_total_transfer_history(from_block=block_number, to_block=block_number)[0]
+        with mock.patch.object(Erc20EventsIndexer, '_is_erc20', autospec=True, return_value=False):
+            # Convert event to erc721
+            event['args']['tokenId'] = event['args']['value']
+            del event['args']['value']
+            original_event = copy.deepcopy(event)
+            del event['args']['tokenId']
+            event['args']['unknown'] = original_event['args']['tokenId']
+
+            self.assertEqual(erc20_events_indexer._process_decoded_element(event), original_event)

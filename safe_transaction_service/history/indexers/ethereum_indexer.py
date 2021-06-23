@@ -28,13 +28,16 @@ class EthereumIndexer(ABC):
     `process_element`
     """
     def __init__(self, ethereum_client: EthereumClient, confirmations: int = 1,
-                 block_process_limit: int = 1000, updated_blocks_behind: int = 20,
+                 block_process_limit: int = 1000,
+                 block_process_limit_max: int = 0,
+                 updated_blocks_behind: int = 20,
                  query_chunk_size: int = 100, first_block_threshold: int = 150000,
                  block_auto_process_limit: bool = True):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
+        :param block_process_limit: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
         :param updated_blocks_behind: Number of blocks scanned for an address that can be behind and
         still be considered as almost updated. For example, if `updated_blocks_behind` is 100,
         `current block number` is 200, and last scan for an address was stopped on block 150, address
@@ -52,6 +55,7 @@ class EthereumIndexer(ABC):
         self.confirmations = confirmations
         self.initial_block_process_limit = block_process_limit
         self.block_process_limit = block_process_limit
+        self.block_process_limit_max = block_process_limit_max
         self.updated_blocks_behind = updated_blocks_behind
         self.query_chunk_size = query_chunk_size
         self.first_block_threshold = first_block_threshold
@@ -223,6 +227,11 @@ class EthereumIndexer(ABC):
                 self.block_process_limit += 5000
                 logger.info('%s: block_process_limit increased to %d', self.__class__.__name__,
                             self.block_process_limit)
+
+        if self.block_process_limit_max and self.block_process_limit > self.block_process_limit_max:
+            self.block_process_limit = self.block_process_limit_max
+            logger.info('%s: block_process_limit %d is bigger than block_process_limit_max %d, reducing',
+                        self.__class__.__name__, self.block_process_limit, self.block_process_limit_max)
 
         processed_elements = self.process_elements(elements)
 

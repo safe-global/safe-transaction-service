@@ -3,6 +3,8 @@ from functools import cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Optional, OrderedDict, Sequence
 
+import django.conf
+
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -22,7 +24,10 @@ class EventsIndexer(EthereumIndexer):
     IGNORE_ADDRESSES_ON_LOG_FILTER: bool = False  # If True, don't use addresses to filter logs
 
     def __init__(self, *args, **kwargs):
-        kwargs['first_block_threshold'] = 0
+        kwargs.setdefault('block_process_limit', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT)
+        kwargs.setdefault('block_process_limit_max', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX)
+        kwargs.setdefault('first_block_threshold', 0)
+        kwargs.setdefault('query_chunk_size', 500)   # For last 500 blocks, process `query_chunk_size` Safes together
         super().__init__(*args, **kwargs)
 
     @property
@@ -49,14 +54,14 @@ class EventsIndexer(EthereumIndexer):
         :param current_block_number: Current block number (for cache purposes)
         :return: LogReceipt for matching events
         """
-        logger.debug('Filtering for Safe events from block-number=%d to block-number=%d', from_block_number,
-                     to_block_number)
+        logger.debug('%s: Filtering for events from block-number=%d to block-number=%d',
+                     self.__class__.__name__, from_block_number, to_block_number)
         log_receipts = self._find_elements_using_topics(addresses, from_block_number, to_block_number)
 
         len_events = len(log_receipts)
         logger_fn = logger.info if len_events else logger.debug
-        logger_fn('Found %d Safe events between block-number=%d and block-number=%d',
-                  len_events, from_block_number, to_block_number)
+        logger_fn('%s: Found %d events between block-number=%d and block-number=%d',
+                  self.__class__.__name__, len_events, from_block_number, to_block_number)
         return log_receipts
 
     def _find_elements_using_topics(self,
@@ -86,6 +91,7 @@ class EventsIndexer(EthereumIndexer):
         except ValueError as e:
             # For example, Polygon returns:
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
+            logger.warning('Value error retrieving erc20 events', exc_info=True)
             raise self.FindRelevantElementsException('Value error retrieving Safe L2 events') from e
 
     @abstractmethod
