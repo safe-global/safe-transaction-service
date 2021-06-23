@@ -38,7 +38,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertTrue(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertTrue(EthereumEvent.objects.erc20_tokens_used_by_address(safe_contract.address))
 
-        # Test _transform_transfer_event
+        # Test _process_decoded_element
         block_number = self.ethereum_client.get_transaction(tx_hash)['blockNumber']
         event = self.ethereum_client.erc20.get_total_transfer_history(from_block=block_number, to_block=block_number)[0]
         self.assertIn('value', event['args'])
@@ -47,4 +47,4 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         del event['args']['value']
         event['args']['unknown'] = original_event['args']['value']
 
-        self.assertEqual(erc20_events_indexer._transform_transfer_event(event), original_event)
+        self.assertEqual(erc20_events_indexer._process_decoded_element(event), original_event)

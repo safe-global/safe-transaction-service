@@ -7,6 +7,7 @@ from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
 from web3.exceptions import BadFunctionCallOutput
+from web3.types import EventData
 
 from gnosis.eth import EthereumClient
 
@@ -67,13 +68,6 @@ class Erc20EventsIndexer(EthereumIndexer):
         """
         addresses_len = len(addresses)
 
-        # Disable find elements without transfer topics. It's too much for the nodes
-        # if (current_block_number - self.updated_blocks_behind) < from_block_number:
-        #    logger.info('Searching for all erc20/721 events from block-number=%d to block-number=%d - '
-        #                'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
-        #    erc20_transfer_events = self._find_elements_without_transfer_topics(addresses, from_block_number,
-        #                                                                        to_block_number)
-        # else:
         logger.debug('Filtering for erc20/721 events from block-number=%d to block-number=%d - '
                      'Number of Safes=%d', from_block_number, to_block_number, addresses_len)
         erc20_transfer_events = self._find_elements_using_transfer_topics(addresses, from_block_number, to_block_number)
@@ -96,9 +90,10 @@ class Erc20EventsIndexer(EthereumIndexer):
         :return: List of events
         """
         try:
-            return self.ethereum_client.erc20.get_total_transfer_history(addresses,
-                                                                         from_block=from_block_number,
-                                                                         to_block=to_block_number)
+            return [self._process_decoded_element(transfer_event) for transfer_event in
+                    self.ethereum_client.erc20.get_total_transfer_history(addresses,
+                                                                          from_block=from_block_number,
+                                                                          to_block=to_block_number)]
         except IOError as e:
             raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
         except ValueError as e:
@@ -106,35 +101,7 @@ class Erc20EventsIndexer(EthereumIndexer):
             #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
             raise self.FindRelevantElementsException('Value error retrieving erc20 events') from e
 
-    def _find_elements_without_transfer_topics(self, addresses: Sequence[str], from_block_number: int,
-                                               to_block_number: int) -> List[Dict[str, Any]]:
-        """
-        It will get all ERC20/721 events for EVERY ethereum address to be filtered afterwards, due to some Transfer
-        events not having `from` or `to` as topics, so they cannot be queried.
-        :param addresses:
-        :param from_block_number:
-        :param to_block_number:
-        :return: List of events
-        """
-        try:
-            erc20_transfer_events = self.ethereum_client.erc20.get_total_transfer_history(from_block=from_block_number,
-                                                                                          to_block=to_block_number)
-        except IOError as e:
-            raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
-        except ValueError as e:
-            # For example, BSC returns:
-            #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
-            raise self.FindRelevantElementsException('Value error retrieving erc20 events') from e
-
-        filtered_events = []
-        addresses_set = set(addresses)  # Linear time `in` filtering
-        for event in erc20_transfer_events:
-            event_args = event.get('args')
-            if event_args and (event_args.get('from') in addresses_set or event_args.get('to') in addresses_set):
-                filtered_events.append(self._transform_transfer_event(event))
-        return filtered_events
-
-    def _transform_transfer_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_decoded_element(self, event: EventData) -> EventData:
         """
         :param event: Be careful, it will be modified instead of copied
         :return: The same event if it's a ERC20/ERC721. Tries to tell apart if it's not defined (`unknown` instead
