@@ -1,4 +1,5 @@
 import operator
+from enum import Enum
 from functools import cached_property
 from typing import Tuple
 
@@ -22,6 +23,11 @@ from ..clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
                        KrakenClient, KucoinClient)
 
 logger = get_task_logger(__name__)
+
+
+class FiatCode(Enum):
+    USD = 1
+    EUR = 2
 
 
 class PriceServiceProvider:

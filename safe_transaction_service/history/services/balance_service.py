@@ -18,7 +18,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from safe_transaction_service.tokens.clients import CannotGetPrice
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
-    PriceService, PriceServiceProvider)
+    FiatCode, PriceService, PriceServiceProvider)
 from safe_transaction_service.tokens.tasks import (
     EthValueWithTimestamp, calculate_token_eth_price_task)
 from safe_transaction_service.utils.redis import get_redis
@@ -63,7 +63,7 @@ class BalanceWithFiat(Balance):
     timestamp: datetime  # Calculated timestamp
     fiat_balance: float
     fiat_conversion: float
-    fiat_code: str = 'USD'
+    fiat_code: str = FiatCode.USD.name
 
 
 class BalanceServiceProvider:
@@ -223,7 +223,7 @@ class BalanceService:
                     token_eth_value_with_timestamp.timestamp,
                     round(fiat_balance, 4),
                     round(fiat_conversion, 4),
-                    'USD'
+                    FiatCode.USD.name,
                 )
             )
 

@@ -14,6 +14,7 @@ from gnosis.eth.ethereum_client import (Erc20Info, Erc20Manager,
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import Token
+from ..services import PriceService
 from .factories import TokenFactory
 
 logger = logging.getLogger(__name__)
@@ -86,3 +87,24 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                                                      'name': token.name,
                                                      'symbol': token.symbol,
                                                      'decimals': token.decimals}])
+
+    def test_token_price_view(self):
+        invalid_address = '0x1234'
+        response = self.client.get(reverse('v1:tokens:price', args=(invalid_address,)))
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        random_address = Account.create().address
+        response = self.client.get(reverse('v1:tokens:price', args=(random_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data, {'detail': ErrorDetail(string='Not found.', code='not_found')})
+
+        token = TokenFactory(address=random_address, decimals=18)  # ERC20
+        response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {'fiat_code': 'USD', 'fiat_price': '0.0'})
+
+        fiat_price = 48.1516
+        with mock.patch.object(PriceService, 'get_token_usd_price', autospec=True, return_value=fiat_price):
+            response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data, {'fiat_code': 'USD', 'fiat_price': str(fiat_price)})
