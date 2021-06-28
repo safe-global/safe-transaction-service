@@ -293,13 +293,16 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'safe_transaction_service.history.indexers.internal_tx_indexer': {
-            'level': 'INFO',
-        },
         'safe_transaction_service.history.indexers.erc20_events_indexer': {
             'level': 'INFO',
         },
+        'safe_transaction_service.history.indexers.internal_tx_indexer': {
+            'level': 'INFO',
+        },
         'safe_transaction_service.history.indexers.tx_processor': {
+            'level': 'INFO',
+        },
+        'safe_transaction_service.history.indexers.safe_events_indexer': {
             'level': 'INFO',
         },
         'safe_transaction_service.history.services.balance_service': {

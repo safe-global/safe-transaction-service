@@ -5,3 +5,4 @@ from .ethereum_indexer import EthereumIndexer
 from .internal_tx_indexer import InternalTxIndexer, InternalTxIndexerProvider
 from .proxy_factory_indexer import (ProxyFactoryIndexer,
                                     ProxyFactoryIndexerProvider)
+from .safe_events_indexer import SafeEventsIndexer, SafeEventsIndexerProvider

@@ -22,17 +22,17 @@ logger = get_task_logger(__name__)
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
-def index_new_proxies_task(self) -> Optional[int]:
+def index_erc20_events_task(self) -> Optional[int]:
     """
-    :return: Number of proxies created
+    Find and process internal txs for monitored addresses
+    :return: Number of addresses processed
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
-            logger.info('Start indexing of new proxies')
-            number_proxies = ProxyFactoryIndexerProvider().start()
-            if number_proxies:
-                logger.info('Indexed new %d proxies', number_proxies)
-                return number_proxies
+            logger.info('Start indexing of erc20/721 events')
+            number_events = Erc20EventsIndexerProvider().start()
+            logger.info('Indexing of erc20/721 events task processed %d events', number_events)
+            return number_events
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
@@ -56,6 +56,21 @@ def index_internal_txs_task(self) -> Optional[int]:
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
+def index_new_proxies_task(self) -> Optional[int]:
+    """
+    :return: Number of proxies created
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            logger.info('Start indexing of new proxies')
+            number_proxies = ProxyFactoryIndexerProvider().start()
+            if number_proxies:
+                logger.info('Indexed new %d proxies', number_proxies)
+                return number_proxies
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_safe_events_task(self) -> Optional[int]:
     """
     Find and process for monitored addresses
@@ -64,28 +79,13 @@ def index_safe_events_task(self) -> Optional[int]:
 
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
-            logger.info('Start indexing of safe events')
+            logger.info('Start indexing of Safe events')
             number = SafeEventsIndexerProvider().start()
-            logger.info('Find safe events processed %d events', number)
+            logger.info('Find Safe events processed %d events', number)
             if number:
                 logger.info('Calling task to process decoded traces')
                 process_decoded_internal_txs_task.delay()
             return number
-
-
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
-                 default_retry_delay=15, retry_kwargs={'max_retries': 3})
-def index_erc20_events_task(self) -> Optional[int]:
-    """
-    Find and process internal txs for monitored addresses
-    :return: Number of addresses processed
-    """
-    with contextlib.suppress(LockError):
-        with only_one_running_task(self):
-            logger.info('Start indexing of erc20/721 events')
-            number_events = Erc20EventsIndexerProvider().start()
-            logger.info('Indexing of erc20/721 events task processed %d events', number_events)
-            return number_events
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
