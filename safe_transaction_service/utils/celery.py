@@ -8,7 +8,7 @@ from celery.utils.log import ColorFormatter
 class IgnoreSucceededNone(logging.Filter):
     """
     Ignore the messages of the style (usually emitted when redis lock is active)
-    `Task history.tasks.index_internal_txs_task[89ad3c46-aeb3-48a1-bd6f-2f3684323ca8]
+    `Task safe_transaction_service.history.tasks.index_internal_txs_task[89ad3c46-aeb3-48a1-bd6f-2f3684323ca8]
     succeeded in 1.0970600529108196s: None`
     """
     def filter(self, rec: logging.LogRecord):
