@@ -134,7 +134,7 @@ def build_webhook_payload(sender: Type[Model],
 
     # Add chainId to every payload
     for payload in payloads:
-        payload['chainId'] = get_ethereum_network().value
+        payload['chainId'] = str(get_ethereum_network().value)
 
     return payloads
 
