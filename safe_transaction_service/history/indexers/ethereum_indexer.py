@@ -14,8 +14,13 @@ from safe_transaction_service.utils.utils import chunks
 
 from ..models import MonitoredAddress
 from ..services import IndexService, IndexServiceProvider
+from ..services.index_service import IndexingException
 
 logger = getLogger(__name__)
+
+
+class FindRelevantElementsException(IndexingException):
+    pass
 
 
 class EthereumIndexer(ABC):
@@ -60,9 +65,6 @@ class EthereumIndexer(ABC):
         self.query_chunk_size = query_chunk_size
         self.first_block_threshold = first_block_threshold
         self.block_auto_process_limit = block_auto_process_limit
-
-    class FindRelevantElementsException(Exception):
-        pass
 
     @property
     @abstractmethod
@@ -202,7 +204,7 @@ class EthereumIndexer(ABC):
         try:
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
                                                    current_block_number=current_block_number)
-        except (self.FindRelevantElementsException, SoftTimeLimitExceeded) as e:
+        except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
             self.block_process_limit = min(self.initial_block_process_limit, 10)  # Set back to less than default
             logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e

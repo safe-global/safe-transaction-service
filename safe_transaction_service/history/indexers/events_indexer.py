@@ -11,7 +11,7 @@ from hexbytes import HexBytes
 from web3.contract import ContractEvent
 from web3.types import EventData, FilterParams, LogReceipt
 
-from .ethereum_indexer import EthereumIndexer
+from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
 
@@ -87,12 +87,12 @@ class EventsIndexer(EthereumIndexer):
         try:
             return self.ethereum_client.slow_w3.eth.get_logs(parameters)
         except IOError as e:
-            raise self.FindRelevantElementsException('Request error retrieving Safe L2 events') from e
+            raise FindRelevantElementsException('Request error retrieving Safe L2 events') from e
         except ValueError as e:
             # For example, Polygon returns:
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
             logger.warning('Value error retrieving erc20 events', exc_info=True)
-            raise self.FindRelevantElementsException('Value error retrieving Safe L2 events') from e
+            raise FindRelevantElementsException('Value error retrieving Safe L2 events') from e
 
     @abstractmethod
     def _process_decoded_element(self, decoded_element: EventData) -> Any:

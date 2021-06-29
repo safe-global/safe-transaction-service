@@ -14,19 +14,23 @@ from ..models import (EthereumBlock, EthereumTx, InternalTxDecoded,
 logger = logging.getLogger(__name__)
 
 
-class TransactionNotFoundException(Exception):
+class IndexingException(Exception):
     pass
 
 
-class TransactionWithoutBlockException(Exception):
+class TransactionNotFoundException(IndexingException):
     pass
 
 
-class BlockNotFoundException(Exception):
+class TransactionWithoutBlockException(IndexingException):
     pass
 
 
-class EthereumBlockHashMismatch(Exception):
+class BlockNotFoundException(IndexingException):
+    pass
+
+
+class EthereumBlockHashMismatch(IndexingException):
     pass
 
 

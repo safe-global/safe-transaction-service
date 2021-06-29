@@ -13,6 +13,7 @@ from web3.types import EventData
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumEvent, SafeContract
+from .ethereum_indexer import FindRelevantElementsException
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -67,12 +68,12 @@ class Erc20EventsIndexer(EventsIndexer):
                                                                          from_block=from_block_number,
                                                                          to_block=to_block_number)
         except IOError as e:
-            raise self.FindRelevantElementsException('Request error retrieving erc20 events') from e
+            raise FindRelevantElementsException('Request error retrieving erc20 events') from e
         except ValueError as e:
             # For example, BSC returns:
             #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
             logger.warning('Value error retrieving erc20 events', exc_info=True)
-            raise self.FindRelevantElementsException('Value error retrieving erc20 events') from e
+            raise FindRelevantElementsException('Value error retrieving erc20 events') from e
 
     @cachedmethod(cache=operator.attrgetter('_cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day

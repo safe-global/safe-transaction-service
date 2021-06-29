@@ -13,7 +13,7 @@ from safe_transaction_service.contracts.tx_decoder import (CannotDecode,
 
 from ..models import (InternalTx, InternalTxDecoded, MonitoredAddress,
                       SafeMasterCopy)
-from .ethereum_indexer import EthereumIndexer
+from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
 
@@ -92,7 +92,7 @@ class InternalTxIndexer(EthereumIndexer):
                                   or trace.get('action', {}).get('to') in addresses_set])
             return OrderedDict.fromkeys(tx_hashes).keys()
         except RequestException as e:
-            raise self.FindRelevantElementsException('Request error calling `trace_block`') from e
+            raise FindRelevantElementsException('Request error calling `trace_block`') from e
 
     def _find_relevant_elements_using_trace_filter(self, addresses: Sequence[str], from_block_number: int,
                                                    to_block_number: int) -> Set[str]:
@@ -115,7 +115,7 @@ class InternalTxIndexer(EthereumIndexer):
                                                                    to_block=to_block_number,
                                                                    from_address=addresses)
         except RequestException as e:
-            raise self.FindRelevantElementsException('Request error calling `trace_filter`') from e
+            raise FindRelevantElementsException('Request error calling `trace_filter`') from e
 
         # Log INFO if traces found, DEBUG if not
         tx_hashes = OrderedDict.fromkeys([trace['transactionHash']

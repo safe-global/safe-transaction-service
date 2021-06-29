@@ -14,4 +14,3 @@ class TestTasks(TestCase):
             with self.assertRaises(LockError):
                 with only_one_running_task(celery_task):
                     pass
-
