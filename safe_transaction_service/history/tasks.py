@@ -15,12 +15,13 @@ from .indexers import (Erc20EventsIndexerProvider, InternalTxIndexerProvider,
 from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import InternalTxDecoded, SafeStatus, WebHook, WebHookType
-from .services import IndexServiceProvider, ReorgService, ReorgServiceProvider
+from .services import (IndexingException, IndexServiceProvider, ReorgService,
+                       ReorgServiceProvider)
 
 logger = get_task_logger(__name__)
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_erc20_events_task(self) -> Optional[int]:
     """
@@ -35,7 +36,7 @@ def index_erc20_events_task(self) -> Optional[int]:
             return number_events
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_internal_txs_task(self) -> Optional[int]:
     """
@@ -54,7 +55,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             return number_traces
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_new_proxies_task(self) -> Optional[int]:
     """
@@ -69,7 +70,7 @@ def index_new_proxies_task(self) -> Optional[int]:
                 return number_proxies
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IOError,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_safe_events_task(self) -> Optional[int]:
     """
@@ -165,7 +166,7 @@ def check_reorgs_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(autoretry_for=(IOError,), default_retry_delay=30, retry_kwargs={'max_retries': 3})
+@app.shared_task(autoretry_for=(IOError,), default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
         return 0
