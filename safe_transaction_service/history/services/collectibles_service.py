@@ -154,21 +154,21 @@ class CollectiblesService:
 
         try:
             logger.debug('Getting metadata for uri=%s', uri)
-            response = requests.get(uri, timeout=5, stream=True)
-            if not response.ok:
-                logger.debug('Cannot get metadata for uri=%s', uri)
-                raise MetadataRetrievalException(uri)
+            with requests.get(uri, timeout=5, stream=True) as response:
+                if not response.ok:
+                    logger.debug('Cannot get metadata for uri=%s', uri)
+                    raise MetadataRetrievalException(uri)
 
-            content_length = response.headers.get('content-length', 0)
-            content_type = response.headers.get('content-type', '')
-            if int(content_length) > self.METDATA_MAX_CONTENT_LENGTH:
-                raise MetadataRetrievalException(f'Content-length={content_length} for uri={uri} is too big')
-            elif 'application/json' not in content_type:
-                raise MetadataRetrievalException(f'Content-type={content_type} for uri={uri} is not valid, expected '
-                                                 f'"application/json"')
-            else:
-                logger.debug('Got metadata for uri=%s', uri)
-                return response.json()
+                content_length = response.headers.get('content-length', 0)
+                content_type = response.headers.get('content-type', '')
+                if int(content_length) > self.METDATA_MAX_CONTENT_LENGTH:
+                    raise MetadataRetrievalException(f'Content-length={content_length} for uri={uri} is too big')
+                elif 'application/json' not in content_type:
+                    raise MetadataRetrievalException(f'Content-type={content_type} for uri={uri} is not valid, '
+                                                     f'expected "application/json"')
+                else:
+                    logger.debug('Got metadata for uri=%s', uri)
+                    return response.json()
         except (IOError, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
 

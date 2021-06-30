@@ -34,15 +34,15 @@ class CoinMarketCapClient:
     def download_file(self, url: str, taget_folder: str, local_filename: str) -> str:
         if not os.path.exists(taget_folder):
             os.makedirs(taget_folder)
-        r = self.http_session.get(url, stream=True)
-        if not r.ok:
-            logger.warning("Image not found for url %s", url)
-            return
-        with open(os.path.join(taget_folder, local_filename), 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-        return local_filename
+        with self.http_session.get(url, stream=True) as response:
+            if not response.ok:
+                logger.warning("Image not found for url %s", url)
+                return
+            with open(os.path.join(taget_folder, local_filename), 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+            return local_filename
 
     def get_map(self) -> List[Dict[str, Any]]:
         """
