@@ -6,14 +6,14 @@ from typing import List, Sequence
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
+from eth_typing import ChecksumAddress
 from web3.contract import ContractEvent
 from web3.exceptions import BadFunctionCallOutput
-from web3.types import EventData
+from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient
 
 from ..models import EthereumEvent, SafeContract
-from .ethereum_indexer import FindRelevantElementsException
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -53,28 +53,20 @@ class Erc20EventsIndexer(EventsIndexer):
     def database_model(self):
         return SafeContract
 
-    def _find_elements_using_topics(self, addresses: Sequence[str], from_block_number: int,
-                                    to_block_number: int):
+    def _do_node_query(self, addresses: List[ChecksumAddress],
+                       from_block_number: int, to_block_number: int) -> List[LogReceipt]:
         """
-        It will get ERC20/721 using topics for filtering. Some transactions without topics will be missed, but
-        that's the only way to sync the events in a reasonable amount of time.
+        Override function to call custom `get_total_transfer_history` function
         :param addresses:
         :param from_block_number:
         :param to_block_number:
-        :return: List of events
+        :return:
         """
-        try:
-            return self.ethereum_client.erc20.get_total_transfer_history(addresses,
-                                                                         from_block=from_block_number,
-                                                                         to_block=to_block_number)
-        except IOError as e:
-            raise FindRelevantElementsException(f'Request error retrieving erc20 events '
-                                                f'from-block={from_block_number} to-block={to_block_number}') from e
-        except ValueError as e:
-            logger.warning('Value error retrieving erc20 events from-block=%d to-block=%d : %s',
-                           from_block_number, to_block_number, e)
-            raise FindRelevantElementsException(f'Request error retrieving erc20 events '
-                                                f'from-block={from_block_number} to-block={to_block_number}') from e
+        if self.IGNORE_ADDRESSES_ON_LOG_FILTER:
+            addresses = None
+        return self.ethereum_client.erc20.get_total_transfer_history(addresses,
+                                                                     from_block=from_block_number,
+                                                                     to_block=to_block_number)
 
     @cachedmethod(cache=operator.attrgetter('_cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day

@@ -65,15 +65,14 @@ class EventsIndexer(EthereumIndexer):
                   self.__class__.__name__, len_events, from_block_number, to_block_number)
         return log_receipts
 
-    def _find_elements_using_topics(self,
-                                    addresses: List[ChecksumAddress],
-                                    from_block_number: int, to_block_number: int) -> List[LogReceipt]:
+    def _do_node_query(self, addresses: List[ChecksumAddress],
+                       from_block_number: int, to_block_number: int) -> List[LogReceipt]:
         """
-        It will get Safe events using all the Gnosis Safe topics for filtering.
+        Do the
         :param addresses:
         :param from_block_number:
         :param to_block_number:
-        :return: LogReceipt for matching events
+        :return:
         """
         filter_topics = list(self.events_to_listen.keys())
         parameters: FilterParams = {
@@ -85,8 +84,21 @@ class EventsIndexer(EthereumIndexer):
         if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
             parameters['address'] = addresses
 
+        return self.ethereum_client.slow_w3.eth.get_logs(parameters)
+
+    def _find_elements_using_topics(self,
+                                    addresses: List[ChecksumAddress],
+                                    from_block_number: int, to_block_number: int) -> List[LogReceipt]:
+        """
+        It will get Safe events using all the Gnosis Safe topics for filtering.
+        :param addresses:
+        :param from_block_number:
+        :param to_block_number:
+        :return: LogReceipt for matching events
+        """
+
         try:
-            return self.ethereum_client.slow_w3.eth.get_logs(parameters)
+            return self._do_node_query(addresses, from_block_number, to_block_number)
         except IOError as e:
             raise FindRelevantElementsException(f'Request error retrieving events '
                                                 f'from-block={from_block_number} to-block={to_block_number}') from e
@@ -95,8 +107,8 @@ class EventsIndexer(EthereumIndexer):
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
             # BSC returns:
             #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
-            logger.warning('Value error retrieving events from-block=%d to-block=%d : %s',
-                           from_block_number, to_block_number, e)
+            logger.warning('%s: Value error retrieving events from-block=%d to-block=%d : %s',
+                           self.__class__.__name__, from_block_number, to_block_number, e)
             raise FindRelevantElementsException(f'Request error retrieving events '
                                                 f'from-block={from_block_number} to-block={to_block_number}') from e
 
