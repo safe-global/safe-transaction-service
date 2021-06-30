@@ -31,25 +31,27 @@ class EthereumIndexer(ABC):
     So the flow would be `start()` -> `process_addresses` -> `find_revelant_elements` -> `process_elements` ->
     `process_element`
     """
-    def __init__(self, ethereum_client: EthereumClient, confirmations: int = 1,
-                 block_process_limit: int = 1000,
+    def __init__(self, ethereum_client: EthereumClient,
+                 confirmations: int = 1,
+                 block_process_limit: int = 2000,
                  block_process_limit_max: int = 0,
+                 blocks_to_reindex_again: int = 0,
                  updated_blocks_behind: int = 20,
-                 query_chunk_size: int = 100, first_block_threshold: int = 150000,
+                 query_chunk_size: int = 200,
                  block_auto_process_limit: bool = True):
         """
         :param ethereum_client:
         :param confirmations: Threshold of blocks to scan to prevent reorgs
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
         :param block_process_limit: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
+        :param blocks_to_reindex_again: Number of blocks to reindex every time the indexer runs, in case something
+        was missed.
         :param updated_blocks_behind: Number of blocks scanned for an address that can be behind and
         still be considered as almost updated. For example, if `updated_blocks_behind` is 100,
         `current block number` is 200, and last scan for an address was stopped on block 150, address
         is almost updated (200 - 100 < 150)
         :param query_chunk_size: Number of addresses to query for relevant data in the same request. By testing,
         it seems that `200` can be a good value
-        :param first_block_threshold: First block to start scanning for address. For example, maybe a contract
-        we are listening to was created in block 2000, but there's a tx sending funds to it in block 1500
         :param block_auto_process_limit: Auto increase or decrease the `block_process_limit`
         based on congestion algorithm
         """
@@ -60,9 +62,9 @@ class EthereumIndexer(ABC):
         self.initial_block_process_limit = block_process_limit
         self.block_process_limit = block_process_limit
         self.block_process_limit_max = block_process_limit_max
+        self.blocks_to_reindex_again = blocks_to_reindex_again
         self.updated_blocks_behind = updated_blocks_behind
         self.query_chunk_size = query_chunk_size
-        self.first_block_threshold = first_block_threshold
         self.block_auto_process_limit = block_auto_process_limit
 
     @property
@@ -103,7 +105,7 @@ class EthereumIndexer(ABC):
     def process_elements(self, elements: Sequence[Any]) -> Sequence[Any]:
         processed_objects = []
         for i, element in enumerate(elements):
-            logger.info('Processing element %d/%d', i + 1, len(list(elements)))
+            logger.info('%s: Processing element %d/%d', i + 1, self.__class__.__name__, len(list(elements)))
             processed_objects.append(self.process_element(element))
         # processed_objects = [self.process_element(element) for element in elements]
         return [item for sublist in processed_objects for item in sublist]
@@ -136,9 +138,9 @@ class EthereumIndexer(ABC):
         updated_addresses = self.database_model.objects.update_addresses(addresses, from_block_number, to_block_number,
                                                                          self.database_field)
         if updated_addresses != len(addresses):
-            logger.warning('Possible reorg - Cannot update all indexed addresses=%s '
+            logger.warning('%s: Possible reorg - Cannot update all indexed addresses=%s '
                            'from-block-number=%d to-block-number=%d',
-                           addresses, from_block_number, to_block_number)
+                           self.__class__.__name__, addresses, from_block_number, to_block_number)
 
         return updated_addresses
 
@@ -161,7 +163,7 @@ class EthereumIndexer(ABC):
         if common_minimum_block_number is None:  # Empty queryset
             return
 
-        from_block_number = common_minimum_block_number + 1
+        from_block_number = max(common_minimum_block_number + 1 - self.blocks_to_reindex_again, 0)
         if (current_block_number - common_minimum_block_number) <= confirmations:
             return  # We don't want problems with reorgs
 
@@ -204,7 +206,7 @@ class EthereumIndexer(ABC):
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
                                                    current_block_number=current_block_number)
         except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
-            self.block_process_limit = min(self.initial_block_process_limit, 10)  # Set back to less than default
+            self.block_process_limit = min(self.initial_block_process_limit, 500)  # Set back to less than default
             logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e
 

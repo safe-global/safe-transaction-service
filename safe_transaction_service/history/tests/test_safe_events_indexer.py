@@ -21,11 +21,15 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.safe_events_indexer = SafeEventsIndexer(cls.ethereum_client, confirmations=0)
+        cls.safe_events_indexer = SafeEventsIndexer(cls.ethereum_client,
+                                                    confirmations=0,
+                                                    blocks_to_reindex_again=0)
         cls.safe_tx_processor = SafeTxProcessor(cls.ethereum_client)
 
     def test_safe_events_indexer_provider(self):
-        SafeEventsIndexerProvider()
+        safe_events_indexer = SafeEventsIndexerProvider()
+        self.assertGreater(safe_events_indexer.confirmations, 0)
+        self.assertGreater(safe_events_indexer.blocks_to_reindex_again, 0)
         self.assertIsNotNone(SafeEventsIndexerProvider.instance)
         SafeEventsIndexerProvider.del_singleton()
         self.assertIsNone(getattr(SafeEventsIndexerProvider, 'instance', None))

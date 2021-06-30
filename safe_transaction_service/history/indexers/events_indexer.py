@@ -26,8 +26,9 @@ class EventsIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault('block_process_limit', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT)
         kwargs.setdefault('block_process_limit_max', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX)
-        kwargs.setdefault('first_block_threshold', 0)
+        kwargs.setdefault('blocks_to_reindex_again', 6)   # Reindex last 6 blocks every run of the indexer
         kwargs.setdefault('query_chunk_size', 500)   # For last 500 blocks, process `query_chunk_size` Safes together
+        kwargs.setdefault('confirmations', 2)   # Due to reorgs, wait for the last 2 blocks
         super().__init__(*args, **kwargs)
 
     @property
@@ -87,12 +88,17 @@ class EventsIndexer(EthereumIndexer):
         try:
             return self.ethereum_client.slow_w3.eth.get_logs(parameters)
         except IOError as e:
-            raise FindRelevantElementsException('Request error retrieving Safe L2 events') from e
+            raise FindRelevantElementsException(f'Request error retrieving events '
+                                                f'from-block={from_block_number} to-block={to_block_number}') from e
         except ValueError as e:
             # For example, Polygon returns:
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
-            logger.warning('Value error retrieving erc20 events', exc_info=True)
-            raise FindRelevantElementsException('Value error retrieving Safe L2 events') from e
+            # BSC returns:
+            #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
+            logger.warning('Value error retrieving events from-block=%d to-block=%d : %s',
+                           from_block_number, to_block_number, e)
+            raise FindRelevantElementsException(f'Request error retrieving events '
+                                                f'from-block={from_block_number} to-block={to_block_number}') from e
 
     @abstractmethod
     def _process_decoded_element(self, decoded_element: EventData) -> Any:

@@ -68,12 +68,13 @@ class Erc20EventsIndexer(EventsIndexer):
                                                                          from_block=from_block_number,
                                                                          to_block=to_block_number)
         except IOError as e:
-            raise FindRelevantElementsException('Request error retrieving erc20 events') from e
+            raise FindRelevantElementsException(f'Request error retrieving erc20 events '
+                                                f'from-block={from_block_number} to-block={to_block_number}') from e
         except ValueError as e:
-            # For example, BSC returns:
-            #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
-            logger.warning('Value error retrieving erc20 events', exc_info=True)
-            raise FindRelevantElementsException('Value error retrieving erc20 events') from e
+            logger.warning('Value error retrieving erc20 events from-block=%d to-block=%d : %s',
+                           from_block_number, to_block_number, e)
+            raise FindRelevantElementsException(f'Request error retrieving erc20 events '
+                                                f'from-block={from_block_number} to-block={to_block_number}') from e
 
     @cachedmethod(cache=operator.attrgetter('_cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day

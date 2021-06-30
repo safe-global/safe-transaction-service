@@ -288,7 +288,8 @@ class SafeEventsIndexer(EventsIndexer):
                         child_internal_tx.save()
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
-                except IntegrityError:
-                    logger.warning('Problem inserting internal_tx', exc_info=True)
+                except IntegrityError as exc:
+                    logger.warning('Problem inserting internal_tx: %s', exc)
+                    return
 
         return internal_tx
