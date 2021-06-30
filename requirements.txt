@@ -1,5 +1,5 @@
 cachetools==4.2.2
-celery==5.1.1
+celery==5.1.2
 django-authtools==1.7.0
 django-cache-memoize==0.1.9
 django-celery-beat==2.2.0
@@ -20,7 +20,7 @@ docutils==0.17.1
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
 firebase-admin==5.0.1
-gnosis-py[django]==3.1.8
+gnosis-py[django]==3.1.9
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.1
 packaging>=20.9

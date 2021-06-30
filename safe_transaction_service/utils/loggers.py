@@ -34,6 +34,7 @@ class LoggingMiddleware:
         response = self.get_response(request)
         if request.resolver_match:
             route = request.resolver_match.route if request.resolver_match else request.path
-            self.logger.info('MT::%s::%s::%s::%d::%s', request.method, route, self.get_milliseconds_now() - milliseconds,
-                             response.status_code, request.path)
+            delta = self.get_milliseconds_now() - milliseconds
+            self.logger.info('MT::%s::%s::%s::%d::%s',
+                             request.method, route, delta, response.status_code, request.path)
         return response
