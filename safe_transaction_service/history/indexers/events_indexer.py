@@ -30,7 +30,7 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault('confirmations', 2)   # Due to reorgs, wait for the last 2 blocks
         kwargs.setdefault('query_chunk_size', 1000000)
         kwargs.setdefault('updated_blocks_behind',
-                          6000)  # For last 300 blocks, process `query_chunk_size` elements together
+                          7 * 24 * 60 * 60 // 15)  # For last week blocks, process `query_chunk_size` elements together
         super().__init__(*args, **kwargs)
 
     @property
@@ -108,8 +108,8 @@ class EventsIndexer(EthereumIndexer):
         :param current_block_number: Current block number (for cache purposes)
         :return: LogReceipt for matching events
         """
-        logger.debug('%s: Filtering for events from block-number=%d to block-number=%d for %d addresses',
-                     self.__class__.__name__, from_block_number, to_block_number, len(addresses))
+        logger.debug('%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s',
+                     self.__class__.__name__, from_block_number, to_block_number, len(addresses), addresses[:10])
         log_receipts = self._find_elements_using_topics(addresses, from_block_number, to_block_number)
 
         len_events = len(log_receipts)
