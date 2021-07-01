@@ -46,3 +46,8 @@ ETH_REORG_BLOCKS = 1
 
 # Fix error with `task_id` when running celery in eager mode
 LOGGING['formatters']['celery_verbose'] = LOGGING['formatters']['verbose']  # noqa F405
+LOGGING['loggers'] = {
+    'safe_transaction_service':  {
+        'level': 'DEBUG',
+    }
+}

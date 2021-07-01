@@ -108,8 +108,11 @@ class Erc20EventsIndexer(EventsIndexer):
         :return: List of `EthereumEvent` already stored in database
         """
         tx_hashes = OrderedDict.fromkeys([log_receipt['transactionHash'] for log_receipt in log_receipts]).keys()
-        logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.debug('End prefetching and storing of ethereum txs')
-        ethereum_events = [EthereumEvent.objects.from_decoded_event(log_receipt) for log_receipt in log_receipts]
-        return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)
+        if not tx_hashes:
+            return []
+        else:
+            logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
+            ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+            logger.debug('End prefetching and storing of ethereum txs')
+            ethereum_events = [EthereumEvent.objects.from_decoded_event(log_receipt) for log_receipt in log_receipts]
+            return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)
