@@ -30,7 +30,7 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault('confirmations', 2)   # Due to reorgs, wait for the last 2 blocks
         kwargs.setdefault('query_chunk_size', 1000000)
         kwargs.setdefault('updated_blocks_behind',
-                          300)  # For last 300 blocks, process `query_chunk_size` elements together
+                          6000)  # For last 300 blocks, process `query_chunk_size` elements together
         super().__init__(*args, **kwargs)
 
     @property

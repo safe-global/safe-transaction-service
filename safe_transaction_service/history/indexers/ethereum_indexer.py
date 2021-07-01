@@ -168,7 +168,7 @@ class EthereumIndexer(ABC):
             return  # We don't want problems with reorgs
 
         if block_process_limit:
-            to_block_number = min(common_minimum_block_number + block_process_limit + 1,
+            to_block_number = min(from_block_number + block_process_limit,
                                   current_block_number - confirmations)
         else:
             to_block_number = current_block_number - confirmations
@@ -212,21 +212,21 @@ class EthereumIndexer(ABC):
 
         if start:
             end = time.time()
-            time_diff = end - start
-            if time_diff > 30:
+            delta = end - start
+            if delta > 30:
                 self.block_process_limit //= 2
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
                             self.block_process_limit)
-            if time_diff > 10:
+            if delta > 10:
                 new_block_process_limit = max(self.block_process_limit - 5000, 500)
                 self.block_process_limit = new_block_process_limit
                 logger.info('%s: block_process_limit decreased to %d', self.__class__.__name__,
                             self.block_process_limit)
-            elif time_diff < 1:
+            elif delta < 1:
                 self.block_process_limit *= 2
                 logger.info('%s: block_process_limit duplicated to %d', self.__class__.__name__,
                             self.block_process_limit)
-            elif time_diff < 3:
+            elif delta < 3:
                 self.block_process_limit += 5000
                 logger.info('%s: block_process_limit increased to %d', self.__class__.__name__,
                             self.block_process_limit)
