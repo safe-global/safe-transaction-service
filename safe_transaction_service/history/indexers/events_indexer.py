@@ -27,8 +27,10 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault('block_process_limit', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT)
         kwargs.setdefault('block_process_limit_max', django.conf.settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX)
         kwargs.setdefault('blocks_to_reindex_again', 6)   # Reindex last 6 blocks every run of the indexer
-        kwargs.setdefault('query_chunk_size', 500)   # For last 500 blocks, process `query_chunk_size` Safes together
         kwargs.setdefault('confirmations', 2)   # Due to reorgs, wait for the last 2 blocks
+        kwargs.setdefault('query_chunk_size', 1000000)
+        kwargs.setdefault('updated_blocks_behind',
+                          300)  # For last 300 blocks, process `query_chunk_size` elements together
         super().__init__(*args, **kwargs)
 
     @property

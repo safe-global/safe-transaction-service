@@ -33,6 +33,7 @@ class Erc20EventsIndexerProvider:
 
 
 class Erc20EventsIndexer(EventsIndexer):
+    IGNORE_ADDRESSES_ON_LOG_FILTER = True  # Retrieve all erc20 events, even for addresses not related to the Safe
     _cache_is_erc20 = {}
 
     """
@@ -62,11 +63,16 @@ class Erc20EventsIndexer(EventsIndexer):
         :param to_block_number:
         :return:
         """
-        if self.IGNORE_ADDRESSES_ON_LOG_FILTER:
-            addresses = None
-        return self.ethereum_client.erc20.get_total_transfer_history(addresses,
-                                                                     from_block=from_block_number,
-                                                                     to_block=to_block_number)
+        parameter_addresses = None if self.IGNORE_ADDRESSES_ON_LOG_FILTER else addresses
+        transfer_events = self.ethereum_client.erc20.get_total_transfer_history(parameter_addresses,
+                                                                                from_block=from_block_number,
+                                                                                to_block=to_block_number)
+        if parameter_addresses:
+            return transfer_events
+        else:
+            addresses = set(addresses)  # Faster to check with `in`
+            return [transfer_event for transfer_event in transfer_events
+                    if transfer_event['args']['to'] in addresses or transfer_event['args']['from'] in addresses]
 
     @cachedmethod(cache=operator.attrgetter('_cache_is_erc20'))
     @cache_memoize(60 * 60 * 24, prefix='erc20-events-indexer-is-erc20')  # 1 day
