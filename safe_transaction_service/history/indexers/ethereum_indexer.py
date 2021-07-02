@@ -217,7 +217,7 @@ class EthereumIndexer(ABC):
                 self.block_process_limit //= 2
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
                             self.block_process_limit)
-            if delta > 10:
+            elif delta > 10:
                 new_block_process_limit = max(self.block_process_limit - 5000, 500)
                 self.block_process_limit = new_block_process_limit
                 logger.info('%s: block_process_limit decreased to %d', self.__class__.__name__,
