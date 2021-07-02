@@ -253,10 +253,12 @@ class EthereumIndexer(ABC):
         almost_updated_monitored_addresses = list(self.get_almost_updated_addresses(current_block_number))
         almost_updated_monitored_addresses_chunks = chunks(almost_updated_monitored_addresses, self.query_chunk_size)
         for almost_updated_addresses_chunk in almost_updated_monitored_addresses_chunks:
-            almost_updated_addresses = [monitored_contract.address
-                                        for monitored_contract in almost_updated_addresses_chunk]
-            processed_elements, _ = self.process_addresses(almost_updated_addresses, current_block_number)
-            number_processed_elements += len(processed_elements)
+            updated = False
+            while not updated:
+                almost_updated_addresses = [monitored_contract.address
+                                            for monitored_contract in almost_updated_addresses_chunk]
+                processed_elements, updated = self.process_addresses(almost_updated_addresses, current_block_number)
+                number_processed_elements += len(processed_elements)
 
         for monitored_contract in self.get_not_updated_addresses(current_block_number):
             updated = False
