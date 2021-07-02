@@ -22,7 +22,7 @@ if READ_DOT_ENV_FILE or DOT_ENV_FILE:
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
-DEBUG = env.bool('DJANGO_DEBUG', False)
+DEBUG = env.bool('DEBUG', False)
 # Local time zone. Choices are
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # though not all of them may be available with every OS.
@@ -294,22 +294,7 @@ LOGGING = {
             'propagate': False,
         },
         'safe_transaction_service': {
-            'level': 'INFO',
-        },
-        'safe_transaction_service.history.indexers.erc20_events_indexer': {
-            'level': 'DEBUG',
-        },
-        'safe_transaction_service.history.indexers.events_indexer': {
-            'level': 'DEBUG',
-        },
-        'safe_transaction_service.history.indexers.internal_tx_indexer': {
-            'level': 'INFO',
-        },
-        'safe_transaction_service.history.indexers.tx_processor': {
-            'level': 'INFO',
-        },
-        'safe_transaction_service.history.indexers.safe_events_indexer': {
-            'level': 'INFO',
+            'level': 'DEBUG' if DEBUG else 'INFO',
         },
         'safe_transaction_service.history.services.balance_service': {
             'level': 'WARNING',

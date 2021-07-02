@@ -210,10 +210,8 @@ class EthereumIndexer(ABC):
             logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e
 
-        logger.info('Entering delta')
         if start:
             delta = int(time.time()) - start
-            logger.info('Delta is %d', delta)
             if delta > 30:
                 self.block_process_limit //= 2
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
