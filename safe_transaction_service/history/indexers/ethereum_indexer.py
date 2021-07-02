@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 
 from django.db.models import Min
 
-from billiard.exceptions import SoftTimeLimitExceeded
+from celery.exceptions import SoftTimeLimitExceeded
 from web3 import Web3
 
 from gnosis.eth import EthereumClient

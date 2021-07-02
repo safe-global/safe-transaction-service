@@ -21,7 +21,7 @@ from .services import (IndexingException, IndexServiceProvider, ReorgService,
 logger = get_task_logger(__name__)
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_erc20_events_task(self) -> Optional[int]:
     """
@@ -36,7 +36,7 @@ def index_erc20_events_task(self) -> Optional[int]:
             return number_events
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_internal_txs_task(self) -> Optional[int]:
     """
@@ -55,7 +55,7 @@ def index_internal_txs_task(self) -> Optional[int]:
             return number_traces
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_new_proxies_task(self) -> Optional[int]:
     """
@@ -70,7 +70,7 @@ def index_new_proxies_task(self) -> Optional[int]:
                 return number_proxies
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, autoretry_for=(IndexingException,),
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT, autoretry_for=(IndexingException,),
                  default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def index_safe_events_task(self) -> Optional[int]:
     """
@@ -89,7 +89,7 @@ def index_safe_events_task(self) -> Optional[int]:
             return number
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     try:
         with only_one_running_task(self):
@@ -104,7 +104,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
         pass
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, task_time_limit=LOCK_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optional[int]:
     """
     Process decoded internal txs for one Safe. Processing decoded transactions is very slow and this way multiple
@@ -147,7 +147,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
         pass
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT)
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def check_reorgs_task(self) -> Optional[int]:
     """
     :return: Number of oldest block with reorg detected. `None` if not reorg found
