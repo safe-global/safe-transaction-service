@@ -198,7 +198,7 @@ class EthereumIndexer(ABC):
         # Optimize number of elements processed every time (block process limit)
         # Check that we are processing the `block_process_limit`, if not, measures are not valid
         if self.block_auto_process_limit and (to_block_number - from_block_number) == self.block_process_limit:
-            start = time.time()
+            start = int(time.time())
         else:
             start = None
 
@@ -206,13 +206,14 @@ class EthereumIndexer(ABC):
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
                                                    current_block_number=current_block_number)
         except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
-            self.block_process_limit = min(self.initial_block_process_limit, 10)  # Set back to less than default
+            self.block_process_limit = min(self.initial_block_process_limit // 2, 50)  # Set back to less than default
             logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e
 
+        logger.info('Entering delta')
         if start:
-            end = time.time()
-            delta = end - start
+            delta = int(time.time()) - start
+            logger.info('Delta is %d', delta)
             if delta > 30:
                 self.block_process_limit //= 2
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
