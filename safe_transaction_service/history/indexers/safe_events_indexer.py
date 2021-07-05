@@ -205,15 +205,23 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx.call_type = None
             internal_tx_decoded = None
         elif event_name == 'SafeSetup':
-            # Usually ProxyCreation is called before SafeSetup, but it can be the opposite if someone creates a Safe
-            # and configure it in the next transaction. Remove it if that's the case
-            InternalTx.objects.filter(contract_address=safe_address).delete()
-            internal_tx_decoded.function_name = 'setup'
-            internal_tx.contract_address = safe_address
-            args['payment'] = 0
-            args['paymentReceiver'] = NULL_ADDRESS
-            args['_threshold'] = args.pop('threshold')
-            args['_owners'] = args.pop('owners')
+            # Check if Safe setup was already processed. Makes processing idempotent
+            if InternalTxDecoded.objects.filter(
+                    function_name='setup',
+                    internal_tx___from=safe_address,
+                    internal_tx__contract_address=None
+            ).exists():
+                internal_tx = None
+            else:
+                # Usually ProxyCreation is called before SafeSetup, but it can be the opposite if someone
+                # creates a Safe and configure it in the next transaction. Remove it if that's the case
+                InternalTx.objects.filter(contract_address=safe_address).delete()
+                internal_tx_decoded.function_name = 'setup'
+                internal_tx.contract_address = safe_address
+                args['payment'] = 0
+                args['paymentReceiver'] = NULL_ADDRESS
+                args['_threshold'] = args.pop('threshold')
+                args['_owners'] = args.pop('owners')
         elif event_name == 'SafeMultiSigTransaction':
             internal_tx_decoded.function_name = 'execTransaction'
             data = HexBytes(args['data'])
