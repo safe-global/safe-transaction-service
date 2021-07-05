@@ -50,9 +50,13 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
                 payment, payment_receiver
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
-        block_number = self.ethereum_client.current_block_number
-        SafeL2MasterCopyFactory(address=self.safe_contract_V1_3_0.address,
-                                initial_block_number=block_number, tx_block_number=block_number, version='1.3.0')
+        initial_block_number = self.ethereum_client.current_block_number
+        safe_l2_master_copy = SafeL2MasterCopyFactory(
+            address=self.safe_contract_V1_3_0.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version='1.3.0'
+        )
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
             self.ethereum_test_account, self.safe_contract_V1_3_0.address,
             initializer=initializer
@@ -358,7 +362,28 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(SafeStatus.objects.last_for_address(safe_address).master_copy,
                          self.safe_contract_V1_3_0.address)
 
-        self.assertEqual(MultisigTransaction.objects.count(), 8)
         self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
                          multisig_tx.safe_tx_hash.hex())
-        self.assertEqual(MultisigConfirmation.objects.count(), 10)
+        expected_multisig_transactions = 8
+        expected_multisig_confirmations = 10
+        expected_safe_statuses = 17
+        expected_internal_txs = 29
+        expected_internal_txs_decoded = 18
+        self.assertEqual(MultisigTransaction.objects.count(), expected_multisig_transactions)
+        self.assertEqual(MultisigConfirmation.objects.count(), expected_multisig_confirmations)
+        self.assertEqual(SafeStatus.objects.count(), expected_safe_statuses)
+        self.assertEqual(InternalTx.objects.count(), expected_internal_txs)
+        self.assertEqual(InternalTxDecoded.objects.count(), expected_internal_txs_decoded)
+
+        # Event processing should be idempotent, so no changes must be done if everything is processed again
+        InternalTxDecoded.objects.update(processed=False)
+        SafeStatus.objects.all().delete()
+        self.assertEqual(
+            len(self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())),
+            18
+        )
+        self.assertEqual(MultisigTransaction.objects.count(), expected_multisig_transactions)
+        self.assertEqual(MultisigConfirmation.objects.count(), expected_multisig_confirmations)
+        self.assertEqual(SafeStatus.objects.count(), expected_safe_statuses)
+        self.assertEqual(InternalTx.objects.count(), expected_internal_txs)
+        self.assertEqual(InternalTxDecoded.objects.count(), expected_internal_txs_decoded)
