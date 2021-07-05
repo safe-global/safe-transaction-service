@@ -63,5 +63,5 @@ class Migration(migrations.Migration):
                                                             (3, 'ETH_SIGN')], db_index=True, default=1),
             preserve_default=False,
         ),
-        migrations.RunPython(add_signature_type),
+        migrations.RunPython(add_signature_type, reverse_code=migrations.RunPython.noop),
     ]

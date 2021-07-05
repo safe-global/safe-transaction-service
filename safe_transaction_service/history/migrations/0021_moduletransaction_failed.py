@@ -28,5 +28,5 @@ class Migration(migrations.Migration):
             name='failed',
             field=models.BooleanField(default=False),
         ),
-        migrations.RunPython(set_failed_for_module_txs),
+        migrations.RunPython(set_failed_for_module_txs, reverse_code=migrations.RunPython.noop),
     ]

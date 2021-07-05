@@ -39,5 +39,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        RunPython(delete_errored_internal_txs)
+        RunPython(delete_errored_internal_txs, reverse_code=migrations.RunPython.noop)
     ]

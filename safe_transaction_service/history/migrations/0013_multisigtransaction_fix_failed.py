@@ -26,5 +26,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(set_failed_for_multisig_txs),
+        migrations.RunPython(set_failed_for_multisig_txs, reverse_code=migrations.RunPython.noop),
     ]

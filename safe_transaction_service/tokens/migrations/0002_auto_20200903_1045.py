@@ -40,5 +40,5 @@ class Migration(migrations.Migration):
             name='decimals',
             field=models.PositiveSmallIntegerField(blank=True, db_index=True, null=True),
         ),
-        migrations.RunPython(fix_token_decimals),
+        migrations.RunPython(fix_token_decimals, reverse_code=migrations.RunPython.noop),
     ]

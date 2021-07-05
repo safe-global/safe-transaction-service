@@ -20,5 +20,5 @@ class Migration(migrations.Migration):
             name='trusted',
             field=models.BooleanField(db_index=True, default=False),
         ),
-        migrations.RunPython(set_confirmed_txs_trusted),
+        migrations.RunPython(set_confirmed_txs_trusted, reverse_code=migrations.RunPython.noop),
     ]
