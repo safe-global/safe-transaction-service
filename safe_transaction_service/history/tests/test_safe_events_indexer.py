@@ -376,11 +376,15 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTxDecoded.objects.count(), expected_internal_txs_decoded)
 
         # Event processing should be idempotent, so no changes must be done if everything is processed again
+        self.assertTrue(self.safe_events_indexer._is_setup_indexed(safe_address))
+        safe_l2_master_copy.tx_block_number = initial_block_number
+        safe_l2_master_copy.save(update_fields=['tx_block_number'])
+        self.assertEqual(self.safe_events_indexer.start(), 28)  # No new events are processed when reindexing
         InternalTxDecoded.objects.update(processed=False)
         SafeStatus.objects.all().delete()
         self.assertEqual(
             len(self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())),
-            18
+            expected_internal_txs_decoded
         )
         self.assertEqual(MultisigTransaction.objects.count(), expected_multisig_transactions)
         self.assertEqual(MultisigConfirmation.objects.count(), expected_multisig_confirmations)

@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Exists
 
 from eth_abi import decode_abi
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from web3.contract import ContractEvent
 from web3.types import EventData
@@ -153,6 +154,13 @@ class SafeEventsIndexer(EventsIndexer):
     def database_field(self):
         return 'tx_block_number'
 
+    def _is_setup_indexed(self, safe_address: ChecksumAddress):
+        return InternalTxDecoded.objects.filter(
+            function_name='setup',
+            internal_tx___from=safe_address,
+            internal_tx__contract_address=None
+        ).exists()
+
     def _process_decoded_element(self, decoded_element: EventData) -> Optional[InternalTx]:
         safe_address = decoded_element['address']
         event_name = decoded_element['event']
@@ -205,12 +213,9 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx.call_type = None
             internal_tx_decoded = None
         elif event_name == 'SafeSetup':
-            # Check if Safe setup was already processed. Makes processing idempotent
-            if InternalTxDecoded.objects.filter(
-                    function_name='setup',
-                    internal_tx___from=safe_address,
-                    internal_tx__contract_address=None
-            ).exists():
+            # Check if Safe setup was already processed. Makes indexing idempotent, as we modified the `trace_address`
+            # when processing `ProxyCreation`
+            if self._is_setup_indexed(safe_address):
                 internal_tx = None
             else:
                 # Usually ProxyCreation is called before SafeSetup, but it can be the opposite if someone
@@ -297,7 +302,7 @@ class SafeEventsIndexer(EventsIndexer):
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
                 except IntegrityError as exc:
-                    logger.warning('Problem inserting internal_tx: %s', exc)
+                    logger.info('Problem inserting internal_tx: %s', exc)
                     return
 
         return internal_tx
