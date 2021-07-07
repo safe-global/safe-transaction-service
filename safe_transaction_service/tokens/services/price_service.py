@@ -16,6 +16,7 @@ from gnosis.eth.oracles import (BalancerOracle, CurveOracle, KyberOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UniswapOracle, UniswapV2Oracle,
                                 UsdPricePoolOracle, YearnOracle)
+from gnosis.eth.oracles.oracles import AaveOracle
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -57,6 +58,7 @@ class PriceService:
         self.uniswap_oracle = UniswapOracle(self.ethereum_client)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.yearn_oracle = YearnOracle(self.ethereum_client)
+        self.aave_oracle = AaveOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.mooniswap_oracle = MooniswapOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
@@ -67,7 +69,8 @@ class PriceService:
     @cached_property
     def enabled_price_oracles(self) -> Tuple[PriceOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle
+            return (self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle,
+                    self.aave_oracle)
         else:
             return self.kyber_oracle, self.uniswap_v2_oracle  # They provide versions in another networks
 
