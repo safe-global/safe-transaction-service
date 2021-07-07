@@ -56,12 +56,16 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
     key_was_set = redis.set(redis_key, f'0:{current_timestamp}', ex=60 * 15, nx=True)  # Expire in 15 minutes
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
-        eth_price = price_service.get_token_eth_value(token_address)
-        if not eth_price:  # Try usd oracles
-            usd_price = price_service.get_token_usd_price(token_address)
-            if usd_price:
-                eth_usd_price = price_service.get_eth_usd_price()
-                eth_price = usd_price / eth_usd_price
+        eth_price = (price_service.get_token_eth_value(token_address)
+                     or price_service.get_token_usd_price(token_address) / price_service.get_eth_usd_price())
+        if not eth_price:  # Try composed oracles
+            if price_per_share_with_token := price_service.get_price_per_share_with_token(token_address):
+                price_per_share, token = price_per_share_with_token
+                # Find underlying token price
+                eth_price = (price_service.get_token_eth_value(token)
+                             or price_service.get_token_usd_price(token) / price_service.get_eth_usd_price())
+                # Multiply by price per share
+                eth_price *= price_per_share
         if eth_price:
             eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
             redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
