@@ -123,7 +123,7 @@ class InternalTxAdmin(admin.ModelAdmin):
                 '-ethereum_tx__transaction_index',
                 '-trace_address']
     raw_id_fields = ('ethereum_tx',)
-    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash']
+    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash', '=contract_address']
 
 
 class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):

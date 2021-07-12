@@ -161,6 +161,7 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx__contract_address=None
         ).exists()
 
+    @transaction.atomic
     def _process_decoded_element(self, decoded_element: EventData) -> Optional[InternalTx]:
         safe_address = decoded_element['address']
         event_name = decoded_element['event']
