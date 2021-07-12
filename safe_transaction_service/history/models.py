@@ -179,12 +179,15 @@ class EthereumTxManager(models.Manager):
     def create_from_tx_dict(self, tx: Dict[str, Any], tx_receipt: Optional[Dict[str, Any]] = None,
                             ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
         data = HexBytes(tx.get('data') or tx.get('input'))
+        # Supporting EIP1559
+        gas_price = tx['gasPrice'] if 'gasPrice' in tx else int(tx_receipt.get('effectiveGasPrice', '0'), 0)
+        assert gas_price, f'Gas price for tx {tx} cannot be None'
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx['hash']).hex(),
             _from=tx['from'],
             gas=tx['gas'],
-            gas_price=tx['gasPrice'],
+            gas_price=gas_price,
             gas_used=tx_receipt and tx_receipt['gasUsed'],
             logs=tx_receipt and [clean_receipt_log(log) for log in tx_receipt.get('logs', list())],
             status=tx_receipt and tx_receipt.get('status'),
