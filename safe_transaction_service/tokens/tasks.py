@@ -59,13 +59,15 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
         eth_price = (price_service.get_token_eth_value(token_address)
                      or price_service.get_token_usd_price(token_address) / price_service.get_eth_usd_price())
         if not eth_price:  # Try composed oracles
-            if price_per_share_with_token := price_service.get_price_per_share_with_token(token_address):
-                price_per_share, token = price_per_share_with_token
-                # Find underlying token price
-                eth_price = (price_service.get_token_eth_value(token)
-                             or price_service.get_token_usd_price(token) / price_service.get_eth_usd_price())
-                # Multiply by price per share
-                eth_price *= price_per_share
+            if underlying_tokens := price_service.get_underlying_tokens(token_address):
+                eth_price = 0
+                for underlying_token in underlying_tokens:
+                    # Find underlying token price and multiply by quantity
+                    address = underlying_token.address
+                    eth_price += (
+                            price_service.get_token_eth_value(address)
+                            or price_service.get_token_usd_price(address) / price_service.get_eth_usd_price()
+                    ) * underlying_token.quantity
         if eth_price:
             eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
             redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))

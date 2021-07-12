@@ -1,7 +1,7 @@
 import operator
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
@@ -15,8 +15,9 @@ from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
                                 ComposedPriceOracle, CurveOracle, KyberOracle,
                                 MooniswapOracle, OracleException, PriceOracle,
                                 PricePoolOracle, SushiswapOracle,
-                                UniswapOracle, UniswapV2Oracle,
-                                UsdPricePoolOracle, YearnOracle)
+                                UnderlyingToken, UniswapOracle,
+                                UniswapV2Oracle, UsdPricePoolOracle,
+                                YearnOracle)
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -50,7 +51,7 @@ class PriceService:
         self.redis = redis
         self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient()
-        self.curve_oracle = CurveOracle(self.ethereum_client)  # Curve returns price in usd
+        self.curve_oracle = CurveOracle(self.ethereum_client)
         self.kraken_client = KrakenClient()
         self.kucoin_client = KucoinClient()
         self.kyber_oracle = KyberOracle(self.ethereum_client)
@@ -64,7 +65,7 @@ class PriceService:
         self.cache_eth_price = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_usd_value = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
-        self.cache_price_per_share_and_token = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
+        self.cache_underlying_token = TTLCache(maxsize=2048, ttl=60 * 30)  # 30 minutes of caching
         self.cache_token_info = {}
 
     @cached_property
@@ -84,15 +85,12 @@ class PriceService:
 
     @cached_property
     def enabled_usd_price_pool_oracles(self) -> Tuple[UsdPricePoolOracle]:
-        if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.curve_oracle,
-        else:
-            return tuple()
+        return tuple()
 
     @cached_property
     def enabled_composed_price_oracles(self) -> Tuple[ComposedPriceOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.yearn_oracle,
+            return self.curve_oracle, self.yearn_oracle
         else:
             return tuple()
 
@@ -194,16 +192,16 @@ class PriceService:
                 pass
         return 0.
 
-    @cachedmethod(cache=operator.attrgetter('cache_price_per_share_and_token'))
-    @cache_memoize(60 * 30, prefix='balances-get_price_per_share_with_token')  # 30 minutes
-    def get_price_per_share_with_token(self, token_address: ChecksumAddress) -> Optional[Tuple[float, ChecksumAddress]]:
+    @cachedmethod(cache=operator.attrgetter('cache_underlying_token'))
+    @cache_memoize(60 * 30, prefix='balances-get_underlying_tokens')  # 30 minutes
+    def get_underlying_tokens(self, token_address: ChecksumAddress) -> Optional[List[UnderlyingToken]]:
         """
         :param token_address:
         :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
         for oracle in self.enabled_composed_price_oracles:
             try:
-                return oracle.get_price_per_share_with_token(token_address)
+                return oracle.get_underlying_tokens(token_address)
             except OracleException:
                 logger.info('Cannot get eth value for token-address=%s from %s', token_address,
                             oracle.__class__.__name__)
