@@ -180,8 +180,13 @@ class EthereumTxManager(models.Manager):
                             ethereum_block: Optional[EthereumBlock] = None) -> 'EthereumTx':
         data = HexBytes(tx.get('data') or tx.get('input'))
         # Supporting EIP1559
-        gas_price = tx['gasPrice'] if 'gasPrice' in tx else int(tx_receipt.get('effectiveGasPrice', '0'), 0)
-        assert gas_price, f'Gas price for tx {tx} cannot be None'
+        if 'gasPrice' in tx:
+            gas_price = tx['gasPrice']
+        else:
+            assert tx_receipt, f'Tx-receipt is required for EIP1559 tx {tx}'
+            gas_price = tx_receipt.get('effectiveGasPrice')
+            assert gas_price is not None, f'Gas price for tx {tx} cannot be None'
+            gas_price = int(gas_price, 0)
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx['hash']).hex(),
