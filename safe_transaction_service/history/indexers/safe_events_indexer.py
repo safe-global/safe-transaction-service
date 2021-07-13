@@ -194,25 +194,30 @@ class SafeEventsIndexer(EventsIndexer):
             arguments=args,
         )
         if event_name == 'ProxyCreation':
-            # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
-            # the master copy used. Without tracing it cannot be detected otherwise
             safe_address = args.pop('proxy')
-            new_trace_address = f'{trace_address},0'
 
-            InternalTx.objects.filter(
-                contract_address=safe_address,
-            ).exclude(
-                Exists(InternalTx.objects.filter(trace_address=new_trace_address))
-            ).update(
-                to=args.pop('singleton'),
-                contract_address=None,
-                trace_address=new_trace_address
-            )
-            # Add creation internal tx. _from is the address of the proxy instead of the safe_address
-            internal_tx.contract_address = safe_address
-            internal_tx.tx_type = InternalTxType.CREATE.value
-            internal_tx.call_type = None
-            internal_tx_decoded = None
+            # Check if Safe setup was already processed. Makes indexing idempotent, as we modified the `trace_address`
+            # when processing `ProxyCreation`
+            if self._is_setup_indexed(safe_address):
+                internal_tx = None
+            else:
+                new_trace_address = f'{trace_address},0'
+                to = args.pop('singleton')
+
+                # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
+                # the master copy used. Without tracing it cannot be detected otherwise
+                InternalTx.objects.filter(
+                    contract_address=safe_address,
+                ).update(
+                    to=to,
+                    contract_address=None,
+                    trace_address=new_trace_address
+                )
+                # Add creation internal tx. _from is the address of the proxy instead of the safe_address
+                internal_tx.contract_address = safe_address
+                internal_tx.tx_type = InternalTxType.CREATE.value
+                internal_tx.call_type = None
+                internal_tx_decoded = None
         elif event_name == 'SafeSetup':
             # Check if Safe setup was already processed. Makes indexing idempotent, as we modified the `trace_address`
             # when processing `ProxyCreation`
