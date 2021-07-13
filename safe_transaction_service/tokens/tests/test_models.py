@@ -1,6 +1,7 @@
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from eth_account import Account
@@ -14,18 +15,45 @@ from .factories import TokenFactory
 
 class TestModels(TestCase):
     def test_token_querysets(self):
-        TokenFactory(decimals=None)
+        erc721_token = TokenFactory(decimals=None)
         self.assertEqual(Token.objects.erc20().count(), 0)
         self.assertEqual(Token.objects.erc721().count(), 1)
-        TokenFactory(decimals=0)
+        self.assertIn('ERC721', str(erc721_token))
+
+        erc20_token = TokenFactory(decimals=0)
         self.assertEqual(Token.objects.erc20().count(), 1)
         self.assertEqual(Token.objects.erc721().count(), 1)
+        self.assertIn('ERC20', str(erc20_token))
+
         TokenFactory(decimals=4)
         self.assertEqual(Token.objects.erc20().count(), 2)
         self.assertEqual(Token.objects.erc721().count(), 1)
         TokenFactory(decimals=None)
         self.assertEqual(Token.objects.erc20().count(), 2)
         self.assertEqual(Token.objects.erc721().count(), 2)
+
+    def test_token_validation(self):
+        t = TokenFactory()
+        t.set_spam()
+        t.trusted = True
+        with self.assertRaises(ValidationError):
+            t.clean()
+
+    def test_token_get_full_logo_uri(self):
+        t = TokenFactory()
+        t.logo_uri = 'http://gnosis.io/image.png'
+        self.assertEqual(t.get_full_logo_uri(), t.logo_uri)
+
+    def test_token_trusted_spam_queryset(self):
+        spam_tokens = [TokenFactory(spam=True), TokenFactory(spam=True)]
+        not_spam_tokens = [TokenFactory(spam=False, trusted=False), TokenFactory(spam=False, trusted=False)]
+        trusted_tokens = [TokenFactory(trusted=True)]
+
+        self.assertCountEqual(Token.objects.spam(), spam_tokens)
+        self.assertCountEqual(Token.objects.not_spam(), not_spam_tokens + trusted_tokens)
+        self.assertCountEqual(Token.objects.trusted(), trusted_tokens)
+
+        self.assertIn('SPAM', str(spam_tokens[0]))
 
     def test_token_create_truncate(self):
         max_length = 60

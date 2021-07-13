@@ -76,7 +76,7 @@ class PriceService:
             return (self.kyber_oracle, self.uniswap_v2_oracle, self.sushiswap_oracle, self.uniswap_oracle,
                     self.aave_oracle)
         else:
-            return self.kyber_oracle, self.uniswap_v2_oracle  # They provide versions in another networks
+            return self.kyber_oracle, self.uniswap_v2_oracle  # There are versions in another networks
 
     @cached_property
     def enabled_price_pool_oracles(self) -> Tuple[PricePoolOracle]:
@@ -84,10 +84,6 @@ class PriceService:
             return self.uniswap_v2_oracle, self.balancer_oracle, self.mooniswap_oracle
         else:
             return tuple()
-
-    @cached_property
-    def enabled_usd_price_pool_oracles(self) -> Tuple[UsdPricePoolOracle]:
-        return tuple()
 
     @cached_property
     def enabled_composed_price_oracles(self) -> Tuple[ComposedPriceOracle]:
@@ -181,13 +177,6 @@ class PriceService:
         :param token_address:
         :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
-        for oracle in self.enabled_usd_price_pool_oracles:
-            try:
-                return oracle.get_pool_usd_token_price(token_address)
-            except OracleException:
-                logger.info('Cannot get eth value for token-address=%s from %s', token_address,
-                            oracle.__class__.__name__)
-
         if self.ethereum_network == EthereumNetwork.MAINNET:
             try:
                 return self.coingecko_client.get_token_price(token_address)

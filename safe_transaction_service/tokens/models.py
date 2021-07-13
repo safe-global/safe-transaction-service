@@ -100,6 +100,9 @@ class TokenQuerySet(models.QuerySet):
     def erc721(self):
         return self.filter(self.erc721_query)
 
+    def spam(self):
+        return self.filter(spam=True)
+
     def not_spam(self):
         return self.filter(spam=False)
 
@@ -133,10 +136,10 @@ class Token(models.Model):
 
     def __str__(self):
         spam_text = 'SPAM ' if self.spam else ''
-        if self.decimals:
-            return f'{spam_text}ERC20 - {self.name} - {self.address}'
+        if self.decimals is None:
+            return f'{spam_text}ERC721 - {self.name} - {self.address}'
         else:
-            return f'ERC721 - {self.name} - {self.address}'
+            return f'{spam_text}ERC20 - {self.name} - {self.address}'
 
     def clean(self):
         if self.trusted and self.spam:
