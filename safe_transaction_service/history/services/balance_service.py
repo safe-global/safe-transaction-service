@@ -2,10 +2,9 @@ import logging
 import operator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 from django.db.models import Q
-from django.utils import timezone
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
@@ -19,8 +18,6 @@ from safe_transaction_service.tokens.clients import CannotGetPrice
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import (
     FiatCode, PriceService, PriceServiceProvider)
-from safe_transaction_service.tokens.tasks import (
-    EthValueWithTimestamp, calculate_token_eth_price_task)
 from safe_transaction_service.utils.redis import get_redis
 
 from ..exceptions import NodeConnectionException
@@ -149,28 +146,6 @@ class BalanceService:
             balances.append(Balance(**balance))
         return balances
 
-    def get_cached_token_eth_values(self,
-                                    token_addresses: Sequence[ChecksumAddress]) -> Iterator[EthValueWithTimestamp]:
-        """
-        Get token eth prices with timestamp of calculation if ready on cache. If not, schedule tasks to do
-        the calculation so next time is available on cache and return `0.` and current datetime
-        :param token_addresses:
-        :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
-        """
-        cache_keys = [f'balance-service:{token_address}:eth-price' for token_address in token_addresses]
-        results = self.redis.mget(cache_keys)  # eth_value:epoch_timestamp
-        for token_address, cache_key, result in zip(token_addresses, cache_keys, results):
-            if not token_address:  # Ether, this will not be used
-                yield EthValueWithTimestamp(1., timezone.now())  # Even if not used, Ether value in ether is 1 :)
-            elif result:
-                yield EthValueWithTimestamp.from_string(result.decode())
-            else:
-                task_result = calculate_token_eth_price_task.delay(token_address, cache_key)
-                if task_result.ready():
-                    yield task_result.get()
-                else:
-                    yield EthValueWithTimestamp(0., timezone.now())
-
     @cachedmethod(cache=operator.attrgetter('cache_token_info'))
     @cache_memoize(60 * 60, prefix='balances-get_token_info')  # 1 hour
     def get_token_info(self, token_address: ChecksumAddress) -> Optional[Erc20InfoWithLogo]:
@@ -189,11 +164,13 @@ class BalanceService:
         """
         All this could be more optimal (e.g. batching requests), but as everything is cached
         I think we should be alright
+
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
         :return: List of BalanceWithFiat
         """
+        # TODO Use price service get_cached_usd_values
         balances: List[Balance] = self.get_balances(safe_address, only_trusted, exclude_spam)
         try:
             eth_price = self.price_service.get_eth_usd_price()
@@ -202,7 +179,7 @@ class BalanceService:
             eth_price = 0
         balances_with_usd = []
         token_addresses = [balance.token_address for balance in balances]
-        token_eth_values_with_timestamp = self.get_cached_token_eth_values(token_addresses)
+        token_eth_values_with_timestamp = self.price_service.get_cached_token_eth_values(token_addresses)
         for balance, token_eth_value_with_timestamp in zip(balances, token_eth_values_with_timestamp):
             token_eth_value = token_eth_value_with_timestamp.eth_value
             token_address = balance.token_address

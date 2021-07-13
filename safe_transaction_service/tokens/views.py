@@ -13,7 +13,6 @@ from web3 import Web3
 from . import filters, serializers
 from .models import Token
 from .services import PriceServiceProvider
-from .services.price_service import FiatCode
 from .tasks import get_token_info_from_blockchain
 
 
@@ -68,8 +67,9 @@ class TokenPriceView(APIView):
 
         if not Token.objects.filter(address=address).exists():
             raise Http404
-        usd_price = PriceServiceProvider().get_token_usd_price(address)
-        serializer = self.serializer_class(data={'fiat_code': FiatCode.USD.name,
-                                                 'fiat_price': str(usd_price)})
+        fiat_price_with_timestamp = next(PriceServiceProvider().get_cached_usd_values([address]))
+        serializer = self.serializer_class(data={'fiat_code': fiat_price_with_timestamp.fiat_code.name,
+                                                 'fiat_price': str(fiat_price_with_timestamp.fiat_price),
+                                                 'timestamp': fiat_price_with_timestamp.timestamp})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

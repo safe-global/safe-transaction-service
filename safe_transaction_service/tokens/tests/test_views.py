@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.urls import reverse
+from django.utils import timezone
 
 from eth_account import Account
 from rest_framework import status
@@ -15,6 +16,7 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import Token
 from ..services import PriceService
+from ..services.price_service import FiatCode, FiatPriceWithTimestamp
 from .factories import TokenFactory
 
 logger = logging.getLogger(__name__)
@@ -101,10 +103,16 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         token = TokenFactory(address=random_address, decimals=18)  # ERC20
         response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {'fiat_code': 'USD', 'fiat_price': '0.0'})
+        self.assertEqual(response.data['fiat_code'], 'USD')
+        self.assertEqual(response.data['fiat_price'], '0.0')
+        self.assertTrue(response.data['timestamp'])
 
-        fiat_price = 48.1516
-        with mock.patch.object(PriceService, 'get_token_usd_price', autospec=True, return_value=fiat_price):
+        fiat_price_with_timestamp = FiatPriceWithTimestamp(48.1516, FiatCode.USD, timezone.now())
+        fiat_price_with_timestamp_iterator = iter([fiat_price_with_timestamp])
+        with mock.patch.object(PriceService, 'get_cached_usd_values', autospec=True,
+                               return_value=fiat_price_with_timestamp_iterator):
             response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(response.data, {'fiat_code': 'USD', 'fiat_price': str(fiat_price)})
+            self.assertEqual(response.data['fiat_code'], 'USD')
+            self.assertEqual(response.data['fiat_price'], str(fiat_price_with_timestamp.fiat_price))
+            self.assertTrue(response.data['timestamp'])

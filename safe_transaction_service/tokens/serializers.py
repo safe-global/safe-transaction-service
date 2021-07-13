@@ -36,3 +36,4 @@ class TokenInfoResponseSerializer(serializers.Serializer):
 class TokenPriceResponseSerializer(serializers.Serializer):
     fiat_code = serializers.CharField()
     fiat_price = serializers.CharField()
+    timestamp = serializers.DateTimeField()

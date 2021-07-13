@@ -1,7 +1,11 @@
 import operator
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from functools import cached_property
-from typing import List, Optional, Tuple
+from typing import Iterator, List, Optional, Sequence, Tuple
+
+from django.utils import timezone
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
@@ -17,13 +21,13 @@ from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
                                 PoolTogetherOracle, PriceOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UnderlyingToken, UniswapOracle,
-                                UniswapV2Oracle, UsdPricePoolOracle,
-                                YearnOracle)
+                                UniswapV2Oracle, YearnOracle)
 
 from safe_transaction_service.utils.redis import get_redis
 
 from ..clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
                        KrakenClient, KucoinClient)
+from ..tasks import EthValueWithTimestamp, calculate_token_eth_price_task
 
 logger = get_task_logger(__name__)
 
@@ -31,6 +35,13 @@ logger = get_task_logger(__name__)
 class FiatCode(Enum):
     USD = 1
     EUR = 2
+
+
+@dataclass
+class FiatPriceWithTimestamp:
+    fiat_price: float
+    fiat_code: FiatCode
+    timestamp: datetime
 
 
 class PriceServiceProvider:
@@ -197,3 +208,43 @@ class PriceService:
             except OracleException:
                 logger.info('Cannot get eth value for token-address=%s from %s', token_address,
                             oracle.__class__.__name__)
+
+    def get_cached_token_eth_values(self,
+                                    token_addresses: Sequence[ChecksumAddress]) -> Iterator[EthValueWithTimestamp]:
+        """
+        Get token eth prices with timestamp of calculation if ready on cache. If not, schedule tasks to do
+        the calculation so next time is available on cache and return `0.` and current datetime
+
+        :param token_addresses:
+        :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
+        """
+        cache_keys = [f'price-service:{token_address}:eth-price' for token_address in token_addresses]
+        results = self.redis.mget(cache_keys)  # eth_value:epoch_timestamp
+        for token_address, cache_key, result in zip(token_addresses, cache_keys, results):
+            if not token_address:  # Ether, this will not be used
+                yield EthValueWithTimestamp(1., timezone.now())  # Even if not used, Ether value in ether is 1 :)
+            elif result:
+                yield EthValueWithTimestamp.from_string(result.decode())
+            else:
+                task_result = calculate_token_eth_price_task.delay(token_address, cache_key)
+                if task_result.ready():
+                    yield task_result.get()
+                else:
+                    yield EthValueWithTimestamp(0., timezone.now())
+
+    def get_cached_usd_values(self, token_addresses: Sequence[ChecksumAddress]) -> Iterator[FiatPriceWithTimestamp]:
+        """
+        Get token usd prices with timestamp of calculation if ready on cache.
+
+        :param token_addresses:
+        :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
+        """
+        try:
+            eth_price = self.get_eth_usd_price()
+        except CannotGetPrice:
+            logger.warning('Cannot get network ether price', exc_info=True)
+            eth_price = 0
+
+        for token_eth_values_with_timestamp in self.get_cached_token_eth_values(token_addresses):
+            yield FiatPriceWithTimestamp(eth_price * token_eth_values_with_timestamp.eth_value,
+                                         FiatCode.USD, token_eth_values_with_timestamp.timestamp)

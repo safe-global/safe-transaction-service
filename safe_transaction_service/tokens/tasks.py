@@ -16,7 +16,6 @@ from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection
 
 from .models import Token
-from .services.price_service import PriceServiceProvider
 
 logger = get_task_logger(__name__)
 
@@ -49,6 +48,7 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
     :param force_recalculation: Force a new calculation even if an old one is on cache
     :return: token price (in ether) when calculated
     """
+    from .services.price_service import PriceServiceProvider
     redis_expiration_time = 60 * 30  # Expire in 30 minutes
     redis = get_redis()
     now = timezone.now()
