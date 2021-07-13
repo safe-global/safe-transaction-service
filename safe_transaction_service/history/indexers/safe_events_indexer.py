@@ -3,7 +3,6 @@ from logging import getLogger
 from typing import List, Optional
 
 from django.db import IntegrityError, transaction
-from django.db.models import Exists
 
 from eth_abi import decode_abi
 from eth_typing import ChecksumAddress

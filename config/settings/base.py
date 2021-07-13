@@ -303,7 +303,7 @@ LOGGING = {
             'level': 'WARNING',
         },
         'celery': {
-            'handlers': ['celery_console'],
+            'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,  # If not it will be out for the root logger too
         },

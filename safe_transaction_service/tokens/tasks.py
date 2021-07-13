@@ -64,10 +64,9 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
                 for underlying_token in underlying_tokens:
                     # Find underlying token price and multiply by quantity
                     address = underlying_token.address
-                    eth_price += (
-                            price_service.get_token_eth_value(address)
-                            or price_service.get_token_usd_price(address) / price_service.get_eth_usd_price()
-                    ) * underlying_token.quantity
+                    eth_price += (price_service.get_token_eth_value(address)
+                                  or price_service.get_token_usd_price(address) / price_service.get_eth_usd_price()
+                                  ) * underlying_token.quantity
         if eth_price:
             eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
             redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))

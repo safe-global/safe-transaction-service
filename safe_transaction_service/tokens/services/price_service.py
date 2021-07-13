@@ -13,7 +13,8 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
 from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
                                 ComposedPriceOracle, CurveOracle, KyberOracle,
-                                MooniswapOracle, OracleException, PriceOracle,
+                                MooniswapOracle, OracleException,
+                                PoolTogetherOracle, PriceOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UnderlyingToken, UniswapOracle,
                                 UniswapV2Oracle, UsdPricePoolOracle,
@@ -58,6 +59,7 @@ class PriceService:
         self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
         self.uniswap_oracle = UniswapOracle(self.ethereum_client)
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
+        self.pool_together_oracle = PoolTogetherOracle(self.ethereum_client)
         self.yearn_oracle = YearnOracle(self.ethereum_client)
         self.aave_oracle = AaveOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
@@ -90,7 +92,7 @@ class PriceService:
     @cached_property
     def enabled_composed_price_oracles(self) -> Tuple[ComposedPriceOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.curve_oracle, self.yearn_oracle
+            return self.curve_oracle, self.yearn_oracle, self.pool_together_oracle
         else:
             return tuple()
 
@@ -126,6 +128,7 @@ class PriceService:
             - On mainnet, use ETH/USD
             - On xDAI, use DAI/USD.
             - On EWT/VOLTA, use EWT/USD
+
         :return: USD price for Ether
         """
         if self.ethereum_network == EthereumNetwork.XDAI:
