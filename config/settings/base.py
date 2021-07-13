@@ -211,6 +211,8 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 # We are not interested in keeping results of tasks
 CELERY_IGNORE_RESULT = True
+# http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-task_always_eager
+CELERY_ALWAYS_EAGER = False
 
 # Django REST Framework
 # ------------------------------------------------------------------------------
