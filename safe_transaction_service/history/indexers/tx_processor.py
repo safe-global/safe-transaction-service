@@ -144,7 +144,9 @@ class SafeTxProcessor(TxProcessor):
     def get_last_safe_status_for_address(self, address: ChecksumAddress) -> SafeStatus:
         safe_status = self.safe_status_cache.get(address) or SafeStatus.objects.last_for_address(address)
         if not safe_status:
-            logger.error('SafeStatus not found for address=%s', address)
+            message = f'SafeStatus not found for address={address}'
+            logger.error(message)
+            raise ValueError(message)
         return safe_status
 
     def is_version_breaking_signatures(self, old_safe_version: str, new_safe_version: str) -> bool:

@@ -135,6 +135,10 @@ class EventsIndexer(EthereumIndexer):
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug('End prefetching and storing of ethereum txs')
         logger.debug('Processing %d decoded events', len(decoded_elements))
-        processed_elements = [self._process_decoded_element(decoded_element) for decoded_element in decoded_elements]
+        processed_elements = []
+        for decoded_element in decoded_elements:
+            processed_element = self._process_decoded_element(decoded_element)
+            if processed_element:
+                processed_elements.append(processed_element)
         logger.debug('End processing %d decoded events', len(decoded_elements))
         return processed_elements

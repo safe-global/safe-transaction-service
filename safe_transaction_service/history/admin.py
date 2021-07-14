@@ -156,9 +156,9 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
     search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
                      '=internal_tx__ethereum_tx__tx_hash', '=internal_tx__ethereum_tx__block__number']
 
+    @admin.action(description='Process internal tx again')
     def process_again(self, request, queryset):
         queryset.filter(processed=True).update(processed=False)
-    process_again.short_description = "Process internal tx again"
 
 
 class MultisigConfirmationListFilter(admin.SimpleListFilter):
@@ -257,24 +257,21 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
     list_display = ('address', 'initial_block_number', 'tx_block_number')
     search_fields = ['address']
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
+    @admin.action(description='Reindex from initial block')
     def reindex(self, request, queryset):
         queryset.update(tx_block_number=F('initial_block_number'))
-    reindex.short_description = "Reindex from initial block"
 
+    @admin.action(description='Reindex last 24 hours')
     def reindex_last_day(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, F('initial_block_number')))
-    reindex_last_day.short_description = "Reindex last 24 hours"
 
+    @admin.action(description='Reindex last week')
     def reindex_last_week(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, F('initial_block_number')))
-    reindex_last_week.short_description = "Reindex last week"
 
+    @admin.action(description='Reindex last month')
     def reindex_last_month(self, request, queryset):
         queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, F('initial_block_number')))
-    reindex_last_month.short_description = "Reindex last month"
 
 
 @admin.register(SafeMasterCopy)
@@ -284,8 +281,9 @@ class SafeMasterCopyAdmin(MonitoredAddressAdmin):
 
 
 @admin.register(SafeL2MasterCopy)
-class SafeMasterCopyAdmin(SafeMasterCopyAdmin):
-    pass
+class SafeL2MasterCopyAdmin(SafeMasterCopyAdmin):
+    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'deployer')
+    list_filter = ('deployer',)
 
 
 @admin.register(ProxyFactory)
@@ -327,19 +325,19 @@ class SafeContractAdmin(admin.ModelAdmin):
     raw_id_fields = ('ethereum_tx',)
     search_fields = ['address']
 
+    @admin.action(description='Reindex from initial block')
     def reindex(self, request, queryset):
         queryset.exclude(
             ethereum_tx=None
         ).update(erc20_block_number=F('ethereum_tx__block_id'))
-    reindex.short_description = "Reindex from initial block"
 
+    @admin.action(description='Reindex last 24 hours')
     def reindex_last_day(self, request, queryset):
         queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 6000, 0))
-    reindex_last_day.short_description = "Reindex last 24 hours"
 
+    @admin.action(description='Reindex last month')
     def reindex_last_month(self, request, queryset):
         queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 200000, 0))
-    reindex_last_month.short_description = "Reindex last month"
 
 
 @admin.register(SafeContractDelegate)
@@ -394,10 +392,10 @@ class SafeStatusAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    @admin.action(description='Remove and process transactions again')
     def remove_and_index(self, request, queryset):
         safe_addresses = list(queryset.distinct().values_list('address', flat=True))
         IndexServiceProvider().reindex_addresses(safe_addresses)
-    remove_and_index.short_description = "Remove and process transactions again"
 
 
 @admin.register(WebHook)
