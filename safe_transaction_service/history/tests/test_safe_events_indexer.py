@@ -379,7 +379,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertTrue(self.safe_events_indexer._is_setup_indexed(safe_address))
         safe_l2_master_copy.tx_block_number = initial_block_number
         safe_l2_master_copy.save(update_fields=['tx_block_number'])
-        self.assertEqual(self.safe_events_indexer.start(), 28)  # No new events are processed when reindexing
+        self.assertEqual(self.safe_events_indexer.start(), 0)  # No new events are processed when reindexing
         InternalTxDecoded.objects.update(processed=False)
         SafeStatus.objects.all().delete()
         self.assertEqual(
