@@ -20,13 +20,13 @@ docutils==0.17.1
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
 firebase-admin==5.0.1
-gnosis-py[django]==3.1.12
+gnosis-py[django]==3.1.13
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.1
-packaging>=20.9
+packaging>=21.0
 pillow==8.3.1
 psycogreen==1.0.2
 psycopg2-binary==2.9.1
 redis==3.5.3
-requests==2.25.1
+requests==2.26.0
 web3==5.19.0
