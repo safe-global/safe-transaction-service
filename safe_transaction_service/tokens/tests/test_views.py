@@ -92,16 +92,16 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
 
     def test_token_price_view(self):
         invalid_address = '0x1234'
-        response = self.client.get(reverse('v1:tokens:price', args=(invalid_address,)))
+        response = self.client.get(reverse('v1:tokens:price-usd', args=(invalid_address,)))
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         random_address = Account.create().address
-        response = self.client.get(reverse('v1:tokens:price', args=(random_address,)))
+        response = self.client.get(reverse('v1:tokens:price-usd', args=(random_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data, {'detail': ErrorDetail(string='Not found.', code='not_found')})
 
         token = TokenFactory(address=random_address, decimals=18)  # ERC20
-        response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
+        response = self.client.get(reverse('v1:tokens:price-usd', args=(token.address,)))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['fiat_code'], 'USD')
         self.assertEqual(response.data['fiat_price'], '0.0')
@@ -111,7 +111,7 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         fiat_price_with_timestamp_iterator = iter([fiat_price_with_timestamp])
         with mock.patch.object(PriceService, 'get_cached_usd_values', autospec=True,
                                return_value=fiat_price_with_timestamp_iterator):
-            response = self.client.get(reverse('v1:tokens:price', args=(token.address,)))
+            response = self.client.get(reverse('v1:tokens:price-usd', args=(token.address,)))
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data['fiat_code'], 'USD')
             self.assertEqual(response.data['fiat_price'], str(fiat_price_with_timestamp.fiat_price))
