@@ -8,6 +8,7 @@ class ContractAbiAdmin(admin.ModelAdmin):
     list_display = ('pk', 'relevance', 'description', 'abi_functions')
     list_filter = ('relevance',)
     ordering = ['relevance']
+    readonly_fields = ('abi_hash',)
     search_fields = ['description']
 
     def abi_functions(self, obj: ContractAbi):

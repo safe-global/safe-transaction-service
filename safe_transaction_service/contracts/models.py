@@ -1,3 +1,4 @@
+import json
 import os
 from logging import getLogger
 from typing import Any, Dict, List, Optional
@@ -10,6 +11,7 @@ from django.db.models import JSONField, Q
 from django.utils.translation import gettext_lazy as _
 
 from botocore.exceptions import ClientError
+from web3 import Web3
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
 
@@ -17,7 +19,7 @@ from gnosis.eth.clients import (BlockscoutClient,
                                 BlockScoutConfigurationProblem,
                                 EtherscanClient,
                                 EtherscanClientConfigurationProblem, Sourcify)
-from gnosis.eth.django.models import EthereumAddressField
+from gnosis.eth.django.models import EthereumAddressField, Sha3HashField
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
 logger = getLogger(__name__)
@@ -51,20 +53,22 @@ class ContractAbi(models.Model):
     abi = JSONField(validators=[validate_abi])
     description = models.CharField(max_length=200, blank=True)
     relevance = models.SmallIntegerField(default=100)  # A lower number will indicate more relevance
+    abi_hash = Sha3HashField(default=None, blank=True, null=True, unique=True)
 
     def __str__(self):
         return f'ContractABI {self.relevance} - {self.description}'
 
-    def clean(self):
-        try:
-            contract_abi = ContractAbi.objects.exclude(pk=self.pk).get(abi=self.abi)
-            raise ValidationError(_(f'Abi cannot be duplicated. Already exists: '
-                                    f'{contract_abi.pk} - {contract_abi.description}'))
-        except ContractAbi.DoesNotExist:
-            pass
-
     def abi_functions(self) -> List[str]:
         return [x['name'] for x in self.abi if x['type'] == 'function']
+
+    def save(self, *args, **kwargs) -> None:
+        if update_fields := kwargs.get('update_fields'):
+            if 'abi_hash' not in update_fields:
+                update_fields.append('abi_hash')
+        if isinstance(self.abi, str):
+            self.abi = json.loads(self.abi)
+        self.abi_hash = Web3.keccak(text=json.dumps(self.abi, separators=(',', ':')))
+        return super().save(*args, **kwargs)
 
 
 def get_contract_logo_path(instance: 'Contract', filename):

@@ -1,3 +1,4 @@
+import json
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -19,22 +20,16 @@ from .factories import ContractFactory
 
 
 class TestContractAbi(TestCase):
-    def test_unique_abi(self):
-        """
-        Abi cannot be unique as it's a very big field
-        """
+    def test_contract_abi_hash(self):
         abi = sourcify_safe_metadata['output']['abi']
-        contract_abi = ContractAbi(abi=abi, description='testing')
-        contract_abi.full_clean()
-        contract_abi.save()
+        contract_abi = ContractAbi.objects.create(abi=abi, description='testing')
+        self.assertIsNotNone(contract_abi.abi_hash)
 
-        contract_abi.description = 'testing 2'
-        contract_abi.full_clean()
-        contract_abi.save()
+        with self.assertRaisesMessage(IntegrityError, 'violates unique constraint'):
+            with atomic():
+                ContractAbi.objects.create(abi=json.dumps(abi), description='another testing')
 
-        contract_abi_2 = ContractAbi(abi=abi, description='whatever')
-        with self.assertRaisesMessage(ValidationError, 'Abi cannot be duplicated'):
-            contract_abi_2.full_clean()
+        ContractAbi.objects.create(abi={}, description='testing 3')
 
 
 class TestContract(TestCase):
