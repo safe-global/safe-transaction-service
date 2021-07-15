@@ -40,7 +40,7 @@ class SafeEventsIndexer(EventsIndexer):
     Indexes Gnosis Safe L2 events
     """
 
-    IGNORE_ADDRESSES_ON_LOG_FILTER = True
+    IGNORE_ADDRESSES_ON_LOG_FILTER = True  # Search for logs in every address (like the ProxyFactory)
 
     @cached_property
     def contract_events(self) -> List[ContractEvent]:
