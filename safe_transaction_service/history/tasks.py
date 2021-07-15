@@ -131,7 +131,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                     message = f'A problem was found in SafeStatus with nonce={safe_status.nonce} ' \
                               f'on internal-tx-id={safe_status.internal_tx_id} ' \
                               f'for safe-address={safe_address}, reindexing'
-                    logger.warning(message)
+                    logger.error(message)
                     IndexServiceProvider().reindex_addresses([safe_address])
                     raise ValueError(message)
 
