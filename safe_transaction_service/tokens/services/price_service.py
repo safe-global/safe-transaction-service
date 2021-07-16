@@ -163,6 +163,9 @@ class PriceService:
         :param token_address:
         :return: Current ether value for a given `token_address`
         """
+        if token_address == '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE':  # Ether
+            return 1.
+
         for oracle in self.enabled_price_oracles:
             try:
                 return oracle.get_price(token_address)

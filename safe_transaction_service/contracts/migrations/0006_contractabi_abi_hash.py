@@ -10,7 +10,7 @@ import gnosis.eth.django.models
 
 def add_hash_for_contract_abis(apps, schema_editor):
     ContractAbi = apps.get_model('contracts', 'ContractAbi')
-    for contract_abi in ContractAbi.objects.all().iterator():
+    for contract_abi in ContractAbi.objects.iterator():
         try:
             with transaction.atomic():
                 contract_abi.abi_hash = Web3.keccak(text=json.dumps(contract_abi.abi, separators=(',', ':')))
