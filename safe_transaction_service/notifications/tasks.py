@@ -9,6 +9,7 @@ from safe_transaction_service.history.models import (MultisigConfirmation,
                                                      SafeStatus, WebHookType)
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection
+from safe_transaction_service.utils.ethereum import get_ethereum_network
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice, FirebaseDeviceOwner
@@ -172,6 +173,7 @@ def send_notification_owner_task(address: str, safe_tx_hash: str):
             'type': WebHookType.CONFIRMATION_REQUEST.name,
             'address': address,
             'safeTxHash': safe_tx_hash,
+            'chainId': str(get_ethereum_network().value),
         }
         # Make sure notification has not been sent before
         duplicate_notification = DuplicateNotification(address, payload)
