@@ -1,4 +1,5 @@
 import contextlib
+from functools import cache
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
@@ -170,6 +171,12 @@ def check_reorgs_task(self) -> Optional[int]:
         pass
 
 
+@cache
+def get_webhook_http_session(webhook_url: str) -> requests.Session:
+    logger.debug('Getting http session for url=%s', webhook_url)
+    return requests.Session()
+
+
 @app.shared_task(autoretry_for=(IOError,), default_retry_delay=15, retry_kwargs={'max_retries': 3})
 def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     if not (address and payload):
@@ -178,6 +185,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     try:
         webhooks = WebHook.objects.matching_for_address(address)
         if not webhooks:
+            logger.debug('There is no webhook configured for address=%s', address)
             return 0
 
         sent_requests = 0
@@ -193,7 +201,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             else:  # Generic WebHook
                 logger.info('Sending webhook for host=%s and payload=%s', host, payload)
 
-            r = requests.post(webhook.url, json=payload)
+            r = get_webhook_http_session(webhook.url).post(webhook.url, json=payload)
             if not r.ok:
                 logger.warning('Failed status code %d posting to host=%s with content=%s',
                                r.status_code, host, r.content)

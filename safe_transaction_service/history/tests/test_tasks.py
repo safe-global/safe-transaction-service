@@ -3,7 +3,10 @@ from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
+import requests
 from eth_account import Account
+
+from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ..models import SafeContract, SafeStatus
 from ..tasks import process_decoded_internal_txs_task
@@ -14,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class TestTasks(TestCase):
-    @patch('requests.post')
-    def test_send_webhook_task(self, mock_post: MagicMock):
+    @patch.object(EthereumClient, 'get_network', return_value=EthereumNetwork.GANACHE)
+    @patch.object(requests.Session, 'post')
+    def test_send_webhook_task(self, mock_post: MagicMock, get_network_mock: MagicMock):
         EthereumEventFactory()
 
         with self.assertRaises(AssertionError):
