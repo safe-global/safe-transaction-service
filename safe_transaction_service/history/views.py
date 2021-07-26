@@ -390,7 +390,7 @@ class SafeCollectiblesView(SafeBalanceView):
         return CollectiblesServiceProvider().get_collectibles_with_metadata(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(15))
+    @method_decorator(cache_page(20))
     def get(self, *args, **kwargs):
         """
         Get collectibles (ERC721 tokens) and information about them
@@ -521,6 +521,7 @@ class SafeTransferListView(ListAPIView):
 
     @swagger_auto_schema(responses={200: serializers.TransferResponseSerializer(many=True),
                                     422: 'Safe address checksum not valid'})
+    @method_decorator(cache_page(20))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
@@ -577,6 +578,7 @@ class SafeInfoView(APIView):
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe not found',
                                     422: 'code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info'})
+    @method_decorator(cache_page(20))
     def get(self, request, address, *args, **kwargs):
         """
         Get status of the safe
@@ -611,6 +613,7 @@ class OwnersView(APIView):
 
     @swagger_auto_schema(responses={200: serializers.OwnerResponseSerializer(),
                                     422: 'Owner address checksum not valid'})
+    @method_decorator(cache_page(20))
     def get(self, request, address, *args, **kwargs):
         """
         Return Safes where the address provided is an owner
@@ -631,6 +634,7 @@ class OwnersDeprecatedView(OwnersView):
     @swagger_auto_schema(deprecated=True,
                          responses={200: serializers.OwnerResponseSerializer(),
                                     422: 'Owner address checksum not valid'})
+    @method_decorator(cache_page(20))
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
