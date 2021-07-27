@@ -7,9 +7,9 @@ from celery.utils.log import get_task_logger
 from safe_transaction_service.history.models import (MultisigConfirmation,
                                                      MultisigTransaction,
                                                      SafeStatus, WebHookType)
+from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection
-from safe_transaction_service.utils.ethereum import get_ethereum_network
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice, FirebaseDeviceOwner

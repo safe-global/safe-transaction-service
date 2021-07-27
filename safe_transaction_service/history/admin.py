@@ -83,9 +83,12 @@ class EthereumEventListFilter(admin.SimpleListFilter):
 
 @admin.register(EthereumEvent)
 class EthereumEventAdmin(admin.ModelAdmin):
-    list_display = ('ethereum_tx_id', 'log_index', 'erc20', 'erc721', 'address', 'from_', 'to', 'arguments')
+    list_display = ('block_number', 'log_index', 'erc20', 'erc721', 'address',
+                    'from_', 'to', 'ethereum_tx_id', 'arguments')
     list_display_links = ('log_index', 'arguments')
     list_filter = (EthereumEventListFilter, )
+    list_select_related = ('ethereum_tx',)
+    ordering = ['-ethereum_tx__block_id']
     search_fields = ['arguments', 'address', '=ethereum_tx__tx_hash']
     raw_id_fields = ('ethereum_tx',)
 
@@ -94,6 +97,11 @@ class EthereumEventAdmin(admin.ModelAdmin):
 
     def to(self, obj: EthereumEvent):
         return obj.arguments.get('to')
+
+    @admin.display()
+    def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
+        if obj.ethereum_tx:
+            return obj.ethereum_tx.block_id
 
     @admin.display(boolean=True)
     def erc20(self, obj: EthereumEvent):
@@ -188,13 +196,14 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
     raw_id_fields = ('ethereum_tx', 'multisig_transaction')
     search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
 
-    @admin.display(boolean=True)
-    def has_multisig_tx(self, obj: MultisigConfirmation) -> bool:
-        return bool(obj.multisig_transaction_id)
-
+    @admin.display()
     def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
         if obj.ethereum_tx:
             return obj.ethereum_tx.block_id
+
+    @admin.display(boolean=True)
+    def has_multisig_tx(self, obj: MultisigConfirmation) -> bool:
+        return bool(obj.multisig_transaction_id)
 
 
 class MultisigTransactionExecutedListFilter(admin.SimpleListFilter):
