@@ -194,17 +194,20 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             if not webhook.is_valid_for_webhook_type(webhook_type):
                 continue
 
-            parsed_url = urlparse(webhook.url)
-            host = f'{parsed_url.scheme}://{parsed_url.netloc}'
+            full_url = webhook.url
+            parsed_url = urlparse(full_url)
+            base_url = f'{parsed_url.scheme}://{parsed_url.netloc}'  # Remove url path for logging
             if webhook.address:
-                logger.info('Sending webhook for address=%s host=%s and payload=%s', address, host, payload)
+                logger.info('Sending webhook for address=%s base-url=%s and payload=%s', address, base_url, payload)
             else:  # Generic WebHook
-                logger.info('Sending webhook for host=%s and payload=%s', host, payload)
+                logger.info('Sending webhook for base-url=%s and payload=%s', base_url, payload)
 
-            r = get_webhook_http_session(webhook.url).post(webhook.url, json=payload)
-            if not r.ok:
-                logger.warning('Failed status code %d posting to host=%s with content=%s',
-                               r.status_code, host, r.content)
+            r = get_webhook_http_session(full_url).post(full_url, json=payload)
+            if r.ok:
+                logger.info('Webhook for base-url=%s and payload=%s was sent successfully', base_url, payload)
+            else:
+                logger.warning('Webhook failed with status-code=%d posting to url=%s with content=%s',
+                               r.status_code, full_url, r.content)
 
             sent_requests += 1
         return sent_requests

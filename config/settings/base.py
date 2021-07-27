@@ -297,6 +297,8 @@ LOGGING = {
         },
         'safe_transaction_service': {
             'level': 'DEBUG' if DEBUG else 'INFO',
+            'handlers': ['console'],
+            'propagate': False,
         },
         'safe_transaction_service.history.services.balance_service': {
             'level': 'WARNING',
