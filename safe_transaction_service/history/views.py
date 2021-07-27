@@ -227,8 +227,6 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-@swagger_auto_schema(responses={200: 'Ok',
-                                404: 'Not found'})
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
     serializer_class = serializers.SafeMultisigTransactionResponseSerializer
     lookup_field = 'safe_tx_hash'
@@ -241,6 +239,15 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
         ).select_related(
             'ethereum_tx__block'
         )
+
+
+class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailView):
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use `multisig-transactions` instead of `transactions`',
+                         responses={200: 'Ok',
+                                    404: 'Not found'})
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
 
 
 class SafeMultisigTransactionListView(ListAPIView):
@@ -314,6 +321,18 @@ class SafeMultisigTransactionListView(ListAPIView):
         else:
             serializer.save()
             return Response(status=status.HTTP_201_CREATED)
+
+
+class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView):
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use `multisig-transactions` instead of `transactions`')
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
+
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use `multisig-transactions` instead of `transactions`')
+    def post(self, *args, **kwargs):
+        return super().post(*args, **kwargs)
 
 
 def swagger_safe_balance_schema(serializer_class):
