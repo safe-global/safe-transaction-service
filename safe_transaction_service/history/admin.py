@@ -27,6 +27,11 @@ class EthereumTxInline(admin.TabularInline):
     raw_id_fields = ('block',)
 
 
+class InternalTxDecodedInline(admin.TabularInline):
+    model = InternalTxDecoded
+    raw_id_fields = ('internal_tx',)
+
+
 class MultisigTransactionInline(admin.TabularInline):
     model = MultisigTransaction
     raw_id_fields = ('ethereum_tx',)
@@ -124,6 +129,7 @@ class EthereumTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
+    inlines = (InternalTxDecodedInline,)
     list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type', 'trace_address')
     list_filter = ('tx_type', 'call_type')
     list_select_related = ('ethereum_tx',)
@@ -409,7 +415,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
 
 @admin.register(WebHook)
 class WebHookAdmin(admin.ModelAdmin):
-    list_display = ('address', 'url', 'pending_outgoing_transaction', 'new_confirmation',
+    list_display = ('pk', 'url', 'address', 'pending_outgoing_transaction', 'new_confirmation',
                     'new_executed_outgoing_transaction', 'new_incoming_transaction', 'new_safe',
                     'new_module_transaction', 'new_outgoing_transaction')
     list_filter = ('pending_outgoing_transaction', 'new_confirmation', 'new_executed_outgoing_transaction',
