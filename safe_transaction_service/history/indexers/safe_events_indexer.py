@@ -154,6 +154,13 @@ class SafeEventsIndexer(EventsIndexer):
         return 'tx_block_number'
 
     def _is_setup_indexed(self, safe_address: ChecksumAddress):
+        """
+        Check if ``SafeSetup`` + ``ProxyCreation`` events were already processed. Makes indexing idempotent,
+        as we modify the `trace_address` when processing `ProxyCreation`
+
+        :param safe_address:
+        :return: ``True`` if ``SafeSetup`` event was processed, ``False`` otherwise
+        """
         return InternalTxDecoded.objects.filter(
             function_name='setup',
             internal_tx___from=safe_address,
@@ -195,8 +202,6 @@ class SafeEventsIndexer(EventsIndexer):
         if event_name == 'ProxyCreation':
             safe_address = args.pop('proxy')
 
-            # Check if Safe setup was already processed. Makes indexing idempotent, as we modified the `trace_address`
-            # when processing `ProxyCreation`
             if self._is_setup_indexed(safe_address):
                 internal_tx = None
             else:
@@ -207,6 +212,7 @@ class SafeEventsIndexer(EventsIndexer):
                 # the master copy used. Without tracing it cannot be detected otherwise
                 InternalTx.objects.filter(
                     contract_address=safe_address,
+                    decoded_tx__function_name='setup'
                 ).update(
                     to=to,
                     contract_address=None,
@@ -218,16 +224,14 @@ class SafeEventsIndexer(EventsIndexer):
                 internal_tx.call_type = None
                 internal_tx_decoded = None
         elif event_name == 'SafeSetup':
-            # Check if Safe setup was already processed. Makes indexing idempotent, as we modified the `trace_address`
-            # when processing `ProxyCreation`
             if self._is_setup_indexed(safe_address):
                 internal_tx = None
             else:
                 # Usually ProxyCreation is called before SafeSetup, but it can be the opposite if someone
                 # creates a Safe and configure it in the next transaction. Remove it if that's the case
                 InternalTx.objects.filter(contract_address=safe_address).delete()
-                internal_tx_decoded.function_name = 'setup'
                 internal_tx.contract_address = safe_address
+                internal_tx_decoded.function_name = 'setup'
                 args['payment'] = 0
                 args['paymentReceiver'] = NULL_ADDRESS
                 args['_threshold'] = args.pop('threshold')
