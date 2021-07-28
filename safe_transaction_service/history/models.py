@@ -150,6 +150,10 @@ class EthereumBlockManager(models.Manager):
 
 class EthereumBlockQuerySet(models.QuerySet):
     def not_confirmed(self, to_block_number: Optional[int] = None):
+        """
+        :param to_block_number:
+        :return: Block not confirmed until ``to_block_number``, if provided
+        """
         queryset = self.filter(confirmed=False)
         if to_block_number is not None:
             queryset = queryset.filter(number__lte=to_block_number)

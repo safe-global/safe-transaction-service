@@ -350,7 +350,8 @@ ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX = env.int(
 # Safe
 # ------------------------------------------------------------------------------
 # Number of blocks from the current block number needed to consider a transaction valid/stable
-ETH_REORG_BLOCKS = env.int('ETH_REORG_BLOCKS', default=10)
+ETH_REORG_BLOCKS = env.int('ETH_REORG_BLOCKS',
+                           default=50 if ETH_L2_NETWORK else 10)  # L2 Networks have more reorgs
 
 # Tokens
 TOKENS_LOGO_BASE_URI = env('TOKENS_LOGO_BASE_URI', default='https://gnosis-safe-token-logos.s3.amazonaws.com/')

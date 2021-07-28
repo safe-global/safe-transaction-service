@@ -7,7 +7,8 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from ..models import EthereumBlock, ProxyFactory, SafeContract, SafeMasterCopy
+from ..models import (EthereumBlock, ProxyFactory, SafeContract,
+                      SafeL2MasterCopy, SafeMasterCopy)
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +32,19 @@ class ReorgService:
                  eth_reorg_rewind_blocks: Optional[int] = 250):
         """
         :param ethereum_client:
-        :param eth_reorg_blocks: Minimum number of blocks to consider a block confirmed and safe to rely on. By default
-        250 blocks (1 hour)
-        :param eth_reorg_back_blocks: Number of blocks to rewind when a reorg is found
+        :param eth_reorg_blocks: Minimum number of blocks to consider a block confirmed and safe to rely on. In Mainnet
+        10 blocks is considered safe
+        :param eth_reorg_rewind_blocks: Number of blocks to rewind indexing when a reorg is found
         """
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks  #
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
         # Dictionary with Django model and attribute for reorgs
         self.reorg_models: Dict[models.Model, str] = {
-            SafeMasterCopy: 'tx_block_number',
             ProxyFactory: 'tx_block_number',
             SafeContract: 'erc20_block_number',
+            SafeL2MasterCopy: 'tx_block_number',
+            SafeMasterCopy: 'tx_block_number',
         }
 
     def check_reorgs(self) -> Optional[int]:
