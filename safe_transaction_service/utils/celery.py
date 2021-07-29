@@ -33,9 +33,9 @@ class PatchedCeleryFormatter(ColorFormatter):
         if task and task.request:
             # For gevent pool, task_id will be something like `7ab44cb4-aacf-444e-bc20-4cbaa2a7b082`. For logs
             # is better to get it short
-            task_id = task.request.id[:8]
+            task_id = task.request.id[:8] if task.request.id else task.request.id
             # Task name usually has all the package, better cut the first part for logging
-            task_name = task.name.split('.')[-1]
+            task_name = task.name.split('.')[-1] if task.name else task.name
 
             record.__dict__.update(task_id=task_id,
                                    task_name=task_name)
