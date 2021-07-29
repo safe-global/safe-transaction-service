@@ -174,9 +174,16 @@ class EthereumBlock(models.Model):
     def __str__(self):
         return f'Block number={self.number} on {self.timestamp}'
 
+    def _set_confirmed(self, confirmed: bool):
+        if self.confirmed != confirmed:
+            self.confirmed = confirmed
+            self.save(update_fields=['confirmed'])
+
     def set_confirmed(self):
-        self.confirmed = True
-        self.save(update_fields=['confirmed'])
+        return self._set_confirmed(True)
+
+    def set_not_confirmed(self):
+        return self._set_confirmed(False)
 
 
 class EthereumTxManager(models.Manager):

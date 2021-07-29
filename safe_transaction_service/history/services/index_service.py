@@ -134,6 +134,7 @@ class IndexService:
             confirmed = (current_block_number - block['number']) >= self.eth_reorg_blocks
             ethereum_block: EthereumBlock = EthereumBlock.objects.get_or_create_from_block(block, confirmed=confirmed)
             if HexBytes(ethereum_block.block_hash) != block['hash']:
+                ethereum_block.set_not_confirmed()  # In case reorg was not detected
                 raise EthereumBlockHashMismatch(f'Stored block={ethereum_block.number} '
                                                 f'with hash={ethereum_block.block_hash} '
                                                 f'is not marching retrieved hash={block["hash"].hex()}')

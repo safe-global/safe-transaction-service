@@ -456,6 +456,22 @@ class TestMultisigConfirmations(TestCase):
         self.assertEqual(MultisigConfirmation.objects.all().delete()[0], 2)
 
 
+class TestEthereumBlock(TestCase):
+    def test_set_confirmed_not_confirmed(self):
+        ethereum_block = EthereumBlockFactory(confirmed=False)
+        ethereum_block.set_confirmed()
+        ethereum_block.refresh_from_db()
+        self.assertTrue(ethereum_block.confirmed)
+        # Check idempotent
+        ethereum_block.set_confirmed()
+        ethereum_block.refresh_from_db()
+        self.assertTrue(ethereum_block.confirmed)
+
+        ethereum_block.set_not_confirmed()
+        ethereum_block.refresh_from_db()
+        self.assertFalse(ethereum_block.confirmed)
+
+
 class TestMultisigTransactions(TestCase):
     def test_last_nonce(self):
         safe_address = Account.create().address
