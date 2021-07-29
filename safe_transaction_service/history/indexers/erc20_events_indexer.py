@@ -50,8 +50,8 @@ class Erc20EventsIndexer(EventsIndexer):
         return 'erc20_block_number'
 
     @property
-    def database_model(self):
-        return SafeContract
+    def database_queryset(self):
+        return SafeContract.objects.all()
 
     def _do_node_query(self, addresses: List[ChecksumAddress],
                        from_block_number: int, to_block_number: int) -> List[LogReceipt]:

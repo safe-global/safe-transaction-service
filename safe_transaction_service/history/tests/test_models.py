@@ -148,11 +148,11 @@ class TestSafeMasterCopy(TestCase):
 
     def test_get_version_for_address(self):
         random_address = Account.create().address
-        self.assertIsNone(SafeMasterCopy.custom_manager.get_version_for_address(random_address))
+        self.assertIsNone(SafeMasterCopy.objects.get_version_for_address(random_address))
 
         safe_master_copy = SafeMasterCopyFactory(address=random_address)
         self.assertTrue(safe_master_copy.version)
-        self.assertEqual(SafeMasterCopy.custom_manager.get_version_for_address(random_address),
+        self.assertEqual(SafeMasterCopy.objects.get_version_for_address(random_address),
                          safe_master_copy.version)
 
     def test_validate_version(self):

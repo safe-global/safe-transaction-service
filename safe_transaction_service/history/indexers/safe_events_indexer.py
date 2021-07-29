@@ -15,7 +15,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_contract as get_safe_V1_2_0_contract
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
-                      InternalTxType, SafeL2MasterCopy)
+                      InternalTxType, SafeMasterCopy)
 from .abis.gnosis import gnosis_safe_l2_v1_3_0_abi, proxy_factory_v1_3_0_abi
 from .events_indexer import EventsIndexer
 
@@ -146,12 +146,12 @@ class SafeEventsIndexer(EventsIndexer):
         ]
 
     @property
-    def database_model(self):
-        return SafeL2MasterCopy
-
-    @property
     def database_field(self):
         return 'tx_block_number'
+
+    @property
+    def database_queryset(self):
+        return SafeMasterCopy.objects.l2()
 
     def _is_setup_indexed(self, safe_address: ChecksumAddress):
         """

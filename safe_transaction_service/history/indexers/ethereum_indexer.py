@@ -45,15 +45,15 @@ class EthereumIndexer(ABC):
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
         :param block_process_limit: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
         :param blocks_to_reindex_again: Number of blocks to reindex every time the indexer runs, in case something
-        was missed.
+            was missed.
         :param updated_blocks_behind: Number of blocks scanned for an address that can be behind and
-        still be considered as almost updated. For example, if `updated_blocks_behind` is 100,
-        `current block number` is 200, and last scan for an address was stopped on block 150, address
-        is almost updated (200 - 100 < 150)
+            still be considered as almost updated. For example, if `updated_blocks_behind` is 100,
+            `current block number` is 200, and last scan for an address was stopped on block 150, address
+            is almost updated (200 - 100 < 150)
         :param query_chunk_size: Number of addresses to query for relevant data in the same request. By testing,
-        it seems that `200` can be a good value
+            it seems that `200` can be a good value
         :param block_auto_process_limit: Auto increase or decrease the `block_process_limit`
-        based on congestion algorithm
+            based on congestion algorithm
         """
         self.ethereum_client = ethereum_client
         self.index_service: IndexService = IndexServiceProvider()
@@ -71,14 +71,17 @@ class EthereumIndexer(ABC):
     @abstractmethod
     def database_field(self):
         """
-        Database field on `database_model` to store scan status
-        :return:
+        :return: Database field for `database_queryset` to store scan status
         """
         pass
 
     @property
-    def database_model(self):
-        return MonitoredAddress
+    @abstractmethod
+    def database_queryset(self):
+        """
+        :return: Queryset of objects being scanned
+        """
+        pass
 
     @abstractmethod
     def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
@@ -86,6 +89,7 @@ class EthereumIndexer(ABC):
                                current_block_number: Optional[int] = None) -> Sequence[Any]:
         """
         Find blockchain relevant elements for the `addresses`
+
         :param addresses:
         :param from_block_number
         :param to_block_number
@@ -97,6 +101,7 @@ class EthereumIndexer(ABC):
     def process_element(self, element: Any) -> List[Any]:
         """
         Process provided `element` to retrieve relevant data (internal txs, events...)
+
         :param element:
         :return:
         """
@@ -114,19 +119,24 @@ class EthereumIndexer(ABC):
         """
         For addresses almost updated (< `updated_blocks_behind` blocks) we process them together
         (`query_chunk_size` addresses at the same time)
+
         :param current_block_number:
         :return:
         """
-        return self.database_model.objects.almost_updated(self.database_field, current_block_number,
-                                                          self.updated_blocks_behind, self.confirmations)
+        return self.database_queryset.filter(
+            **{self.database_field + '__lt': current_block_number - self.confirmations,
+               self.database_field + '__gt': current_block_number - self.updated_blocks_behind})
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
         For addresses not updated (> `updated_blocks_behind` blocks) we process them one by one (node hangs)
+
         :param current_block_number:
         :return:
         """
-        return self.database_model.objects.not_updated(self.database_field, current_block_number, self.confirmations)
+        return self.database_queryset.filter(
+            **{self.database_field + '__lt': current_block_number - self.confirmations}
+        )
 
     def update_monitored_address(self, addresses: Sequence[str], from_block_number: int, to_block_number: int) -> int:
         """
@@ -135,8 +145,12 @@ class EthereumIndexer(ABC):
         :param to_block_number: Block number to be updated
         :return: Number of addresses updated
         """
-        updated_addresses = self.database_model.objects.update_addresses(addresses, from_block_number, to_block_number,
-                                                                         self.database_field)
+        updated_addresses = self.database_queryset.filter(
+            **{'address__in': addresses,
+               self.database_field + '__gte': from_block_number - 1,  # Protect in case of reorg
+               }
+        ).update(**{self.database_field: to_block_number})
+
         if updated_addresses != len(addresses):
             logger.warning('%s: Possible reorg - Cannot update all indexed addresses=%s '
                            'from-block-number=%d to-block-number=%d',
@@ -155,7 +169,7 @@ class EthereumIndexer(ABC):
         confirmations = self.confirmations
         current_block_number = current_block_number or self.ethereum_client.current_block_number
 
-        monitored_contract_queryset = self.database_model.objects.filter(address__in=addresses)
+        monitored_contract_queryset = self.database_queryset.filter(address__in=addresses)
         common_minimum_block_number = monitored_contract_queryset.aggregate(**{
             self.database_field: Min(self.database_field)
         })[self.database_field]
@@ -179,6 +193,7 @@ class EthereumIndexer(ABC):
                           current_block_number: Optional[int] = None) -> Tuple[Sequence[Any], bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
+
         :param addresses: Addresses to process
         :param current_block_number: To prevent fetching it again
         :return: List of processed data and a boolean (`True` if no more blocks to scan, `False` otherwise)
@@ -243,6 +258,7 @@ class EthereumIndexer(ABC):
     def start(self) -> int:
         """
         Find and process relevant data for existing database addresses
+
         :return: Number of elements processed
         """
         current_block_number = self.ethereum_client.current_block_number

@@ -14,7 +14,7 @@ from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, MultisigConfirmation,
                       MultisigTransaction, SafeStatus)
-from .factories import SafeL2MasterCopyFactory
+from .factories import SafeMasterCopyFactory
 
 
 class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
@@ -51,11 +51,12 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
         initial_block_number = self.ethereum_client.current_block_number
-        safe_l2_master_copy = SafeL2MasterCopyFactory(
+        safe_l2_master_copy = SafeMasterCopyFactory(
             address=self.safe_contract_V1_3_0.address,
             initial_block_number=initial_block_number,
             tx_block_number=initial_block_number,
-            version='1.3.0'
+            version='1.3.0',
+            l2=True
         )
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
             self.ethereum_test_account, self.safe_contract_V1_3_0.address,

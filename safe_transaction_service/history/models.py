@@ -969,38 +969,7 @@ class MultisigConfirmation(TimeStampedModel):
             return f'Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}'
 
 
-class MonitoredAddressManager(models.Manager):
-    def update_addresses(self, addresses: List[str], from_block_number: int, block_number: int,
-                         database_field: str) -> int:
-        """
-        :param addresses: Addresses to have the block number updated
-        :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
-        :param block_number: Block number to be updated
-        :param database_field: Database field to store the block number
-        :return: Number of entities updated
-        """
-        return self.filter(
-            **{'address__in': addresses,
-               database_field + '__gte': from_block_number - 1,  # Protect in case of reorg
-               }
-        ).update(**{database_field: block_number})
-
-
-class MonitoredAddressQuerySet(models.QuerySet):
-    def almost_updated(self, database_field: str, current_block_number: int,
-                       updated_blocks_behind: int, confirmations: int):
-        return self.filter(
-            **{database_field + '__lt': current_block_number - confirmations,
-               database_field + '__gt': current_block_number - updated_blocks_behind})
-
-    def not_updated(self, database_field: str, current_block_number: int, confirmations: int):
-        return self.filter(
-            **{database_field + '__lt': current_block_number - confirmations}
-        )
-
-
 class MonitoredAddress(models.Model):
-    objects = MonitoredAddressManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     initial_block_number = models.IntegerField(default=0)  # Block number when address received first tx
     tx_block_number = models.IntegerField(null=True, default=None,
@@ -1033,7 +1002,7 @@ def validate_version(value: str):
         )
 
 
-class SafeMasterCopyBaseManager(models.Manager):
+class SafeMasterCopyManager(models.Manager):
     def get_version_for_address(self, address: ChecksumAddress) -> Optional[str]:
         try:
             return self.filter(address=address).only('version').get().version
@@ -1041,33 +1010,26 @@ class SafeMasterCopyBaseManager(models.Manager):
             return None
 
 
-class SafeMasterCopyBase(MonitoredAddress):
-    custom_manager = SafeMasterCopyBaseManager()
+class SafeMasterCopyQueryset(models.QuerySet):
+    def l2(self):
+        return self.filter(l2=True)
+
+    def not_l2(self):
+        return self.filter(l2=False)
+
+
+class SafeMasterCopy(MonitoredAddress):
+    objects = SafeMasterCopyManager.from_queryset(SafeMasterCopyQueryset)()
     version = models.CharField(max_length=20, validators=[validate_version])
     deployer = models.CharField(max_length=50, default='Gnosis')
+    l2 = models.BooleanField(default=False)
 
-    class Meta:
-        abstract = True
-
-
-class SafeMasterCopy(SafeMasterCopyBase):
     class Meta:
         verbose_name_plural = 'Safe master copies'
         ordering = ['tx_block_number']
 
 
-class SafeL2MasterCopy(SafeMasterCopyBase):
-    class Meta:
-        verbose_name_plural = 'Safe L2 master copies'
-        ordering = ['tx_block_number']
-
-
-class SafeContractManager(MonitoredAddressManager):
-    pass
-
-
 class SafeContract(models.Model):
-    objects = SafeContractManager.from_queryset(MonitoredAddressQuerySet)()
     address = EthereumAddressField(primary_key=True)
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE, related_name='safe_contracts')
     erc20_block_number = models.IntegerField(default=0, db_index=True)  # Block number of last scan of erc20

@@ -16,8 +16,8 @@ from ..models import (EthereumBlock, EthereumEvent, EthereumTx,
                       EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, ModuleTransaction, MultisigConfirmation,
                       MultisigTransaction, ProxyFactory, SafeContract,
-                      SafeContractDelegate, SafeL2MasterCopy, SafeMasterCopy,
-                      SafeStatus, WebHook)
+                      SafeContractDelegate, SafeMasterCopy, SafeStatus,
+                      WebHook)
 
 
 class EthereumBlockFactory(DjangoModelFactory):
@@ -246,14 +246,10 @@ class ProxyFactoryFactory(MonitoredAddressFactory):
 class SafeMasterCopyFactory(MonitoredAddressFactory):
     version = factory.Sequence(lambda n: f'1.0.{n}')
     deployer = factory.Faker('company')
+    l2 = False
 
     class Meta:
         model = SafeMasterCopy
-
-
-class SafeL2MasterCopyFactory(SafeMasterCopyFactory):
-    class Meta:
-        model = SafeL2MasterCopy
 
 
 class SafeStatusFactory(DjangoModelFactory):

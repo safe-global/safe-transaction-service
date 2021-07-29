@@ -20,8 +20,8 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
 from ..models import (EthereumTx, InternalTx, InternalTxDecoded,
                       ModuleTransaction, MultisigConfirmation,
-                      MultisigTransaction, SafeContract, SafeL2MasterCopy,
-                      SafeMasterCopy, SafeStatus)
+                      MultisigTransaction, SafeContract, SafeMasterCopy,
+                      SafeStatus)
 
 logger = getLogger(__name__)
 
@@ -131,11 +131,7 @@ class SafeTxProcessor(TxProcessor):
 
     @cache
     def get_safe_version_from_master_copy(self, master_copy: ChecksumAddress) -> Optional[str]:
-        for MasterCopyModel in (SafeMasterCopy, SafeL2MasterCopy):
-            version = MasterCopyModel.custom_manager.get_version_for_address(master_copy)
-            if version:
-                return version
-        return None
+        return SafeMasterCopy.objects.get_version_for_address(master_copy)
 
     @cache
     def get_chain_id(self) -> int:

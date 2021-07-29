@@ -45,8 +45,8 @@ class ProxyFactoryIndexer(EventsIndexer):
         return 'tx_block_number'
 
     @property
-    def database_model(self):
-        return ProxyFactory
+    def database_queryset(self):
+        return ProxyFactory.objects.all()
 
     def _process_decoded_element(self, decoded_element: EventData) -> Optional[SafeContract]:
         contract_address = decoded_element['args']['proxy']

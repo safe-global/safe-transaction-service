@@ -11,12 +11,12 @@ from gnosis.eth import EthereumClientProvider
 from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
                      InternalTxDecoded, ModuleTransaction,
                      MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                     SafeContract, SafeContractDelegate, SafeL2MasterCopy,
-                     SafeMasterCopy, SafeStatus, WebHook)
+                     SafeContract, SafeContractDelegate, SafeMasterCopy,
+                     SafeStatus, WebHook)
 from .services import IndexServiceProvider
 
 
-# Inline objects
+# Inline objects ------------------------------
 class EthereumEventInline(admin.TabularInline):
     model = EthereumEvent
     raw_id_fields = ('ethereum_tx',)
@@ -52,6 +52,7 @@ class SafeContractDelegateInline(admin.TabularInline):
     raw_id_fields = ('safe_contract',)
 
 
+# Admin models ------------------------------
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
@@ -291,13 +292,7 @@ class MonitoredAddressAdmin(admin.ModelAdmin):
 
 @admin.register(SafeMasterCopy)
 class SafeMasterCopyAdmin(MonitoredAddressAdmin):
-    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'deployer')
-    list_filter = ('deployer',)
-
-
-@admin.register(SafeL2MasterCopy)
-class SafeL2MasterCopyAdmin(SafeMasterCopyAdmin):
-    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'deployer')
+    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'l2', 'deployer')
     list_filter = ('deployer',)
 
 

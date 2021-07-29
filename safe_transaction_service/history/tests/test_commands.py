@@ -11,7 +11,7 @@ from django_celery_beat.models import PeriodicTask
 
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 
-from ..models import ProxyFactory, SafeL2MasterCopy, SafeMasterCopy
+from ..models import ProxyFactory, SafeMasterCopy
 from .factories import MultisigTransactionFactory
 
 
@@ -71,7 +71,7 @@ class TestCommands(TestCase):
         self.assertEqual(last_proxy_factory.tx_block_number, last_proxy_factory_initial_block)
 
         self.assertEqual(SafeMasterCopy.objects.count(), 8)
-        self.assertEqual(SafeL2MasterCopy.objects.count(), 1)
+        self.assertEqual(SafeMasterCopy.objects.l2().count(), 1)
         self.assertEqual(ProxyFactory.objects.count(), 4)
 
     def test_setup_service_rinkeby(self):

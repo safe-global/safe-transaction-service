@@ -52,8 +52,8 @@ class InternalTxIndexer(EthereumIndexer):
         return 'tx_block_number'
 
     @property
-    def database_model(self):
-        return SafeMasterCopy
+    def database_queryset(self):
+        return SafeMasterCopy.objects.all()
 
     def find_relevant_elements(self, addresses: Sequence[str], from_block_number: int,
                                to_block_number: int, current_block_number: Optional[int] = None) -> Set[str]:

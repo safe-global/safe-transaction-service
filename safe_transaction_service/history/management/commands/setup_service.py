@@ -9,7 +9,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
 
-from ...models import ProxyFactory, SafeL2MasterCopy, SafeMasterCopy
+from ...models import ProxyFactory, SafeMasterCopy
 
 
 @dataclass
@@ -226,20 +226,19 @@ class Command(BaseCommand):
 
     def _setup_safe_master_copies(self, safe_master_copies: Sequence[Tuple[str, int, str]]):
         for address, initial_block_number, version in safe_master_copies:
-            ModelsToInsert = (SafeL2MasterCopy, SafeMasterCopy) if version.endswith('+L2') else (SafeMasterCopy,)
-            for ModelToInsert in ModelsToInsert:
-                safe_master_copy, _ = ModelToInsert.objects.get_or_create(
-                    address=address,
-                    defaults={
-                        'initial_block_number': initial_block_number,
-                        'tx_block_number': initial_block_number,
-                        'version': version,
-                    }
-                )
-                if safe_master_copy.version != version or safe_master_copy.initial_block_number != initial_block_number:
-                    safe_master_copy.version = initial_block_number
-                    safe_master_copy.version = version
-                    safe_master_copy.save(update_fields=['initial_block_number', 'version'])
+            safe_master_copy, _ = SafeMasterCopy.objects.get_or_create(
+                address=address,
+                defaults={
+                    'initial_block_number': initial_block_number,
+                    'tx_block_number': initial_block_number,
+                    'version': version,
+                    'l2': version.endswith('+L2'),
+                }
+            )
+            if safe_master_copy.version != version or safe_master_copy.initial_block_number != initial_block_number:
+                safe_master_copy.version = initial_block_number
+                safe_master_copy.version = version
+                safe_master_copy.save(update_fields=['initial_block_number', 'version'])
 
     def _setup_safe_proxy_factories(self, safe_proxy_factories: Sequence[Tuple[str, int]]):
         for address, initial_block_number in safe_proxy_factories:

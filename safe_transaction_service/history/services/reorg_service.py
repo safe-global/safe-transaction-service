@@ -7,8 +7,7 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from ..models import (EthereumBlock, ProxyFactory, SafeContract,
-                      SafeL2MasterCopy, SafeMasterCopy)
+from ..models import EthereumBlock, ProxyFactory, SafeContract, SafeMasterCopy
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,6 @@ class ReorgService:
         self.reorg_models: Dict[models.Model, str] = {
             ProxyFactory: 'tx_block_number',
             SafeContract: 'erc20_block_number',
-            SafeL2MasterCopy: 'tx_block_number',
             SafeMasterCopy: 'tx_block_number',
         }
 
