@@ -136,6 +136,7 @@ class AllTransactionsListView(ListAPIView):
     @swagger_auto_schema(responses={200: _schema_200_response,
                                     422: 'code = 1: Checksum address validation failed'},
                          manual_parameters=[_schema_executed_param, _schema_queued_param, _schema_trusted_param])
+    @method_decorator(cache_page(20))
     def get(self, request, *args, **kwargs):
         """
         Returns a paginated list of transactions for a Safe. The list has different structures depending on the
