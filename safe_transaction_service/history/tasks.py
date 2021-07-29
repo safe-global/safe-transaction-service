@@ -114,6 +114,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
     """
     Process decoded internal txs for one Safe. Processing decoded transactions is very slow and this way multiple
     Safes can be processed at the same time
+
     :param safe_address:
     :return:
     """

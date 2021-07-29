@@ -130,6 +130,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
 def send_notification_owner_task(address: str, safe_tx_hash: str):
     """
     Send a confirmation request to an owner
+
     :param address: Safe address
     :param safe_tx_hash: Hash of the safe tx
     :return: Tuple with the number of successful and failed notifications sent

@@ -40,6 +40,7 @@ def migrate_back_l2_master_copies(apps, schema_editor):
             }
         )
 
+
 class Migration(migrations.Migration):
 
     dependencies = [

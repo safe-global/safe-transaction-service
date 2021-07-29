@@ -19,6 +19,7 @@ logger = get_task_logger(__name__)
 def create_missing_contracts_with_metadata_task() -> int:
     """
     Insert detected contracts the users are interacting with on database and retrieve metadata (name, abi) if possible
+
     :return: Number of contracts missing
     """
     try:
@@ -36,6 +37,7 @@ def create_missing_contracts_with_metadata_task() -> int:
 def reindex_contracts_without_metadata() -> int:
     """
     Try to reindex existing contracts without metadata
+
     :return: Number of contracts missing
     """
     try:

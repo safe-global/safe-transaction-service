@@ -43,6 +43,7 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
                                    force_recalculation: bool = False) -> Optional[EthValueWithTimestamp]:
     """
     Do price calculation for token in an async way and store it with its timestamp on redis
+
     :param token_address: Token address
     :param redis_key: Redis key for token price
     :param force_recalculation: Force a new calculation even if an old one is on cache
@@ -85,6 +86,7 @@ def calculate_token_eth_price_task(token_address: ChecksumAddress, redis_key: st
 def fix_pool_tokens_task() -> Optional[int]:
     """
     Fix names for generic pool tokens, like Balancer or Uniswap
+
     :return: Number of pool token names updated
     """
     if get_ethereum_network() == EthereumNetwork.MAINNET:
@@ -101,6 +103,7 @@ def fix_pool_tokens_task() -> Optional[int]:
 def get_token_info_from_blockchain(token_address: ChecksumAddress) -> bool:
     """
     Retrieve token information from blockchain
+
     :param token_address:
     :return: `True` if found, `False` otherwise
     """
