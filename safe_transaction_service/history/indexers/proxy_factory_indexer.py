@@ -65,6 +65,7 @@ class ProxyFactoryIndexer(EventsIndexer):
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[SafeContract]:
         """
         Process all logs
+
         :param log_receipts: Iterable of Events fetched using `web3.eth.getLogs`
         :return: List of `SafeContract` already stored in database
         """

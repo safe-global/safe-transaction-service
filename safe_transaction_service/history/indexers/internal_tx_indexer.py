@@ -98,6 +98,7 @@ class InternalTxIndexer(EthereumIndexer):
                                                    to_block_number: int) -> Set[str]:
         """
         Search for tx hashes with internal txs (in and out) of a `address`
+
         :param addresses:
         :param from_block_number: Starting block number
         :param to_block_number: Ending block number
@@ -185,6 +186,7 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
         Return every address. As we are using `trace_block` every master copy should be processed together
+
         :param current_block_number:
         :return:
         """

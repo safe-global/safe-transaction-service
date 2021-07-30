@@ -57,6 +57,7 @@ class Erc20EventsIndexer(EventsIndexer):
                        from_block_number: int, to_block_number: int) -> List[LogReceipt]:
         """
         Override function to call custom `get_total_transfer_history` function
+
         :param addresses:
         :param from_block_number:
         :param to_block_number:
@@ -86,7 +87,7 @@ class Erc20EventsIndexer(EventsIndexer):
         """
         :param event: Be careful, it will be modified instead of copied
         :return: The same event if it's a ERC20/ERC721. Tries to tell apart if it's not defined (`unknown` instead
-        of `value` or `tokenId`)
+            of `value` or `tokenId`)
         """
         event_args = event['args']
         if 'unknown' in event_args:  # Not standard event, trying to tell apart ERC20 from ERC721
@@ -103,6 +104,7 @@ class Erc20EventsIndexer(EventsIndexer):
     def process_elements(self, log_receipts: Sequence[EventData]) -> List[EthereumEvent]:
         """
         Process all events found by `find_relevant_elements`
+
         :param log_receipts: Events to store in database
         :return: List of `EthereumEvent` already stored in database
         """

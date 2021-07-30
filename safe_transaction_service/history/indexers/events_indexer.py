@@ -48,7 +48,8 @@ class EventsIndexer(EthereumIndexer):
     def _do_node_query(self, addresses: List[ChecksumAddress],
                        from_block_number: int, to_block_number: int) -> List[LogReceipt]:
         """
-        Do the
+        Perform query to the node
+
         :param addresses:
         :param from_block_number:
         :param to_block_number:
@@ -71,6 +72,7 @@ class EventsIndexer(EthereumIndexer):
                                     from_block_number: int, to_block_number: int) -> List[LogReceipt]:
         """
         It will get Safe events using all the Gnosis Safe topics for filtering.
+
         :param addresses:
         :param from_block_number:
         :param to_block_number:
@@ -102,6 +104,7 @@ class EventsIndexer(EthereumIndexer):
                                current_block_number: Optional[int] = None) -> List[LogReceipt]:
         """
         Search for log receipts for Safe events
+
         :param addresses: Not used
         :param from_block_number: Starting block number
         :param to_block_number: Ending block number
@@ -121,6 +124,7 @@ class EventsIndexer(EthereumIndexer):
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
         """
         Process all events found by `find_relevant_elements`
+
         :param log_receipts: Events to store in database
         :return: List of `EthereumEvent` already stored in database
         """
