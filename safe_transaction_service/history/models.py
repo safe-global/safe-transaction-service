@@ -1112,7 +1112,7 @@ class SafeStatusQuerySet(models.QuerySet):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                    SELECT address
+                    SELECT DISTINCT(address)
                     FROM (
                         SELECT address, owners,
                                 rank() OVER (PARTITION BY address ORDER BY nonce DESC, internal_tx_id DESC) AS pos
