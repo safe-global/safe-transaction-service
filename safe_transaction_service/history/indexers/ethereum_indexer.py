@@ -221,7 +221,7 @@ class EthereumIndexer(ABC):
             elements = self.find_relevant_elements(addresses, from_block_number, to_block_number,
                                                    current_block_number=current_block_number)
         except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
-            self.block_process_limit = min(self.initial_block_process_limit // 2, 50)  # Set back to less than default
+            self.block_process_limit = 1  # Set back to the very minimum
             logger.info('%s: block_process_limit set back to %d', self.__class__.__name__, self.block_process_limit)
             raise e
 
@@ -232,7 +232,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit halved to %d', self.__class__.__name__,
                             self.block_process_limit)
             elif delta > 10:
-                new_block_process_limit = max(self.block_process_limit - 5000, 500)
+                new_block_process_limit = max(self.block_process_limit - 100, 1)
                 self.block_process_limit = new_block_process_limit
                 logger.info('%s: block_process_limit decreased to %d', self.__class__.__name__,
                             self.block_process_limit)
@@ -241,7 +241,7 @@ class EthereumIndexer(ABC):
                 logger.info('%s: block_process_limit duplicated to %d', self.__class__.__name__,
                             self.block_process_limit)
             elif delta < 3:
-                self.block_process_limit += 5000
+                self.block_process_limit += 100
                 logger.info('%s: block_process_limit increased to %d', self.__class__.__name__,
                             self.block_process_limit)
 
