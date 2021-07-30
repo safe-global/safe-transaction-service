@@ -2,12 +2,13 @@ import datetime
 from enum import Enum
 from itertools import islice
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypedDict
+from typing import (Any, Dict, List, Optional, Sequence, Set, Tuple, Type,
+                    TypedDict)
 
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models
+from django.db import IntegrityError, connection, models
 from django.db.models import (Case, Count, Index, JSONField, Max, Q, QuerySet,
                               Sum)
 from django.db.models.expressions import (F, OuterRef, RawSQL, Subquery, Value,
@@ -1100,11 +1101,28 @@ class SafeStatusQuerySet(models.QuerySet):
             'internal_tx__trace_address',
         )
 
-    def addresses_for_owner(self, owner_address: str) -> List[str]:
-        return self.filter(
-            owners__contains=[owner_address],
-            internal_tx__in=self.last_for_every_address().values('pk')
-        ).values_list('address', flat=True)
+    def addresses_for_owner(self, owner_address: str) -> Set[str]:
+        """
+        Use raw query to get the Safes for an owner. We order by the internal_tx_id instead of using JOIN to get
+        the internal tx index as a shortcut. It's not as accurate but should be enough
+
+        :param owner_address:
+        :return:
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                    SELECT address
+                    FROM (
+                        SELECT address, owners,
+                                rank() OVER (PARTITION BY address ORDER BY nonce DESC, internal_tx_id DESC) AS pos
+                        FROM history_safestatus
+                        ) AS ss
+                    WHERE pos = 1 AND owners @> ARRAY[%s]::varchar(42)[];
+                """,
+                [owner_address]
+            )
+            return {row[0] for row in cursor.fetchall()}
 
     def last_for_every_address(self) -> QuerySet:
         return self.distinct(
@@ -1135,6 +1153,7 @@ class SafeStatus(models.Model):
     class Meta:
         indexes = [
             Index(fields=['address', '-nonce']),   # Index on address and nonce DESC
+            Index(fields=['address', '-nonce', '-internal_tx']),   # For Window search
             GinIndex(fields=['owners'])
         ]
         unique_together = (('internal_tx', 'address'),)

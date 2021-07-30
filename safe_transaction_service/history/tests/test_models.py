@@ -387,14 +387,26 @@ class TestSafeStatus(TestCase):
         owner_address = Account.create().address
         address = Account.create().address
         address_2 = Account.create().address
-        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
         SafeStatusFactory(address=address, nonce=0, owners=[owner_address])
-        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [address])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), {address})
         SafeStatusFactory(address=address, nonce=1)
-        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
         SafeStatusFactory(address=address, nonce=2, owners=[owner_address])
         SafeStatusFactory(address=address_2, nonce=0, owners=[owner_address])
-        self.assertCountEqual(SafeStatus.objects.addresses_for_owner(owner_address), [address, address_2])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), {address, address_2})
+        # Remove the owner from one of the Safes
+        new_owner = Account.create().address
+        SafeStatusFactory(address=address, nonce=3, owners=[new_owner])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), {address_2})
+
+        # Add new owner for the other Safe
+        SafeStatusFactory(address=address_2, nonce=1, owners=[owner_address, new_owner])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), {address_2})
+
+        # Remove the owner from the other Safe
+        SafeStatusFactory(address=address_2, nonce=2, owners=[new_owner])
+        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
 
 
 class TestSafeContract(TestCase):

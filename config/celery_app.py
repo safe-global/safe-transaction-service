@@ -12,6 +12,7 @@ def on_celery_setup_logging(**kwargs):
     :return:
     """
     from logging.config import dictConfig
+
     from django.conf import settings
 
     # Patch all the code to use Celery logger (if not just logs inside tasks.py are displayed with the
