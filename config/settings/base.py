@@ -301,10 +301,10 @@ LOGGING = {
             'propagate': False,
         },
         'safe_transaction_service.history.services.balance_service': {
-            'level': 'WARNING',
+            'level': 'DEBUG' if DEBUG else 'WARNING',
         },
         'safe_transaction_service.history.services.collectibles_service': {
-            'level': 'WARNING',
+            'level': 'DEBUG' if DEBUG else 'WARNING',
         },
         'celery': {
             'handlers': ['console'],

@@ -46,7 +46,7 @@ class AboutView(APIView):
     """
     renderer_classes = (JSONRenderer,)
 
-    @method_decorator(cache_page(60 * 60))  # Cache 1 hour
+    @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, format=None):
         content = {
             'name': 'Safe Transaction Service',
@@ -136,7 +136,6 @@ class AllTransactionsListView(ListAPIView):
     @swagger_auto_schema(responses={200: _schema_200_response,
                                     422: 'code = 1: Checksum address validation failed'},
                          manual_parameters=[_schema_executed_param, _schema_queued_param, _schema_trusted_param])
-    @method_decorator(cache_page(20))
     def get(self, request, *args, **kwargs):
         """
         Returns a paginated list of transactions for a Safe. The list has different structures depending on the
@@ -366,7 +365,6 @@ class SafeBalanceView(APIView):
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(20))
     def get(self, request, address):
         """
         Get balance for Ether and ERC20 tokens
@@ -395,7 +393,6 @@ class SafeBalanceUsdView(SafeBalanceView):
         return BalanceServiceProvider().get_usd_balances(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(20))
     def get(self, *args, **kwargs):
         """
         Get balance for Ether and ERC20 tokens with USD fiat conversion
@@ -410,7 +407,6 @@ class SafeCollectiblesView(SafeBalanceView):
         return CollectiblesServiceProvider().get_collectibles_with_metadata(*args, **kwargs)
 
     @swagger_safe_balance_schema(serializer_class)
-    @method_decorator(cache_page(20))
     def get(self, *args, **kwargs):
         """
         Get collectibles (ERC721 tokens) and information about them
@@ -541,7 +537,6 @@ class SafeTransferListView(ListAPIView):
 
     @swagger_auto_schema(responses={200: serializers.TransferResponseSerializer(many=True),
                                     422: 'Safe address checksum not valid'})
-    @method_decorator(cache_page(20))
     def get(self, request, address, format=None):
         """
         Returns the history of a multisig tx (safe)
@@ -598,7 +593,6 @@ class SafeInfoView(APIView):
     @swagger_auto_schema(responses={200: serializer_class(),
                                     404: 'Safe not found',
                                     422: 'code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info'})
-    @method_decorator(cache_page(20))
     def get(self, request, address, *args, **kwargs):
         """
         Get status of the safe
@@ -633,7 +627,7 @@ class OwnersView(APIView):
 
     @swagger_auto_schema(responses={200: serializers.OwnerResponseSerializer(),
                                     422: 'Owner address checksum not valid'})
-    @method_decorator(cache_page(20))
+    @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, *args, **kwargs):
         """
         Return Safes where the address provided is an owner
@@ -648,15 +642,6 @@ class OwnersView(APIView):
         serializer = self.serializer_class(data={'safes': safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
-
-
-class OwnersDeprecatedView(OwnersView):
-    @swagger_auto_schema(deprecated=True,
-                         responses={200: serializers.OwnerResponseSerializer(),
-                                    422: 'Owner address checksum not valid'})
-    @method_decorator(cache_page(20))
-    def get(self, *args, **kwargs):
-        return super().get(*args, **kwargs)
 
 
 class DataDecoderView(GenericAPIView):
