@@ -63,7 +63,7 @@ class Erc20EventsIndexer(EventsIndexer):
         :param to_block_number:
         :return:
         """
-        parameter_addresses = None if len(addresses) > 10 else addresses
+        parameter_addresses = None if len(addresses) > 300 else addresses
         transfer_events = self.ethereum_client.erc20.get_total_transfer_history(parameter_addresses,
                                                                                 from_block=from_block_number,
                                                                                 to_block=to_block_number)
