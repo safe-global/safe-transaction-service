@@ -111,14 +111,19 @@ class EventsIndexer(EthereumIndexer):
         :param current_block_number: Current block number (for cache purposes)
         :return: LogReceipt for matching events
         """
-        logger.debug('%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s',
-                     self.__class__.__name__, from_block_number, to_block_number, len(addresses), addresses[:10])
+        len_addresses = len(addresses)
+        logger.debug(
+            '%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s',
+            self.__class__.__name__, from_block_number, to_block_number, len_addresses, addresses[:10]
+        )
         log_receipts = self._find_elements_using_topics(addresses, from_block_number, to_block_number)
 
         len_events = len(log_receipts)
         logger_fn = logger.info if len_events else logger.debug
-        logger_fn('%s: Found %d events between block-number=%d and block-number=%d',
-                  self.__class__.__name__, len_events, from_block_number, to_block_number)
+        logger_fn(
+            '%s: Found %d events from block-number=%d to block-number=%d for %d addresses: %s',
+            self.__class__.__name__, len_events, from_block_number, to_block_number, len_addresses, addresses[:10]
+        )
         return log_receipts
 
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:

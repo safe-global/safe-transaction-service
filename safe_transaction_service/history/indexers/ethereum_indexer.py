@@ -51,7 +51,7 @@ class EthereumIndexer(ABC):
             `current block number` is 200, and last scan for an address was stopped on block 150, address
             is almost updated (200 - 100 < 150)
         :param query_chunk_size: Number of addresses to query for relevant data in the same request. By testing,
-            it seems that `200` can be a good value
+            it seems that `200` can be a good value. If `0`, process all together
         :param block_auto_process_limit: Auto increase or decrease the `block_process_limit`
             based on congestion algorithm
         """
@@ -118,7 +118,6 @@ class EthereumIndexer(ABC):
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
         For addresses almost updated (< `updated_blocks_behind` blocks) we process them together
-        (`query_chunk_size` addresses at the same time)
 
         :param current_block_number:
         :return:
@@ -266,7 +265,17 @@ class EthereumIndexer(ABC):
 
         # We need to cast the `iterable` to `list`, if not chunks will not work well when models are updated
         almost_updated_monitored_addresses = list(self.get_almost_updated_addresses(current_block_number))
-        almost_updated_monitored_addresses_chunks = chunks(almost_updated_monitored_addresses, self.query_chunk_size)
+        if almost_updated_monitored_addresses:
+            logger.info('%s: Processing %d almost updated addresses',
+                        self.__class__.__name__, len(almost_updated_monitored_addresses))
+        if self.query_chunk_size:
+            almost_updated_monitored_addresses_chunks = chunks(almost_updated_monitored_addresses,
+                                                               self.query_chunk_size)
+        elif almost_updated_monitored_addresses:
+            almost_updated_monitored_addresses_chunks = [almost_updated_monitored_addresses]  # One `chunk`
+        else:
+            almost_updated_monitored_addresses_chunks = []
+
         for almost_updated_addresses_chunk in almost_updated_monitored_addresses_chunks:
             updated = False
             while not updated:
@@ -275,7 +284,10 @@ class EthereumIndexer(ABC):
                 processed_elements, updated = self.process_addresses(almost_updated_addresses, current_block_number)
                 number_processed_elements += len(processed_elements)
 
-        for monitored_contract in self.get_not_updated_addresses(current_block_number):
+        not_updated_addresses = self.get_not_updated_addresses(current_block_number)
+        if not_updated_addresses:
+            logger.info('%s: Processing %d not updated addresses', self.__class__.__name__, len(not_updated_addresses))
+        for monitored_contract in not_updated_addresses:
             updated = False
             while not updated:
                 processed_elements, updated = self.process_addresses([monitored_contract.address], current_block_number)
