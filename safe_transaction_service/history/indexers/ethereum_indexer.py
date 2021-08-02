@@ -128,7 +128,11 @@ class EthereumIndexer(ABC):
         if common_minimum_block_number is None:  # Empty queryset
             return
 
-        from_block_number = max(common_minimum_block_number + 1 - self.blocks_to_reindex_again, 0)
+        from_block_number = common_minimum_block_number + 1
+        if (from_block_number + self.block_process_limit) >= (current_block_number - self.confirmations):
+            # Reindex again when it's almost sync to prevent reorg/missing elements issues
+            from_block_number = max(from_block_number - self.blocks_to_reindex_again, 0)
+
         if (current_block_number - common_minimum_block_number) <= self.confirmations:
             return  # We don't want problems with reorgs
 
