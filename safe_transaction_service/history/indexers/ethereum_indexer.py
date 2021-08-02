@@ -115,6 +115,12 @@ class EthereumIndexer(ABC):
         # processed_objects = [self.process_element(element) for element in elements]
         return [item for sublist in processed_objects for item in sublist]
 
+    def get_minimum_block_number(self, addresses: Optional[Sequence[str]] = None) -> Optional[int]:
+        queryset = self.database_queryset.filter(address__in=addresses) if addresses else self.database_queryset
+        return queryset.aggregate(**{
+            self.database_field: Min(self.database_field)
+        })[self.database_field]
+
     def get_almost_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
         For addresses almost updated (< `updated_blocks_behind` blocks) we process them together
@@ -122,9 +128,11 @@ class EthereumIndexer(ABC):
         :param current_block_number:
         :return:
         """
+        minimum_block_number = max(self.get_minimum_block_number() or 0,
+                                   current_block_number - self.updated_blocks_behind)
         return self.database_queryset.filter(
             **{self.database_field + '__lt': current_block_number - self.confirmations,
-               self.database_field + '__gt': current_block_number - self.updated_blocks_behind})
+               self.database_field + '__gt': minimum_block_number})
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
@@ -172,11 +180,7 @@ class EthereumIndexer(ABC):
         confirmations = self.confirmations
         current_block_number = current_block_number or self.ethereum_client.current_block_number
 
-        monitored_contract_queryset = self.database_queryset.filter(address__in=addresses)
-        common_minimum_block_number = monitored_contract_queryset.aggregate(**{
-            self.database_field: Min(self.database_field)
-        })[self.database_field]
-
+        common_minimum_block_number = self.get_minimum_block_number(addresses)
         if common_minimum_block_number is None:  # Empty queryset
             return
 
