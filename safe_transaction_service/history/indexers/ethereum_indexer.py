@@ -115,6 +115,28 @@ class EthereumIndexer(ABC):
         # processed_objects = [self.process_element(element) for element in elements]
         return [item for sublist in processed_objects for item in sublist]
 
+    def get_block_numbers_for_search(self, addresses: Sequence[str],
+                                     current_block_number: Optional[int] = None) -> Optional[Sequence[Tuple[int, int]]]:
+        """
+        :param addresses:
+        :param current_block_number: To prevent fetching it again
+        :return: Minimum common `from_block_number` and `to_block_number` for search of relevant `tx hashes`
+        """
+        current_block_number = current_block_number or self.ethereum_client.current_block_number
+
+        common_minimum_block_number = self.get_minimum_block_number(addresses)
+        if common_minimum_block_number is None:  # Empty queryset
+            return
+
+        from_block_number = max(common_minimum_block_number + 1 - self.blocks_to_reindex_again, 0)
+        if (current_block_number - common_minimum_block_number) <= self.confirmations:
+            return  # We don't want problems with reorgs
+
+        to_block_number = min(from_block_number + self.block_process_limit,
+                              current_block_number - self.confirmations)
+
+        return from_block_number, to_block_number
+
     def get_minimum_block_number(self, addresses: Optional[Sequence[str]] = None) -> Optional[int]:
         queryset = self.database_queryset.filter(address__in=addresses) if addresses else self.database_queryset
         return queryset.aggregate(**{
@@ -128,11 +150,13 @@ class EthereumIndexer(ABC):
         :param current_block_number:
         :return:
         """
-        minimum_block_number = max(self.get_minimum_block_number() or 0,
-                                   current_block_number - self.updated_blocks_behind)
+        from_block_number = max(self.get_minimum_block_number() or 0,
+                                current_block_number - self.updated_blocks_behind)
+        to_block_number = min(from_block_number + self.block_process_limit,
+                              current_block_number - self.confirmations)
         return self.database_queryset.filter(
-            **{self.database_field + '__lt': current_block_number - self.confirmations,
-               self.database_field + '__gt': minimum_block_number})
+            **{self.database_field + '__lt': to_block_number,
+               self.database_field + '__gt': from_block_number})
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
@@ -168,33 +192,6 @@ class EthereumIndexer(ABC):
             )
 
         return updated_addresses
-
-    def get_block_numbers_for_search(self, addresses: Sequence[str],
-                                     current_block_number: Optional[int] = None) -> Optional[Sequence[Tuple[int, int]]]:
-        """
-        :param addresses:
-        :param current_block_number: To prevent fetching it again
-        :return: Minimum common `from_block_number` and `to_block_number` for search of relevant `tx hashes`
-        """
-        block_process_limit = self.block_process_limit
-        confirmations = self.confirmations
-        current_block_number = current_block_number or self.ethereum_client.current_block_number
-
-        common_minimum_block_number = self.get_minimum_block_number(addresses)
-        if common_minimum_block_number is None:  # Empty queryset
-            return
-
-        from_block_number = max(common_minimum_block_number + 1 - self.blocks_to_reindex_again, 0)
-        if (current_block_number - common_minimum_block_number) <= confirmations:
-            return  # We don't want problems with reorgs
-
-        if block_process_limit:
-            to_block_number = min(from_block_number + block_process_limit,
-                                  current_block_number - confirmations)
-        else:
-            to_block_number = current_block_number - confirmations
-
-        return from_block_number, to_block_number
 
     def process_addresses(self, addresses: Sequence[str],
                           current_block_number: Optional[int] = None) -> Tuple[Sequence[Any], bool]:
