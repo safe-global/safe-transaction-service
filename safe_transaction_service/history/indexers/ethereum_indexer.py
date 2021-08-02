@@ -147,6 +147,7 @@ class EthereumIndexer(ABC):
         updated_addresses = self.database_queryset.filter(
             **{'address__in': addresses,
                self.database_field + '__gte': from_block_number - 1,  # Protect in case of reorg
+               self.database_field + '__lte': to_block_number,  # Don't update to a lower block number
                }
         ).update(**{self.database_field: to_block_number})
 
