@@ -152,8 +152,7 @@ class EthereumIndexer(ABC):
         """
         from_block_number = max(self.get_minimum_block_number() or 0,
                                 current_block_number - self.updated_blocks_behind)
-        to_block_number = min(from_block_number + self.block_process_limit,
-                              current_block_number - self.confirmations)
+        to_block_number = current_block_number - self.confirmations
         return self.database_queryset.filter(
             **{self.database_field + '__lt': to_block_number,
                self.database_field + '__gt': from_block_number})
