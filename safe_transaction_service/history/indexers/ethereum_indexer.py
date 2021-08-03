@@ -159,7 +159,7 @@ class EthereumIndexer(ABC):
         to_block_number = current_block_number - self.confirmations
         return self.database_queryset.filter(
             **{self.database_field + '__lt': to_block_number,
-               self.database_field + '__gt': from_block_number}).order_by(self.database_field)
+               self.database_field + '__gte': from_block_number}).order_by(self.database_field)
 
     def get_not_updated_addresses(self, current_block_number: int) -> List[MonitoredAddress]:
         """
