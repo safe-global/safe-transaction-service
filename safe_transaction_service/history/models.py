@@ -1117,10 +1117,14 @@ class SafeStatusQuerySet(models.QuerySet):
                         SELECT address, owners,
                                 rank() OVER (PARTITION BY address ORDER BY nonce DESC, internal_tx_id DESC) AS pos
                         FROM history_safestatus
+                        WHERE address IN (
+                            SELECT address FROM history_safestatus
+                            WHERE owners @> ARRAY[%s]::varchar(42)[]
+                        )
                         ) AS ss
                     WHERE pos = 1 AND owners @> ARRAY[%s]::varchar(42)[];
                 """,
-                [owner_address]
+                [owner_address, owner_address]
             )
             return {row[0] for row in cursor.fetchall()}
 
