@@ -47,9 +47,11 @@ DATABASES = {
 }
 DATABASES['default']['ATOMIC_REQUESTS'] = False
 DATABASES['default']['ENGINE'] = 'django_db_geventpool.backends.postgresql_psycopg2'
+DATABASES['default']['CONN_MAX_AGE'] = 0
 DATABASES['default']['OPTIONS'] = {
-    'MAX_CONNS': 20,
-    'REUSE_CONNS': 10
+    # https://github.com/jneight/django-db-geventpool#settings
+    'MAX_CONNS': 4,
+    'REUSE_CONNS': 4,
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
