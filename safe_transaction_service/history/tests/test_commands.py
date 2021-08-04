@@ -12,7 +12,7 @@ from django_celery_beat.models import PeriodicTask
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 
 from ..models import ProxyFactory, SafeMasterCopy
-from .factories import MultisigTransactionFactory
+from .factories import MultisigTransactionFactory, SafeContractFactory
 
 
 class TestCommands(TestCase):
@@ -52,6 +52,33 @@ class TestCommands(TestCase):
         self.assertIn(f'Setting up {ethereum_network.name} proxy factory addresses', buf.getvalue())
         self.assertNotIn('Created Periodic Task', buf.getvalue())
         self.assertIn('was already created', buf.getvalue())
+
+    def test_index_erc20(self):
+        command = 'index_erc20'
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn('No addresses to process', buf.getvalue())
+
+        buf = StringIO()
+        call_command(command, '--block-process-limit=10', stdout=buf)
+        self.assertIn('Setting block-process-limit to 10', buf.getvalue())
+
+        buf = StringIO()
+        call_command(command, '--block-process-limit=10', '--block-process-limit-max=15', stdout=buf)
+        self.assertIn('Setting block-process-limit to 10', buf.getvalue())
+        self.assertIn('Setting block-process-limit-max to 15', buf.getvalue())
+
+        safe_contract = SafeContractFactory()
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn(f'Start indexing ERC20 addresses {[safe_contract.address]}', buf.getvalue())
+        self.assertIn(f'End indexing ERC20 addresses {[safe_contract.address]}', buf.getvalue())
+
+        safe_contract_2 = SafeContractFactory()
+        buf = StringIO()
+        call_command(command, f'--addresses={safe_contract_2.address}', stdout=buf)
+        self.assertIn(f'Start indexing ERC20 addresses {[safe_contract_2.address]}', buf.getvalue())
+        self.assertIn(f'End indexing ERC20 addresses {[safe_contract_2.address]}', buf.getvalue())
 
     def test_setup_service_mainnet(self):
         self._test_setup_service(EthereumNetwork.MAINNET)
