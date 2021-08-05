@@ -1,7 +1,8 @@
-from functools import cached_property
+from functools import cache, cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
 
+import gevent
 from eth_abi.exceptions import DecodingError
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
@@ -23,6 +24,7 @@ from gnosis.eth.contracts import (get_safe_V0_0_1_contract,
 from gnosis.safe.multi_send import MultiSend
 
 from safe_transaction_service.contracts.models import ContractAbi
+from safe_transaction_service.utils.utils import running_on_gevent
 
 from .decoder_abis.aave import (aave_a_token, aave_lending_pool,
                                 aave_lending_pool_addresses_provider,
@@ -65,26 +67,32 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+@cache
 def get_db_tx_decoder() -> 'DbTxDecoder':
-    if not hasattr(get_db_tx_decoder, 'instance'):
-        get_db_tx_decoder.instance = DbTxDecoder()
-    return get_db_tx_decoder.instance
+    def _get_db_tx_decoder() -> 'DbTxDecoder':
+        return DbTxDecoder()
+
+    if running_on_gevent():
+        # It's a very intensive CPU task, so to prevent blocking
+        # http://www.gevent.org/api/gevent.threadpool.html
+        pool = gevent.get_hub().threadpool
+        return pool.spawn(_get_db_tx_decoder).get()
+    else:
+        return _get_db_tx_decoder()
 
 
 def is_db_tx_decoder_loaded() -> bool:
-    return hasattr(get_db_tx_decoder, 'instance')
+    return get_db_tx_decoder.cache_info().currsize != 0
 
 
+@cache
 def get_tx_decoder() -> 'TxDecoder':
-    if not hasattr(get_tx_decoder, 'instance'):
-        get_tx_decoder.instance = TxDecoder()
-    return get_tx_decoder.instance
+    return TxDecoder()
 
 
+@cache
 def get_safe_tx_decoder() -> 'SafeTxDecoder':
-    if not hasattr(get_safe_tx_decoder, 'instance'):
-        get_safe_tx_decoder.instance = SafeTxDecoder()
-    return get_safe_tx_decoder.instance
+    return SafeTxDecoder()
 
 
 class SafeTxDecoder:

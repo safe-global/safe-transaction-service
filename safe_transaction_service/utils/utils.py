@@ -3,6 +3,8 @@ from typing import Any, List, Union
 from django.core.signals import request_finished
 from django.db import connection
 
+from gevent.monkey import saved
+
 
 def chunks(elements: List[Any], n: int):
     """
@@ -12,6 +14,10 @@ def chunks(elements: List[Any], n: int):
     """
     for i in range(0, len(elements), n):
         yield elements[i:i + n]
+
+
+def running_on_gevent() -> bool:
+    return 'sys' in saved
 
 
 def close_gevent_db_connection():
