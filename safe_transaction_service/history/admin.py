@@ -271,6 +271,7 @@ class ModuleTransactionAdmin(admin.ModelAdmin):
 class MonitoredAddressAdmin(admin.ModelAdmin):
     actions = ['reindex', 'reindex_last_day', 'reindex_last_week', 'reindex_last_month']
     list_display = ('address', 'initial_block_number', 'tx_block_number')
+    readonly_fields = ['initial_block_number']
     search_fields = ['address']
 
     @admin.action(description='Reindex from initial block')
