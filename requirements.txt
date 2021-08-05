@@ -13,7 +13,7 @@ django-model-utils==4.1.1
 django-redis==5.0.0
 django-s3-storage==0.13.4
 django-timezone-field==4.2.1
-django==3.2.5
+django==3.2.6
 djangorestframework-camel-case==1.2.0
 djangorestframework==3.12.4
 docutils==0.17.1

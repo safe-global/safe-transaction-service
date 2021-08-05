@@ -2,7 +2,7 @@
 coverage==5.5
 django-stubs==1.8.0
 factory-boy==3.2.0
-faker==8.10.3
+faker==8.11.0
 mypy==0.910
 pytest-celery==0.0.0
 pytest-django==4.4.0
