@@ -457,6 +457,13 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
     balance = serializers.CharField()
 
 
+class SafeFiatRatesResponseSerializer(serializers.Serializer):
+    address = serializers.CharField()
+    fiat_conversion_rate = serializers.CharField()
+    fiat_currency_code = serializers.CharField()
+    timestamp = serializers.DateTimeField()
+
+
 class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
     eth_value = serializers.CharField()
     timestamp = serializers.DateTimeField()

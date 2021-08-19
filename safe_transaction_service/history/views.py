@@ -402,6 +402,20 @@ class SafeBalanceUsdView(SafeBalanceView):
         return super().get(*args, **kwargs)
 
 
+class SafeFiatRatesView(SafeBalanceView):
+    serializer_class = serializers.SafeFiatRatesResponseSerializer
+
+    def get_result(self, *args, **kwargs):
+        return BalanceServiceProvider().get_token_usd_rates(*args, **kwargs)
+
+    @swagger_safe_balance_schema(serializer_class)
+    def get(self, *args, **kwargs):
+        """
+        Get USD fiat rates for Ether and ERC20 tokens
+        """
+        return super().get(*args, **kwargs)
+
+
 class SafeCollectiblesView(SafeBalanceView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 

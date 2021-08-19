@@ -15,6 +15,7 @@ from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.tests import utils
 from gnosis.safe import CannotEstimateGas, Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
@@ -24,6 +25,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
+from ...tokens.clients import CannotGetPrice
 from ..exceptions import NodeConnectionException
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
@@ -1621,3 +1623,96 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(reverse('v1:history:multisig-transaction-estimate', args=(safe_address,)),
                                     format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_fiat_rates_json_view(self, timezone_now_mock: MagicMock,
+                                  get_eth_usd_price_mock: MagicMock,
+                                  get_token_eth_value_mock: MagicMock):
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        expected = [
+            {
+                "address": None,
+                "fiatConversionRate": "123.4",
+                "fiatCurrencyCode": "USD",
+                "timestamp": timezone_now_mock.return_value.isoformat().replace('+00:00', 'Z')
+            }
+        ]
+
+        actual = self.client.get(reverse('v1:history:safe-balances-rates', args=(safe_address,)), format='json')
+
+        self.assertEqual(actual.status_code, status.HTTP_200_OK)
+        self.assertEqual(actual.json(), expected)
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_fiat_rates_view(self, timezone_now_mock: MagicMock,
+                             get_eth_usd_price_mock: MagicMock,
+                             get_token_eth_value_mock: MagicMock):
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        expected = [
+            {
+                "address": None,
+                "fiat_conversion_rate": "123.4",
+                "fiat_currency_code": "USD",
+                "timestamp": timezone_now_mock.return_value.isoformat().replace('+00:00', 'Z')
+            }
+        ]
+
+        actual = self.client.get(reverse('v1:history:safe-balances-rates', args=(safe_address,)), format='json')
+
+        self.assertEqual(actual.status_code, status.HTTP_200_OK)
+        self.assertEqual(actual.data, expected)
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_fiat_rates_view_with_token(self, timezone_now_mock: MagicMock,
+                                        get_eth_usd_price_mock: MagicMock,
+                                        get_token_eth_value_mock: MagicMock):
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        token_amount = int(12 * 1e18)
+        erc20 = utils.deploy_erc20(self.w3, 'Eurodollar', 'EUD', safe_address, token_amount)
+        EthereumEventFactory(address=erc20.address, to=safe_address)
+
+        expected = [
+            {
+                "address": None,
+                "fiat_conversion_rate": "123.4",
+                "fiat_currency_code": "USD",
+                "timestamp": timezone_now_mock.return_value.isoformat().replace('+00:00', 'Z')
+            },
+            {
+                "address": erc20.address,
+                "fiat_conversion_rate": str(round(123.4 * 0.4)),
+                "fiat_currency_code": "USD",
+                "timestamp": timezone_now_mock.return_value.isoformat().replace('+00:00', 'Z')
+            }
+        ]
+
+        actual = self.client.get(reverse('v1:history:safe-balances-rates', args=(safe_address,)), format='json')
+
+        self.assertEqual(actual.status_code, status.HTTP_200_OK)
+        self.assertEqual(actual.data, expected)
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', side_effect=CannotGetPrice())
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_fiat_rates_view_cannot_get_price(self, timezone_now_mock: MagicMock,
+                                        get_eth_usd_price_mock: MagicMock,
+                                        get_token_eth_value_mock: MagicMock):
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        expected = {
+            "detail": "Unable to retrieve current Ether price",
+        }
+
+        actual = self.client.get(reverse('v1:history:safe-balances-rates', args=(safe_address,)), format='json')
+
+        self.assertEqual(actual.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(actual.json(), expected)

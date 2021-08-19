@@ -5,11 +5,13 @@ from datetime import datetime
 from typing import List, Optional, Sequence
 
 from django.db.models import Q
+from django.utils import timezone
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
+from rest_framework.exceptions import APIException
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -63,6 +65,14 @@ class BalanceWithFiat(Balance):
     fiat_code: str = FiatCode.USD.name
 
 
+@dataclass
+class ERC20FiatRate:
+    address: Optional[ChecksumAddress]
+    fiat_conversion_rate: float
+    timestamp: datetime
+    fiat_currency_code: str = FiatCode.USD.name
+
+
 class BalanceServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
@@ -112,6 +122,15 @@ class BalanceService:
 
         return addresses
 
+    def _get_token_addresses(self, safe_address: ChecksumAddress,
+                             only_trusted: bool = False,
+                             exclude_spam: bool = False) -> List[ChecksumAddress]:
+        all_erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
+        for address in all_erc20_addresses:
+            # Store tokens in database if not present
+            self.get_token_info(address)  # This is cached
+        return self._filter_addresses(all_erc20_addresses, only_trusted, exclude_spam)
+
     def get_balances(self, safe_address: ChecksumAddress,
                      only_trusted: bool = False, exclude_spam: bool = False) -> List[Balance]:
         """
@@ -122,12 +141,9 @@ class BalanceService:
         """
         assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
-        all_erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
-        for address in all_erc20_addresses:
-            # Store tokens in database if not present
-            self.get_token_info(address)  # This is cached
-        erc20_addresses = self._filter_addresses(all_erc20_addresses, only_trusted, exclude_spam)
-
+        erc20_addresses = self._get_token_addresses(safe_address=safe_address,
+                                                    only_trusted=only_trusted,
+                                                    exclude_spam=exclude_spam)
         try:
             raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
         except IOError as exc:
@@ -158,6 +174,40 @@ class BalanceService:
             else:
                 logger.warning('Cannot get erc20 token info for token-address=%s', token_address)
                 return None
+
+    def get_token_usd_rates(self, safe_address: ChecksumAddress,
+                            only_trusted: bool = False,
+                            exclude_spam: bool = False
+                            ) -> List[ERC20FiatRate]:
+        all_erc20_addresses = self._get_token_addresses(safe_address=safe_address, only_trusted=only_trusted,
+                                                        exclude_spam=exclude_spam)
+        token_eth_rates = self.price_service.get_cached_token_eth_values(all_erc20_addresses)
+
+        try:
+            eth_usd_rate = self.price_service.get_eth_usd_price()
+        except CannotGetPrice:
+            logger.warning('Cannot get network ether price', exc_info=True)
+            raise APIException(detail="Unable to retrieve current Ether price")
+
+        # Add ETH/USD conversion always
+        rates = [
+            ERC20FiatRate(
+                address=None,
+                fiat_conversion_rate=eth_usd_rate,
+                timestamp=timezone.now(),
+                fiat_currency_code=FiatCode.USD.name
+            )
+        ]
+        for address, token_eth_rate in zip(all_erc20_addresses, token_eth_rates):
+            token_usd_rate = round(token_eth_rate.eth_value * eth_usd_rate)
+            rate = ERC20FiatRate(
+                address=address,
+                fiat_conversion_rate=token_usd_rate,
+                timestamp=token_eth_rate.timestamp,
+                fiat_currency_code=FiatCode.USD.name
+            )
+            rates.append(rate)
+        return rates
 
     def get_usd_balances(self, safe_address: ChecksumAddress, only_trusted: bool = False,
                          exclude_spam: bool = False) -> List[BalanceWithFiat]:

@@ -10,11 +10,12 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
 
 from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import PriceService
+from safe_transaction_service.tokens.services.price_service import (
+    FiatCode, PriceService)
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceServiceProvider
-from ..services.balance_service import BalanceWithFiat
+from ..services.balance_service import BalanceWithFiat, ERC20FiatRate
 from .factories import EthereumEventFactory, SafeContractFactory
 
 
@@ -147,3 +148,57 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         expected_address = db_not_trusted_addresses + db_trusted_addresses + [db_events_bugged_erc20_address]
         self.assertCountEqual(balance_service._filter_addresses(addresses, False, True),
                               expected_address)
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_token_usd_rate_erc20(self, timezone_now_mock: MagicMock, get_eth_usd_price_mock: MagicMock,
+                                  get_token_eth_value_mock: MagicMock):
+        balance_service = BalanceServiceProvider()
+        # Deploy safe
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        # Deploy ERC20 token and add token balance to safe
+        token_amount = int(12 * 1e18)
+        erc20 = deploy_erc20(self.w3, 'Eurodollar', 'EUD', safe_address, token_amount)
+        # ERC20 Event indexed
+        EthereumEventFactory(address=erc20.address, to=safe_address)
+
+        rates = balance_service.get_token_usd_rates(safe_address)
+
+        self.assertSequenceEqual(rates, [
+            ERC20FiatRate(
+                address=None,
+                fiat_conversion_rate=123.4,
+                timestamp=timezone_now_mock.return_value,
+                fiat_currency_code=FiatCode.USD.name
+            ),
+            ERC20FiatRate(
+                address=erc20.address,
+                fiat_conversion_rate=round(123.4 * 0.4),
+                timestamp=timezone_now_mock.return_value,
+                fiat_currency_code=FiatCode.USD.name
+            )
+        ])
+
+    @mock.patch.object(PriceService, 'get_token_eth_value', return_value=0.4, autospec=True)
+    @mock.patch.object(PriceService, 'get_eth_usd_price', return_value=123.4, autospec=True)
+    @mock.patch.object(timezone, 'now', return_value=timezone.now())
+    def test_token_usd_rate_no_tokens(self, timezone_now_mock: MagicMock, get_eth_usd_price_mock: MagicMock,
+                                      get_token_eth_value_mock: MagicMock):
+        balance_service = BalanceServiceProvider()
+        # Deploy safe and send ether
+        safe_address = Account.create().address
+        SafeContractFactory(address=safe_address)
+        self.send_ether(safe_address, 1)
+
+        rates = balance_service.get_token_usd_rates(safe_address)
+
+        self.assertSequenceEqual(rates, [
+            ERC20FiatRate(
+                address=None,
+                fiat_conversion_rate=123.4,
+                timestamp=timezone_now_mock.return_value,
+                fiat_currency_code=FiatCode.USD.name
+            ),
+        ])

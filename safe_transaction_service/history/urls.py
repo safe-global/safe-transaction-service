@@ -32,6 +32,8 @@ urlpatterns = [
          name='safe-creation'),
     path('safes/<str:address>/balances/', views.SafeBalanceView.as_view(),
          name='safe-balances'),
+    path('safes/<str:address>/balances/rates', views.SafeFiatRatesView.as_view(),
+         name='safe-balances-rates'),
     path('safes/<str:address>/balances/usd/', views.SafeBalanceUsdView.as_view(),
          name='safe-balances-usd'),
     path('safes/<str:address>/collectibles/', views.SafeCollectiblesView.as_view(),
