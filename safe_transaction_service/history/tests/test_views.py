@@ -415,6 +415,47 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
 
+    def test_post_multisig_transactions_null_signature(self):
+        safe_owner_1 = Account.create()
+        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe_create2_tx.safe_address
+        safe = Safe(safe_address, self.ethereum_client)
+
+        response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
+        to = Account.create().address
+        data = {"to": to,
+                "value": 100000000000000000,
+                "data": None,
+                "operation": 0,
+                "nonce": 0,
+                "safeTxGas": 0,
+                "baseGas": 0,
+                "gasPrice": 0,
+                "gasToken": "0x0000000000000000000000000000000000000000",
+                "refundReceiver": "0x0000000000000000000000000000000000000000",
+                # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+                "sender": safe_owner_1.address,
+                "signature": None
+                }
+        safe_tx = safe.build_multisig_tx(data['to'], data['value'], data['data'], data['operation'],
+                                         data['safeTxGas'], data['baseGas'], data['gasPrice'],
+                                         data['gasToken'],
+                                         data['refundReceiver'], safe_nonce=data['nonce'])
+        data['contractTransactionHash'] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertFalse(multisig_transaction_db.trusted)
+
+        response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIsNone(response.data['results'][0]['executor'])
+        self.assertEqual(len(response.data['results'][0]['confirmations']), 0)
+
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
         safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
