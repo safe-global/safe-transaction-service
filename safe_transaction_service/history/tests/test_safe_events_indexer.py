@@ -2,6 +2,8 @@ from django.test import TestCase
 
 from eth_account import Account
 from hexbytes import HexBytes
+from web3.datastructures import AttributeDict
+from web3.types import LogReceipt
 
 from gnosis.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
 from gnosis.eth.contracts import get_safe_V1_3_0_contract
@@ -33,6 +35,67 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertIsNotNone(SafeEventsIndexerProvider.instance)
         SafeEventsIndexerProvider.del_singleton()
         self.assertIsNone(getattr(SafeEventsIndexerProvider, 'instance', None))
+
+    def test_invalid_event(self):
+        """
+        AddedOwner event broke indexer on BSC. Same signature, but different number of indexed attributes
+        """
+
+        valid_event: LogReceipt = AttributeDict(
+            {'address': '0x384f55D8BD4046461433A56bb87fe4aA615C0cc8',
+             'blockHash': HexBytes('0x551a6e5ca972c453873898be696980d7ff65d27a6f80ddffab17591144c99e01'),
+             'blockNumber': 9205844,
+             'data': '0x000000000000000000000000a1350318b2907ee0f6c8918eddc778a0b633e774',
+             'logIndex': 0,
+             'removed': False,
+             'topics': [
+                 HexBytes('0x9465fa0c962cc76958e6373a993326400c1c94f8be2fe3a952adfa7f60b2ea26')
+             ],
+             'transactionHash': HexBytes('0x7e4b2bb0ac5129552908e9c8433ea1746f76616188e8c3597a6bdce88d0b474c'),
+             'transactionIndex': 0,
+             'transactionLogIndex': '0x0',
+             'type': 'mined'
+             })
+
+        dangling_event: LogReceipt = AttributeDict(
+            {'address': '0x1E44C806f1AfD4f420C10c8088f4e0388F066E7A',
+             'topics': [
+                 HexBytes('0x9465fa0c962cc76958e6373a993326400c1c94f8be2fe3a952adfa7f60b2ea26'),
+                 HexBytes('0x00000000000000000000000020212521370dd2dde0b0e3ac25b65eb3e859d303')
+             ],
+             'data': '0x',
+             'blockNumber': 10129293,
+             'transactionHash': HexBytes('0xc19ef099702fb9f7d7962925428683eff534e009210ef2cf23135f43962c192a'),
+             'transactionIndex': 89,
+             'blockHash': HexBytes('0x6b41eac9177a1606e1a853adf3f3da018fcf476f7d217acb69b7d130bdfaf2c9'),
+             'logIndex': 290,
+             'removed': False}
+        )
+
+        # Dangling event topic is "supported"
+        self.assertIn(dangling_event['topics'][0].hex(), self.safe_events_indexer.events_to_listen)
+
+        # Dangling event cannot be decoded
+        self.assertEqual(self.safe_events_indexer.decode_elements([dangling_event]),
+                         [])
+
+        # Valid event is supported
+        self.assertIn(valid_event['topics'][0].hex(), self.safe_events_indexer.events_to_listen)
+
+        # Dangling event cannot be decoded
+        expected_event = AttributeDict(
+            {'args': AttributeDict(
+                {'owner': '0xa1350318b2907ee0f6c8918edDC778A0b633e774'}
+            ),
+                'event': 'AddedOwner',
+                'logIndex': 0,
+                'transactionIndex': 0,
+                'transactionHash': HexBytes('0x7e4b2bb0ac5129552908e9c8433ea1746f76616188e8c3597a6bdce88d0b474c'),
+                'address': '0x384f55D8BD4046461433A56bb87fe4aA615C0cc8',
+                'blockHash': HexBytes('0x551a6e5ca972c453873898be696980d7ff65d27a6f80ddffab17591144c99e01'),
+                'blockNumber': 9205844}
+        )
+        self.assertEqual(self.safe_events_indexer.decode_elements([valid_event]), [expected_event])
 
     def test_safe_events_indexer(self):
         owner_account_1 = self.ethereum_test_account
