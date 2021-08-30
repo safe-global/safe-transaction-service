@@ -21,8 +21,18 @@ from .mocks.mocks_internal_tx_indexer import (block_result,
 
 
 class TestInternalTxIndexer(TestCase):
-    def test_internal_tx_indexer_provider(self):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.internal_tx_indexer = InternalTxIndexerProvider()
+        cls.internal_tx_indexer.blocks_to_reindex_again = 0
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
         InternalTxIndexerProvider.del_singleton()
+
+    def test_internal_tx_indexer_provider(self):
         internal_tx_indexer = InternalTxIndexerProvider()
         self.assertIsInstance(internal_tx_indexer, InternalTxIndexer)
         self.assertNotIsInstance(internal_tx_indexer, InternalTxIndexerWithTraceBlock)
@@ -30,7 +40,6 @@ class TestInternalTxIndexer(TestCase):
         with self.settings(ETH_INTERNAL_NO_FILTER=True):
             internal_tx_indexer = InternalTxIndexerProvider()
             self.assertIsInstance(internal_tx_indexer, (InternalTxIndexer, InternalTxIndexerWithTraceBlock))
-        InternalTxIndexerProvider.del_singleton()
 
     @mock.patch.object(ParityManager, 'trace_blocks', autospec=True, return_value=trace_blocks_result)
     @mock.patch.object(ParityManager, 'trace_filter', autospec=True, return_value=trace_filter_result)
@@ -46,7 +55,7 @@ class TestInternalTxIndexer(TestCase):
                                   trace_block_mock: MagicMock):
         current_block_number = current_block_number_mock.return_value
 
-        internal_tx_indexer = InternalTxIndexerProvider()
+        internal_tx_indexer = self.internal_tx_indexer
         self.assertEqual(internal_tx_indexer.ethereum_client.current_block_number, current_block_number)
         self.assertIsNone(current_block_number_mock.assert_called_with())
 
@@ -100,7 +109,7 @@ class TestInternalTxIndexer(TestCase):
                                     trace_filter_mock: MagicMock, trace_block_mock: MagicMock):
 
         current_block_number = current_block_number_mock.return_value
-        internal_tx_indexer = InternalTxIndexerProvider()
+        internal_tx_indexer = self.internal_tx_indexer
         addresses = ['0x5aC255889882aCd3da2aA939679E3f3d4cea221e']
         trace_filter_transactions = [trace['transactionHash'] for trace in trace_filter_mock.return_value]
         trace_block_transactions = [trace['transactionHash'] for sublist in trace_block_mock.return_value

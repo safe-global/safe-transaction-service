@@ -23,15 +23,18 @@ class InternalTxIndexerProvider:
         if not hasattr(cls, 'instance'):
             from django.conf import settings
             block_process_limit = settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
+            blocks_to_reindex_again = 6
             if settings.ETH_INTERNAL_NO_FILTER:
                 cls.instance = InternalTxIndexerWithTraceBlock(
                     EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=min(block_process_limit, 500)
+                    block_process_limit=min(block_process_limit, 500),
+                    blocks_to_reindex_again=blocks_to_reindex_again,
                 )
             else:
                 cls.instance = InternalTxIndexer(
                     EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=block_process_limit
+                    block_process_limit=block_process_limit,
+                    blocks_to_reindex_again=blocks_to_reindex_again,
                 )
         return cls.instance
 
@@ -43,9 +46,9 @@ class InternalTxIndexerProvider:
 
 class InternalTxIndexer(EthereumIndexer):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.tx_decoder = get_safe_tx_decoder()
         self.number_trace_blocks = 10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
+        super().__init__(*args, **kwargs)
 
     @property
     def database_field(self):
