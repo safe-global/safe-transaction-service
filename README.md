@@ -20,6 +20,13 @@ a transaction that is pending to be sent to the blockchain.
 
 - [Docs](https://docs.gnosis.io/safe/docs/services_transactions/)
 
+## Setup for development
+```bash
+cp .env.dev .env
+docker-compose build --force-rm
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
 ## Setup for production (event indexing)
 Since **version 3.0.0** transaction service can be configured to rely on **event indexing**
 when [SafeL2 version](https://github.com/gnosis/safe-contracts/blob/v1.3.0/contracts/GnosisSafeL2.sol) is used. Only
