@@ -62,7 +62,7 @@ class PriceService:
         self.ethereum_network = self.ethereum_client.get_network()
         self.redis = redis
         self.binance_client = BinanceClient()
-        self.coingecko_client = CoingeckoClient()
+        self.coingecko_client = CoingeckoClient(self.ethereum_network)
         self.curve_oracle = CurveOracle(self.ethereum_client)
         self.kraken_client = KrakenClient()
         self.kucoin_client = KucoinClient()
@@ -191,7 +191,7 @@ class PriceService:
         :param token_address:
         :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
-        if self.ethereum_network == EthereumNetwork.MAINNET:
+        if self.coingecko_client.supports_network(EthereumNetwork.MAINNET):
             try:
                 return self.coingecko_client.get_token_price(token_address)
             except CannotGetPrice:
