@@ -11,20 +11,27 @@ from gnosis.eth.oracles import (KyberOracle, OracleException, UniswapOracle,
 
 from safe_transaction_service.history.tests.utils import \
     just_test_if_mainnet_node
-from safe_transaction_service.tokens.clients import (BinanceClient,
-                                                     CannotGetPrice,
-                                                     CoingeckoClient,
-                                                     KrakenClient,
-                                                     KucoinClient)
+from safe_transaction_service.utils.redis import get_redis
 
+from ..clients import (BinanceClient, CannotGetPrice, CoingeckoClient,
+                       KrakenClient, KucoinClient)
 from ..services.price_service import PriceService, PriceServiceProvider
 
 
 class TestPriceService(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.price_service = PriceServiceProvider()
+        cls.redis = get_redis()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        PriceServiceProvider.del_singleton()
+
     @mock.patch.object(KrakenClient, 'get_eth_usd_price', return_value=0.4)
     @mock.patch.object(BinanceClient, 'get_eth_usd_price', return_value=0.5)
     def test_get_eth_usd_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
-        price_service = PriceServiceProvider()
+        price_service = self.price_service
         eth_usd_price = price_service.get_eth_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
         binance_mock.assert_not_called()
@@ -47,7 +54,7 @@ class TestPriceService(TestCase):
     def test_get_ewt_usd_price(self, get_ewt_usd_price_kraken_mock: MagicMock,
                                get_ewt_usd_price_kucoin_mock: MagicMock,
                                get_ewt_usd_price_coingecko_mock: MagicMock):
-        price_service = PriceServiceProvider()
+        price_service = self.price_service
 
         price = price_service.get_ewt_usd_price()
         self.assertEqual(price, 5.)
@@ -66,7 +73,7 @@ class TestPriceService(TestCase):
     def test_get_matic_usd_price(self, get_matic_usd_price_kraken_mock: MagicMock,
                                  get_matic_usd_price_binance_mock: MagicMock,
                                  get_matic_usd_price_coingecko_mock: MagicMock):
-        price_service = PriceServiceProvider()
+        price_service = self.price_service
 
         price = price_service.get_matic_usd_price()
         self.assertEqual(price, 5.)
@@ -81,7 +88,7 @@ class TestPriceService(TestCase):
 
     def test_token_eth_value(self):
         mainnet_node = just_test_if_mainnet_node()
-        price_service = PriceService(EthereumClient(mainnet_node), PriceServiceProvider().redis)
+        price_service = PriceService(EthereumClient(mainnet_node), self.redis)
         gno_token_address = '0x6810e776880C02933D47DB1b9fc05908e5386b96'
         token_eth_value = price_service.get_token_eth_value(gno_token_address)
         self.assertIsInstance(token_eth_value, float)
@@ -89,7 +96,7 @@ class TestPriceService(TestCase):
 
     @mock.patch.object(KyberOracle, 'get_price', return_value=1.23, autospec=True)
     def test_token_eth_value_mocked(self, kyber_get_price_mock: MagicMock):
-        price_service = PriceServiceProvider()
+        price_service = self.price_service
         random_address = Account.create().address
         self.assertEqual(len(price_service.cache_token_eth_value), 0)
         self.assertEqual(price_service.get_token_eth_value(random_address), 1.23)
