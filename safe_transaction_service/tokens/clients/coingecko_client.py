@@ -1,8 +1,11 @@
 import logging
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
 from eth_typing import ChecksumAddress
+
+from gnosis.eth import EthereumNetwork
 
 from safe_transaction_service.tokens.clients.exceptions import CannotGetPrice
 
@@ -12,8 +15,23 @@ logger = logging.getLogger(__name__)
 class CoingeckoClient:
     base_url = 'https://api.coingecko.com/'
 
-    def __init__(self):
+    def __init__(self, network: Optional[EthereumNetwork] = None):
         self.http_session = requests.Session()
+        if network == EthereumNetwork.BINANCE:
+            self.asset_platform = 'binance-smart-chain'
+        elif network == EthereumNetwork.MATIC:
+            self.asset_platform = 'polygon-pos'
+        elif network == EthereumNetwork.XDAI:
+            self.asset_platform = 'xdai'
+        else:
+            self.asset_platform = 'ethereum'
+
+    @staticmethod
+    def supports_network(network: EthereumNetwork):
+        return network in (EthereumNetwork.MAINNET,
+                           EthereumNetwork.BINANCE,
+                           EthereumNetwork.MATIC,
+                           EthereumNetwork.XDAI)
 
     def _get_price(self, url: str, name: str):
         try:
@@ -46,15 +64,17 @@ class CoingeckoClient:
         :return: usd price for token address, 0. if not found
         """
         token_address = token_address.lower()
-        url = urljoin(self.base_url,
-                      f'api/v3/simple/token_price/ethereum?contract_addresses={token_address}&vs_currencies=usd')
+        url = urljoin(
+            self.base_url,
+            f'api/v3/simple/token_price/{self.asset_platform}?contract_addresses={token_address}&vs_currencies=usd'
+        )
         return self._get_price(url, token_address)
 
     def get_bnb_usd_price(self) -> float:
         return self.get_price('binancecoin')
 
-    def get_matic_usd_price(self) -> float:
-        return self.get_price('matic-network')
-
     def get_ewt_usd_price(self) -> float:
         return self.get_price('energy-web-token')
+
+    def get_matic_usd_price(self) -> float:
+        return self.get_price('matic-network')
