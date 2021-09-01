@@ -132,6 +132,7 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
                     tx_processor.clear_cache()
                     message = f'A problem was found in SafeStatus with nonce={safe_status.nonce} ' \
                               f'on internal-tx-id={safe_status.internal_tx_id} ' \
+                              f'tx-hash={safe_status.internal_tx.ethereum_tx_id} ' \
                               f'for safe-address={safe_address}, reindexing'
                     logger.error(message)
                     IndexServiceProvider().reindex_addresses([safe_address])
