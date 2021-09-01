@@ -1,9 +1,9 @@
 import logging
-from typing import Collection, List, OrderedDict, Union, Optional
+from typing import Collection, List, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
-from eth_typing import ChecksumAddress
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -218,7 +218,8 @@ class IndexService:
         :param addresses: Master Copy or Safes(for L2 event processing) addresses. If not provided,
             all master copies will be used
         """
-        from ..indexers import SafeEventsIndexerProvider, InternalTxIndexerProvider, EthereumIndexer
+        from ..indexers import (EthereumIndexer, InternalTxIndexerProvider,
+                                SafeEventsIndexerProvider)
         indexer_provider = SafeEventsIndexerProvider if self.eth_l2_network else InternalTxIndexerProvider
         indexer: EthereumIndexer = indexer_provider()
         ethereum_client = EthereumClientProvider()

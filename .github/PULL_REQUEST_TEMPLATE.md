@@ -1,5 +1,7 @@
 ### What was wrong?
 
-Related to Issue #
+Closes issue #
 
 ### How was it fixed?
+
+@gnosis/safe-services
