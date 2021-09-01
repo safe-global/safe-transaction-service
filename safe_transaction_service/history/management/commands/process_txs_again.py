@@ -32,7 +32,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS('Decoded InternalTxs'))
 
             self.stdout.write(self.style.SUCCESS('Removing elements from database'))
-            IndexServiceProvider().reindex_all()
+            IndexServiceProvider().reprocess_all()
 
         if not sync:
             process_decoded_internal_txs_task.delay()

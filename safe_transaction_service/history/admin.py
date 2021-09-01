@@ -406,7 +406,7 @@ class SafeStatusAdmin(admin.ModelAdmin):
     @admin.action(description='Remove and process transactions again')
     def remove_and_index(self, request, queryset):
         safe_addresses = list(queryset.distinct().values_list('address', flat=True))
-        IndexServiceProvider().reindex_addresses(safe_addresses)
+        IndexServiceProvider().reprocess_addresses(safe_addresses)
 
 
 @admin.register(WebHook)
