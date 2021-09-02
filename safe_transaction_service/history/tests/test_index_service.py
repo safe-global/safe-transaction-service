@@ -66,25 +66,25 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         with self.assertRaises(EthereumBlockHashMismatch):
             index_service.txs_create_or_update_from_tx_hashes([tx_hash])
 
-    def test_reindex_addresses(self):
+    def test_reprocess_addresses(self):
         index_service: IndexService = IndexServiceProvider()
-        self.assertIsNone(index_service.reindex_addresses([]))
+        self.assertIsNone(index_service.reprocess_addresses([]))
 
         safe_status = SafeStatusFactory()
         MultisigTransactionFactory()  # It shouldn't be deleted
         MultisigTransactionFactory(safe=safe_status.address)  # It should be deleted
         MultisigTransactionFactory(safe=safe_status.address, ethereum_tx=None)  # It shouldn't be deleted
-        self.assertIsNone(index_service.reindex_addresses([safe_status.address]))
+        self.assertIsNone(index_service.reprocess_addresses([safe_status.address]))
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 2)
 
-    def test_reindex_all(self):
+    def test_reprocess_all(self):
         index_service: IndexService = IndexServiceProvider()
         for _ in range(5):
             safe_status = SafeStatusFactory()
             MultisigTransactionFactory(safe=safe_status.address)
         MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
 
-        self.assertIsNone(index_service.reindex_all())
+        self.assertIsNone(index_service.reprocess_all())
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 1)

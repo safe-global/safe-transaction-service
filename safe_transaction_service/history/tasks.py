@@ -127,15 +127,19 @@ def process_decoded_internal_txs_for_safe_task(self, safe_address: str) -> Optio
             # Use slicing for memory issues
             while True:
                 # Check if something is wrong during indexing
-                safe_status = SafeStatus.objects.last_for_address(safe_address)
-                if safe_status and safe_status.is_corrupted():
+                last_safe_status = SafeStatus.objects.last_for_address(safe_address)
+                if last_safe_status and last_safe_status.is_corrupted():
                     tx_processor.clear_cache()
-                    message = f'A problem was found in SafeStatus with nonce={safe_status.nonce} ' \
-                              f'on internal-tx-id={safe_status.internal_tx_id} ' \
-                              f'for safe-address={safe_address}, reindexing'
-                    logger.error(message)
-                    IndexServiceProvider().reindex_addresses([safe_address])
-                    raise ValueError(message)
+                    # Find first corrupted safe status
+                    for safe_status in SafeStatus.objects.filter(address=safe_address).sorted_reverse_by_internal_tx():
+                        if safe_status.is_corrupted():
+                            message = f'A problem was found in SafeStatus with nonce={last_safe_status.nonce} ' \
+                                      f'on internal-tx-id={last_safe_status.internal_tx_id} ' \
+                                      f'tx-hash={last_safe_status.internal_tx.ethereum_tx_id} ' \
+                                      f'for safe-address={safe_address}, reindexing'
+                            logger.error(message)
+                            IndexServiceProvider().reprocess_addresses([safe_address])
+                            raise ValueError(message)
 
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(safe_address)[:batch]
                 if not internal_txs_decoded:

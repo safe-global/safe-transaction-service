@@ -83,4 +83,4 @@ class Command(BaseCommand):
 
             if fix and addresses_to_reindex:
                 self.stdout.write(self.style.SUCCESS(f'Fixing Safes={addresses_to_reindex}'))
-                index_service.reindex_addresses(addresses_to_reindex)
+                index_service.reprocess_addresses(addresses_to_reindex)

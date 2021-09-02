@@ -1,8 +1,9 @@
 import logging
-from typing import Collection, List, OrderedDict, Union
+from typing import Collection, List, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -38,7 +39,7 @@ class IndexServiceProvider:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             from django.conf import settings
-            cls.instance = IndexService(EthereumClientProvider(), settings.ETH_REORG_BLOCKS)
+            cls.instance = IndexService(EthereumClientProvider(), settings.ETH_REORG_BLOCKS, settings.ETH_L2_NETWORK)
         return cls.instance
 
     @classmethod
@@ -49,9 +50,10 @@ class IndexServiceProvider:
 
 # TODO Test IndexService
 class IndexService:
-    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int):
+    def __init__(self, ethereum_client: EthereumClient, eth_reorg_blocks: int, eth_l2_network: bool):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
+        self.eth_l2_network = eth_l2_network
 
     def block_get_or_create_from_block_number(self, block_number: int):
         try:
@@ -152,9 +154,10 @@ class IndexService:
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
-    def _reindex(self, addresses: List[str]):
+    def _reprocess(self, addresses: List[str]):
         """
         Trigger processing of traces again. If addresses is empty, everything is reprocessed
+
         :param addresses:
         :return:
         """
@@ -188,17 +191,56 @@ class IndexService:
             queryset = queryset.filter(internal_tx___from__in=addresses)
         queryset.update(processed=False)
 
-    def reindex_addresses(self, addresses: List[str]):
+    def reprocess_addresses(self, addresses: List[str]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
         every `InternalTxDecoded` not processed to be processed again
+
         :param addresses: List of checksummed addresses or queryset
         :return: Number of `SafeStatus` deleted
         """
         if not addresses:
             return
 
-        return self._reindex(addresses)
+        return self._reprocess(addresses)
 
-    def reindex_all(self):
-        return self._reindex(None)
+    def reprocess_all(self):
+        return self._reprocess(None)
+
+    def reindex_master_copies(self, from_block_number: int, block_process_limit: int = 1000,
+                              addresses: Optional[ChecksumAddress] = None):
+        """
+        Reindexes master copies in parallel with the current running indexer, so service will have no missing txs
+        while reindexing
+
+        :param from_block_number: Block number to start indexing from
+        :param block_process_limit: Number of blocks to process each time
+        :param addresses: Master Copy or Safes(for L2 event processing) addresses. If not provided,
+            all master copies will be used
+        """
+        from ..indexers import (EthereumIndexer, InternalTxIndexerProvider,
+                                SafeEventsIndexerProvider)
+        indexer_provider = SafeEventsIndexerProvider if self.eth_l2_network else InternalTxIndexerProvider
+        indexer: EthereumIndexer = indexer_provider()
+        ethereum_client = EthereumClientProvider()
+
+        if addresses:
+            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False  # Just process addresses provided
+        else:
+            addresses = list(indexer.database_queryset.values_list('address', flat=True))
+
+        if not addresses:
+            logger.warning('No addresses to process')
+        else:
+            logger.info('Start reindexing addresses %s', addresses)
+            current_block_number = ethereum_client.current_block_number
+            block_number = from_block_number
+            while block_number < current_block_number:
+                elements = indexer.find_relevant_elements(addresses, block_number,
+                                                          block_number + block_process_limit)
+                indexer.process_elements(elements)
+                block_number += block_process_limit
+                logger.info('Current block number %d, found %d traces/events',
+                            block_number, len(elements))
+
+            logger.info('End reindexing addresses %s', addresses)

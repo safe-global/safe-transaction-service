@@ -2,17 +2,20 @@ import os.path
 import tempfile
 from io import StringIO
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import TestCase
 
 from django_celery_beat.models import PeriodicTask
 
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 
+from ..indexers import InternalTxIndexer, SafeEventsIndexer
 from ..models import ProxyFactory, SafeMasterCopy
-from .factories import MultisigTransactionFactory, SafeContractFactory
+from ..services import IndexServiceProvider
+from .factories import (MultisigTransactionFactory, SafeContractFactory,
+                        SafeMasterCopyFactory)
 
 
 class TestCommands(TestCase):
@@ -79,6 +82,70 @@ class TestCommands(TestCase):
         call_command(command, f'--addresses={safe_contract_2.address}', stdout=buf)
         self.assertIn(f'Start indexing ERC20 addresses {[safe_contract_2.address]}', buf.getvalue())
         self.assertIn(f'End indexing ERC20 addresses {[safe_contract_2.address]}', buf.getvalue())
+
+    @mock.patch.object(EthereumClient, 'current_block_number', new_callable=PropertyMock)
+    def test_reindex_master_copies(self, current_block_number_mock: PropertyMock):
+        logger_name = 'safe_transaction_service.history.services.index_service'
+        current_block_number_mock.return_value = 1000
+        command = 'reindex_master_copies'
+
+        with self.assertRaisesMessage(CommandError, 'the following arguments are required: --from-block-number'):
+            call_command(command)
+
+        buf = StringIO()
+        with self.assertLogs(logger_name, level='WARNING') as cm:
+            call_command(command, '--block-process-limit=11', '--from-block-number=76', stdout=buf)
+            self.assertIn('Setting block-process-limit to 11', buf.getvalue())
+            self.assertIn('Setting from-block-number to 76', buf.getvalue())
+            self.assertIn('No addresses to process', cm.output[0])
+
+        safe_master_copy = SafeMasterCopyFactory(l2=False)
+        buf = StringIO()
+        with self.assertLogs(logger_name, level='INFO') as cm:
+            with mock.patch.object(InternalTxIndexer, 'find_relevant_elements', return_value=[]
+                                   ) as find_relevant_elements_mock:
+                IndexServiceProvider.del_singleton()
+                from_block_number = 100
+                block_process_limit = 500
+                call_command(command, f'--block-process-limit={block_process_limit}',
+                             f'--from-block-number={from_block_number}', stdout=buf)
+                self.assertIn(f'Start reindexing addresses {[safe_master_copy.address]}', cm.output[0])
+                self.assertIn(f'found 0 traces/events', cm.output[1])
+                self.assertIn(f'End reindexing addresses {[safe_master_copy.address]}', cm.output[3])
+                find_relevant_elements_mock.assert_any_call([safe_master_copy.address],
+                                                            from_block_number,
+                                                            from_block_number + block_process_limit)
+                find_relevant_elements_mock.assert_any_call([safe_master_copy.address],
+                                                            from_block_number + block_process_limit,
+                                                            from_block_number + block_process_limit * 2)
+                self.assertEqual(find_relevant_elements_mock.call_count, 2)
+
+        with self.settings(ETH_L2_NETWORK=True):
+            IndexServiceProvider.del_singleton()
+            buf = StringIO()
+            with self.assertLogs(logger_name, level='WARNING') as cm:
+                call_command(command, '--from-block-number=71', stdout=buf)
+            self.assertIn('No addresses to process', cm.output[0])
+
+            with self.assertLogs(logger_name, level='INFO') as cm:
+                with mock.patch.object(SafeEventsIndexer, 'find_relevant_elements', return_value=[]
+                                   ) as find_relevant_elements_mock:
+                    safe_l2_master_copy = SafeMasterCopyFactory(l2=True)
+                    buf = StringIO()
+                    from_block_number = 200
+                    block_process_limit = 500
+                    call_command(command, f'--block-process-limit={block_process_limit}',
+                                 f'--from-block-number={from_block_number}', stdout=buf)
+                    self.assertIn(f'Start reindexing addresses {[safe_l2_master_copy.address]}', cm.output[0])
+                    self.assertIn(f'found 0 traces/events', cm.output[1])
+                    self.assertIn(f'End reindexing addresses {[safe_l2_master_copy.address]}', cm.output[3])
+                    find_relevant_elements_mock.assert_any_call([safe_l2_master_copy.address],
+                                                                from_block_number,
+                                                                from_block_number + block_process_limit)
+                    find_relevant_elements_mock.assert_any_call([safe_l2_master_copy.address],
+                                                                from_block_number + block_process_limit,
+                                                                from_block_number + block_process_limit * 2)
+                    self.assertEqual(find_relevant_elements_mock.call_count, 2)
 
     def test_setup_service_mainnet(self):
         self._test_setup_service(EthereumNetwork.MAINNET)

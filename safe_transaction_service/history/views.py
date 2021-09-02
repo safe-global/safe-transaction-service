@@ -455,8 +455,8 @@ class SafeDelegateListView(ListCreateAPIView):
         Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
         For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
         For example:
-             - we want to add the owner `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
-             - TOTP = epoch // 3600 = 1586779140 // 3600 = 440771
+             - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
+             - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
              - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
         """
         if not Web3.isChecksumAddress(address):
