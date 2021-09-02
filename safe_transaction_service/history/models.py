@@ -670,9 +670,15 @@ class InternalTxDecodedQuerySet(models.QuerySet):
 
     def order_by_processing_queue(self):
         """
-        :return: Transactions ordered to be processed. First older transactions
+        :return: Transactions ordered to be processed. First `setup` and then older transactions
         """
-        return self.order_by(
+        return self.annotate(
+            is_setup=Case(
+                When(function_name='setup', then=Value(0)),
+                default=Value(1),
+            )
+        ).order_by(
+            'is_setup',
             'internal_tx__ethereum_tx__block_id',
             'internal_tx__ethereum_tx__transaction_index',
             'internal_tx__trace_address',
