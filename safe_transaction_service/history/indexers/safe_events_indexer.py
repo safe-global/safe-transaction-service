@@ -168,6 +168,10 @@ class SafeEventsIndexer(EventsIndexer):
         ).exists()
 
     @transaction.atomic
+    def decode_elements(self, *args) -> List[EventData]:
+        return super().decode_elements(*args)
+
+    @transaction.atomic
     def _process_decoded_element(self, decoded_element: EventData) -> Optional[InternalTx]:
         safe_address = decoded_element['address']
         event_name = decoded_element['event']
@@ -200,6 +204,7 @@ class SafeEventsIndexer(EventsIndexer):
             arguments=args,
         )
         if event_name == 'ProxyCreation':
+            # Should be the 2nd event to be indexed, after `SafeSetup`
             safe_address = args.pop('proxy')
 
             if self._is_setup_indexed(safe_address):
@@ -224,6 +229,7 @@ class SafeEventsIndexer(EventsIndexer):
                 internal_tx.call_type = None
                 internal_tx_decoded = None
         elif event_name == 'SafeSetup':
+            # Should be the 1st event to be indexed, unless custom `to` and `data` are set
             if self._is_setup_indexed(safe_address):
                 internal_tx = None
             else:
