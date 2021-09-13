@@ -124,6 +124,4 @@ docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
 ```
 
 ## Contributors
-- Denís Graña (denis@gnosis.pm)
-- Giacomo Licari (giacomo.licari@gnosis.pm)
-- Uxío Fuentefría (uxio@gnosis.pm)
+[See contributors](https://github.com/gnosis/safe-transaction-service/graphs/contributors)
