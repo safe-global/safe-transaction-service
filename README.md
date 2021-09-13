@@ -124,4 +124,4 @@ docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
 ```
 
 ## Contributors
-[See contributors](https://github.com/gnosis/safe-transaction-service/graphs/contributors>)
+[See contributors](https://github.com/gnosis/safe-transaction-service/graphs/contributors)
