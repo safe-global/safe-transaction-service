@@ -44,7 +44,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     - name: Install dependencies
-      run: pip install -r requirements-test.txt coveralls wheel
+      run: |
+        pip install wheel
+        pip install -r requirements-test.txt coveralls
       env:
         PIP_USE_MIRRORS: true
     - name: Run tests and coverage
