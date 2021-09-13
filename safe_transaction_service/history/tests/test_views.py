@@ -1470,12 +1470,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'version': safe_master_copy.version,
              'deployer': safe_master_copy.deployer,
              'deployed_block_number': deployed_block_number,
-             'last_indexed_block_number': last_indexed_block_number
+             'last_indexed_block_number': last_indexed_block_number,
+             'l2': False,
              }
         ]
         self.assertCountEqual(response.data, expected)
 
-        safe_master_copy = SafeMasterCopyFactory()
+        safe_master_copy = SafeMasterCopyFactory(l2=True)
         response = self.client.get(reverse('v1:history:master-copies'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected += [
@@ -1484,6 +1485,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
              'deployer': safe_master_copy.deployer,
              'deployed_block_number': 0,
              'last_indexed_block_number': 0,
+             'l2': True,
              }
         ]
 

@@ -519,6 +519,7 @@ class MasterCopyResponseSerializer(serializers.Serializer):
     deployer = serializers.CharField()
     deployed_block_number = serializers.IntegerField(source='initial_block_number')
     last_indexed_block_number = serializers.IntegerField(source='tx_block_number')
+    l2 = serializers.BooleanField()
 
 
 class OwnerResponseSerializer(serializers.Serializer):
