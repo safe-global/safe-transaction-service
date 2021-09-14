@@ -321,37 +321,51 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
                              topics=decoded_event['topics'],
                              arguments=decoded_event['args'])
 
-    def erc20_tokens_used_by_address(self, address: str) -> List[str]:
+    def erc20_tokens_used_by_address(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
         """
         :param address:
         :return: List of token addresses used by an address
         """
         # return self.erc20_events(address=address).values_list('address', flat=True).distinct()
         address_as_postgres_text = f'"{address}"'
-        events = self.raw("""SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
-            ("topic" = %s
-            AND (("arguments" -> 'to')::text = %s
-            OR ("arguments" -> 'from')::text = %s)
-            AND "arguments" ? 'value')
-        """, [ERC20_721_TRANSFER_TOPIC[2:], address_as_postgres_text, address_as_postgres_text])
-        return [event.address for event in events]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT "address" FROM "history_ethereumevent" WHERE
+                ("topic" = %s
+                AND (("arguments" -> 'to')::text = %s
+                OR ("arguments" -> 'from')::text = %s)
+                AND "arguments" ? 'value')
+                """,
+                [ERC20_721_TRANSFER_TOPIC[2:],
+                 address_as_postgres_text,
+                 address_as_postgres_text]
+            )
+            return {row[0] for row in cursor.fetchall()}
 
-    def erc721_tokens_used_by_address(self, address: str) -> List[str]:
+    def erc721_tokens_used_by_address(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
         """
         :param address:
         :return: List of token addresses used by an address
         """
         # return self.erc721_events(address=address).values_list('address', flat=True).distinct()
         address_as_postgres_text = f'"{address}"'
-        events = self.raw("""SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
-                    ("topic" = '%s'
-                    AND (("arguments" -> 'to')::text = '"%s"'
-                    OR ("arguments" -> 'from')::text = '"%s"')
-                    AND "arguments" ? 'tokenId')
-        """, [ERC20_721_TRANSFER_TOPIC[2:], address_as_postgres_text, address_as_postgres_text])
-        return [event.address for event in events]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
+                ("topic" = '%s'
+                AND (("arguments" -> 'to')::text = '"%s"'
+                OR ("arguments" -> 'from')::text = '"%s"')
+                AND "arguments" ? 'tokenId')
+                """,
+                [ERC20_721_TRANSFER_TOPIC[2:],
+                 address_as_postgres_text,
+                 address_as_postgres_text]
+            )
+            return {row[0] for row in cursor.fetchall()}
 
-    def erc20_tokens_with_balance(self, address: str) -> List[Dict[str, Any]]:
+    def erc20_tokens_with_balance(self, address: ChecksumAddress) -> List[Dict[str, Any]]:
         """
         :return: List of dictionaries {'token_address': str, 'balance': int}
         """
