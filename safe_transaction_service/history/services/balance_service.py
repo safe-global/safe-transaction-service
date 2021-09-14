@@ -122,7 +122,7 @@ class BalanceService:
         """
         assert Web3.isChecksumAddress(safe_address), f'Not valid address {safe_address} for getting balances'
 
-        all_erc20_addresses = list(EthereumEvent.objects.erc20_tokens_used_by_address(safe_address))
+        all_erc20_addresses = EthereumEvent.objects.erc20_tokens_used_by_address(safe_address)
         for address in all_erc20_addresses:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached
