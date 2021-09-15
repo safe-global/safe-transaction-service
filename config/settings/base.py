@@ -215,6 +215,13 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_IGNORE_RESULT = True
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-task_always_eager
 CELERY_ALWAYS_EAGER = False
+# https://docs.celeryproject.org/en/latest/userguide/configuration.html#task-default-priority
+CELERY_TASK_DEFAULT_PRIORITY = 5  # Higher = more priority
+# https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'queue_order_strategy': 'priority',
+}
+
 
 # Django REST Framework
 # ------------------------------------------------------------------------------
