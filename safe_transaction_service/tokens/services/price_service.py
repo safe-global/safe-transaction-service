@@ -11,7 +11,6 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
-from gnosis.eth.constants import NULL_ADDRESS
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -248,14 +247,6 @@ class PriceService:
         except CannotGetPrice:
             logger.warning('Cannot get network ether price', exc_info=True)
             eth_price = 0
-
-        # If the token is the native one (NULL_ADDRESS) we can return the eth_price immediately
-        if len(token_addresses) == 1 and token_addresses[0] == NULL_ADDRESS:
-            yield FiatPriceWithTimestamp(
-                fiat_price=eth_price,
-                fiat_code=
-                FiatCode.USD, timestamp=timezone.now()
-            )
 
         for token_eth_values_with_timestamp in self.get_cached_token_eth_values(token_addresses):
             yield FiatPriceWithTimestamp(eth_price * token_eth_values_with_timestamp.eth_value,

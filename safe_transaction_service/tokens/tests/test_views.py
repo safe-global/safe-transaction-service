@@ -117,11 +117,13 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(response.data['fiat_price'], str(fiat_price_with_timestamp.fiat_price))
             self.assertTrue(response.data['timestamp'])
 
-    @mock.patch.object(PriceService, 'get_eth_usd_price', autospec=True, return_value=12)
-    def test_token_price_view_address_0(self, get_eth_usd_price):
+    def test_token_price_view_address_0(self):
         token_address = "0x0000000000000000000000000000000000000000"
+
         response = self.client.get(reverse('v1:tokens:price-usd', args=(token_address,)))
+
+        # Native token should be retrieved even if it is not part of the Token table
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['fiat_code'], 'USD')
-        self.assertEqual(response.data['fiat_price'], str(12))
+        self.assertTrue(response.data['fiat_price'])
         self.assertTrue(response.data['timestamp'])
