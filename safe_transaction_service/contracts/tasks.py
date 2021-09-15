@@ -26,7 +26,7 @@ def create_missing_contracts_with_metadata_task() -> int:
         i = 0
         for address in MultisigTransaction.objects.not_indexed_metadata_contract_addresses():
             logger.info('Detected missing contract %s', address)
-            create_or_update_contract_with_metadata_task.delay(address)
+            create_or_update_contract_with_metadata_task.apply_async((address,), priority=0)  # Lowest priority
             i += 1
         return i
     finally:
