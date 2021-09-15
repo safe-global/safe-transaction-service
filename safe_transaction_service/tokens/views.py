@@ -3,6 +3,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters.rest_framework
+from gnosis.eth.constants import NULL_ADDRESS
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -65,7 +66,8 @@ class TokenPriceView(APIView):
                                            'message': 'Invalid ethereum address',
                                            'arguments': [address]})
 
-        if not Token.objects.filter(address=address).exists():
+        # NULL_ADDRESS does not have to be stored in the Token table
+        if not Token.objects.filter(address=address).exists() and address != NULL_ADDRESS:
             raise Http404
         fiat_price_with_timestamp = next(PriceServiceProvider().get_cached_usd_values([address]))
         serializer = self.serializer_class(data={'fiat_code': fiat_price_with_timestamp.fiat_code.name,
