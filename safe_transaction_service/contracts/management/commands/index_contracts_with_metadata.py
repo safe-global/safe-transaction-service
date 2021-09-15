@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from ...tasks import (create_missing_contracts_with_metadata_task,
-                      reindex_contracts_without_metadata)
+                      reindex_contracts_without_metadata_task)
 
 
 class Command(BaseCommand):
@@ -17,7 +17,7 @@ class Command(BaseCommand):
         sync = options['sync']
 
         if reindex:
-            task = reindex_contracts_without_metadata
+            task = reindex_contracts_without_metadata_task
         else:
             task = create_missing_contracts_with_metadata_task
 

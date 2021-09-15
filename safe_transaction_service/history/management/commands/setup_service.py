@@ -55,7 +55,7 @@ TASKS = [
                             'Check Reorgs', 3, IntervalSchedule.MINUTES),
     CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.create_missing_contracts_with_metadata_task',
                             'Index contract names and ABIs', 1, IntervalSchedule.HOURS),
-    CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata',
+    CeleryTaskConfiguration('safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata_task',
                             'Reindex contracts with missing names or ABIs', 7, IntervalSchedule.DAYS),
     CeleryTaskConfiguration('safe_transaction_service.tokens.tasks.fix_pool_tokens_task',
                             'Fix Pool Token Names', 1, IntervalSchedule.HOURS),
