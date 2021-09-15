@@ -12,7 +12,7 @@ from safe_transaction_service.history.tests.factories import \
 
 from ..models import Contract
 from ..tasks import (create_missing_contracts_with_metadata_task,
-                     reindex_contracts_without_metadata)
+                     reindex_contracts_without_metadata_task)
 
 
 class TestTasks(TestCase):
@@ -36,5 +36,5 @@ class TestTasks(TestCase):
             contract_abi_id = contract.contract_abi_id
 
             # Reindex all the contracts, they should have the same abi
-            self.assertEqual(reindex_contracts_without_metadata(), 2)
+            self.assertEqual(reindex_contracts_without_metadata_task(), 2)
             self.assertEqual(Contract.objects.filter(contract_abi_id=contract_abi_id).count(), 3)
