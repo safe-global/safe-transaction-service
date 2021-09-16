@@ -429,6 +429,8 @@ class SafeDelegateListView(ListCreateAPIView):
             return serializers.SafeDelegateResponseSerializer
         elif self.request.method == 'POST':
             return serializers.SafeDelegateSerializer
+        elif self.request.method == 'DELETE':
+            return serializers.SafeDelegateDeleteSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     422: 'Invalid Ethereum address'})
