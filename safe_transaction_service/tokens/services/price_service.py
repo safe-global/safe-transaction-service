@@ -14,6 +14,7 @@ from eth_typing import ChecksumAddress
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import EthereumNetwork
 from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
                                 ComposedPriceOracle, CurveOracle, KyberOracle,
@@ -163,7 +164,7 @@ class PriceService:
         :param token_address:
         :return: Current ether value for a given `token_address`
         """
-        if token_address == '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE':  # Ether
+        if token_address == '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' or token_address == NULL_ADDRESS:  # Ether
             return 1.
 
         for oracle in self.enabled_price_oracles:
