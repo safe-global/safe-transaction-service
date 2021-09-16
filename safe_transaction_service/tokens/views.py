@@ -10,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
 
+from gnosis.eth.constants import NULL_ADDRESS
+
 from . import filters, serializers
 from .models import Token
 from .services import PriceServiceProvider
@@ -65,7 +67,8 @@ class TokenPriceView(APIView):
                                            'message': 'Invalid ethereum address',
                                            'arguments': [address]})
 
-        if not Token.objects.filter(address=address).exists():
+        # NULL_ADDRESS does not have to be stored in the Token table
+        if not Token.objects.filter(address=address).exists() and address != NULL_ADDRESS:
             raise Http404
         fiat_price_with_timestamp = next(PriceServiceProvider().get_cached_usd_values([address]))
         serializer = self.serializer_class(data={'fiat_code': fiat_price_with_timestamp.fiat_code.name,
