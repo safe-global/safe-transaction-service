@@ -110,7 +110,7 @@ class TestCommands(TestCase):
                 call_command(command, f'--block-process-limit={block_process_limit}',
                              f'--from-block-number={from_block_number}', stdout=buf)
                 self.assertIn(f'Start reindexing addresses {[safe_master_copy.address]}', cm.output[0])
-                self.assertIn(f'found 0 traces/events', cm.output[1])
+                self.assertIn('found 0 traces/events', cm.output[1])
                 self.assertIn(f'End reindexing addresses {[safe_master_copy.address]}', cm.output[3])
                 find_relevant_elements_mock.assert_any_call([safe_master_copy.address],
                                                             from_block_number,
@@ -129,7 +129,7 @@ class TestCommands(TestCase):
 
             with self.assertLogs(logger_name, level='INFO') as cm:
                 with mock.patch.object(SafeEventsIndexer, 'find_relevant_elements', return_value=[]
-                                   ) as find_relevant_elements_mock:
+                                       ) as find_relevant_elements_mock:
                     safe_l2_master_copy = SafeMasterCopyFactory(l2=True)
                     buf = StringIO()
                     from_block_number = 200
@@ -137,7 +137,7 @@ class TestCommands(TestCase):
                     call_command(command, f'--block-process-limit={block_process_limit}',
                                  f'--from-block-number={from_block_number}', stdout=buf)
                     self.assertIn(f'Start reindexing addresses {[safe_l2_master_copy.address]}', cm.output[0])
-                    self.assertIn(f'found 0 traces/events', cm.output[1])
+                    self.assertIn('found 0 traces/events', cm.output[1])
                     self.assertIn(f'End reindexing addresses {[safe_l2_master_copy.address]}', cm.output[3])
                     find_relevant_elements_mock.assert_any_call([safe_l2_master_copy.address],
                                                                 from_block_number,

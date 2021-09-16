@@ -1,5 +1,5 @@
 [run]
-omit = 
+omit =
      *__init__.py*
      *tests*
      */migrations/*

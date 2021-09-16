@@ -1,6 +1,6 @@
 -r requirements.txt
 -r requirements-test.txt
 flake8
-isort
 ipdb
 ipython
+isort

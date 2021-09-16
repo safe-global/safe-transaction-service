@@ -1,5 +1,6 @@
 ![Build Status](https://github.com/gnosis/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-service?branch=master)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.9](https://img.shields.io/badge/Python-3.9-blue.svg)
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
 
@@ -21,10 +22,20 @@ a transaction that is pending to be sent to the blockchain.
 - [Docs](https://docs.gnosis.io/safe/docs/services_transactions/)
 
 ## Setup for development
+Use a virtualenv if possible:
+
 ```bash
+python -m venv venv
+```
+
+Then enter the virtualenv and install the dependencies:
+
+```bash
+source venv/bin/activate
+pip install -r requirements-dev.txt
+pre-commit install -f
 cp .env.dev .env
-docker-compose build --force-rm
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+./run_tests.sh
 ```
 
 ## Setup for production (event indexing)
