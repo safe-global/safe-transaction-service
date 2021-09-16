@@ -429,6 +429,8 @@ class SafeDelegateListView(ListCreateAPIView):
             return serializers.SafeDelegateResponseSerializer
         elif self.request.method == 'POST':
             return serializers.SafeDelegateSerializer
+        elif self.request.method == 'DELETE':
+            return serializers.SafeDelegateDeleteSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data',
                                     422: 'Invalid Ethereum address'})
@@ -467,6 +469,28 @@ class SafeDelegateListView(ListCreateAPIView):
 
         request.data['safe'] = address
         return super().post(request, address, **kwargs)
+
+    @swagger_auto_schema(responses={204: 'Deleted',
+                                    400: 'Malformed data',
+                                    422: 'Invalid Ethereum address/Error processing data'})
+    def delete(self, request, address, *args, **kwargs):
+        """
+        Delete all delegates for a Safe. Signature is built the same way that for adding a delegate using the Safe
+        address as the delegate.
+
+        Check `POST /delegates/`
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [address]})
+        request.data['safe'] = address
+        request.data['delegate'] = address
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        SafeContractDelegate.objects.filter(safe_contract_id=address).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SafeDelegateDestroyView(DestroyAPIView):

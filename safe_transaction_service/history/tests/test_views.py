@@ -916,6 +916,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
 
+    def test_delete_safe_delegate_list(self):
+        endpoint = 'v1:history:safe-delegates'
+
+        owner_account = Account.create()
+        safe_address = self.deploy_test_safe(owners=[owner_account.address]).safe_address
+        safe_contract = SafeContractFactory(address=safe_address)
+        response = self.client.delete(reverse(endpoint, args=(safe_address,)), format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)  # Data is missing
+
+        data = {
+            'signature': '0x' + '1' * 130,
+        }
+        not_existing_safe = Account.create().address
+        response = self.client.delete(reverse(endpoint, args=(not_existing_safe,)), format='json',
+                                      data=data)
+        self.assertIn(f'Safe={not_existing_safe} does not exist', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(safe_address, eth_sign=True)
+        data['signature'] = owner_account.signHash(hash_to_sign)['signature'].hex()
+        SafeContractDelegateFactory(safe_contract=safe_contract)
+        SafeContractDelegateFactory(safe_contract=safe_contract)
+        SafeContractDelegateFactory(safe_contract=SafeContractFactory())
+        self.assertEqual(SafeContractDelegate.objects.count(), 3)
+        response = self.client.delete(reverse(endpoint, args=(safe_address,)),
+                                      format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+
+        # Sign random address instead of the Safe address
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(Account.create().address, eth_sign=True)
+        data['signature'] = owner_account.signHash(hash_to_sign)['signature'].hex()
+        response = self.client.delete(reverse(endpoint, args=(safe_address,)),
+                                      format='json', data=data)
+        self.assertIn('Signing owner is not an owner of the Safe', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_post_safe_delegate(self):
         safe_address = Account.create().address
         delegate_address = Account.create().address
