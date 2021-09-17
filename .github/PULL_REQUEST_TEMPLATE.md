@@ -1,6 +1,6 @@
 ### What was wrong?
 
-Closes issue #
+Closes #
 
 ### How was it fixed?
 
