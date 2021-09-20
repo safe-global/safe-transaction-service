@@ -4,3 +4,4 @@ flake8
 ipdb
 ipython
 isort
+pre-commit
