@@ -127,7 +127,7 @@ def send_notification_task(address: Optional[str], payload: Dict[str, Any]) -> T
 
 
 @app.shared_task()
-def send_notification_owner_task(address: str, safe_tx_hash: str):
+def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, int]:
     """
     Send a confirmation request to an owner
 
