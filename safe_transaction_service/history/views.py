@@ -470,7 +470,8 @@ class SafeDelegateListView(ListCreateAPIView):
         request.data['safe'] = address
         return super().post(request, address, **kwargs)
 
-    @swagger_auto_schema(responses={204: 'Deleted',
+    @swagger_auto_schema(operation_id='safes_delegates_delete_all',
+                         responses={204: 'Deleted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
     def delete(self, request, address, *args, **kwargs):
