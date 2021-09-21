@@ -130,7 +130,7 @@ class BalanceService:
 
         try:
             raw_balances = self.ethereum_client.erc20.get_balances(safe_address, erc20_addresses)
-        except IOError as exc:
+        except (IOError, ValueError) as exc:
             raise NodeConnectionException from exc
 
         balances = []

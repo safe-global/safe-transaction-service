@@ -356,7 +356,7 @@ class CollectiblesService:
                 for key in redis_map_to_store.keys():
                     pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
                 pipe.execute()
-        except IOError as exc:
+        except (IOError, ValueError) as exc:
             raise NodeConnectionException from exc
 
         return [self.cache_token_uri[address_with_token_id]
