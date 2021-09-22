@@ -241,12 +241,16 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
         safe_address = self.context['safe_address']
         ethereum_client = EthereumClientProvider()
         safe = Safe(safe_address, ethereum_client)
-        try:
-            safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
-                                               self.validated_data['data'], self.validated_data['operation'])
-        except IOError as exc:
-            raise NodeConnectionException(f'Node connection error when estimating gas for safe {safe_address}') from exc
-        return {'safe_tx_gas': safe_tx_gas}
+        exc = None
+        # Retry thrice to get an estimation
+        for _ in range(3):
+            try:
+                safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
+                                                   self.validated_data['data'], self.validated_data['operation'])
+                return {'safe_tx_gas': safe_tx_gas}
+            except (IOError, ValueError) as _exc:
+                exc = _exc
+        raise NodeConnectionException(f'Node connection error when estimating gas for Safe {safe_address}') from exc
 
 
 class SafeDelegateDeleteSerializer(serializers.Serializer):
