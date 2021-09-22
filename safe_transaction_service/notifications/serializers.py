@@ -2,7 +2,7 @@ import time
 from typing import Any, Dict, Sequence
 from uuid import uuid4
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from packaging import version as semantic_version
 from rest_framework import serializers
@@ -92,6 +92,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
         data['owners_not_registered'] = owners_without_safe
         return data
 
+    @transaction.atomic
     def save(self, **kwargs):
         try:
             uuid = self.validated_data['uuid']
@@ -105,16 +106,19 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                     'version': self.validated_data['version'],
                 }
             )
-        except IntegrityError as e:
+        except IntegrityError:
             raise serializers.ValidationError('Cloud messaging token is linked to another device')
 
         # Remove every owner registered for the device and add the provided ones
         firebase_device.owners.all().delete()
         for owner in self.validated_data['owners_registered']:
-            FirebaseDeviceOwner.objects.create(
-                firebase_device=firebase_device,
-                owner=owner
-            )
+            try:
+                FirebaseDeviceOwner.objects.create(
+                    firebase_device=firebase_device,
+                    owner=owner
+                )
+            except IntegrityError:
+                raise serializers.ValidationError(f'Owner {owner} already created for firebase_device')
 
         # Remove every Safe registered for the device and add the provided ones
         firebase_device.safes.clear()
