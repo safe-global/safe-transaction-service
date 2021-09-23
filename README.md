@@ -38,6 +38,11 @@ cp .env.dev .env
 ./run_tests.sh
 ```
 
+## Setup for development using docker
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
 ## Setup for production (event indexing)
 Since **version 3.0.0** transaction service can be configured to rely on **event indexing**
 when [SafeL2 version](https://github.com/gnosis/safe-contracts/blob/v1.3.0/contracts/GnosisSafeL2.sol) is used. Only

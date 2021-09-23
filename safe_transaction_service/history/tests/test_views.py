@@ -1091,6 +1091,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(SafeContractDelegate.objects.count(), 1)
 
+        # Check if a delegate can delete itself
+        SafeContractDelegate.objects.all().delete()
+        delegate_account = Account().create()
+        SafeContractDelegateFactory(safe_contract=safe_contract, delegate=delegate_account.address)
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_account.address)
+        data['signature'] = delegate_account.signHash(hash_to_sign)['signature'].hex()
+        response = self.client.delete(reverse('v1:history:safe-delegate', args=(safe_address, delegate_account.address)),
+                                      format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(SafeContractDelegate.objects.count(), 0)
+
     def test_incoming_transfers_view(self):
         safe_address = Account.create().address
         response = self.client.get(reverse('v1:history:incoming-transfers', args=(safe_address, )))
