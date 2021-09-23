@@ -56,6 +56,20 @@ class TestCommands(TestCase):
         self.assertNotIn('Created Periodic Task', buf.getvalue())
         self.assertIn('was already created', buf.getvalue())
 
+    def test_add_webhook(self):
+        command = 'add_webhook'
+
+        with self.assertRaisesMessage(CommandError, 'the following arguments are required: --url'):
+            call_command(command)
+
+        buf = StringIO()
+        call_command(command, '--url=http://docker-url', stdout=buf)
+        self.assertIn('Created webhook for', buf.getvalue())
+
+        buf = StringIO()
+        call_command(command, '--url=https://test-url.com', stdout=buf)
+        self.assertIn('Created webhook for', buf.getvalue())
+
     def test_index_erc20(self):
         command = 'index_erc20'
         buf = StringIO()
