@@ -57,7 +57,7 @@ class SafeContractDelegateInline(admin.TabularInline):
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = 'timestamp'
     inlines = (EthereumTxInline,)
-    list_display = ('number', 'timestamp', 'confirmed', 'gas_limit', 'gas_used', 'block_hash')
+    list_display = ('number', 'timestamp', 'confirmed', 'gas_used', 'block_hash')
     list_filter = ('confirmed',)
     search_fields = ['=number', '=block_hash']
     ordering = ['-number']
