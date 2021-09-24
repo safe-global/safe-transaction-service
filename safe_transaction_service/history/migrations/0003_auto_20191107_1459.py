@@ -22,7 +22,6 @@ class Migration(migrations.Migration):
             name='EthereumBlock',
             fields=[
                 ('number', models.PositiveIntegerField(primary_key=True, serialize=False, unique=True)),
-                ('gas_limit', models.PositiveIntegerField()),
                 ('gas_used', models.PositiveIntegerField()),
                 ('timestamp', models.DateTimeField()),
                 ('block_hash', gnosis.eth.django.models.Sha3HashField(unique=True)),

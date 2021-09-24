@@ -136,7 +136,6 @@ class EthereumBlockManager(models.Manager):
         try:
             return super().create(
                 number=block['number'],
-                gas_limit=block['gasLimit'],
                 gas_used=block['gasUsed'],
                 timestamp=datetime.datetime.fromtimestamp(block['timestamp'],
                                                           datetime.timezone.utc),
@@ -164,7 +163,6 @@ class EthereumBlockQuerySet(models.QuerySet):
 class EthereumBlock(models.Model):
     objects = EthereumBlockManager.from_queryset(EthereumBlockQuerySet)()
     number = models.PositiveIntegerField(primary_key=True)
-    gas_limit = models.PositiveIntegerField()
     gas_used = models.PositiveIntegerField()
     timestamp = models.DateTimeField()
     block_hash = Sha3HashField(unique=True)
