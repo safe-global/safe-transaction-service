@@ -23,6 +23,7 @@ from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UnderlyingToken, UniswapOracle,
                                 UniswapV2Oracle, YearnOracle)
+from gnosis.eth.oracles.oracles import EnzymeOracle
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -73,6 +74,7 @@ class PriceService:
         self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
         self.pool_together_oracle = PoolTogetherOracle(self.ethereum_client)
         self.yearn_oracle = YearnOracle(self.ethereum_client)
+        self.enzyme_oracle = EnzymeOracle(self.ethereum_client)
         self.aave_oracle = AaveOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.balancer_oracle = BalancerOracle(self.ethereum_client, self.uniswap_v2_oracle)
         self.mooniswap_oracle = MooniswapOracle(self.ethereum_client, self.uniswap_v2_oracle)
@@ -100,7 +102,7 @@ class PriceService:
     @cached_property
     def enabled_composed_price_oracles(self) -> Tuple[ComposedPriceOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.curve_oracle, self.yearn_oracle, self.pool_together_oracle
+            return self.curve_oracle, self.yearn_oracle, self.pool_together_oracle, self.enzyme_oracle
         else:
             return tuple()
 
@@ -210,7 +212,7 @@ class PriceService:
             try:
                 return oracle.get_underlying_tokens(token_address)
             except OracleException:
-                logger.info('Cannot get eth value for token-address=%s from %s', token_address,
+                logger.info('Cannot get an underlying token for token-address=%s from %s', token_address,
                             oracle.__class__.__name__)
 
     def get_cached_token_eth_values(self,
