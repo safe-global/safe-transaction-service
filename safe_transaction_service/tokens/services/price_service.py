@@ -17,13 +17,12 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import EthereumNetwork
 from gnosis.eth.oracles import (AaveOracle, BalancerOracle,
-                                ComposedPriceOracle, CurveOracle, KyberOracle,
-                                MooniswapOracle, OracleException,
+                                ComposedPriceOracle, CurveOracle, EnzymeOracle,
+                                KyberOracle, MooniswapOracle, OracleException,
                                 PoolTogetherOracle, PriceOracle,
                                 PricePoolOracle, SushiswapOracle,
                                 UnderlyingToken, UniswapOracle,
                                 UniswapV2Oracle, YearnOracle)
-from gnosis.eth.oracles.oracles import EnzymeOracle
 
 from safe_transaction_service.utils.redis import get_redis
 

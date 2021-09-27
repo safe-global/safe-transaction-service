@@ -11,7 +11,7 @@ def just_test_if_mainnet_node() -> str:
 
     if not mainnet_node_url:
         pytest.skip("Mainnet node not defined, cannot test oracles", allow_module_level=True)
-    elif requests.get(mainnet_node_url).status_code == 404:
+    elif requests.post(mainnet_node_url).status_code == 404:
         pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
 
     just_test_if_mainnet_node.checked = True
