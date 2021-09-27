@@ -1069,7 +1069,7 @@ class SafeContract(models.Model):
 
 
 class SafeContractDelegateManager(models.Manager):
-    def get_delegates_for_safe(self, address: str) -> List[str]:
+    def get_delegates_for_safe(self, address: ChecksumAddress) -> List[ChecksumAddress]:
         return list(self.filter(safe_contract_id=address).values_list('delegate', flat=True))
 
 
@@ -1078,7 +1078,8 @@ class SafeContractDelegate(models.Model):
     The owners of the Safe can add users so they can propose/retrieve txs as if they were the owners of the Safe
     """
     objects = SafeContractDelegateManager()
-    safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates')
+    safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates',
+                                      null=True, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()  # Owner who created the delegate
     label = models.CharField(max_length=50)
@@ -1086,7 +1087,7 @@ class SafeContractDelegate(models.Model):
     write = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = (('safe_contract', 'delegate'),)
+        unique_together = (('safe_contract', 'delegate', 'delegator'),)
 
     def __str__(self):
         return f'Delegate={self.delegate} for Safe={self.safe_contract_id} - Label={self.label}'
