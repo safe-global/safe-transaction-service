@@ -1093,25 +1093,29 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             safe_contract_delegate = SafeContractDelegate.objects.get()
             self.assertEqual(safe_contract_delegate.label, label)
 
+        # Create delegate without a Safe
         another_label = 'Kim Wexler'
-        another_delegate_address = Account.create().address
         data = {
-            'delegate': another_delegate_address,
             'label': another_label,
+            'delegate': delegate.address,
+            'delegator': delegator.address,
+            'safe': None,
             'signature': delegator.signHash(
-                DelegateSignatureHelper.calculate_hash(another_delegate_address,
-                                                       eth_sign=True)
+                DelegateSignatureHelper.calculate_hash(delegate.address, eth_sign=True)
             )['signature'].hex(),
         }
-        response = self.client.post(url, format='json',
-                                    data=data)
+        response = self.client.post(url, format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeContractDelegate.objects.count(), 2)
 
         # Test not internal server error on contract signature
         signature = signature_to_bytes(0, int(delegator.address, 16), 65) + HexBytes('0' * 65)
         data['signature'] = signature.hex()
-        response = self.client.post(url, format='json',
-                                    data=data)
+        response = self.client.post(url, format='json', data=data)
+        self.assertIn(
+            f'Signature of type=CONTRACT_SIGNATURE for delegator={delegator.address} is not valid',
+            response.data['non_field_errors'][0]
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         response = self.client.get(url, format='json')
@@ -1120,17 +1124,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 'delegate': delegate.address,
                 'delegator': delegator.address,
                 'label': label,
+                'safe': safe_address,
             },
             {
-                'delegate': another_delegate_address,
+                'delegate': delegate.address,
                 'delegator': delegator.address,
                 'label': another_label,
+                'safe': None,
             },
         ])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
-        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
-                              [delegate.address, another_delegate_address])
+        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address), [delegate.address])
 
     def test_delete_safe_delegate(self):
         safe_address = Account.create().address

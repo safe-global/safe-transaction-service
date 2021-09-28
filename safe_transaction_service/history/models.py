@@ -1069,8 +1069,8 @@ class SafeContract(models.Model):
 
 
 class SafeContractDelegateManager(models.Manager):
-    def get_delegates_for_safe(self, address: ChecksumAddress) -> List[ChecksumAddress]:
-        return list(self.filter(safe_contract_id=address).values_list('delegate', flat=True))
+    def get_delegates_for_safe(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
+        return set(self.filter(safe_contract_id=address).values_list('delegate', flat=True).distinct())
 
 
 class SafeContractDelegate(models.Model):
