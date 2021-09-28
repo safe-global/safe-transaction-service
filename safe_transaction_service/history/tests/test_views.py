@@ -28,7 +28,7 @@ from ..exceptions import NodeConnectionException
 from ..helpers import DelegateSignatureHelper
 from ..models import (MultisigConfirmation, MultisigTransaction,
                       SafeContractDelegate)
-from ..serializers import TransferType
+from ..serializers import DelegateSerializer, TransferType
 from ..services import BalanceService, CollectiblesService, SafeService
 from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
@@ -1031,6 +1031,106 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
                               [delegate_address, another_delegate_address])
+
+    def test_post_delegate(self):
+        url = reverse('v1:history:delegates')
+        safe_address = Account.create().address
+        delegate = Account.create()
+        delegator = Account.create()
+        label = 'Saul Goodman'
+        data = {
+            'safe': None,
+            'delegate': delegate.address,
+            'delegator': delegator.address,
+            'label': label,
+            'signature': '0x' + '1' * 130,
+        }
+        response = self.client.post(url, format='json', data=data)
+        self.assertIn('Signature does not match provided delegator', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        data['safe'] = safe_address
+        response = self.client.post(url, format='json', data=data)
+        self.assertIn(f'Safe={safe_address} does not exist', response.data['non_field_errors'][0])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        SafeContractFactory(address=safe_address)
+        with mock.patch.object(DelegateSerializer, 'get_safe_owners',
+                               autospec=True, return_value=[Account.create().address]) as get_safe_owners_mock:
+            response = self.client.post(url, format='json', data=data)
+            self.assertIn(
+                f'Provided delegator={delegator.address} is not an owner of Safe={safe_address}',
+                response.data['non_field_errors'][0]
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            get_safe_owners_mock.return_value = [delegator.address]
+            response = self.client.post(url, format='json', data=data)
+            self.assertIn(
+                f'Signature does not match provided delegator={delegator.address}',
+                response.data['non_field_errors'][0]
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Create delegate
+            self.assertEqual(SafeContractDelegate.objects.count(), 0)
+            hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate.address)
+            data['signature'] = delegator.signHash(hash_to_sign)['signature'].hex()
+            response = self.client.post(url, format='json', data=data)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            safe_contract_delegate = SafeContractDelegate.objects.get()
+            self.assertEqual(safe_contract_delegate.delegate, delegate.address)
+            self.assertEqual(safe_contract_delegate.delegator, delegator.address)
+            self.assertEqual(safe_contract_delegate.label, label)
+            self.assertEqual(safe_contract_delegate.safe_contract_id, safe_address)
+
+            # Update label
+            label = 'Jimmy McGill'
+            data['label'] = label
+            response = self.client.post(url, format='json', data=data)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(SafeContractDelegate.objects.count(), 1)
+            safe_contract_delegate = SafeContractDelegate.objects.get()
+            self.assertEqual(safe_contract_delegate.label, label)
+
+        another_label = 'Kim Wexler'
+        another_delegate_address = Account.create().address
+        data = {
+            'delegate': another_delegate_address,
+            'label': another_label,
+            'signature': delegator.signHash(
+                DelegateSignatureHelper.calculate_hash(another_delegate_address,
+                                                       eth_sign=True)
+            )['signature'].hex(),
+        }
+        response = self.client.post(url, format='json',
+                                    data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Test not internal server error on contract signature
+        signature = signature_to_bytes(0, int(delegator.address, 16), 65) + HexBytes('0' * 65)
+        data['signature'] = signature.hex()
+        response = self.client.post(url, format='json',
+                                    data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.get(url, format='json')
+        self.assertCountEqual(response.data['results'], [
+            {
+                'delegate': delegate.address,
+                'delegator': delegator.address,
+                'label': label,
+            },
+            {
+                'delegate': another_delegate_address,
+                'delegator': delegator.address,
+                'label': another_label,
+            },
+        ])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(SafeContractDelegate.objects.count(), 2)
+        self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
+                              [delegate.address, another_delegate_address])
 
     def test_delete_safe_delegate(self):
         safe_address = Account.create().address

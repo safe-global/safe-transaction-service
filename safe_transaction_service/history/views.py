@@ -526,6 +526,60 @@ class SafeDelegateDestroyView(DestroyAPIView):
         return super().delete(request, address, delegate_address, *args, **kwargs)
 
 
+class DelegateListView(ListCreateAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = filters.DelegateListFilter
+    pagination_class = pagination.DefaultPagination
+    queryset = SafeContractDelegate.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return serializers.SafeDelegateResponseSerializer
+        elif self.request.method == 'POST':
+            return serializers.DelegateSerializer
+        elif self.request.method == 'DELETE':
+            return serializers.SafeDelegateDeleteSerializer
+
+    @swagger_auto_schema(responses={400: 'Invalid data'})
+    def get(self, request, **kwargs):
+        """
+        Get the list of delegates for a Safe address
+        """
+        return super().get(request, **kwargs)
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data'})
+    def post(self, request, **kwargs):
+        """
+        Create a delegate for a Safe address with a custom label. Calls with same delegate but different label or
+        signer will update the label or delegator if different.
+        For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
+        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
+        For example:
+             - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
+             - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
+             - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
+        """
+        return super().post(request, **kwargs)
+
+    @swagger_auto_schema(responses={204: 'Deleted',
+                                    400: 'Malformed data'})
+    def delete(self, request, **kwargs):
+        """
+        Delete all delegates for a Safe. Signature is built the same way that for adding a delegate using the Safe
+        address as the delegate.
+
+        Check `POST /delegates/`
+        """
+        # request.data['safe'] = address
+        # request.data['delegate'] = address
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # SafeContractDelegate.objects.filter(safe_contract_id=address).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class SafeTransferListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.TransferListFilter

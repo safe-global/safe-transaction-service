@@ -9,6 +9,12 @@ from gnosis.eth.django.models import EthereumAddressField, Uint256Field
 from .models import ModuleTransaction, MultisigTransaction
 
 
+class DelegateListFilter(filters.FilterSet):
+    safe = django_filters.CharFilter(field_name='safe_contract_id')
+    delegate = django_filters.CharFilter()
+    delegator = django_filters.CharFilter()
+
+
 class TransferListFilter(filters.FilterSet):
     _from = django_filters.CharFilter()
     block_number = django_filters.NumberFilter(field_name='block_number')

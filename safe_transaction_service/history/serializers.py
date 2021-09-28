@@ -255,6 +255,9 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
 
 
 class SafeDelegateDeleteSerializer(serializers.Serializer):
+    """
+    Deprecated in favour of DelegateDeleteSerializer
+    """
     safe = EthereumAddressField()
     delegate = EthereumAddressField()
     signature = HexadecimalField(min_length=65)
@@ -332,6 +335,9 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
 
 
 class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
+    """
+    Deprecated in favour of DelegateSerializer
+    """
     label = serializers.CharField(max_length=50)
 
     def get_valid_delegators(self, ethereum_client: EthereumClient, safe_address: ChecksumAddress,
@@ -355,6 +361,90 @@ class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
             defaults={
                 'label': label,
                 'delegator': delegator,
+            }
+        )
+        return obj
+
+
+class DelegateSerializer(serializers.Serializer):
+    safe = EthereumAddressField(allow_null=True)
+    delegate = EthereumAddressField()
+    delegator = EthereumAddressField()
+    signature = HexadecimalField(min_length=65)
+    label = serializers.CharField(max_length=50)
+
+    def get_safe_owners(self, ethereum_client: EthereumClient, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+        safe = Safe(safe_address, ethereum_client)
+        try:
+            return safe.retrieve_owners(block_identifier='pending')
+        except BadFunctionCallOutput:  # Error using pending block identifier
+            return safe.retrieve_owners(block_identifier='latest')
+
+    def check_signature(self, ethereum_client: EthereumClient, signature: bytes,
+                        operation_hash: bytes, delegator: List[ChecksumAddress]
+                        ) -> bool:
+        """
+        Checks signature and returns a valid owner if found, None otherwise
+        :param ethereum_client:
+        :param signature:
+        :param operation_hash:
+        :param delegator:
+        :return: `True` if signature is valid for the delegator, `False` otherwise
+        """
+        safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
+        if not safe_signatures:
+            raise ValidationError('Signature is not valid')
+        elif len(safe_signatures) > 1:
+            raise ValidationError('More than one signatures detected, just one is expected')
+
+        safe_signature = safe_signatures[0]
+        owner = safe_signature.owner
+        if owner == delegator:
+            if not safe_signature.is_valid(ethereum_client, owner):
+                raise ValidationError(f'Signature of type={safe_signature.signature_type.name} '
+                                      f'for delegator={delegator} is not valid')
+            return True
+        return False
+
+    def validate(self, data):
+        super().validate(data)
+
+        safe_address: Optional[ChecksumAddress] = data['safe']
+        if safe_address and not SafeContract.objects.filter(address=safe_address).exists():
+            raise ValidationError(f"Safe={safe_address} does not exist or it's still not indexed")
+
+        signature = data['signature']
+        delegate = data['delegate']  # Delegate address to be added/removed
+        delegator = data['delegator']  # Delegator giving permissions to delegate (signer)
+
+        ethereum_client = EthereumClientProvider()
+        if safe_address:
+            # Valid delegators must be owners
+            valid_delegators = self.get_safe_owners(ethereum_client, safe_address)
+            if delegator not in valid_delegators:
+                raise ValidationError(f"Provided delegator={delegator} is not an owner of Safe={safe_address}")
+
+        # Tries to find a valid delegator using multiple strategies
+        for operation_hash in (DelegateSignatureHelper.calculate_hash(delegate),
+                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
+                               DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
+                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
+            if self.check_signature(ethereum_client, signature, operation_hash, delegator):
+                return data
+
+        raise ValidationError(f'Signature does not match provided delegator={delegator}')
+
+    def save(self, **kwargs):
+        safe_address = self.validated_data['safe']
+        delegate = self.validated_data['delegate']
+        delegator = self.validated_data['delegator']
+        label = self.validated_data['label']
+        obj, _ = SafeContractDelegate.objects.update_or_create(
+            safe_contract_id=safe_address,
+            delegate=delegate,
+            delegator=delegator,
+            defaults={
+                'label': label,
             }
         )
         return obj
@@ -510,6 +600,7 @@ class SafeMultisigTransactionEstimateResponseSerializer(serializers.Serializer):
 
 
 class SafeDelegateResponseSerializer(serializers.Serializer):
+    safe = EthereumAddressField(source='safe_contract_id')
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     label = serializers.CharField(max_length=50)
