@@ -156,7 +156,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         data['safe_owners'] = safe_owners
 
         delegates = SafeContractDelegate.objects.get_delegates_for_safe(safe.address)
-        allowed_senders = safe_owners + delegates
+        allowed_senders = set(safe_owners) | delegates
         if not data['sender'] in allowed_senders:
             raise ValidationError(f'Sender={data["sender"]} is not an owner or delegate. '
                                   f'Current owners={safe_owners}. Delegates={delegates}')

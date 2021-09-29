@@ -1020,11 +1020,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 'delegate': delegate_address,
                 'delegator': owner_account.address,
                 'label': label,
+                'safe': safe_address,
             },
             {
                 'delegate': another_delegate_address,
                 'delegator': owner_account.address,
                 'label': another_label,
+                'safe': safe_address,
             },
         ])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
