@@ -519,7 +519,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
-    signatures = HexadecimalField()
+    signatures = HexadecimalField(allow_null=True)
 
     def get_block_number(self, obj: MultisigTransaction) -> Optional[int]:
         if obj.ethereum_tx_id:
