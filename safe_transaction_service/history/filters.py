@@ -2,6 +2,7 @@ from django.db.models import Q
 
 import django_filters
 from django_filters import rest_framework as filters
+from rest_framework.exceptions import ValidationError
 
 from gnosis.eth.django.filters import EthereumAddressFilter
 from gnosis.eth.django.models import EthereumAddressField, Uint256Field
@@ -13,6 +14,14 @@ class DelegateListFilter(filters.FilterSet):
     safe = django_filters.CharFilter(field_name='safe_contract_id')
     delegate = django_filters.CharFilter()
     delegator = django_filters.CharFilter()
+    label = django_filters.CharFilter()
+
+    def filter_queryset(self, queryset):
+        # Check at least one value is present
+        for name, value in self.form.cleaned_data.items():
+            if value:
+                return super().filter_queryset(queryset)
+        raise ValidationError('At least one query param must be provided')
 
 
 class TransferListFilter(filters.FilterSet):

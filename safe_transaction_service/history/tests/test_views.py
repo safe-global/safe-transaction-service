@@ -1034,7 +1034,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
                               [delegate_address, another_delegate_address])
 
-    def test_post_delegate(self):
+    def test_delegates_post(self):
         url = reverse('v1:history:delegates')
         safe_address = Account.create().address
         delegate = Account.create()
@@ -1138,6 +1138,59 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address), [delegate.address])
+
+    def test_delegates_get(self):
+        url = reverse('v1:history:delegates')
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.data[0], 'At least one query param must be provided')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        delegator = Account.create().address
+
+        # Add 2 delegates for the same Safe and delegator and another for a different Safe
+        safe_contract_delegate_1 = SafeContractDelegateFactory(delegator=delegator)
+        safe_contract = safe_contract_delegate_1.safe_contract
+        safe_contract_delegate_2 = SafeContractDelegateFactory(safe_contract=safe_contract, delegator=delegator)
+        safe_contract_delegate_3 = SafeContractDelegateFactory(delegate=safe_contract_delegate_1.delegate)
+
+        expected = [
+            {
+                'delegate': safe_contract_delegate_1.delegate,
+                'delegator': safe_contract_delegate_1.delegator,
+                'label': safe_contract_delegate_1.label,
+                'safe': safe_contract.address,
+            },
+            {
+                'delegate': safe_contract_delegate_2.delegate,
+                'delegator': safe_contract_delegate_2.delegator,
+                'label': safe_contract_delegate_2.label,
+                'safe': safe_contract.address,
+            },
+        ]
+        response = self.client.get(url + f'?safe={safe_contract.address}', format='json')
+        self.assertCountEqual(response.data['results'], expected)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(url + f'?delegator={delegator}', format='json')
+        self.assertCountEqual(response.data['results'], expected)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected = [
+            {
+                'delegate': safe_contract_delegate_1.delegate,
+                'delegator': safe_contract_delegate_1.delegator,
+                'label': safe_contract_delegate_1.label,
+                'safe': safe_contract.address,
+            },
+            {
+                'delegate': safe_contract_delegate_3.delegate,
+                'delegator': safe_contract_delegate_3.delegator,
+                'label': safe_contract_delegate_3.label,
+                'safe': safe_contract_delegate_3.safe_contract_id,
+            },
+        ]
+        response = self.client.get(url + f'?delegate={safe_contract_delegate_1.delegate}', format='json')
+        self.assertCountEqual(response.data['results'], expected)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_delete_safe_delegate(self):
         safe_address = Account.create().address
