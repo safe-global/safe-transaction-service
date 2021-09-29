@@ -1120,22 +1120,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        response = self.client.get(url, format='json')
-        self.assertCountEqual(response.data['results'], [
-            {
-                'delegate': delegate.address,
-                'delegator': delegator.address,
-                'label': label,
-                'safe': safe_address,
-            },
-            {
-                'delegate': delegate.address,
-                'delegator': delegator.address,
-                'label': another_label,
-                'safe': None,
-            },
-        ])
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         self.assertCountEqual(SafeContractDelegate.objects.get_delegates_for_safe(safe_address), [delegate.address])
 
