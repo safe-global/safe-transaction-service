@@ -38,6 +38,8 @@ USE_I18N = True
 USE_L10N = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#use-tz
 USE_TZ = True
+# https://docs.djangoproject.com/en/3.2/ref/settings/#force-script-name
+FORCE_SCRIPT_NAME = env('FORCE_SCRIPT_NAME', default=None)
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -112,7 +114,7 @@ MIDDLEWARE = [
 STATIC_ROOT = str(ROOT_DIR / "staticfiles")
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#static-url
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#std:setting-STATICFILES_DIRS
 STATICFILES_DIRS = [
     str(APPS_DIR / 'static'),
