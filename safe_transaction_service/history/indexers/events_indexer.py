@@ -151,7 +151,7 @@ class EventsIndexer(EthereumIndexer):
         decoded_elements: List[EventData] = self.decode_elements(log_receipts)
         tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in log_receipts]).keys()
         logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+        self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug('End prefetching and storing of ethereum txs')
         logger.debug('Processing %d decoded events', len(decoded_elements))
         processed_elements = []
