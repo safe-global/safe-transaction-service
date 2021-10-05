@@ -16,6 +16,8 @@ urlpatterns = [
          name='data-decoder'),
     path('delegates/', views.DelegateListView.as_view(),
          name='delegates'),
+    path('delegates/<str:delegate_address>/', views.DelegateDeleteView.as_view(),
+         name='delegate'),
     path('safes/<str:address>/', views.SafeInfoView.as_view(),
          name='safe-info'),
     path('safes/<str:address>/transactions/', views.SafeMultisigTransactionDeprecatedListView.as_view(),

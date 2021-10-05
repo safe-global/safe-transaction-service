@@ -1176,10 +1176,59 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.data['results'], expected)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_delegate_delete(self):
+        url_name = 'v1:history:delegate'
+        delegate = Account.create()
+        delegator = Account.create()
+        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate.address)
+        # Test delete using delegate signature and then delegator signature
+        for signer in (delegate, delegator):
+            with self.subTest(signer=signer):
+                SafeContractDelegateFactory(
+                    delegate=delegate.address,
+                    delegator=delegator.address
+                )   # Expected to be deleted
+                SafeContractDelegateFactory(
+                    safe_contract=None,
+                    delegate=delegate.address,
+                    delegator=delegator.address
+                )  # Expected to be deleted
+                SafeContractDelegateFactory(
+                    delegate=delegate.address,  # random delegator, should not be deleted
+                )
+                data = {
+                    'signature': signer.signHash(hash_to_sign)['signature'].hex(),
+                    'delegator': delegator.address,
+                }
+                self.assertEqual(SafeContractDelegate.objects.count(), 3)
+                response = self.client.delete(reverse(url_name, args=(delegate.address,)), format='json', data=data)
+                self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+                self.assertEqual(SafeContractDelegate.objects.count(), 1)
+                response = self.client.delete(reverse(url_name, args=(delegate.address,)), format='json', data=data)
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+                SafeContractDelegate.objects.all().delete()
+
+        # Try an invalid signer
+        SafeContractDelegateFactory(
+            delegate=delegate.address,
+            delegator=delegator.address
+        )
+        signer = Account.create()
+        data = {
+            'signature': signer.signHash(hash_to_sign)['signature'].hex(),
+            'delegator': delegator.address,
+        }
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+        response = self.client.delete(reverse(url_name, args=(delegate.address,)), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Signature does not match provided delegate', response.data['non_field_errors'][0])
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+
     def test_delete_safe_delegate(self):
         safe_address = Account.create().address
         delegate_address = Account.create().address
-        response = self.client.delete(reverse('v1:history:safe-delegate', args=(safe_address, delegate_address)), format='json')
+        response = self.client.delete(reverse('v1:history:safe-delegate', args=(safe_address, delegate_address)),
+                                      format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)  # Data is missing
 
         data = {

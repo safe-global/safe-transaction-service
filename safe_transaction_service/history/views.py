@@ -537,13 +537,11 @@ class DelegateListView(ListCreateAPIView):
             return serializers.SafeDelegateResponseSerializer
         elif self.request.method == 'POST':
             return serializers.DelegateSerializer
-        elif self.request.method == 'DELETE':
-            return serializers.SafeDelegateDeleteSerializer
 
     @swagger_auto_schema(responses={400: 'Invalid data'})
     def get(self, request, **kwargs):
         """
-        Get the list of delegates for a Safe address
+        Get list of delegates
         """
         return super().get(request, **kwargs)
 
@@ -563,21 +561,37 @@ class DelegateListView(ListCreateAPIView):
         """
         return super().post(request, **kwargs)
 
-    @swagger_auto_schema(responses={204: 'Deleted',
-                                    400: 'Malformed data'})
-    def delete(self, request, **kwargs):
-        """
-        Delete all delegates for a Safe. Signature is built the same way that for adding a delegate using the Safe
-        address as the delegate.
 
+class DelegateDeleteView(APIView):
+    serializer_class = serializers.DelegateDeleteSerializer
+
+    @swagger_auto_schema(
+        request_body=serializer_class(),
+        responses={204: 'Deleted',
+                   400: 'Malformed data',
+                   404: 'Delegate not found',
+                   422: 'Invalid Ethereum address/Error processing data'})
+    def delete(self, request, delegate_address, *args, **kwargs):
+        """
+        Delete every pair delegate/delegator found. Signature is built the same way as for adding a delegate,
+        but in this case the signer can be either the `delegator` (owner) or the `delegate` itself.
         Check `POST /delegates/`
         """
-        # request.data['safe'] = address
-        # request.data['delegate'] = address
-        serializer = self.get_serializer(data=request.data)
+        if not Web3.isChecksumAddress(delegate_address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [delegate_address]})
+
+        request.data['delegate'] = delegate_address
+        serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # SafeContractDelegate.objects.filter(safe_contract_id=address).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        deleted, _ = SafeContractDelegate.objects.filter(delegate=serializer.validated_data['delegate'],
+                                                         delegator=serializer.validated_data['delegator']).delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 class SafeTransferListView(ListAPIView):
