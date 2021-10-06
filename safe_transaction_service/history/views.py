@@ -432,7 +432,9 @@ class SafeDelegateListView(ListCreateAPIView):
         elif self.request.method == 'DELETE':
             return serializers.SafeDelegateDeleteSerializer
 
-    @swagger_auto_schema(responses={400: 'Invalid data',
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use /delegates endpoint',
+                         responses={400: 'Invalid data',
                                     422: 'Invalid Ethereum address'})
     def get(self, request, address, **kwargs):
         """
@@ -446,7 +448,9 @@ class SafeDelegateListView(ListCreateAPIView):
 
         return super().get(request, address, **kwargs)
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use /delegates endpoint',
+                         responses={202: 'Accepted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
     def post(self, request, address, **kwargs):
@@ -471,6 +475,8 @@ class SafeDelegateListView(ListCreateAPIView):
         return super().post(request, address, **kwargs)
 
     @swagger_auto_schema(operation_id='safes_delegates_delete_all',
+                         deprecated=True,
+                         operation_description='Use /delegates endpoint',
                          responses={204: 'Deleted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
