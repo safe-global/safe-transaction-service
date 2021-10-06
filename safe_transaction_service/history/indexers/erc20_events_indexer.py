@@ -113,7 +113,11 @@ class Erc20EventsIndexer(EventsIndexer):
             return []
         else:
             logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
-            ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+            self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
             logger.debug('End prefetching and storing of ethereum txs')
-            ethereum_events = [EthereumEvent.objects.from_decoded_event(log_receipt) for log_receipt in log_receipts]
-            return EthereumEvent.objects.bulk_create(ethereum_events, ignore_conflicts=True)
+            logger.debug('Creating EthereumEvent objects')
+            ethereum_events = (EthereumEvent.objects.from_decoded_event(log_receipt) for log_receipt in log_receipts)
+            logger.debug('Storing EthereumEvent objects')
+            result = EthereumEvent.objects.bulk_create_from_generator(ethereum_events, ignore_conflicts=True)
+            logger.debug('Stored EthereumEvent objects')
+            return range(result)  # TODO Hack to prevent returning `EthereumEvent` and using too much RAM

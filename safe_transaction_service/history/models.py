@@ -105,7 +105,7 @@ class BulkCreateSignalMixin:
             post_save.send(obj.__class__, instance=obj, created=True)
         return result
 
-    def bulk_create_from_generator(self, objs, batch_size: int = 10000, ignore_conflicts: bool = False) -> int:
+    def bulk_create_from_generator(self, objs, batch_size: int = 100, ignore_conflicts: bool = False) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
         they will be brought to RAM. This approach is more friendly
