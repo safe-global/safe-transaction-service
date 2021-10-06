@@ -19,6 +19,9 @@ class FirebaseDeviceCreateView(CreateAPIView):
     Creates a new FirebaseDevice. If uuid is not provided a new device will be created.
     If a uuid for an existing Safe is provided the FirebaseDevice will be updated with all the new data provided.
     Safes provided on the request are always added and never removed/replaced
+    Signature must sign `keccack256('gnosis-safe{timestamp-epoch}{uuid}{cloud_messaging_token}{safes_sorted}':
+        - `{timestamp-epoch}` must be an integer (no milliseconds)
+        - `{safes_sorted}` must be checksummed safe addresses sorted and joined with no spaces
     """
     serializer_class = serializers.FirebaseDeviceSerializer
     response_serializer_class = serializers.FirebaseDeviceSerializerWithOwnersResponseSerializer
