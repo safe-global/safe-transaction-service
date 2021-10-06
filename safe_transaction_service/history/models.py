@@ -1072,6 +1072,18 @@ class SafeContractDelegateManager(models.Manager):
     def get_delegates_for_safe(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
         return set(self.filter(safe_contract_id=address).values_list('delegate', flat=True).distinct())
 
+    def get_delegates_for_safe_and_owners(self, safe_address: ChecksumAddress,
+                                          owner_addresses: Sequence[ChecksumAddress]) -> Set[ChecksumAddress]:
+        print(list(self.all()))
+        return set(
+            self.filter(
+                # If safe_contract is null on SafeContractDelegate, delegates are valid for every Safe
+                Q(safe_contract_id=safe_address) | Q(safe_contract=None)
+            ).filter(
+                delegator__in=owner_addresses
+            ).values_list('delegate', flat=True).distinct()
+        )
+
 
 class SafeContractDelegate(models.Model):
     """
@@ -1090,7 +1102,8 @@ class SafeContractDelegate(models.Model):
         unique_together = (('safe_contract', 'delegate', 'delegator'),)
 
     def __str__(self):
-        return f'Delegate={self.delegate} for Safe={self.safe_contract_id} - Label={self.label}'
+        return f'Delegator={self.delegator} Delegate={self.delegate} for Safe={self.safe_contract_id} - ' \
+               f'Label={self.label}'
 
 
 class SafeStatusManager(models.Manager):

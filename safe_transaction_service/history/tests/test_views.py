@@ -729,8 +729,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                       response.data['non_field_errors'][0])
 
         # Add delegate
-        SafeContractDelegateFactory(safe_contract__address=safe_address, delegate=safe_delegate.address)
-        response = self.client.post(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json', data=data)
+        SafeContractDelegateFactory(
+            safe_contract__address=safe_address,
+            delegate=safe_delegate.address,
+            delegator=safe_owners[0].address
+        )
+        response = self.client.post(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json',
+                                    data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigTransaction.objects.count(), 1)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
