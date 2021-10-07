@@ -1069,8 +1069,19 @@ class SafeContract(models.Model):
 
 
 class SafeContractDelegateManager(models.Manager):
-    def get_delegates_for_safe(self, address: str) -> List[str]:
-        return list(self.filter(safe_contract_id=address).values_list('delegate', flat=True))
+    def get_delegates_for_safe(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
+        return set(self.filter(safe_contract_id=address).values_list('delegate', flat=True).distinct())
+
+    def get_delegates_for_safe_and_owners(self, safe_address: ChecksumAddress,
+                                          owner_addresses: Sequence[ChecksumAddress]) -> Set[ChecksumAddress]:
+        return set(
+            self.filter(
+                # If safe_contract is null on SafeContractDelegate, delegates are valid for every Safe
+                Q(safe_contract_id=safe_address) | Q(safe_contract=None)
+            ).filter(
+                delegator__in=owner_addresses
+            ).values_list('delegate', flat=True).distinct()
+        )
 
 
 class SafeContractDelegate(models.Model):
@@ -1078,7 +1089,8 @@ class SafeContractDelegate(models.Model):
     The owners of the Safe can add users so they can propose/retrieve txs as if they were the owners of the Safe
     """
     objects = SafeContractDelegateManager()
-    safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates')
+    safe_contract = models.ForeignKey(SafeContract, on_delete=models.CASCADE, related_name='safe_contract_delegates',
+                                      null=True, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()  # Owner who created the delegate
     label = models.CharField(max_length=50)
@@ -1086,10 +1098,11 @@ class SafeContractDelegate(models.Model):
     write = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = (('safe_contract', 'delegate'),)
+        unique_together = (('safe_contract', 'delegate', 'delegator'),)
 
     def __str__(self):
-        return f'Delegate={self.delegate} for Safe={self.safe_contract_id} - Label={self.label}'
+        return f'Delegator={self.delegator} Delegate={self.delegate} for Safe={self.safe_contract_id} - ' \
+               f'Label={self.label}'
 
 
 class SafeStatusManager(models.Manager):

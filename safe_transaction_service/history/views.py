@@ -432,7 +432,9 @@ class SafeDelegateListView(ListCreateAPIView):
         elif self.request.method == 'DELETE':
             return serializers.SafeDelegateDeleteSerializer
 
-    @swagger_auto_schema(responses={400: 'Invalid data',
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use /delegates endpoint',
+                         responses={400: 'Invalid data',
                                     422: 'Invalid Ethereum address'})
     def get(self, request, address, **kwargs):
         """
@@ -446,7 +448,9 @@ class SafeDelegateListView(ListCreateAPIView):
 
         return super().get(request, address, **kwargs)
 
-    @swagger_auto_schema(responses={202: 'Accepted',
+    @swagger_auto_schema(deprecated=True,
+                         operation_description='Use /delegates endpoint',
+                         responses={202: 'Accepted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
     def post(self, request, address, **kwargs):
@@ -471,6 +475,8 @@ class SafeDelegateListView(ListCreateAPIView):
         return super().post(request, address, **kwargs)
 
     @swagger_auto_schema(operation_id='safes_delegates_delete_all',
+                         deprecated=True,
+                         operation_description='Use /delegates endpoint',
                          responses={204: 'Deleted',
                                     400: 'Malformed data',
                                     422: 'Invalid Ethereum address/Error processing data'})
@@ -524,6 +530,74 @@ class SafeDelegateDestroyView(DestroyAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return super().delete(request, address, delegate_address, *args, **kwargs)
+
+
+class DelegateListView(ListCreateAPIView):
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = filters.DelegateListFilter
+    pagination_class = pagination.DefaultPagination
+    queryset = SafeContractDelegate.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return serializers.SafeDelegateResponseSerializer
+        elif self.request.method == 'POST':
+            return serializers.DelegateSerializer
+
+    @swagger_auto_schema(responses={400: 'Invalid data'})
+    def get(self, request, **kwargs):
+        """
+        Get list of delegates
+        """
+        return super().get(request, **kwargs)
+
+    @swagger_auto_schema(responses={202: 'Accepted',
+                                    400: 'Malformed data'})
+    def post(self, request, **kwargs):
+        """
+        Create a delegate for a Safe address with a custom label. Calls with same delegate but different label or
+        signer will update the label or delegator if different.
+        For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
+        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
+        For example:
+             - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
+             - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
+             - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
+        """
+        return super().post(request, **kwargs)
+
+
+class DelegateDeleteView(APIView):
+    serializer_class = serializers.DelegateDeleteSerializer
+
+    @swagger_auto_schema(
+        request_body=serializer_class(),
+        responses={204: 'Deleted',
+                   400: 'Malformed data',
+                   404: 'Delegate not found',
+                   422: 'Invalid Ethereum address/Error processing data'})
+    def delete(self, request, delegate_address, *args, **kwargs):
+        """
+        Delete every pair delegate/delegator found. Signature is built the same way as for adding a delegate,
+        but in this case the signer can be either the `delegator` (owner) or the `delegate` itself.
+        Check `POST /delegates/`
+        """
+        if not Web3.isChecksumAddress(delegate_address):
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            data={'code': 1,
+                                  'message': 'Checksum address validation failed',
+                                  'arguments': [delegate_address]})
+
+        request.data['delegate'] = delegate_address
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        deleted, _ = SafeContractDelegate.objects.filter(delegate=serializer.validated_data['delegate'],
+                                                         delegator=serializer.validated_data['delegator']).delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 class SafeTransferListView(ListAPIView):

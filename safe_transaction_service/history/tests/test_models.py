@@ -430,7 +430,7 @@ class TestSafeStatus(TestCase):
 class TestSafeContract(TestCase):
     def test_get_delegates_for_safe(self):
         random_safe = Account.create().address
-        self.assertEqual(SafeContractDelegate.objects.get_delegates_for_safe(random_safe), [])
+        self.assertEqual(SafeContractDelegate.objects.get_delegates_for_safe(random_safe), set())
 
         safe_contract_delegate = SafeContractDelegateFactory()
         safe_contract_delegate_2 = SafeContractDelegateFactory(safe_contract=safe_contract_delegate.safe_contract)

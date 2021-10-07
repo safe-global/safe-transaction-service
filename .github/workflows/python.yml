@@ -46,9 +46,11 @@ jobs:
     - name: Install dependencies
       run: |
         pip install wheel
-        pip install -r requirements-test.txt coveralls
+        pip install -r requirements-test.txt coveralls pre-commit
       env:
         PIP_USE_MIRRORS: true
+    - name: Run pre-commit
+      run: pre-commit run --all-files
     - name: Run tests and coverage
       run: |
         python manage.py check
