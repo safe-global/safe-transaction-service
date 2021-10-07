@@ -259,7 +259,7 @@ class DelegateSignatureCheckerMixin:
     Mixin to include delegate signature validation
     """
     def check_delegate_signature(self, ethereum_client: EthereumClient, signature: bytes,
-                                 operation_hash: bytes, delegator: List[ChecksumAddress]
+                                 operation_hash: bytes, delegator: ChecksumAddress
                                  ) -> bool:
         """
         Checks signature and returns a valid owner if found, None otherwise
@@ -319,10 +319,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
                 raise ValidationError(f"Provided delegator={delegator} is not an owner of Safe={safe_address}")
 
         # Tries to find a valid delegator using multiple strategies
-        for operation_hash in (DelegateSignatureHelper.calculate_hash(delegate),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(delegate):
             if self.check_delegate_signature(ethereum_client, signature, operation_hash, delegator):
                 return data
 
@@ -358,10 +355,7 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
 
         ethereum_client = EthereumClientProvider()
         # Tries to find a valid delegator using multiple strategies
-        for operation_hash in (DelegateSignatureHelper.calculate_hash(delegate),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(delegate):
             for signer in (delegate, delegator):
                 if self.check_delegate_signature(ethereum_client, signature, operation_hash, signer):
                     return data
@@ -775,10 +769,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         valid_delegators = self.get_valid_delegators(ethereum_client, safe_address, delegate)
 
         # Tries to find a valid delegator using multiple strategies
-        for operation_hash in (DelegateSignatureHelper.calculate_hash(delegate),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, previous_topt=True),
-                               DelegateSignatureHelper.calculate_hash(delegate, eth_sign=True, previous_topt=True)):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(delegate):
             delegator = self.check_signature(ethereum_client, safe_address, signature, operation_hash, valid_delegators)
             if delegator:
                 break

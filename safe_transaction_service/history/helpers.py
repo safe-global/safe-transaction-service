@@ -1,5 +1,7 @@
 import time
+from typing import List
 
+from eth_typing import ChecksumAddress
 from eth_utils import keccak
 
 
@@ -19,10 +21,19 @@ class DelegateSignatureHelper:
         return int((time.time() - topt_t0) // topt_tx)
 
     @classmethod
-    def calculate_hash(cls, address: str, eth_sign: bool = False, previous_topt: bool = False) -> bytes:
+    def calculate_hash(cls, address: ChecksumAddress, eth_sign: bool = False, previous_topt: bool = False) -> bytes:
         topt = cls.calculate_topt(previous=previous_topt)
         message = address + str(topt)
         if eth_sign:
             return keccak(text="\x19Ethereum Signed Message:\n" + str(len(message)) + message)
         else:
             return keccak(text=message)
+
+    @classmethod
+    def calculate_all_possible_hashes(cls, delegate: ChecksumAddress) -> List[bytes]:
+        return [
+            cls.calculate_hash(delegate),
+            cls.calculate_hash(delegate, eth_sign=True),
+            cls.calculate_hash(delegate, previous_topt=True),
+            cls.calculate_hash(delegate, eth_sign=True, previous_topt=True)
+        ]
