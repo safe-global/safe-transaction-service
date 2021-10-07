@@ -17,6 +17,10 @@ class TestContractViews(APITestCase):
         return urljoin('http://testserver/', path)
 
     def test_contract_view(self):
+        contract_address = '0x'  # Invalid format
+        response = self.client.get(reverse('v1:contracts:detail', args=(contract_address,)))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
         contract_address = Account.create().address
         response = self.client.get(reverse('v1:contracts:detail', args=(contract_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
