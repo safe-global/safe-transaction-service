@@ -10,8 +10,8 @@ from rest_framework.test import APITestCase
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from safe_transaction_service.history.tests.factories import \
-    SafeContractFactory
+from safe_transaction_service.history.tests.factories import (
+    SafeContractDelegateFactory, SafeContractFactory)
 from safe_transaction_service.notifications.models import (FirebaseDevice,
                                                            FirebaseDeviceOwner)
 
@@ -153,6 +153,45 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(FirebaseDevice.objects.count(), 1)
             self.assertCountEqual(FirebaseDeviceOwner.objects.values_list('owner', flat=True),
                                   [owner_account.address, owner_account_2.address])
+
+    def test_notifications_devices_create_with_delegates_signatures_view(self):
+        delegate = Account.create()
+        safe_contract_delegate = SafeContractDelegateFactory(delegate=delegate.address)
+        safe_address = safe_contract_delegate.safe_contract.address
+
+        self.assertEqual(FirebaseDevice.objects.count(), 0)
+        unique_id = uuid.uuid4()
+        timestamp = int(time.time())
+        cloud_messaging_token = 'A' * 163
+        safes = [safe_address]
+        hash_to_sign = calculate_device_registration_hash(timestamp,
+                                                          unique_id,
+                                                          cloud_messaging_token,
+                                                          safes)
+        signatures = [delegate.signHash(hash_to_sign)['signature'].hex()]
+        data = {
+            'uuid': unique_id,
+            'safes': [safe_address],
+            'cloudMessagingToken': cloud_messaging_token,
+            'buildNumber': 0,
+            'bundle': 'company.package.app',
+            'deviceType': 'WEB',
+            'version': '2.0.1',
+            'timestamp': timestamp,
+            'signatures': signatures,
+        }
+        response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['owners_registered'], [])
+        self.assertEqual(response.data['owners_not_registered'], [delegate.address])
+
+        with mock.patch('safe_transaction_service.notifications.serializers.get_safe_owners',
+                        return_value=[safe_contract_delegate.delegator]):
+            response = self.client.post(reverse('v1:notifications:devices'), format='json', data=data)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data['owners_registered'], [delegate.address])
+            self.assertEqual(response.data['owners_not_registered'], [])
+            self.assertEqual(FirebaseDeviceOwner.objects.filter(owner=delegate.address).count(), 1)
 
     def test_notifications_devices_delete_view(self):
         safe_contract = SafeContractFactory()
