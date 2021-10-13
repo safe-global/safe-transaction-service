@@ -14,7 +14,7 @@ from safe_transaction_service.history.models import (EthereumTxCallType,
 from safe_transaction_service.history.signals import build_webhook_payload
 from safe_transaction_service.history.tests.factories import (
     InternalTxFactory, MultisigConfirmationFactory, MultisigTransactionFactory,
-    SafeContractFactory, SafeStatusFactory)
+    SafeContractDelegateFactory, SafeContractFactory, SafeStatusFactory)
 
 from ..tasks import (DuplicateNotification, filter_notification,
                      send_notification_owner_task, send_notification_task)
@@ -131,6 +131,25 @@ class TestViews(TestCase):
             with self.assertLogs(logger=task_logger) as cm:
                 self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
                 self.assertIn('does not require more confirmations', cm.output[0])
+
+    def test_send_notification_owner_delegate_task(self):
+        safe_tx_hash = Web3.keccak(text='aloha').hex()
+        safe_contract = SafeContractFactory()
+        safe_address = safe_contract.address
+        safe_status = SafeStatusFactory(address=safe_address, threshold=3)
+        safe_contract_delegate = SafeContractDelegateFactory(safe_contract=safe_contract,
+                                                             delegator=safe_status.owners[0])
+        safe_contract_delegate_2 = SafeContractDelegateFactory(safe_contract=None, delegator=safe_status.owners[1])
+        safe_contract_delegate_random = SafeContractDelegateFactory(safe_contract=None)
+
+        # No firebase device
+        self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (0, 0))
+
+        FirebaseDeviceOwnerFactory(firebase_device__safes=[safe_contract], owner=safe_contract_delegate.delegate)
+        FirebaseDeviceOwnerFactory(firebase_device__safes=[safe_contract], owner=safe_contract_delegate_2.delegate)
+        FirebaseDeviceOwnerFactory(owner=safe_contract_delegate_random.delegate)
+
+        self.assertEqual(send_notification_owner_task(safe_address, safe_tx_hash), (2, 0))
 
     def test_send_notification_owner_task_called(self):
         safe_address = Account.create().address
