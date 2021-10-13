@@ -123,8 +123,13 @@ class AllTransactionsListView(ListAPIView):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs['address']
         executed, queued, trusted = self.get_parameters()
-        queryset = self.filter_queryset(transaction_service.get_all_tx_hashes(safe, executed=executed,
-                                                                              queued=queued, trusted=trusted))
+        queryset = self.filter_queryset(
+            transaction_service.get_all_tx_hashes(
+                safe,
+                executed=executed,
+                queued=queued,
+                trusted=trusted)
+        )
         page = self.paginate_queryset(queryset)
 
         if not page:
@@ -606,19 +611,6 @@ class SafeTransferListView(ListAPIView):
     serializer_class = serializers.TransferWithTokenInfoResponseSerializer
     pagination_class = pagination.DefaultPagination
 
-    def list(self, request, *args, **kwargs):
-        # Queryset must be already filtered, as we cannot filter a union
-        # queryset = self.filter_queryset(self.get_queryset())
-
-        queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
     def add_tokens_to_transfers(self, transfers: TransferDict) -> TransferDict:
         tokens = {token.address: token
                   for token in Token.objects.filter(address__in={transfer['token_address'] for transfer in transfers
@@ -634,13 +626,26 @@ class SafeTransferListView(ListAPIView):
 
     def get_queryset(self):
         address = self.kwargs['address']
-        return self.add_tokens_to_transfers(self.get_transfers(address))
+        return self.get_transfers(address)
+
+    def list(self, request, *args, **kwargs):
+        # Queryset must be already filtered, as we cannot filter a union
+        # queryset = self.filter_queryset(self.get_queryset())
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(self.add_tokens_to_transfers(page), many=True)
+            return self.get_paginated_response(serializer.data)
+        else:
+            serializer = self.get_serializer(self.add_tokens_to_transfers(queryset), many=True)
+            return Response(serializer.data)
 
     @swagger_auto_schema(responses={200: serializers.TransferResponseSerializer(many=True),
                                     422: 'Safe address checksum not valid'})
     def get(self, request, address, format=None):
         """
-        Returns the history of a multisig tx (safe)
+        Returns ether/tokens transfers for a Safe
         """
         if not Web3.isChecksumAddress(address):
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -655,6 +660,14 @@ class SafeTransferListView(ListAPIView):
 
 
 class SafeIncomingTransferListView(SafeTransferListView):
+    @swagger_auto_schema(responses={200: serializers.TransferResponseSerializer(many=True),
+                                    422: 'Safe address checksum not valid'})
+    def get(self, *args, **kwargs):
+        """
+        Returns incoming ether/tokens transfers for a Safe
+        """
+        return super().get(*args, **kwargs)
+
     def get_transfers(self, address: str):
         tokens_queryset = super().filter_queryset(InternalTx.objects.token_incoming_txs_for_address(address))
         ether_queryset = super().filter_queryset(InternalTx.objects.ether_incoming_txs_for_address(address))
