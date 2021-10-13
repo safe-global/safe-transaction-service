@@ -66,6 +66,7 @@ class TransactionService:
         """
         Store executed transactions older than 10 minutes, using `ethereum_tx_hash` as key (for
         MultisigTransaction it will be `SafeTxHash`) and expire then in one hour
+
         :param safe_address:
         :param hashes_with_txs:
         """
@@ -83,7 +84,7 @@ class TransactionService:
     def get_all_tx_hashes(self, safe_address: str, executed: bool = False,
                           queued: bool = True, trusted: bool = True) -> QuerySet:
         """
-        Build a queryset with hashes for every tx for a Safe for pagination filtering. In the case of
+        Build a queryset with hashes for every tx for a Safe for paginated filtering. In the case of
         Multisig Transactions, as some of them are not mined, we use the SafeTxHash
         Criteria for building this list:
           - Return only multisig txs with `nonce < current Safe Nonce`
@@ -92,6 +93,7 @@ class TransactionService:
           date the execution date of the transaction with the same nonce that has been executed should be taken.
           - Incoming and outgoing transfers or Eth/tokens must be under a multisig/module tx if triggered by one.
           Otherwise they should have their own entry in the list using a EthereumTx
+
         :param safe_address:
         :param executed: By default `False`, all transactions are returned. With `True`, just txs executed are returned.
         :param queued: By default `True`, all transactions are returned. With `False`, just txs with
@@ -118,8 +120,13 @@ class TransactionService:
             execution_date=case,
             block=F('ethereum_tx__block_id'),
             safe_nonce=F('nonce'),
-        ).values('safe_tx_hash', 'execution_date',
-                 'created', 'block', 'safe_nonce')  # Tricky, we will merge SafeTx hashes with EthereumTx hashes
+        ).values(
+            'safe_tx_hash',    # Tricky, we will merge SafeTx hashes with EthereumTx hashes
+            'execution_date',
+            'created',
+            'block',
+            'safe_nonce'
+        )
         # Block is needed to get stable ordering
 
         if not queued:  # Filter out txs with nonce >= Safe nonce
@@ -195,6 +202,7 @@ class TransactionService:
                                                                                ModuleTransaction]]:
         """
         Now that we know how to paginate, we retrieve the real transactions
+
         :param safe_address:
         :param hashes_to_search:
         :return:
@@ -234,9 +242,11 @@ class TransactionService:
         all_hashes = hashes_not_cached + [multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs.values()]
 
         tokens_queryset = InternalTx.objects.token_txs_for_address(safe_address).filter(
-            ethereum_tx__in=all_hashes)
+            ethereum_tx__in=all_hashes
+        )
         ether_queryset = InternalTx.objects.ether_txs_for_address(safe_address).filter(
-            ethereum_tx__in=all_hashes)
+            ethereum_tx__in=all_hashes
+        )
 
         # Build dict of transfers for optimizing access
         transfer_dict = defaultdict(list)
