@@ -12,7 +12,7 @@ from web3.types import EventData
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_safe_contract as get_safe_V1_2_0_contract
+from gnosis.eth.contracts import get_safe_V1_1_1_contract
 
 from ..models import (EthereumTxCallType, InternalTx, InternalTxDecoded,
                       InternalTxType, SafeMasterCopy)
@@ -115,7 +115,7 @@ class SafeEventsIndexer(EventsIndexer):
         """
         l2_contract = self.ethereum_client.w3.eth.contract(abi=gnosis_safe_l2_v1_3_0_abi)
         proxy_factory_contract = self.ethereum_client.w3.eth.contract(abi=proxy_factory_v1_3_0_abi)
-        old_contract = get_safe_V1_2_0_contract(self.ethereum_client.w3)
+        old_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
         return [
             l2_contract.events.SafeMultiSigTransaction(),
             l2_contract.events.SafeModuleTransaction(),

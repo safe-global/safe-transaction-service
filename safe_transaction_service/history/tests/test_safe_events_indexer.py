@@ -108,21 +108,21 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         payment = 0
         payment_receiver = NULL_ADDRESS
         initializer = HexBytes(
-            self.safe_contract_V1_3_0.functions.setup(
+            self.safe_contract.functions.setup(
                 owners, threshold, to, data, fallback_handler, payment_token,
                 payment, payment_receiver
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
         initial_block_number = self.ethereum_client.current_block_number
         safe_l2_master_copy = SafeMasterCopyFactory(
-            address=self.safe_contract_V1_3_0.address,
+            address=self.safe_contract.address,
             initial_block_number=initial_block_number,
             tx_block_number=initial_block_number,
             version='1.3.0',
             l2=True
         )
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
-            self.ethereum_test_account, self.safe_contract_V1_3_0.address,
+            self.ethereum_test_account, self.safe_contract.address,
             initializer=initializer
         )
         safe_address = ethereum_tx_sent.contract_address
@@ -150,7 +150,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         self.assertEqual(SafeStatus.objects.count(), 1)
         safe_status = SafeStatus.objects.get()
-        self.assertEqual(safe_status.master_copy, self.safe_contract_V1_3_0.address)
+        self.assertEqual(safe_status.master_copy, self.safe_contract.address)
         self.assertEqual(safe_status.owners, owners)
         self.assertEqual(safe_status.threshold, threshold)
         self.assertEqual(safe_status.nonce, 0)
@@ -162,7 +162,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Add an owner but don't update the threshold (nonce: 0) --------------------------------------------------
         owner_account_2 = Account.create()
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.addOwnerWithThreshold(
+            self.safe_contract.functions.addOwnerWithThreshold(
                 owner_account_2.address,
                 1
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
@@ -191,7 +191,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         # Change threshold (nonce: 1) ------------------------------------------------------------------------------
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.changeThreshold(
+            self.safe_contract.functions.changeThreshold(
                 2
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
@@ -219,7 +219,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         # Remove an owner and change threshold back to 1 (nonce: 2) --------------------------------------------------
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.removeOwner(
+            self.safe_contract.functions.removeOwner(
                 SENTINEL_ADDRESS,
                 owner_account_2.address,
                 1
@@ -258,7 +258,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Enable module (nonce: 3) ---------------------------------------------------------------------
         module_address = Account.create().address
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.enableModule(
+            self.safe_contract.functions.enableModule(
                 module_address
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
@@ -302,7 +302,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Set fallback handler (nonce: 4) --------------------------------------------------------------------------
         new_fallback_handler = Account.create().address
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.setFallbackHandler(
+            self.safe_contract.functions.setFallbackHandler(
                 new_fallback_handler
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
@@ -332,7 +332,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         # Disable Module (nonce: 5) ----------------------------------------------------------------------------------
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.disableModule(
+            self.safe_contract.functions.disableModule(
                 SENTINEL_ADDRESS,
                 module_address
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
@@ -401,7 +401,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
         guard_address = Account.create().address
         data = HexBytes(
-            self.safe_contract_V1_3_0.functions.setGuard(
+            self.safe_contract.functions.setGuard(
                 guard_address
             ).buildTransaction({'gas': 1, 'gasPrice': 1})['data']
         )
@@ -424,7 +424,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         # Check master copy did not change during the execution
         self.assertEqual(SafeStatus.objects.last_for_address(safe_address).master_copy,
-                         self.safe_contract_V1_3_0.address)
+                         self.safe_contract.address)
 
         self.assertEqual(MultisigTransaction.objects.order_by('-nonce')[0].safe_tx_hash,
                          multisig_tx.safe_tx_hash.hex())
