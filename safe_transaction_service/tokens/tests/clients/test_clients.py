@@ -2,8 +2,7 @@ from django.test import TestCase
 
 from gnosis.eth.tests.utils import just_test_if_mainnet_node
 
-from ...clients import (BinanceClient, CoingeckoClient, KrakenClient,
-                        KucoinClient)
+from ...clients import BinanceClient, CoingeckoClient, KrakenClient, KucoinClient
 
 
 class TestClients(TestCase):

@@ -11,10 +11,12 @@ from .tx_decoder import get_db_tx_decoder, is_db_tx_decoder_loaded
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=ContractAbi, dispatch_uid='contract_abi.add_abi_to_tx_decoder')
-def add_abi_in_tx_decoder(sender: Type[Model],
-                          instance: ContractAbi,
-                          created: bool, **kwargs) -> None:
+@receiver(
+    post_save, sender=ContractAbi, dispatch_uid="contract_abi.add_abi_to_tx_decoder"
+)
+def add_abi_in_tx_decoder(
+    sender: Type[Model], instance: ContractAbi, created: bool, **kwargs
+) -> None:
     """
     When a `ContractAbi` is saved, TxDecoder must be updated
     :param sender: ContractAbi
@@ -28,4 +30,6 @@ def add_abi_in_tx_decoder(sender: Type[Model],
         if is_db_tx_decoder_loaded():
             db_tx_decoder = get_db_tx_decoder()
             if db_tx_decoder.add_abi(instance.abi):
-                logger.info('ABI for ContractAbi %s was loaded on the TxDecoder', instance)
+                logger.info(
+                    "ABI for ContractAbi %s was loaded on the TxDecoder", instance
+                )

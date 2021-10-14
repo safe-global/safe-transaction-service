@@ -13,17 +13,21 @@ def custom_exception_handler(exc, context):
         response = Response(status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         if str(exc):
-            exception_str = '{}: {}'.format(exc.__class__.__name__, exc)
+            exception_str = "{}: {}".format(exc.__class__.__name__, exc)
         else:
             exception_str = exc.__class__.__name__
-        response.data = {'exception': 'Problem connecting to Ethereum network',
-                         'trace': exception_str}
+        response.data = {
+            "exception": "Problem connecting to Ethereum network",
+            "trace": exception_str,
+        }
 
-        logger.warning('%s - Exception: %s - Data received %s',
-                       context['request'].build_absolute_uri(),
-                       exception_str,
-                       context['request'].data,
-                       exc_info=exc)
+        logger.warning(
+            "%s - Exception: %s - Data received %s",
+            context["request"].build_absolute_uri(),
+            exception_str,
+            context["request"].data,
+            exc_info=exc,
+        )
     else:
         # Call REST framework's default exception handler,
         # to get the standard error response.

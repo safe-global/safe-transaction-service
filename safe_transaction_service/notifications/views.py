@@ -23,11 +23,15 @@ class FirebaseDeviceCreateView(CreateAPIView):
         - `{timestamp-epoch}` must be an integer (no milliseconds)
         - `{safes_sorted}` must be checksummed safe addresses sorted and joined with no spaces
     """
-    serializer_class = serializers.FirebaseDeviceSerializer
-    response_serializer_class = serializers.FirebaseDeviceSerializerWithOwnersResponseSerializer
 
-    @swagger_auto_schema(responses={200: response_serializer_class(),
-                                    400: 'Invalid data'})
+    serializer_class = serializers.FirebaseDeviceSerializer
+    response_serializer_class = (
+        serializers.FirebaseDeviceSerializerWithOwnersResponseSerializer
+    )
+
+    @swagger_auto_schema(
+        responses={200: response_serializer_class(), 400: "Invalid data"}
+    )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
@@ -35,16 +39,21 @@ class FirebaseDeviceCreateView(CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        response_serializer = self.response_serializer_class(data=serializer.validated_data)
+        response_serializer = self.response_serializer_class(
+            data=serializer.validated_data
+        )
         response_serializer.is_valid(raise_exception=True)
         headers = self.get_success_headers(response_serializer.data)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
 
 class FirebaseDeviceDeleteView(DestroyAPIView):
     """
     Remove a FirebaseDevice
     """
+
     queryset = FirebaseDevice.objects.all()
 
 
@@ -52,16 +61,24 @@ class FirebaseDeviceSafeDeleteView(DestroyAPIView):
     """
     Remove a Safe for a FirebaseDevice
     """
+
     queryset = FirebaseDevice.objects.all()
 
     def perform_destroy(self, firebase_device: FirebaseDevice):
-        safe_address = self.kwargs['address']
+        safe_address = self.kwargs["address"]
         try:
             safe_contract = SafeContract.objects.get(address=safe_address)
             firebase_device.safes.remove(safe_contract)
-            current_owners = {owner for safe in firebase_device.safes.values_list('address', flat=True)
-                              for owner in get_safe_owners(safe)}
+            current_owners = {
+                owner
+                for safe in firebase_device.safes.values_list("address", flat=True)
+                for owner in get_safe_owners(safe)
+            }
             # Remove owners not linked to any Safe
             firebase_device.owners.exclude(owner__in=current_owners).delete()
         except SafeContract.DoesNotExist:
-            logger.info('Cannot remove safe=%s for firebase_device with uuid=%s', safe_address, self.kwargs['pk'])
+            logger.info(
+                "Cannot remove safe=%s for firebase_device with uuid=%s",
+                safe_address,
+                self.kwargs["pk"],
+            )

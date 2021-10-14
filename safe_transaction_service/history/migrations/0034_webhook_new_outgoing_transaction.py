@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0033_auto_20210318_1654'),
+        ("history", "0033_auto_20210318_1654"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='webhook',
-            name='new_outgoing_transaction',
+            model_name="webhook",
+            name="new_outgoing_transaction",
             field=models.BooleanField(default=True),
         ),
     ]

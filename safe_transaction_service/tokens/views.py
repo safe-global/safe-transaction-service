@@ -20,17 +20,21 @@ from .tasks import get_token_info_from_blockchain
 
 class TokenView(RetrieveAPIView):
     serializer_class = serializers.TokenInfoResponseSerializer
-    lookup_field = 'address'
+    lookup_field = "address"
     queryset = Token.objects.all()
 
     @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this should never change
     def get(self, request, *args, **kwargs):
-        address = self.kwargs['address']
+        address = self.kwargs["address"]
         if not Web3.isChecksumAddress(address):
-            return response.Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                     data={'code': 1,
-                                           'message': 'Invalid ethereum address',
-                                           'arguments': [address]})
+            return response.Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Invalid ethereum address",
+                    "arguments": [address],
+                },
+            )
 
         try:
             return super().get(request, *args, **kwargs)
@@ -41,11 +45,15 @@ class TokenView(RetrieveAPIView):
 
 class TokensView(ListAPIView):
     serializer_class = serializers.TokenInfoResponseSerializer
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend, SearchFilter, OrderingFilter)
+    filter_backends = (
+        django_filters.rest_framework.DjangoFilterBackend,
+        SearchFilter,
+        OrderingFilter,
+    )
     filterset_class = filters.TokenFilter
-    search_fields = ('name', 'symbol')
-    ordering_fields = '__all__'
-    ordering = ('name',)
+    search_fields = ("name", "symbol")
+    ordering_fields = "__all__"
+    ordering = ("name",)
     queryset = Token.objects.all()
 
     @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
@@ -55,24 +63,37 @@ class TokensView(ListAPIView):
 
 class TokenPriceView(APIView):
     serializer_class = serializers.TokenPriceResponseSerializer
-    lookup_field = 'address'
+    lookup_field = "address"
     queryset = Token.objects.all()
 
     @method_decorator(cache_page(60 * 10))  # Cache 10 minutes
     def get(self, request, *args, **kwargs):
-        address = self.kwargs['address']
+        address = self.kwargs["address"]
         if not Web3.isChecksumAddress(address):
-            return response.Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                     data={'code': 1,
-                                           'message': 'Invalid ethereum address',
-                                           'arguments': [address]})
+            return response.Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Invalid ethereum address",
+                    "arguments": [address],
+                },
+            )
 
         # NULL_ADDRESS does not have to be stored in the Token table
-        if not Token.objects.filter(address=address).exists() and address != NULL_ADDRESS:
+        if (
+            not Token.objects.filter(address=address).exists()
+            and address != NULL_ADDRESS
+        ):
             raise Http404
-        fiat_price_with_timestamp = next(PriceServiceProvider().get_cached_usd_values([address]))
-        serializer = self.serializer_class(data={'fiat_code': fiat_price_with_timestamp.fiat_code.name,
-                                                 'fiat_price': str(fiat_price_with_timestamp.fiat_price),
-                                                 'timestamp': fiat_price_with_timestamp.timestamp})
+        fiat_price_with_timestamp = next(
+            PriceServiceProvider().get_cached_usd_values([address])
+        )
+        serializer = self.serializer_class(
+            data={
+                "fiat_code": fiat_price_with_timestamp.fiat_code.name,
+                "fiat_price": str(fiat_price_with_timestamp.fiat_price),
+                "timestamp": fiat_price_with_timestamp.timestamp,
+            }
+        )
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

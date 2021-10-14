@@ -13,20 +13,22 @@ def delete_errored_internal_txs(apps, schema_editor):
     :param schema_editor:
     :return:
     """
-    InternalTx = apps.get_model('history', 'InternalTx')
+    InternalTx = apps.get_model("history", "InternalTx")
 
-    parent_errored_query = InternalTx.objects.annotate(
-        child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
-        #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
-    ).filter(
-        child_trace_address__startswith=F('trace_address'),
-        ethereum_tx=OuterRef('ethereum_tx'),
-    ).exclude(
-        error=None
+    parent_errored_query = (
+        InternalTx.objects.annotate(
+            child_trace_address=RawSQL('"history_internaltx"."trace_address"', tuple())
+            #  Django bug, so we use RawSQL instead of: child_trace_address=OuterRef('trace_address')
+        )
+        .filter(
+            child_trace_address__startswith=F("trace_address"),
+            ethereum_tx=OuterRef("ethereum_tx"),
+        )
+        .exclude(error=None)
     )
 
     InternalTx.objects.annotate(
-        parent_errored=Subquery(parent_errored_query.values('pk')[:1])
+        parent_errored=Subquery(parent_errored_query.values("pk")[:1])
     ).exclude(
         parent_errored=None,
     ).delete()
@@ -35,7 +37,7 @@ def delete_errored_internal_txs(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0026_auto_20201030_1355'),
+        ("history", "0026_auto_20201030_1355"),
     ]
 
     operations = [

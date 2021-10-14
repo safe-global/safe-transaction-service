@@ -20,9 +20,10 @@ from django.core.wsgi import get_wsgi_application
 
 # This allows easy placement of apps within the interior
 # safe_transaction_service directory.
-app_path = os.path.abspath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), os.pardir))
-sys.path.append(os.path.join(app_path, 'safe_transaction_service'))
+app_path = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
+)
+sys.path.append(os.path.join(app_path, "safe_transaction_service"))
 
 
 # We defer to a DJANGO_SETTINGS_MODULE already in the environment. This breaks

@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0021_moduletransaction_failed'),
+        ("history", "0021_moduletransaction_failed"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='multisigconfirmation',
-            options={'ordering': ['created']},
+            name="multisigconfirmation",
+            options={"ordering": ["created"]},
         ),
     ]

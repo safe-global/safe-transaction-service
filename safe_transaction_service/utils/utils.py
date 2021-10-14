@@ -13,11 +13,11 @@ def chunks(elements: List[Any], n: int):
     :return: Yield successive n-sized chunks from l
     """
     for i in range(0, len(elements), n):
-        yield elements[i:i + n]
+        yield elements[i : i + n]
 
 
 def running_on_gevent() -> bool:
-    return 'sys' in saved
+    return "sys" in saved
 
 
 def close_gevent_db_connection():
@@ -32,7 +32,7 @@ def close_gevent_db_connection():
 
 
 def parse_boolean_query_param(value: Union[bool, str]) -> bool:
-    if value in (True, 'True', 'true', '1'):
+    if value in (True, "True", "true", "1"):
         return True
     else:
         return False

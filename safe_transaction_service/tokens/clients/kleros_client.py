@@ -22,13 +22,16 @@ class KlerosClient:
     https://github.com/kleros/kleros-interaction/blob/master/contracts/standard/permission/ArbitrableTokenList.sol
     https://github.com/kleros/t2cr-badges-example/blob/master/docs/deep-dive.md
     """
+
     abi = kleros_abi
-    mainnet_address = '0xEbcf3bcA271B26ae4B162Ba560e243055Af0E679'
-    null_token_id = b'\x00' * 32  # Empty bytes32 for null tokens
+    mainnet_address = "0xEbcf3bcA271B26ae4B162Ba560e243055Af0E679"
+    null_token_id = b"\x00" * 32  # Empty bytes32 for null tokens
 
     def __init__(self, ethereum_client: EthereumClient):
         self.ethereum_client = ethereum_client
-        self.kleros_contract = ethereum_client.erc20.slow_w3.eth.contract(self.mainnet_address, abi=self.abi)
+        self.kleros_contract = ethereum_client.erc20.slow_w3.eth.contract(
+            self.mainnet_address, abi=self.abi
+        )
 
     def get_token_count(self) -> int:
         return self.kleros_contract.functions.tokenCount().call()
@@ -59,7 +62,7 @@ class KlerosClient:
         token_ids: List[bytes]
         has_more: bool
         token_ids, has_more = self.kleros_contract.functions.queryTokens(
-            b'',
+            b"",
             token_count,
             [
                 False,  # Include absent tokens in result.
@@ -72,7 +75,8 @@ class KlerosClient:
                 False,  # Include tokens challenged by the caller.
             ],
             False,
-            NULL_ADDRESS).call()
+            NULL_ADDRESS,
+        ).call()
         return [token_id for token_id in token_ids if token_id != self.null_token_id]
 
     def get_token_info(self, token_ids: Sequence[bytes]) -> Sequence[KlerosToken]:

@@ -26,34 +26,38 @@ def configure_workers(sender=None, conf=None, **kwargs):
         """
         try:
             from psycogreen.gevent import patch_psycopg
-            logger.info('Patching psycopg for gevent')
+
+            logger.info("Patching psycopg for gevent")
             patch_psycopg()
         except ImportError:
             pass
+
     patch_psycopg()
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
-    logger.warning('Worker shutting down')
+    logger.warning("Worker shutting down")
     gevent.spawn(shutdown_worker)  # If not raises a `BlockingSwitchOutError`
 
 
 def shutdown_worker():
     WORKER_STOPPED.add(True)
     if ACTIVE_LOCKS:
-        logger.warning('Force releasing of redis locks %s', ACTIVE_LOCKS)
+        logger.warning("Force releasing of redis locks %s", ACTIVE_LOCKS)
         get_redis().delete(*ACTIVE_LOCKS)
-        logger.warning('Released redis locks')
+        logger.warning("Released redis locks")
     else:
-        logger.warning('No redis locks to release')
+        logger.warning("No redis locks to release")
 
 
 @contextlib.contextmanager
-def only_one_running_task(task: CeleryTask,
-                          lock_name_suffix: Optional[str] = None,
-                          blocking_timeout: int = 1,
-                          lock_timeout: Optional[int] = LOCK_TIMEOUT):
+def only_one_running_task(
+    task: CeleryTask,
+    lock_name_suffix: Optional[str] = None,
+    blocking_timeout: int = 1,
+    lock_timeout: Optional[int] = LOCK_TIMEOUT,
+):
     """
     Ensures one running task at the same, using `task` name as a unique key
     :param task: CeleryTask
@@ -67,12 +71,14 @@ def only_one_running_task(task: CeleryTask,
     :raises: LockError if lock cannot be acquired
     """
     if WORKER_STOPPED:
-        raise LockError('Worker is stopping')
+        raise LockError("Worker is stopping")
     redis = get_redis()
-    lock_name = f'tasks:{task.name}'
+    lock_name = f"tasks:{task.name}"
     if lock_name_suffix:
-        lock_name = f'{lock_name}:{lock_name_suffix}'
-    with redis.lock(lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout) as lock:
+        lock_name = f"{lock_name}:{lock_name_suffix}"
+    with redis.lock(
+        lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout
+    ) as lock:
         ACTIVE_LOCKS.add(lock_name)
         yield lock
         ACTIVE_LOCKS.remove(lock_name)

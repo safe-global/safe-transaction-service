@@ -11,39 +11,58 @@ import safe_transaction_service.history.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0038_safestatus_guard'),
+        ("history", "0038_safestatus_guard"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SafeL2MasterCopy',
+            name="SafeL2MasterCopy",
             fields=[
-                ('address', gnosis.eth.django.models.EthereumAddressField(primary_key=True, serialize=False)),
-                ('initial_block_number', models.IntegerField(default=0)),
-                ('tx_block_number', models.IntegerField(db_index=True, default=None, null=True)),
-                ('version', models.CharField(max_length=20, validators=[safe_transaction_service.history.models.validate_version])),
-                ('deployer', models.CharField(default='Gnosis', max_length=50)),
+                (
+                    "address",
+                    gnosis.eth.django.models.EthereumAddressField(
+                        primary_key=True, serialize=False
+                    ),
+                ),
+                ("initial_block_number", models.IntegerField(default=0)),
+                (
+                    "tx_block_number",
+                    models.IntegerField(db_index=True, default=None, null=True),
+                ),
+                (
+                    "version",
+                    models.CharField(
+                        max_length=20,
+                        validators=[
+                            safe_transaction_service.history.models.validate_version
+                        ],
+                    ),
+                ),
+                ("deployer", models.CharField(default="Gnosis", max_length=50)),
             ],
             options={
-                'verbose_name_plural': 'Safe L2 master copies',
+                "verbose_name_plural": "Safe L2 master copies",
             },
             managers=[
-                ('custom_manager', django.db.models.manager.Manager()),
+                ("custom_manager", django.db.models.manager.Manager()),
             ],
         ),
         migrations.AlterModelOptions(
-            name='safemastercopy',
-            options={'verbose_name_plural': 'Safe master copies'},
+            name="safemastercopy",
+            options={"verbose_name_plural": "Safe master copies"},
         ),
         migrations.AlterModelManagers(
-            name='safemastercopy',
+            name="safemastercopy",
             managers=[
-                ('custom_manager', django.db.models.manager.Manager()),
+                ("custom_manager", django.db.models.manager.Manager()),
             ],
         ),
         migrations.AlterField(
-            model_name='safemastercopy',
-            name='version',
-            field=models.CharField(max_length=20, validators=[safe_transaction_service.history.models.validate_version]),
+            model_name="safemastercopy",
+            name="version",
+            field=models.CharField(
+                max_length=20,
+                validators=[safe_transaction_service.history.models.validate_version],
+            ),
         ),
     ]

@@ -22,16 +22,27 @@ class EventsIndexer(EthereumIndexer):
     Indexes Ethereum events
     """
 
-    IGNORE_ADDRESSES_ON_LOG_FILTER: bool = False  # If True, don't use addresses to filter logs
+    IGNORE_ADDRESSES_ON_LOG_FILTER: bool = (
+        False  # If True, don't use addresses to filter logs
+    )
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault('block_process_limit', settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT)
-        kwargs.setdefault('block_process_limit_max', settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX)
-        kwargs.setdefault('blocks_to_reindex_again', 10)   # Reindex last 10 blocks every run of the indexer
-        kwargs.setdefault('confirmations', 2)   # Due to reorgs, wait for the last 2 blocks
-        kwargs.setdefault('query_chunk_size', settings.ETH_EVENTS_QUERY_CHUNK_SIZE)
-        kwargs.setdefault('updated_blocks_behind', settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
-                          )  # For last x blocks, process `query_chunk_size` elements together
+        kwargs.setdefault(
+            "block_process_limit", settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT
+        )
+        kwargs.setdefault(
+            "block_process_limit_max", settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX
+        )
+        kwargs.setdefault(
+            "blocks_to_reindex_again", 10
+        )  # Reindex last 10 blocks every run of the indexer
+        kwargs.setdefault(
+            "confirmations", 2
+        )  # Due to reorgs, wait for the last 2 blocks
+        kwargs.setdefault("query_chunk_size", settings.ETH_EVENTS_QUERY_CHUNK_SIZE)
+        kwargs.setdefault(
+            "updated_blocks_behind", settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
+        )  # For last x blocks, process `query_chunk_size` elements together
         super().__init__(*args, **kwargs)
 
     @property
@@ -44,10 +55,17 @@ class EventsIndexer(EthereumIndexer):
 
     @cached_property
     def events_to_listen(self) -> Dict[bytes, ContractEvent]:
-        return {HexBytes(event_abi_to_log_topic(event.abi)).hex(): event for event in self.contract_events}
+        return {
+            HexBytes(event_abi_to_log_topic(event.abi)).hex(): event
+            for event in self.contract_events
+        }
 
-    def _do_node_query(self, addresses: List[ChecksumAddress],
-                       from_block_number: int, to_block_number: int) -> List[LogReceipt]:
+    def _do_node_query(
+        self,
+        addresses: List[ChecksumAddress],
+        from_block_number: int,
+        to_block_number: int,
+    ) -> List[LogReceipt]:
         """
         Perform query to the node
 
@@ -58,19 +76,22 @@ class EventsIndexer(EthereumIndexer):
         """
         filter_topics = list(self.events_to_listen.keys())
         parameters: FilterParams = {
-            'fromBlock': from_block_number,
-            'toBlock': to_block_number,
-            'topics': [filter_topics]
+            "fromBlock": from_block_number,
+            "toBlock": to_block_number,
+            "topics": [filter_topics],
         }
 
         if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
-            parameters['address'] = addresses
+            parameters["address"] = addresses
 
         return self.ethereum_client.slow_w3.eth.get_logs(parameters)
 
-    def _find_elements_using_topics(self,
-                                    addresses: List[ChecksumAddress],
-                                    from_block_number: int, to_block_number: int) -> List[LogReceipt]:
+    def _find_elements_using_topics(
+        self,
+        addresses: List[ChecksumAddress],
+        from_block_number: int,
+        to_block_number: int,
+    ) -> List[LogReceipt]:
         """
         It will get Safe events using all the Gnosis Safe topics for filtering.
 
@@ -83,26 +104,38 @@ class EventsIndexer(EthereumIndexer):
         try:
             return self._do_node_query(addresses, from_block_number, to_block_number)
         except IOError as e:
-            raise FindRelevantElementsException(f'Request error retrieving events '
-                                                f'from-block={from_block_number} to-block={to_block_number}') from e
+            raise FindRelevantElementsException(
+                f"Request error retrieving events "
+                f"from-block={from_block_number} to-block={to_block_number}"
+            ) from e
         except ValueError as e:
             # For example, Polygon returns:
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
             # BSC returns:
             #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
-            logger.warning('%s: Value error retrieving events from-block=%d to-block=%d : %s',
-                           self.__class__.__name__, from_block_number, to_block_number, e)
-            raise FindRelevantElementsException(f'Request error retrieving events '
-                                                f'from-block={from_block_number} to-block={to_block_number}') from e
+            logger.warning(
+                "%s: Value error retrieving events from-block=%d to-block=%d : %s",
+                self.__class__.__name__,
+                from_block_number,
+                to_block_number,
+                e,
+            )
+            raise FindRelevantElementsException(
+                f"Request error retrieving events "
+                f"from-block={from_block_number} to-block={to_block_number}"
+            ) from e
 
     @abstractmethod
     def _process_decoded_element(self, decoded_element: EventData) -> Any:
         pass
 
-    def find_relevant_elements(self, addresses: List[ChecksumAddress],
-                               from_block_number: int,
-                               to_block_number: int,
-                               current_block_number: Optional[int] = None) -> List[LogReceipt]:
+    def find_relevant_elements(
+        self,
+        addresses: List[ChecksumAddress],
+        from_block_number: int,
+        to_block_number: int,
+        current_block_number: Optional[int] = None,
+    ) -> List[LogReceipt]:
         """
         Search for log receipts for Safe events
 
@@ -114,16 +147,27 @@ class EventsIndexer(EthereumIndexer):
         """
         len_addresses = len(addresses)
         logger.debug(
-            '%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s',
-            self.__class__.__name__, from_block_number, to_block_number, len_addresses, addresses[:10]
+            "%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s",
+            self.__class__.__name__,
+            from_block_number,
+            to_block_number,
+            len_addresses,
+            addresses[:10],
         )
-        log_receipts = self._find_elements_using_topics(addresses, from_block_number, to_block_number)
+        log_receipts = self._find_elements_using_topics(
+            addresses, from_block_number, to_block_number
+        )
 
         len_events = len(log_receipts)
         logger_fn = logger.info if len_events else logger.debug
         logger_fn(
-            '%s: Found %d events from block-number=%d to block-number=%d for %d addresses: %s',
-            self.__class__.__name__, len_events, from_block_number, to_block_number, len_addresses, addresses[:10]
+            "%s: Found %d events from block-number=%d to block-number=%d for %d addresses: %s",
+            self.__class__.__name__,
+            len_events,
+            from_block_number,
+            to_block_number,
+            len_addresses,
+            addresses[:10],
         )
         return log_receipts
 
@@ -132,10 +176,16 @@ class EventsIndexer(EthereumIndexer):
         for log_receipt in log_receipts:
             try:
                 decoded_elements.append(
-                    self.events_to_listen[log_receipt['topics'][0].hex()].processLog(log_receipt)
+                    self.events_to_listen[log_receipt["topics"][0].hex()].processLog(
+                        log_receipt
+                    )
                 )
             except LogTopicError:
-                logger.error('Unexpected log format for log-receipt %s', log_receipt, exc_info=True)
+                logger.error(
+                    "Unexpected log format for log-receipt %s",
+                    log_receipt,
+                    exc_info=True,
+                )
         return decoded_elements
 
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
@@ -149,15 +199,17 @@ class EventsIndexer(EthereumIndexer):
             return []
 
         decoded_elements: List[EventData] = self.decode_elements(log_receipts)
-        tx_hashes = OrderedDict.fromkeys([event['transactionHash'] for event in log_receipts]).keys()
-        logger.debug('Prefetching and storing %d ethereum txs', len(tx_hashes))
+        tx_hashes = OrderedDict.fromkeys(
+            [event["transactionHash"] for event in log_receipts]
+        ).keys()
+        logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
         self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.debug('End prefetching and storing of ethereum txs')
-        logger.debug('Processing %d decoded events', len(decoded_elements))
+        logger.debug("End prefetching and storing of ethereum txs")
+        logger.debug("Processing %d decoded events", len(decoded_elements))
         processed_elements = []
         for decoded_element in decoded_elements:
             processed_element = self._process_decoded_element(decoded_element)
             if processed_element:
                 processed_elements.append(processed_element)
-        logger.debug('End processing %d decoded events', len(decoded_elements))
+        logger.debug("End processing %d decoded events", len(decoded_elements))
         return processed_elements

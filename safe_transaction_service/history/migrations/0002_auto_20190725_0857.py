@@ -8,28 +8,28 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0001_initial'),
+        ("history", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='multisigconfirmation',
-            name='signature',
+            model_name="multisigconfirmation",
+            name="signature",
             field=gnosis.eth.django.models.HexField(max_length=500, null=True),
         ),
         migrations.AlterField(
-            model_name='multisigconfirmation',
-            name='block_date_time',
+            model_name="multisigconfirmation",
+            name="block_date_time",
             field=models.DateTimeField(null=True),
         ),
         migrations.AlterField(
-            model_name='multisigconfirmation',
-            name='block_number',
+            model_name="multisigconfirmation",
+            name="block_number",
             field=gnosis.eth.django.models.Uint256Field(null=True),
         ),
         migrations.AlterField(
-            model_name='multisigconfirmation',
-            name='transaction_hash',
+            model_name="multisigconfirmation",
+            name="transaction_hash",
             field=gnosis.eth.django.models.Sha3HashField(null=True),
         ),
     ]

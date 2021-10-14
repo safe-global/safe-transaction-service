@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0029_auto_20201118_1015'),
+        ("history", "0029_auto_20201118_1015"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='multisigtransaction',
-            name='origin',
+            model_name="multisigtransaction",
+            name="origin",
             field=models.CharField(default=None, max_length=200, null=True),
         ),
     ]

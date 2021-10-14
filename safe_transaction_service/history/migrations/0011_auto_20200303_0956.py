@@ -9,19 +9,25 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0010_auto_20200226_1508'),
+        ("history", "0010_auto_20200226_1508"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='safestatus',
-            name='enabled_modules',
-            field=django.contrib.postgres.fields.ArrayField(base_field=gnosis.eth.django.models.EthereumAddressField(), default=list, size=None),
+            model_name="safestatus",
+            name="enabled_modules",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=gnosis.eth.django.models.EthereumAddressField(),
+                default=list,
+                size=None,
+            ),
         ),
         migrations.AddField(
-            model_name='safestatus',
-            name='fallback_handler',
-            field=gnosis.eth.django.models.EthereumAddressField(default='0x0000000000000000000000000000000000000000'),
+            model_name="safestatus",
+            name="fallback_handler",
+            field=gnosis.eth.django.models.EthereumAddressField(
+                default="0x0000000000000000000000000000000000000000"
+            ),
             preserve_default=False,
         ),
     ]

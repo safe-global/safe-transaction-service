@@ -6,20 +6,26 @@ from ..indexers.tx_processor import SafeTxProcessorProvider
 
 
 def fix_failed_module_transactions(apps, schema_editor):
-    ModuleTransaction = apps.get_model('history', 'ModuleTransaction')
+    ModuleTransaction = apps.get_model("history", "ModuleTransaction")
     safe_tx_processor = SafeTxProcessorProvider()
-    for m in ModuleTransaction.objects.select_related('internal_tx__ethereum_tx').iterator():
-        if safe_tx_processor.is_module_failed(m.internal_tx.ethereum_tx, m.module, m.safe):
+    for m in ModuleTransaction.objects.select_related(
+        "internal_tx__ethereum_tx"
+    ).iterator():
+        if safe_tx_processor.is_module_failed(
+            m.internal_tx.ethereum_tx, m.module, m.safe
+        ):
             m.failed = True
-            m.save(update_fields=['failed'])
+            m.save(update_fields=["failed"])
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0036_fix_exec_from_module'),
+        ("history", "0036_fix_exec_from_module"),
     ]
 
     operations = [
-        migrations.RunPython(fix_failed_module_transactions, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(
+            fix_failed_module_transactions, reverse_code=migrations.RunPython.noop
+        ),
     ]

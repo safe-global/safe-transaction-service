@@ -8,101 +8,128 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClientProvider
 
-from .models import (EthereumBlock, EthereumEvent, EthereumTx, InternalTx,
-                     InternalTxDecoded, ModuleTransaction,
-                     MultisigConfirmation, MultisigTransaction, ProxyFactory,
-                     SafeContract, SafeContractDelegate, SafeMasterCopy,
-                     SafeStatus, WebHook)
+from .models import (
+    EthereumBlock,
+    EthereumEvent,
+    EthereumTx,
+    InternalTx,
+    InternalTxDecoded,
+    ModuleTransaction,
+    MultisigConfirmation,
+    MultisigTransaction,
+    ProxyFactory,
+    SafeContract,
+    SafeContractDelegate,
+    SafeMasterCopy,
+    SafeStatus,
+    WebHook,
+)
 from .services import IndexServiceProvider
 
 
 # Inline objects ------------------------------
 class EthereumEventInline(admin.TabularInline):
     model = EthereumEvent
-    raw_id_fields = ('ethereum_tx',)
+    raw_id_fields = ("ethereum_tx",)
 
 
 class EthereumTxInline(admin.TabularInline):
     model = EthereumTx
-    raw_id_fields = ('block',)
+    raw_id_fields = ("block",)
 
 
 class InternalTxDecodedInline(admin.TabularInline):
     model = InternalTxDecoded
-    raw_id_fields = ('internal_tx',)
+    raw_id_fields = ("internal_tx",)
 
 
 class MultisigTransactionInline(admin.TabularInline):
     model = MultisigTransaction
-    raw_id_fields = ('ethereum_tx',)
+    raw_id_fields = ("ethereum_tx",)
 
 
 class MultisigConfirmationInline(admin.TabularInline):
     model = MultisigConfirmation
-    raw_id_fields = ('ethereum_tx', 'multisig_transaction')
+    raw_id_fields = ("ethereum_tx", "multisig_transaction")
 
 
 class SafeContractInline(admin.TabularInline):
     model = SafeContract
-    raw_id_fields = ('ethereum_tx',)
+    raw_id_fields = ("ethereum_tx",)
 
 
 class SafeContractDelegateInline(admin.TabularInline):
     model = SafeContractDelegate
-    raw_id_fields = ('safe_contract',)
+    raw_id_fields = ("safe_contract",)
 
 
 # Admin models ------------------------------
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
-    date_hierarchy = 'timestamp'
+    date_hierarchy = "timestamp"
     inlines = (EthereumTxInline,)
-    list_display = ('number', 'timestamp', 'confirmed', 'gas_limit', 'gas_used', 'block_hash')
-    list_filter = ('confirmed',)
-    search_fields = ['=number', '=block_hash']
-    ordering = ['-number']
+    list_display = (
+        "number",
+        "timestamp",
+        "confirmed",
+        "gas_limit",
+        "gas_used",
+        "block_hash",
+    )
+    list_filter = ("confirmed",)
+    search_fields = ["=number", "=block_hash"]
+    ordering = ["-number"]
 
 
 class EthereumEventListFilter(admin.SimpleListFilter):
     # Human-readable title which will be displayed in the
     # right admin sidebar just above the filter options.
-    title = 'Event type'
+    title = "Event type"
 
     # Parameter for the filter that will be used in the URL query.
-    parameter_name = 'event_type'
+    parameter_name = "event_type"
 
     def lookups(self, request, model_admin):
         return (
-            ('ERC20', 'ERC20 Transfer'),
-            ('ERC721', 'ERC721 Transfer'),
-            ('OTHER', 'Other events'),
+            ("ERC20", "ERC20 Transfer"),
+            ("ERC721", "ERC721 Transfer"),
+            ("OTHER", "Other events"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'ERC20':
+        if self.value() == "ERC20":
             return queryset.erc20_events()
-        elif self.value() == 'ERC721':
+        elif self.value() == "ERC721":
             return queryset.erc721_events()
-        elif self.value() == 'OTHER':
+        elif self.value() == "OTHER":
             return queryset.not_erc_20_721_events()
 
 
 @admin.register(EthereumEvent)
 class EthereumEventAdmin(admin.ModelAdmin):
-    list_display = ('block_number', 'log_index', 'erc20', 'erc721', 'address',
-                    'from_', 'to', 'ethereum_tx_id', 'arguments')
-    list_display_links = ('log_index', 'arguments')
-    list_filter = (EthereumEventListFilter, )
-    list_select_related = ('ethereum_tx',)
-    ordering = ['-ethereum_tx__block_id']
-    search_fields = ['arguments', 'address', '=ethereum_tx__tx_hash']
-    raw_id_fields = ('ethereum_tx',)
+    list_display = (
+        "block_number",
+        "log_index",
+        "erc20",
+        "erc721",
+        "address",
+        "from_",
+        "to",
+        "ethereum_tx_id",
+        "arguments",
+    )
+    list_display_links = ("log_index", "arguments")
+    list_filter = (EthereumEventListFilter,)
+    list_select_related = ("ethereum_tx",)
+    ordering = ["-ethereum_tx__block_id"]
+    search_fields = ["arguments", "address", "=ethereum_tx__tx_hash"]
+    raw_id_fields = ("ethereum_tx",)
 
     def from_(self, obj: EthereumEvent):
-        return obj.arguments.get('from')
+        return obj.arguments.get("from")
 
     def to(self, obj: EthereumEvent):
-        return obj.arguments.get('to')
+        return obj.arguments.get("to")
 
     @admin.display()
     def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
@@ -120,88 +147,136 @@ class EthereumEventAdmin(admin.ModelAdmin):
 
 @admin.register(EthereumTx)
 class EthereumTxAdmin(admin.ModelAdmin):
-    inlines = (EthereumEventInline, SafeContractInline, MultisigTransactionInline, MultisigConfirmationInline)
-    list_display = ('block_id', 'tx_hash', 'nonce', '_from', 'to')
-    list_filter = ('status',)
-    search_fields = ['=tx_hash', '=_from', '=to']
-    ordering = ['-block_id']
-    raw_id_fields = ('block',)
+    inlines = (
+        EthereumEventInline,
+        SafeContractInline,
+        MultisigTransactionInline,
+        MultisigConfirmationInline,
+    )
+    list_display = ("block_id", "tx_hash", "nonce", "_from", "to")
+    list_filter = ("status",)
+    search_fields = ["=tx_hash", "=_from", "=to"]
+    ordering = ["-block_id"]
+    raw_id_fields = ("block",)
 
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
     inlines = (InternalTxDecodedInline,)
-    list_display = ('ethereum_tx_id', 'block_number', '_from', 'to', 'value', 'call_type', 'trace_address')
-    list_filter = ('tx_type', 'call_type')
-    list_select_related = ('ethereum_tx',)
-    ordering = ['-ethereum_tx__block_id',
-                '-ethereum_tx__transaction_index',
-                '-trace_address']
-    raw_id_fields = ('ethereum_tx',)
-    search_fields = ['=ethereum_tx__block__number', '=_from', '=to', '=ethereum_tx__tx_hash', '=contract_address']
+    list_display = (
+        "ethereum_tx_id",
+        "block_number",
+        "_from",
+        "to",
+        "value",
+        "call_type",
+        "trace_address",
+    )
+    list_filter = ("tx_type", "call_type")
+    list_select_related = ("ethereum_tx",)
+    ordering = [
+        "-ethereum_tx__block_id",
+        "-ethereum_tx__transaction_index",
+        "-trace_address",
+    ]
+    raw_id_fields = ("ethereum_tx",)
+    search_fields = [
+        "=ethereum_tx__block__number",
+        "=_from",
+        "=to",
+        "=ethereum_tx__tx_hash",
+        "=contract_address",
+    ]
 
 
 class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
-    title = 'Gnosis official Safes'
-    parameter_name = 'official_safes'
+    title = "Gnosis official Safes"
+    parameter_name = "official_safes"
 
     def lookups(self, request, model_admin):
-        return (
-            ('YES', 'Yes'),
-        )
+        return (("YES", "Yes"),)
 
     def queryset(self, request, queryset):
-        if self.value() == 'YES':
+        if self.value() == "YES":
             return queryset.filter(
-                Q(internal_tx___from__in=SafeContract.objects.values('address'))  # Just Safes indexed
-                | Q(function_name='setup')  # Safes pending to be indexed
+                Q(
+                    internal_tx___from__in=SafeContract.objects.values("address")
+                )  # Just Safes indexed
+                | Q(function_name="setup")  # Safes pending to be indexed
             )
 
 
 @admin.register(InternalTxDecoded)
 class InternalTxDecodedAdmin(admin.ModelAdmin):
-    actions = ['process_again']
-    list_display = ('block_number', 'processed', 'internal_tx_id', 'tx_hash', 'address', 'function_name', 'arguments')
-    list_filter = ('function_name', 'processed', InternalTxDecodedOfficialListFilter)
-    list_select_related = ('internal_tx__ethereum_tx',)
-    ordering = ['-internal_tx__ethereum_tx__block_id',
-                '-internal_tx__ethereum_tx__transaction_index',
-                '-internal_tx__trace_address']
-    raw_id_fields = ('internal_tx',)
-    search_fields = ['function_name', 'arguments', '=internal_tx__to', '=internal_tx___from',
-                     '=internal_tx__ethereum_tx__tx_hash', '=internal_tx__ethereum_tx__block__number']
+    actions = ["process_again"]
+    list_display = (
+        "block_number",
+        "processed",
+        "internal_tx_id",
+        "tx_hash",
+        "address",
+        "function_name",
+        "arguments",
+    )
+    list_filter = ("function_name", "processed", InternalTxDecodedOfficialListFilter)
+    list_select_related = ("internal_tx__ethereum_tx",)
+    ordering = [
+        "-internal_tx__ethereum_tx__block_id",
+        "-internal_tx__ethereum_tx__transaction_index",
+        "-internal_tx__trace_address",
+    ]
+    raw_id_fields = ("internal_tx",)
+    search_fields = [
+        "function_name",
+        "arguments",
+        "=internal_tx__to",
+        "=internal_tx___from",
+        "=internal_tx__ethereum_tx__tx_hash",
+        "=internal_tx__ethereum_tx__block__number",
+    ]
 
-    @admin.action(description='Process internal tx again')
+    @admin.action(description="Process internal tx again")
     def process_again(self, request, queryset):
         queryset.filter(processed=True).update(processed=False)
 
 
 class MultisigConfirmationListFilter(admin.SimpleListFilter):
-    title = 'Has multisig transaction'
-    parameter_name = 'has_multisig_tx'
+    title = "Has multisig transaction"
+    parameter_name = "has_multisig_tx"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'Yes'),
-            ('NO', 'No'),
+            ("YES", "Yes"),
+            ("NO", "No"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'YES':
+        if self.value() == "YES":
             return queryset.exclude(multisig_transaction=None)
-        elif self.value() == 'NO':
+        elif self.value() == "NO":
             return queryset.filter(multisig_transaction=None)
 
 
 @admin.register(MultisigConfirmation)
 class MultisigConfirmationAdmin(admin.ModelAdmin):
-    list_display = ('block_number', 'multisig_transaction_hash', 'has_multisig_tx', 'ethereum_tx_id',
-                    'signature_type', 'owner')
-    list_filter = (MultisigConfirmationListFilter, 'signature_type')
-    list_select_related = ('ethereum_tx',)
-    ordering = ['-created']
-    raw_id_fields = ('ethereum_tx', 'multisig_transaction')
-    search_fields = ['=multisig_transaction__safe', '=ethereum_tx__tx_hash', '=multisig_transaction_hash', '=owner']
+    list_display = (
+        "block_number",
+        "multisig_transaction_hash",
+        "has_multisig_tx",
+        "ethereum_tx_id",
+        "signature_type",
+        "owner",
+    )
+    list_filter = (MultisigConfirmationListFilter, "signature_type")
+    list_select_related = ("ethereum_tx",)
+    ordering = ["-created"]
+    raw_id_fields = ("ethereum_tx", "multisig_transaction")
+    search_fields = [
+        "=multisig_transaction__safe",
+        "=ethereum_tx__tx_hash",
+        "=multisig_transaction_hash",
+        "=owner",
+    ]
 
     @admin.display()
     def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
@@ -214,33 +289,43 @@ class MultisigConfirmationAdmin(admin.ModelAdmin):
 
 
 class MultisigTransactionExecutedListFilter(admin.SimpleListFilter):
-    title = 'Executed'
-    parameter_name = 'executed'
+    title = "Executed"
+    parameter_name = "executed"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'Transaction executed (mined)'),
-            ('NO', 'Transaction not executed'),
+            ("YES", "Transaction executed (mined)"),
+            ("NO", "Transaction not executed"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'YES':
+        if self.value() == "YES":
             return queryset.executed()
-        elif self.value() == 'NO':
+        elif self.value() == "NO":
             return queryset.not_executed()
 
 
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(admin.ModelAdmin):
-    date_hierarchy = 'created'
+    date_hierarchy = "created"
     inlines = (MultisigConfirmationInline,)
-    list_display = ('created', 'safe', 'executed', 'successful', 'safe_tx_hash', 'ethereum_tx_id', 'to', 'value',
-                    'nonce', 'data')
-    list_filter = (MultisigTransactionExecutedListFilter, 'failed', 'trusted')
-    list_select_related = ('ethereum_tx',)
-    ordering = ['-created']
-    raw_id_fields = ('ethereum_tx',)
-    search_fields = ['=ethereum_tx__tx_hash', '=safe', 'to', 'safe_tx_hash']
+    list_display = (
+        "created",
+        "safe",
+        "executed",
+        "successful",
+        "safe_tx_hash",
+        "ethereum_tx_id",
+        "to",
+        "value",
+        "nonce",
+        "data",
+    )
+    list_filter = (MultisigTransactionExecutedListFilter, "failed", "trusted")
+    list_select_related = ("ethereum_tx",)
+    ordering = ["-created"]
+    raw_id_fields = ("ethereum_tx",)
+    search_fields = ["=ethereum_tx__tx_hash", "=safe", "to", "safe_tx_hash"]
 
     @admin.display(boolean=True)
     def executed(self, obj: MultisigTransaction):
@@ -253,13 +338,23 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
 
 @admin.register(ModuleTransaction)
 class ModuleTransactionAdmin(admin.ModelAdmin):
-    date_hierarchy = 'created'
-    list_display = ('created', 'failed', 'safe', 'tx_hash', 'module', 'to', 'operation', 'value', 'data_hex')
-    list_filter = ('failed', 'operation', 'module')
-    list_select_related = ('internal_tx',)
-    ordering = ['-created']
-    raw_id_fields = ('internal_tx',)
-    search_fields = ['safe', 'module', 'to']
+    date_hierarchy = "created"
+    list_display = (
+        "created",
+        "failed",
+        "safe",
+        "tx_hash",
+        "module",
+        "to",
+        "operation",
+        "value",
+        "data_hex",
+    )
+    list_filter = ("failed", "operation", "module")
+    list_select_related = ("internal_tx",)
+    ordering = ["-created"]
+    raw_id_fields = ("internal_tx",)
+    search_fields = ["safe", "module", "to"]
 
     def data_hex(self, o: ModuleTransaction):
         return HexBytes(o.data.tobytes()).hex() if o.data else None
@@ -269,32 +364,51 @@ class ModuleTransactionAdmin(admin.ModelAdmin):
 
 
 class MonitoredAddressAdmin(admin.ModelAdmin):
-    actions = ['reindex', 'reindex_last_day', 'reindex_last_week', 'reindex_last_month']
-    list_display = ('address', 'initial_block_number', 'tx_block_number')
-    readonly_fields = ['initial_block_number']
-    search_fields = ['address']
+    actions = ["reindex", "reindex_last_day", "reindex_last_week", "reindex_last_month"]
+    list_display = ("address", "initial_block_number", "tx_block_number")
+    readonly_fields = ["initial_block_number"]
+    search_fields = ["address"]
 
-    @admin.action(description='Reindex from initial block')
+    @admin.action(description="Reindex from initial block")
     def reindex(self, request, queryset):
-        queryset.update(tx_block_number=F('initial_block_number'))
+        queryset.update(tx_block_number=F("initial_block_number"))
 
-    @admin.action(description='Reindex last 24 hours')
+    @admin.action(description="Reindex last 24 hours")
     def reindex_last_day(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 6000, F('initial_block_number')))
+        queryset.update(
+            tx_block_number=Greatest(
+                F("tx_block_number") - 6000, F("initial_block_number")
+            )
+        )
 
-    @admin.action(description='Reindex last week')
+    @admin.action(description="Reindex last week")
     def reindex_last_week(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 42000, F('initial_block_number')))
+        queryset.update(
+            tx_block_number=Greatest(
+                F("tx_block_number") - 42000, F("initial_block_number")
+            )
+        )
 
-    @admin.action(description='Reindex last month')
+    @admin.action(description="Reindex last month")
     def reindex_last_month(self, request, queryset):
-        queryset.update(tx_block_number=Greatest(F('tx_block_number') - 200000, F('initial_block_number')))
+        queryset.update(
+            tx_block_number=Greatest(
+                F("tx_block_number") - 200000, F("initial_block_number")
+            )
+        )
 
 
 @admin.register(SafeMasterCopy)
 class SafeMasterCopyAdmin(MonitoredAddressAdmin):
-    list_display = ('address', 'initial_block_number', 'tx_block_number', 'version', 'l2', 'deployer')
-    list_filter = ('deployer',)
+    list_display = (
+        "address",
+        "initial_block_number",
+        "tx_block_number",
+        "version",
+        "l2",
+        "deployer",
+    )
+    list_filter = ("deployer",)
 
 
 @admin.register(ProxyFactory)
@@ -305,94 +419,131 @@ class ProxyFactoryAdmin(MonitoredAddressAdmin):
 class SafeContractERC20ListFilter(admin.SimpleListFilter):
     # Human-readable title which will be displayed in the
     # right admin sidebar just above the filter options.
-    title = 'ERC20 Indexation'
+    title = "ERC20 Indexation"
 
     # Parameter for the filter that will be used in the URL query.
-    parameter_name = 'erc20_indexation'
+    parameter_name = "erc20_indexation"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'ERC20 Indexation updated'),
-            ('NO', 'ERC20 Indexation not updated'),
+            ("YES", "ERC20 Indexation updated"),
+            ("NO", "ERC20 Indexation not updated"),
         )
 
     def queryset(self, request, queryset):
         current_block_number = EthereumClientProvider().current_block_number
-        condition = {'erc20_block_number__gte': current_block_number - 200}
-        if self.value() == 'YES':
+        condition = {"erc20_block_number__gte": current_block_number - 200}
+        if self.value() == "YES":
             return queryset.filter(**condition)
-        elif self.value() == 'NO':
+        elif self.value() == "NO":
             return queryset.exclude(**condition)
 
 
 @admin.register(SafeContract)
 class SafeContractAdmin(admin.ModelAdmin):
-    actions = ['reindex', 'reindex_last_day', 'reindex_last_month']
+    actions = ["reindex", "reindex_last_day", "reindex_last_month"]
     inlines = (SafeContractDelegateInline,)
-    list_display = ('created_block_number', 'address', 'ethereum_tx_id', 'erc20_block_number')
-    list_filter = (SafeContractERC20ListFilter, )
-    list_select_related = ('ethereum_tx',)
-    ordering = ['-ethereum_tx__block_id']
-    raw_id_fields = ('ethereum_tx',)
-    search_fields = ['address']
+    list_display = (
+        "created_block_number",
+        "address",
+        "ethereum_tx_id",
+        "erc20_block_number",
+    )
+    list_filter = (SafeContractERC20ListFilter,)
+    list_select_related = ("ethereum_tx",)
+    ordering = ["-ethereum_tx__block_id"]
+    raw_id_fields = ("ethereum_tx",)
+    search_fields = ["address"]
 
-    @admin.action(description='Reindex from initial block')
+    @admin.action(description="Reindex from initial block")
     def reindex(self, request, queryset):
-        queryset.exclude(
-            ethereum_tx=None
-        ).update(erc20_block_number=F('ethereum_tx__block_id'))
+        queryset.exclude(ethereum_tx=None).update(
+            erc20_block_number=F("ethereum_tx__block_id")
+        )
 
-    @admin.action(description='Reindex last 24 hours')
+    @admin.action(description="Reindex last 24 hours")
     def reindex_last_day(self, request, queryset):
-        queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 6000, 0))
+        queryset.update(erc20_block_number=Greatest(F("erc20_block_number") - 6000, 0))
 
-    @admin.action(description='Reindex last month')
+    @admin.action(description="Reindex last month")
     def reindex_last_month(self, request, queryset):
-        queryset.update(erc20_block_number=Greatest(F('erc20_block_number') - 200000, 0))
+        queryset.update(
+            erc20_block_number=Greatest(F("erc20_block_number") - 200000, 0)
+        )
 
 
 @admin.register(SafeContractDelegate)
 class SafeContractDelegateAdmin(admin.ModelAdmin):
-    list_display = ('safe_contract', 'read', 'write', 'delegate', 'delegator')
-    list_filter = ('read', 'write')
-    ordering = ['safe_contract_id']
-    raw_id_fields = ('safe_contract',)
-    search_fields = ['safe_contract', 'delegate', 'delegator']
+    list_display = ("safe_contract", "read", "write", "delegate", "delegator")
+    list_filter = ("read", "write")
+    ordering = ["safe_contract_id"]
+    raw_id_fields = ("safe_contract",)
+    search_fields = ["safe_contract", "delegate", "delegator"]
 
 
 class SafeStatusModulesListFilter(admin.SimpleListFilter):
-    title = 'Modules enabled in Safe'
-    parameter_name = 'enabled_modules'
+    title = "Modules enabled in Safe"
+    parameter_name = "enabled_modules"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'Yes'),
-            ('NO', 'No'),
+            ("YES", "Yes"),
+            ("NO", "No"),
         )
 
     def queryset(self, request, queryset):
-        parameters = {'enabled_modules__len__gt': 0}
-        if self.value() == 'YES':
+        parameters = {"enabled_modules__len__gt": 0}
+        if self.value() == "YES":
             return queryset.filter(**parameters)
-        elif self.value() == 'NO':
+        elif self.value() == "NO":
             return queryset.exclude(**parameters)
 
 
 @admin.register(SafeStatus)
 class SafeStatusAdmin(admin.ModelAdmin):
-    actions = ['remove_and_index']
-    fields = ('internal_tx', 'address', 'owners', 'threshold', 'nonce', 'master_copy', 'fallback_handler',
-              'enabled_modules', 'function_name', 'arguments')
-    readonly_fields = ('function_name', 'arguments')
-    list_display = ('block_number', 'internal_tx_id', 'function_name',
-                    'address', 'owners', 'threshold', 'nonce', 'master_copy',
-                    'fallback_handler', 'guard', 'enabled_modules')
-    list_filter = ('threshold', 'master_copy', 'fallback_handler', 'guard', SafeStatusModulesListFilter)
-    list_select_related = ('internal_tx__ethereum_tx', 'internal_tx__decoded_tx')
-    ordering = ['-internal_tx__ethereum_tx__block_id', '-internal_tx_id']
-    raw_id_fields = ('internal_tx',)
-    search_fields = ['address', 'owners', '=internal_tx__ethereum_tx__tx_hash',
-                     'enabled_modules']
+    actions = ["remove_and_index"]
+    fields = (
+        "internal_tx",
+        "address",
+        "owners",
+        "threshold",
+        "nonce",
+        "master_copy",
+        "fallback_handler",
+        "enabled_modules",
+        "function_name",
+        "arguments",
+    )
+    readonly_fields = ("function_name", "arguments")
+    list_display = (
+        "block_number",
+        "internal_tx_id",
+        "function_name",
+        "address",
+        "owners",
+        "threshold",
+        "nonce",
+        "master_copy",
+        "fallback_handler",
+        "guard",
+        "enabled_modules",
+    )
+    list_filter = (
+        "threshold",
+        "master_copy",
+        "fallback_handler",
+        "guard",
+        SafeStatusModulesListFilter,
+    )
+    list_select_related = ("internal_tx__ethereum_tx", "internal_tx__decoded_tx")
+    ordering = ["-internal_tx__ethereum_tx__block_id", "-internal_tx_id"]
+    raw_id_fields = ("internal_tx",)
+    search_fields = [
+        "address",
+        "owners",
+        "=internal_tx__ethereum_tx__tx_hash",
+        "enabled_modules",
+    ]
 
     def function_name(self, obj: SafeStatus) -> str:
         return obj.internal_tx.decoded_tx.function_name
@@ -403,18 +554,34 @@ class SafeStatusAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin.action(description='Remove and process transactions again')
+    @admin.action(description="Remove and process transactions again")
     def remove_and_index(self, request, queryset):
-        safe_addresses = list(queryset.distinct().values_list('address', flat=True))
+        safe_addresses = list(queryset.distinct().values_list("address", flat=True))
         IndexServiceProvider().reprocess_addresses(safe_addresses)
 
 
 @admin.register(WebHook)
 class WebHookAdmin(admin.ModelAdmin):
-    list_display = ('pk', 'url', 'address', 'pending_outgoing_transaction', 'new_confirmation',
-                    'new_executed_outgoing_transaction', 'new_incoming_transaction', 'new_safe',
-                    'new_module_transaction', 'new_outgoing_transaction')
-    list_filter = ('pending_outgoing_transaction', 'new_confirmation', 'new_executed_outgoing_transaction',
-                   'new_incoming_transaction', 'new_safe', 'new_module_transaction', 'new_outgoing_transaction')
-    ordering = ['-pk']
-    search_fields = ['address', 'url']
+    list_display = (
+        "pk",
+        "url",
+        "address",
+        "pending_outgoing_transaction",
+        "new_confirmation",
+        "new_executed_outgoing_transaction",
+        "new_incoming_transaction",
+        "new_safe",
+        "new_module_transaction",
+        "new_outgoing_transaction",
+    )
+    list_filter = (
+        "pending_outgoing_transaction",
+        "new_confirmation",
+        "new_executed_outgoing_transaction",
+        "new_incoming_transaction",
+        "new_safe",
+        "new_module_transaction",
+        "new_outgoing_transaction",
+    )
+    ordering = ["-pk"]
+    search_fields = ["address", "url"]

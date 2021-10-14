@@ -5,49 +5,49 @@ from .models import Contract, ContractAbi
 
 @admin.register(ContractAbi)
 class ContractAbiAdmin(admin.ModelAdmin):
-    list_display = ('pk', 'relevance', 'description', 'abi_functions')
-    list_filter = ('relevance',)
-    ordering = ['relevance']
-    readonly_fields = ('abi_hash',)
-    search_fields = ['description']
+    list_display = ("pk", "relevance", "description", "abi_functions")
+    list_filter = ("relevance",)
+    ordering = ["relevance"]
+    readonly_fields = ("abi_hash",)
+    search_fields = ["description"]
 
     def abi_functions(self, obj: ContractAbi):
         return obj.abi_functions()
 
 
 class HasAbiFilter(admin.SimpleListFilter):
-    title = 'Has ABI'
-    parameter_name = 'has_abi'
+    title = "Has ABI"
+    parameter_name = "has_abi"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'Yes'),
-            ('NO', 'No'),
+            ("YES", "Yes"),
+            ("NO", "No"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'NO':
+        if self.value() == "NO":
             return queryset.filter(contract_abi=None)
-        elif self.value() == 'YES':
+        elif self.value() == "YES":
             return queryset.exclude(contract_abi=None)
         else:
             return queryset
 
 
 class HasLogoFilter(admin.SimpleListFilter):
-    title = 'Has Logo'
-    parameter_name = 'has_logo'
+    title = "Has Logo"
+    parameter_name = "has_logo"
 
     def lookups(self, request, model_admin):
         return (
-            ('YES', 'Yes'),
-            ('NO', 'No'),
+            ("YES", "Yes"),
+            ("NO", "No"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'NO':
+        if self.value() == "NO":
             return queryset.without_logo()
-        elif self.value() == 'YES':
+        elif self.value() == "YES":
             return queryset.with_logo()
         else:
             return queryset
@@ -55,12 +55,25 @@ class HasLogoFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ('address', 'name', 'display_name', 'has_abi', 'has_logo', 'abi_relevance', 'contract_abi_id')
+    list_display = (
+        "address",
+        "name",
+        "display_name",
+        "has_abi",
+        "has_logo",
+        "abi_relevance",
+        "contract_abi_id",
+    )
     list_filter = (HasAbiFilter, HasLogoFilter)
-    list_select_related = ('contract_abi',)
-    ordering = ['address']
-    raw_id_fields = ('contract_abi',)
-    search_fields = ['address', 'name', 'contract_abi__abi', 'contract_abi__description']
+    list_select_related = ("contract_abi",)
+    ordering = ["address"]
+    raw_id_fields = ("contract_abi",)
+    search_fields = [
+        "address",
+        "name",
+        "contract_abi__abi",
+        "contract_abi__description",
+    ]
 
     def abi_relevance(self, obj: Contract):
         if obj.contract_abi_id:
