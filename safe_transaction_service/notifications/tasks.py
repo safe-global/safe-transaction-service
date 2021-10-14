@@ -6,6 +6,7 @@ from celery.utils.log import get_task_logger
 
 from safe_transaction_service.history.models import (MultisigConfirmation,
                                                      MultisigTransaction,
+                                                     SafeContractDelegate,
                                                      SafeStatus, WebHookType)
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
@@ -163,11 +164,17 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
         if not owners_to_notify:
             return 0, 0
 
-        tokens = FirebaseDeviceOwner.objects.get_devices_for_safe_and_owners(address, owners_to_notify)
+        # Delegates must be notified too
+        delegates = SafeContractDelegate.objects.get_delegates_for_safe_and_owners(address, safe_status.owners)
+        users_to_notify = delegates | owners_to_notify
+
+        tokens = FirebaseDeviceOwner.objects.get_devices_for_safe_and_owners(address, users_to_notify)
 
         if not tokens:
-            logger.info('No cloud messaging tokens found for needed owners %s to sign safe-tx-hash=%s for safe=%s',
-                        owners_to_notify, safe_tx_hash, address)
+            logger.info(
+                'No cloud messaging tokens found for owners %s or delegates %s to sign safe-tx-hash=%s for safe=%s',
+                owners_to_notify, delegates, safe_tx_hash, address
+            )
             return 0, 0
 
         payload = {

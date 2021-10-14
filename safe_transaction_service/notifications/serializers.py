@@ -1,9 +1,10 @@
 import time
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Set
 from uuid import uuid4
 
 from django.db import IntegrityError, transaction
 
+from eth_typing import ChecksumAddress
 from packaging import version as semantic_version
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -12,7 +13,8 @@ from gnosis.eth.django.serializers import (EthereumAddressField,
                                            HexadecimalField)
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
-from safe_transaction_service.history.models import SafeContract
+from safe_transaction_service.history.models import (SafeContract,
+                                                     SafeContractDelegate)
 
 from .models import DeviceTypeEnum, FirebaseDevice, FirebaseDeviceOwner
 from .utils import calculate_device_registration_hash, get_safe_owners
@@ -32,12 +34,12 @@ class FirebaseDeviceSerializer(serializers.Serializer):
         child=HexadecimalField(required=False, min_length=65, max_length=65)  # Signatures must be 65 bytes
     )
 
-    def validate_safes(self, safes: Sequence[str]):
+    def validate_safes(self, safes: Sequence[ChecksumAddress]) -> Sequence[ChecksumAddress]:
         if SafeContract.objects.filter(address__in=safes).count() != len(safes):
             raise serializers.ValidationError('At least one Safe provided was not found or is duplicated')
         return safes
 
-    def validate_timestamp(self, timestamp: int):
+    def validate_timestamp(self, timestamp: int) -> int:
         """
         Validate if timestamp is not on a range within 5 minutes
         :param timestamp:
@@ -51,20 +53,36 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                 raise ValidationError(f'Provided timestamp is not in a range within {minutes_allowed} minutes')
         return timestamp
 
-    def validate_version(self, value: str):
+    def validate_version(self, value: str) -> str:
         try:
             semantic_version.Version(value)
         except semantic_version.InvalidVersion:
             raise serializers.ValidationError('Semantic version was expected')
         return value
 
+    def get_valid_owners(self, safe_addresses: Sequence[ChecksumAddress]) -> Set[ChecksumAddress]:
+        """
+        Return safe owners and delegates
+
+        :param safe_addresses:
+        :return:
+        """
+        valid_owners = set()
+        for safe_address in safe_addresses:
+            owners = get_safe_owners(safe_address)
+            delegates = SafeContractDelegate.objects.get_delegates_for_safe_and_owners(safe_address, owners)
+            valid_owners = valid_owners.union(owners, delegates)
+
+        return valid_owners
+
     def validate(self, data: Dict[str, Any]):
         data = super().validate(data)
         signature_owners = []
         owners_without_safe = []
         signatures = data.get('signatures') or []
+        safe_addresses = data['safes']
         if signatures:
-            current_owners = {owner for safe in data['safes'] for owner in get_safe_owners(safe)}
+            valid_owners = self.get_valid_owners(safe_addresses)
             for signature in signatures:
                 hash_to_sign = calculate_device_registration_hash(data['timestamp'],
                                                                   data['uuid'],
@@ -79,7 +97,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                     owner = safe_signature.owner
                     if owner in (signature_owners + owners_without_safe):
                         raise ValidationError(f'Signature for owner={owner} is duplicated')
-                    elif owner not in current_owners:
+                    elif owner not in valid_owners:
                         owners_without_safe.append(owner)
                         # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
                         #                       f'Expected hash to sign {hash_to_sign.hex()}')

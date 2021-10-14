@@ -1074,6 +1074,8 @@ class SafeContractDelegateManager(models.Manager):
 
     def get_delegates_for_safe_and_owners(self, safe_address: ChecksumAddress,
                                           owner_addresses: Sequence[ChecksumAddress]) -> Set[ChecksumAddress]:
+        if not owner_addresses:
+            return set()
         return set(
             self.filter(
                 # If safe_contract is null on SafeContractDelegate, delegates are valid for every Safe
