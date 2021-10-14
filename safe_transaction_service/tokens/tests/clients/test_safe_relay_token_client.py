@@ -8,7 +8,7 @@ from ...clients import SafeRelayTokenClient
 
 
 class TestSafeRelayTokenClient(TestCase):
-    @unittest.skip('Not needed anymore')
+    @unittest.skip("Not needed anymore")
     def test_safe_relay_token_client(self):
         safe_relay_token_client = SafeRelayTokenClient()
         tokens = safe_relay_token_client.get_tokens()

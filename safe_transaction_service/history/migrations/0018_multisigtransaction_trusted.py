@@ -4,21 +4,23 @@ from django.db import migrations, models
 
 
 def set_confirmed_txs_trusted(apps, schema_editor):
-    MultisigTransaction = apps.get_model('history', 'MultisigTransaction')
+    MultisigTransaction = apps.get_model("history", "MultisigTransaction")
     MultisigTransaction.objects.exclude(confirmations__isnull=True).update(trusted=True)
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0017_safecontractdelegate'),
+        ("history", "0017_safecontractdelegate"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='multisigtransaction',
-            name='trusted',
+            model_name="multisigtransaction",
+            name="trusted",
             field=models.BooleanField(db_index=True, default=False),
         ),
-        migrations.RunPython(set_confirmed_txs_trusted, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(
+            set_confirmed_txs_trusted, reverse_code=migrations.RunPython.noop
+        ),
     ]

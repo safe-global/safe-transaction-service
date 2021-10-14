@@ -8,13 +8,15 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0037_fix_failed_module_transactions'),
+        ("history", "0037_fix_failed_module_transactions"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='safestatus',
-            name='guard',
-            field=gnosis.eth.django.models.EthereumAddressField(default=None, null=True),
+            model_name="safestatus",
+            name="guard",
+            field=gnosis.eth.django.models.EthereumAddressField(
+                default=None, null=True
+            ),
         ),
     ]

@@ -6,32 +6,36 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0014_auto_20200327_0954'),
+        ("history", "0014_auto_20200327_0954"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='internaltxdecoded',
-            name='processed',
+            model_name="internaltxdecoded",
+            name="processed",
             field=models.BooleanField(default=False),
         ),
         migrations.AlterField(
-            model_name='proxyfactory',
-            name='tx_block_number',
+            model_name="proxyfactory",
+            name="tx_block_number",
             field=models.IntegerField(db_index=True, default=None, null=True),
         ),
         migrations.AlterField(
-            model_name='safecontract',
-            name='erc20_block_number',
+            model_name="safecontract",
+            name="erc20_block_number",
             field=models.IntegerField(db_index=True, default=0),
         ),
         migrations.AlterField(
-            model_name='safemastercopy',
-            name='tx_block_number',
+            model_name="safemastercopy",
+            name="tx_block_number",
             field=models.IntegerField(db_index=True, default=None, null=True),
         ),
         migrations.AddIndex(
-            model_name='internaltxdecoded',
-            index=models.Index(condition=models.Q(processed=False), fields=['processed'], name='history_decoded_processed_idx'),
+            model_name="internaltxdecoded",
+            index=models.Index(
+                condition=models.Q(processed=False),
+                fields=["processed"],
+                name="history_decoded_processed_idx",
+            ),
         ),
     ]

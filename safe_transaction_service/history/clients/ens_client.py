@@ -8,15 +8,15 @@ from hexbytes import HexBytes
 
 class EnsClient:
     def __init__(self, network_id: int):
-        base_url = 'https://api.thegraph.com/subgraphs/name/ensdomains/'
+        base_url = "https://api.thegraph.com/subgraphs/name/ensdomains/"
         if network_id == 3:  # Ropsten
-            url = base_url + 'ensropsten'
+            url = base_url + "ensropsten"
         elif network_id == 4:  # Rinkeby
-            url = base_url + 'ensrinkeby'
+            url = base_url + "ensrinkeby"
         elif network_id == 5:  # Goerli
-            url = base_url + 'ensgoerli'
+            url = base_url + "ensgoerli"
         else:  # Fallback to mainnet
-            url = base_url + 'ens'
+            url = base_url + "ens"
         self.url: str = url
         self.request_timeout = 5  # Seconds
         self.request_session = requests.Session()
@@ -37,11 +37,11 @@ class EnsClient:
         :return: Domain hash as an hex string of 66 chars (counting with 0x), padding with zeros if needed
         """
         if not domain_hash:
-            domain_hash = b''
-        return '0x' + HexBytes(domain_hash).hex()[2:].rjust(64, '0')
+            domain_hash = b""
+        return "0x" + HexBytes(domain_hash).hex()[2:].rjust(64, "0")
 
     @lru_cache
-    @cache_memoize(60 * 60 * 24, prefix='ens-_query_by_domain_hash')  # 1 day
+    @cache_memoize(60 * 60 * 24, prefix="ens-_query_by_domain_hash")  # 1 day
     def _query_by_domain_hash(self, domain_hash_str: str) -> Optional[str]:
         query = """
                 {
@@ -49,9 +49,13 @@ class EnsClient:
                         labelName
                     }
                 }
-                """.replace('domain_hash', domain_hash_str)
+                """.replace(
+            "domain_hash", domain_hash_str
+        )
         try:
-            r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
+            r = self.request_session.post(
+                self.url, json={"query": query}, timeout=self.request_timeout
+            )
         except IOError:
             return None
 
@@ -71,11 +75,13 @@ class EnsClient:
             """
             data = r.json()
             if data:
-                domains = data.get('data', {}).get('domains')
+                domains = data.get("data", {}).get("domains")
                 if domains:
-                    return domains[0].get('labelName')
+                    return domains[0].get("labelName")
 
-    def query_by_domain_hash(self, domain_hash: Union[str, bytes, int]) -> Optional[str]:
+    def query_by_domain_hash(
+        self, domain_hash: Union[str, bytes, int]
+    ) -> Optional[str]:
         """
         Get domain label from domain_hash (keccak of domain name without the TLD, don't confuse with namehash)
         used for ENS ERC721 token_id. Use another method for caching purposes (use same parameter type)
@@ -107,7 +113,7 @@ class EnsClient:
             ]
         }
         """
-        query = '''query getRegistrations {
+        query = """query getRegistrations {
           account(id: "account_id") {
             registrations {
               expiryDate
@@ -122,9 +128,13 @@ class EnsClient:
               }
             }
           }
-        }'''.replace('account_id', account.lower())
+        }""".replace(
+            "account_id", account.lower()
+        )
         try:
-            r = self.request_session.post(self.url, json={'query': query}, timeout=self.request_timeout)
+            r = self.request_session.post(
+                self.url, json={"query": query}, timeout=self.request_timeout
+            )
         except IOError:
             return None
 
@@ -155,4 +165,4 @@ class EnsClient:
             """
             data = r.json()
             if data:
-                return data.get('data', {}).get('account')
+                return data.get("data", {}).get("account")

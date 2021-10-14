@@ -10,7 +10,10 @@ from .base import env
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = False
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="q8lVkJGsIiHcTSQKaWIBsMVPOGnCnF6f7NDGup8KdDNmviSaZVhP0Nq3q3MolmFU")
+SECRET_KEY = env(
+    "DJANGO_SECRET_KEY",
+    default="q8lVkJGsIiHcTSQKaWIBsMVPOGnCnF6f7NDGup8KdDNmviSaZVhP0Nq3q3MolmFU",
+)
 # https://docs.djangoproject.com/en/dev/ref/settings/#test-runner
 TEST_RUNNER = "django.test.runner.DiscoverRunner"
 
@@ -19,7 +22,7 @@ TEST_RUNNER = "django.test.runner.DiscoverRunner"
 # https://docs.djangoproject.com/en/dev/ref/settings/#caches
 CACHES = {
     "default": {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        "BACKEND": "django.core.cache.backends.dummy.DummyCache",
     },
 }
 
@@ -41,13 +44,15 @@ EMAIL_PORT = 1025
 CELERY_ALWAYS_EAGER = True
 
 # Ganache #2 private key
-ETHEREUM_TEST_PRIVATE_KEY = '6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c'
+ETHEREUM_TEST_PRIVATE_KEY = (
+    "6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c"
+)
 ETH_REORG_BLOCKS = 1
 
 # Fix error with `task_id` when running celery in eager mode
-LOGGING['formatters']['celery_verbose'] = LOGGING['formatters']['verbose']  # noqa F405
-LOGGING['loggers'] = {  # noqa F405
-    'safe_transaction_service': {
-        'level': 'DEBUG',
+LOGGING["formatters"]["celery_verbose"] = LOGGING["formatters"]["verbose"]  # noqa F405
+LOGGING["loggers"] = {  # noqa F405
+    "safe_transaction_service": {
+        "level": "DEBUG",
     }
 }

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class KucoinClient:
-    PRICE_URL = 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT'
+    PRICE_URL = "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=EWT-USDT"
 
     def __init__(self):
         self.http_session = requests.Session()
@@ -17,6 +17,6 @@ class KucoinClient:
         try:
             response = self.http_session.get(self.PRICE_URL, timeout=10)
             result = response.json()
-            return float(result['data']['price'])
+            return float(result["data"]["price"])
         except (ValueError, IOError) as e:
             raise CannotGetPrice from e

@@ -8,14 +8,18 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0007_auto_20200122_1305'),
+        ("history", "0007_auto_20200122_1305"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='ethereumtx',
-            name='logs',
-            field=django.contrib.postgres.fields.ArrayField(base_field=django.contrib.postgres.fields.jsonb.JSONField(),
-                                                            default=None, null=True, size=None),
+            model_name="ethereumtx",
+            name="logs",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=django.contrib.postgres.fields.jsonb.JSONField(),
+                default=None,
+                null=True,
+                size=None,
+            ),
         ),
     ]

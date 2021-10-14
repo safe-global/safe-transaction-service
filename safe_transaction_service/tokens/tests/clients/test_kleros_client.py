@@ -4,8 +4,7 @@ from eth_utils import is_checksum_address
 
 from gnosis.eth import EthereumClient
 
-from safe_transaction_service.history.tests.utils import \
-    just_test_if_mainnet_node
+from safe_transaction_service.history.tests.utils import just_test_if_mainnet_node
 
 from ...clients.kleros_client import KlerosClient
 
@@ -22,4 +21,4 @@ class TestKlerosClient(TestCase):
         self.assertEqual(len(kleros_tokens), 5)
         for kleros_token in kleros_tokens:
             self.assertTrue(is_checksum_address(kleros_token.address))
-            self.assertTrue(kleros_token.symbol_multihash.startswith('/ipfs/'))
+            self.assertTrue(kleros_token.symbol_multihash.startswith("/ipfs/"))

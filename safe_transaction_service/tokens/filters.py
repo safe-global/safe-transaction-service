@@ -7,8 +7,8 @@ class TokenFilter(filters.FilterSet):
     class Meta:
         model = Token
         fields = {
-            'name': ['exact'],
-            'address': ['exact'],
-            'symbol': ['exact'],
-            'decimals': ['lt', 'gt', 'exact'],
+            "name": ["exact"],
+            "address": ["exact"],
+            "symbol": ["exact"],
+            "decimals": ["lt", "gt", "exact"],
         }

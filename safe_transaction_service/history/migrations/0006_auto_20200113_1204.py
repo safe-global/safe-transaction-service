@@ -8,18 +8,18 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0005_multisigtransaction_failed'),
+        ("history", "0005_multisigtransaction_failed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='multisigtransaction',
-            name='nonce',
+            model_name="multisigtransaction",
+            name="nonce",
             field=gnosis.eth.django.models.Uint256Field(db_index=True),
         ),
         migrations.AlterField(
-            model_name='multisigtransaction',
-            name='safe',
+            model_name="multisigtransaction",
+            name="safe",
             field=gnosis.eth.django.models.EthereumAddressField(db_index=True),
         ),
     ]

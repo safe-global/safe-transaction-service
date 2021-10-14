@@ -8,29 +8,42 @@ from ...models import Token
 
 
 class Command(BaseCommand):
-    help = 'Update list of tokens'
+    help = "Update list of tokens"
 
     def add_arguments(self, parser):
         # Positional arguments
-        parser.add_argument('api-key', help='Coinmarketcap API Key', type=str)
-        parser.add_argument('--download-folder', help='Download images to folder', type=str)
-        parser.add_argument('--store-db', help='Do changes on database', action='store_true', default=False)
+        parser.add_argument("api-key", help="Coinmarketcap API Key", type=str)
+        parser.add_argument(
+            "--download-folder", help="Download images to folder", type=str
+        )
+        parser.add_argument(
+            "--store-db",
+            help="Do changes on database",
+            action="store_true",
+            default=False,
+        )
 
     def handle(self, *args, **options):
-        api_key = options['api-key']
-        download_folder = options['download_folder']
-        store_db = options['store_db']
+        api_key = options["api-key"]
+        download_folder = options["download_folder"]
+        store_db = options["store_db"]
 
         ethereum_client = EthereumClientProvider()
         coinmarketcap_client = CoinMarketCapClient(api_key)
 
-        self.stdout.write(self.style.SUCCESS('Importing tokens from Coinmarketcap'))
+        self.stdout.write(self.style.SUCCESS("Importing tokens from Coinmarketcap"))
         if not store_db:
-            self.stdout.write(self.style.SUCCESS('Not modifying database. Set --store-db if you want so'))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Not modifying database. Set --store-db if you want so"
+                )
+            )
 
         for token in coinmarketcap_client.get_ethereum_tokens():
             if download_folder:
-                coinmarketcap_client.download_file(token.logo_uri, download_folder, f'{token.token_address}.png')
+                coinmarketcap_client.download_file(
+                    token.logo_uri, download_folder, f"{token.token_address}.png"
+                )
 
             if not store_db:
                 continue
@@ -44,11 +57,16 @@ class Command(BaseCommand):
                     decimals = token_info.decimals
                 except InvalidERC20Info:
                     try:
-                        token_info = ethereum_client.erc721.get_info(token.token_address)
+                        token_info = ethereum_client.erc721.get_info(
+                            token.token_address
+                        )
                         decimals = 0
                     except InvalidERC721Info:
-                        self.stdout.write(self.style.WARNING(
-                            f'Cannot get token information for {token.name} at address {token.token_address}'))
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"Cannot get token information for {token.name} at address {token.token_address}"
+                            )
+                        )
                         continue
 
                 Token.objects.create(
@@ -58,5 +76,8 @@ class Command(BaseCommand):
                     decimals=decimals,
                     trusted=True,
                 )
-                self.stdout.write(self.style.SUCCESS(
-                    f'Inserted new token {token_info.name} at address {token.token_address}'))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Inserted new token {token_info.name} at address {token.token_address}"
+                    )
+                )

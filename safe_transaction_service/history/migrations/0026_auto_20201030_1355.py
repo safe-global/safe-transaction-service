@@ -6,16 +6,17 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0025_auto_20201015_1147'),
+        ("history", "0025_auto_20201015_1147"),
     ]
 
     operations = [
         # Create btree index for EthereumEvents
         migrations.RunSQL(
             "CREATE INDEX history_ethereumevent_arguments_to ON history_ethereumevent USING BTREE (((arguments->'to')::text))",
-            reverse_sql="DROP INDEX history_ethereumevent_arguments_to"),
+            reverse_sql="DROP INDEX history_ethereumevent_arguments_to",
+        ),
         migrations.RunSQL(
             "CREATE INDEX history_ethereumevent_arguments_from ON history_ethereumevent USING BTREE (((arguments->'from')::text))",
-            reverse_sql="DROP INDEX history_ethereumevent_arguments_from"
-        )
+            reverse_sql="DROP INDEX history_ethereumevent_arguments_from",
+        ),
     ]

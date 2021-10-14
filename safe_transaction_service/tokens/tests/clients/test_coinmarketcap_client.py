@@ -10,9 +10,11 @@ from ...clients import CoinMarketCapClient
 
 class TestCoinMarketCapClient(TestCase):
     def test_coinmarketcap_client(self):
-        api_token = os.environ.get('COINMARKETCAP_API_TOKEN')
+        api_token = os.environ.get("COINMARKETCAP_API_TOKEN")
         if not api_token:
-            unittest.skip('`COINMARKETCAP_API_TOKEN` environment variable not set, skipping integration test')
+            unittest.skip(
+                "`COINMARKETCAP_API_TOKEN` environment variable not set, skipping integration test"
+            )
         else:
             coinmarketcap_client = CoinMarketCapClient(api_token)
             tokens = coinmarketcap_client.get_ethereum_tokens()

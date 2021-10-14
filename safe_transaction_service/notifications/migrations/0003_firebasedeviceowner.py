@@ -9,21 +9,36 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('notifications', '0002_auto_20200806_1534'),
+        ("notifications", "0002_auto_20200806_1534"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='FirebaseDeviceOwner',
+            name="FirebaseDeviceOwner",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('owner', gnosis.eth.django.models.EthereumAddressField(db_index=True)),
-                ('firebase_device', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='owners', to='notifications.firebasedevice')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("owner", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
+                (
+                    "firebase_device",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="owners",
+                        to="notifications.firebasedevice",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Firebase Device Owner',
-                'verbose_name_plural': 'Firebase Device Owners',
-                'unique_together': {('firebase_device', 'owner')},
+                "verbose_name": "Firebase Device Owner",
+                "verbose_name_plural": "Firebase Device Owners",
+                "unique_together": {("firebase_device", "owner")},
             },
         ),
     ]

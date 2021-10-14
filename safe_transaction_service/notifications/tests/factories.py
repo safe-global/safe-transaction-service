@@ -12,11 +12,11 @@ class FirebaseDeviceFactory(DjangoModelFactory):
         model = FirebaseDevice
 
     uuid = factory.LazyFunction(uuid.uuid4)
-    cloud_messaging_token = factory.Faker('isbn13')
+    cloud_messaging_token = factory.Faker("isbn13")
     build_number = factory.Sequence(lambda n: n)
-    bundle = 'company.package.app'
+    bundle = "company.package.app"
     device_type = 0
-    version = factory.Sequence(lambda n: f'{n}.0.0')
+    version = factory.Sequence(lambda n: f"{n}.0.0")
 
     @factory.post_generation
     def safes(self, create, extracted, **kwargs):

@@ -5,8 +5,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 from django.conf import settings
 
 from firebase_admin import App, credentials, initialize_app, messaging
-from firebase_admin.messaging import (BatchResponse, SendResponse,
-                                      UnregisteredError)
+from firebase_admin.messaging import BatchResponse, SendResponse, UnregisteredError
 
 logger = getLogger(__name__)
 
@@ -21,20 +20,23 @@ class FirebaseTokensNotValid(FirebaseClientException):
         self.tokens = tokens
 
 
-def get_firebase_client() -> 'MessagingClient':
+def get_firebase_client() -> "MessagingClient":
     """
     Don't use singleton due to gevent. Google Services is keeping the same socket opened. When creating multiple
     instances they need to have a different name, we use an incremental index for that
     :return: New instance of a configured MessagingClient
     """
-    if hasattr(settings, 'NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS'):
-        if not hasattr(get_firebase_client, 'created_count'):
+    if hasattr(settings, "NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS"):
+        if not hasattr(get_firebase_client, "created_count"):
             get_firebase_client.created_count = 0
         get_firebase_client.created_count += 1
         created_count = get_firebase_client.created_count
-        return FirebaseClient(settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS, app_name=f'[SAFE-{created_count}]')
+        return FirebaseClient(
+            settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS,
+            app_name=f"[SAFE-{created_count}]",
+        )
     else:
-        logger.warning('Using mocked messaging client')
+        logger.warning("Using mocked messaging client")
         return MockedClient()
 
 
@@ -48,6 +50,7 @@ class FirebaseClientPool:
         firebase_client...
     ```
     """
+
     firebase_client_pool = []
 
     def __init__(self):
@@ -66,14 +69,16 @@ class FirebaseClientPool:
 
 class FirebaseProvider:
     def __new__(cls):
-        if not hasattr(cls, 'instance'):
+        if not hasattr(cls, "instance"):
             cls.instance: MessagingClient = get_firebase_client()
         return cls.instance
 
 
 class MessagingClient(ABC):
     @abstractmethod
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
+    def send_message(
+        self, tokens: Sequence[str], data: Dict[str, any]
+    ) -> Tuple[int, int, Sequence[str]]:
         raise NotImplementedError
 
 
@@ -81,7 +86,8 @@ class FirebaseClient(MessagingClient):
     """
     Wrapper Client for Firebase Cloud Messaging Service
     """
-    def __init__(self, credentials_dict: Dict[str, Any], app_name: str = '[DEFAULT]'):
+
+    def __init__(self, credentials_dict: Dict[str, Any], app_name: str = "[DEFAULT]"):
         self._credentials = credentials_dict
         self._authenticate(app_name)
         self.app: App
@@ -94,7 +100,7 @@ class FirebaseClient(MessagingClient):
     def auth_provider(self):
         return self._certificate
 
-    def _build_android_config(self, title_loc_key: str = ''):
+    def _build_android_config(self, title_loc_key: str = ""):
         return messaging.AndroidConfig(
             # priority='high',
             # ttl=6*60*60,  # 6 hours
@@ -103,7 +109,7 @@ class FirebaseClient(MessagingClient):
             # )
         )
 
-    def _build_apns_config(self, title_loc_key: str = ''):
+    def _build_apns_config(self, title_loc_key: str = ""):
         """
         Data for the Apple Push Notification Service
         see https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging
@@ -131,7 +137,7 @@ class FirebaseClient(MessagingClient):
                     # different
                     mutable_content=True,
                     badge=1,
-                    sound='default',
+                    sound="default",
                 ),
             ),
         )
@@ -143,16 +149,15 @@ class FirebaseClient(MessagingClient):
         :return: True if valid, False otherwise
         """
         try:
-            message = messaging.Message(
-                data={},
-                token=token
-            )
+            message = messaging.Message(data={}, token=token)
             messaging.send(message, dry_run=True, app=self.app)
             return True
         except UnregisteredError:
             return False
 
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
+    def send_message(
+        self, tokens: Sequence[str], data: Dict[str, any]
+    ) -> Tuple[int, int, Sequence[str]]:
         """
         Send multicast message using firebase cloud messaging service
         :param tokens: Firebase token of recipient
@@ -169,9 +174,17 @@ class FirebaseClient(MessagingClient):
         batch_response: BatchResponse = messaging.send_multicast(message, app=self.app)
         responses: List[SendResponse] = batch_response.responses
         # Check if there are invalid tokens
-        invalid_tokens = [token for token, response in zip(tokens, responses)
-                          if not response.success and isinstance(response.exception, messaging.UnregisteredError)]
-        return batch_response.success_count, batch_response.failure_count, invalid_tokens
+        invalid_tokens = [
+            token
+            for token, response in zip(tokens, responses)
+            if not response.success
+            and isinstance(response.exception, messaging.UnregisteredError)
+        ]
+        return (
+            batch_response.success_count,
+            batch_response.failure_count,
+            invalid_tokens,
+        )
 
 
 class MockedClient(MessagingClient):
@@ -186,6 +199,10 @@ class MockedClient(MessagingClient):
     def verify_token(self, token: str) -> bool:
         return bool(token)
 
-    def send_message(self, tokens: Sequence[str], data: Dict[str, any]) -> Tuple[int, int, Sequence[str]]:
-        logger.warning("MockedClient: Not sending message with data=%s and tokens=%s", data, tokens)
+    def send_message(
+        self, tokens: Sequence[str], data: Dict[str, any]
+    ) -> Tuple[int, int, Sequence[str]]:
+        logger.warning(
+            "MockedClient: Not sending message with data=%s and tokens=%s", data, tokens
+        )
         return len(tokens), 0, []

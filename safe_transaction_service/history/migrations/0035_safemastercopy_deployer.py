@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0034_webhook_new_outgoing_transaction'),
+        ("history", "0034_webhook_new_outgoing_transaction"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='safemastercopy',
-            name='deployer',
-            field=models.CharField(default='Gnosis', max_length=50),
+            model_name="safemastercopy",
+            name="deployer",
+            field=models.CharField(default="Gnosis", max_length=50),
         ),
     ]
