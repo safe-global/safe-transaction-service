@@ -19,6 +19,9 @@ services:
     image: redis:alpine
     ports:
       - "6379:6379"
+    command:
+      - --save ""
+      - --appendonly no
 
   db:
     image: postgres:10-alpine

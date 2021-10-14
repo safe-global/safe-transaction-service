@@ -76,11 +76,11 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         with self.assertRaises(CannotGetSafeInfo):
             self.safe_service.get_safe_info(safe_address)
 
-        safe_create_tx = self.deploy_test_safe()
-        safe_info = self.safe_service.get_safe_info(safe_create_tx.safe_address)
+        safe = self.deploy_test_safe()
+        safe_info = self.safe_service.get_safe_info(safe.address)
         self.assertIsInstance(safe_info, SafeInfo)
-        self.assertEqual(safe_info.address, safe_create_tx.safe_address)
-        self.assertEqual(safe_info.owners, safe_create_tx.owners)
-        self.assertEqual(safe_info.threshold, safe_create_tx.threshold)
-        self.assertEqual(safe_info.fallback_handler, NULL_ADDRESS)
+        self.assertEqual(safe_info.address, safe.address)
+        self.assertEqual(safe_info.owners, safe.retrieve_owners())
+        self.assertEqual(safe_info.threshold, safe.retrieve_threshold())
+        self.assertEqual(safe_info.fallback_handler, self.compatibility_fallback_handler.address)
         self.assertEqual(safe_info.guard, NULL_ADDRESS)

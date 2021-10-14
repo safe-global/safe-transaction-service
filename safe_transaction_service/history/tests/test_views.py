@@ -254,8 +254,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         owner_account_1 = Account.create()
         owner_account_2 = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=[owner_account_1.address, owner_account_2.address])
-        safe_address = safe_create2_tx.safe_address
+        safe = self.deploy_test_safe(owners=[owner_account_1.address, owner_account_2.address])
+        safe_address = safe.address
         multisig_transaction = MultisigTransactionFactory(safe=safe_address, trusted=False)
         safe_tx_hash = multisig_transaction.safe_tx_hash
         response = self.client.post(reverse('v1:history:multisig-transaction-confirmations', args=(safe_tx_hash,)),
@@ -417,8 +417,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_post_multisig_transactions_null_signature(self):
         safe_owner_1 = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
-        safe_address = safe_create2_tx.safe_address
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
         safe = Safe(safe_address, self.ethereum_client)
 
         response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
@@ -458,9 +458,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
-        safe_address = safe_create2_tx.safe_address
-        safe = Safe(safe_address, self.ethereum_client)
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
 
         response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -527,9 +526,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_post_executed_transaction(self):
         safe_owner_1 = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
-        safe_address = safe_create2_tx.safe_address
-        safe = Safe(safe_address, self.ethereum_client)
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
 
         response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -595,9 +593,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_post_multisig_transactions_with_origin(self):
         safe_owner_1 = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=[safe_owner_1.address])
-        safe_address = safe_create2_tx.safe_address
-        safe = Safe(safe_address, self.ethereum_client)
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
 
         response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -636,9 +633,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_post_multisig_transactions_with_multiple_signatures(self):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
-        safe_create2_tx = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
-        safe_address = safe_create2_tx.safe_address
-        safe = Safe(safe_address, self.ethereum_client)
+        safe = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe.address
 
         response = self.client.get(reverse('v1:history:multisig-transactions', args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -687,9 +683,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
         safe_delegate = Account.create()
-        safe_create2_tx = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
-        safe_address = safe_create2_tx.safe_address
-        safe = Safe(safe_address, self.ethereum_client)
+        safe = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe.address
 
         self.assertEqual(MultisigTransaction.objects.count(), 0)
 
@@ -925,7 +920,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         endpoint = 'v1:history:safe-delegates'
 
         owner_account = Account.create()
-        safe_address = self.deploy_test_safe(owners=[owner_account.address]).safe_address
+        safe_address = self.deploy_test_safe(owners=[owner_account.address]).address
         safe_contract = SafeContractFactory(address=safe_address)
         response = self.client.delete(reverse(endpoint, args=(safe_address,)), format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)  # Data is missing
@@ -972,7 +967,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         }
 
         owner_account = Account.create()
-        safe_address = self.deploy_test_safe(owners=[owner_account.address]).safe_address
+        safe_address = self.deploy_test_safe(owners=[owner_account.address]).address
         response = self.client.post(reverse('v1:history:safe-delegates', args=(safe_address, )), format='json', data=data)
         self.assertIn(f'Safe={safe_address} does not exist', response.data['non_field_errors'][0])
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -1246,7 +1241,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         owner_account = Account.create()
-        safe_address = self.deploy_test_safe(owners=[owner_account.address]).safe_address
+        safe_address = self.deploy_test_safe(owners=[owner_account.address]).address
         response = self.client.delete(reverse('v1:history:safe-delegate', args=(safe_address, delegate_address)),
                                       format='json', data=data)
         self.assertIn(f'Safe={safe_address} does not exist', response.data['non_field_errors'][0])
@@ -1676,8 +1671,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(reverse('v1:history:safe-info', args=(invalid_address,)))
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        safe_create_tx = self.deploy_test_safe()
-        safe_address = safe_create_tx.safe_address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         response = self.client.get(reverse('v1:history:safe-info', args=(safe_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -1687,13 +1682,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data, {
             'address': safe_address,
             'nonce': 0,
-            'threshold': safe_create_tx.threshold,
-            'owners': safe_create_tx.owners,
-            'master_copy': safe_create_tx.master_copy_address,
+            'threshold': safe.retrieve_threshold(),
+            'owners': safe.retrieve_owners(),
+            'master_copy': safe.retrieve_master_copy_address(),
             'modules': [],
-            'fallback_handler': safe_create_tx.fallback_handler,
+            'fallback_handler': safe.retrieve_fallback_handler(),
             'guard': NULL_ADDRESS,
-            'version': '1.1.1'})
+            'version': '1.3.0'})
 
         with mock.patch.object(SafeService, 'get_safe_info', side_effect=NodeConnectionException, autospec=True):
             response = self.client.get(reverse('v1:history:safe-info', args=(safe_address,)), format='json')
