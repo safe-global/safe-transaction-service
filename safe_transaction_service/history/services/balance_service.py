@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Sequence
 
+from django.core.cache import cache as django_cache
 from django.db.models import Q
 
 from cache_memoize import cache_memoize
@@ -24,7 +25,7 @@ from safe_transaction_service.tokens.services.price_service import (
 from safe_transaction_service.utils.redis import get_redis
 
 from ..exceptions import NodeConnectionException
-from ..models import EthereumEvent
+from ..models import EthereumEvent, InternalTx
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,35 @@ class BalanceService:
         return addresses
 
     def get_balances(
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
+    ):
+        """
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`. Elements are cached
+        for one hour
+        """
+
+        # Cache based on the number of erc20 events and the ether transferred
+        number_erc20_events = EthereumEvent.objects.erc20_events(
+            address=safe_address
+        ).count()
+        number_eth_events = InternalTx.objects.ether_txs_for_address(
+            safe_address
+        ).count()
+        cache_key = f"balances:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc20_events}:{number_eth_events}"
+        if balances := django_cache.get(cache_key):
+            return balances
+        else:
+            balances = self._get_balances(safe_address, only_trusted, exclude_spam)
+            django_cache.set(cache_key, balances, 60 * 10)  # 10 minutes cache
+            return balances
+
+    def _get_balances(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
