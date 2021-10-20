@@ -265,12 +265,7 @@ class SafeModuleTransactionListView(ListAPIView):
                 },
             )
 
-        response = super().get(request, address)
-        response.setdefault(
-            "ETag",
-            "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
-        )
-        return response
+        return super().get(request, address)
 
 
 class SafeMultisigConfirmationsView(ListCreateAPIView):
@@ -386,10 +381,6 @@ class SafeMultisigTransactionListView(ListAPIView):
         response = super().get(request, *args, **kwargs)
         response.data["count_unique_nonce"] = (
             self.get_unique_nonce(address) if response.data["count"] else 0
-        )
-        response.setdefault(
-            "ETag",
-            "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
         )
         return response
 
@@ -845,12 +836,7 @@ class SafeTransferListView(ListAPIView):
                 },
             )
 
-        response = super().get(request, address)
-        response.setdefault(
-            "ETag",
-            "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
-        )
-        return response
+        return super().get(request, address)
 
 
 class SafeIncomingTransferListView(SafeTransferListView):
