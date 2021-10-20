@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin
 
 from django.conf import settings
+from django.core.cache import cache as django_cache
 from django.db.models import Q
 
 import requests
@@ -281,11 +282,34 @@ class CollectiblesService:
         self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False
     ) -> List[Collectible]:
         """
-        Get collectibles using the owner, addresses and the token_ids
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :return:
+        :return: Collectibles using the owner, addresses and the token_ids
+        """
+
+        # Cache based on the number of erc721 events
+        number_erc721_events = EthereumEvent.objects.erc721_events(
+            address=safe_address
+        ).count()
+        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc721_events}"
+        if collectibles := django_cache.get(cache_key):
+            return collectibles
+        else:
+            collectibles = self._get_collectibles(
+                safe_address, only_trusted, exclude_spam
+            )
+            django_cache.set(cache_key, collectibles, 60 * 10)  # 10 minutes cache
+            return collectibles
+
+    def _get_collectibles(
+        self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False
+    ) -> List[Collectible]:
+        """
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :return: Collectibles using the owner, addresses and the token_ids
         """
         unfiltered_addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(
             address=safe_address

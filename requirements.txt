@@ -8,9 +8,9 @@ django-cors-headers==3.10.0
 django-db-geventpool==4.0.0
 django-debug-toolbar
 django-debug-toolbar-force
-django-environ==0.7.0
+django-environ==0.8.0
 django-filter==21.1
-django-model-utils==4.1.1
+django-model-utils==4.2.0
 django-redis==5.0.0
 django-s3-storage==0.13.4
 django-timezone-field==4.2.1
@@ -24,7 +24,7 @@ gnosis-py[django]==3.5.3
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.2
 packaging>=21.0
-pillow==8.3.2
+pillow==8.4.0
 psycogreen==1.0.2
 psycopg2-binary==2.9.1
 redis==3.5.3
