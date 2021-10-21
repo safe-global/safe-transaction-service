@@ -289,9 +289,9 @@ class CollectiblesService:
         """
 
         # Cache based on the number of erc721 events
-        number_erc721_events = EthereumEvent.objects.erc721_events(
-            address=safe_address
-        ).count()
+        number_erc721_events = EthereumEvent.objects.erc721_events_count_by_address(
+            safe_address
+        )
         cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc721_events}"
         if collectibles := django_cache.get(cache_key):
             return collectibles

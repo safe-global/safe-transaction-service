@@ -1037,11 +1037,14 @@ class MultisigTransactionManager(models.Manager):
 
 
 class MultisigTransactionQuerySet(models.QuerySet):
+    def ether_transfers(self):
+        return self.exclude(value=0)
+
     def executed(self):
-        return self.exclude(ethereum_tx__block=None)
+        return self.exclude(ethereum_tx=None)
 
     def not_executed(self):
-        return self.filter(ethereum_tx__block=None)
+        return self.filter(ethereum_tx=None)
 
     def with_confirmations(self):
         return self.exclude(confirmations__isnull=True)
