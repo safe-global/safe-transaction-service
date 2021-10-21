@@ -25,7 +25,7 @@ from safe_transaction_service.tokens.services.price_service import (
 from safe_transaction_service.utils.redis import get_redis
 
 from ..exceptions import NodeConnectionException
-from ..models import EthereumEvent, InternalTx
+from ..models import EthereumEvent, InternalTx, MultisigTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -152,14 +152,21 @@ class BalanceService:
         for one hour
         """
 
-        # Cache based on the number of erc20 events and the ether transferred
-        number_erc20_events = EthereumEvent.objects.erc20_events(
-            address=safe_address
-        ).count()
+        # Cache based on the number of erc20 events and the ether transferred, and also check outgoing ether
+        # transactions that will not emit events on non L2 networks
+        events_sending_eth = (
+            MultisigTransaction.objects.ether_transfers()
+            .executed()
+            .filter(safe=safe_address)
+            .count()
+        )
+        number_erc20_events = EthereumEvent.objects.erc20_events_count_by_address(
+            safe_address
+        )
         number_eth_events = InternalTx.objects.ether_txs_for_address(
             safe_address
         ).count()
-        cache_key = f"balances:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc20_events}:{number_eth_events}"
+        cache_key = f"balances:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
         if balances := django_cache.get(cache_key):
             return balances
         else:
