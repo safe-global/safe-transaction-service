@@ -377,7 +377,8 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
         )
 
     def erc20_tokens_used_by_address(
-        self, address: ChecksumAddress
+        self,
+        address: ChecksumAddress,
     ) -> Set[ChecksumAddress]:
         """
         :param address:
@@ -402,6 +403,32 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
             )
             return {row[0] for row in cursor.fetchall()}
 
+    def erc20_events_count_by_address(
+        self, address: ChecksumAddress
+    ) -> Set[ChecksumAddress]:
+        """
+        :param address:
+        :return: List of token addresses used by an address
+        """
+        # return self.erc20_events(address=address).values_list('address', flat=True).distinct()
+        address_as_postgres_text = f'"{address}"'
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM "history_ethereumevent" WHERE
+                ("topic" = %s
+                AND (("arguments" -> 'to')::text = %s
+                OR ("arguments" -> 'from')::text = %s)
+                AND "arguments" ? 'value')
+                """,
+                [
+                    ERC20_721_TRANSFER_TOPIC[2:],
+                    address_as_postgres_text,
+                    address_as_postgres_text,
+                ],
+            )
+            return int(cursor.fetchone()[0])
+
     def erc721_tokens_used_by_address(
         self, address: ChecksumAddress
     ) -> Set[ChecksumAddress]:
@@ -414,10 +441,10 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT DISTINCT "id", "address" FROM "history_ethereumevent" WHERE
-                ("topic" = '%s'
-                AND (("arguments" -> 'to')::text = '"%s"'
-                OR ("arguments" -> 'from')::text = '"%s"')
+                SELECT DISTINCT "address" FROM "history_ethereumevent" WHERE
+                ("topic" = %s
+                AND (("arguments" -> 'to')::text = %s
+                OR ("arguments" -> 'from')::text = %s)
                 AND "arguments" ? 'tokenId')
                 """,
                 [
@@ -427,6 +454,32 @@ class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
                 ],
             )
             return {row[0] for row in cursor.fetchall()}
+
+    def erc721_events_count_by_address(
+        self, address: ChecksumAddress
+    ) -> Set[ChecksumAddress]:
+        """
+        :param address:
+        :return: List of token addresses used by an address
+        """
+        # return self.erc20_events(address=address).values_list('address', flat=True).distinct()
+        address_as_postgres_text = f'"{address}"'
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM "history_ethereumevent" WHERE
+                ("topic" = %s
+                AND (("arguments" -> 'to')::text = %s
+                OR ("arguments" -> 'from')::text = %s)
+                AND "arguments" ? 'tokenId')
+                """,
+                [
+                    ERC20_721_TRANSFER_TOPIC[2:],
+                    address_as_postgres_text,
+                    address_as_postgres_text,
+                ],
+            )
+            return int(cursor.fetchone()[0])
 
     def erc20_tokens_with_balance(
         self, address: ChecksumAddress
