@@ -109,8 +109,7 @@ class Erc20EventsIndexer(EventsIndexer):
                 "Cannot tell apart erc20 or 721 for token-address=%s - Checking token decimals",
                 event["address"],
             )
-            value = event_args["unknown"]
-            del event_args["unknown"]
+            value = event_args.pop("unknown")
             if self._is_erc20(event["address"]):
                 event_args["value"] = value
             else:

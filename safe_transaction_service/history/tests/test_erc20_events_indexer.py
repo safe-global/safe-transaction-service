@@ -47,6 +47,15 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             EthereumEvent.objects.erc20_tokens_used_by_address(safe_contract.address)
         )
 
+        erc20_events_count = EthereumEvent.objects.erc20_events_count_by_address(
+            safe_contract.address
+        )
+        self.assertEqual(erc20_events_count, 1)
+        self.assertEqual(
+            erc20_events_count,
+            EthereumEvent.objects.erc20_events(address=safe_contract.address).count(),
+        )
+
         # Test _process_decoded_element
         block_number = self.ethereum_client.get_transaction(tx_hash)["blockNumber"]
         event = self.ethereum_client.erc20.get_total_transfer_history(
@@ -55,8 +64,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertIn("value", event["args"])
 
         original_event = copy.deepcopy(event)
-        del event["args"]["value"]
-        event["args"]["unknown"] = original_event["args"]["value"]
+        event["args"]["unknown"] = event["args"].pop("value")
 
         self.assertEqual(
             erc20_events_indexer._process_decoded_element(event), original_event
@@ -70,10 +78,9 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             Erc20EventsIndexer, "_is_erc20", autospec=True, return_value=False
         ):
             # Convert event to erc721
-            event["args"]["tokenId"] = event["args"]["value"]
-            del event["args"]["value"]
+            event["args"]["tokenId"] = event["args"].pop("value")
             original_event = copy.deepcopy(event)
-            del event["args"]["tokenId"]
+            event["args"]["unknown"] = event["args"].pop("tokenId")
             event["args"]["unknown"] = original_event["args"]["tokenId"]
 
             self.assertEqual(

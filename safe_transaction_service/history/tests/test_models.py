@@ -225,6 +225,44 @@ class TestEthereumTx(TestCase):
 
 
 class TestEthereumEvent(TestCase):
+    def test_erc20_events(self):
+        safe_address = Account.create().address
+        e1 = EthereumEventFactory(to=safe_address)
+        e2 = EthereumEventFactory(from_=safe_address)
+        EthereumEventFactory()  # This event should not appear
+        erc20_events_count = EthereumEvent.objects.erc20_events_count_by_address(
+            safe_address
+        )
+        self.assertEqual(erc20_events_count, 2)
+        self.assertEqual(
+            erc20_events_count,
+            EthereumEvent.objects.erc20_events(address=safe_address).count(),
+        )
+
+        self.assertSetEqual(
+            EthereumEvent.objects.erc20_tokens_used_by_address(safe_address),
+            {e1.address, e2.address},
+        )
+
+    def test_erc721_events(self):
+        safe_address = Account.create().address
+        e1 = EthereumEventFactory(to=safe_address, erc721=True)
+        e2 = EthereumEventFactory(from_=safe_address, erc721=True)
+        EthereumEventFactory(erc721=True)  # This event should not appear
+        erc721_events_count = EthereumEvent.objects.erc721_events_count_by_address(
+            safe_address
+        )
+        self.assertEqual(erc721_events_count, 2)
+        self.assertEqual(
+            erc721_events_count,
+            EthereumEvent.objects.erc721_events(address=safe_address).count(),
+        )
+
+        self.assertSetEqual(
+            EthereumEvent.objects.erc721_tokens_used_by_address(safe_address),
+            {e1.address, e2.address},
+        )
+
     def test_incoming_tokens(self):
         address = Account.create().address
         self.assertFalse(InternalTx.objects.token_incoming_txs_for_address(address))
