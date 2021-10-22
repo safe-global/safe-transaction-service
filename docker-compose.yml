@@ -24,7 +24,7 @@ services:
       - --appendonly no
 
   db:
-    image: postgres:10-alpine
+    image: postgres:14-alpine
     ports:
       - "5432:5432"
     environment:
