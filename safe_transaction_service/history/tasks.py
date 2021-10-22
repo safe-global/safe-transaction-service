@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import requests
 from celery import app
 from celery.utils.log import get_task_logger
+from eth_typing import ChecksumAddress
 from redis.exceptions import LockError
 
 from safe_transaction_service.utils.utils import close_gevent_db_connection
@@ -13,6 +14,7 @@ from safe_transaction_service.utils.utils import close_gevent_db_connection
 from ..utils.tasks import LOCK_TIMEOUT, SOFT_TIMEOUT, only_one_running_task
 from .indexers import (
     Erc20EventsIndexerProvider,
+    FindRelevantElementsException,
     InternalTxIndexerProvider,
     ProxyFactoryIndexerProvider,
 )
@@ -39,7 +41,8 @@ logger = get_task_logger(__name__)
 )
 def index_erc20_events_task(self) -> Optional[int]:
     """
-    Find and process internal txs for monitored addresses
+    Find and process ERC20/721 events for monitored addresses
+
     :return: Number of addresses processed
     """
     with contextlib.suppress(LockError):
@@ -50,6 +53,59 @@ def index_erc20_events_task(self) -> Optional[int]:
                 "Indexing of erc20/721 events task processed %d events", number_events
             )
             return number_events
+
+
+@app.shared_task(
+    bind=True,
+)
+def index_erc20_events_out_of_sync_task(
+    self,
+    block_process_limit: Optional[int] = None,
+    block_process_limit_max: Optional[int] = None,
+    addresses: Optional[ChecksumAddress] = None,
+    number_of_addresses: Optional[int] = None,
+) -> Optional[int]:
+    """
+    Find and process ERC20/721 events for monitored addresses out of sync (really behind)
+
+    :return: Number of addresses processed
+    """
+    erc20_events_indexer = Erc20EventsIndexerProvider()
+    if block_process_limit:
+        erc20_events_indexer.block_process_limit = block_process_limit
+    if block_process_limit_max:
+        erc20_events_indexer.block_process_limit_max = block_process_limit_max
+
+    current_block_number = erc20_events_indexer.ethereum_client.current_block_number
+    addresses = addresses or [
+        x.address
+        for x in erc20_events_indexer.get_not_updated_addresses(current_block_number)[
+            :number_of_addresses
+        ]
+    ]
+
+    if not addresses:
+        logger.info("No addresses to process")
+    else:
+        logger.info(
+            "Start indexing of erc20/721 events for out of sync addresses %s", addresses
+        )
+        updated = False
+        number_events_processed = 0
+        while not updated:
+            try:
+                events_processed, updated = erc20_events_indexer.process_addresses(
+                    addresses, current_block_number
+                )
+                number_events_processed += len(events_processed)
+            except FindRelevantElementsException:
+                pass
+
+        logger.info(
+            "Indexing of erc20/721 events for out of sync addresses task processed %d events",
+            number_events_processed,
+        )
+        return number_events_processed
 
 
 @app.shared_task(

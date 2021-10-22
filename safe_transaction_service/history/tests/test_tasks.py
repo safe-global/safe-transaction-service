@@ -9,11 +9,14 @@ from eth_account import Account
 from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ..models import SafeContract, SafeStatus
+from ..tasks import index_erc20_events_out_of_sync_task
+from ..tasks import logger as task_logger
 from ..tasks import process_decoded_internal_txs_task
 from .factories import (
     EthereumEventFactory,
     InternalTxDecodedFactory,
     InternalTxFactory,
+    SafeContractFactory,
     WebHookFactory,
 )
 
@@ -60,3 +63,20 @@ class TestTasks(TestCase):
         self.assertEqual(safe_status.master_copy, master_copy)
         self.assertEqual(safe_status.owners, [owner])
         self.assertEqual(safe_status.threshold, threshold)
+
+    def test_index_erc20_events_out_of_sync_task(self):
+        with self.assertLogs(logger=task_logger) as cm:
+            index_erc20_events_out_of_sync_task.delay()
+            self.assertIn("No addresses to process", cm.output[0])
+
+        with self.assertLogs(logger=task_logger) as cm:
+            safe_contract = SafeContractFactory()
+            index_erc20_events_out_of_sync_task.delay()
+            self.assertIn(
+                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
+                cm.output[0],
+            )
+            self.assertIn(
+                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
+                cm.output[1],
+            )

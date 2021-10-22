@@ -65,9 +65,15 @@ TASKS = [
     ),
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.index_erc20_events_task",
-        "Index ERC20 Events",
+        "Index ERC20/721 Events",
         14,
         IntervalSchedule.SECONDS,
+    ),
+    CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.index_erc20_events_out_of_sync_task",
+        "Index out of sync ERC20/ERC721 Events",
+        5,
+        IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",

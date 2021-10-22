@@ -14,6 +14,7 @@ from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 from ..indexers import InternalTxIndexer, SafeEventsIndexer
 from ..models import ProxyFactory, SafeMasterCopy
 from ..services import IndexServiceProvider
+from ..tasks import logger as task_logger
 from .factories import (
     MultisigTransactionFactory,
     SafeContractFactory,
@@ -92,10 +93,12 @@ class TestCommands(TestCase):
         self.assertIn("Created webhook for", buf.getvalue())
 
     def test_index_erc20(self):
+
         command = "index_erc20"
         buf = StringIO()
-        call_command(command, stdout=buf)
-        self.assertIn("No addresses to process", buf.getvalue())
+        with self.assertLogs(logger=task_logger) as cm:
+            call_command(command, stdout=buf)
+            self.assertIn("No addresses to process", cm.output[0])
 
         buf = StringIO()
         call_command(command, "--block-process-limit=10", stdout=buf)
@@ -111,26 +114,47 @@ class TestCommands(TestCase):
         self.assertIn("Setting block-process-limit to 10", buf.getvalue())
         self.assertIn("Setting block-process-limit-max to 15", buf.getvalue())
 
-        safe_contract = SafeContractFactory()
-        buf = StringIO()
-        call_command(command, stdout=buf)
-        self.assertIn(
-            f"Start indexing ERC20 addresses {[safe_contract.address]}", buf.getvalue()
-        )
-        self.assertIn(
-            f"End indexing ERC20 addresses {[safe_contract.address]}", buf.getvalue()
-        )
+        with self.assertLogs(logger=task_logger) as cm:
+            safe_contract = SafeContractFactory()
+            buf = StringIO()
+            call_command(command, stdout=buf)
+            self.assertIn(
+                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
+                cm.output[0],
+            )
+            self.assertIn(
+                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
+                cm.output[1],
+            )
 
-        safe_contract_2 = SafeContractFactory()
-        buf = StringIO()
-        call_command(command, f"--addresses={safe_contract_2.address}", stdout=buf)
-        self.assertIn(
-            f"Start indexing ERC20 addresses {[safe_contract_2.address]}",
-            buf.getvalue(),
-        )
-        self.assertIn(
-            f"End indexing ERC20 addresses {[safe_contract_2.address]}", buf.getvalue()
-        )
+        with self.assertLogs(logger=task_logger) as cm:
+            safe_contract_2 = SafeContractFactory()
+            buf = StringIO()
+            call_command(command, f"--addresses={safe_contract_2.address}", stdout=buf)
+            self.assertIn(
+                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract_2.address]}",
+                cm.output[0],
+            )
+            self.assertIn(
+                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
+                cm.output[1],
+            )
+
+        # Test sync task call
+        with self.assertLogs(logger=task_logger) as cm:
+            safe_contract_2 = SafeContractFactory()
+            buf = StringIO()
+            call_command(
+                command, f"--addresses={safe_contract_2.address}", "--sync", stdout=buf
+            )
+            self.assertIn(
+                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract_2.address]}",
+                cm.output[0],
+            )
+            self.assertIn(
+                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
+                cm.output[1],
+            )
 
     @mock.patch.object(
         EthereumClient, "current_block_number", new_callable=PropertyMock
