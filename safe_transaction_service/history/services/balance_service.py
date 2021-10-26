@@ -25,7 +25,7 @@ from safe_transaction_service.tokens.services.price_service import (
 from safe_transaction_service.utils.redis import get_redis
 
 from ..exceptions import NodeConnectionException
-from ..models import EthereumEvent, InternalTx, MultisigTransaction
+from ..models import ERC20Transfer, InternalTx, MultisigTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -160,9 +160,7 @@ class BalanceService:
             .filter(safe=safe_address)
             .count()
         )
-        number_erc20_events = EthereumEvent.objects.erc20_events_count_by_address(
-            safe_address
-        )
+        number_erc20_events = ERC20Transfer.objects.to_or_from(safe_address).count()
         number_eth_events = InternalTx.objects.ether_txs_for_address(
             safe_address
         ).count()
@@ -190,9 +188,7 @@ class BalanceService:
             safe_address
         ), f"Not valid address {safe_address} for getting balances"
 
-        all_erc20_addresses = EthereumEvent.objects.erc20_tokens_used_by_address(
-            safe_address
-        )
+        all_erc20_addresses = ERC20Transfer.objects.tokens_used_by_address(safe_address)
         for address in all_erc20_addresses:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached

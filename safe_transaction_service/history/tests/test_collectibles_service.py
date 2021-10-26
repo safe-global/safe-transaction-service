@@ -27,7 +27,7 @@ from ..services.collectibles_service import (
     Erc721InfoWithLogo,
     ipfs_to_http,
 )
-from .factories import EthereumEventFactory
+from .factories import ERC721TransferFactory
 from .utils import just_test_if_mainnet_node
 
 
@@ -69,8 +69,8 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             ]
 
             for erc721_address, token_id in erc721_addresses:
-                EthereumEventFactory(
-                    erc721=True, to=safe_address, address=erc721_address, value=token_id
+                ERC721TransferFactory(
+                    to=safe_address, address=erc721_address, token_id=token_id
                 )
 
             expected = [

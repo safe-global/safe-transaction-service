@@ -1,6 +1,6 @@
 access_logfile = "-"
 error_logfile = "-"
-# max_requests = 500000  # Restart a worker after it has processed a given number of requests (for memory leaks)
+max_requests = 500000  # Restart a worker after it has processed a given number of requests (for memory leaks)
 # graceful_timeout = 90  # https://stackoverflow.com/a/24305939
 keep_alive = 2
 log_file = "-"

@@ -193,7 +193,7 @@ class EventsIndexer(EthereumIndexer):
         Process all events found by `find_relevant_elements`
 
         :param log_receipts: Events to store in database
-        :return: List of `EthereumEvent` already stored in database
+        :return: List of events already stored in database
         """
         if not log_receipts:
             return []

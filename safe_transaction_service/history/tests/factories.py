@@ -13,6 +13,8 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (
+    ERC20Transfer,
+    ERC721Transfer,
     EthereumBlock,
     EthereumEvent,
     EthereumTx,
@@ -28,6 +30,7 @@ from ..models import (
     SafeContractDelegate,
     SafeMasterCopy,
     SafeStatus,
+    TokenTransfer,
     WebHook,
 )
 
@@ -60,6 +63,32 @@ class EthereumTxFactory(DjangoModelFactory):
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
     logs = factory.LazyFunction(lambda: [])
+
+
+class TokenTransfer(DjangoModelFactory):
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
+    log_index = factory.Sequence(lambda n: n)
+    address = factory.LazyFunction(lambda: Account.create().address)
+    _from = factory.LazyFunction(lambda: Account.create().address)
+    to = factory.LazyFunction(lambda: Account.create().address)
+
+    class Meta:
+        model = TokenTransfer
+        abstract = True
+
+
+class ERC20TransferFactory(TokenTransfer):
+    value = factory.fuzzy.FuzzyInteger(0, 1000)
+
+    class Meta:
+        model = ERC20Transfer
+
+
+class ERC721TransferFactory(TokenTransfer):
+    token_id = factory.fuzzy.FuzzyInteger(0, 1000)
+
+    class Meta:
+        model = ERC721Transfer
 
 
 class EthereumEventFactory(DjangoModelFactory):

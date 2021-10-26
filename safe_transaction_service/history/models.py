@@ -1,8 +1,20 @@
 import datetime
+from decimal import Decimal
 from enum import Enum
 from itertools import islice
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Type, TypedDict
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypedDict,
+    Union,
+)
 
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
@@ -18,6 +30,7 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from packaging.version import Version
+from web3.types import EventData
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (
@@ -92,9 +105,9 @@ class TransferDict(TypedDict):
     transaction_hash: HexBytes
     to: str
     _from: str
-    value: int
+    _value: int
     execution_date: datetime.datetime
-    token_id: int
+    _token_id: int
     token_address: str
 
 
@@ -297,6 +310,196 @@ class EthereumTx(TimeStampedModel):
             )
 
 
+class TokenTransferQuerySet(models.QuerySet):
+    def token_address(self, address: ChecksumAddress):
+        """
+        :param address:
+        :return: Results filtered by token_address
+        """
+        return self.filter(address=address)
+
+    def to_or_from(self, address: ChecksumAddress):
+        """
+        :param address:
+        :return: Transfers with to or from equal to the provided `address`
+        """
+        return self.filter(Q(to=address) | Q(_from=address))
+
+    def incoming(self, address: ChecksumAddress):
+        return self.filter(to=address)
+
+    def outgoing(self, address: ChecksumAddress):
+        return self.filter(_from=address)
+
+    def token_txs(self):
+        raise NotImplementedError
+
+
+class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
+    def tokens_used_by_address(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
+        return set(
+            self.to_or_from(address).values_list("address", flat=True).distinct()
+        )
+
+
+class TokenTransfer(models.Model):
+    objects = TokenTransferManager.from_queryset(TokenTransferQuerySet)()
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    address = EthereumAddressField(db_index=True)  # Token address
+    _from = EthereumAddressField(db_index=True)
+    to = EthereumAddressField(db_index=True)
+    log_index = models.PositiveIntegerField()
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f"Token Transfer from={self._from} to={self.to}"
+
+    @staticmethod
+    def _prepare_parameters_from_decoded_event(event_data: EventData) -> Dict[str, Any]:
+        topic = HexBytes(event_data["topics"][0])
+        expected_topic = HexBytes(ERC20_721_TRANSFER_TOPIC)
+        if topic != expected_topic:
+            raise ValueError(
+                f"Not supported EventData, topic {topic.hex()} does not match expected {expected_topic.hex()}"
+            )
+
+        return {
+            "ethereum_tx_id": event_data["transactionHash"],
+            "log_index": event_data["logIndex"],
+            "address": event_data["address"],
+            "_from": event_data["args"]["from"],
+            "to": event_data["args"]["to"],
+        }
+
+    @classmethod
+    def from_decoded_event(cls, event_data: EventData):
+        raise NotImplementedError
+
+    @property
+    def created(self):
+        return self.ethereum_tx.block.timestamp
+
+
+class ERC20TransferQuerySet(TokenTransferQuerySet):
+    def token_txs(self):
+        return self.annotate(
+            _value=F("value"),
+            transaction_hash=F("ethereum_tx_id"),
+            block_number=F("ethereum_tx__block_id"),
+            execution_date=F("ethereum_tx__block__timestamp"),
+            _token_id=RawSQL("NULL::numeric", ()),
+            token_address=F("address"),
+        ).order_by("-ethereum_tx__block_id")
+
+
+class ERC20Transfer(TokenTransfer):
+    objects = TokenTransferManager.from_queryset(ERC20TransferQuerySet)()
+    value = Uint256Field()
+
+    def __str__(self):
+        return f"Token Transfer from={self._from} to={self.to} value={self.value}"
+
+    @classmethod
+    def from_decoded_event(cls, event_data: EventData) -> Union["ERC20Transfer"]:
+        """
+        Does not create the model, as it requires that `ethereum_tx` exists
+
+        :param event_data:
+        :return: `ERC20Transfer`
+        :raises: ValueError
+        """
+
+        parameters = cls._prepare_parameters_from_decoded_event(event_data)
+
+        if "value" in event_data["args"]:
+            parameters["value"] = event_data["args"]["value"]
+            return ERC20Transfer(**parameters)
+        else:
+            raise ValueError(
+                f"Not supported EventData, `value` not present {event_data}"
+            )
+
+
+class ERC721TransferManager(TokenTransferManager):
+    # TODO Optimize this
+    def erc721_owned_by(self, address: str) -> List[Tuple[str, int]]:
+        """
+        Returns erc721 owned by address, removing the ones sent
+        :return: List of tuples(token_address: str, token_id: int)
+        """
+        # Get all the token history
+        erc721_events = self.to_or_from(address)
+        # Get tokens received and remove tokens transferred
+        tokens_in: Tuple[str, int] = []
+        tokens_out: Tuple[str, int] = []
+        for erc721_event in erc721_events:
+            token_address = erc721_event.address
+            token_id = erc721_event.token_id
+            if token_id is None:
+                logger.error(
+                    "TokenId for ERC721 info token=%s with owner=%s can never be None",
+                    token_address,
+                    address,
+                )
+                continue
+            if erc721_event.to == address:
+                list_to_append = tokens_in
+            else:
+                list_to_append = tokens_out
+            list_to_append.append((token_address, token_id))
+
+        for token_out in tokens_out:  # Remove tokens sent from list
+            if token_out in tokens_in:
+                tokens_in.remove(token_out)
+        return tokens_in
+
+
+class ERC721TransferQuerySet(TokenTransferQuerySet):
+    def token_txs(self):
+        return self.annotate(
+            _value=RawSQL("NULL::numeric", ()),
+            transaction_hash=F("ethereum_tx_id"),
+            block_number=F("ethereum_tx__block_id"),
+            execution_date=F("ethereum_tx__block__timestamp"),
+            _token_id=F("token_id"),
+            token_address=F("address"),
+        ).order_by("-ethereum_tx__block_id")
+
+
+class ERC721Transfer(TokenTransfer):
+    objects = ERC721TransferManager.from_queryset(ERC721TransferQuerySet)()
+    token_id = Uint256Field()
+
+    def __str__(self):
+        return f"Token Transfer from={self._from} to={self.to} token_id={self.token_id}"
+
+    @classmethod
+    def from_decoded_event(cls, event_data: EventData) -> Union["ERC721Transfer"]:
+        """
+        Does not create the model, as it requires that `ethereum_tx` exists
+
+        :param event_data:
+        :return: `ERC721Transfer`
+        :raises: ValueError
+        """
+
+        parameters = cls._prepare_parameters_from_decoded_event(event_data)
+
+        if "tokenId" in event_data["args"]:
+            parameters["token_id"] = event_data["args"]["tokenId"]
+            return ERC721Transfer(**parameters)
+        else:
+            raise ValueError(
+                f"Not supported EventData, `tokenId` not present {event_data}"
+            )
+
+    @property
+    def value(self) -> Decimal:
+        return self.token_id
+
+
 class EthereumEventQuerySet(models.QuerySet):
     def not_erc_20_721_events(self):
         return self.exclude(topic=ERC20_721_TRANSFER_TOPIC)
@@ -361,9 +564,10 @@ class EthereumEventQuerySet(models.QuerySet):
 
 
 class EthereumEventManager(BulkCreateSignalMixin, models.Manager):
-    def from_decoded_event(self, decoded_event: Dict[str, Any]) -> "EthereumEvent":
+    def from_decoded_event(self, decoded_event: EventData) -> "EthereumEvent":
         """
-        Does not create the model. Requires that `ethereum_tx` exists
+        Does not create the model, as it requires that `ethereum_tx` exists
+
         :param decoded_event:
         :return: `EthereumEvent` instance (not stored in database)
         """
@@ -629,10 +833,11 @@ class InternalTxQuerySet(models.QuerySet):
         return (
             self.filter(call_type=EthereumTxCallType.CALL.value, value__gt=0)
             .annotate(
+                _value=F("value"),
                 transaction_hash=F("ethereum_tx_id"),
                 block_number=F("ethereum_tx__block_id"),
                 execution_date=F("ethereum_tx__block__timestamp"),
-                token_id=Value(None, output_field=Uint256Field()),
+                _token_id=RawSQL("NULL::numeric", ()),
                 token_address=Value(None, output_field=EthereumAddressField()),
             )
             .order_by("-ethereum_tx__block_id")
@@ -645,55 +850,79 @@ class InternalTxQuerySet(models.QuerySet):
         return self.ether_txs().filter(to=address)
 
     def token_txs(self):
-        return (
-            EthereumEvent.objects.erc20_and_721_events()
-            .annotate(
-                to=RawSQL("arguments->>%s", ("to",)),  # Order is really important!
-                _from=RawSQL("arguments->>%s", ("from",)),
-                value=RawSQL("(arguments->>%s)::numeric", ("value",)),
-                transaction_hash=F("ethereum_tx_id"),
-                block_number=F("ethereum_tx__block_id"),
-                execution_date=F("ethereum_tx__block__timestamp"),
-                token_id=RawSQL("(arguments->>%s)::numeric", ("tokenId",)),
-                token_address=F("address"),
-            )
-            .order_by("-ethereum_tx__block_id")
-        )
-
-    def token_txs_for_address(self, address: str):
-        return self.token_txs().filter(
-            Q(arguments__to=address) | Q(arguments__from=address)
-        )
-
-    def token_incoming_txs_for_address(self, address: str):
-        return self.token_txs().filter(arguments__to=address)
-
-    def ether_and_token_txs(self, address: str):
-        tokens_queryset = self.token_txs_for_address(address)
-        ether_queryset = self.ether_txs_for_address(address)
-        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
-
-    def ether_and_token_incoming_txs(self, address: str):
-        tokens_queryset = self.token_incoming_txs_for_address(address)
-        ether_queryset = self.ether_incoming_txs_for_address(address)
-        return self.union_ether_and_token_txs(tokens_queryset, ether_queryset)
-
-    def union_ether_and_token_txs(
-        self, tokens_queryset: QuerySet, ether_queryset: QuerySet
-    ) -> TransferDict:
-        values = (
+        values = [
             "block_number",
             "transaction_hash",
             "to",
             "_from",
-            "value",
+            "_value",
             "execution_date",
-            "token_id",
+            "_token_id",
             "token_address",
+        ]
+        erc20_queryset = ERC20Transfer.objects.token_txs()
+        erc721_queryset = ERC721Transfer.objects.token_txs()
+        return (
+            erc20_queryset.values(*values)
+            .union(erc721_queryset.values(*values))
+            .order_by("-block_number")
         )
+
+    def token_incoming_txs_for_address(self, address: str):
+        values = [
+            "block_number",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+        ]
+        erc20_queryset = ERC20Transfer.objects.incoming(address).token_txs()
+        erc721_queryset = ERC721Transfer.objects.incoming(address).token_txs()
+        return (
+            erc20_queryset.values(*values)
+            .union(erc721_queryset.values(*values))
+            .order_by("-block_number")
+        )
+
+    def ether_and_token_txs(self, address: str):
+        erc20_queryset = ERC20Transfer.objects.to_or_from(address).token_txs()
+        erc721_queryset = ERC721Transfer.objects.to_or_from(address).token_txs()
+        ether_queryset = self.ether_txs_for_address(address)
+        return self.union_ether_and_token_txs(
+            erc20_queryset, erc721_queryset, ether_queryset
+        )
+
+    def ether_and_token_incoming_txs(self, address: str):
+        erc20_queryset = ERC20Transfer.objects.incoming(address).token_txs()
+        erc721_queryset = ERC721Transfer.objects.incoming(address).token_txs()
+        ether_queryset = self.ether_incoming_txs_for_address(address)
+        return self.union_ether_and_token_txs(
+            erc20_queryset, erc721_queryset, ether_queryset
+        )
+
+    def union_ether_and_token_txs(
+        self,
+        erc20_queryset: QuerySet,
+        erc721_queryset: QuerySet,
+        ether_queryset: QuerySet,
+    ) -> TransferDict:
+        values = [
+            "block_number",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+        ]
         return (
             ether_queryset.values(*values)
-            .union(tokens_queryset.values(*values))
+            .union(erc20_queryset.values(*values))
+            .union(erc721_queryset.values(*values))
             .order_by("-block_number")
         )
 

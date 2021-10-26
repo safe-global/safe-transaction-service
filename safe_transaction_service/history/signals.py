@@ -13,12 +13,14 @@ from safe_transaction_service.notifications.tasks import send_notification_task
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 
 from .models import (
-    EthereumEvent,
+    ERC20Transfer,
+    ERC721Transfer,
     InternalTx,
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    TokenTransfer,
     WebHookType,
 )
 from .tasks import send_webhook_task
@@ -87,7 +89,7 @@ def bind_confirmation(
 def build_webhook_payload(
     sender: Type[Model],
     instance: Union[
-        EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction
+        TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
 ) -> List[Dict[str, Any]]:
     payloads: List[Dict[str, Any]] = []
@@ -128,24 +130,21 @@ def build_webhook_payload(
         outgoing_payload["type"] = WebHookType.OUTGOING_ETHER.name
         outgoing_payload["address"] = instance._from
         payloads = [incoming_payload, outgoing_payload]
-    elif (
-        sender == EthereumEvent
-        and "to" in instance.arguments
-        and "from" in instance.arguments
-    ):
+    elif sender == ERC20Transfer or sender == ERC721Transfer:
         # INCOMING_TOKEN / OUTGOING_TOKEN
         incoming_payload = {
-            "address": instance.arguments["to"],
+            "address": instance.to,
             "type": WebHookType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
             "txHash": HexBytes(instance.ethereum_tx_id).hex(),
         }
-        for element in ("tokenId", "value"):
-            if element in instance.arguments:
-                incoming_payload[element] = str(instance.arguments[element])
+        if isinstance(instance, ERC20Transfer):
+            incoming_payload["value"] = str(instance.value)
+        else:
+            incoming_payload["tokenId"] = str(instance.token_id)
         outgoing_payload = dict(incoming_payload)
         outgoing_payload["type"] = WebHookType.OUTGOING_TOKEN.name
-        outgoing_payload["address"] = instance.arguments["from"]
+        outgoing_payload["address"] = instance._from
         payloads = [incoming_payload, outgoing_payload]
     elif sender == SafeContract:  # Safe created
         payloads = [
@@ -176,7 +175,7 @@ def build_webhook_payload(
 def is_valid_webhook(
     sender: Type[Model],
     instance: Union[
-        EthereumEvent, InternalTx, MultisigConfirmation, MultisigTransaction
+        TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
     created: bool,
     minutes: int = 10,
@@ -219,14 +218,17 @@ def is_valid_webhook(
     dispatch_uid="multisig_transaction.process_webhook",
 )
 @receiver(
-    post_save, sender=EthereumEvent, dispatch_uid="ethereum_event.process_webhook"
+    post_save, sender=ERC20Transfer, dispatch_uid="erc20_transfer.process_webhook"
+)
+@receiver(
+    post_save, sender=ERC721Transfer, dispatch_uid="erc721_transfer.process_webhook"
 )
 @receiver(post_save, sender=InternalTx, dispatch_uid="internal_tx.process_webhook")
 @receiver(post_save, sender=SafeContract, dispatch_uid="safe_contract.process_webhook")
 def process_webhook(
     sender: Type[Model],
     instance: Union[
-        EthereumEvent,
+        TokenTransfer,
         InternalTx,
         MultisigConfirmation,
         MultisigTransaction,
@@ -237,7 +239,7 @@ def process_webhook(
 ) -> None:
     if is_valid_webhook(sender, instance, created):
         # Don't send information for older than 10 minutes transactions
-        # This triggers a DB query on EthereumEvent, InternalTx (they are not TimeStampedModel)
+        # This triggers a DB query on TokenTransfer, InternalTx (they are not TimeStampedModel)
         payloads = build_webhook_payload(sender, instance)
         for payload in payloads:
             if address := payload.get("address"):
