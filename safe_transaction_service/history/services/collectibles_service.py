@@ -26,7 +26,7 @@ from safe_transaction_service.utils.utils import chunks
 
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
-from ..models import EthereumEvent
+from ..models import ERC721Transfer
 
 logger = logging.getLogger(__name__)
 
@@ -289,9 +289,7 @@ class CollectiblesService:
         """
 
         # Cache based on the number of erc721 events
-        number_erc721_events = EthereumEvent.objects.erc721_events_count_by_address(
-            safe_address
-        )
+        number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
         cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc721_events}"
         if collectibles := django_cache.get(cache_key):
             return collectibles
@@ -311,8 +309,8 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return: Collectibles using the owner, addresses and the token_ids
         """
-        unfiltered_addresses_with_token_ids = EthereumEvent.objects.erc721_owned_by(
-            address=safe_address
+        unfiltered_addresses_with_token_ids = ERC721Transfer.objects.erc721_owned_by(
+            safe_address
         )
         for address, _ in unfiltered_addresses_with_token_ids:
             # Store tokens in database if not present

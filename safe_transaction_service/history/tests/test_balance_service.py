@@ -15,7 +15,7 @@ from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceServiceProvider
 from ..services.balance_service import BalanceWithFiat
-from .factories import EthereumEventFactory, SafeContractFactory
+from .factories import ERC20TransferFactory, SafeContractFactory
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
@@ -64,7 +64,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         balances = balance_service.get_usd_balances(safe_address)
         self.assertEqual(len(balances), 1)
 
-        EthereumEventFactory(address=erc20.address, to=safe_address)
+        ERC20TransferFactory(address=erc20.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(
@@ -123,8 +123,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         )
         token_info_3 = balance_service.get_token_info(erc20_3.address)
 
-        EthereumEventFactory(address=erc20_2.address, to=safe_address)
-        EthereumEventFactory(address=erc20_3.address, to=safe_address)
+        ERC20TransferFactory(address=erc20_2.address, to=safe_address)
+        ERC20TransferFactory(address=erc20_3.address, to=safe_address)
         balances = balance_service.get_usd_balances(safe_address)
         token_info = balance_service.get_token_info(erc20.address)
         self.assertCountEqual(

@@ -11,7 +11,7 @@ from ..services.transaction_service import (
     TransactionServiceProvider,
 )
 from .factories import (
-    EthereumEventFactory,
+    ERC20TransferFactory,
     InternalTxFactory,
     ModuleTransactionFactory,
     MultisigTransactionFactory,
@@ -45,9 +45,9 @@ class TestTransactionService(TestCase):
         internal_tx_out = InternalTxFactory(
             _from=safe_address, value=5
         )  # Should not appear
-        erc20_transfer_in = EthereumEventFactory(to=safe_address)
-        erc20_transfer_out = EthereumEventFactory(
-            from_=safe_address
+        erc20_transfer_in = ERC20TransferFactory(to=safe_address)
+        erc20_transfer_out = ERC20TransferFactory(
+            _from=safe_address
         )  # Should not appear
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = (
@@ -222,9 +222,9 @@ class TestTransactionService(TestCase):
         module_transaction = ModuleTransactionFactory(safe=safe_address)
         internal_tx_in = InternalTxFactory(to=safe_address, value=4)
         internal_tx_out = InternalTxFactory(_from=safe_address, value=5)
-        erc20_transfer_in = EthereumEventFactory(to=safe_address)
-        erc20_transfer_out = EthereumEventFactory(
-            from_=safe_address
+        erc20_transfer_in = ERC20TransferFactory(to=safe_address)
+        erc20_transfer_out = ERC20TransferFactory(
+            _from=safe_address
         )  # Should not appear
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = (
@@ -269,7 +269,7 @@ class TestTransactionService(TestCase):
             value=5,
             ethereum_tx=another_multisig_transaction.ethereum_tx,
         )
-        erc20_transfer_in_2 = EthereumEventFactory(
+        erc20_transfer_in_2 = ERC20TransferFactory(
             to=safe_address, ethereum_tx=another_multisig_transaction.ethereum_tx
         )
         internal_tx_in_2 = InternalTxFactory(

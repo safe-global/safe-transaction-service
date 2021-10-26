@@ -1,7 +1,7 @@
 import operator
 from collections import OrderedDict
 from logging import getLogger
-from typing import List, Sequence
+from typing import Iterator, List, Sequence
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
@@ -13,7 +13,7 @@ from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient
 
-from ..models import EthereumEvent, SafeContract
+from ..models import ERC20Transfer, ERC721Transfer, SafeContract, TokenTransfer
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -116,14 +116,32 @@ class Erc20EventsIndexer(EventsIndexer):
                 event_args["tokenId"] = value
         return event
 
+    def events_to_erc20_transfer(
+        self, log_receipts: Sequence[EventData]
+    ) -> Iterator[ERC20Transfer]:
+        for log_receipt in log_receipts:
+            try:
+                yield ERC20Transfer.from_decoded_event(log_receipt)
+            except ValueError:
+                pass
+
+    def events_to_erc721_transfer(
+        self, log_receipts: Sequence[EventData]
+    ) -> Iterator[ERC721Transfer]:
+        for log_receipt in log_receipts:
+            try:
+                yield ERC721Transfer.from_decoded_event(log_receipt)
+            except ValueError:
+                pass
+
     def process_elements(
         self, log_receipts: Sequence[EventData]
-    ) -> List[EthereumEvent]:
+    ) -> List[TokenTransfer]:
         """
         Process all events found by `find_relevant_elements`
 
         :param log_receipts: Events to store in database
-        :return: List of `EthereumEvent` already stored in database
+        :return: List of `TokenTransfer` already stored in database
         """
         tx_hashes = OrderedDict.fromkeys(
             [log_receipt["transactionHash"] for log_receipt in log_receipts]
@@ -134,16 +152,15 @@ class Erc20EventsIndexer(EventsIndexer):
             logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
             self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
             logger.debug("End prefetching and storing of ethereum txs")
-            logger.debug("Creating EthereumEvent objects")
-            ethereum_events = (
-                EthereumEvent.objects.from_decoded_event(log_receipt)
-                for log_receipt in log_receipts
+
+            logger.debug("Storing TokenTransfer objects")
+            result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
+                self.events_to_erc20_transfer(log_receipts), ignore_conflicts=True
             )
-            logger.debug("Storing EthereumEvent objects")
-            result = EthereumEvent.objects.bulk_create_from_generator(
-                ethereum_events, ignore_conflicts=True
+            result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
+                self.events_to_erc721_transfer(log_receipts), ignore_conflicts=True
             )
-            logger.debug("Stored EthereumEvent objects")
+            logger.debug("Stored TokenTransfer objects")
             return range(
-                result
-            )  # TODO Hack to prevent returning `EthereumEvent` and using too much RAM
+                result_erc20 + result_erc721
+            )  # TODO Hack to prevent returning `TokenTransfer` and using too much RAM

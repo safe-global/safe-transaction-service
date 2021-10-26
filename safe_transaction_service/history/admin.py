@@ -9,8 +9,9 @@ from hexbytes import HexBytes
 from gnosis.eth import EthereumClientProvider
 
 from .models import (
+    ERC20Transfer,
+    ERC721Transfer,
     EthereumBlock,
-    EthereumEvent,
     EthereumTx,
     InternalTx,
     InternalTxDecoded,
@@ -28,8 +29,13 @@ from .services import IndexServiceProvider
 
 
 # Inline objects ------------------------------
-class EthereumEventInline(admin.TabularInline):
-    model = EthereumEvent
+class ERC20TransferInline(admin.TabularInline):
+    model = ERC20Transfer
+    raw_id_fields = ("ethereum_tx",)
+
+
+class ERC721TransferInline(admin.TabularInline):
+    model = ERC721Transfer
     raw_id_fields = ("ethereum_tx",)
 
 
@@ -81,74 +87,43 @@ class EthereumBlockAdmin(admin.ModelAdmin):
     ordering = ["-number"]
 
 
-class EthereumEventListFilter(admin.SimpleListFilter):
-    # Human-readable title which will be displayed in the
-    # right admin sidebar just above the filter options.
-    title = "Event type"
-
-    # Parameter for the filter that will be used in the URL query.
-    parameter_name = "event_type"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("ERC20", "ERC20 Transfer"),
-            ("ERC721", "ERC721 Transfer"),
-            ("OTHER", "Other events"),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == "ERC20":
-            return queryset.erc20_events()
-        elif self.value() == "ERC721":
-            return queryset.erc721_events()
-        elif self.value() == "OTHER":
-            return queryset.not_erc_20_721_events()
-
-
-@admin.register(EthereumEvent)
-class EthereumEventAdmin(admin.ModelAdmin):
+class TokenTransferAdmin(admin.ModelAdmin):
     list_display = (
         "block_number",
         "log_index",
-        "erc20",
-        "erc721",
         "address",
-        "from_",
+        "_from",
         "to",
         "ethereum_tx_id",
-        "arguments",
+        "value",
     )
-    list_display_links = ("log_index", "arguments")
-    list_filter = (EthereumEventListFilter,)
+    list_display_links = ("log_index",)
     list_select_related = ("ethereum_tx",)
     ordering = ["-ethereum_tx__block_id"]
-    search_fields = ["arguments", "address", "=ethereum_tx__tx_hash"]
+    search_fields = ["_from", "to", "address", "=ethereum_tx__tx_hash"]
     raw_id_fields = ("ethereum_tx",)
-
-    def from_(self, obj: EthereumEvent):
-        return obj.arguments.get("from")
-
-    def to(self, obj: EthereumEvent):
-        return obj.arguments.get("to")
 
     @admin.display()
     def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
         if obj.ethereum_tx:
             return obj.ethereum_tx.block_id
 
-    @admin.display(boolean=True)
-    def erc20(self, obj: EthereumEvent):
-        return obj.is_erc20()
 
-    @admin.display(boolean=True)
-    def erc721(self, obj: EthereumEvent):
-        return obj.is_erc721()
+@admin.register(ERC20Transfer)
+class ERC20TransferAdmin(TokenTransferAdmin):
+    pass
+
+
+@admin.register(ERC721Transfer)
+class ERC721TransferAdmin(TokenTransferAdmin):
+    pass
 
 
 @admin.register(EthereumTx)
 class EthereumTxAdmin(admin.ModelAdmin):
     inlines = (
-        EthereumEventInline,
+        ERC20TransferInline,
+        ERC721TransferInline,
         SafeContractInline,
         MultisigTransactionInline,
         MultisigConfirmationInline,

@@ -63,7 +63,7 @@ def index_erc20_events_out_of_sync_task(
     block_process_limit: Optional[int] = None,
     block_process_limit_max: Optional[int] = None,
     addresses: Optional[ChecksumAddress] = None,
-    number_of_addresses: Optional[int] = None,
+    number_of_addresses: Optional[int] = 100,
 ) -> Optional[int]:
     """
     Find and process ERC20/721 events for monitored addresses out of sync (really behind)
@@ -88,7 +88,8 @@ def index_erc20_events_out_of_sync_task(
         logger.info("No addresses to process")
     else:
         logger.info(
-            "Start indexing of erc20/721 events for out of sync addresses %s", addresses
+            "Start indexing of erc20/721 events for out of sync addresses %s",
+            addresses,
         )
         updated = False
         number_events_processed = 0

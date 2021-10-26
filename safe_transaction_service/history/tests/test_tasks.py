@@ -13,7 +13,7 @@ from ..tasks import index_erc20_events_out_of_sync_task
 from ..tasks import logger as task_logger
 from ..tasks import process_decoded_internal_txs_task
 from .factories import (
-    EthereumEventFactory,
+    ERC20TransferFactory,
     InternalTxDecodedFactory,
     InternalTxFactory,
     SafeContractFactory,
@@ -27,7 +27,7 @@ class TestTasks(TestCase):
     @patch.object(EthereumClient, "get_network", return_value=EthereumNetwork.GANACHE)
     @patch.object(requests.Session, "post")
     def test_send_webhook_task(self, mock_post: MagicMock, get_network_mock: MagicMock):
-        EthereumEventFactory()
+        ERC20TransferFactory()
 
         with self.assertRaises(AssertionError):
             mock_post.assert_called()
