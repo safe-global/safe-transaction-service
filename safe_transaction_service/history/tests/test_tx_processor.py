@@ -25,15 +25,26 @@ from .factories import (
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeMasterCopyFactory,
+    SafeStatusFactory,
 )
-from .mocks.traces import call_trace
+from .mocks.traces import call_trace, module_traces, rinkeby_traces
 
 logger = logging.getLogger(__name__)
 
 
 class TestSafeTxProcessor(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.tx_processor = SafeTxProcessorProvider()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        SafeTxProcessorProvider.del_singleton()
+
     def test_tx_processor_with_factory(self):
-        tx_processor = SafeTxProcessorProvider()
+        tx_processor = self.tx_processor
         owner = Account.create().address
         safe_address = Account.create().address
         fallback_handler = Account.create().address
@@ -204,7 +215,10 @@ class TestSafeTxProcessor(TestCase):
         self.assertEqual(safe_status.nonce, 7)
 
         with mock.patch.object(
-            ParityManager, "trace_transaction", autospec=True, return_value=[call_trace]
+            ParityManager,
+            "trace_transaction",
+            autospec=True,
+            return_value=rinkeby_traces,
         ):
             # call_trace has [] as a trace address and module txs need to get the grandfather tx, so [0,0] must
             # be used
@@ -269,7 +283,7 @@ class TestSafeTxProcessor(TestCase):
             )
 
     def test_tx_processor_failed(self):
-        tx_processor = SafeTxProcessorProvider()
+        tx_processor = self.tx_processor
         # Event for Safes < 1.1.1
         logs = [
             {
@@ -305,7 +319,7 @@ class TestSafeTxProcessor(TestCase):
         )
 
     def test_tx_is_version_breaking_signatures(self):
-        tx_processor = SafeTxProcessorProvider()
+        tx_processor = self.tx_processor
         self.assertTrue(tx_processor.is_version_breaking_signatures("0.0.1", "1.1.1"))
         self.assertTrue(tx_processor.is_version_breaking_signatures("0.0.1", "1.3.0"))
         self.assertTrue(tx_processor.is_version_breaking_signatures("0.0.1", "1.4.0"))
@@ -330,7 +344,7 @@ class TestSafeTxProcessor(TestCase):
         self.assertFalse(tx_processor.is_version_breaking_signatures("0.9.0", "0.0.1"))
 
     def test_tx_processor_change_master_copy(self):
-        tx_processor = SafeTxProcessorProvider()
+        tx_processor = self.tx_processor
         owner = Account.create().address
         safe_address = Account.create().address
         fallback_handler = Account.create().address
@@ -391,3 +405,43 @@ class TestSafeTxProcessor(TestCase):
             MultisigTransaction.objects.filter(safe=safe_address, nonce=2).count(), 0
         )  # It was deleted
         self.assertEqual(MultisigTransaction.objects.count(), 3)
+
+    def test_process_module_tx(self):
+        safe_tx_processor = self.tx_processor
+        safe_status = SafeStatusFactory()
+        module_internal_tx_decoded = InternalTxDecodedFactory(
+            function_name="execTransactionFromModule",
+            internal_tx___from=safe_status.address,
+            internal_tx__to="0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
+            internal_tx__trace_address="0,0,0,4",
+            internal_tx__ethereum_tx__tx_hash="0x59f20a56a94ad4ee934468eb26b9148151289c97fefece779e05d98befd156f0",
+        )
+
+        self.assertEqual(ModuleTransaction.objects.count(), 0)
+        with self.assertRaises(ValueError):  # trace_transaction not supported
+            safe_tx_processor.process_decoded_transaction(module_internal_tx_decoded)
+            self.assertEqual(ModuleTransaction.objects.count(), 0)
+
+        with mock.patch.object(
+            ParityManager,
+            "trace_transaction",
+            autospec=True,
+            return_value=module_traces,
+        ):
+            safe_tx_processor.process_decoded_transaction(module_internal_tx_decoded)
+            self.assertEqual(ModuleTransaction.objects.count(), 1)
+            module_tx = ModuleTransaction.objects.get()
+            self.assertEqual(
+                "0x" + bytes(module_tx.data).hex(),
+                module_internal_tx_decoded.arguments["data"],
+            )
+            self.assertEqual(
+                module_tx.module, "0x03967E5b71577ba3498E1a87E425139B22B3c085"
+            )
+            self.assertEqual(
+                module_tx.operation, module_internal_tx_decoded.arguments["operation"]
+            )
+            self.assertEqual(module_tx.to, module_internal_tx_decoded.arguments["to"])
+            self.assertEqual(
+                module_tx.value, module_internal_tx_decoded.arguments["value"]
+            )
