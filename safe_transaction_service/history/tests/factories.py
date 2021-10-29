@@ -9,14 +9,13 @@ from factory.fuzzy import FuzzyInteger
 from hexbytes import HexBytes
 from web3 import Web3
 
-from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
     EthereumBlock,
-    EthereumEvent,
     EthereumTx,
     EthereumTxCallType,
     InternalTx,
@@ -89,30 +88,6 @@ class ERC721TransferFactory(TokenTransfer):
 
     class Meta:
         model = ERC721Transfer
-
-
-class EthereumEventFactory(DjangoModelFactory):
-    class Meta:
-        model = EthereumEvent
-
-    class Params:
-        to = None
-        from_ = None
-        erc721 = False
-        value = 1200
-
-    ethereum_tx = factory.SubFactory(EthereumTxFactory)
-    log_index = factory.Sequence(lambda n: n)
-    address = factory.LazyFunction(lambda: Account.create().address)
-    topic = ERC20_721_TRANSFER_TOPIC
-    topics = [ERC20_721_TRANSFER_TOPIC]
-    arguments = factory.LazyAttribute(
-        lambda o: {
-            "to": o.to if o.to else Account.create().address,
-            "from": o.from_ if o.from_ else Account.create().address,
-            "tokenId" if o.erc721 else "value": o.value,
-        }
-    )
 
 
 class InternalTxFactory(DjangoModelFactory):

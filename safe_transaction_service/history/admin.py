@@ -94,10 +94,10 @@ class TokenTransferAdmin(admin.ModelAdmin):
         "address",
         "_from",
         "to",
-        "ethereum_tx_id",
         "value",
+        "ethereum_tx_id",
     )
-    list_display_links = ("log_index",)
+    # list_display_links = ("block_number",)
     list_select_related = ("ethereum_tx",)
     ordering = ["-ethereum_tx__block_id"]
     search_fields = ["_from", "to", "address", "=ethereum_tx__tx_hash"]
