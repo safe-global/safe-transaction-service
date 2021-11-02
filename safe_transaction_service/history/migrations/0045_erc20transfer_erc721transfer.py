@@ -6,27 +6,6 @@ from django.db import migrations, models
 import gnosis.eth.django.models
 
 
-def migrate_data(apps, schema_editor):
-    EthereumEvent = apps.get_model("history", "EthereumEvent")
-    ERC20Transfer = apps.get_model("history", "ERC20Transfer")
-    ERC721Transfer = apps.get_model("history", "ERC721Transfer")
-
-    for event in EthereumEvent.objects.all().iterator():
-        parameters = {
-            "ethereum_tx_id": event.ethereum_tx_id,
-            "log_index": event.log_index,
-            "address": event.address,
-            "_from": event.arguments["from"],
-            "to": event.arguments["to"],
-        }
-        if "tokenId" in event.arguments:
-            parameters["token_id"] = event.arguments["tokenId"]
-            ERC721Transfer.objects.create(**parameters)
-        elif "value" in event.arguments:
-            parameters["value"] = event.arguments["value"]
-            ERC20Transfer.objects.create(**parameters)
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -100,5 +79,18 @@ class Migration(migrations.Migration):
                 "verbose_name_plural": "ERC721 Transfers",
             },
         ),
-        migrations.RunPython(migrate_data, reverse_code=migrations.RunPython.noop),
+        migrations.RunSQL(
+            """
+            INSERT INTO history_erc20transfer(address, ethereum_tx_id, "_from", "to", log_index, value)
+            SELECT address, ethereum_tx_id, arguments->>'from', arguments->>'to', log_index, (arguments->>'value')::numeric
+            FROM history_ethereumevent WHERE arguments ? 'value'
+            """
+        ),
+        migrations.RunSQL(
+            """
+            INSERT INTO history_erc721transfer(address, ethereum_tx_id, "_from", "to", log_index, token_id)
+            SELECT address, ethereum_tx_id, arguments->>'from', arguments->>'to', log_index, (arguments->>'tokenId')::numeric
+            FROM history_ethereumevent WHERE arguments ? 'tokenId'
+            """
+        ),
     ]
