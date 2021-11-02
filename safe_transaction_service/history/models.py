@@ -401,6 +401,7 @@ class ERC20Transfer(TokenTransfer):
     class Meta:
         verbose_name = "ERC20 Transfer"
         verbose_name_plural = "ERC20 Transfers"
+        unique_together = (("ethereum_tx", "log_index"),)
 
     def __str__(self):
         return f"Token Transfer from={self._from} to={self.to} value={self.value}"
@@ -479,6 +480,7 @@ class ERC721Transfer(TokenTransfer):
     class Meta:
         verbose_name = "ERC721 Transfer"
         verbose_name_plural = "ERC721 Transfers"
+        unique_together = (("ethereum_tx", "log_index"),)
 
     def __str__(self):
         return f"Token Transfer from={self._from} to={self.to} token_id={self.token_id}"
