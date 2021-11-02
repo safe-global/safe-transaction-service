@@ -69,11 +69,8 @@ jobs:
         COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
     - name: Send results to coveralls
       continue-on-error: true  # Ignore coveralls problems
-      if: ${{ env.COVERALLS_REPO_TOKEN }}
-      run: |
-        coveralls
+      run: coveralls
       env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Required for coveralls
   docker-deploy:
     runs-on: ubuntu-latest
