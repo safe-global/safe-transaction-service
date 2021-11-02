@@ -702,15 +702,15 @@ class TransferResponseSerializer(serializers.Serializer):
         return result
 
     def get_type(self, obj: TransferDict) -> str:
-        if not obj.get("token_address"):
+        if obj["token_address"] is None:
             return TransferType.ETHER_TRANSFER.name
         else:
-            if obj.get("_value") is not None:
+            if obj["_value"] is not None:
                 return TransferType.ERC20_TRANSFER.name
-            elif obj.get("_token_id") is not None:
+            elif obj["_token_id"] is not None:
                 return TransferType.ERC721_TRANSFER.name
-
-        return TransferType.UNKNOWN
+            else:
+                return TransferType.UNKNOWN.name
 
     def validate(self, data):
         super().validate(data)

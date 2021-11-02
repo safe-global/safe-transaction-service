@@ -823,7 +823,7 @@ class SafeTransferListView(ListAPIView):
 
     @swagger_auto_schema(
         responses={
-            200: serializers.TransferResponseSerializer(many=True),
+            200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
             422: "Safe address checksum not valid",
         }
     )
@@ -847,7 +847,7 @@ class SafeTransferListView(ListAPIView):
 class SafeIncomingTransferListView(SafeTransferListView):
     @swagger_auto_schema(
         responses={
-            200: serializers.TransferResponseSerializer(many=True),
+            200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
             422: "Safe address checksum not valid",
         }
     )
