@@ -519,6 +519,9 @@ class ERC721Transfer(TokenTransfer):
 
     @property
     def value(self) -> Decimal:
+        """
+        Behave as a ERC20Transfer so it's easier to handle
+        """
         return self.token_id
 
     def to_erc20_transfer(self):
