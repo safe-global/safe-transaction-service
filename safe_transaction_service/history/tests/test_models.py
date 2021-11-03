@@ -227,6 +227,30 @@ class TestEthereumTx(TestCase):
 
 
 class TestTokenTransfer(TestCase):
+    def test_transfer_to_erc721(self):
+        erc20_transfer = ERC20TransferFactory()
+        self.assertEqual(ERC721Transfer.objects.count(), 0)
+        erc20_transfer.to_erc721_transfer().save()
+        self.assertEqual(ERC721Transfer.objects.count(), 1)
+        erc721_transfer = ERC721Transfer.objects.get()
+        self.assertEqual(erc721_transfer.ethereum_tx_id, erc20_transfer.ethereum_tx_id)
+        self.assertEqual(erc721_transfer.address, erc20_transfer.address)
+        self.assertEqual(erc721_transfer.log_index, erc20_transfer.log_index)
+        self.assertEqual(erc721_transfer.to, erc20_transfer.to)
+        self.assertEqual(erc721_transfer.token_id, erc20_transfer.value)
+
+    def test_transfer_to_erc20(self):
+        erc721_transfer = ERC721TransferFactory()
+        self.assertEqual(ERC20Transfer.objects.count(), 0)
+        erc721_transfer.to_erc20_transfer().save()
+        self.assertEqual(ERC20Transfer.objects.count(), 1)
+        erc20_transfer = ERC721Transfer.objects.get()
+        self.assertEqual(erc721_transfer.ethereum_tx_id, erc20_transfer.ethereum_tx_id)
+        self.assertEqual(erc721_transfer.address, erc20_transfer.address)
+        self.assertEqual(erc721_transfer.log_index, erc20_transfer.log_index)
+        self.assertEqual(erc721_transfer.to, erc20_transfer.to)
+        self.assertEqual(erc721_transfer.token_id, erc20_transfer.value)
+
     def test_erc20_events(self):
         safe_address = Account.create().address
         e1 = ERC20TransferFactory(to=safe_address)

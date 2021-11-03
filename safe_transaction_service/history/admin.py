@@ -3,6 +3,7 @@ from typing import Optional
 from django.contrib import admin
 from django.db.models import F, Q
 from django.db.models.functions import Greatest
+from django.db.transaction import atomic
 
 from hexbytes import HexBytes
 
@@ -111,12 +112,26 @@ class TokenTransferAdmin(admin.ModelAdmin):
 
 @admin.register(ERC20Transfer)
 class ERC20TransferAdmin(TokenTransferAdmin):
-    pass
+    actions = ["to_erc721"]
+
+    @admin.action(description="Convert to ERC721 Transfer")
+    @atomic
+    def to_erc721(self, request, queryset):
+        for element in queryset:
+            element.to_erc721_transfer().save()
+        queryset.delete()
 
 
 @admin.register(ERC721Transfer)
 class ERC721TransferAdmin(TokenTransferAdmin):
-    pass
+    actions = ["to_erc20"]
+
+    @admin.action(description="Convert to ERC20 Transfer")
+    @atomic
+    def to_erc20(self, request, queryset):
+        for element in queryset:
+            element.to_erc20_transfer().save()
+        queryset.delete()
 
 
 @admin.register(EthereumTx)

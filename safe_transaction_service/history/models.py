@@ -404,7 +404,7 @@ class ERC20Transfer(TokenTransfer):
         unique_together = (("ethereum_tx", "log_index"),)
 
     def __str__(self):
-        return f"Token Transfer from={self._from} to={self.to} value={self.value}"
+        return f"ERC20 Transfer from={self._from} to={self.to} value={self.value}"
 
     @classmethod
     def from_decoded_event(cls, event_data: EventData) -> Union["ERC20Transfer"]:
@@ -425,6 +425,16 @@ class ERC20Transfer(TokenTransfer):
             raise ValueError(
                 f"Not supported EventData, `value` not present {event_data}"
             )
+
+    def to_erc721_transfer(self):
+        return ERC721Transfer(
+            ethereum_tx=self.ethereum_tx,
+            address=self.address,
+            _from=self._from,
+            to=self.to,
+            log_index=self.log_index,
+            token_id=self.value,
+        )
 
 
 class ERC721TransferManager(TokenTransferManager):
@@ -483,7 +493,9 @@ class ERC721Transfer(TokenTransfer):
         unique_together = (("ethereum_tx", "log_index"),)
 
     def __str__(self):
-        return f"Token Transfer from={self._from} to={self.to} token_id={self.token_id}"
+        return (
+            f"ERC721 Transfer from={self._from} to={self.to} token_id={self.token_id}"
+        )
 
     @classmethod
     def from_decoded_event(cls, event_data: EventData) -> Union["ERC721Transfer"]:
@@ -508,6 +520,16 @@ class ERC721Transfer(TokenTransfer):
     @property
     def value(self) -> Decimal:
         return self.token_id
+
+    def to_erc20_transfer(self):
+        return ERC20Transfer(
+            ethereum_tx=self.ethereum_tx,
+            address=self.address,
+            _from=self._from,
+            to=self.to,
+            log_index=self.log_index,
+            value=self.token_id,
+        )
 
 
 class InternalTxManager(BulkCreateSignalMixin, models.Manager):
