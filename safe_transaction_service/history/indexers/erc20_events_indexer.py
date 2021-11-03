@@ -13,6 +13,8 @@ from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient
 
+from safe_transaction_service.tokens.models import Token
+
 from ..models import ERC20Transfer, ERC721Transfer, SafeContract, TokenTransfer
 from .events_indexer import EventsIndexer
 
@@ -90,10 +92,14 @@ class Erc20EventsIndexer(EventsIndexer):
     @cache_memoize(60 * 60 * 24, prefix="erc20-events-indexer-is-erc20")  # 1 day
     def _is_erc20(self, token_address: str) -> bool:
         try:
-            decimals = self.ethereum_client.erc20.get_decimals(token_address)
-            return decimals >= 0
-        except (ValueError, BadFunctionCallOutput, DecodingError):
-            return False
+            token = Token.objects.get(address=token_address)
+            return token.is_erc20()
+        except Token.DoesNotExist:
+            try:
+                decimals = self.ethereum_client.erc20.get_decimals(token_address)
+                return decimals is not None
+            except (ValueError, BadFunctionCallOutput, DecodingError):
+                return False
 
     def _process_decoded_element(self, event: EventData) -> EventData:
         """
@@ -102,18 +108,15 @@ class Erc20EventsIndexer(EventsIndexer):
             of `value` or `tokenId`)
         """
         event_args = event["args"]
-        if (
-            "unknown" in event_args
-        ):  # Not standard event, trying to tell apart ERC20 from ERC721
-            logger.info(
-                "Cannot tell apart erc20 or 721 for token-address=%s - Checking token decimals",
-                event["address"],
-            )
-            value = event_args.pop("unknown")
-            if self._is_erc20(event["address"]):
-                event_args["value"] = value
-            else:
-                event_args["tokenId"] = value
+        if "unknown" in event_args:  # Not standard event
+            event_args["value"] = event_args.pop("unknown")
+
+        if self._is_erc20(event["address"]):
+            if "tokenId" in event_args:
+                event_args["value"] = event_args.pop("tokenId")
+        else:
+            if "value" in event_args:
+                event_args["tokenId"] = event_args.pop("value")
         return event
 
     def events_to_erc20_transfer(
