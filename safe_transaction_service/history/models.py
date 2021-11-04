@@ -391,7 +391,7 @@ class ERC20TransferQuerySet(TokenTransferQuerySet):
             execution_date=F("ethereum_tx__block__timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=F("address"),
-        ).order_by("-ethereum_tx__block_id")
+        )
 
 
 class ERC20Transfer(TokenTransfer):
@@ -480,7 +480,7 @@ class ERC721TransferQuerySet(TokenTransferQuerySet):
             execution_date=F("ethereum_tx__block__timestamp"),
             _token_id=F("token_id"),
             token_address=F("address"),
-        ).order_by("-ethereum_tx__block_id")
+        )
 
 
 class ERC721Transfer(TokenTransfer):
@@ -600,17 +600,15 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
 class InternalTxQuerySet(models.QuerySet):
     def ether_txs(self):
-        return (
-            self.filter(call_type=EthereumTxCallType.CALL.value, value__gt=0)
-            .annotate(
-                _value=F("value"),
-                transaction_hash=F("ethereum_tx_id"),
-                block_number=F("ethereum_tx__block_id"),
-                execution_date=F("ethereum_tx__block__timestamp"),
-                _token_id=RawSQL("NULL::numeric", ()),
-                token_address=Value(None, output_field=EthereumAddressField()),
-            )
-            .order_by("-ethereum_tx__block_id")
+        return self.filter(
+            call_type=EthereumTxCallType.CALL.value, value__gt=0
+        ).annotate(
+            _value=F("value"),
+            transaction_hash=F("ethereum_tx_id"),
+            block_number=F("ethereum_tx__block_id"),
+            execution_date=F("ethereum_tx__block__timestamp"),
+            _token_id=RawSQL("NULL::numeric", ()),
+            token_address=Value(None, output_field=EthereumAddressField()),
         )
 
     def ether_txs_for_address(self, address: str):
@@ -634,7 +632,7 @@ class InternalTxQuerySet(models.QuerySet):
         erc721_queryset = ERC721Transfer.objects.token_txs()
         return (
             erc20_queryset.values(*values)
-            .union(erc721_queryset.values(*values))
+            .union(erc721_queryset.values(*values), all=True)
             .order_by("-block_number")
         )
 
@@ -653,7 +651,7 @@ class InternalTxQuerySet(models.QuerySet):
         erc721_queryset = ERC721Transfer.objects.incoming(address).token_txs()
         return (
             erc20_queryset.values(*values)
-            .union(erc721_queryset.values(*values))
+            .union(erc721_queryset.values(*values), all=True)
             .order_by("-block_number")
         )
 
@@ -691,8 +689,8 @@ class InternalTxQuerySet(models.QuerySet):
         ]
         return (
             ether_queryset.values(*values)
-            .union(erc20_queryset.values(*values))
-            .union(erc721_queryset.values(*values))
+            .union(erc20_queryset.values(*values), all=True)
+            .union(erc721_queryset.values(*values), all=True)
             .order_by("-block_number")
         )
 
