@@ -76,8 +76,22 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             event["args"]["tokenId"] = event["args"].pop("value")
             original_event = copy.deepcopy(event)
             event["args"]["unknown"] = event["args"].pop("tokenId")
-            event["args"]["unknown"] = original_event["args"]["tokenId"]
 
+            self.assertEqual(
+                erc20_events_indexer._process_decoded_element(event), original_event
+            )
+
+        event = self.ethereum_client.erc20.get_total_transfer_history(
+            from_block=block_number, to_block=block_number
+        )[0]
+        with mock.patch.object(
+            Erc20EventsIndexer, "_is_erc20", autospec=True, return_value=True
+        ):
+            # Convert event to erc721
+            original_event = copy.deepcopy(event)
+            event["args"]["tokenId"] = event["args"].pop("value")
+
+            # ERC721 event will be converted to ERC20
             self.assertEqual(
                 erc20_events_indexer._process_decoded_element(event), original_event
             )
