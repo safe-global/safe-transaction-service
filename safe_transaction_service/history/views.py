@@ -787,13 +787,13 @@ class SafeTransferListView(ListAPIView):
         return transfers
 
     def get_transfers(self, address: str):
-        erc20_queryset = super().filter_queryset(
+        erc20_queryset = self.filter_queryset(
             ERC20Transfer.objects.to_or_from(address).token_txs()
         )
-        erc721_queryset = super().filter_queryset(
+        erc721_queryset = self.filter_queryset(
             ERC721Transfer.objects.to_or_from(address).token_txs()
         )
-        ether_queryset = super().filter_queryset(
+        ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_txs_for_address(address)
         )
         return InternalTx.objects.union_ether_and_token_txs(
@@ -858,13 +858,13 @@ class SafeIncomingTransferListView(SafeTransferListView):
         return super().get(*args, **kwargs)
 
     def get_transfers(self, address: str):
-        erc20_queryset = super().filter_queryset(
+        erc20_queryset = self.filter_queryset(
             ERC20Transfer.objects.incoming(address).token_txs()
         )
-        erc721_queryset = super().filter_queryset(
+        erc721_queryset = self.filter_queryset(
             ERC721Transfer.objects.incoming(address).token_txs()
         )
-        ether_queryset = super().filter_queryset(
+        ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_incoming_txs_for_address(address)
         )
         return InternalTx.objects.union_ether_and_token_txs(
