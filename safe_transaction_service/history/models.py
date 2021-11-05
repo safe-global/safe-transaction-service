@@ -1028,7 +1028,7 @@ class MultisigTransactionManager(models.Manager):
         :return:
         """
         return (
-            MultisigTransaction.objects.exclude(data=None)
+            self.exclude(data=None)
             .exclude(to__in=Contract.objects.values("address"))
             .values_list("to", flat=True)
             .distinct()
@@ -1145,7 +1145,21 @@ class MultisigTransaction(TimeStampedModel):
             return [safe_signature.owner for safe_signature in safe_signatures]
 
 
+class ModuleTransactionManager(models.Manager):
+    def not_indexed_metadata_contract_addresses(self):
+        """
+        Find contracts with metadata (abi, contract name) not indexed
+        :return:
+        """
+        return (
+            self.exclude(module__in=Contract.objects.values("address"))
+            .values_list("module", flat=True)
+            .distinct()
+        )
+
+
 class ModuleTransaction(TimeStampedModel):
+    objects = ModuleTransactionManager()
     internal_tx = models.OneToOneField(
         InternalTx, on_delete=models.CASCADE, related_name="module_tx", primary_key=True
     )
