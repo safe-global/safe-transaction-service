@@ -34,6 +34,8 @@ from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
 from .models import (
+    ERC20Transfer,
+    ERC721Transfer,
     InternalTx,
     ModuleTransaction,
     MultisigConfirmation,
@@ -785,14 +787,17 @@ class SafeTransferListView(ListAPIView):
         return transfers
 
     def get_transfers(self, address: str):
-        tokens_queryset = super().filter_queryset(
-            InternalTx.objects.token_txs_for_address(address)
+        erc20_queryset = self.filter_queryset(
+            ERC20Transfer.objects.to_or_from(address).token_txs()
         )
-        ether_queryset = super().filter_queryset(
+        erc721_queryset = self.filter_queryset(
+            ERC721Transfer.objects.to_or_from(address).token_txs()
+        )
+        ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_txs_for_address(address)
         )
         return InternalTx.objects.union_ether_and_token_txs(
-            tokens_queryset, ether_queryset
+            erc20_queryset, erc721_queryset, ether_queryset
         )
 
     def get_queryset(self):
@@ -818,7 +823,7 @@ class SafeTransferListView(ListAPIView):
 
     @swagger_auto_schema(
         responses={
-            200: serializers.TransferResponseSerializer(many=True),
+            200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
             422: "Safe address checksum not valid",
         }
     )
@@ -842,7 +847,7 @@ class SafeTransferListView(ListAPIView):
 class SafeIncomingTransferListView(SafeTransferListView):
     @swagger_auto_schema(
         responses={
-            200: serializers.TransferResponseSerializer(many=True),
+            200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
             422: "Safe address checksum not valid",
         }
     )
@@ -853,14 +858,17 @@ class SafeIncomingTransferListView(SafeTransferListView):
         return super().get(*args, **kwargs)
 
     def get_transfers(self, address: str):
-        tokens_queryset = super().filter_queryset(
-            InternalTx.objects.token_incoming_txs_for_address(address)
+        erc20_queryset = self.filter_queryset(
+            ERC20Transfer.objects.incoming(address).token_txs()
         )
-        ether_queryset = super().filter_queryset(
+        erc721_queryset = self.filter_queryset(
+            ERC721Transfer.objects.incoming(address).token_txs()
+        )
+        ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_incoming_txs_for_address(address)
         )
         return InternalTx.objects.union_ether_and_token_txs(
-            tokens_queryset, ether_queryset
+            erc20_queryset, erc721_queryset, ether_queryset
         )
 
 

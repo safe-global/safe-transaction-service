@@ -1,3 +1,5 @@
+from itertools import chain
+
 from django.db import IntegrityError, transaction
 
 from celery import app
@@ -6,7 +8,10 @@ from eth_typing import ChecksumAddress
 
 from gnosis.eth.clients import EtherscanRateLimitError
 
-from safe_transaction_service.history.models import MultisigTransaction
+from safe_transaction_service.history.models import (
+    ModuleTransaction,
+    MultisigTransaction,
+)
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection
 
@@ -22,11 +27,13 @@ def create_missing_contracts_with_metadata_task() -> int:
 
     :return: Number of contracts missing
     """
+    addresses = chain(
+        MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),
+        ModuleTransaction.objects.not_indexed_metadata_contract_addresses(),
+    )
     try:
         i = 0
-        for (
-            address
-        ) in MultisigTransaction.objects.not_indexed_metadata_contract_addresses():
+        for address in addresses:
             logger.info("Detected missing contract %s", address)
             create_or_update_contract_with_metadata_task.apply_async(
                 (address,), priority=0

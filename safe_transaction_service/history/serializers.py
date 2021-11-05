@@ -32,6 +32,7 @@ from .models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
+    TransferDict,
 )
 from .services.safe_service import SafeCreationInfo
 
@@ -689,8 +690,8 @@ class TransferResponseSerializer(serializers.Serializer):
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
     from_ = EthereumAddressField(source="_from", allow_zero_address=True)
-    value = serializers.CharField(allow_null=True)
-    token_id = serializers.CharField(allow_null=True)
+    value = serializers.CharField(allow_null=True, source="_value")
+    token_id = serializers.CharField(allow_null=True, source="_token_id")
     token_address = EthereumAddressField(allow_null=True, default=None)
 
     def get_fields(self):
@@ -700,16 +701,16 @@ class TransferResponseSerializer(serializers.Serializer):
         result["from"] = from_
         return result
 
-    def get_type(self, obj: Dict[str, Any]) -> str:
-        if not obj.get("token_address"):
+    def get_type(self, obj: TransferDict) -> str:
+        if obj["token_address"] is None:
             return TransferType.ETHER_TRANSFER.name
         else:
-            if obj.get("value") is not None:
+            if obj["_value"] is not None:
                 return TransferType.ERC20_TRANSFER.name
-            elif obj.get("token_id") is not None:
+            elif obj["_token_id"] is not None:
                 return TransferType.ERC721_TRANSFER.name
-
-        return TransferType.UNKNOWN
+            else:
+                return TransferType.UNKNOWN.name
 
     def validate(self, data):
         super().validate(data)
@@ -721,10 +722,11 @@ class TransferResponseSerializer(serializers.Serializer):
 class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
     token_info = TokenInfoResponseSerializer(source="token")
 
-    def get_type(self, obj: Dict[str, Any]) -> str:
+    def get_type(self, obj: TransferDict) -> str:
         """
         Sometimes ERC20/721 `Transfer` events look the same, if token info is available better use that information
         to check
+
         :param obj:
         :return: `TransferType` as a string
         """
@@ -739,12 +741,18 @@ class TransferWithTokenInfoResponseSerializer(TransferResponseSerializer):
                 )
                 if decimals is None:
                     transfer_type = TransferType.ERC721_TRANSFER.name
-                    if obj["token_id"] is None:
-                        obj["token_id"], obj["value"] = obj["value"], obj["token_id"]
+                    if obj["_token_id"] is None:
+                        obj["_token_id"], obj["_value"] = (
+                            obj["_value"],
+                            obj["_token_id"],
+                        )
                 else:
                     transfer_type = TransferType.ERC20_TRANSFER.name
-                    if obj["value"] is None:
-                        obj["token_id"], obj["value"] = obj["value"], obj["token_id"]
+                    if obj["_value"] is None:
+                        obj["_token_id"], obj["_value"] = (
+                            obj["_value"],
+                            obj["_token_id"],
+                        )
         return transfer_type
 
 

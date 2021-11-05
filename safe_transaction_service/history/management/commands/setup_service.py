@@ -65,9 +65,15 @@ TASKS = [
     ),
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.index_erc20_events_task",
-        "Index ERC20 Events",
+        "Index ERC20/721 Events",
         14,
         IntervalSchedule.SECONDS,
+    ),
+    CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.index_erc20_events_out_of_sync_task",
+        "Index out of sync ERC20/ERC721 Events",
+        5,
+        IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
@@ -203,6 +209,10 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 1_010_518, "1.3.0+L2"),
         ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 1_010_520, "1.3.0"),
     ],
+    EthereumNetwork.OLYMPUS: [
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 1227, "1.3.0+L2"),
+        ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 1278, "1.3.0"),
+    ],
 }
 
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
@@ -274,6 +284,9 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     ],
     EthereumNetwork.FUSE_SPARK: [
         ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 1_010_506),  # v1.3.0
+    ],
+    EthereumNetwork.OLYMPUS: [
+        ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 1266),  # v1.3.0
     ],
 }
 

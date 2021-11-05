@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from django.db.models import Case, F, OuterRef, Q, QuerySet, Subquery, Value, When
+from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When
 from django.utils import timezone
 
 from redis import Redis
@@ -17,7 +17,8 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
 
 from ..models import (
-    EthereumEvent,
+    ERC20Transfer,
+    ERC721Transfer,
     EthereumTx,
     EthereumTxCallType,
     InternalTx,
@@ -207,9 +208,23 @@ class TransactionService:
         # Get incoming/outgoing tokens not included on Multisig or Module txs.
         # Outgoing tokens can be triggered by another user after the Safe calls `approve`, that's why it will not
         # always appear as a MultisigTransaction
-        event_tx_ids = (
-            EthereumEvent.objects.erc20_and_721_events()
-            .filter(Q(arguments__to=safe_address) | Q(arguments__from=safe_address))
+        erc20_tx_ids = (
+            ERC20Transfer.objects.to_or_from(safe_address)
+            .exclude(ethereum_tx__in=multisig_and_module_hashes)
+            .annotate(
+                execution_date=F("ethereum_tx__block__timestamp"),
+                created=F("ethereum_tx__block__timestamp"),
+                block=F("ethereum_tx__block_id"),
+                safe_nonce=Value(0, output_field=Uint256Field()),
+            )
+            .distinct()
+            .values(
+                "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
+            )
+        )
+
+        erc721_tx_ids = (
+            ERC721Transfer.objects.to_or_from(safe_address)
             .exclude(ethereum_tx__in=multisig_and_module_hashes)
             .annotate(
                 execution_date=F("ethereum_tx__block__timestamp"),
@@ -246,7 +261,8 @@ class TransactionService:
         # Tricky, we merge SafeTx hashes with EthereumTx hashes
         queryset = (
             multisig_safe_tx_ids.distinct()
-            .union(event_tx_ids)
+            .union(erc20_tx_ids)
+            .union(erc721_tx_ids)
             .union(internal_tx_ids)
             .union(module_tx_ids)
             .order_by("-execution_date", "-safe_nonce", "block", "-created")
@@ -309,8 +325,15 @@ class TransactionService:
             multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs.values()
         ]
 
-        tokens_queryset = InternalTx.objects.token_txs_for_address(safe_address).filter(
-            ethereum_tx__in=all_hashes
+        erc20_queryset = (
+            ERC20Transfer.objects.to_or_from(safe_address)
+            .token_txs()
+            .filter(ethereum_tx__in=all_hashes)
+        )
+        erc721_queryset = (
+            ERC721Transfer.objects.to_or_from(safe_address)
+            .token_txs()
+            .filter(ethereum_tx__in=all_hashes)
         )
         ether_queryset = InternalTx.objects.ether_txs_for_address(safe_address).filter(
             ethereum_tx__in=all_hashes
@@ -319,7 +342,7 @@ class TransactionService:
         # Build dict of transfers for optimizing access
         transfer_dict = defaultdict(list)
         transfers: List[TransferDict] = InternalTx.objects.union_ether_and_token_txs(
-            tokens_queryset, ether_queryset
+            erc20_queryset, erc721_queryset, ether_queryset
         )
         for transfer in transfers:
             transfer_dict[transfer["transaction_hash"]].append(transfer)

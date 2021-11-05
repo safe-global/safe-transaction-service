@@ -8,7 +8,7 @@ import factory
 from gnosis.eth import EthereumNetwork
 
 from ..models import (
-    EthereumEvent,
+    ERC20Transfer,
     InternalTx,
     MultisigConfirmation,
     MultisigTransaction,
@@ -16,7 +16,7 @@ from ..models import (
 )
 from ..signals import build_webhook_payload, is_valid_webhook
 from .factories import (
-    EthereumEventFactory,
+    ERC20TransferFactory,
     InternalTxFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
@@ -30,7 +30,7 @@ class TestSignals(TestCase):
             [
                 payload["type"]
                 for payload in build_webhook_payload(
-                    EthereumEvent, EthereumEventFactory()
+                    ERC20Transfer, ERC20TransferFactory()
                 )
             ],
             [WebHookType.INCOMING_TOKEN.name, WebHookType.OUTGOING_TOKEN.name],
@@ -46,7 +46,7 @@ class TestSignals(TestCase):
             [
                 payload["chainId"]
                 for payload in build_webhook_payload(
-                    EthereumEvent, EthereumEventFactory()
+                    ERC20Transfer, ERC20TransferFactory()
                 )
             ],
             [str(EthereumNetwork.GANACHE.value), str(EthereumNetwork.GANACHE.value)],

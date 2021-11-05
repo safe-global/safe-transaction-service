@@ -115,16 +115,16 @@ class PriceService:
     def enabled_price_oracles(self) -> Tuple[PriceOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
             return (
-                self.kyber_oracle,
                 self.uniswap_v2_oracle,
                 self.sushiswap_oracle,
                 self.uniswap_oracle,
                 self.aave_oracle,
+                self.kyber_oracle,
             )
         else:
             return (
-                self.kyber_oracle,
                 self.uniswap_v2_oracle,
+                self.kyber_oracle,
             )  # There are versions in another networks
 
     @cached_property

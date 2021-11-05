@@ -6,6 +6,10 @@ from django.http import HttpRequest
 from gunicorn import glogging
 
 
+def get_milliseconds_now():
+    return int(time.time() * 1000)
+
+
 class IgnoreCheckUrl(logging.Filter):
     def filter(self, record):
         message = record.getMessage()
@@ -26,17 +30,14 @@ class LoggingMiddleware:
         self.get_response = get_response
         self.logger = logging.getLogger("LoggingMiddleware")
 
-    def get_milliseconds_now(self):
-        return int(time.time() * 1000)
-
     def __call__(self, request: HttpRequest):
-        milliseconds = self.get_milliseconds_now()
+        milliseconds = get_milliseconds_now()
         response = self.get_response(request)
         if request.resolver_match:
             route = (
                 request.resolver_match.route if request.resolver_match else request.path
             )
-            delta = self.get_milliseconds_now() - milliseconds
+            delta = get_milliseconds_now() - milliseconds
             self.logger.info(
                 "MT::%s::%s::%s::%d::%s",
                 request.method,

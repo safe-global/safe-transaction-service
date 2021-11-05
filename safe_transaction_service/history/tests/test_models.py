@@ -13,7 +13,8 @@ from gnosis.safe.safe_signature import SafeSignatureType
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 
 from ..models import (
-    EthereumEvent,
+    ERC20Transfer,
+    ERC721Transfer,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -24,8 +25,9 @@ from ..models import (
     SafeStatus,
 )
 from .factories import (
+    ERC20TransferFactory,
+    ERC721TransferFactory,
     EthereumBlockFactory,
-    EthereumEventFactory,
     EthereumTxFactory,
     InternalTxDecodedFactory,
     InternalTxFactory,
@@ -224,15 +226,63 @@ class TestEthereumTx(TestCase):
     pass
 
 
-class TestEthereumEvent(TestCase):
+class TestTokenTransfer(TestCase):
+    def test_transfer_to_erc721(self):
+        erc20_transfer = ERC20TransferFactory()
+        self.assertEqual(ERC721Transfer.objects.count(), 0)
+        erc20_transfer.to_erc721_transfer().save()
+        self.assertEqual(ERC721Transfer.objects.count(), 1)
+        erc721_transfer = ERC721Transfer.objects.get()
+        self.assertEqual(erc721_transfer.ethereum_tx_id, erc20_transfer.ethereum_tx_id)
+        self.assertEqual(erc721_transfer.address, erc20_transfer.address)
+        self.assertEqual(erc721_transfer.log_index, erc20_transfer.log_index)
+        self.assertEqual(erc721_transfer.to, erc20_transfer.to)
+        self.assertEqual(erc721_transfer.token_id, erc20_transfer.value)
+
+    def test_transfer_to_erc20(self):
+        erc721_transfer = ERC721TransferFactory()
+        self.assertEqual(ERC20Transfer.objects.count(), 0)
+        erc721_transfer.to_erc20_transfer().save()
+        self.assertEqual(ERC20Transfer.objects.count(), 1)
+        erc20_transfer = ERC721Transfer.objects.get()
+        self.assertEqual(erc721_transfer.ethereum_tx_id, erc20_transfer.ethereum_tx_id)
+        self.assertEqual(erc721_transfer.address, erc20_transfer.address)
+        self.assertEqual(erc721_transfer.log_index, erc20_transfer.log_index)
+        self.assertEqual(erc721_transfer.to, erc20_transfer.to)
+        self.assertEqual(erc721_transfer.token_id, erc20_transfer.value)
+
+    def test_erc20_events(self):
+        safe_address = Account.create().address
+        e1 = ERC20TransferFactory(to=safe_address)
+        e2 = ERC20TransferFactory(_from=safe_address)
+        ERC20TransferFactory()  # This event should not appear
+        self.assertEqual(ERC20Transfer.objects.to_or_from(safe_address).count(), 2)
+
+        self.assertSetEqual(
+            ERC20Transfer.objects.tokens_used_by_address(safe_address),
+            {e1.address, e2.address},
+        )
+
+    def test_erc721_events(self):
+        safe_address = Account.create().address
+        e1 = ERC721TransferFactory(to=safe_address)
+        e2 = ERC721TransferFactory(_from=safe_address)
+        ERC721TransferFactory()  # This event should not appear
+        self.assertEqual(ERC721Transfer.objects.to_or_from(safe_address).count(), 2)
+
+        self.assertSetEqual(
+            ERC721Transfer.objects.tokens_used_by_address(safe_address),
+            {e1.address, e2.address},
+        )
+
     def test_incoming_tokens(self):
         address = Account.create().address
         self.assertFalse(InternalTx.objects.token_incoming_txs_for_address(address))
-        EthereumEventFactory(to=address)
+        ERC20TransferFactory(to=address)
         self.assertEqual(
             InternalTx.objects.token_incoming_txs_for_address(address).count(), 1
         )
-        EthereumEventFactory(to=address, erc721=True)
+        ERC721TransferFactory(to=address)
         self.assertEqual(
             InternalTx.objects.token_incoming_txs_for_address(address).count(), 2
         )
@@ -242,35 +292,34 @@ class TestEthereumEvent(TestCase):
         incoming_token_1 = InternalTx.objects.token_incoming_txs_for_address(address)[
             1
         ]  # Erc20 token
-        self.assertIsNone(incoming_token_0.value)
-        self.assertIsNotNone(incoming_token_0.token_id)
-        self.assertIsNone(incoming_token_1.token_id)
-        self.assertIsNotNone(incoming_token_1.value)
+        self.assertIsNone(incoming_token_0["_value"])
+        self.assertIsNotNone(incoming_token_0["_token_id"])
+        self.assertIsNone(incoming_token_1["_token_id"])
+        self.assertIsNotNone(incoming_token_1["_value"])
 
     def test_erc721_owned_by(self):
         random_address = Account.create().address
         self.assertEqual(
-            EthereumEvent.objects.erc721_owned_by(address=random_address), []
+            ERC721Transfer.objects.erc721_owned_by(address=random_address), []
         )
-        ethereum_event = EthereumEventFactory(to=random_address, erc721=True)
-        EthereumEventFactory(
-            from_=random_address, erc721=True, value=6
+        erc721_transfer = ERC721TransferFactory(to=random_address)
+        ERC721TransferFactory(
+            _from=random_address, token_id=6
         )  # Not appearing as owner it's not the receiver
-        EthereumEventFactory(
-            to=Account.create().address, erc721=True
+        ERC721TransferFactory(
+            to=Account.create().address
         )  # Not appearing as it's not the owner
-        EthereumEventFactory(to=random_address)  # Not appearing as it's not an erc721
+        ERC20TransferFactory(to=random_address)  # Not appearing as it's not an erc721
         self.assertEqual(
-            len(EthereumEvent.objects.erc721_owned_by(address=random_address)), 1
+            len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 1
         )
-        EthereumEventFactory(
-            from_=random_address,
-            erc721=True,
-            address=ethereum_event.address,
-            value=ethereum_event.arguments["tokenId"],
+        ERC721TransferFactory(
+            _from=random_address,
+            address=erc721_transfer.address,
+            token_id=erc721_transfer.token_id,
         )  # Send the token out
         self.assertEqual(
-            len(EthereumEvent.objects.erc721_owned_by(address=random_address)), 0
+            len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 0
         )
 
 
@@ -289,18 +338,18 @@ class TestInternalTx(TestCase):
         self.assertEqual(txs.count(), 2)
 
         token_value = 10
-        ethereum_event = EthereumEventFactory(to=ethereum_address, value=token_value)
-        EthereumEventFactory(value=token_value)  # Create tx with a random address too
+        ERC20TransferFactory(to=ethereum_address, value=token_value)
+        ERC20TransferFactory(value=token_value)  # Create tx with a random address too
         txs = InternalTx.objects.ether_and_token_txs(ethereum_address)
         self.assertEqual(txs.count(), 3)
-        EthereumEventFactory(from_=ethereum_address, value=token_value)
+        ERC20TransferFactory(_from=ethereum_address, value=token_value)
         self.assertEqual(txs.count(), 4)
 
         for i, tx in enumerate(txs):
             if tx["token_address"]:
-                self.assertEqual(tx["value"], token_value)
+                self.assertEqual(tx["_value"], token_value)
             else:
-                self.assertEqual(tx["value"], ether_value)
+                self.assertEqual(tx["_value"], ether_value)
         self.assertEqual(i, 3)
 
         self.assertEqual(InternalTx.objects.ether_txs().count(), 3)
@@ -318,12 +367,12 @@ class TestInternalTx(TestCase):
         self.assertEqual(incoming_txs.count(), 1)
 
         token_value = 10
-        ethereum_event = EthereumEventFactory(to=ethereum_address, value=token_value)
-        EthereumEventFactory(value=token_value)  # Create tx with a random address too
+        ERC20TransferFactory(to=ethereum_address, value=token_value)
+        ERC20TransferFactory(value=token_value)  # Create tx with a random address too
         incoming_txs = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address)
         self.assertEqual(incoming_txs.count(), 2)
 
-        # Make internal_tx more recent than ethereum_event
+        # Make internal_tx more recent than ERC20Transfer
         internal_tx.ethereum_tx.block = (
             EthereumBlockFactory()
         )  # As factory has a sequence, it will always be the last
@@ -332,7 +381,7 @@ class TestInternalTx(TestCase):
         incoming_tx = InternalTx.objects.ether_and_token_incoming_txs(
             ethereum_address
         ).first()
-        self.assertEqual(incoming_tx["value"], ether_value)
+        self.assertEqual(incoming_tx["_value"], ether_value)
         self.assertIsNone(incoming_tx["token_address"])
 
     def test_internal_tx_can_be_decoded(self):
