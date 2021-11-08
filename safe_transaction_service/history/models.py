@@ -972,6 +972,7 @@ class MultisigTransactionManager(models.Manager):
         have an invalid `safeNonce`, so `safeTxHash` is not valid and owners recovered from the signatures wouldn't be
         valid. We exclude `Approved hashes` and `Contract signatures` as that owners are not retrieved using the
         signature, so they will show the right owner even if `safeNonce` is not valid
+
         :param safe:
         :return: Last valid indexed transaction mined
         """
@@ -1023,6 +1024,7 @@ class MultisigTransactionManager(models.Manager):
     def not_indexed_metadata_contract_addresses(self):
         """
         Find contracts with metadata (abi, contract name) not indexed
+
         :return:
         """
         return (
@@ -1056,7 +1058,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
         """
         threshold_query = (
             SafeStatus.objects.filter(internal_tx__ethereum_tx=OuterRef("ethereum_tx"))
-            .sorted_reverse_by_internal_tx()
+            .sorted_reverse_by_mined()
             .values("threshold")
         )
 
@@ -1399,11 +1401,12 @@ class SafeStatusManager(models.Manager):
 
 
 class SafeStatusQuerySet(models.QuerySet):
-    def sorted_by_internal_tx(self):
+    def sorted_by_mined(self):
         """
         Last SafeStatus first. Usually ordering by `nonce` it should be enough, but in some cases
         (MultiSend, calling functions inside the Safe like adding/removing owners...) there could be multiple
         transactions with the same nonce. `address` must be part of the expression to use `distinct()` later
+
         :return: SafeStatus QuerySet sorted
         """
         return self.order_by(
@@ -1414,7 +1417,7 @@ class SafeStatusQuerySet(models.QuerySet):
             "-internal_tx__trace_address",
         )
 
-    def sorted_reverse_by_internal_tx(self):
+    def sorted_reverse_by_mined(self):
         return self.order_by(
             "address",
             "nonce",
@@ -1454,11 +1457,11 @@ class SafeStatusQuerySet(models.QuerySet):
         return (
             self.distinct("address")  # Uses PostgreSQL `DISTINCT ON`
             .select_related("internal_tx__ethereum_tx")
-            .sorted_by_internal_tx()
+            .sorted_by_mined()
         )
 
     def last_for_address(self, address: str) -> Optional["SafeStatus"]:
-        return self.filter(address=address).sorted_by_internal_tx().first()
+        return self.filter(address=address).sorted_by_mined().first()
 
 
 class SafeStatus(models.Model):
@@ -1491,14 +1494,15 @@ class SafeStatus(models.Model):
         return f"safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
 
     @property
-    def block_number(self):
+    def block_number(self) -> int:
         return self.internal_tx.ethereum_tx.block_id
 
-    def is_corrupted(self):
+    def is_corrupted(self) -> bool:
         """
         SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
         something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
         adding owners and enabling a Module in the same contract `execTransaction`)
+
         :return: True if corrupted, False otherwise
         """
         return (
@@ -1506,6 +1510,16 @@ class SafeStatus(models.Model):
                 address=self.address, nonce__lte=self.nonce
             ).count()
             <= self.nonce
+        )
+
+    def previous(self) -> Optional["SafeStatus"]:
+        """
+        :return: SafeStatus with the previous nonce
+        """
+        return (
+            self.__class__.objects.filter(address=self.address, nonce__lt=self.nonce)
+            .sorted_by_mined()
+            .first()
         )
 
     def store_new(self, internal_tx: InternalTx) -> None:
