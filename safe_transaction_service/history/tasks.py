@@ -229,9 +229,9 @@ def process_decoded_internal_txs_for_safe_task(
                         if safe_status.is_corrupted():
                             message = (
                                 f"Safe-address={safe_address} A problem was found in SafeStatus "
-                                f"with nonce={last_safe_status.nonce} "
-                                f"on internal-tx-id={last_safe_status.internal_tx_id} "
-                                f"tx-hash={last_safe_status.internal_tx.ethereum_tx_id} "
+                                f"with nonce={safe_status.nonce} "
+                                f"on internal-tx-id={safe_status.internal_tx_id} "
+                                f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
                             )
                             logger.error(message)
                             index_service = IndexServiceProvider()
@@ -251,7 +251,6 @@ def process_decoded_internal_txs_for_safe_task(
                             logger.error(
                                 "Safe-address=%s Processing traces again",
                                 safe_address,
-                                previous_safe_status.nonce,
                             )
                             index_service.reprocess_addresses([safe_address])
                             raise ValueError(message)

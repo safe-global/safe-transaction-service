@@ -1503,12 +1503,12 @@ class SafeStatus(models.Model):
         something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
         adding owners and enabling a Module in the same contract `execTransaction`)
 
-        :return: True if corrupted, False otherwise
+        :return: `True` if corrupted, `False` otherwise
         """
         return (
-            self.__class__.objects.filter(
-                address=self.address, nonce__lte=self.nonce
-            ).count()
+            self.__class__.objects.distinct("nonce")
+            .filter(address=self.address, nonce__lte=self.nonce)
+            .count()
             <= self.nonce
         )
 
