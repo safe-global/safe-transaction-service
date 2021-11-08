@@ -182,7 +182,7 @@ def index_safe_events_task(self) -> Optional[int]:
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task(self) -> Optional[int]:
-    try:
+    with contextlib.suppress(LockError):
         with only_one_running_task(self):
             count = InternalTxDecoded.objects.pending_for_safes().count()
             if not count:
@@ -193,8 +193,6 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     safe_to_process
                 ) in InternalTxDecoded.objects.safes_pending_to_be_processed():
                     process_decoded_internal_txs_for_safe_task.delay(safe_to_process)
-    except LockError:
-        pass
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -208,7 +206,7 @@ def process_decoded_internal_txs_for_safe_task(
     :param safe_address:
     :return:
     """
-    try:
+    with contextlib.suppress(LockError):
         with only_one_running_task(self, lock_name_suffix=safe_address):
             logger.info(
                 "Start processing decoded internal txs for safe %s", safe_address
@@ -256,8 +254,6 @@ def process_decoded_internal_txs_for_safe_task(
                     safe_address,
                 )
                 return number_processed
-    except LockError:
-        pass
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -265,7 +261,7 @@ def check_reorgs_task(self) -> Optional[int]:
     """
     :return: Number of oldest block with reorg detected. `None` if not reorg found
     """
-    try:
+    with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start checking of reorgs")
             reorg_service: ReorgService = ReorgServiceProvider()
@@ -277,8 +273,6 @@ def check_reorgs_task(self) -> Optional[int]:
                 # Stopping running tasks is not possible with gevent
                 reorg_service.recover_from_reorg(first_reorg_block_number)
                 return first_reorg_block_number
-    except LockError:
-        pass
 
 
 @cache
