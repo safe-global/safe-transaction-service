@@ -19,7 +19,7 @@ djangorestframework-camel-case==1.2.0
 docutils==0.18
 drf-yasg[validation]==1.20.0
 ethereum==2.3.2
-firebase-admin==5.0.3
+firebase-admin==5.1.0
 gnosis-py[django]==3.5.3
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.2
