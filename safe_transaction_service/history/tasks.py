@@ -223,16 +223,34 @@ def process_decoded_internal_txs_for_safe_task(
                     # Find first corrupted safe status
                     for safe_status in SafeStatus.objects.filter(
                         address=safe_address
-                    ).sorted_reverse_by_internal_tx():
+                    ).sorted_reverse_by_mined():
                         if safe_status.is_corrupted():
                             message = (
-                                f"A problem was found in SafeStatus with nonce={last_safe_status.nonce} "
-                                f"on internal-tx-id={last_safe_status.internal_tx_id} "
-                                f"tx-hash={last_safe_status.internal_tx.ethereum_tx_id} "
-                                f"for safe-address={safe_address}, reindexing"
+                                f"Safe-address={safe_address} A problem was found in SafeStatus "
+                                f"with nonce={safe_status.nonce} "
+                                f"on internal-tx-id={safe_status.internal_tx_id} "
+                                f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
                             )
                             logger.error(message)
-                            IndexServiceProvider().reprocess_addresses([safe_address])
+                            index_service = IndexServiceProvider()
+                            if previous_safe_status := safe_status.previous():
+                                block_number = (
+                                    previous_safe_status.internal_tx.ethereum_tx.block_id
+                                )
+                                logger.error(
+                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d, reindexing",
+                                    safe_address,
+                                    previous_safe_status.nonce,
+                                    block_number,
+                                )
+                                index_service.reindex_master_copies(
+                                    from_block_number=block_number
+                                )
+                            logger.error(
+                                "Safe-address=%s Processing traces again",
+                                safe_address,
+                            )
+                            index_service.reprocess_addresses([safe_address])
                             raise ValueError(message)
 
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(

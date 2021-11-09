@@ -607,6 +607,19 @@ class TestSafeStatus(TestCase):
         SafeStatusFactory(address=address_2, nonce=2, owners=[new_owner])
         self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
 
+    def test_safe_status_previous(self):
+        safe_status_5 = SafeStatusFactory(nonce=5)
+        safe_status_7 = SafeStatusFactory(nonce=7)
+        self.assertIsNone(safe_status_5.previous())
+        self.assertIsNone(safe_status_7.previous())  # Not the same address
+        safe_status_5.address = safe_status_7.address
+        safe_status_5.save()
+        self.assertEqual(safe_status_7.previous(), safe_status_5)
+
+        safe_status_2 = SafeStatusFactory(nonce=2, address=safe_status_5.address)
+        self.assertIsNone(safe_status_2.previous())
+        self.assertEqual(safe_status_5.previous(), safe_status_2)
+
 
 class TestSafeContract(TestCase):
     def test_get_delegates_for_safe(self):

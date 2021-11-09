@@ -227,7 +227,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(safe_status.nonce, 1)
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertCountEqual(safe_status.owners, [owner_account_1.address])
@@ -261,7 +261,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 2)
         self.assertEqual(safe_status.threshold, 2)
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 2)
@@ -297,14 +297,14 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.threshold, 1)
         self.assertEqual(safe_status.owners, [owner_account_1.address])
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Processed execTransaction and removeOwner
         self.assertEqual(safe_status.nonce, 3)
         self.assertEqual(safe_status.threshold, 2)
         self.assertEqual(safe_status.owners, [owner_account_1.address])
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             2
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 3)
@@ -342,7 +342,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.enabled_modules, [module_address])
         self.assertEqual(safe_status.nonce, 4)
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.enabled_modules, [])
@@ -395,7 +395,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.enabled_modules, [module_address])
         self.assertEqual(safe_status.nonce, 5)
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.fallback_handler, fallback_handler)
@@ -430,7 +430,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 6)
         self.assertEqual(safe_status.enabled_modules, [])
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 6)
@@ -526,7 +526,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 8)
         self.assertEqual(safe_status.guard, guard_address)
 
-        safe_status = SafeStatus.objects.sorted_by_internal_tx()[
+        safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 8)
