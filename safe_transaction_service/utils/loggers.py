@@ -11,7 +11,7 @@ def get_milliseconds_now():
 
 
 class IgnoreCheckUrl(logging.Filter):
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
         return not ("GET /check/" in message and "200" in message)
 
