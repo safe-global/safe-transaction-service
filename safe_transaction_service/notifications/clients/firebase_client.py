@@ -10,20 +10,11 @@ from firebase_admin.messaging import BatchResponse, SendResponse, UnregisteredEr
 logger = getLogger(__name__)
 
 
-class FirebaseClientException(Exception):
-    pass
-
-
-class FirebaseTokensNotValid(FirebaseClientException):
-    def __init__(self, tokens: Sequence[str]):
-        super().__init__()
-        self.tokens = tokens
-
-
 def get_firebase_client() -> "MessagingClient":
     """
     Don't use singleton due to gevent. Google Services is keeping the same socket opened. When creating multiple
     instances they need to have a different name, we use an incremental index for that
+
     :return: New instance of a configured MessagingClient
     """
     if hasattr(settings, "NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS"):
@@ -58,20 +49,15 @@ class FirebaseClientPool:
 
     def __enter__(self):
         if self.firebase_client_pool:
+            # If there are elements on the pool, take them
             self.instance = self.firebase_client_pool.pop()
         else:
+            # If not, get a new client
             self.instance = get_firebase_client()
         return self.instance
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.firebase_client_pool.append(self.instance)
-
-
-class FirebaseProvider:
-    def __new__(cls):
-        if not hasattr(cls, "instance"):
-            cls.instance: MessagingClient = get_firebase_client()
-        return cls.instance
 
 
 class MessagingClient(ABC):
@@ -113,6 +99,7 @@ class FirebaseClient(MessagingClient):
         """
         Data for the Apple Push Notification Service
         see https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging
+
         :param title_loc_key:
         :return:
         """
@@ -145,6 +132,7 @@ class FirebaseClient(MessagingClient):
     def verify_token(self, token: str) -> bool:
         """
         Check if a token is valid on firebase for the project. Only way to do it is simulating a message send
+
         :param token: Firebase client token
         :return: True if valid, False otherwise
         """
@@ -160,6 +148,7 @@ class FirebaseClient(MessagingClient):
     ) -> Tuple[int, int, Sequence[str]]:
         """
         Send multicast message using firebase cloud messaging service
+
         :param tokens: Firebase token of recipient
         :param data: Dictionary with the notification data
         :return: Success count, failure count, invalid tokens
