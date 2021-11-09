@@ -11,7 +11,7 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
 from gnosis.eth.tests.utils import deploy_example_erc20
 
-from ..clients import CoinMarketCapClient, CoinMarketCapToken, SafeRelayTokenClient
+from ..clients import CoinMarketCapClient, CoinMarketCapToken
 from ..models import Token
 from .factories import TokenFactory
 
@@ -99,28 +99,3 @@ class TestCommands(TestCase):
 
         call_command(command, "fake-api-key", "--store-db", stdout=buf)
         self.assertTrue(Token.objects.first().trusted)
-
-    @mock.patch.object(
-        SafeRelayTokenClient,
-        "_do_query",
-        autospec=True,
-        return_value=relay_token_client_mock,
-    )
-    def test_update_tokens_from_relay(
-        self, relay_token_client_do_query_mock: MagicMock
-    ):
-        command = "update_tokens_from_relay"
-        buf = StringIO()
-
-        self.assertEqual(Token.objects.count(), 0)
-        call_command(command, stdout=buf)
-        self.assertEqual(Token.objects.count(), 0)
-        call_command(command, "--store-db", stdout=buf)
-        self.assertEqual(Token.objects.count(), 2)
-        for token in Token.objects.all():
-            self.assertTrue(token.trusted)
-        Token.objects.update(trusted=False)
-
-        call_command(command, "--store-db", stdout=buf)
-        for token in Token.objects.all():
-            self.assertTrue(token.trusted)
