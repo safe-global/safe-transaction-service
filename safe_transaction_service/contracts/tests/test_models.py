@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.db.models.fields.files import ImageFieldFile
 from django.db.transaction import atomic
 from django.test import TestCase
 
@@ -22,7 +23,7 @@ from gnosis.eth.tests.clients.mocks import (
 )
 
 from ..models import Contract, ContractAbi, validate_abi
-from .factories import ContractFactory
+from .factories import ContractAbiFactory, ContractFactory
 
 
 class TestContractAbi(TestCase):
@@ -30,6 +31,7 @@ class TestContractAbi(TestCase):
         abi = sourcify_safe_metadata["output"]["abi"]
         contract_abi = ContractAbi.objects.create(abi=abi, description="testing")
         self.assertIsNotNone(contract_abi.abi_hash)
+        self.assertGreater(len(str(contract_abi)), 1)
 
         with self.assertRaisesMessage(IntegrityError, "violates unique constraint"):
             with atomic():
@@ -38,6 +40,13 @@ class TestContractAbi(TestCase):
                 )
 
         ContractAbi.objects.create(abi={}, description="testing 3")
+
+    def test_contract_abi_save(self):
+        contract_abi = ContractAbiFactory()
+        abi_hash = contract_abi.abi_hash
+        contract_abi.abi = {}
+        contract_abi.save(update_fields=["abi"])
+        self.assertNotEqual(contract_abi.abi_hash, abi_hash)
 
 
 class TestContract(TestCase):
@@ -92,6 +101,29 @@ class TestContract(TestCase):
         )
         self.assertEqual(contract_without_metadata.name, "")
         self.assertIsNone(contract_without_metadata.contract_abi)
+
+    def test_fix_missing_logos(self):
+        self.assertEqual(Contract.objects.fix_missing_logos(), 0)
+        contract_name = "test-contract"
+        contract_display_name = "awesome-contract"
+        contract = ContractFactory(logo="", name=contract_name, display_name="")
+        self.assertEqual(contract.get_main_name(), contract_name)
+        contract.display_name = contract_display_name
+        contract.save()
+        self.assertEqual(contract.get_main_name(), contract_display_name)
+        self.assertIn("without logo", str(contract))
+        self.assertEqual(Contract.objects.with_logo().count(), 0)
+        self.assertEqual(Contract.objects.without_logo().count(), 1)
+        self.assertEqual(contract.logo, "")
+        self.assertEqual(Contract.objects.fix_missing_logos(), 0)
+        with mock.patch.object(ImageFieldFile, "size", return_value=1):
+            self.assertEqual(Contract.objects.fix_missing_logos(), 1)
+
+        contract.refresh_from_db()
+        self.assertIn("with logo", str(contract))
+        self.assertIn(f"{contract.address}.png", contract.logo.name)
+        self.assertEqual(Contract.objects.with_logo().count(), 1)
+        self.assertEqual(Contract.objects.without_logo().count(), 0)
 
     @mock.patch.object(EtherscanClient, "get_contract_metadata", autospec=True)
     @mock.patch.object(
@@ -152,6 +184,10 @@ class TestContract(TestCase):
         self.assertIsNone(contract.contract_abi)
         self.assertEqual(ContractAbi.objects.count(), 0)
         self.assertTrue(contract.sync_abi_from_api(network=network))
+        # Remove contract_abi description and sync again to check that's filled
+        contract.contract_abi.description = ""
+        contract.contract_abi.save()
+        self.assertTrue(contract.sync_abi_from_api(network=network))
         self.assertIsNotNone(contract.contract_abi)
         self.assertEqual(contract.name, contract_name)
         contract_abi = contract.contract_abi
@@ -180,10 +216,10 @@ class TestContract(TestCase):
         self.assertFalse(contract.sync_abi_from_api(network=network))
 
     def test_without_metadata(self):
-        contract_without_abi = ContractFactory(name="aloha", contract_abi=None)
-        contract_without_name = ContractFactory(name="")
+        ContractFactory(name="aloha", contract_abi=None)
+        ContractFactory(name="")
         self.assertEqual(Contract.objects.without_metadata().count(), 2)
-        contract_with_everything = ContractFactory()
+        ContractFactory()
         self.assertEqual(Contract.objects.without_metadata().count(), 2)
 
     def test_validate_abi(self):
