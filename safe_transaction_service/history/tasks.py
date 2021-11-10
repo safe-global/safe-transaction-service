@@ -233,17 +233,18 @@ def process_decoded_internal_txs_for_safe_task(
                             logger.error(message)
                             index_service = IndexServiceProvider()
                             if previous_safe_status := safe_status.previous():
-                                block_number = (
-                                    previous_safe_status.internal_tx.ethereum_tx.block_id
-                                )
+                                block_number = previous_safe_status.block_number
+                                to_block_number = last_safe_status.block_number
                                 logger.error(
-                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d, reindexing",
+                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , reindexing until block=%d",
                                     safe_address,
                                     previous_safe_status.nonce,
                                     block_number,
+                                    to_block_number,
                                 )
                                 index_service.reindex_master_copies(
-                                    from_block_number=block_number
+                                    from_block_number=block_number,
+                                    to_block_number=to_block_number,
                                 )
                             logger.error(
                                 "Safe-address=%s Processing traces again",

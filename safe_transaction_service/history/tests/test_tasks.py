@@ -113,14 +113,15 @@ class TestTasks(TestCase):
         safe_status_0 = SafeStatusFactory(nonce=0)
         safe_address = safe_status_0.address
         safe_status_2 = SafeStatusFactory(nonce=2, address=safe_address)
-        SafeStatusFactory(nonce=5, address=safe_address)
+        safe_status_5 = SafeStatusFactory(nonce=5, address=safe_address)
         with patch.object(IndexService, "reindex_master_copies") as reindex_mock:
             with patch.object(IndexService, "reprocess_addresses") as reprocess_mock:
                 with self.assertLogs(logger=task_logger) as cm:
                     process_decoded_internal_txs_for_safe_task.delay(safe_address)
                     reprocess_mock.assert_called_with([safe_address])
                     reindex_mock.assert_called_with(
-                        from_block_number=safe_status_0.internal_tx.ethereum_tx.block_id
+                        from_block_number=safe_status_0.block_number,
+                        to_block_number=safe_status_5.block_number,
                     )
                     self.assertIn(
                         f"Safe-address={safe_address} A problem was found in SafeStatus "
@@ -128,7 +129,7 @@ class TestTasks(TestCase):
                         cm.output[1],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Last known not corrupted SafeStatus with nonce=0 on block={safe_status_0.internal_tx.ethereum_tx.block_id}, reindexing",
+                        f"Safe-address={safe_address} Last known not corrupted SafeStatus with nonce=0 on block={safe_status_0.internal_tx.ethereum_tx.block_id} , reindexing until block={safe_status_5.block_number}",
                         cm.output[2],
                     )
                     self.assertIn(
