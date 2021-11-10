@@ -259,7 +259,7 @@ LOGGING = {
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
         "ignore_succeeded_none": {
-            "()": "safe_transaction_service.utils.celery.IgnoreSucceededNone"
+            "()": "safe_transaction_service.utils.loggers.IgnoreSucceededNone"
         },
     },
     "formatters": {
