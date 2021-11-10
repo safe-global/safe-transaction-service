@@ -85,8 +85,9 @@ class EnsClient:
         """
         Get domain label from domain_hash (keccak of domain name without the TLD, don't confuse with namehash)
         used for ENS ERC721 token_id. Use another method for caching purposes (use same parameter type)
+
         :param domain_hash: keccak of domain name without the TLD, don't confuse with namehash. E.g. For
-        batman.eth it would be just keccak('batman')
+            batman.eth it would be just keccak('batman')
         :return: domain label if found
         """
         domain_hash_str = self.domain_hash_to_hex_str(domain_hash)
@@ -101,9 +102,9 @@ class EnsClient:
                 {
                     "domain": {
                         "isMigrated": true,
-                        "labelName": "uxio",
-                        "labelhash": "0xaa4c58f9a1044bd2936d4bb029ac36ddbc4e0129665fddff8534635a61cdd2be",
-                        "name": "uxio.eth",
+                        "labelName": "gilfoyle",
+                        "labelhash": "0xadfd886b420023026d5c0b1be0ffb5f18bb2f37143dff545aeaea0d23a4ba910",
+                        "name": "gilfoyle.eth",
                         "parent": {
                             "name": "eth"
                         }
@@ -141,28 +142,6 @@ class EnsClient:
         if not r.ok:
             return None
         else:
-            """
-             {
-                "data": {
-                    "account": {
-                        "registrations": [
-                            {
-                                "domain": {
-                                    "isMigrated": true,
-                                    "labelName": "uxio",
-                                    "labelhash": "0xaa4c58f9a1044bd2936d4bb029ac36ddbc4e0129665fddff8534635a61cdd2be",
-                                    "name": "uxio.eth",
-                                    "parent": {
-                                        "name": "eth"
-                                    }
-                                },
-                                "expiryDate": "1905460880"
-                            }
-                        ]
-                    }
-                }
-            }
-            """
             data = r.json()
             if data:
                 return data.get("data", {}).get("account")
