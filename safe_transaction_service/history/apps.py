@@ -11,7 +11,7 @@ class HistoryConfig(AppConfig):
         from . import signals  # noqa
 
         for argument in sys.argv:
-            if "gunicorn" in argument:
+            if "gunicorn" in argument:  # pragma: no cover
                 # Just run this on production
                 # TODO Find a better way
                 from safe_transaction_service.contracts.tx_decoder import (

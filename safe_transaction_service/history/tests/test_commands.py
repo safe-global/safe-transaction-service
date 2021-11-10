@@ -93,7 +93,6 @@ class TestCommands(TestCase):
         self.assertIn("Created webhook for", buf.getvalue())
 
     def test_index_erc20(self):
-
         command = "index_erc20"
         buf = StringIO()
         with self.assertLogs(logger=task_logger) as cm:

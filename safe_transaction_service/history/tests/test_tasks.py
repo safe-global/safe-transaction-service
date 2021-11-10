@@ -10,7 +10,14 @@ from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ..models import SafeContract, SafeStatus
 from ..services import IndexService
-from ..tasks import index_erc20_events_out_of_sync_task
+from ..tasks import (
+    check_reorgs_task,
+    index_erc20_events_out_of_sync_task,
+    index_erc20_events_task,
+    index_internal_txs_task,
+    index_new_proxies_task,
+    index_safe_events_task,
+)
 from ..tasks import logger as task_logger
 from ..tasks import (
     process_decoded_internal_txs_for_safe_task,
@@ -29,6 +36,38 @@ logger = logging.getLogger(__name__)
 
 
 class TestTasks(TestCase):
+    def test_check_reorgs_task(self):
+        self.assertIsNone(check_reorgs_task.delay().result, 0)
+
+    def test_index_erc20_events_task(self):
+        self.assertEqual(index_erc20_events_task.delay().result, 0)
+
+    def test_index_erc20_events_out_of_sync_task(self):
+        with self.assertLogs(logger=task_logger) as cm:
+            index_erc20_events_out_of_sync_task.delay()
+            self.assertIn("No addresses to process", cm.output[0])
+
+        with self.assertLogs(logger=task_logger) as cm:
+            safe_contract = SafeContractFactory()
+            index_erc20_events_out_of_sync_task.delay()
+            self.assertIn(
+                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
+                cm.output[0],
+            )
+            self.assertIn(
+                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
+                cm.output[1],
+            )
+
+    def test_index_internal_txs_task(self):
+        self.assertEqual(index_internal_txs_task.delay().result, 0)
+
+    def test_index_new_proxies_task(self):
+        self.assertEqual(index_new_proxies_task.delay().result, 0)
+
+    def test_index_safe_events_task(self):
+        self.assertEqual(index_safe_events_task.delay().result, 0)
+
     @patch.object(EthereumClient, "get_network", return_value=EthereumNetwork.GANACHE)
     @patch.object(requests.Session, "post")
     def test_send_webhook_task(self, mock_post: MagicMock, get_network_mock: MagicMock):
@@ -96,20 +135,3 @@ class TestTasks(TestCase):
                         f"Safe-address={safe_address} Processing traces again",
                         cm.output[3],
                     )
-
-    def test_index_erc20_events_out_of_sync_task(self):
-        with self.assertLogs(logger=task_logger) as cm:
-            index_erc20_events_out_of_sync_task.delay()
-            self.assertIn("No addresses to process", cm.output[0])
-
-        with self.assertLogs(logger=task_logger) as cm:
-            safe_contract = SafeContractFactory()
-            index_erc20_events_out_of_sync_task.delay()
-            self.assertIn(
-                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
-                cm.output[0],
-            )
-            self.assertIn(
-                "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
-                cm.output[1],
-            )

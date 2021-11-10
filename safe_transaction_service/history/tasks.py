@@ -151,8 +151,7 @@ def index_new_proxies_task(self) -> Optional[int]:
             logger.info("Start indexing of new proxies")
             number_proxies = ProxyFactoryIndexerProvider().start()
             logger.info("Proxy indexing found %d proxies", number_proxies)
-            if number_proxies:
-                return number_proxies
+            return number_proxies
 
 
 @app.shared_task(

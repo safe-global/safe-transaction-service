@@ -12,13 +12,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--reindex",
-            help="Try to fetch contract names/ABIS for contracts already indexed",
+            help="Try to fetch contract names/ABIS for contracts already indexed. "
+            "If not provided only missing contracts will be processed",
             action="store_true",
             default=False,
         )
         parser.add_argument(
             "--sync",
-            help="Don't trigger an async task",
+            help="Command will wait for the command to run. If not provided an async task will be used",
             action="store_true",
             default=False,
         )
@@ -28,11 +29,20 @@ class Command(BaseCommand):
         sync = options["sync"]
 
         if reindex:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Calling `reindex_contracts_without_metadata_task` task"
+                )
+            )
             task = reindex_contracts_without_metadata_task
         else:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Calling `create_missing_contracts_with_metadata_task` task"
+                )
+            )
             task = create_missing_contracts_with_metadata_task
 
-        self.stdout.write(self.style.SUCCESS("Triggering task"))
         if sync:
             task()
             self.stdout.write(self.style.SUCCESS("Processing finished"))
