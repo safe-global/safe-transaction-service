@@ -272,6 +272,7 @@ class IndexService:
     def reindex_master_copies(
         self,
         from_block_number: int,
+        to_block_number: Optional[int] = None,
         block_process_limit: int = 1000,
         addresses: Optional[ChecksumAddress] = None,
     ):
@@ -280,10 +281,13 @@ class IndexService:
         while reindexing
 
         :param from_block_number: Block number to start indexing from
+        :param to_block_number: Block number to stop indexing on
         :param block_process_limit: Number of blocks to process each time
         :param addresses: Master Copy or Safes(for L2 event processing) addresses. If not provided,
             all master copies will be used
         """
+        assert (not to_block_number) or to_block_number > from_block_number
+
         from ..indexers import (
             EthereumIndexer,
             InternalTxIndexerProvider,
@@ -312,8 +316,13 @@ class IndexService:
         else:
             logger.info("Start reindexing addresses %s", addresses)
             current_block_number = ethereum_client.current_block_number
+            stop_block_number = (
+                min(current_block_number, to_block_number)
+                if to_block_number
+                else current_block_number
+            )
             block_number = from_block_number
-            while block_number < current_block_number:
+            while block_number < stop_block_number:
                 elements = indexer.find_relevant_elements(
                     addresses, block_number, block_number + block_process_limit
                 )
