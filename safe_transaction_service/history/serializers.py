@@ -359,7 +359,7 @@ class DelegateSignatureCheckerMixin:
 
 
 class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
-    safe = EthereumAddressField(allow_null=True)
+    safe = EthereumAddressField(allow_null=True, required=False)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65)
@@ -377,7 +377,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     def validate(self, data):
         super().validate(data)
 
-        safe_address: Optional[ChecksumAddress] = data["safe"]
+        safe_address: Optional[ChecksumAddress] = data.get("safe")
         if (
             safe_address
             and not SafeContract.objects.filter(address=safe_address).exists()

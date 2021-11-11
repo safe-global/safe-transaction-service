@@ -593,7 +593,7 @@ class SafeDelegateListView(ListCreateAPIView):
         signer will update the label or delegator if different.
         For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
         Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
-        For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
+        For signature this hash need to be signed: keccak(checksummed address + str(int(current_epoch // 3600)))
         For example:
              - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
              - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
@@ -715,7 +715,7 @@ class DelegateListView(ListCreateAPIView):
         signer will update the label or delegator if different.
         For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
         Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
-        For signature this hash need to be signed: keccak(address + str(int(current_epoch // 3600)))
+        For signature this hash need to be signed: keccak(checksummed address + str(int(current_epoch // 3600)))
         For example:
              - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
              - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
