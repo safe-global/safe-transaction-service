@@ -1607,7 +1607,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         delegator = Account.create()
         label = "Saul Goodman"
         data = {
-            "safe": None,
             "delegate": delegate.address,
             "delegator": delegator.address,
             "label": label,
