@@ -235,8 +235,9 @@ def process_decoded_internal_txs_for_safe_task(
                             if previous_safe_status := safe_status.previous():
                                 block_number = previous_safe_status.block_number
                                 to_block_number = last_safe_status.block_number
-                                logger.error(
-                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , reindexing until block=%d",
+                                logger.info(
+                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , "
+                                    "reindexing until block=%d",
                                     safe_address,
                                     previous_safe_status.nonce,
                                     block_number,
@@ -246,7 +247,7 @@ def process_decoded_internal_txs_for_safe_task(
                                     from_block_number=block_number,
                                     to_block_number=to_block_number,
                                 )
-                            logger.error(
+                            logger.info(
                                 "Safe-address=%s Processing traces again",
                                 safe_address,
                             )

@@ -314,7 +314,7 @@ class IndexService:
         if not addresses:
             logger.warning("No addresses to process")
         else:
-            logger.info("Start reindexing addresses %s", addresses)
+            logger.info("Start reindexing Safe Master Copy addresses %s", addresses)
             current_block_number = ethereum_client.current_block_number
             stop_block_number = (
                 min(current_block_number, to_block_number)
