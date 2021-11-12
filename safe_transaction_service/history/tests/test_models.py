@@ -1,9 +1,11 @@
 import logging
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.test import TestCase
+from django.utils import timezone
 
 from eth_account import Account
 from web3 import Web3
@@ -15,6 +17,7 @@ from safe_transaction_service.contracts.tests.factories import ContractFactory
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
+    EthereumBlock,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -773,6 +776,36 @@ class TestEthereumBlock(TestCase):
         ethereum_block.set_not_confirmed()
         ethereum_block.refresh_from_db()
         self.assertFalse(ethereum_block.confirmed)
+
+    def test_oldest_than(self):
+        now = timezone.now()
+        one_hour_ago = now - timedelta(hours=1)
+        one_day_ago = now - timedelta(days=1)
+        one_week_ago = now - timedelta(weeks=1)
+
+        ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
+        ethereum_block_1 = EthereumBlockFactory(timestamp=one_day_ago)
+        ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
+        ethereum_block_3 = EthereumBlockFactory(timestamp=now)
+
+        self.assertEqual(EthereumBlock.objects.oldest_than(0).first(), ethereum_block_3)
+        self.assertEqual(EthereumBlock.objects.oldest_than(2).first(), ethereum_block_2)
+        self.assertEqual(
+            EthereumBlock.objects.oldest_than(60 * 60 + 1).first(), ethereum_block_1
+        )
+        self.assertEqual(
+            EthereumBlock.objects.oldest_than(60 * 60 + 5).first(), ethereum_block_1
+        )
+        self.assertEqual(
+            EthereumBlock.objects.oldest_than(60 * 60 + 5).first(), ethereum_block_1
+        )
+        self.assertEqual(
+            EthereumBlock.objects.oldest_than(60 * 60 * 24 + 1).first(),
+            ethereum_block_0,
+        )
+        self.assertIsNone(
+            EthereumBlock.objects.oldest_than(60 * 60 * 24 * 7 + 1).first(), None
+        )
 
 
 class TestMultisigTransactions(TestCase):

@@ -20,7 +20,7 @@ from .indexers import (
 )
 from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
-from .models import InternalTxDecoded, SafeStatus, WebHook, WebHookType
+from .models import EthereumBlock, InternalTxDecoded, SafeStatus, WebHook, WebHookType
 from .services import (
     IndexingException,
     IndexServiceProvider,
@@ -192,6 +192,35 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     safe_to_process
                 ) in InternalTxDecoded.objects.safes_pending_to_be_processed():
                     process_decoded_internal_txs_for_safe_task.delay(safe_to_process)
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def reindex_last_hours(self, hours: int = 2) -> Optional[int]:
+    """
+    Reindexes last hours for master copies to prevent indexing issues
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            if ethereum_block := EthereumBlock.objects.oldest_than(
+                seconds=60 * 60 * hours
+            ).first():
+                from_block_number = ethereum_block.number
+                to_block_number = (
+                    EthereumBlock.objects.order_by("-timestamp").first().number
+                )
+                assert to_block_number >= from_block_number
+                if to_block_number != from_block_number:
+                    logger.info(
+                        "Reindexing master copies for last %d hours, from-block=%d to-block=%d",
+                        hours,
+                        from_block_number,
+                        to_block_number,
+                    )
+                    index_service = IndexServiceProvider()
+                    index_service.reindex_master_copies(
+                        from_block_number=from_block_number,
+                        to_block_number=to_block_number,
+                    )
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)

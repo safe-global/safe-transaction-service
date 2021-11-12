@@ -76,6 +76,12 @@ TASKS = [
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.reindex_last_hours",
+        "Reindex master copies for the last hours",
+        110,
+        IntervalSchedule.MINUTES,
+    ),
+    CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
         "Process Internal Txs",
         2,

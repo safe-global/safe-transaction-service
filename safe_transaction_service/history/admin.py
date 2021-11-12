@@ -301,6 +301,7 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     inlines = (MultisigConfirmationInline,)
     list_display = (
         "created",
+        "nonce",
         "safe",
         "executed",
         "successful",
@@ -308,7 +309,6 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
         "ethereum_tx_id",
         "to",
         "value",
-        "nonce",
         "data",
     )
     list_filter = (MultisigTransactionExecutedListFilter, "failed", "trusted")
