@@ -139,5 +139,11 @@ A user must be created to get access:
 docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
 ```
 
+## Troubleshooting
+
+### Issues installing grpc on a Mac M1
+
+If you face issues installing the `grpc` dependency locally (required by this project) on a M1 chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
+
 ## Contributors
 [See contributors](https://github.com/gnosis/safe-transaction-service/graphs/contributors)
