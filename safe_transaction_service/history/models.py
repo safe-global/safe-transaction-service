@@ -24,6 +24,7 @@ from django.db.models import Case, Count, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from eth_typing import ChecksumAddress
@@ -177,6 +178,15 @@ class EthereumBlockManager(models.Manager):
 
 
 class EthereumBlockQuerySet(models.QuerySet):
+    def oldest_than(self, seconds: int):
+        """
+        :param seconds: Seconds
+        :return: Blocks oldest than second, ordered by timestamp descending
+        """
+        return self.filter(
+            timestamp__lte=timezone.now() - datetime.timedelta(seconds=seconds)
+        ).order_by("-timestamp")
+
     def not_confirmed(self, to_block_number: Optional[int] = None):
         """
         :param to_block_number:
