@@ -154,10 +154,21 @@ class TestTasks(TestCase):
                         cm.output[1],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Last known not corrupted SafeStatus with nonce=0 on block={safe_status_0.internal_tx.ethereum_tx.block_id} , reindexing until block={safe_status_5.block_number}",
+                        f"Safe-address={safe_address} Processing traces again",
                         cm.output[2],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Processing traces again",
+                        f"Safe-address={safe_address} Last known not corrupted SafeStatus with nonce=0 on "
+                        f"block={safe_status_0.internal_tx.ethereum_tx.block_id} , "
+                        f"reindexing until block={safe_status_5.block_number}",
                         cm.output[3],
+                    )
+                    self.assertIn(
+                        f"Reindexing master copies from-block={safe_status_0.internal_tx.ethereum_tx.block_id} "
+                        f"to-block={safe_status_5.block_number}",
+                        cm.output[4],
+                    )
+                    self.assertIn(
+                        f"Safe-address={safe_address} Processing traces again after reindexing",
+                        cm.output[5],
                     )
