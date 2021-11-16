@@ -82,9 +82,11 @@ def only_one_running_task(
     with redis.lock(
         lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout
     ) as lock:
-        ACTIVE_LOCKS.add(lock_name)
-        yield lock
-        ACTIVE_LOCKS.remove(lock_name)
-        if gevent:
-            # Needed for django-db-geventpool
-            close_gevent_db_connection()
+        try:
+            ACTIVE_LOCKS.add(lock_name)
+            yield lock
+            ACTIVE_LOCKS.remove(lock_name)
+        finally:
+            if gevent:
+                # Needed for django-db-geventpool
+                close_gevent_db_connection()

@@ -84,7 +84,7 @@ TASKS = [
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
         "Process Internal Txs",
-        2,
+        20,
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(

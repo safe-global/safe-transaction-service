@@ -191,7 +191,9 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 for (
                     safe_to_process
                 ) in InternalTxDecoded.objects.safes_pending_to_be_processed():
-                    process_decoded_internal_txs_for_safe_task.delay(safe_to_process)
+                    process_decoded_internal_txs_for_safe_task.delay(
+                        safe_to_process, reindex_master_copies=False
+                    )
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -216,22 +218,40 @@ def reindex_last_hours(self, hours: int = 2) -> Optional[int]:
                         from_block_number,
                         to_block_number,
                     )
-                    index_service = IndexServiceProvider()
-                    index_service.reindex_master_copies(
-                        from_block_number=from_block_number,
-                        to_block_number=to_block_number,
-                    )
+                    reindex_master_copies_task.delay(from_block_number, to_block_number)
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def reindex_master_copies_task(
+    self, from_block_number: int, to_block_number: int
+) -> None:
+    """
+    Reindexes master copies
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            index_service = IndexServiceProvider()
+            logger.info(
+                "Reindexing master copies from-block=%d to-block=%d",
+                from_block_number,
+                to_block_number,
+            )
+            index_service.reindex_master_copies(
+                from_block_number=from_block_number,
+                to_block_number=to_block_number,
+            )
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def process_decoded_internal_txs_for_safe_task(
-    self, safe_address: str
+    self, safe_address: str, reindex_master_copies: bool = True
 ) -> Optional[int]:
     """
     Process decoded internal txs for one Safe. Processing decoded transactions is very slow and this way multiple
     Safes can be processed at the same time
 
     :param safe_address:
+    :param reindex_master_copies: Trigger auto reindexing if a problem is found
     :return:
     """
     with contextlib.suppress(LockError):
@@ -249,6 +269,7 @@ def process_decoded_internal_txs_for_safe_task(
                 if last_safe_status and last_safe_status.is_corrupted():
                     tx_processor.clear_cache()
                     # Find first corrupted safe status
+                    previous_safe_status: Optional[SafeStatus] = None
                     for safe_status in SafeStatus.objects.filter(
                         address=safe_address
                     ).sorted_reverse_by_mined():
@@ -261,7 +282,11 @@ def process_decoded_internal_txs_for_safe_task(
                             )
                             logger.error(message)
                             index_service = IndexServiceProvider()
-                            if previous_safe_status := safe_status.previous():
+                            logger.info(
+                                "Safe-address=%s Processing traces again",
+                                safe_address,
+                            )
+                            if reindex_master_copies and previous_safe_status:
                                 block_number = previous_safe_status.block_number
                                 to_block_number = last_safe_status.block_number
                                 logger.info(
@@ -272,16 +297,16 @@ def process_decoded_internal_txs_for_safe_task(
                                     block_number,
                                     to_block_number,
                                 )
-                                index_service.reindex_master_copies(
-                                    from_block_number=block_number,
-                                    to_block_number=to_block_number,
+                                reindex_master_copies_task.delay(
+                                    block_number, to_block_number
                                 )
                             logger.info(
-                                "Safe-address=%s Processing traces again",
+                                "Safe-address=%s Processing traces again after reindexing",
                                 safe_address,
                             )
                             index_service.reprocess_addresses([safe_address])
                             raise ValueError(message)
+                        previous_safe_status = safe_status
 
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
                     safe_address
