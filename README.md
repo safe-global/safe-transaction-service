@@ -45,8 +45,8 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 ## Setup for production (event indexing)
 Since **version 3.0.0** transaction service can be configured to rely on **event indexing**
-when [SafeL2 version](https://github.com/gnosis/safe-contracts/blob/v1.3.0/contracts/GnosisSafeL2.sol) is used. Only
-contracts from v1.3.0 onwards with L2 events will be indexed.
+when [SafeL2 version](https://github.com/gnosis/safe-contracts/blob/v1.3.0/contracts/GnosisSafeL2.sol) is used. **Only
+contracts from v1.3.0 onwards with L2 events will be indexed.**
 
 An example environment file can be used for the L2 setup:
 ```bash
@@ -138,6 +138,12 @@ A user must be created to get access:
 ```bash
 docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
 ```
+
+## Safe Contract ABIs and addresses
+- [v1.3.0](https://github.com/gnosis/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe.json)
+- [v1.3.0 L2](https://github.com/gnosis/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe_l2.json)
+- [Other related contracts and previous Safe versions](https://github.com/gnosis/safe-deployments/blob/main/src/assets)
+
 
 ## Troubleshooting
 

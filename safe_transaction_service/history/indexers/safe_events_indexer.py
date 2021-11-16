@@ -326,7 +326,13 @@ class SafeEventsIndexer(EventsIndexer):
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
                 except IntegrityError as exc:
-                    logger.info("Problem inserting internal_tx: %s", exc)
+                    logger.info(
+                        "Ignoring already processed event %s for Safe %s on tx-hash=%s: %s",
+                        event_name,
+                        safe_address,
+                        decoded_element["transactionHash"].hex(),
+                        exc,
+                    )
                     return
 
         return internal_tx
