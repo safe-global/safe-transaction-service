@@ -7,6 +7,16 @@ app_name = "history"
 urlpatterns = [
     path("about/", views.AboutView.as_view(), name="about"),
     path(
+        "about/ethereum-rpc/",
+        views.AboutEthereumRPCView.as_view(),
+        name="about-ethereum-rpc",
+    ),
+    path(
+        "about/ethereum-tracing-rpc/",
+        views.AboutEthereumTracingRPCView.as_view(),
+        name="about-ethereum-tracing-rpc",
+    ),
+    path(
         "about/master-copies/", views.MasterCopiesView.as_view(), name="master-copies"
     ),
     path(

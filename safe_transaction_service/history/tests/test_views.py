@@ -50,6 +50,26 @@ logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def test_about_view(self):
+        url = reverse("v1:history:about")
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_about_ethereum_rpc_url(self):
+        for url_name in (
+            "v1:history:about-ethereum-rpc",
+            "v1:history:about-ethereum-tracing-rpc",
+        ):
+            with self.subTest(url_name=url_name):
+                url = reverse(url_name)
+                response = self.client.get(url, format="json")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertIn("EthereumJS TestRPC", response.data["version"])
+                self.assertGreaterEqual(response.data["block_number"], 0)
+                self.assertEqual(response.data["chain_id"], 1337)
+                self.assertEqual(response.data["chain"], "GANACHE")
+                self.assertEqual(response.data["syncing"], False)
+
     def test_all_transactions_view(self):
         safe_address = Account.create().address
         response = self.client.get(
