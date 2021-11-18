@@ -4,8 +4,6 @@ from typing import Generator, List, Optional, Sequence, Set
 
 from django.db import transaction
 
-from requests import RequestException
-
 from gnosis.eth import EthereumClient
 
 from safe_transaction_service.contracts.tx_decoder import (
@@ -133,7 +131,7 @@ class InternalTxIndexer(EthereumIndexer):
                     ]
                 )
             return OrderedDict.fromkeys(tx_hashes).keys()
-        except RequestException as e:
+        except IOError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_block`"
             ) from e
@@ -168,7 +166,7 @@ class InternalTxIndexer(EthereumIndexer):
                 to_block=to_block_number,
                 from_address=addresses,
             )
-        except RequestException as e:
+        except IOError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_filter`"
             ) from e
