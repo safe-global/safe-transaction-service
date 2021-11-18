@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 from django.conf import settings
 from django.db.models import Count
@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from web3 import Web3
 
+from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import CannotEstimateGas
 
@@ -92,6 +93,50 @@ class AboutView(APIView):
             },
         }
         return Response(content)
+
+
+class AboutEthereumRPCView(APIView):
+    """
+    Returns information about ethereum RPC the service is using
+    """
+
+    renderer_classes = (JSONRenderer,)
+
+    def _get_info(self, ethereum_client: EthereumClient) -> Dict[str, Any]:
+        try:
+            client_version = ethereum_client.w3.clientVersion
+        except (IOError, ValueError):
+            client_version = ""
+
+        ethereum_network = ethereum_client.get_network()
+        return {
+            "version": client_version,
+            "block_number": ethereum_client.current_block_number,
+            "chain_id": ethereum_network.value,
+            "chain": ethereum_network.name,
+            "syncing": ethereum_client.w3.eth.syncing,
+        }
+
+    @method_decorator(cache_page(15))  # 15 seconds
+    def get(self, request, format=None):
+        """
+        Get information about the Ethereum RPC node used by the service
+        """
+        ethereum_client = EthereumClientProvider()
+        return Response(self._get_info(ethereum_client))
+
+
+class AboutEthereumTracingRPCView(AboutEthereumRPCView):
+    @method_decorator(cache_page(15))  # 15 seconds
+    def get(self, request, format=None):
+        """
+        Get information about the Ethereum Tracing RPC node used by the service (if any configured)
+        """
+        if not settings.ETHEREUM_TRACING_NODE_URL:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        else:
+            ethereum_client = EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
+            return Response(self._get_info(ethereum_client))
 
 
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
