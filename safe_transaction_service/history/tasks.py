@@ -259,55 +259,59 @@ def process_decoded_internal_txs_for_safe_task(
             logger.info(
                 "Start processing decoded internal txs for safe %s", safe_address
             )
-            number_processed = 0
-            batch = 100  # Process at most 100 decoded transactions for a single Safe
+            number_processed: int = 0
+            batch: int = (
+                100  # Process at most 100 decoded transactions for a single Safe
+            )
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
+
+            # Check if something is wrong during indexing
+            last_safe_status = SafeStatus.objects.last_for_address(safe_address)
+            if last_safe_status and last_safe_status.is_corrupted():
+                tx_processor.clear_cache()
+                # Find first corrupted safe status
+                previous_safe_status: Optional[SafeStatus] = None
+                for safe_status in SafeStatus.objects.filter(
+                    address=safe_address
+                ).sorted_reverse_by_mined():
+                    if safe_status.is_corrupted():
+                        message = (
+                            f"Safe-address={safe_address} A problem was found in SafeStatus "
+                            f"with nonce={safe_status.nonce} "
+                            f"on internal-tx-id={safe_status.internal_tx_id} "
+                            f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
+                        )
+                        logger.error(message)
+                        index_service = IndexServiceProvider()
+                        logger.info(
+                            "Safe-address=%s Processing traces again",
+                            safe_address,
+                        )
+                        if reindex_master_copies and previous_safe_status:
+                            block_number = previous_safe_status.block_number
+                            to_block_number = last_safe_status.block_number
+                            logger.info(
+                                "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , "
+                                "reindexing until block=%d",
+                                safe_address,
+                                previous_safe_status.nonce,
+                                block_number,
+                                to_block_number,
+                            )
+                            reindex_master_copies_task.delay(
+                                block_number, to_block_number
+                            )
+                        logger.info(
+                            "Safe-address=%s Processing traces again after reindexing",
+                            safe_address,
+                        )
+                        index_service.reprocess_addresses([safe_address])
+                        raise ValueError(message)
+                    previous_safe_status = safe_status
+
+            tx_processor.clear_cache()  # TODO Fix this properly
             # Use slicing for memory issues
             while True:
-                # Check if something is wrong during indexing
-                last_safe_status = SafeStatus.objects.last_for_address(safe_address)
-                if last_safe_status and last_safe_status.is_corrupted():
-                    tx_processor.clear_cache()
-                    # Find first corrupted safe status
-                    previous_safe_status: Optional[SafeStatus] = None
-                    for safe_status in SafeStatus.objects.filter(
-                        address=safe_address
-                    ).sorted_reverse_by_mined():
-                        if safe_status.is_corrupted():
-                            message = (
-                                f"Safe-address={safe_address} A problem was found in SafeStatus "
-                                f"with nonce={safe_status.nonce} "
-                                f"on internal-tx-id={safe_status.internal_tx_id} "
-                                f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
-                            )
-                            logger.error(message)
-                            index_service = IndexServiceProvider()
-                            logger.info(
-                                "Safe-address=%s Processing traces again",
-                                safe_address,
-                            )
-                            if reindex_master_copies and previous_safe_status:
-                                block_number = previous_safe_status.block_number
-                                to_block_number = last_safe_status.block_number
-                                logger.info(
-                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , "
-                                    "reindexing until block=%d",
-                                    safe_address,
-                                    previous_safe_status.nonce,
-                                    block_number,
-                                    to_block_number,
-                                )
-                                reindex_master_copies_task.delay(
-                                    block_number, to_block_number
-                                )
-                            logger.info(
-                                "Safe-address=%s Processing traces again after reindexing",
-                                safe_address,
-                            )
-                            index_service.reprocess_addresses([safe_address])
-                            raise ValueError(message)
-                        previous_safe_status = safe_status
-
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
                     safe_address
                 )[:batch]
@@ -318,8 +322,7 @@ def process_decoded_internal_txs_for_safe_task(
                 )
                 if not number_processed:
                     break
-                tx_processor.clear_cache()  # TODO Fix this properly
-                logger.info("Processed %d decoded transactions", number_processed)
+            logger.info("Processed %d decoded transactions", number_processed)
             if number_processed:
                 logger.info(
                     "%d decoded internal txs successfully processed for safe %s",
