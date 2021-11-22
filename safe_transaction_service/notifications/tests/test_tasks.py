@@ -118,7 +118,8 @@ class TestViews(TestCase):
         safe_tx_hash = Web3.keccak(text="hola").hex()
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (0, 0),
             )
             self.assertIn("Cannot find threshold information", cm.output[0])
 
@@ -127,7 +128,8 @@ class TestViews(TestCase):
         )
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (0, 0),
             )
             self.assertIn(
                 "No need to send confirmation notification for ", cm.output[0]
@@ -137,7 +139,8 @@ class TestViews(TestCase):
         safe_status.save(update_fields=["threshold"])
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (0, 0),
             )
             self.assertIn("No cloud messaging tokens found", cm.output[0])
 
@@ -146,19 +149,22 @@ class TestViews(TestCase):
         ]
         # Notification is not sent to both owners as they are not related to the safe address
         self.assertEqual(
-            send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+            send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+            (0, 0),
         )
 
         for firebase_device_owner in firebase_device_owner_factories:
             firebase_device_owner.firebase_device.safes.add(safe_contract)
         self.assertEqual(
-            send_notification_owner_task(safe_address, safe_tx_hash), (2, 0)
+            send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+            (2, 0),
         )
 
         # Duplicated notifications are not sent
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (0, 0),
             )
             self.assertIn("Duplicated notification", cm.output[0])
 
@@ -167,7 +173,8 @@ class TestViews(TestCase):
             DuplicateNotification, "is_duplicated", autospec=True, return_value=False
         ):
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (2, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (2, 0),
             )
 
             # Add one confirmation for that transaction and other random confirmation for other transaction
@@ -181,7 +188,8 @@ class TestViews(TestCase):
 
             # Just one transaction sent, as owners[0] already confirmed
             self.assertEqual(
-                send_notification_owner_task(safe_address, safe_tx_hash), (1, 0)
+                send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+                (1, 0),
             )
 
             # Reach the threshold with an unrelated owner
@@ -190,7 +198,10 @@ class TestViews(TestCase):
             )
             with self.assertLogs(logger=task_logger) as cm:
                 self.assertEqual(
-                    send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+                    send_notification_owner_task.delay(
+                        safe_address, safe_tx_hash
+                    ).result,
+                    (0, 0),
                 )
                 self.assertIn("does not require more confirmations", cm.output[0])
 
@@ -209,7 +220,8 @@ class TestViews(TestCase):
 
         # No firebase device
         self.assertEqual(
-            send_notification_owner_task(safe_address, safe_tx_hash), (0, 0)
+            send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+            (0, 0),
         )
 
         FirebaseDeviceOwnerFactory(
@@ -223,7 +235,8 @@ class TestViews(TestCase):
         FirebaseDeviceOwnerFactory(owner=safe_contract_delegate_random.delegate)
 
         self.assertEqual(
-            send_notification_owner_task(safe_address, safe_tx_hash), (2, 0)
+            send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
+            (2, 0),
         )
 
     def test_send_notification_owner_task_called(self):
