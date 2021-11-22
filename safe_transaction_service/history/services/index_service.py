@@ -273,7 +273,7 @@ class IndexService:
         self,
         from_block_number: int,
         to_block_number: Optional[int] = None,
-        block_process_limit: int = 1000,
+        block_process_limit: int = 100,
         addresses: Optional[ChecksumAddress] = None,
     ):
         """

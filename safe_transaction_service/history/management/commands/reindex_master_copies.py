@@ -16,7 +16,7 @@ class Command(BaseCommand):
             "--block-process-limit",
             type=int,
             help="Number of blocks to query each time",
-            default=1000,
+            default=100,
         )
         parser.add_argument(
             "--from-block-number",
