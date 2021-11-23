@@ -9,7 +9,10 @@ from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from redis.exceptions import LockError
 
-from safe_transaction_service.utils.utils import close_gevent_db_connection
+from safe_transaction_service.utils.utils import (
+    chunks_iterable,
+    close_gevent_db_connection,
+)
 
 from ..utils.tasks import LOCK_TIMEOUT, SOFT_TIMEOUT, only_one_running_task
 from .indexers import (
@@ -311,17 +314,13 @@ def process_decoded_internal_txs_for_safe_task(
 
             tx_processor.clear_cache()  # TODO Fix this properly
             # Use slicing for memory issues
-            while True:
-                internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
-                    safe_address
-                )[:batch]
-                if not internal_txs_decoded:
-                    break
+            for internal_txs_decoded in chunks_iterable(
+                InternalTxDecoded.objects.pending_for_safe(safe_address).iterator(),
+                batch,
+            ):
                 number_processed += len(
                     tx_processor.process_decoded_transactions(internal_txs_decoded)
                 )
-                if not number_processed:
-                    break
             logger.info("Processed %d decoded transactions", number_processed)
             if number_processed:
                 logger.info(

@@ -1,4 +1,5 @@
-from typing import Any, List, Union
+from itertools import islice
+from typing import Any, Iterable, List, Union
 
 from django.core.signals import request_finished
 from django.db import connection
@@ -14,6 +15,22 @@ def chunks(elements: List[Any], n: int):
     """
     for i in range(0, len(elements), n):
         yield elements[i : i + n]
+
+
+def chunks_iterable(iterable: Iterable[Any], n: int) -> Iterable[Iterable[Any]]:
+    """
+    Same as `chunks`, but for iterables
+
+    :param iterable:
+    :param n:
+    :return:
+    """
+    it = iter(iterable)
+    while True:
+        chunk = tuple(islice(it, n))
+        if not chunk:
+            return
+        yield chunk
 
 
 def running_on_gevent() -> bool:

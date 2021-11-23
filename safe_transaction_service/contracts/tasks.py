@@ -28,8 +28,8 @@ def create_missing_contracts_with_metadata_task() -> int:
     :return: Number of contracts missing
     """
     addresses = chain(
-        MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),
-        ModuleTransaction.objects.not_indexed_metadata_contract_addresses(),
+        MultisigTransaction.objects.not_indexed_metadata_contract_addresses().iterator(),
+        ModuleTransaction.objects.not_indexed_metadata_contract_addresses().iterator(),
     )
     try:
         i = 0
@@ -53,8 +53,10 @@ def reindex_contracts_without_metadata_task() -> int:
     """
     try:
         i = 0
-        for address in Contract.objects.without_metadata().values_list(
-            "address", flat=True
+        for address in (
+            Contract.objects.without_metadata()
+            .values_list("address", flat=True)
+            .iterator()
         ):
             logger.info("Reindexing contract %s", address)
             create_or_update_contract_with_metadata_task.apply_async(
