@@ -6,6 +6,7 @@ from logging import getLogger
 from typing import (
     Any,
     Dict,
+    Iterable,
     List,
     Optional,
     Sequence,
@@ -125,7 +126,7 @@ class BulkCreateSignalMixin:
         return result
 
     def bulk_create_from_generator(
-        self, objs, batch_size: int = 100, ignore_conflicts: bool = False
+        self, objs: Iterable[Any], batch_size: int = 100, ignore_conflicts: bool = False
     ) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
