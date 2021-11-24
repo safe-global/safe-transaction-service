@@ -232,7 +232,6 @@ class TransactionService:
                 block=F("ethereum_tx__block_id"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
-            .distinct()
             .values(
                 "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
             )
@@ -252,7 +251,6 @@ class TransactionService:
                 block=F("ethereum_tx__block_id"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
-            .distinct()
             .values(
                 "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
             )
@@ -260,8 +258,7 @@ class TransactionService:
 
         # Tricky, we merge SafeTx hashes with EthereumTx hashes
         queryset = (
-            multisig_safe_tx_ids.distinct()
-            .union(erc20_tx_ids)
+            multisig_safe_tx_ids.union(erc20_tx_ids)
             .union(erc721_tx_ids)
             .union(internal_tx_ids)
             .union(module_tx_ids)
