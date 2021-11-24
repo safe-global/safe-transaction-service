@@ -78,7 +78,7 @@ def only_one_running_task(
     redis = get_redis()
     lock_name = f"tasks:{task.name}"
     if lock_name_suffix:
-        lock_name = f"{lock_name}:{lock_name_suffix}"
+        lock_name += f":{lock_name_suffix}"
     with redis.lock(
         lock_name, blocking_timeout=blocking_timeout, timeout=lock_timeout
     ) as lock:
