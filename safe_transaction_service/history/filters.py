@@ -26,13 +26,9 @@ class DelegateListFilter(filters.FilterSet):
 
 class TransferListFilter(filters.FilterSet):
     _from = django_filters.CharFilter()
-    block_number = django_filters.NumberFilter(field_name="block_number")
-    block_number__gt = django_filters.NumberFilter(
-        field_name="block_number", lookup_expr="gt"
-    )
-    block_number__lt = django_filters.NumberFilter(
-        field_name="block_number", lookup_expr="lt"
-    )
+    block_number = django_filters.NumberFilter(field_name="block")
+    block_number__gt = django_filters.NumberFilter(field_name="block", lookup_expr="gt")
+    block_number__lt = django_filters.NumberFilter(field_name="block", lookup_expr="lt")
     execution_date__gte = django_filters.IsoDateTimeFilter(
         field_name="execution_date", lookup_expr="gte"
     )

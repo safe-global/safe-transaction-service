@@ -686,7 +686,7 @@ class TransferType(Enum):
 class TransferResponseSerializer(serializers.Serializer):
     type = serializers.SerializerMethodField()
     execution_date = serializers.DateTimeField()
-    block_number = serializers.IntegerField()
+    block_number = serializers.IntegerField(source="block")
     transaction_hash = Sha3HashField()
     to = EthereumAddressField()
     from_ = EthereumAddressField(source="_from", allow_zero_address=True)

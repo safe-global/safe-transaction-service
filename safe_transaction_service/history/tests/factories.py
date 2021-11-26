@@ -65,6 +65,8 @@ class EthereumTxFactory(DjangoModelFactory):
 
 
 class TokenTransfer(DjangoModelFactory):
+    timestamp = factory.SelfAttribute("ethereum_tx.block.timestamp")
+    block_number = factory.SelfAttribute("ethereum_tx.block.number")
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     log_index = factory.Sequence(lambda n: n)
     address = factory.LazyFunction(lambda: Account.create().address)

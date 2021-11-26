@@ -1,6 +1,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
+from functools import lru_cache
 from itertools import islice
 from logging import getLogger
 from typing import (
@@ -176,6 +177,12 @@ class EthereumBlockManager(models.Manager):
         except IntegrityError:
             # The block could be created in the meantime by other task while the block was fetched from blockchain
             return self.get(number=block["number"])
+
+    @lru_cache(maxsize=10000)
+    def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:
+        return EthereumBlock.objects.values("timestamp").get(block_hash=block_hash)[
+            "timestamp"
+        ]
 
 
 class EthereumBlockQuerySet(models.QuerySet):
@@ -355,14 +362,22 @@ class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
 
 class TokenTransfer(models.Model):
     objects = TokenTransferManager.from_queryset(TokenTransferQuerySet)()
+    timestamp = models.DateTimeField(db_index=True)
+    block_number = models.PositiveIntegerField()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
-    address = EthereumAddressField(db_index=True)  # Token address
-    _from = EthereumAddressField(db_index=True)
-    to = EthereumAddressField(db_index=True)
+    address = EthereumAddressField()  # Token address
+    _from = EthereumAddressField()
+    to = EthereumAddressField()
     log_index = models.PositiveIntegerField()
 
     class Meta:
         abstract = True
+        indexes = [
+            Index(fields=["address"]),
+            Index(fields=["_from", "timestamp"]),
+            Index(fields=["to", "timestamp"]),
+        ]
+        unique_together = (("ethereum_tx", "log_index"),)
 
     def __str__(self):
         return f"Token Transfer from={self._from} to={self.to}"
@@ -377,6 +392,10 @@ class TokenTransfer(models.Model):
             )
 
         return {
+            "timestamp": EthereumBlock.objects.get_timestamp_by_hash(
+                event_data["blockHash"]
+            ),
+            "block_number": event_data["blockNumber"],
             "ethereum_tx_id": event_data["transactionHash"],
             "log_index": event_data["logIndex"],
             "address": event_data["address"],
@@ -398,8 +417,8 @@ class ERC20TransferQuerySet(TokenTransferQuerySet):
         return self.annotate(
             _value=F("value"),
             transaction_hash=F("ethereum_tx_id"),
-            block_number=F("ethereum_tx__block_id"),
-            execution_date=F("ethereum_tx__block__timestamp"),
+            block=F("block_number"),
+            execution_date=F("timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=F("address"),
         )
@@ -409,7 +428,8 @@ class ERC20Transfer(TokenTransfer):
     objects = TokenTransferManager.from_queryset(ERC20TransferQuerySet)()
     value = Uint256Field()
 
-    class Meta:
+    class Meta(TokenTransfer.Meta):
+        abstract = False
         verbose_name = "ERC20 Transfer"
         verbose_name_plural = "ERC20 Transfers"
         unique_together = (("ethereum_tx", "log_index"),)
@@ -439,6 +459,8 @@ class ERC20Transfer(TokenTransfer):
 
     def to_erc721_transfer(self):
         return ERC721Transfer(
+            timestamp=self.timestamp,
+            block_number=self.block_number,
             ethereum_tx=self.ethereum_tx,
             address=self.address,
             _from=self._from,
@@ -487,8 +509,8 @@ class ERC721TransferQuerySet(TokenTransferQuerySet):
         return self.annotate(
             _value=RawSQL("NULL::numeric", ()),
             transaction_hash=F("ethereum_tx_id"),
-            block_number=F("ethereum_tx__block_id"),
-            execution_date=F("ethereum_tx__block__timestamp"),
+            block=F("block_number"),
+            execution_date=F("timestamp"),
             _token_id=F("token_id"),
             token_address=F("address"),
         )
@@ -498,7 +520,8 @@ class ERC721Transfer(TokenTransfer):
     objects = ERC721TransferManager.from_queryset(ERC721TransferQuerySet)()
     token_id = Uint256Field()
 
-    class Meta:
+    class Meta(TokenTransfer.Meta):
+        abstract = False
         verbose_name = "ERC721 Transfer"
         verbose_name_plural = "ERC721 Transfers"
         unique_together = (("ethereum_tx", "log_index"),)
@@ -537,6 +560,8 @@ class ERC721Transfer(TokenTransfer):
 
     def to_erc20_transfer(self):
         return ERC20Transfer(
+            timestamp=self.timestamp,
+            block_number=self.block_number,
             ethereum_tx=self.ethereum_tx,
             address=self.address,
             _from=self._from,
@@ -616,7 +641,7 @@ class InternalTxQuerySet(models.QuerySet):
         ).annotate(
             _value=F("value"),
             transaction_hash=F("ethereum_tx_id"),
-            block_number=F("ethereum_tx__block_id"),
+            block=F("ethereum_tx__block_id"),
             execution_date=F("ethereum_tx__block__timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=Value(None, output_field=EthereumAddressField()),
@@ -630,7 +655,7 @@ class InternalTxQuerySet(models.QuerySet):
 
     def token_txs(self):
         values = [
-            "block_number",
+            "block",
             "transaction_hash",
             "to",
             "_from",
@@ -644,12 +669,12 @@ class InternalTxQuerySet(models.QuerySet):
         return (
             erc20_queryset.values(*values)
             .union(erc721_queryset.values(*values), all=True)
-            .order_by("-block_number")
+            .order_by("-block")
         )
 
     def token_incoming_txs_for_address(self, address: str):
         values = [
-            "block_number",
+            "block",
             "transaction_hash",
             "to",
             "_from",
@@ -663,7 +688,7 @@ class InternalTxQuerySet(models.QuerySet):
         return (
             erc20_queryset.values(*values)
             .union(erc721_queryset.values(*values), all=True)
-            .order_by("-block_number")
+            .order_by("-block")
         )
 
     def ether_and_token_txs(self, address: str):
@@ -689,7 +714,7 @@ class InternalTxQuerySet(models.QuerySet):
         ether_queryset: QuerySet,
     ) -> TransferDict:
         values = [
-            "block_number",
+            "block",
             "transaction_hash",
             "to",
             "_from",
@@ -702,7 +727,7 @@ class InternalTxQuerySet(models.QuerySet):
             ether_queryset.values(*values)
             .union(erc20_queryset.values(*values), all=True)
             .union(erc721_queryset.values(*values), all=True)
-            .order_by("-block_number")
+            .order_by("-block")
         )
 
     def can_be_decoded(self):
