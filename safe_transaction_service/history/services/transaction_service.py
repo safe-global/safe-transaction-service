@@ -212,9 +212,9 @@ class TransactionService:
             ERC20Transfer.objects.to_or_from(safe_address)
             .exclude(ethereum_tx__in=multisig_and_module_hashes)
             .annotate(
-                execution_date=F("ethereum_tx__block__timestamp"),
-                created=F("ethereum_tx__block__timestamp"),
-                block=F("ethereum_tx__block_id"),
+                execution_date=F("timestamp"),
+                created=F("timestamp"),
+                block=F("block_number"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
             .distinct()
@@ -227,9 +227,9 @@ class TransactionService:
             ERC721Transfer.objects.to_or_from(safe_address)
             .exclude(ethereum_tx__in=multisig_and_module_hashes)
             .annotate(
-                execution_date=F("ethereum_tx__block__timestamp"),
-                created=F("ethereum_tx__block__timestamp"),
-                block=F("ethereum_tx__block_id"),
+                execution_date=F("timestamp"),
+                created=F("timestamp"),
+                block=F("block_number"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
             .values(

@@ -100,14 +100,9 @@ class TokenTransferAdmin(admin.ModelAdmin):
     )
     # list_display_links = ("block_number",)
     list_select_related = ("ethereum_tx",)
-    ordering = ["-ethereum_tx__block_id"]
-    search_fields = ["_from", "to", "address", "=ethereum_tx__tx_hash"]
+    ordering = ["-timestamp"]
+    search_fields = ["=_from", "=to", "=address", "=ethereum_tx__tx_hash"]
     raw_id_fields = ("ethereum_tx",)
-
-    @admin.display()
-    def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
-        if obj.ethereum_tx:
-            return obj.ethereum_tx.block_id
 
 
 @admin.register(ERC20Transfer)
