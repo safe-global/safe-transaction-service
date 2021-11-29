@@ -409,7 +409,7 @@ class TokenTransfer(models.Model):
 
     @property
     def created(self):
-        return self.ethereum_tx.block.timestamp
+        return self.timestamp
 
 
 class ERC20TransferQuerySet(TokenTransferQuerySet):
@@ -753,12 +753,10 @@ class InternalTx(models.Model):
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
     )
-    _from = EthereumAddressField(
-        null=True, db_index=True
-    )  # For SELF-DESTRUCT it can be null
+    _from = EthereumAddressField(null=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
-    to = EthereumAddressField(null=True, db_index=True)
+    to = EthereumAddressField(null=True)
     value = Uint256Field()
     gas_used = Uint256Field()
     contract_address = EthereumAddressField(null=True, db_index=True)  # Create
@@ -778,6 +776,19 @@ class InternalTx(models.Model):
 
     class Meta:
         unique_together = (("ethereum_tx", "trace_address"),)
+        indexes = [
+            models.Index(
+                name="history_internaltx_value_idx",
+                fields=["value"],
+                condition=Q(value__gt=0),
+            ),
+            models.Index(
+                fields=["_from"],
+            ),
+            models.Index(
+                fields=["to"],
+            ),
+        ]
 
     def __str__(self):
         if self.to:

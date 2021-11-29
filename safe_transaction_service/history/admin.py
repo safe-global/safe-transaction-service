@@ -89,6 +89,8 @@ class EthereumBlockAdmin(admin.ModelAdmin):
 
 
 class TokenTransferAdmin(admin.ModelAdmin):
+    date_hierarchy = "timestamp"
+    inlines = (EthereumTxInline,)
     list_display = (
         "block_number",
         "log_index",
