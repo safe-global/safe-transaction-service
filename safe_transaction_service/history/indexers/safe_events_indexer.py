@@ -15,6 +15,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_V1_1_1_contract
 
 from ..models import (
+    EthereumBlock,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -193,9 +194,15 @@ class SafeEventsIndexer(EventsIndexer):
         log_index = decoded_element["logIndex"]
         trace_address = str(log_index)
         args = dict(decoded_element["args"])
+        ethereum_tx_hash = decoded_element["transactionHash"]
+        ethereum_block = EthereumBlock.objects.values("number", "timestamp").get(
+            txs=ethereum_tx_hash
+        )
 
         internal_tx = InternalTx(
-            ethereum_tx_id=decoded_element["transactionHash"],
+            ethereum_tx_id=ethereum_tx_hash,
+            timestamp=ethereum_block["timestamp"],
+            block_number=ethereum_block["number"],
             _from=safe_address,
             gas=50000,
             data=b"",
@@ -262,7 +269,9 @@ class SafeEventsIndexer(EventsIndexer):
             )
             if args["value"] and not data:  # Simulate ether transfer
                 child_internal_tx = InternalTx(
-                    ethereum_tx_id=decoded_element["transactionHash"],
+                    ethereum_tx_id=ethereum_tx_hash,
+                    timestamp=ethereum_block["timestamp"],
+                    block_number=ethereum_block["number"],
                     _from=safe_address,
                     gas=23000,
                     data=b"",

@@ -65,9 +65,9 @@ class EthereumTxFactory(DjangoModelFactory):
 
 
 class TokenTransfer(DjangoModelFactory):
+    ethereum_tx = factory.SubFactory(EthereumTxFactory)
     timestamp = factory.SelfAttribute("ethereum_tx.block.timestamp")
     block_number = factory.SelfAttribute("ethereum_tx.block.number")
-    ethereum_tx = factory.SubFactory(EthereumTxFactory)
     log_index = factory.Sequence(lambda n: n)
     address = factory.LazyFunction(lambda: Account.create().address)
     _from = factory.LazyFunction(lambda: Account.create().address)
@@ -97,6 +97,8 @@ class InternalTxFactory(DjangoModelFactory):
         model = InternalTx
 
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
+    timestamp = factory.SelfAttribute("ethereum_tx.block.timestamp")
+    block_number = factory.SelfAttribute("ethereum_tx.block.number")
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
     data = factory.Sequence(lambda n: HexBytes("%x" % (n + 1000)))

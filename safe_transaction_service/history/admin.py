@@ -90,8 +90,8 @@ class EthereumBlockAdmin(admin.ModelAdmin):
 
 class TokenTransferAdmin(admin.ModelAdmin):
     date_hierarchy = "timestamp"
-    inlines = (EthereumTxInline,)
     list_display = (
+        "timestamp",
         "block_number",
         "log_index",
         "address",
@@ -100,7 +100,6 @@ class TokenTransferAdmin(admin.ModelAdmin):
         "value",
         "ethereum_tx_id",
     )
-    # list_display_links = ("block_number",)
     list_select_related = ("ethereum_tx",)
     ordering = ["-timestamp"]
     search_fields = ["=_from", "=to", "=address", "=ethereum_tx__tx_hash"]
@@ -149,9 +148,11 @@ class EthereumTxAdmin(admin.ModelAdmin):
 
 @admin.register(InternalTx)
 class InternalTxAdmin(admin.ModelAdmin):
+    date_hierarchy = "timestamp"
     inlines = (InternalTxDecodedInline,)
     list_display = (
         "ethereum_tx_id",
+        "timestamp",
         "block_number",
         "_from",
         "to",
@@ -162,13 +163,13 @@ class InternalTxAdmin(admin.ModelAdmin):
     list_filter = ("tx_type", "call_type")
     list_select_related = ("ethereum_tx",)
     ordering = [
-        "-ethereum_tx__block_id",
+        "-block_number",
         "-ethereum_tx__transaction_index",
         "-trace_address",
     ]
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
-        "=ethereum_tx__block__number",
+        "=block__number",
         "=_from",
         "=to",
         "=ethereum_tx__tx_hash",
@@ -208,7 +209,7 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
     list_filter = ("function_name", "processed", InternalTxDecodedOfficialListFilter)
     list_select_related = ("internal_tx__ethereum_tx",)
     ordering = [
-        "-internal_tx__ethereum_tx__block_id",
+        "-internal_tx__block_number",
         "-internal_tx__ethereum_tx__transaction_index",
         "-internal_tx__trace_address",
     ]
@@ -219,7 +220,7 @@ class InternalTxDecodedAdmin(admin.ModelAdmin):
         "=internal_tx__to",
         "=internal_tx___from",
         "=internal_tx__ethereum_tx__tx_hash",
-        "=internal_tx__ethereum_tx__block__number",
+        "=internal_tx__block_number",
     ]
 
     @admin.action(description="Process internal tx again")

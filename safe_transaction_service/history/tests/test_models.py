@@ -376,10 +376,15 @@ class TestInternalTx(TestCase):
         self.assertEqual(incoming_txs.count(), 2)
 
         # Make internal_tx more recent than ERC20Transfer
+        block = EthereumBlockFactory()
+        internal_tx.block_number = block.number
+        internal_tx.timestamp = block.timestamp
+        internal_tx.save(update_fields=["block_number", "timestamp"])
+
         internal_tx.ethereum_tx.block = (
-            EthereumBlockFactory()
-        )  # As factory has a sequence, it will always be the last
-        internal_tx.ethereum_tx.save()
+            block  # As factory has a sequence, it will always be the last
+        )
+        internal_tx.ethereum_tx.save(update_fields=["block"])
 
         incoming_tx = InternalTx.objects.ether_and_token_incoming_txs(
             ethereum_address

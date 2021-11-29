@@ -548,6 +548,8 @@ class SafeTxProcessor(TxProcessor):
                         "trusted": True,
                     },
                 )
+
+                # Don't modify created
                 if not multisig_tx.ethereum_tx_id:
                     multisig_tx.ethereum_tx = ethereum_tx
                     multisig_tx.failed = failed
