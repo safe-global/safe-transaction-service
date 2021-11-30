@@ -185,7 +185,6 @@ class TransactionService:
                 block=F("internal_tx__ethereum_tx__block_id"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
-            .distinct()
             .values(
                 "internal_tx__ethereum_tx_id",
                 "execution_date",
@@ -193,6 +192,7 @@ class TransactionService:
                 "block",
                 "safe_nonce",
             )
+            .distinct()
         )
 
         multisig_hashes = (
@@ -217,10 +217,10 @@ class TransactionService:
                 block=F("block_number"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
-            .distinct()
             .values(
                 "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
             )
+            .distinct()
         )
 
         erc721_tx_ids = (
@@ -235,6 +235,7 @@ class TransactionService:
             .values(
                 "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
             )
+            .distinct()
         )
 
         # Get incoming txs not included on Multisig or Module txs
@@ -246,14 +247,15 @@ class TransactionService:
             )
             .exclude(ethereum_tx__in=multisig_and_module_hashes)
             .annotate(
-                execution_date=F("ethereum_tx__block__timestamp"),
-                created=F("ethereum_tx__block__timestamp"),
-                block=F("ethereum_tx__block_id"),
+                execution_date=F("timestamp"),
+                created=F("timestamp"),
+                block=F("block_number"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )
             .values(
                 "ethereum_tx_id", "execution_date", "created", "block", "safe_nonce"
             )
+            .distinct()
         )
 
         # Tricky, we merge SafeTx hashes with EthereumTx hashes

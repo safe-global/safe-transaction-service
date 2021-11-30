@@ -362,9 +362,9 @@ class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
 
 class TokenTransfer(models.Model):
     objects = TokenTransferManager.from_queryset(TokenTransferQuerySet)()
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField()
-    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
     address = EthereumAddressField()  # Token address
     _from = EthereumAddressField()
     to = EthereumAddressField()
@@ -409,7 +409,7 @@ class TokenTransfer(models.Model):
 
     @property
     def created(self):
-        return self.ethereum_tx.block.timestamp
+        return self.timestamp
 
 
 class ERC20TransferQuerySet(TokenTransferQuerySet):
@@ -590,6 +590,8 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
         return InternalTx(
             ethereum_tx=ethereum_tx,
+            timestamp=ethereum_tx.block.timestamp,
+            block_number=ethereum_tx.block_id,
             trace_address=trace_address_str,
             _from=trace["action"].get("from"),
             gas=trace["action"].get("gas", 0),
@@ -616,6 +618,8 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
             ethereum_tx=ethereum_tx,
             trace_address=trace_address_str,
             defaults={
+                "timestamp": ethereum_tx.block.timestamp,
+                "block_number": ethereum_tx.block_id,
                 "_from": trace["action"].get("from"),
                 "gas": trace["action"].get("gas", 0),
                 "data": trace["action"].get("input") or trace["action"].get("init"),
@@ -641,8 +645,8 @@ class InternalTxQuerySet(models.QuerySet):
         ).annotate(
             _value=F("value"),
             transaction_hash=F("ethereum_tx_id"),
-            block=F("ethereum_tx__block_id"),
-            execution_date=F("ethereum_tx__block__timestamp"),
+            block=F("block_number"),
+            execution_date=F("timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=Value(None, output_field=EthereumAddressField()),
         )
@@ -753,12 +757,12 @@ class InternalTx(models.Model):
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
     )
-    _from = EthereumAddressField(
-        null=True, db_index=True
-    )  # For SELF-DESTRUCT it can be null
+    timestamp = models.DateTimeField(db_index=True)
+    block_number = models.PositiveIntegerField()
+    _from = EthereumAddressField(null=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
-    to = EthereumAddressField(null=True, db_index=True)
+    to = EthereumAddressField(null=True)
     value = Uint256Field()
     gas_used = Uint256Field()
     contract_address = EthereumAddressField(null=True, db_index=True)  # Create
@@ -778,6 +782,15 @@ class InternalTx(models.Model):
 
     class Meta:
         unique_together = (("ethereum_tx", "trace_address"),)
+        indexes = [
+            models.Index(
+                name="history_internaltx_value_idx",
+                fields=["value"],
+                condition=Q(value__gt=0),
+            ),
+            Index(fields=["_from", "timestamp"]),
+            Index(fields=["to", "timestamp"]),
+        ]
 
     def __str__(self):
         if self.to:
@@ -788,12 +801,8 @@ class InternalTx(models.Model):
             return "Internal tx hash={} from={}".format(self.ethereum_tx_id, self._from)
 
     @property
-    def block_number(self):
-        return self.ethereum_tx.block_id
-
-    @property
     def created(self):
-        return self.ethereum_tx.block.timestamp
+        return self.timestamp
 
     @property
     def can_be_decoded(self) -> bool:
@@ -904,7 +913,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             )
         ).order_by(
             "is_setup",
-            "internal_tx__ethereum_tx__block_id",
+            "internal_tx__block_number",
             "internal_tx__ethereum_tx__transaction_index",
             "internal_tx__trace_address",
         )
@@ -1448,7 +1457,7 @@ class SafeStatusQuerySet(models.QuerySet):
         return self.order_by(
             "address",
             "-nonce",
-            "-internal_tx__ethereum_tx__block_id",
+            "-internal_tx__block_number",
             "-internal_tx__ethereum_tx__transaction_index",
             "-internal_tx__trace_address",
         )
@@ -1457,7 +1466,7 @@ class SafeStatusQuerySet(models.QuerySet):
         return self.order_by(
             "address",
             "nonce",
-            "internal_tx__ethereum_tx__block_id",
+            "internal_tx__block_number",
             "internal_tx__ethereum_tx__transaction_index",
             "internal_tx__trace_address",
         )
