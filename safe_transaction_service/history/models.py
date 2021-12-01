@@ -33,11 +33,12 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from packaging.version import Version
+from web3 import Web3
 from web3.types import EventData
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (
-    EthereumAddressField,
+    EthereumAddressV2Field,
     HexField,
     Sha3HashField,
     Uint256Field,
@@ -299,12 +300,12 @@ class EthereumTx(TimeStampedModel):
     )  # If mined. Old txs don't have `status`
     logs = ArrayField(JSONField(), null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
-    _from = EthereumAddressField(null=True, db_index=True)
+    _from = EthereumAddressV2Field(null=True, db_index=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
     data = models.BinaryField(null=True)
     nonce = Uint256Field()
-    to = EthereumAddressField(null=True, db_index=True)
+    to = EthereumAddressV2Field(null=True, db_index=True)
     value = Uint256Field()
 
     def __str__(self):
@@ -382,9 +383,9 @@ class TokenTransfer(models.Model):
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField()
-    address = EthereumAddressField()  # Token address
-    _from = EthereumAddressField()
-    to = EthereumAddressField()
+    address = EthereumAddressV2Field()  # Token address
+    _from = EthereumAddressV2Field()
+    to = EthereumAddressV2Field()
     log_index = models.PositiveIntegerField()
 
     class Meta:
@@ -665,7 +666,7 @@ class InternalTxQuerySet(models.QuerySet):
             block=F("block_number"),
             execution_date=F("timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
-            token_address=Value(None, output_field=EthereumAddressField()),
+            token_address=Value(None, output_field=EthereumAddressV2Field()),
         )
 
     def ether_txs_for_address(self, address: str):
@@ -776,16 +777,18 @@ class InternalTx(models.Model):
     )
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField()
-    _from = EthereumAddressField(null=True)  # For SELF-DESTRUCT it can be null
+    _from = EthereumAddressV2Field(null=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
-    to = EthereumAddressField(null=True)
+    to = EthereumAddressV2Field(null=True)
     value = Uint256Field()
     gas_used = Uint256Field()
-    contract_address = EthereumAddressField(null=True, db_index=True)  # Create
+    contract_address = EthereumAddressV2Field(null=True, db_index=True)  # Create
     code = models.BinaryField(null=True)  # Create
     output = models.BinaryField(null=True)  # Call
-    refund_address = EthereumAddressField(null=True, db_index=True)  # For SELF-DESTRUCT
+    refund_address = EthereumAddressV2Field(
+        null=True, db_index=True
+    )  # For SELF-DESTRUCT
     tx_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in InternalTxType], db_index=True
     )
@@ -1152,7 +1155,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
 class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Sha3HashField(primary_key=True)
-    safe = EthereumAddressField(db_index=True)
+    safe = EthereumAddressV2Field(db_index=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx,
         null=True,
@@ -1161,7 +1164,7 @@ class MultisigTransaction(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="multisig_txs",
     )
-    to = EthereumAddressField(null=True, db_index=True)
+    to = EthereumAddressV2Field(null=True, db_index=True)
     value = Uint256Field()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField(
@@ -1170,8 +1173,8 @@ class MultisigTransaction(TimeStampedModel):
     safe_tx_gas = Uint256Field()
     base_gas = Uint256Field()
     gas_price = Uint256Field()
-    gas_token = EthereumAddressField(null=True)
-    refund_receiver = EthereumAddressField(null=True)
+    gas_token = EthereumAddressV2Field(null=True)
+    refund_receiver = EthereumAddressV2Field(null=True)
     signatures = models.BinaryField(null=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
     failed = models.BooleanField(null=True, default=None, db_index=True)
@@ -1236,13 +1239,13 @@ class ModuleTransaction(TimeStampedModel):
     internal_tx = models.OneToOneField(
         InternalTx, on_delete=models.CASCADE, related_name="module_tx", primary_key=True
     )
-    safe = EthereumAddressField(
+    safe = EthereumAddressV2Field(
         db_index=True
     )  # Just for convenience, it could be retrieved from `internal_tx`
-    module = EthereumAddressField(
+    module = EthereumAddressV2Field(
         db_index=True
     )  # Just for convenience, it could be retrieved from `internal_tx`
-    to = EthereumAddressField(db_index=True)
+    to = EthereumAddressV2Field(db_index=True)
     value = Uint256Field()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField(
@@ -1310,7 +1313,7 @@ class MultisigConfirmation(TimeStampedModel):
     multisig_transaction_hash = Sha3HashField(
         null=True, db_index=True
     )  # Use this while we don't have a `multisig_transaction`
-    owner = EthereumAddressField()
+    owner = EthereumAddressV2Field()
 
     signature = HexField(null=True, default=None, max_length=2000)
     signature_type = models.PositiveSmallIntegerField(
@@ -1329,7 +1332,7 @@ class MultisigConfirmation(TimeStampedModel):
 
 
 class MonitoredAddress(models.Model):
-    address = EthereumAddressField(primary_key=True)
+    address = EthereumAddressV2Field(primary_key=True)
     initial_block_number = models.IntegerField(
         default=0
     )  # Block number when address received first tx
@@ -1394,7 +1397,7 @@ class SafeMasterCopy(MonitoredAddress):
 
 
 class SafeContract(models.Model):
-    address = EthereumAddressField(primary_key=True)
+    address = EthereumAddressV2Field(primary_key=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="safe_contracts"
     )
@@ -1453,8 +1456,8 @@ class SafeContractDelegate(models.Model):
         null=True,
         default=None,
     )
-    delegate = EthereumAddressField()
-    delegator = EthereumAddressField()  # Owner who created the delegate
+    delegate = EthereumAddressV2Field()
+    delegator = EthereumAddressV2Field()  # Owner who created the delegate
     label = models.CharField(max_length=50)
     read = models.BooleanField(default=True)  # For permissions in the future
     write = models.BooleanField(default=True)
@@ -1517,14 +1520,14 @@ class SafeStatusQuerySet(models.QuerySet):
                         FROM history_safestatus
                         WHERE address IN (
                             SELECT address FROM history_safestatus
-                            WHERE owners @> ARRAY[%s]::varchar(42)[]
+                            WHERE owners @> ARRAY[%s]::bytea[]
                         )
                         ) AS ss
-                    WHERE pos = 1 AND owners @> ARRAY[%s]::varchar(42)[];
+                    WHERE pos = 1 AND owners @> ARRAY[%s]::bytea[];
                 """,
-                [owner_address, owner_address],
+                [HexBytes(owner_address), HexBytes(owner_address)],
             )
-            return {row[0] for row in cursor.fetchall()}
+            return {Web3.toChecksumAddress(row[0].hex()) for row in cursor.fetchall()}
 
     def last_for_every_address(self) -> QuerySet:
         return (
@@ -1545,14 +1548,14 @@ class SafeStatus(models.Model):
         related_name="safe_status",
         primary_key=True,
     )
-    address = EthereumAddressField(db_index=True)
-    owners = ArrayField(EthereumAddressField())
+    address = EthereumAddressV2Field(db_index=True)
+    owners = ArrayField(EthereumAddressV2Field())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
-    master_copy = EthereumAddressField()
-    fallback_handler = EthereumAddressField()
-    guard = EthereumAddressField(default=None, null=True)
-    enabled_modules = ArrayField(EthereumAddressField(), default=list)
+    master_copy = EthereumAddressV2Field()
+    fallback_handler = EthereumAddressV2Field()
+    guard = EthereumAddressV2Field(default=None, null=True)
+    enabled_modules = ArrayField(EthereumAddressV2Field(), default=list)
 
     class Meta:
         indexes = [
@@ -1615,12 +1618,12 @@ class WebHookType(Enum):
 
 class WebHookQuerySet(models.QuerySet):
     def matching_for_address(self, address: str):
-        return self.filter(Q(address=address) | Q(address=""))
+        return self.filter(Q(address=address) | Q(address=None))
 
 
 class WebHook(models.Model):
     objects = WebHookQuerySet.as_manager()
-    address = EthereumAddressField(db_index=True, blank=True)
+    address = EthereumAddressV2Field(db_index=True, null=True)
     url = models.URLField()
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)

@@ -307,6 +307,9 @@ class SafeStatusFactory(DjangoModelFactory):
     threshold = FuzzyInteger(low=1, high=2)
     nonce = factory.Sequence(lambda n: n)
     master_copy = factory.LazyFunction(lambda: Account.create().address)
+    fallback_handler = NULL_ADDRESS
+    guard = NULL_ADDRESS
+    enabled_modules = []
 
 
 class WebHookFactory(DjangoModelFactory):

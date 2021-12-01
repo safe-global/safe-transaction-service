@@ -313,7 +313,7 @@ class MultisigTransactionAdmin(admin.ModelAdmin):
     list_select_related = ("ethereum_tx",)
     ordering = ["-created"]
     raw_id_fields = ("ethereum_tx",)
-    search_fields = ["=ethereum_tx__tx_hash", "=safe", "to", "safe_tx_hash"]
+    search_fields = ["=ethereum_tx__tx_hash", "=safe", "=to", "=safe_tx_hash"]
 
     @admin.display(boolean=True)
     def executed(self, obj: MultisigTransaction):

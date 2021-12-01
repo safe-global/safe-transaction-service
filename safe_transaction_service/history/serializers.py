@@ -8,6 +8,8 @@ from rest_framework.exceptions import NotFound, ValidationError
 from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.django.models import EthereumAddressV2Field as EthereumAddressDbField
+from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
 from gnosis.eth.django.serializers import (
     EthereumAddressField,
     HexadecimalField,
@@ -43,6 +45,14 @@ def get_data_decoded_from_data(data: bytes):
         return tx_decoder.get_data_decoded(data)
     except TxDecoderException:
         return None
+
+
+class GnosisBaseModelSerializer(serializers.ModelSerializer):
+    serializer_field_mapping = (
+        serializers.ModelSerializer.serializer_field_mapping.copy()
+    )
+    serializer_field_mapping[EthereumAddressDbField] = serializers.CharField
+    serializer_field_mapping[Keccak256DbField] = serializers.CharField
 
 
 # ================================================ #
@@ -465,7 +475,7 @@ class DataDecoderSerializer(serializers.Serializer):
 # ================================================ #
 #            Response Serializers
 # ================================================ #
-class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
+class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
     execution_date = serializers.DateTimeField()
     data = HexadecimalField(allow_null=True, allow_blank=True)
     data_decoded = serializers.SerializerMethodField()
@@ -491,7 +501,7 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
         )
 
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
-        return obj.internal_tx.ethereum_tx.block_id
+        return obj.internal_tx.block_number
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
         return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b"")
@@ -503,7 +513,7 @@ class SafeModuleTransactionResponseSerializer(serializers.ModelSerializer):
         return obj.internal_tx.ethereum_tx_id
 
 
-class SafeMultisigConfirmationResponseSerializer(serializers.ModelSerializer):
+class SafeMultisigConfirmationResponseSerializer(GnosisBaseModelSerializer):
     submission_date = serializers.DateTimeField(source="created")
     transaction_hash = serializers.SerializerMethodField()
     signature = HexadecimalField()
