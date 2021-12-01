@@ -152,7 +152,7 @@ class IndexService:
 
         # Get transactions for hashes not in db
         fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
-        block_numbers = set()
+        block_hashes = set()
         txs = []
         for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs):
             tx = tx or self.ethereum_client.get_transaction(
@@ -162,31 +162,31 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            elif tx.get("blockNumber") is None:
+            elif tx.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
-                    f"Cannot find blockNumber for tx with "
+                    f"Cannot find blockHash for tx with "
                     f"tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            block_numbers.add(tx["blockNumber"])
+            block_hashes.add(tx["blockHash"].hex())
             txs.append(tx)
 
-        blocks = self.ethereum_client.get_blocks(block_numbers)
+        blocks = self.ethereum_client.get_blocks(block_hashes)
         block_dict = {}
-        for block_number, block in zip(block_numbers, blocks):
+        for block_hash, block in zip(block_hashes, blocks):
             block = block or self.ethereum_client.get_block(
-                block_number
+                block_hash
             )  # Retry fetching if failed
             if not block:
                 raise BlockNotFoundException(
-                    f"Block with number={block_number} was not found"
+                    f"Block with hash={block_hash} was not found"
                 )
-            assert block_number == block["number"]
-            block_dict[block["number"]] = block
+            assert block_hash == block["hash"].hex()
+            block_dict[block["hash"]] = block
 
         # Create new transactions or update them if they have no receipt
         current_block_number = self.ethereum_client.current_block_number
         for tx, tx_receipt in zip(txs, tx_receipts):
-            block = block_dict.get(tx["blockNumber"])
+            block = block_dict[tx["blockHash"]]
             confirmed = (
                 current_block_number - block["number"]
             ) >= self.eth_reorg_blocks

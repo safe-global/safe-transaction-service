@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, PropertyMock
 
 from django.test import TestCase
 
+from eth_typing import HexStr
+
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
 
@@ -53,6 +55,10 @@ class TestInternalTxIndexer(TestCase):
                 (InternalTxIndexer, InternalTxIndexerWithTraceBlock),
             )
 
+    def return_sorted_blocks(self, hashes: HexStr):
+        block_dict = {block["hash"].hex(): block for block in block_result}
+        return [block_dict[provided_hash] for provided_hash in hashes]
+
     @mock.patch.object(
         ParityManager, "trace_blocks", autospec=True, return_value=trace_blocks_result
     )
@@ -66,7 +72,7 @@ class TestInternalTxIndexer(TestCase):
         return_value=trace_transactions_result,
     )
     @mock.patch.object(
-        EthereumClient, "get_blocks", autospec=True, return_value=block_result
+        EthereumClient, "get_blocks", autospec=True, side_effect=return_sorted_blocks
     )
     @mock.patch.object(
         EthereumClient,
