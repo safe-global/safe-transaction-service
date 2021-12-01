@@ -333,8 +333,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             + "?transaction_hash=0x2345"
         )
         response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         url = (
             reverse("v1:history:module-transactions", args=(safe_address,))
@@ -2227,8 +2226,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             + "?transaction_hash=0x2345"
         )
         response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         # Add from tx
         internal_tx_2 = InternalTxFactory(_from=safe_address, value=value)

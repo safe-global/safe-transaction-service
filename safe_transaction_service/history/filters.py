@@ -5,9 +5,19 @@ from django_filters import rest_framework as filters
 from rest_framework.exceptions import ValidationError
 
 from gnosis.eth.django.filters import EthereumAddressFilter
-from gnosis.eth.django.models import EthereumAddressField, Uint256Field
+from gnosis.eth.django.models import (
+    EthereumAddressField,
+    EthereumAddressV2Field,
+    Uint256Field,
+)
 
 from .models import ModuleTransaction, MultisigTransaction
+
+filter_overrides = {
+    Uint256Field: {"filter_class": django_filters.NumberFilter},
+    EthereumAddressField: {"filter_class": EthereumAddressFilter},
+    EthereumAddressV2Field: {"filter_class": EthereumAddressFilter},
+}
 
 
 class DelegateListFilter(filters.FilterSet):
@@ -116,10 +126,7 @@ class MultisigTransactionFilter(filters.FilterSet):
             "to": ["exact"],
             "value": ["lt", "gt", "exact"],
         }
-        filter_overrides = {
-            Uint256Field: {"filter_class": django_filters.NumberFilter},
-            EthereumAddressField: {"filter_class": EthereumAddressFilter},
-        }
+        filter_overrides = filter_overrides
 
 
 class ModuleTransactionFilter(filters.FilterSet):
@@ -146,10 +153,7 @@ class ModuleTransactionFilter(filters.FilterSet):
             "failed": ["exact"],
         }
 
-        filter_overrides = {
-            Uint256Field: {"filter_class": django_filters.NumberFilter},
-            EthereumAddressField: {"filter_class": EthereumAddressFilter},
-        }
+        filter_overrides = filter_overrides
 
 
 class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
@@ -169,10 +173,7 @@ class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
             "trusted": ["exact"],
         }
 
-        filter_overrides = {
-            Uint256Field: {"filter_class": django_filters.NumberFilter},
-            EthereumAddressField: {"filter_class": EthereumAddressFilter},
-        }
+        filter_overrides = filter_overrides
 
 
 class AnalyticsMultisigTxsBySafeFilter(filters.FilterSet):

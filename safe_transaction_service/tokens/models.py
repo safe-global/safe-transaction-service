@@ -10,7 +10,7 @@ from django.db.models import Q
 from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
-from gnosis.eth.django.models import EthereumAddressField
+from gnosis.eth.django.models import EthereumAddressV2Field
 
 from .clients.zerion_client import (
     BalancerTokenAdapterClient,
@@ -124,7 +124,7 @@ class TokenQuerySet(models.QuerySet):
 class Token(models.Model):
     objects = TokenManager.from_queryset(TokenQuerySet)()
     pool_tokens = PoolTokenManager()
-    address = EthereumAddressField(primary_key=True)
+    address = EthereumAddressV2Field(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
     decimals = models.PositiveSmallIntegerField(

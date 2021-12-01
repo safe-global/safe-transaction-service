@@ -417,5 +417,8 @@ class TransactionService:
                 raise ValueError(f"Type={model_type} not expected, cannot serialize")
             serialized = serializer(model)
             # serialized.is_valid(raise_exception=True)
+            print("a", serializer)
+            print(type(model), model)
             results.append(serialized.data)
+            print("b", serializer)
         return results
