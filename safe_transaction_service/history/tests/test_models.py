@@ -12,6 +12,7 @@ from web3 import Web3
 
 from gnosis.safe.safe_signature import SafeSignatureType
 
+from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 
 from ..models import (
@@ -131,6 +132,31 @@ class TestModelMixins(TestCase):
 
 
 class TestMultisigTransaction(TestCase):
+    def test_data_should_be_decoded(self):
+        try:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            multisig_transaction = MultisigTransactionFactory(
+                signatures=None, operation=0
+            )
+            self.assertTrue(multisig_transaction.data_should_be_decoded())
+
+            multisig_transaction = MultisigTransactionFactory(
+                signatures=None, operation=1
+            )
+            self.assertFalse(multisig_transaction.data_should_be_decoded())
+
+            ContractFactory(
+                address=multisig_transaction.to, trusted_for_delegate_call=True
+            )
+            # Cache is used, so it will still be false
+            self.assertFalse(multisig_transaction.data_should_be_decoded())
+
+            # Empty cache
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            self.assertTrue(multisig_transaction.data_should_be_decoded())
+        finally:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+
     def test_multisig_transaction_owners(self):
         multisig_transaction = MultisigTransactionFactory(signatures=None)
         self.assertEqual(multisig_transaction.owners, [])

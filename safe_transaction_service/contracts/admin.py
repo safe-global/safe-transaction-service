@@ -61,10 +61,11 @@ class ContractAdmin(admin.ModelAdmin):
         "display_name",
         "has_abi",
         "has_logo",
+        "trusted_for_delegate_call",
         "abi_relevance",
         "contract_abi_id",
     )
-    list_filter = (HasAbiFilter, HasLogoFilter)
+    list_filter = (HasAbiFilter, HasLogoFilter, "trusted_for_delegate_call")
     list_select_related = ("contract_abi",)
     ordering = ["address"]
     raw_id_fields = ("contract_abi",)

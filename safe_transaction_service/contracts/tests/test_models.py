@@ -107,10 +107,8 @@ class TestContract(TestCase):
         contract_name = "test-contract"
         contract_display_name = "awesome-contract"
         contract = ContractFactory(logo="", name=contract_name, display_name="")
-        self.assertEqual(contract.get_main_name(), contract_name)
         contract.display_name = contract_display_name
         contract.save()
-        self.assertEqual(contract.get_main_name(), contract_display_name)
         self.assertIn("without logo", str(contract))
         self.assertEqual(Contract.objects.with_logo().count(), 0)
         self.assertEqual(Contract.objects.without_logo().count(), 1)

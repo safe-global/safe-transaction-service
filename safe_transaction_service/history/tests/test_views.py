@@ -15,11 +15,14 @@ from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
-from gnosis.safe import CannotEstimateGas, Safe
+from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from safe_transaction_service.contracts.models import ContractQuerySet
+from safe_transaction_service.contracts.tests.factories import ContractFactory
+from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
@@ -570,6 +573,51 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
         self.assertEqual(response.data["count_unique_nonce"], 1)
+
+    @mock.patch.object(
+        DbTxDecoder, "get_data_decoded", return_value={"param1": "value"}
+    )
+    def test_get_multisig_transactions_not_decoded(
+        self, get_data_decoded_mock: MagicMock
+    ):
+        try:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            multisig_transaction = MultisigTransactionFactory(
+                operation=SafeOperation.CALL.value, data=b"abcd"
+            )
+            safe_address = multisig_transaction.safe
+            response = self.client.get(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(
+                response.data["results"][0]["data_decoded"], {"param1": "value"}
+            )
+
+            multisig_transaction.operation = SafeOperation.DELEGATE_CALL.value
+            multisig_transaction.save()
+            response = self.client.get(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertIsNone(response.data["results"][0]["data_decoded"])
+
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            ContractFactory(
+                address=multisig_transaction.to, trusted_for_delegate_call=True
+            )
+            response = self.client.get(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(
+                response.data["results"][0]["data_decoded"], {"param1": "value"}
+            )
+        finally:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 
     def test_get_multisig_transactions_filters(self):
         safe_address = Account.create().address

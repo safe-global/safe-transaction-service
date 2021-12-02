@@ -1,4 +1,5 @@
 import json
+import operator
 import os
 from logging import getLogger
 from typing import Any, Dict, List, Optional
@@ -11,6 +12,7 @@ from django.db.models import JSONField, Q
 from django.utils.translation import gettext_lazy as _
 
 from botocore.exceptions import ClientError
+from cachetools import TTLCache, cachedmethod
 from web3 import Web3
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
@@ -119,6 +121,9 @@ class ContractManager(models.Manager):
 
 
 class ContractQuerySet(models.QuerySet):
+    cache_trusted_addresses_for_delegate_call = TTLCache(
+        maxsize=2048, ttl=60 * 5
+    )  # 5 minutes of caching
     no_logo_query = Q(logo=None) | Q(logo="")
 
     def with_logo(self):
@@ -129,6 +134,15 @@ class ContractQuerySet(models.QuerySet):
 
     def without_metadata(self):
         return self.filter(Q(contract_abi=None) | Q(name=""))
+
+    def trusted_for_delegate_call(self):
+        return self.filter(trusted_for_delegate_call=True)
+
+    @cachedmethod(
+        cache=operator.attrgetter("cache_trusted_addresses_for_delegate_call")
+    )
+    def trusted_addresses_for_delegate_call(self):
+        return self.trusted_for_delegate_call().values_list("address", flat=True)
 
 
 class Contract(models.Model):  # Known addresses by the service
@@ -150,17 +164,13 @@ class Contract(models.Model):  # Known addresses by the service
         blank=True,
         related_name="contracts",
     )
+    # Trusted for doing delegate calls, as it's very dangerous doing delegate calls to other contracts
+    trusted_for_delegate_call = models.BooleanField(default=False)
 
     def __str__(self):
         has_abi = self.contract_abi_id is not None
         logo = " with logo" if self.logo else " without logo"
         return f"Contract {self.address} - {self.name} - with abi {has_abi}{logo}"
-
-    def get_main_name(self):
-        """
-        :return: `display_name` if available, else use scraped `name`
-        """
-        return self.display_name if self.display_name else self.name
 
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """

@@ -43,3 +43,4 @@ class ContractFactory(DjangoModelFactory):
     display_name = ""
     logo = factory.django.ImageField(color="green")
     contract_abi = factory.SubFactory(ContractAbiFactory)
+    trusted_for_delegate_call = False
