@@ -15,3 +15,4 @@ class ContractSerializer(serializers.Serializer):
     display_name = serializers.CharField()
     logo_uri = serializers.ImageField(source="logo")
     contract_abi = ContractAbiSerializer()
+    trusted_for_delegate_call = serializers.BooleanField()

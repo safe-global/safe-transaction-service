@@ -1189,6 +1189,17 @@ class MultisigTransaction(TimeStampedModel):
             )
             return [safe_signature.owner for safe_signature in safe_signatures]
 
+    def data_should_be_decoded(self) -> bool:
+        """
+        Decoding could lead people to be tricked, and this is real critical when using DELEGATE_CALL as the operation
+
+        :return: `True` if data should be decoded, `False` otherwise
+        """
+        return not (
+            self.operation == SafeOperation.DELEGATE_CALL.value
+            and self.to not in Contract.objects.trusted_addresses_for_delegate_call()
+        )
+
 
 class ModuleTransactionManager(models.Manager):
     def not_indexed_metadata_contract_addresses(self):

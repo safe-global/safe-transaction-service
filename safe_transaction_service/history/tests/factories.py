@@ -229,7 +229,7 @@ class MultisigTransactionFactory(DjangoModelFactory):
     to = factory.LazyFunction(lambda: Account.create().address)
     value = FuzzyInteger(low=0, high=10)
     data = b""
-    operation = FuzzyInteger(low=0, high=2)
+    operation = 0
     safe_tx_gas = FuzzyInteger(low=400000, high=500000)
     base_gas = FuzzyInteger(low=200000, high=300000)
     gas_price = FuzzyInteger(low=1, high=10)

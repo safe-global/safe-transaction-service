@@ -46,6 +46,7 @@ class TestContractViews(APITestCase):
                     "description": contract.contract_abi.description,
                     "relevance": contract.contract_abi.relevance,
                 },
+                "trusted_for_delegate_call": False,
             },
         )
 
@@ -66,6 +67,7 @@ class TestContractViews(APITestCase):
                 "display_name": display_name,
                 "logo_uri": None,
                 "contract_abi": None,
+                "trusted_for_delegate_call": False,
             },
         )
 
@@ -92,6 +94,7 @@ class TestContractViews(APITestCase):
                         "description": contract.contract_abi.description,
                         "relevance": contract.contract_abi.relevance,
                     },
+                    "trusted_for_delegate_call": False,
                 }
             ],
         )

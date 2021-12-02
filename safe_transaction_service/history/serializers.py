@@ -590,7 +590,9 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             return not obj.failed
 
     def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
-        return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b"")
+        # If delegate call contract must be whitelisted (security)
+        if obj.data_should_be_decoded():
+            return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b"")
 
 
 class Erc20InfoSerializer(serializers.Serializer):
