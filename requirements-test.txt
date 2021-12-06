@@ -6,6 +6,6 @@ faker==9.8.3
 mypy==0.910
 pytest==6.2.5
 pytest-celery==0.0.0
-pytest-django==4.4.0
+pytest-django==4.5.1
 pytest-env==0.6.2
 pytest-sugar==0.9.4
