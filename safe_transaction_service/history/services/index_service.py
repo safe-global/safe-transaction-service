@@ -82,7 +82,7 @@ class IndexService:
             confirmed = (
                 current_block_number - block["number"]
             ) >= self.eth_reorg_blocks
-            return EthereumBlock.objects.create_from_block(block, cofirmed=confirmed)
+            return EthereumBlock.objects.create_from_block(block, confirmed=confirmed)
 
     def tx_create_or_update_from_tx_hash(self, tx_hash: str) -> "EthereumTx":
         try:
