@@ -4,10 +4,11 @@ import django_filters
 from django_filters import rest_framework as filters
 from rest_framework.exceptions import ValidationError
 
-from gnosis.eth.django.filters import EthereumAddressFilter
+from gnosis.eth.django.filters import EthereumAddressFilter, Keccak256Filter
 from gnosis.eth.django.models import (
     EthereumAddressField,
     EthereumAddressV2Field,
+    Keccak256Field,
     Uint256Field,
 )
 
@@ -15,15 +16,16 @@ from .models import ModuleTransaction, MultisigTransaction
 
 filter_overrides = {
     Uint256Field: {"filter_class": django_filters.NumberFilter},
+    Keccak256Field: {"filter_class": Keccak256Filter},
     EthereumAddressField: {"filter_class": EthereumAddressFilter},
     EthereumAddressV2Field: {"filter_class": EthereumAddressFilter},
 }
 
 
 class DelegateListFilter(filters.FilterSet):
-    safe = django_filters.CharFilter(field_name="safe_contract_id")
-    delegate = django_filters.CharFilter()
-    delegator = django_filters.CharFilter()
+    safe = EthereumAddressFilter(field_name="safe_contract_id")
+    delegate = EthereumAddressFilter()
+    delegator = EthereumAddressFilter()
     label = django_filters.CharFilter()
 
     def filter_queryset(self, queryset):
@@ -35,7 +37,7 @@ class DelegateListFilter(filters.FilterSet):
 
 
 class TransferListFilter(filters.FilterSet):
-    _from = django_filters.CharFilter()
+    _from = EthereumAddressFilter()
     block_number = django_filters.NumberFilter(field_name="block")
     block_number__gt = django_filters.NumberFilter(field_name="block", lookup_expr="gt")
     block_number__lt = django_filters.NumberFilter(field_name="block", lookup_expr="lt")
@@ -51,9 +53,9 @@ class TransferListFilter(filters.FilterSet):
     execution_date__lt = django_filters.IsoDateTimeFilter(
         field_name="execution_date", lookup_expr="lt"
     )
-    to = django_filters.CharFilter()
-    token_address = django_filters.CharFilter()
-    transaction_hash = django_filters.CharFilter(field_name="transaction_hash")
+    to = EthereumAddressFilter()
+    token_address = EthereumAddressFilter()
+    transaction_hash = Keccak256Filter(field_name="transaction_hash")
     value = django_filters.NumberFilter(field_name="_value")
     value__gt = django_filters.NumberFilter(field_name="_value", lookup_expr="gt")
     value__lt = django_filters.NumberFilter(field_name="_value", lookup_expr="lt")
@@ -99,7 +101,7 @@ class MultisigTransactionFilter(filters.FilterSet):
     submission_date__lte = django_filters.IsoDateTimeFilter(
         field_name="created", lookup_expr="lte"
     )
-    transaction_hash = django_filters.CharFilter(field_name="ethereum_tx_id")
+    transaction_hash = Keccak256Filter(field_name="ethereum_tx_id")
 
     def filter_confirmations(self, queryset, name: str, value: bool):
         if value:
@@ -139,9 +141,7 @@ class ModuleTransactionFilter(filters.FilterSet):
     block_number__lt = django_filters.NumberFilter(
         field_name="internal_tx__ethereum_tx__block_id", lookup_expr="lt"
     )
-    transaction_hash = django_filters.CharFilter(
-        field_name="internal_tx__ethereum_tx_id"
-    )
+    transaction_hash = Keccak256Filter(field_name="internal_tx__ethereum_tx_id")
 
     class Meta:
         model = ModuleTransaction
@@ -177,4 +177,4 @@ class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
 
 
 class AnalyticsMultisigTxsBySafeFilter(filters.FilterSet):
-    master_copy = django_filters.CharFilter()
+    master_copy = EthereumAddressFilter()
