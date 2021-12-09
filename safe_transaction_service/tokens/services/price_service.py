@@ -195,6 +195,12 @@ class PriceService:
             return self.get_matic_usd_price()
         elif self.ethereum_network == EthereumNetwork.BINANCE:
             return self.get_binance_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.GATHER_DEVNET,
+            EthereumNetwork.GATHER_TESTNET,
+            EthereumNetwork.GATHER_MAINNET,
+        ):
+            return self.coingecko_client.get_gather_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
