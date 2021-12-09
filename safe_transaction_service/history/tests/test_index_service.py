@@ -7,7 +7,6 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..models import EthereumTx, MultisigTransaction, SafeStatus
 from ..services.index_service import (
-    EthereumBlockHashMismatch,
     IndexService,
     IndexServiceProvider,
     TransactionNotFoundException,
@@ -70,10 +69,6 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         # Uses database
         index_service.txs_create_or_update_from_tx_hashes([tx_hash])
         ethereum_tx.delete()
-
-        # Try to fetch again
-        with self.assertRaises(EthereumBlockHashMismatch):
-            index_service.txs_create_or_update_from_tx_hashes([tx_hash])
 
     def test_reprocess_addresses(self):
         index_service: IndexService = IndexServiceProvider()
