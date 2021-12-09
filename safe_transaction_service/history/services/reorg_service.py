@@ -76,6 +76,7 @@ class ReorgService:
         """
         Reset database fields to a block to start reindexing from that block. It's useful when you want to trigger
         a indexation for txs that are not appearing on database but you don't want to delete anything
+
         :param block_number:
         :return: Number of updated models
         """
@@ -89,6 +90,9 @@ class ReorgService:
     @transaction.atomic
     def recover_from_reorg(self, first_reorg_block_number: int) -> int:
         """
+        Reset database fields to a block to start reindexing from that block and remove blocks greater or equal
+        than `first_reorg_block_number`
+
         :param first_reorg_block_number:
         :return: Return number of elements updated
         """

@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
@@ -19,6 +20,7 @@ from ..models import (
     ERC20Transfer,
     ERC721Transfer,
     EthereumBlock,
+    EthereumBlockManager,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -42,6 +44,7 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
+from .mocks.mocks_internal_tx_indexer import block_result
 
 logger = logging.getLogger(__name__)
 
@@ -794,6 +797,25 @@ class TestMultisigConfirmations(TestCase):
 
 
 class TestEthereumBlock(TestCase):
+    def test_get_or_create_from_block(self):
+        mock_block = block_result[0]
+        self.assertEqual(EthereumBlock.objects.count(), 0)
+        EthereumBlock.objects.get_or_create_from_block(mock_block)
+        self.assertEqual(EthereumBlock.objects.count(), 1)
+        with mock.patch.object(
+            EthereumBlockManager, "create_from_block"
+        ) as create_from_block_mock:
+            # Block already exists
+            EthereumBlock.objects.get_or_create_from_block(mock_block)
+            create_from_block_mock.assert_not_called()
+
+        mock_block_2 = dict(mock_block)
+        mock_block_2["hash"] = Web3.keccak(text="another-hash")
+        self.assertNotEqual(mock_block["hash"], mock_block_2["hash"])
+        block = EthereumBlock.objects.get_or_create_from_block(mock_block_2)
+        self.assertEqual(block.block_hash, mock_block_2["hash"].hex())
+        self.assertEqual(EthereumBlock.objects.count(), 1)
+
     def test_set_confirmed_not_confirmed(self):
         ethereum_block = EthereumBlockFactory(confirmed=False)
         ethereum_block.set_confirmed()

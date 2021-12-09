@@ -37,10 +37,6 @@ class BlockNotFoundException(IndexingException):
     pass
 
 
-class EthereumBlockHashMismatch(IndexingException):
-    pass
-
-
 class IndexServiceProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
@@ -71,18 +67,20 @@ class IndexService:
         self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_l2_network = eth_l2_network
 
-    def block_get_or_create_from_block_number(self, block_number: int):
+    def block_get_or_create_from_block_hash(self, block_hash: int):
         try:
-            return EthereumBlock.objects.get(number=block_number)
+            return EthereumBlock.objects.get(block_hash=block_hash)
         except EthereumBlock.DoesNotExist:
             current_block_number = (
                 self.ethereum_client.current_block_number
             )  # For reorgs
-            block = self.ethereum_client.get_block(block_number)
+            block = self.ethereum_client.get_block(block_hash)
             confirmed = (
                 current_block_number - block["number"]
             ) >= self.eth_reorg_blocks
-            return EthereumBlock.objects.create_from_block(block, confirmed=confirmed)
+            return EthereumBlock.objects.get_or_create_from_block(
+                block, confirmed=confirmed
+            )
 
     def tx_create_or_update_from_tx_hash(self, tx_hash: str) -> "EthereumTx":
         try:
@@ -90,15 +88,15 @@ class IndexService:
             # For txs stored before being mined
             if ethereum_tx.block is None:
                 tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-                ethereum_block = self.block_get_or_create_from_block_number(
-                    tx_receipt["blockNumber"]
+                ethereum_block = self.block_get_or_create_from_block_hash(
+                    tx_receipt["blockHash"]
                 )
                 ethereum_tx.update_with_block_and_receipt(ethereum_block, tx_receipt)
             return ethereum_tx
         except EthereumTx.DoesNotExist:
             tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-            ethereum_block = self.block_get_or_create_from_block_number(
-                tx_receipt["blockNumber"]
+            ethereum_block = self.block_get_or_create_from_block_hash(
+                tx_receipt["blockHash"]
             )
             tx = self.ethereum_client.get_transaction(tx_hash)
             return EthereumTx.objects.create_from_tx_dict(
@@ -195,13 +193,6 @@ class IndexService:
                     block, confirmed=confirmed
                 )
             )
-            if HexBytes(ethereum_block.block_hash) != block["hash"]:
-                ethereum_block.set_not_confirmed()  # In case reorg was not detected
-                raise EthereumBlockHashMismatch(
-                    f"Stored block={ethereum_block.number} "
-                    f"with hash={ethereum_block.block_hash} "
-                    f'is not marching retrieved hash={block["hash"].hex()}'
-                )
             try:
                 with transaction.atomic():
                     ethereum_tx = EthereumTx.objects.create_from_tx_dict(

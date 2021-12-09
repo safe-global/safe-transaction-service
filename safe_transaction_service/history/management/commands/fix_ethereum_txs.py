@@ -18,10 +18,10 @@ class Command(BaseCommand):
         ethereum_client = index_service.ethereum_client
         for i, ethereum_tx in enumerate(queryset.iterator()):
             tx_receipt = ethereum_client.get_transaction_receipt(ethereum_tx.tx_hash)
-            block_number = tx_receipt["blockNumber"]
+            block_hash = tx_receipt["blockHash"]
             block = (
                 ethereum_tx.block
-                or index_service.block_get_or_create_from_block_number(block_number)
+                or index_service.block_get_or_create_from_block_hash(block_hash)
             )
             ethereum_tx.update_with_block_and_receipt(block, tx_receipt)
             self.stdout.write(

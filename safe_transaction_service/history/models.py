@@ -150,7 +150,20 @@ class BulkCreateSignalMixin:
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
         try:
-            return self.get(number=block["number"])
+            db_block = self.get(number=block["number"])
+            if db_block.block_hash != block["hash"].hex():
+                logger.warning(
+                    "Stored block=%d "
+                    "with hash=%s "
+                    "is not marching retrieved hash=%s",
+                    db_block.number,
+                    db_block.block_hash,
+                    block["hash"].hex(),
+                )
+                db_block.delete()
+                raise self.model.DoesNotExist
+            else:
+                return db_block
         except self.model.DoesNotExist:
             return self.create_from_block(block, confirmed=confirmed)
 
@@ -170,8 +183,8 @@ class EthereumBlockManager(models.Manager):
                 timestamp=datetime.datetime.fromtimestamp(
                     block["timestamp"], datetime.timezone.utc
                 ),
-                block_hash=block["hash"],
-                parent_hash=block["parentHash"],
+                block_hash=HexBytes(block["hash"]).hex(),
+                parent_hash=HexBytes(block["parentHash"]).hex(),
                 confirmed=confirmed,
             )
         except IntegrityError:
@@ -180,9 +193,13 @@ class EthereumBlockManager(models.Manager):
 
     @lru_cache(maxsize=10000)
     def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:
-        return EthereumBlock.objects.values("timestamp").get(block_hash=block_hash)[
-            "timestamp"
-        ]
+        try:
+            return self.values("timestamp").get(block_hash=block_hash)["timestamp"]
+        except self.model.DoesNotExist:
+            logger.error(
+                "Block with hash=%s does not exist on database", block_hash.hex()
+            )
+            raise
 
 
 class EthereumBlockQuerySet(models.QuerySet):
