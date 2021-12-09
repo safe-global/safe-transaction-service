@@ -40,7 +40,7 @@ from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
     HexField,
-    Sha3HashField,
+    Keccak256Field,
     Uint256Field,
 )
 from gnosis.safe import SafeOperation
@@ -230,8 +230,8 @@ class EthereumBlock(models.Model):
     gas_limit = models.PositiveIntegerField()
     gas_used = models.PositiveIntegerField()
     timestamp = models.DateTimeField()
-    block_hash = Sha3HashField(unique=True)
-    parent_hash = Sha3HashField(unique=True)
+    block_hash = Keccak256Field(unique=True)
+    parent_hash = Keccak256Field(unique=True)
     # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
     confirmed = models.BooleanField(default=False, db_index=True)
 
@@ -293,7 +293,7 @@ class EthereumTx(TimeStampedModel):
         default=None,
         related_name="txs",
     )  # If mined
-    tx_hash = Sha3HashField(primary_key=True)
+    tx_hash = Keccak256Field(primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
     status = models.IntegerField(
         null=True, default=None, db_index=True
@@ -1154,7 +1154,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
 class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
-    safe_tx_hash = Sha3HashField(primary_key=True)
+    safe_tx_hash = Keccak256Field(primary_key=True)
     safe = EthereumAddressV2Field(db_index=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx,
@@ -1310,7 +1310,7 @@ class MultisigConfirmation(TimeStampedModel):
         null=True,
         related_name="confirmations",
     )
-    multisig_transaction_hash = Sha3HashField(
+    multisig_transaction_hash = Keccak256Field(
         null=True, db_index=True
     )  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressV2Field()
