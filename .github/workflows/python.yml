@@ -64,7 +64,7 @@ jobs:
       run: |
         python manage.py check
         python manage.py makemigrations --check --dry-run
-        coverage run --source=$SOURCE_FOLDER -m py.test -rxXs
+        coverage run --source=$SOURCE_FOLDER -m py.test -rxXs --reruns 3
       env:
         SOURCE_FOLDER: safe_transaction_service
         DJANGO_SETTINGS_MODULE: config.settings.test
