@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             """
-            DROP INDEX IF EXISTS 
+            DROP INDEX IF EXISTS
                 notifications_firebasede_safecontract_id_acb5c418_like,
                 notifications_firebasedeviceowner_owner_025b0ed6_like
             """,

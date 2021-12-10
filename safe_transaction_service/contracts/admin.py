@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from safe_transaction_service.utils.admin import BinarySearchAdmin
+
 from .models import Contract, ContractAbi
 
 
 @admin.register(ContractAbi)
-class ContractAbiAdmin(admin.ModelAdmin):
+class ContractAbiAdmin(BinarySearchAdmin):
     list_display = ("pk", "relevance", "description", "abi_functions")
     list_filter = ("relevance",)
     ordering = ["relevance"]
@@ -54,7 +56,7 @@ class HasLogoFilter(admin.SimpleListFilter):
 
 
 @admin.register(Contract)
-class ContractAdmin(admin.ModelAdmin):
+class ContractAdmin(BinarySearchAdmin):
     list_display = (
         "address",
         "name",
@@ -70,7 +72,7 @@ class ContractAdmin(admin.ModelAdmin):
     ordering = ["address"]
     raw_id_fields = ("contract_abi",)
     search_fields = [
-        "address",
+        "=address",
         "name",
         "contract_abi__abi",
         "contract_abi__description",
