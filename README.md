@@ -136,9 +136,11 @@ the **GnosisSafe/GnosisSafeL2**.
 ## Use admin interface
 Services come with a basic administration web ui (provided by Django) by default on http://localhost:8000/admin/
 
-A user must be created to get access:
+A user must be created to get access. Also a token is required for 2FA. Later a `TOTP` token can be configured
+from the admin to be used with applications like `AndOTP` or `Google Authenticator`.
 ```bash
-docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
+docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser --username yourusername
+docker exec -it safe-transaction-service_web_1 python manage.py addstatictoken yourusername
 ```
 
 ## Safe Contract ABIs and addresses

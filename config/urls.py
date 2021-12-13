@@ -5,9 +5,14 @@ from django.http import HttpResponse
 from django.urls import path, re_path
 from django.views import defaults as default_views
 
+from django_otp.admin import OTPAdminSite
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+
+if not settings.DEBUG:
+    admin.site.__class__ = OTPAdminSite
+
 
 schema_view = get_schema_view(
     openapi.Info(

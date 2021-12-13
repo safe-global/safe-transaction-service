@@ -83,6 +83,9 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "drf_yasg",
     "django_s3_storage",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
 ]
 LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
@@ -105,6 +108,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     # 'django.middleware.csrf.CsrfViewMiddleware',
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

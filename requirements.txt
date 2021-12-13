@@ -11,6 +11,7 @@ django-debug-toolbar-force
 django-environ==0.8.1
 django-filter==21.1
 django-model-utils==4.2.0
+django-otp[qrcode]==1.1.3
 django-redis==5.2.0
 django-s3-storage==0.13.5
 django-timezone-field==4.2.1
