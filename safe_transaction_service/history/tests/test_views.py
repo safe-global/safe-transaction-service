@@ -1360,7 +1360,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         token_dict = asdict(erc20_info)
         del token_dict["address"]
-        self.maxDiff = None
         self.assertCountEqual(
             response.data,
             [

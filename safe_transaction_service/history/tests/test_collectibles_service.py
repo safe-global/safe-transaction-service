@@ -41,7 +41,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         self.assertIn("testing-url/path/?arguments", result)
 
     def test_get_collectibles(self):
-        self.maxDiff = None
         mainnet_node = just_test_if_mainnet_node()
         try:
             ethereum_client = EthereumClient(mainnet_node)
