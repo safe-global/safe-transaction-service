@@ -206,6 +206,10 @@ INSTALLED_APPS += [
 ]
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-broker_url
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="django://")
+# https://docs.celeryproject.org/en/stable/userguide/optimizing.html#broker-connection-pools
+CELERY_BROKER_POOL_LIMIT = env(
+    "CELERY_BROKER_POOL_LIMIT", default=env("CELERYD_CONCURRENCY", default=500)
+)
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_backend
 if CELERY_BROKER_URL == "django://":
     CELERY_RESULT_BACKEND = "redis://"
