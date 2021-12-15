@@ -71,7 +71,6 @@ class Migration(migrations.Migration):
             ALTER TABLE "history_multisigtransaction" ALTER COLUMN "safe" TYPE bytea USING DECODE(SUBSTRING("safe", 3), 'hex');
             ALTER TABLE "history_multisigtransaction" ALTER COLUMN "to" TYPE bytea USING DECODE(SUBSTRING("to", 3), 'hex');
             ALTER TABLE "history_proxyfactory" ALTER COLUMN "address" TYPE bytea USING DECODE(SUBSTRING("address", 3), 'hex');
-            DROP INDEX IF EXISTS "history_safecontract_address_b3109ec5_like";
             SET CONSTRAINTS "history_safecontract_safe_contract_id_4389cdbf_fk_history_s" IMMEDIATE;
             ALTER TABLE "history_safecontractdelegate" DROP CONSTRAINT "history_safecontract_safe_contract_id_4389cdbf_fk_history_s";
             ALTER TABLE "history_safecontractdelegate" ADD CONSTRAINT "history_safecontractdelegate_safe_contract_id_4389cdbf_fk" FOREIGN KEY ("safe_contract_id") REFERENCES "history_safecontract" ("address") DEFERRABLE INITIALLY DEFERRED;
@@ -87,7 +86,6 @@ class Migration(migrations.Migration):
             ALTER TABLE "history_safestatus" ALTER COLUMN "master_copy" TYPE bytea USING DECODE(SUBSTRING("master_copy", 3), 'hex');
             ALTER TABLE "history_safestatus" ALTER COLUMN "owners" TYPE bytea[] USING "owners"::bytea[];
             ALTER TABLE "history_webhook" ALTER COLUMN "address" TYPE bytea USING DECODE(SUBSTRING("address", 3), 'hex'), ALTER COLUMN "address" DROP NOT NULL;
-            COMMIT
             """
         ),
         migrations.RunSQL(
