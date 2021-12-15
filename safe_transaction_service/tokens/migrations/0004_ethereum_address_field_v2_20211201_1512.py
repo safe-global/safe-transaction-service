@@ -13,7 +13,10 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            "DROP INDEX IF EXISTS tokens_token_address_18ef94ca_like",
+            """
+            DROP INDEX IF EXISTS tokens_token_address_18ef94ca_like;
+            ALTER TABLE "tokens_token" ALTER COLUMN "address" TYPE bytea USING DECODE(SUBSTRING("address", 3), 'hex');
+            """,
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.AlterField(
