@@ -16,7 +16,9 @@ class Migration(migrations.Migration):
             """
             DROP INDEX IF EXISTS
                 notifications_firebasede_safecontract_id_acb5c418_like,
-                notifications_firebasedeviceowner_owner_025b0ed6_like
+                notifications_firebasedeviceowner_owner_025b0ed6_like;
+
+            ALTER TABLE "notifications_firebasedeviceowner" ALTER COLUMN "owner" TYPE bytea USING DECODE(SUBSTRING("owner", 3), 'hex');
             """,
             reverse_sql=migrations.RunSQL.noop,
         ),
