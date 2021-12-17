@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 notifications_firebasede_safecontract_id_acb5c418_like,
                 notifications_firebasedeviceowner_owner_025b0ed6_like,
                 contracts_contract_address_858bb34d_like;
-            ALTER TABLE "contracts_contract" ALTER COLUMN "address" TYPE bytea USING DECODE("address", 'hex');
+            ALTER TABLE "contracts_contract" ALTER COLUMN "address" TYPE bytea USING DECODE(SUBSTRING("address", 3), 'hex');
             """,
             reverse_sql=migrations.RunSQL.noop,
         ),
