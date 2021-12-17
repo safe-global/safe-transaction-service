@@ -88,41 +88,6 @@ class Migration(migrations.Migration):
             ALTER TABLE "history_webhook" ALTER COLUMN "address" TYPE bytea USING DECODE(SUBSTRING("address", 3), 'hex'), ALTER COLUMN "address" DROP NOT NULL;
             """
         ),
-        migrations.RunSQL(
-            # Create function to migrate bytea[]
-            """
-            CREATE OR REPLACE FUNCTION array_address_parse(bytea[])
-            RETURNS bytea[]
-            AS
-            $$
-            DECLARE
-               arrBytes ALIAS FOR $1;
-               retVal bytea[];
-            BEGIN
-               IF array_upper(arrBytes, 1) is NULL THEN
-                 RETURN ARRAY[]::bytea[];
-               END IF;
-               FOR I IN array_lower(arrBytes, 1)..array_upper(arrBytes, 1) LOOP
-                 retVal[I] := decode(substring(encode(arrBytes[I], 'escape'), 3), 'hex');
-               END LOOP;
-            RETURN retVal;
-            END;
-            $$
-            LANGUAGE plpgsql
-               STABLE
-            RETURNS NULL ON NULL INPUT;
-
-            UPDATE "history_safestatus"
-            SET
-                owners = array_address_parse(owners),
-                enabled_modules = array_address_parse(enabled_modules);
-
-            UPDATE history_webhook SET address=null WHERE address='';
-
-            DROP FUNCTION array_address_parse(bytea[]);
-            """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
         migrations.AlterField(
             model_name="erc20transfer",
             name="_from",
@@ -308,14 +273,5 @@ class Migration(migrations.Migration):
             field=gnosis.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
-        ),
-        migrations.RunSQL(
-            """
-            UPDATE "history_safecontract"
-                SET "address" = DECODE(SUBSTRING(ENCODE("address", 'escape'), 3), 'hex');
-            UPDATE "history_safecontractdelegate"
-                SET "safe_contract_id" = DECODE(SUBSTRING(ENCODE("safe_contract_id", 'escape'), 3), 'hex');
-            """,
-            migrations.RunSQL.noop,
         ),
     ]
