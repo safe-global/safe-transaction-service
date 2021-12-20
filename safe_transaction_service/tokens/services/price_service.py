@@ -172,9 +172,9 @@ class PriceService:
 
     @cachedmethod(cache=operator.attrgetter("cache_eth_price"))
     @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
-    def get_eth_usd_price(self) -> float:
+    def get_native_coin_usd_price(self) -> float:
         """
-        Get USD price for Ether. It depends on the ethereum network:
+        Get USD price for native coin. It depends on the ethereum network:
             - On mainnet, use ETH/USD
             - On xDAI, use DAI/USD.
             - On EWT/VOLTA, use EWT/USD
@@ -321,7 +321,7 @@ class PriceService:
         :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
         """
         try:
-            eth_price = self.get_eth_usd_price()
+            eth_price = self.get_native_coin_usd_price()
         except CannotGetPrice:
             logger.warning("Cannot get network ether price", exc_info=True)
             eth_price = 0

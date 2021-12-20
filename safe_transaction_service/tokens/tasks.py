@@ -65,7 +65,7 @@ def calculate_token_eth_price_task(
         eth_price = (
             price_service.get_token_eth_value(token_address)
             or price_service.get_token_usd_price(token_address)
-            / price_service.get_eth_usd_price()
+            / price_service.get_native_coin_usd_price()
         )
         if not eth_price:  # Try composed oracles
             if underlying_tokens := price_service.get_underlying_tokens(token_address):

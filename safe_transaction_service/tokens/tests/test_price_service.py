@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from gnosis.eth import EthereumClient
+from gnosis.eth import EthereumClient, EthereumNetwork
 from gnosis.eth.oracles import (
     KyberOracle,
     OracleException,
@@ -38,23 +38,79 @@ class TestPriceService(TestCase):
 
     @mock.patch.object(KrakenClient, "get_eth_usd_price", return_value=0.4)
     @mock.patch.object(BinanceClient, "get_eth_usd_price", return_value=0.5)
-    def test_get_eth_usd_price(self, binance_mock: MagicMock, kraken_mock: MagicMock):
+    def test_get_native_coin_usd_price(
+        self, binance_mock: MagicMock, kraken_mock: MagicMock
+    ):
         price_service = self.price_service
-        eth_usd_price = price_service.get_eth_usd_price()
+        eth_usd_price = price_service.get_native_coin_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
         binance_mock.assert_not_called()
 
         kraken_mock.side_effect = CannotGetPrice
 
         # Cache is still working
-        eth_usd_price = price_service.get_eth_usd_price()
+        eth_usd_price = price_service.get_native_coin_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
 
         # Remove cache and test binance is called
         price_service.cache_eth_price.clear()
-        eth_usd_price = price_service.get_eth_usd_price()
+        eth_usd_price = price_service.get_native_coin_usd_price()
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
+
+        # XDAI
+        price_service.ethereum_network = EthereumNetwork.XDAI
+        with mock.patch.object(KrakenClient, "get_dai_usd_price", return_value=1.5):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1.5)
+
+        with mock.patch.object(
+            KrakenClient, "get_dai_usd_price", side_effect=CannotGetPrice
+        ):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1)
+
+        # POLYGON
+        price_service.ethereum_network = EthereumNetwork.MATIC
+        with mock.patch.object(KrakenClient, "get_matic_usd_price", return_value=0.7):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 0.7)
+
+        # EWT
+        price_service.ethereum_network = EthereumNetwork.ENERGY_WEB_CHAIN
+        with mock.patch.object(KrakenClient, "get_ewt_usd_price", return_value=0.9):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 0.9)
+
+        # BINANCE
+        price_service.ethereum_network = EthereumNetwork.BINANCE
+        with mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=1.2):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1.2)
+
+        # Gather
+        price_service.ethereum_network = EthereumNetwork.GATHER_MAINNET
+        with mock.patch.object(
+            CoingeckoClient, "get_gather_usd_price", return_value=1.7
+        ):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1.7)
+
+    @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
+    @mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=5.0)
+    def test_get_binance_usd_price(
+        self,
+        get_bnb_usd_price_binance_mock: MagicMock,
+        get_bnb_usd_price_coingecko: MagicMock,
+    ):
+        price_service = self.price_service
+
+        price = price_service.get_binance_usd_price()
+        self.assertEqual(price, 5.0)
+
+        get_bnb_usd_price_binance_mock.side_effect = CannotGetPrice
+        price = price_service.get_binance_usd_price()
+        self.assertEqual(price, 3.0)
 
     @mock.patch.object(CoingeckoClient, "get_ewt_usd_price", return_value=3.0)
     @mock.patch.object(KucoinClient, "get_ewt_usd_price", return_value=7.0)

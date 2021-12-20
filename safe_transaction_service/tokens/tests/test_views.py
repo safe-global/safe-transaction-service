@@ -155,7 +155,12 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
             )
             self.assertTrue(response.data["timestamp"])
 
-    def test_token_price_view_address_0(self):
+    @mock.patch.object(
+        PriceService, "get_native_coin_usd_price", return_value=321.2, autospec=True
+    )
+    def test_token_price_view_address_0(
+        self, get_native_coin_usd_price_mock: MagicMock
+    ):
         token_address = "0x0000000000000000000000000000000000000000"
 
         response = self.client.get(
@@ -165,5 +170,5 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         # Native token should be retrieved even if it is not part of the Token table
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["fiat_code"], "USD")
-        self.assertTrue(response.data["fiat_price"])
+        self.assertEqual(response.data["fiat_price"], "321.2")
         self.assertTrue(response.data["timestamp"])

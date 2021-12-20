@@ -1,4 +1,5 @@
 from django.http import Http404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -79,21 +80,25 @@ class TokenPriceView(APIView):
                 },
             )
 
-        # NULL_ADDRESS does not have to be stored in the Token table
-        if (
-            not Token.objects.filter(address=address).exists()
-            and address != NULL_ADDRESS
-        ):
+        price_service = PriceServiceProvider()
+        if address == NULL_ADDRESS:
+            data = {
+                "fiat_code": "USD",
+                "fiat_price": str(price_service.get_native_coin_usd_price()),
+                "timestamp": timezone.now(),
+            }
+        elif not Token.objects.filter(address=address).exists():
             raise Http404
-        fiat_price_with_timestamp = next(
-            PriceServiceProvider().get_cached_usd_values([address])
-        )
-        serializer = self.serializer_class(
-            data={
+        else:
+            fiat_price_with_timestamp = next(
+                PriceServiceProvider().get_cached_usd_values([address])
+            )
+            data = {
                 "fiat_code": fiat_price_with_timestamp.fiat_code.name,
                 "fiat_price": str(fiat_price_with_timestamp.fiat_price),
                 "timestamp": fiat_price_with_timestamp.timestamp,
             }
-        )
+
+        serializer = self.serializer_class(data=data)
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
