@@ -354,6 +354,13 @@ class TestTokenTransfer(TestCase):
             len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 0
         )
 
+        # Send the token to oneself. Should only appear once
+        ERC721TransferFactory(to=random_address, token_id=6)
+        ERC721TransferFactory(_from=random_address, to=random_address, token_id=6)
+        self.assertEqual(
+            len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 1
+        )
+
 
 class TestInternalTx(TestCase):
     def test_ether_and_token_txs(self):
