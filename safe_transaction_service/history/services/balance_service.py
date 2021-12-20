@@ -253,7 +253,7 @@ class BalanceService:
             safe_address, only_trusted, exclude_spam
         )
         try:
-            eth_price = self.price_service.get_eth_usd_price()
+            eth_price = self.price_service.get_native_coin_usd_price()
         except CannotGetPrice:
             logger.warning("Cannot get network ether price", exc_info=True)
             eth_price = 0

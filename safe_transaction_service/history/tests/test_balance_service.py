@@ -38,13 +38,13 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         PriceService, "get_token_eth_value", return_value=0.4, autospec=True
     )
     @mock.patch.object(
-        PriceService, "get_eth_usd_price", return_value=123.4, autospec=True
+        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
     )
     @mock.patch.object(timezone, "now", return_value=timezone.now())
     def test_get_usd_balances(
         self,
         timezone_now_mock: MagicMock,
-        get_eth_usd_price_mock: MagicMock,
+        get_native_coin_usd_price_mock: MagicMock,
         get_token_eth_value_mock: MagicMock,
     ):
         balance_service = BalanceServiceProvider()

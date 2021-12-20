@@ -1308,13 +1308,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         PriceService, "get_token_eth_value", return_value=0.4, autospec=True
     )
     @mock.patch.object(
-        PriceService, "get_eth_usd_price", return_value=123.4, autospec=True
+        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
     )
     @mock.patch.object(timezone, "now", return_value=timezone.now())
     def test_safe_balances_usd_view(
         self,
         timezone_now_mock: MagicMock,
-        get_eth_usd_price_mock: MagicMock,
+        get_native_coin_usd_price_mock: MagicMock,
         get_token_eth_value_mock: MagicMock,
         get_token_info_mock: MagicMock,
     ):
