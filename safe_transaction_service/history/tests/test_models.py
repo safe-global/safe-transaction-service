@@ -29,6 +29,7 @@ from ..models import (
     SafeContractDelegate,
     SafeMasterCopy,
     SafeStatus,
+    WebHook,
 )
 from .factories import (
     ERC20TransferFactory,
@@ -43,6 +44,7 @@ from .factories import (
     SafeContractFactory,
     SafeMasterCopyFactory,
     SafeStatusFactory,
+    WebHookFactory,
 )
 from .mocks.mocks_internal_tx_indexer import block_result
 
@@ -1075,4 +1077,29 @@ class TestMultisigTransactions(TestCase):
         self.assertEqual(
             MultisigTransaction.objects.last_valid_transaction(safe_address),
             multisig_transaction_2,
+        )
+
+
+class TestWebHook(TestCase):
+    def test_matching_for_address(self):
+        addresses = [Account.create().address for _ in range(3)]
+        webhook_0 = WebHookFactory(address=addresses[0])
+        webhook_1 = WebHookFactory(address=addresses[1])
+
+        self.assertCountEqual(
+            WebHook.objects.matching_for_address(addresses[0]), [webhook_0]
+        )
+        self.assertCountEqual(
+            WebHook.objects.matching_for_address(addresses[1]), [webhook_1]
+        )
+
+        webhook_2 = WebHookFactory(address=None)
+        self.assertCountEqual(
+            WebHook.objects.matching_for_address(addresses[0]), [webhook_0, webhook_2]
+        )
+        self.assertCountEqual(
+            WebHook.objects.matching_for_address(addresses[1]), [webhook_1, webhook_2]
+        )
+        self.assertCountEqual(
+            WebHook.objects.matching_for_address(addresses[2]), [webhook_2]
         )

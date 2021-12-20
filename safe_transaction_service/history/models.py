@@ -1623,7 +1623,7 @@ class WebHookQuerySet(models.QuerySet):
 
 class WebHook(models.Model):
     objects = WebHookQuerySet.as_manager()
-    address = EthereumAddressV2Field(db_index=True, null=True)
+    address = EthereumAddressV2Field(db_index=True, null=True, blank=True)
     url = models.URLField()
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)
