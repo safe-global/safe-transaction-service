@@ -492,6 +492,7 @@ class ERC721TransferManager(TokenTransferManager):
     def erc721_owned_by(self, address: str) -> List[Tuple[str, int]]:
         """
         Returns erc721 owned by address, removing the ones sent
+
         :return: List of tuples(token_address: str, token_id: int)
         """
         # Get all the token history
@@ -509,7 +510,9 @@ class ERC721TransferManager(TokenTransferManager):
                     address,
                 )
                 continue
-            if erc721_event.to == address:
+            if erc721_event.to == erc721_event._from:
+                continue  # Nice try ¯\_(ツ)_/¯
+            elif erc721_event.to == address:
                 list_to_append = tokens_in
             else:
                 list_to_append = tokens_out
