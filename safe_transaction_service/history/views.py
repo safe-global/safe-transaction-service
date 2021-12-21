@@ -106,7 +106,12 @@ class AboutEthereumRPCView(APIView):
         try:
             client_version = ethereum_client.w3.clientVersion
         except (IOError, ValueError):
-            client_version = ""
+            client_version = "Error getting client version"
+
+        try:
+            syncing = ethereum_client.w3.eth.syncing
+        except (IOError, ValueError):
+            syncing = "Error getting syncing status"
 
         ethereum_network = ethereum_client.get_network()
         return {
@@ -114,7 +119,7 @@ class AboutEthereumRPCView(APIView):
             "block_number": ethereum_client.current_block_number,
             "chain_id": ethereum_network.value,
             "chain": ethereum_network.name,
-            "syncing": ethereum_client.w3.eth.syncing,
+            "syncing": syncing,
         }
 
     @method_decorator(cache_page(15))  # 15 seconds
