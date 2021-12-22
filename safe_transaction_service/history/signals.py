@@ -175,13 +175,13 @@ def build_webhook_payload(
     return payloads
 
 
-def is_valid_webhook(
+def is_relevant_notification(
     sender: Type[Model],
     instance: Union[
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
     created: bool,
-    minutes: int = 10,
+    minutes: int = 30,
 ) -> bool:
     """
     For `MultisigTransaction`, webhook is valid if the instance was modified in the last `minutes` minutes.
@@ -241,16 +241,18 @@ def process_webhook(
     created: bool,
     **kwargs,
 ) -> None:
-    if is_valid_webhook(sender, instance, created):
-        # Don't send information for older than 10 minutes transactions
-        # This triggers a DB query on TokenTransfer, InternalTx (they are not TimeStampedModel)
-        payloads = build_webhook_payload(sender, instance)
-        logger.debug(
-            "Built payloads %s for created=%s object=%s", payloads, created, instance
-        )
-        for payload in payloads:
-            if address := payload.get("address"):
-                send_webhook_task.delay(address, payload)
+    payloads = build_webhook_payload(sender, instance)
+    logger.debug(
+        "Built payloads %s for created=%s object=%s", payloads, created, instance
+    )
+    for payload in payloads:
+        if address := payload.get("address"):
+            send_webhook_task.delay(address, payload)
+            if is_relevant_notification(sender, instance, created):
                 send_notification_task.apply_async(args=(address, payload), countdown=5)
-    else:
-        logger.debug("Not valid webhook for created=%s object=%s", created, instance)
+            else:
+                logger.debug(
+                    "Notification will not be sent for created=%s object=%s",
+                    created,
+                    instance,
+                )
