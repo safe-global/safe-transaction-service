@@ -374,6 +374,10 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
         webhook_type = WebHookType[payload["type"]]
         for webhook in webhooks:
             if not webhook.is_valid_for_webhook_type(webhook_type):
+                logger.debug(
+                    "There is no webhook configured for webhook_type=%s",
+                    webhook_type.name,
+                )
                 continue
 
             full_url = webhook.url
