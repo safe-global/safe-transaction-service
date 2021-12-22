@@ -166,14 +166,25 @@ class EthereumIndexer(ABC):
     def get_minimum_block_number(
         self, addresses: Optional[Sequence[str]] = None
     ) -> Optional[int]:
+        logger.debug(
+            "%s: Getting minimum-block-number for %d addresses",
+            self.__class__.__name__,
+            len(addresses) if addresses else 0,
+        )
         queryset = (
             self.database_queryset.filter(address__in=addresses)
             if addresses
             else self.database_queryset
         )
-        return queryset.aggregate(**{self.database_field: Min(self.database_field)})[
-            self.database_field
-        ]
+        minimum_block_number = queryset.aggregate(
+            **{self.database_field: Min(self.database_field)}
+        )[self.database_field]
+        logger.debug(
+            "%s: Got minimum-block-number=%s",
+            self.__class__.__name__,
+            minimum_block_number,
+        )
+        return minimum_block_number
 
     def get_almost_updated_addresses(
         self, current_block_number: int
@@ -350,8 +361,16 @@ class EthereumIndexer(ABC):
         :return: Number of elements processed
         """
         current_block_number = self.ethereum_client.current_block_number
+        logger.debug(
+            "%s: Current RPC block number=%d",
+            self.__class__.__name__,
+            current_block_number,
+        )
         number_processed_elements = 0
 
+        logger.debug(
+            "%s: Retrieving almost updated monitored addresses", self.__class__.__name__
+        )
         # We need to cast the `iterable` to `list`, if not chunks will not work well when models are updated
         almost_updated_monitored_addresses = list(
             self.get_almost_updated_addresses(current_block_number)
@@ -361,6 +380,10 @@ class EthereumIndexer(ABC):
                 "%s: Processing %d almost updated addresses",
                 self.__class__.__name__,
                 len(almost_updated_monitored_addresses),
+            )
+        else:
+            logger.debug(
+                "%s: No almost updated addresses to process", self.__class__.__name__
             )
         if self.query_chunk_size:
             almost_updated_monitored_addresses_chunks = chunks(
@@ -385,12 +408,19 @@ class EthereumIndexer(ABC):
                 )
                 number_processed_elements += len(processed_elements)
 
+        logger.debug(
+            "%s: Retrieving not updated monitored addresses", self.__class__.__name__
+        )
         not_updated_addresses = self.get_not_updated_addresses(current_block_number)
         if not_updated_addresses:
             logger.info(
                 "%s: Processing %d not updated addresses",
                 self.__class__.__name__,
                 len(not_updated_addresses),
+            )
+        else:
+            logger.debug(
+                "%s: No not updated addresses to process", self.__class__.__name__
             )
         for monitored_contract in not_updated_addresses:
             updated = False

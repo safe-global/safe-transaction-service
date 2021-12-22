@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from logging import getLogger
 from typing import Any, Dict, List, Type, Union
 
 from django.db.models import Model
@@ -24,6 +25,8 @@ from .models import (
     WebHookType,
 )
 from .tasks import send_webhook_task
+
+logger = getLogger(__name__)
 
 
 @receiver(
@@ -184,6 +187,7 @@ def is_valid_webhook(
     For `MultisigTransaction`, webhook is valid if the instance was modified in the last `minutes` minutes.
     For the other instances, webhook is valid if the instance was created in the last `minutes` minutes.
     This time restriction is important to prevent sending duplicate transactions when reindexing.
+
     :param sender:
     :param instance:
     :param created:
@@ -241,7 +245,12 @@ def process_webhook(
         # Don't send information for older than 10 minutes transactions
         # This triggers a DB query on TokenTransfer, InternalTx (they are not TimeStampedModel)
         payloads = build_webhook_payload(sender, instance)
+        logger.debug(
+            "Built payloads %s for created=%s object=%s", payloads, created, instance
+        )
         for payload in payloads:
             if address := payload.get("address"):
                 send_webhook_task.delay(address, payload)
                 send_notification_task.apply_async(args=(address, payload), countdown=5)
+    else:
+        logger.debug("Not valid webhook for created=%s object=%s", created, instance)

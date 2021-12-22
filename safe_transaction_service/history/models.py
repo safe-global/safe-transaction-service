@@ -1260,9 +1260,7 @@ class ModuleTransaction(TimeStampedModel):
         if self.value:
             return f"{self.safe} - {self.to} - {self.value}"
         else:
-            return (
-                f"{self.safe} - {self.to} - {HexBytes(self.data.tobytes()).hex()[:8]}"
-            )
+            return f"{self.safe} - {self.to} - 0x{bytes(self.data).hex()[:6]}"
 
     @property
     def execution_date(self) -> Optional[datetime.datetime]:
