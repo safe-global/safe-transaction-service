@@ -53,8 +53,10 @@ An example environment file can be used for the L2 setup:
 cp .env.l2.sample .env
 ```
 
-Edit `.env` file to add `ETHEREUM_NODE_URL` and remember to modify `DJANGO_SECRET_KEY` to **use a strong key**.
-The rest of the configuration does not need to be modified. Then:
+Edit `.env` file to add `ETHEREUM_NODE_URL` (on the example a `Polygon` public node is used)
+and remember to modify `DJANGO_SECRET_KEY` to **use a strong key**. The rest of the
+configuration does not need to be modified. Then:
+
 ```bash
 docker-compose build --force-rm
 docker-compose up
