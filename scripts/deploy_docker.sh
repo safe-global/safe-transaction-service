@@ -15,6 +15,7 @@ else
     docker build -t $DOCKERHUB_PROJECT -f docker/web/Dockerfile . --cache-from gnosispm/$DOCKERHUB_PROJECT:staging --build-arg BUILDKIT_INLINE_CACHE=1 || \
     docker build -t $DOCKERHUB_PROJECT -f docker/web/Dockerfile . --build-arg BUILDKIT_INLINE_CACHE=1
     docker tag $DOCKERHUB_PROJECT gnosispm/$DOCKERHUB_PROJECT:latest
+    docker push gnosispm/$DOCKERHUB_PROJECT:latest
 fi
 docker tag $DOCKERHUB_PROJECT gnosispm/$DOCKERHUB_PROJECT:$1
 docker push gnosispm/$DOCKERHUB_PROJECT:$1
