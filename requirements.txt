@@ -26,7 +26,7 @@ hexbytes==0.2.2
 packaging>=21.0
 pillow==8.4.0
 psycogreen==1.0.2
-psycopg2-binary==2.9.2
+psycopg2==2.9.2
 redis==3.5.3
 requests==2.26.0
 web3==5.24.0
