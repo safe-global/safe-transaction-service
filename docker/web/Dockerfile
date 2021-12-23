@@ -9,6 +9,7 @@ RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
 		libssl-dev \
+        libpq-dev \
 		" \
     && apt-get update \
     && apt-get install -y --no-install-recommends $buildDeps tmux postgresql-client \
