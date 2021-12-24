@@ -72,7 +72,6 @@ WSGI_APPLICATION = "config.wsgi.application"
 # APPS
 # ------------------------------------------------------------------------------
 DJANGO_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -87,22 +86,26 @@ THIRD_PARTY_APPS = [
     "drf_yasg",
     "django_s3_storage",
 ]
-SECOND_FACTOR_APPS = [
-    "django_otp",
-    "django_otp.plugins.otp_totp",
-    "django_otp.plugins.otp_static",
-]
+
 LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
     "safe_transaction_service.notifications.apps.NotificationsConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
 ]
-# https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
-
 if ENABLE_2FA:
-    INSTALLED_APPS += SECOND_FACTOR_APPS
+    SECOND_FACTOR_APPS = [
+        "django_otp",
+        "django_otp.plugins.otp_totp",
+        "django_otp.plugins.otp_static",
+    ]
+    DJANGO_APPS.append("config.admin.OTPAdminConfig")
+else:
+    SECOND_FACTOR_APPS = []
+    DJANGO_APPS.append("django.contrib.admin")
+
+# https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + SECOND_FACTOR_APPS + LOCAL_APPS
 
 # MIDDLEWARE
 # ------------------------------------------------------------------------------
