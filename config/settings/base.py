@@ -41,6 +41,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/ref/settings/#force-script-name
 FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default=None)
 
+# SECURITY
+ENABLE_2FA = env.bool("ENABLE_2FA", default=not DEBUG)
+
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
@@ -83,6 +86,8 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "drf_yasg",
     "django_s3_storage",
+]
+SECOND_FACTOR_APPS = [
     "django_otp",
     "django_otp.plugins.otp_totp",
     "django_otp.plugins.otp_static",
@@ -96,6 +101,9 @@ LOCAL_APPS = [
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
+if ENABLE_2FA:
+    INSTALLED_APPS += SECOND_FACTOR_APPS
+
 # MIDDLEWARE
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
@@ -108,10 +116,17 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     # 'django.middleware.csrf.CsrfViewMiddleware',
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if ENABLE_2FA:
+    # Insert OTP middleware after AuthenticationMiddleware
+    MIDDLEWARE.insert(
+        1 + MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware"),
+        "django_otp.middleware.OTPMiddleware",
+    )
+
 
 # STATIC
 # ------------------------------------------------------------------------------
