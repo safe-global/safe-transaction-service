@@ -29,4 +29,4 @@ psycogreen==1.0.2
 psycopg2==2.9.2
 redis==4.0.2
 requests==2.26.0
-web3==5.24.0
+web3==5.25.0
