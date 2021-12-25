@@ -13,7 +13,7 @@ from safe_transaction_service.history.models import (
 )
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
-from safe_transaction_service.utils.utils import close_gevent_db_connection
+from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice, FirebaseDeviceOwner
@@ -90,6 +90,7 @@ def is_pending_multisig_transaction(payload: Dict[str, Any]) -> bool:
 
 
 @app.shared_task()
+@close_gevent_db_connection_decorator
 def send_notification_task(
     address: Optional[str], payload: Dict[str, Any]
 ) -> Tuple[int, int]:
@@ -101,62 +102,57 @@ def send_notification_task(
     if not (address and payload):  # Both must be present
         return 0, 0
 
-    try:
-        firebase_devices = FirebaseDevice.objects.filter(
-            safes__address=address
-        ).exclude(
-            cloud_messaging_token=None
-        )  # TODO Use cache
-        tokens = [
-            firebase_device.cloud_messaging_token
-            for firebase_device in firebase_devices
-        ]
+    firebase_devices = FirebaseDevice.objects.filter(safes__address=address).exclude(
+        cloud_messaging_token=None
+    )  # TODO Use cache
+    tokens = [
+        firebase_device.cloud_messaging_token for firebase_device in firebase_devices
+    ]
 
-        if is_pending_multisig_transaction(payload):
-            send_notification_owner_task.delay(address, payload["safeTxHash"])
+    if is_pending_multisig_transaction(payload):
+        send_notification_owner_task.delay(address, payload["safeTxHash"])
 
-        if not (tokens and filter_notification(payload)):
-            return 0, 0
+    if not (tokens and filter_notification(payload)):
+        return 0, 0
 
-        # Make sure notification has not been sent before
-        duplicate_notification = DuplicateNotification(address, payload)
-        if duplicate_notification.is_duplicated():
+    # Make sure notification has not been sent before
+    duplicate_notification = DuplicateNotification(address, payload)
+    if duplicate_notification.is_duplicated():
+        logger.info(
+            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
+            address,
+            payload,
+            tokens,
+        )
+        return 0, 0
+
+    duplicate_notification.set_duplicated()
+
+    with FirebaseClientPool() as firebase_client:
+        logger.info(
+            "Sending notification about Safe=%s with payload=%s to tokens=%s",
+            address,
+            payload,
+            tokens,
+        )
+        success_count, failure_count, invalid_tokens = firebase_client.send_message(
+            tokens, payload
+        )
+        if invalid_tokens:
             logger.info(
-                "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
+                "Removing invalid tokens for safe=%s. Tokens=%s",
                 address,
-                payload,
-                tokens,
+                invalid_tokens,
             )
-            return 0, 0
+            FirebaseDevice.objects.filter(
+                cloud_messaging_token__in=invalid_tokens
+            ).update(cloud_messaging_token=None)
 
-        duplicate_notification.set_duplicated()
-
-        with FirebaseClientPool() as firebase_client:
-            logger.info(
-                "Sending notification about Safe=%s with payload=%s to tokens=%s",
-                address,
-                payload,
-                tokens,
-            )
-            success_count, failure_count, invalid_tokens = firebase_client.send_message(
-                tokens, payload
-            )
-            if invalid_tokens:
-                logger.info(
-                    "Removing invalid tokens for safe=%s. Tokens=%s",
-                    address,
-                    invalid_tokens,
-                )
-                FirebaseDevice.objects.filter(
-                    cloud_messaging_token__in=invalid_tokens
-                ).update(cloud_messaging_token=None)
-
-        return success_count, failure_count
-    finally:
-        close_gevent_db_connection()
+    return success_count, failure_count
 
 
 @app.shared_task()
+@close_gevent_db_connection_decorator
 def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, int]:
     """
     Send a confirmation request to an owner
@@ -166,98 +162,94 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
     :return: Tuple with the number of successful and failed notifications sent
     """
     assert safe_tx_hash, "Safe tx hash was not provided"
+    safe_status = SafeStatus.objects.last_for_address(address)
 
-    try:
-        safe_status = SafeStatus.objects.last_for_address(address)
+    if not safe_status:
+        logger.info("Cannot find threshold information for safe=%s", address)
+        return 0, 0
 
-        if not safe_status:
-            logger.info("Cannot find threshold information for safe=%s", address)
-            return 0, 0
-
-        if safe_status.threshold == 1:
-            logger.info(
-                "No need to send confirmation notification for safe=%s with threshold=1",
-                address,
-            )
-            return 0, 0
-
-        confirmed_owners = MultisigConfirmation.objects.filter(
-            multisig_transaction_id=safe_tx_hash
-        ).values_list("owner", flat=True)
-
-        if safe_status.threshold <= len(confirmed_owners):
-            # No need for more confirmations
-            logger.info(
-                "Multisig transaction with safe-tx-hash=%s for safe=%s does not require more confirmations",
-                safe_tx_hash,
-                address,
-            )
-            return 0, 0
-
-        # Get cloud messaging token for missing owners
-        owners_to_notify = set(safe_status.owners) - set(confirmed_owners)
-        if not owners_to_notify:
-            return 0, 0
-
-        # Delegates must be notified too
-        delegates = SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
-            address, safe_status.owners
+    if safe_status.threshold == 1:
+        logger.info(
+            "No need to send confirmation notification for safe=%s with threshold=1",
+            address,
         )
-        users_to_notify = delegates | owners_to_notify
+        return 0, 0
 
-        tokens = FirebaseDeviceOwner.objects.get_devices_for_safe_and_owners(
-            address, users_to_notify
+    confirmed_owners = MultisigConfirmation.objects.filter(
+        multisig_transaction_id=safe_tx_hash
+    ).values_list("owner", flat=True)
+
+    if safe_status.threshold <= len(confirmed_owners):
+        # No need for more confirmations
+        logger.info(
+            "Multisig transaction with safe-tx-hash=%s for safe=%s does not require more confirmations",
+            safe_tx_hash,
+            address,
         )
+        return 0, 0
 
-        if not tokens:
+    # Get cloud messaging token for missing owners
+    owners_to_notify = set(safe_status.owners) - set(confirmed_owners)
+    if not owners_to_notify:
+        return 0, 0
+
+    # Delegates must be notified too
+    delegates = SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+        address, safe_status.owners
+    )
+    users_to_notify = delegates | owners_to_notify
+
+    tokens = FirebaseDeviceOwner.objects.get_devices_for_safe_and_owners(
+        address, users_to_notify
+    )
+
+    if not tokens:
+        logger.info(
+            "No cloud messaging tokens found for owners %s or delegates %s to sign safe-tx-hash=%s for safe=%s",
+            owners_to_notify,
+            delegates,
+            safe_tx_hash,
+            address,
+        )
+        return 0, 0
+
+    payload = {
+        "type": WebHookType.CONFIRMATION_REQUEST.name,
+        "address": address,
+        "safeTxHash": safe_tx_hash,
+        "chainId": str(get_ethereum_network().value),
+    }
+    # Make sure notification has not been sent before
+    duplicate_notification = DuplicateNotification(address, payload)
+    if duplicate_notification.is_duplicated():
+        logger.info(
+            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
+            address,
+            payload,
+            tokens,
+        )
+        return 0, 0
+
+    duplicate_notification.set_duplicated()
+
+    with FirebaseClientPool() as firebase_client:
+        logger.info(
+            "Sending notification about Safe=%s with payload=%s to tokens=%s",
+            address,
+            payload,
+            tokens,
+        )
+        success_count, failure_count, invalid_tokens = firebase_client.send_message(
+            tokens, payload
+        )
+        if invalid_tokens:
             logger.info(
-                "No cloud messaging tokens found for owners %s or delegates %s to sign safe-tx-hash=%s for safe=%s",
-                owners_to_notify,
-                delegates,
-                safe_tx_hash,
+                "Removing invalid tokens for owners of safe=%s. Tokens=%s",
                 address,
+                invalid_tokens,
             )
-            return 0, 0
+            FirebaseDevice.objects.filter(
+                cloud_messaging_token__in=invalid_tokens
+            ).update(cloud_messaging_token=None)
 
-        payload = {
-            "type": WebHookType.CONFIRMATION_REQUEST.name,
-            "address": address,
-            "safeTxHash": safe_tx_hash,
-            "chainId": str(get_ethereum_network().value),
-        }
-        # Make sure notification has not been sent before
-        duplicate_notification = DuplicateNotification(address, payload)
-        if duplicate_notification.is_duplicated():
-            logger.info(
-                "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
-                address,
-                payload,
-                tokens,
-            )
-            return 0, 0
-
-        duplicate_notification.set_duplicated()
-
-        with FirebaseClientPool() as firebase_client:
-            logger.info(
-                "Sending notification about Safe=%s with payload=%s to tokens=%s",
-                address,
-                payload,
-                tokens,
-            )
-            success_count, failure_count, invalid_tokens = firebase_client.send_message(
-                tokens, payload
-            )
-            if invalid_tokens:
-                logger.info(
-                    "Removing invalid tokens for owners of safe=%s. Tokens=%s",
-                    address,
-                    invalid_tokens,
-                )
-                FirebaseDevice.objects.filter(
-                    cloud_messaging_token__in=invalid_tokens
-                ).update(cloud_messaging_token=None)
-
-        return success_count, failure_count
-    finally:
-        close_gevent_db_connection()
+    return success_count, failure_count
