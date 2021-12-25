@@ -13,7 +13,7 @@ from gnosis.eth.ethereum_client import EthereumNetwork
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
-from safe_transaction_service.utils.utils import close_gevent_db_connection
+from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .models import Token
 
@@ -40,6 +40,7 @@ class EthValueWithTimestamp(object):
 
 
 @app.shared_task()
+@close_gevent_db_connection_decorator
 def calculate_token_eth_price_task(
     token_address: ChecksumAddress, redis_key: str, force_recalculation: bool = False
 ) -> Optional[EthValueWithTimestamp]:
@@ -98,6 +99,7 @@ def calculate_token_eth_price_task(
 
 
 @app.shared_task()
+@close_gevent_db_connection_decorator
 def fix_pool_tokens_task() -> Optional[int]:
     """
     Fix names for generic pool tokens, like Balancer or Uniswap
@@ -105,16 +107,14 @@ def fix_pool_tokens_task() -> Optional[int]:
     :return: Number of pool token names updated
     """
     if get_ethereum_network() == EthereumNetwork.MAINNET:
-        try:
-            number = Token.pool_tokens.fix_all_pool_tokens()
-            if number:
-                logger.info("%d pool token names were fixed", number)
-            return number
-        finally:
-            close_gevent_db_connection()
+        number = Token.pool_tokens.fix_all_pool_tokens()
+        if number:
+            logger.info("%d pool token names were fixed", number)
+        return number
 
 
 @app.shared_task()
+@close_gevent_db_connection_decorator
 def get_token_info_from_blockchain(token_address: ChecksumAddress) -> bool:
     """
     Retrieve token information from blockchain

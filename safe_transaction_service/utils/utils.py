@@ -1,3 +1,4 @@
+from functools import wraps
 from itertools import islice
 from typing import Any, Iterable, List, Union
 
@@ -37,15 +38,25 @@ def running_on_gevent() -> bool:
     return "sys" in saved
 
 
-def close_gevent_db_connection():
+def close_gevent_db_connection() -> None:
     """
     Clean gevent db connections. Check `atomic block` to prevent breaking the tests (Django `TestCase` wraps tests
     inside an atomic block that rollbacks at the end of the test)
     https://github.com/jneight/django-db-geventpool#using-orm-when-not-serving-requests
-    :return:
     """
     if not connection.in_atomic_block:
         request_finished.send(sender="greenlet")
+
+
+def close_gevent_db_connection_decorator(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        finally:
+            close_gevent_db_connection()
+
+    return wrapper
 
 
 def parse_boolean_query_param(value: Union[bool, str]) -> bool:

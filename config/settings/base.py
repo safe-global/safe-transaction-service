@@ -306,6 +306,9 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
         },
+        "django.geventpool": {
+            "level": "DEBUG" if DEBUG else "WARNING",
+        },
         "LoggingMiddleware": {
             "handlers": ["console_short"],
             "level": "INFO",

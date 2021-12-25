@@ -818,10 +818,12 @@ class InternalTx(models.Model):
     def __str__(self):
         if self.to:
             return "Internal tx hash={} from={} to={}".format(
-                self.ethereum_tx_id, self._from, self.to
+                HexBytes(self.ethereum_tx_id).hex(), self._from, self.to
             )
         else:
-            return "Internal tx hash={} from={}".format(self.ethereum_tx_id, self._from)
+            return "Internal tx hash={} from={}".format(
+                HexBytes(self.ethereum_tx_id).hex(), self._from
+            )
 
     @property
     def created(self):
