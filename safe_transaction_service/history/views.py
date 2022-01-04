@@ -1029,9 +1029,19 @@ class OwnersView(APIView):
                 },
             )
 
+        if settings.ENABLE_OWNERS_ENDPOINT:
+            return self.get_owners(address)
+        else:
+            return self.get_owners_empty()
+
+    def get_owners(self, address):
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
         serializer = self.serializer_class(data={"safes": safes_for_owner})
         assert serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+    def get_owners_empty(self):
+        serializer = self.serializer_class(data={"safes": []})
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
