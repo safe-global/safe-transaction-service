@@ -419,3 +419,4 @@ AWS_CONFIGURED = bool(
 
 ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://cloudflare-ipfs.com/")
+ENABLE_OWNERS_ENDPOINT = env.bool("ENABLE_OWNERS_ENDPOINT", default=True)
