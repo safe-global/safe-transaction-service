@@ -3,6 +3,7 @@ from dataclasses import asdict
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
@@ -2841,21 +2842,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
+    def test_owners_without_auth(self):
+        owner_address = Account.create().address
+
+        response = self.client.get(reverse("v1:history:owners", args=(owner_address,)))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_owners_view(self):
+        from rest_framework.authtoken.models import Token
+
+        user = User.objects.create_user("test", "test@test.com", "test")
+        token = Token.objects.create(user=user, key="test_token")
+        auth_header = f"Token {token.key}"
         invalid_address = "0x2A"
         response = self.client.get(
-            reverse("v1:history:owners", args=(invalid_address,))
+            reverse("v1:history:owners", args=(invalid_address,)),
+            HTTP_AUTHORIZATION=auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         owner_address = Account.create().address
-        response = self.client.get(reverse("v1:history:owners", args=(owner_address,)))
+        response = self.client.get(
+            reverse("v1:history:owners", args=(owner_address,)),
+            HTTP_AUTHORIZATION=auth_header,
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["safes"], [])
 
         safe_status = SafeStatusFactory(owners=[owner_address])
         response = self.client.get(
-            reverse("v1:history:owners", args=(owner_address,)), format="json"
+            reverse("v1:history:owners", args=(owner_address,)),
+            format="json",
+            HTTP_AUTHORIZATION=auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["safes"], [safe_status.address])
@@ -2863,7 +2882,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_status_2 = SafeStatusFactory(owners=[owner_address])
         SafeStatusFactory()  # Test that other SafeStatus don't appear
         response = self.client.get(
-            reverse("v1:history:owners", args=(owner_address,)), format="json"
+            reverse("v1:history:owners", args=(owner_address,)),
+            format="json",
+            HTTP_AUTHORIZATION=auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertCountEqual(

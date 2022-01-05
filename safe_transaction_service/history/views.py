@@ -11,6 +11,7 @@ import django_filters
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import (
     DestroyAPIView,
@@ -20,6 +21,7 @@ from rest_framework.generics import (
     RetrieveAPIView,
     get_object_or_404,
 )
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -1006,6 +1008,8 @@ class MasterCopiesView(ListAPIView):
 
 
 class OwnersView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
     serializer_class = serializers.OwnerResponseSerializer
 
     @swagger_auto_schema(
@@ -1029,19 +1033,8 @@ class OwnersView(APIView):
                 },
             )
 
-        if settings.ENABLE_OWNERS_ENDPOINT:
-            return self.get_owners(address)
-        else:
-            return self.get_owners_empty()
-
-    def get_owners(self, address):
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
         serializer = self.serializer_class(data={"safes": safes_for_owner})
-        assert serializer.is_valid()
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
-
-    def get_owners_empty(self):
-        serializer = self.serializer_class(data={"safes": []})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
