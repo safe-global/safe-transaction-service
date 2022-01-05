@@ -1042,6 +1042,7 @@ class OwnersView(APIView):
 
     def get_owners_empty(self):
         serializer = self.serializer_class(data={"safes": []})
+        assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
