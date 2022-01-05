@@ -1,7 +1,7 @@
 ![Build Status](https://github.com/gnosis/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/gnosis/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/gnosis/safe-transaction-service?branch=master)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-![Python 3.9](https://img.shields.io/badge/Python-3.9-blue.svg)
+![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
 
 # Gnosis Transaction Service
@@ -53,8 +53,10 @@ An example environment file can be used for the L2 setup:
 cp .env.l2.sample .env
 ```
 
-Edit `.env` file to add `ETHEREUM_NODE_URL` and remember to modify `DJANGO_SECRET_KEY` to **use a strong key**.
-The rest of the configuration does not need to be modified. Then:
+Edit `.env` file to add `ETHEREUM_NODE_URL` (on the example a `Polygon` public node is used)
+and remember to modify `DJANGO_SECRET_KEY` to **use a strong key**. The rest of the
+configuration does not need to be modified. Then:
+
 ```bash
 docker-compose build --force-rm
 docker-compose up

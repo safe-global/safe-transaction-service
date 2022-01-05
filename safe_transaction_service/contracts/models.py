@@ -24,7 +24,7 @@ from gnosis.eth.clients import (
     EtherscanClientConfigurationProblem,
     Sourcify,
 )
-from gnosis.eth.django.models import EthereumAddressField, Sha3HashField
+from gnosis.eth.django.models import EthereumAddressV2Field, Keccak256Field
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 
 logger = getLogger(__name__)
@@ -62,7 +62,7 @@ class ContractAbi(models.Model):
     relevance = models.SmallIntegerField(
         default=100
     )  # A lower number will indicate more relevance
-    abi_hash = Sha3HashField(default=None, blank=True, null=True, unique=True)
+    abi_hash = Keccak256Field(default=None, blank=True, null=True, unique=True)
 
     def __str__(self):
         return f"ContractABI {self.relevance} - {self.description}"
@@ -147,7 +147,7 @@ class ContractQuerySet(models.QuerySet):
 
 class Contract(models.Model):  # Known addresses by the service
     objects = ContractManager.from_queryset(ContractQuerySet)()
-    address = EthereumAddressField(primary_key=True)
+    address = EthereumAddressV2Field(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default="")
     display_name = models.CharField(max_length=200, blank=True, default="")
     logo = models.ImageField(

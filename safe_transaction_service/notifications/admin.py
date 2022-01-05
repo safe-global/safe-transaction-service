@@ -2,11 +2,13 @@ from typing import List
 
 from django.contrib import admin
 
+from safe_transaction_service.utils.admin import BinarySearchAdmin
+
 from .models import FirebaseDevice, FirebaseDeviceOwner
 
 
 @admin.register(FirebaseDevice)
-class FirebaseDeviceAdmin(admin.ModelAdmin):
+class FirebaseDeviceAdmin(BinarySearchAdmin):
     list_display = (
         "uuid",
         "cloud_messaging_token",
@@ -18,7 +20,7 @@ class FirebaseDeviceAdmin(admin.ModelAdmin):
     ordering = ["uuid"]
     raw_id_fields = ("safes",)
     readonly_fields = ("owners",)
-    search_fields = ["uuid", "cloud_messaging_token", "safes__address"]
+    search_fields = ["uuid", "cloud_messaging_token", "=safes__address"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -32,7 +34,7 @@ class FirebaseDeviceAdmin(admin.ModelAdmin):
 
 
 @admin.register(FirebaseDeviceOwner)
-class FirebaseDeviceOwnerAdmin(admin.ModelAdmin):
+class FirebaseDeviceOwnerAdmin(BinarySearchAdmin):
     list_display = ("firebase_device_id", "owner")
     ordering = ["firebase_device_id"]
-    search_fields = ["firebase_device_id", "owner"]
+    search_fields = ["firebase_device_id", "=owner"]
