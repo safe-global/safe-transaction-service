@@ -264,9 +264,6 @@ LOGGING = {
     "disable_existing_loggers": False,
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
-        "ignore_succeeded_none": {
-            "()": "safe_transaction_service.utils.loggers.IgnoreSucceededNone"
-        },
     },
     "formatters": {
         "short": {"format": "%(asctime)s %(message)s"},
@@ -296,7 +293,6 @@ LOGGING = {
         },
         "celery_console": {
             "level": "DEBUG",
-            "filters": ["ignore_succeeded_none"],
             "class": "logging.StreamHandler",
             "formatter": "celery_verbose",
         },
