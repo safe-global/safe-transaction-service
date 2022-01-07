@@ -6,6 +6,7 @@ from django.db.models.functions import Greatest
 from django.db.transaction import atomic
 
 from hexbytes import HexBytes
+from rest_framework.authtoken.admin import TokenAdmin
 
 from gnosis.eth import EthereumClientProvider
 
@@ -29,6 +30,14 @@ from .models import (
     WebHook,
 )
 from .services import IndexServiceProvider
+
+# By default, TokenAdmin doesn't allow key edition
+# IFF you have a service that requests from multiple safe-transaction-service
+# you might want to share that key for convenience between instances.
+TokenAdmin.fields = (
+    "user",
+    "key",
+)
 
 
 # Inline objects ------------------------------

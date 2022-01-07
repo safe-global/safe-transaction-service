@@ -83,6 +83,7 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "drf_yasg",
     "django_s3_storage",
+    "rest_framework.authtoken",
 ]
 LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
@@ -415,4 +416,9 @@ AWS_CONFIGURED = bool(
 
 ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://cloudflare-ipfs.com/")
-ENABLE_OWNERS_ENDPOINT = env.bool("ENABLE_OWNERS_ENDPOINT", default=True)
+
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
+    },
+}

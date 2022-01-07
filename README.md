@@ -141,6 +141,29 @@ A user must be created to get access:
 docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
 ```
 
+## Authenticated Endpoints
+
+Currently most public endpoints do not have any authentication in place. However some endpoiints do require authentication in order to be used such as `/api/v1/owners/<str:address>/safes/`. For accessing such endpoints a token needs to be created (which will be associated to a specific user).
+
+### 1. Create an authorization token:
+
+1a. This can be done via the admin interface under `/admin/authtoken/tokenproxy/`
+
+OR
+
+1b. By using the following command:
+
+```shell
+python manage.py drf_create_token <username>
+```
+
+### 2. Use the generated token to access authenticated endpoints:
+
+
+```shell
+curl -X GET "http://127.0.0.1:8000/api/v1/owners/<str:address>/safes/" -H 'Authorization: Token <auth_token>'
+```
+
 ## Safe Contract ABIs and addresses
 - [v1.3.0](https://github.com/gnosis/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe.json)
 - [v1.3.0 L2](https://github.com/gnosis/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe_l2.json)
