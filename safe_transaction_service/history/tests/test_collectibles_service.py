@@ -38,7 +38,13 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         ipfs_url = "ipfs://testing-url/path/?arguments"
         result = ipfs_to_http(ipfs_url)
         self.assertTrue(result.startswith("http"))
-        self.assertIn("testing-url/path/?arguments", result)
+        self.assertIn("ipfs/testing-url/path/?arguments", result)
+
+        ipfs_with_path_url = "ipfs://ipfs/testing-url/path/?arguments"
+        result = ipfs_to_http(ipfs_with_path_url)
+        self.assertTrue(result.startswith("http"))
+        self.assertNotIn("ipfs/ipfs", result)
+        self.assertIn("ipfs/testing-url/path/?arguments", result)
 
     def test_get_collectibles(self):
         mainnet_node = just_test_if_mainnet_node()

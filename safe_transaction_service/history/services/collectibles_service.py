@@ -41,6 +41,7 @@ class MetadataRetrievalException(CollectiblesServiceException):
 
 def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
     if uri and uri.startswith("ipfs://"):
+        uri = uri.replace("ipfs://ipfs/", "ipfs://")
         return urljoin(
             settings.IPFS_GATEWAY, uri.replace("ipfs://", "", 1)
         )  # Use ipfs gateway
@@ -159,6 +160,7 @@ class CollectiblesService:
         """
         Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
         supported
+
         :param uri: Uri starting with the protocol, like http://example.org/token/3
         :return: Metadata as a decoded json
         """
