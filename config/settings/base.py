@@ -420,9 +420,3 @@ AWS_CONFIGURED = bool(
 
 ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://cloudflare-ipfs.com/")
-
-SWAGGER_SETTINGS = {
-    "SECURITY_DEFINITIONS": {
-        "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
-    },
-}

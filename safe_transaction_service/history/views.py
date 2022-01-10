@@ -11,7 +11,6 @@ import django_filters
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import (
     DestroyAPIView,
@@ -21,7 +20,6 @@ from rest_framework.generics import (
     RetrieveAPIView,
     get_object_or_404,
 )
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -1008,8 +1006,6 @@ class MasterCopiesView(ListAPIView):
 
 
 class OwnersView(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
     serializer_class = serializers.OwnerResponseSerializer
 
     @swagger_auto_schema(
