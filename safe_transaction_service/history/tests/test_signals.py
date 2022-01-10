@@ -79,7 +79,7 @@ class TestSignals(TestCase):
     @factory.django.mute_signals(post_save)
     def test_process_webhook(self):
         multisig_confirmation = MultisigConfirmationFactory()
-        with mock.patch.object(send_webhook_task, "delay") as webhook_task_mock:
+        with mock.patch.object(send_webhook_task, "apply_async") as webhook_task_mock:
             with mock.patch.object(
                 send_notification_task, "apply_async"
             ) as send_notification_task_mock:
@@ -88,7 +88,7 @@ class TestSignals(TestCase):
                 send_notification_task_mock.assert_called()
 
         multisig_confirmation.created -= timedelta(minutes=45)
-        with mock.patch.object(send_webhook_task, "delay") as webhook_task_mock:
+        with mock.patch.object(send_webhook_task, "apply_async") as webhook_task_mock:
             with mock.patch.object(
                 send_notification_task, "apply_async"
             ) as send_notification_task_mock:
