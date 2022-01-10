@@ -247,9 +247,13 @@ def process_webhook(
     )
     for payload in payloads:
         if address := payload.get("address"):
-            send_webhook_task.delay(address, payload)
+            send_webhook_task.apply_async(
+                args=(address, payload), priority=4
+            )  # Almost the lowest priority
             if is_relevant_notification(sender, instance, created):
-                send_notification_task.apply_async(args=(address, payload), countdown=5)
+                send_notification_task.apply_async(
+                    args=(address, payload), countdown=5, priority=4
+                )
             else:
                 logger.debug(
                     "Notification will not be sent for created=%s object=%s",
