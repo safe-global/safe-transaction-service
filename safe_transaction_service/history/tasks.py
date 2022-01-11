@@ -355,7 +355,15 @@ def check_reorgs_task(self) -> Optional[int]:
 @cache
 def get_webhook_http_session(webhook_url: str) -> requests.Session:
     logger.debug("Getting http session for url=%s", webhook_url)
-    return requests.Session()
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=1,  # Doing all the connections to the same url
+        pool_maxsize=100,  # Number of concurrent connections
+        pool_block=False,
+    )
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 @app.shared_task(
