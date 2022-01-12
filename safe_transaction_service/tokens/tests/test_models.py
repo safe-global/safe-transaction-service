@@ -6,6 +6,8 @@ from django.test import TestCase
 
 from eth_account import Account
 
+from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
+
 from ..clients.zerion_client import (
     BalancerTokenAdapterClient,
     ZerionPoolMetadata,
@@ -126,8 +128,6 @@ class TestModels(TestCase):
         self.assertEqual(
             token.name, "Balancer Pool Token " + get_metadata_mock.return_value.name
         )
-
-    from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
 
     @mock.patch.object(
         Erc20Manager,
