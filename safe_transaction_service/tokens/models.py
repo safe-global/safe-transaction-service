@@ -95,10 +95,10 @@ class TokenManager(models.Manager):
         # If symbol is way bigger than name (by 5 characters), swap them (e.g. POAP)
         name, symbol = erc_info.name, erc_info.symbol
 
-        if name is bytes:
+        if isinstance(name, bytes):
             name = name.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
 
-        if symbol is bytes:
+        if isinstance(symbol, bytes):
             symbol = symbol.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
 
         if (len(name) - len(symbol)) < -5:
