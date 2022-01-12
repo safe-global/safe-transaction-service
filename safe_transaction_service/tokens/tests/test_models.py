@@ -6,6 +6,8 @@ from django.test import TestCase
 
 from eth_account import Account
 
+from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
+
 from ..clients.zerion_client import (
     BalancerTokenAdapterClient,
     ZerionPoolMetadata,
@@ -126,3 +128,22 @@ class TestModels(TestCase):
         self.assertEqual(
             token.name, "Balancer Pool Token " + get_metadata_mock.return_value.name
         )
+
+    @mock.patch.object(
+        Erc20Manager,
+        "get_info",
+        autospec=True,
+        return_value=Erc20Info(
+            name=b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+            symbol=b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+            decimals=18,
+        ),
+    )
+    def test_create_from_blockchain_with_byte_data(self, get_info: MagicMock):
+        Token.objects.create_from_blockchain(
+            "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
+        )
+
+        token = Token.objects.get(address="0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413")
+        self.assertEqual(token.name, "�������������������������������\x01")
+        self.assertEqual(token.symbol, "�������������������������������\x01")
