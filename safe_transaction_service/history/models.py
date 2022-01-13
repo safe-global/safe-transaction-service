@@ -21,7 +21,7 @@ from typing import (
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, models
+from django.db import IntegrityError, connection, models, transaction
 from django.db.models import Case, Count, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
@@ -151,20 +151,7 @@ class BulkCreateSignalMixin:
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
         try:
-            db_block = self.get(number=block["number"])
-            if db_block.block_hash != block["hash"].hex():
-                logger.warning(
-                    "Stored block=%d "
-                    "with hash=%s "
-                    "is not marching retrieved hash=%s",
-                    db_block.number,
-                    db_block.block_hash,
-                    block["hash"].hex(),
-                )
-                db_block.delete()
-                raise self.model.DoesNotExist
-            else:
-                return db_block
+            return self.get(block_hash=block["hash"])
         except self.model.DoesNotExist:
             return self.create_from_block(block, confirmed=confirmed)
 
@@ -177,20 +164,32 @@ class EthereumBlockManager(models.Manager):
         :return: EthereumBlock model
         """
         try:
-            return super().create(
-                number=block["number"],
-                gas_limit=block["gasLimit"],
-                gas_used=block["gasUsed"],
-                timestamp=datetime.datetime.fromtimestamp(
-                    block["timestamp"], datetime.timezone.utc
-                ),
-                block_hash=HexBytes(block["hash"]).hex(),
-                parent_hash=HexBytes(block["parentHash"]).hex(),
-                confirmed=confirmed,
-            )
+            with transaction.atomic():  # Needed for handling IntegrityError
+                return super().create(
+                    number=block["number"],
+                    gas_limit=block["gasLimit"],
+                    gas_used=block["gasUsed"],
+                    timestamp=datetime.datetime.fromtimestamp(
+                        block["timestamp"], datetime.timezone.utc
+                    ),
+                    block_hash=block["hash"].hex(),
+                    parent_hash=block["parentHash"].hex(),
+                    confirmed=confirmed,
+                )
         except IntegrityError:
-            # The block could be created in the meantime by other task while the block was fetched from blockchain
-            return self.get(number=block["number"])
+            db_block = self.get(number=block["number"])
+            if HexBytes(db_block.block_hash) == block["hash"]:  # pragma: no cover
+                # Block was inserted by another task
+                return db_block
+            else:
+                # There's a wrong block with the same number
+                db_block.confirmed = False  # Will be taken care of by the reorg task
+                db_block.save(update_fields=["confirmed"])
+                raise IntegrityError(
+                    f"Error inserting block with hash={block['hash'].hex()}, "
+                    f"there is a block with the same number={block['number']} inserted. "
+                    f"Marking block as not confirmed"
+                )
 
     @lru_cache(maxsize=10000)
     def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:

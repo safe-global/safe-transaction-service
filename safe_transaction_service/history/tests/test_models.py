@@ -809,7 +809,9 @@ class TestEthereumBlock(TestCase):
     def test_get_or_create_from_block(self):
         mock_block = block_result[0]
         self.assertEqual(EthereumBlock.objects.count(), 0)
-        EthereumBlock.objects.get_or_create_from_block(mock_block)
+        db_block = EthereumBlock.objects.get_or_create_from_block(mock_block)
+        db_block.set_confirmed()
+        self.assertEqual(db_block.confirmed, True)
         self.assertEqual(EthereumBlock.objects.count(), 1)
         with mock.patch.object(
             EthereumBlockManager, "create_from_block"
@@ -818,12 +820,15 @@ class TestEthereumBlock(TestCase):
             EthereumBlock.objects.get_or_create_from_block(mock_block)
             create_from_block_mock.assert_not_called()
 
+        # Test block with different block-hash but same block number
         mock_block_2 = dict(mock_block)
         mock_block_2["hash"] = Web3.keccak(text="another-hash")
         self.assertNotEqual(mock_block["hash"], mock_block_2["hash"])
-        block = EthereumBlock.objects.get_or_create_from_block(mock_block_2)
-        self.assertEqual(block.block_hash, mock_block_2["hash"].hex())
-        self.assertEqual(EthereumBlock.objects.count(), 1)
+        with self.assertRaises(IntegrityError):
+            EthereumBlock.objects.get_or_create_from_block(mock_block_2)
+            self.assertEqual(EthereumBlock.objects.count(), 1)
+            db_block.refresh_from_db()
+            self.assertEqual(db_block.confirmed, False)
 
     def test_set_confirmed_not_confirmed(self):
         ethereum_block = EthereumBlockFactory(confirmed=False)

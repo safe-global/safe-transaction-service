@@ -39,7 +39,7 @@ class ReorgService:
         """
         :param ethereum_client:
         :param eth_reorg_blocks: Minimum number of blocks to consider a block confirmed and safe to rely on. In Mainnet
-        10 blocks is considered safe
+            10 blocks is considered safe
         :param eth_reorg_rewind_blocks: Number of blocks to rewind indexing when a reorg is found
         """
         self.ethereum_client = ethereum_client
@@ -60,7 +60,7 @@ class ReorgService:
         to_block = current_block_number - self.eth_reorg_blocks
         for database_block in EthereumBlock.objects.not_confirmed(
             to_block_number=to_block
-        ):
+        ).only("number", "block_hash", "confirmed"):
             blockchain_block = self.ethereum_client.get_block(
                 database_block.number, full_transactions=False
             )
