@@ -140,9 +140,9 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx-receipt with tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            elif tx_receipt.get("blockNumber") is None:
+            elif tx_receipt.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
-                    f"Cannot find blockNumber for tx-receipt with "
+                    f"Cannot find blockHash for tx-receipt with "
                     f"tx-hash={HexBytes(tx_hash).hex()}"
                 )
             else:
@@ -165,8 +165,9 @@ class IndexService:
                     f"Cannot find blockHash for tx with "
                     f"tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            block_hashes.add(tx["blockHash"].hex())
-            txs.append(tx)
+            else:
+                block_hashes.add(tx["blockHash"].hex())
+                txs.append(tx)
 
         blocks = self.ethereum_client.get_blocks(block_hashes)
         block_dict = {}
