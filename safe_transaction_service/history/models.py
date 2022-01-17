@@ -18,6 +18,7 @@ from typing import (
     Union,
 )
 
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
@@ -1385,6 +1386,16 @@ class SafeMasterCopyQueryset(models.QuerySet):
 
     def not_l2(self):
         return self.filter(l2=False)
+
+    def relevant(self):
+        """
+        :return: Relevant master copies for this network. If network is `L2`, only `L2` master copies are returned.
+            Otherwise, all master copies are returned
+        """
+        if settings.ETH_L2_NETWORK:
+            return self.l2()
+        else:
+            return self.all()
 
 
 class SafeMasterCopy(MonitoredAddress):

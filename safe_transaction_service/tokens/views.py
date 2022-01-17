@@ -16,7 +16,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from . import filters, serializers
 from .models import Token
 from .services import PriceServiceProvider
-from .tasks import get_token_info_from_blockchain
+from .tasks import get_token_info_from_blockchain_task
 
 
 class TokenView(RetrieveAPIView):
@@ -40,7 +40,7 @@ class TokenView(RetrieveAPIView):
         try:
             return super().get(request, *args, **kwargs)
         except Http404 as exc:  # Try to get info about the token
-            get_token_info_from_blockchain.delay(address)
+            get_token_info_from_blockchain_task.delay(address)
             raise exc
 
 

@@ -115,7 +115,7 @@ def fix_pool_tokens_task() -> Optional[int]:
 
 @app.shared_task()
 @close_gevent_db_connection_decorator
-def get_token_info_from_blockchain(token_address: ChecksumAddress) -> bool:
+def get_token_info_from_blockchain_task(token_address: ChecksumAddress) -> bool:
     """
     Retrieve token information from blockchain
 

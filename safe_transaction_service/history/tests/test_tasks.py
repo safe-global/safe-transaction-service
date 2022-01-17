@@ -14,6 +14,7 @@ from ..models import SafeContract, SafeStatus
 from ..services import IndexService
 from ..tasks import (
     check_reorgs_task,
+    check_sync_status_task,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -24,7 +25,7 @@ from ..tasks import logger as task_logger
 from ..tasks import (
     process_decoded_internal_txs_for_safe_task,
     process_decoded_internal_txs_task,
-    reindex_last_hours,
+    reindex_last_hours_task,
 )
 from .factories import (
     ERC20TransferFactory,
@@ -42,6 +43,9 @@ logger = logging.getLogger(__name__)
 class TestTasks(TestCase):
     def test_check_reorgs_task(self):
         self.assertIsNone(check_reorgs_task.delay().result, 0)
+
+    def test_check_sync_status_task(self):
+        self.assertTrue(check_sync_status_task.delay().result)
 
     def test_index_erc20_events_task(self):
         self.assertEqual(index_erc20_events_task.delay().result, 0)
@@ -73,13 +77,13 @@ class TestTasks(TestCase):
         self.assertEqual(index_safe_events_task.delay().result, 0)
 
     @patch.object(IndexService, "reindex_master_copies")
-    def test_reindex_last_hours(self, reindex_master_copies_mock: MagicMock):
+    def test_reindex_last_hours_task(self, reindex_master_copies_mock: MagicMock):
         now = timezone.now()
         one_hour_ago = now - timedelta(hours=1)
         one_day_ago = now - timedelta(days=1)
         one_week_ago = now - timedelta(weeks=1)
 
-        reindex_last_hours()
+        reindex_last_hours_task()
         reindex_master_copies_mock.assert_not_called()
 
         ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
@@ -87,7 +91,7 @@ class TestTasks(TestCase):
         ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
-        reindex_last_hours()
+        reindex_last_hours_task()
         reindex_master_copies_mock.assert_called_with(
             from_block_number=ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
