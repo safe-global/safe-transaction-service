@@ -15,6 +15,8 @@ from ..models import (
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
+    SafeContract,
+    SafeMasterCopy,
     SafeStatus,
 )
 
@@ -81,6 +83,33 @@ class IndexService:
             return EthereumBlock.objects.get_or_create_from_block(
                 block, confirmed=confirmed
             )
+
+    def is_service_synced(self) -> bool:
+        """
+        :return: `True` if master copies and ERC20/721 are synced, `False` otherwise
+        """
+
+        # Use number of reorg blocks to consider as not synced
+        reference_block_number = (
+            self.ethereum_client.current_block_number - self.eth_reorg_blocks
+        )
+        synced = True
+        for safe_master_copy in SafeMasterCopy.objects.relevant().filter(
+            tx_block_number__lt=reference_block_number
+        ):
+            logger.error("Master Copy %s is out of sync", safe_master_copy.address)
+            synced = False
+
+        out_of_sync_contracts = SafeContract.objects.filter(
+            erc20_block_number__lt=reference_block_number
+        ).count()
+        if out_of_sync_contracts > 0:
+            logger.error(
+                "%d Safe Contracts have ERC20/721 out of sync", out_of_sync_contracts
+            )
+            synced = False
+
+        return synced
 
     def tx_create_or_update_from_tx_hash(self, tx_hash: str) -> "EthereumTx":
         try:

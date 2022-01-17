@@ -43,6 +43,18 @@ class CeleryTaskConfiguration:
 
 TASKS = [
     CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.check_reorgs_task",
+        "Check Reorgs",
+        3,
+        IntervalSchedule.MINUTES,
+    ),
+    CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.check_sync_status_task",
+        "Check Sync status",
+        10,
+        IntervalSchedule.MINUTES,
+    ),
+    CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.index_internal_txs_task",
         "Index Internal Txs",
         13,
@@ -76,7 +88,7 @@ TASKS = [
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
-        "safe_transaction_service.history.tasks.reindex_last_hours",
+        "safe_transaction_service.history.tasks.reindex_last_hours_task",
         "Reindex master copies for the last hours",
         110,
         IntervalSchedule.MINUTES,
@@ -85,12 +97,6 @@ TASKS = [
         "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
         "Process Internal Txs",
         20,
-        IntervalSchedule.MINUTES,
-    ),
-    CeleryTaskConfiguration(
-        "safe_transaction_service.history.tasks.check_reorgs_task",
-        "Check Reorgs",
-        3,
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(

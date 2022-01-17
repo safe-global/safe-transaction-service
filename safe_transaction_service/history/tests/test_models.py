@@ -242,6 +242,18 @@ class TestSafeMasterCopy(TestCase):
             safe_master_copy.version,
         )
 
+    def test_master_copy_relevant(self):
+        SafeMasterCopyFactory(l2=True)
+        SafeMasterCopyFactory(l2=False)
+        SafeMasterCopyFactory(l2=False)
+
+        with self.settings(ETH_L2_NETWORK=True):
+            self.assertEqual(SafeMasterCopy.objects.relevant().count(), 1)
+            self.assertEqual(SafeMasterCopy.objects.relevant().get().l2, True)
+
+        with self.settings(ETH_L2_NETWORK=False):
+            self.assertEqual(SafeMasterCopy.objects.relevant().count(), 3)
+
     def test_validate_version(self):
         safe_master_copy = SafeMasterCopyFactory()
         safe_master_copy.version = ""

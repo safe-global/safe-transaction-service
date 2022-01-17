@@ -1,8 +1,12 @@
+from unittest import mock
+from unittest.mock import PropertyMock
+
 from django.test import TestCase
 
 from eth_account import Account
 from web3 import Web3
 
+from gnosis.eth import EthereumClient
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..models import EthereumTx, MultisigTransaction, SafeStatus
@@ -11,12 +15,28 @@ from ..services.index_service import (
     IndexServiceProvider,
     TransactionNotFoundException,
 )
-from .factories import EthereumTxFactory, MultisigTransactionFactory, SafeStatusFactory
+from .factories import (
+    EthereumTxFactory,
+    MultisigTransactionFactory,
+    SafeContractFactory,
+    SafeMasterCopyFactory,
+    SafeStatusFactory,
+)
 
 
 class TestIndexService(EthereumTestCaseMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.index_service = IndexServiceProvider()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        IndexServiceProvider.del_singleton()
+
     def test_create_or_update_from_tx_hashes_existing(self):
-        index_service: IndexService = IndexServiceProvider()
+        index_service: IndexService = self.index_service
         self.assertListEqual(index_service.txs_create_or_update_from_tx_hashes([]), [])
         tx_hashes = [
             "0x52fcb05f2ad209d53d84b0a9a7ce6474ab415db88bc364c088758d70c8b5b0ef"
@@ -70,8 +90,32 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         index_service.txs_create_or_update_from_tx_hashes([tx_hash])
         ethereum_tx.delete()
 
+    @mock.patch.object(
+        EthereumClient, "current_block_number", new_callable=PropertyMock
+    )
+    def test_is_service_synced(self, current_block_number_mock: PropertyMock):
+        current_block_number_mock.return_value = 500
+        self.assertTrue(self.index_service.is_service_synced())
+        reorg_blocks = self.index_service.eth_reorg_blocks
+
+        safe_master_copy = SafeMasterCopyFactory(
+            tx_block_number=current_block_number_mock.return_value - reorg_blocks - 1
+        )
+        self.assertFalse(self.index_service.is_service_synced())
+        safe_master_copy.tx_block_number = safe_master_copy.tx_block_number + 1
+        safe_master_copy.save()
+        self.assertTrue(self.index_service.is_service_synced())
+
+        safe_contract = SafeContractFactory(
+            erc20_block_number=current_block_number_mock.return_value - reorg_blocks - 1
+        )
+        self.assertFalse(self.index_service.is_service_synced())
+        safe_contract.erc20_block_number = safe_contract.erc20_block_number + 1
+        safe_contract.save()
+        self.assertTrue(self.index_service.is_service_synced())
+
     def test_reprocess_addresses(self):
-        index_service: IndexService = IndexServiceProvider()
+        index_service: IndexService = self.index_service
         self.assertIsNone(index_service.reprocess_addresses([]))
 
         safe_status = SafeStatusFactory()
@@ -85,7 +129,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 2)
 
     def test_reprocess_all(self):
-        index_service: IndexService = IndexServiceProvider()
+        index_service: IndexService = self.index_service
         for _ in range(5):
             safe_status = SafeStatusFactory()
             MultisigTransactionFactory(safe=safe_status.address)
