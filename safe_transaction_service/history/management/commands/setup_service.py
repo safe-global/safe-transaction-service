@@ -353,7 +353,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS("Removing old tasks"))
         PeriodicTask.objects.filter(
-            name__startswith="safe_transaction_service"
+            task__startswith="safe_transaction_service"
         ).delete()
         self.stdout.write(self.style.SUCCESS("Old tasks were removed"))
 
