@@ -73,8 +73,9 @@ class TestCommands(TestCase):
             f"Setting up {ethereum_network.name} proxy factory addresses",
             buf.getvalue(),
         )
-        self.assertNotIn("Created Periodic Task", buf.getvalue())
-        self.assertIn("was already created", buf.getvalue())
+        self.assertIn("Removing old tasks", buf.getvalue())
+        self.assertIn("Old tasks were removed", buf.getvalue())
+        self.assertIn("Created Periodic Task", buf.getvalue())
 
     def test_add_webhook(self):
         command = "add_webhook"
