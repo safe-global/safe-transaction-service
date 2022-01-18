@@ -158,10 +158,9 @@ class CollectiblesService:
     )  # 1 day
     def _retrieve_metadata_from_uri(self, uri: str) -> Dict[Any, Any]:
         """
-        Get metadata from uri. Maybe at some point support IPFS or another protocols. Currently just http/https is
-        supported
+        Get metadata from URI. Currently just ipfs/http/https is supported
 
-        :param uri: Uri starting with the protocol, like http://example.org/token/3
+        :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
         uri = ipfs_to_http(uri)
@@ -346,6 +345,7 @@ class CollectiblesService:
     ) -> List[CollectibleWithMetadata]:
         """
         Get collectibles using the owner, addresses and the token_ids
+
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
@@ -406,15 +406,16 @@ class CollectiblesService:
     ) -> List[Optional[str]]:
         """
         Cache token_uris, as they shouldn't change
+
         :param addresses_with_token_ids:
         :return: List of token_uris in the same other that `addresses_with_token_ids` were provided
         """
 
-        def get_redis_key(address_with_token_id: Tuple[str, int]):
+        def get_redis_key(address_with_token_id: Tuple[str, int]) -> str:
             token_address, token_id = address_with_token_id
             return f"token-uri:{token_address}:{token_id}"
 
-        def get_not_found_cache():
+        def get_not_found_cache() -> List[Tuple[str, int]]:
             """
             :return: address_with_token_id not found on the local cache
             """
