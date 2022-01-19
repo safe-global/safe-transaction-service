@@ -310,6 +310,9 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
         },
+        "web3.providers": {
+            "level": "DEBUG" if DEBUG else "WARNING",
+        },
         "django.geventpool": {
             "level": "DEBUG" if DEBUG else "WARNING",
         },
