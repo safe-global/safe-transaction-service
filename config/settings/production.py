@@ -61,11 +61,7 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = "DENY"
 # https://docs.djangoproject.com/en/3.2/ref/settings/#csrf-trusted-origins
-allowed_csrf_origins = env("CSRF_TRUSTED_ORIGINS", default="")
-CSRF_TRUSTED_ORIGINS = [
-    allowed_csrf_origins.strip()
-    for allowed_csrf_origins in allowed_csrf_origins.split(",")
-]
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[""])
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
