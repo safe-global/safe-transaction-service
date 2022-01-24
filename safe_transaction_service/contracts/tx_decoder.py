@@ -1,9 +1,23 @@
+import itertools
 from functools import cache, cached_property
 from logging import getLogger
-from typing import Any, Dict, List, Sequence, Tuple, Type, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypedDict,
+    Union,
+    cast,
+)
 
 import gevent
 from eth_abi.exceptions import DecodingError
+from eth_typing import ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from web3 import Web3
@@ -81,6 +95,25 @@ class CannotDecode(TxDecoderException):
     pass
 
 
+class ParameterDecoded(TypedDict):
+    name: str
+    type: str
+    value: Any
+
+
+class DataDecoded(TypedDict):
+    method: str
+    parameters: List[ParameterDecoded]
+
+
+class MultisendDecoded(TypedDict):
+    operation: int
+    to: ChecksumAddress
+    value: str
+    data: Optional[HexStr]
+    data_decoded: Optional[DataDecoded]
+
+
 @cache
 def get_db_tx_decoder() -> "DbTxDecoder":
     def _get_db_tx_decoder() -> "DbTxDecoder":
@@ -114,6 +147,8 @@ class SafeTxDecoder:
     Decode simple txs for Safe contracts. No multisend or nested transactions are decoded
     """
 
+    EXEC_TRANSACTION_SELECTOR = HexBytes("0x6a761202")
+
     dummy_w3 = Web3()
 
     def __init__(self):
@@ -130,9 +165,10 @@ class SafeTxDecoder:
     ) -> Tuple[str, List[Tuple[str, str, Any]]]:
         """
         Decode tx data
+
         :param data: Tx data as `hex string` or `bytes`
         :return: Tuple with the `function name` and a List of sorted tuples with
-        the `name` of the argument, `type` and `value`
+            the `name` of the argument, `type` and `value`
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
@@ -142,9 +178,6 @@ class SafeTxDecoder:
 
         data = HexBytes(data)
         selector, params = data[:4], data[4:]
-        if selector not in self.fn_selectors_with_abis:
-            raise CannotDecode(data.hex())
-
         try:
             fn_abi = self.fn_selectors_with_abis[selector]
             names = get_abi_input_names(fn_abi)
@@ -152,6 +185,8 @@ class SafeTxDecoder:
             decoded = self.dummy_w3.codec.decode_abi(types, cast(HexBytes, params))
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
+        except KeyError:  # Selector not found
+            raise CannotDecode(data.hex())
         except (ValueError, DecodingError) as exc:
             logger.warning("Cannot decode %s", data.hex())
             raise UnexpectedProblemDecoding(data) from exc
@@ -189,6 +224,7 @@ class SafeTxDecoder:
         """
         Parse decoded arguments, like converting `bytes` to hexadecimal `str` or `int` and `float` to `str` (to
         prevent problems when deserializing in another languages like JavaScript
+
         :param value_decoded:
         :return: Dict[str, Any]
         """
@@ -199,6 +235,7 @@ class SafeTxDecoder:
     def add_abi(self, abi: ABI) -> bool:
         """
         Add a new abi without rebuilding the entire decoder
+
         :return: True if decoder updated, False otherwise
         """
         updated = False
@@ -213,6 +250,7 @@ class SafeTxDecoder:
     ) -> Sequence[Dict[str, Any]]:
         """
         Decode inner data for function parameters, e.g. Multisend `data` or `data` in Gnosis Safe `execTransaction`
+
         :param data:
         :param parameters:
         :return: Parameters with extra data
@@ -221,12 +259,13 @@ class SafeTxDecoder:
 
     def decode_transaction_with_types(
         self, data: Union[bytes, str]
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    ) -> Tuple[str, List[ParameterDecoded]]:
         """
-        Decode tx data
+        Decode tx data and return a list of dictionaries
+
         :param data: Tx data as `hex string` or `bytes`
         :return: Tuple with the `function name` and a list of dictionaries
-        [{'name': str, 'type': str, 'value': `depending on type`}...]
+            [{'name': str, 'type': str, 'value': `depending on type`}...]
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
@@ -242,7 +281,8 @@ class SafeTxDecoder:
 
     def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
         """
-        Decode tx data
+        Decode tx data and return all the parameters in the same dictionary
+
         :param data: Tx data as `hex string` or `bytes`
         :return: Tuple with the `function name` and a dictionary with the arguments of the function
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
@@ -256,7 +296,7 @@ class SafeTxDecoder:
         }
         return fn_name, decoded_transactions
 
-    def get_supported_abis(self) -> List[ABI]:
+    def get_supported_abis(self) -> Iterable[ABI]:
         safe_abis = [
             get_safe_V0_0_1_contract(self.dummy_w3).abi,
             get_safe_V1_0_0_contract(self.dummy_w3).abi,
@@ -268,9 +308,10 @@ class SafeTxDecoder:
         # will take preference
         return safe_abis
 
-    def get_data_decoded(self, data: Union[str, bytes]) -> Dict[str, Any]:
+    def get_data_decoded(self, data: Union[str, bytes]) -> Optional[DataDecoded]:
         """
         Return data prepared for serializing
+
         :param data:
         :return:
         """
@@ -289,17 +330,17 @@ class TxDecoder(SafeTxDecoder):
     """
 
     @cached_property
-    def multisend_fn_selectors_with_abis(self) -> Dict[bytes, ABI]:
-        return self._generate_selectors_with_abis_from_abis(self._get_multisend_abis())
-
-    def _get_multisend_abis(self):
+    def multisend_abis(self) -> List[ABI]:
         return [get_multi_send_contract(self.dummy_w3).abi]
 
-    def _get_data_decoded_for_multisend(
-        self, data: Union[bytes, str]
-    ) -> List[Dict[str, Any]]:
+    @cached_property
+    def multisend_fn_selectors_with_abis(self) -> Dict[bytes, ABI]:
+        return self._generate_selectors_with_abis_from_abis(self.multisend_abis)
+
+    def decode_multisend_data(self, data: Union[bytes, str]) -> List[MultisendDecoded]:
         """
-        Return a multisend
+        Decodes Multisend raw data to Multisend dictionary
+
         :param data:
         :return:
         """
@@ -324,8 +365,9 @@ class TxDecoder(SafeTxDecoder):
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
-        Add custom parsing to the decoded function arguments. Converts numbers to strings and recursively parses lists
-        tuples and sets.
+        Add custom parsing to the decoded function arguments. Convert numbers to strings and
+        recursively parse lists, tuples and sets.
+
         :param value_decoded:
         :return:
         """
@@ -337,10 +379,10 @@ class TxDecoder(SafeTxDecoder):
         elif isinstance(value_decoded, (list, tuple, set)):
             value_decoded = list(
                 [self._parse_decoded_arguments(e) for e in value_decoded]
-            )  # Parse recursive inside sequences
+            )  # Recursive parsing inside sequences
         return value_decoded
 
-    def get_supported_abis(self) -> List[ABI]:
+    def get_supported_abis(self) -> Iterable[ABI]:
         supported_abis = super().get_supported_abis()
 
         aave_contracts = [
@@ -414,7 +456,7 @@ class TxDecoder(SafeTxDecoder):
             + gnosis_protocol
             + gnosis_safe
             + erc_contracts
-            + self._get_multisend_abis()
+            + self.multisend_abis
             + supported_abis
         )
 
@@ -423,17 +465,19 @@ class TxDecoder(SafeTxDecoder):
     ) -> Sequence[Dict[str, Any]]:
         """
         Decode inner data for function parameters, in this case Multisend `data` and
-         `data` in Gnosis Safe `execTransaction`
+        `data` in Gnosis Safe `execTransaction`
+
         :param data:
         :param parameters:
-        :return: Parameters with a extra object with key `value_decoded` if decoding is possible
+        :return: Parameters with an extra object with key `value_decoded` if decoding is possible
         """
-        if data[:4] in self.multisend_fn_selectors_with_abis:
+        fn_selector = data[:4]
+        if fn_selector in self.multisend_fn_selectors_with_abis:
             # If multisend, decode the transactions
-            parameters[0]["value_decoded"] = self._get_data_decoded_for_multisend(data)
+            parameters[0]["value_decoded"] = self.decode_multisend_data(data)
 
         elif (
-            data[:4] == HexBytes("0x6a761202")
+            fn_selector == self.EXEC_TRANSACTION_SELECTOR
             and len(parameters) > 2
             and (data := HexBytes(parameters[2]["value"]))
         ):
@@ -452,11 +496,12 @@ class DbTxDecoder(TxDecoder):
     Decode contracts from ABIs in database
     """
 
-    def get_supported_abis(self) -> List[Type[Contract]]:
+    def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()
-        db_abis = list(
+        db_abis = (
             ContractAbi.objects.all()
             .order_by("-relevance")
             .values_list("abi", flat=True)
+            .iterator()
         )
-        return db_abis + supported_abis
+        return itertools.chain(db_abis, supported_abis)
