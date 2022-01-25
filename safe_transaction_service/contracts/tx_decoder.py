@@ -1,4 +1,5 @@
 import itertools
+import operator
 from functools import cache, cached_property
 from logging import getLogger
 from typing import (
@@ -16,6 +17,7 @@ from typing import (
 )
 
 import gevent
+from cachetools import TTLCache, cachedmethod
 from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
@@ -296,17 +298,20 @@ class SafeTxDecoder:
         nested_parameters = self.decode_parameters_data(data, parameters)
         return fn_name, nested_parameters
 
-    def decode_transaction(self, data: Union[bytes, str]) -> Tuple[str, Dict[str, Any]]:
+    def decode_transaction(
+        self, data: Union[bytes, str], address: Optional[ChecksumAddress] = None
+    ) -> Tuple[str, Dict[str, Any]]:
         """
         Decode tx data and return all the parameters in the same dictionary
 
         :param data: Tx data as `hex string` or `bytes`
+        :param address: contract address in case of ABI colliding
         :return: Tuple with the `function name` and a dictionary with the arguments of the function
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
         fn_name, decoded_transactions_with_types = self.decode_transaction_with_types(
-            data
+            data, address=address
         )
         decoded_transactions = {
             d["name"]: d["value"] for d in decoded_transactions_with_types
@@ -521,6 +526,43 @@ class DbTxDecoder(TxDecoder):
     """
     Decode contracts from ABIs in database
     """
+
+    cache_abis_by_address = TTLCache(maxsize=2048, ttl=60 * 5)  # 5 minutes of caching
+
+    @cachedmethod(cache=operator.attrgetter("cache_abis_by_address"))
+    def get_contract_abi(
+        self, address: ChecksumAddress
+    ) -> Optional[Dict[bytes, ABIFunction]]:
+        """
+        :param address: Contract address
+        :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
+        """
+        abis = ContractAbi.objects.filter(contracts__address=address).values_list(
+            "abi", flat=True
+        )
+        if abis:
+            return self._generate_selectors_with_abis_from_abi(abis[0])
+
+    def get_abi_function(
+        self, data: bytes, address: Optional[ChecksumAddress] = None
+    ) -> Optional[ABIFunction]:
+        """
+        :param data: transaction data
+        :param address: contract address in case of ABI colliding
+        :return: Abi function for data if it can be decoded, `None` if not found
+        """
+        selector = data[:4]
+        # Check first that selector is supported on our database
+        if selector in self.fn_selectors_with_abis:
+            # Try to use specific ABI if address provided
+            if address:
+                contract_selectors_with_abis = self.get_contract_abi(address)
+                if (
+                    contract_selectors_with_abis
+                    and selector in contract_selectors_with_abis
+                ):
+                    return contract_selectors_with_abis[selector]
+            return self.fn_selectors_with_abis[selector]
 
     def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()
