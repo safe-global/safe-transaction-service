@@ -90,6 +90,9 @@ class CoingeckoClient:
     def get_avax_usd_price(self) -> float:
         return self.get_price("avalanche-2")
 
+    def get_aoa_usd_price(self) -> float:
+        return self.get_price("aurora")
+
     def get_bnb_usd_price(self) -> float:
         return self.get_price("binancecoin")
 
