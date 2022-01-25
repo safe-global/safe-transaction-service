@@ -96,6 +96,12 @@ class TestPriceService(TestCase):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 1.7)
 
+        # Avalanche
+        price_service.ethereum_network = EthereumNetwork.AVALANCHE
+        with mock.patch.object(KrakenClient, "get_avax_usd_price", return_value=6.5):
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 6.5)
+
     @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
     @mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=5.0)
     def test_get_binance_usd_price(

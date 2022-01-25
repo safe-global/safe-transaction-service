@@ -146,6 +146,12 @@ class PriceService:
         else:
             return tuple()
 
+    def get_avalanche_usd_price(self) -> float:
+        try:
+            return self.kraken_client.get_avax_usd_price()
+        except CannotGetPrice:
+            return self.coingecko_client.get_avax_usd_price()
+
     def get_binance_usd_price(self) -> float:
         try:
             return self.binance_client.get_bnb_usd_price()
@@ -201,6 +207,8 @@ class PriceService:
             EthereumNetwork.GATHER_MAINNET,
         ):
             return self.coingecko_client.get_gather_usd_price()
+        elif self.ethereum_network == EthereumNetwork.AVALANCHE:
+            return self.get_avalanche_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
