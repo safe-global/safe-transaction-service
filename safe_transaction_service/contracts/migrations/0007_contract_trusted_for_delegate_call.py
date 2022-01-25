@@ -8,12 +8,12 @@ def add_trusted_contracts(apps, schema_editor):
     Contract.objects.filter(
         address__in=[
             # Multisend v1.3.0
-            "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761",
+            # "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761", Not safe, allows nested delegate calls
             "0x998739BFdAAdde7C933B942a68053933098f9EDa",
             "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
             "0xA1dabEF33b3B82c7814B6D82A79e50F4AC44102B",
             # Multisend v1.1.1
-            "0x8D29bE29923b68abfDD21e541b9374737B49cdAD",
+            # "0x8D29bE29923b68abfDD21e541b9374737B49cdAD", Not safe, allows nested delegate calls
         ]
     ).update(trusted_for_delegate_call=True)
 
