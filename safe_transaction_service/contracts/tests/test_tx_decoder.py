@@ -8,7 +8,10 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe.multi_send import MultiSendOperation
 
-from safe_transaction_service.contracts.tests.factories import ContractAbiFactory
+from safe_transaction_service.contracts.tests.factories import (
+    ContractAbiFactory,
+    ContractFactory,
+)
 
 from ..tx_decoder import (
     CannotDecode,
@@ -208,7 +211,7 @@ class TestTxDecoder(TestCase):
             },
         ]
         # Get just the multisend object
-        self.assertEqual(tx_decoder._get_data_decoded_for_multisend(data), expected)
+        self.assertEqual(tx_decoder.decode_multisend_data(data), expected)
 
         # Now decode all the data
         expected = (
@@ -274,7 +277,7 @@ class TestTxDecoder(TestCase):
             "000000"
         )
         tx_decoder = get_tx_decoder()
-        self.assertEqual(tx_decoder._get_data_decoded_for_multisend(data), [])
+        self.assertEqual(tx_decoder.decode_multisend_data(data), [])
         self.assertEqual(
             tx_decoder.decode_transaction_with_types(data),
             (
@@ -510,19 +513,26 @@ class TestTxDecoder(TestCase):
 
     def test_db_tx_decoder(self):
         example_abi = [
-            {"inputs": [], "stateMutability": "nonpayable", "type": "constructor"},
             {
-                "inputs": [],
-                "name": "uxioSayHi",
-                "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-                "stateMutability": "view",
+                "inputs": [
+                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
+                    {
+                        "internalType": "uint256",
+                        "name": "numberOfDroids",
+                        "type": "uint256",
+                    },
+                ],
+                "name": "buyDroid",
+                "outputs": [],
+                "stateMutability": "nonpayable",
                 "type": "function",
             },
         ]
+
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
-            .functions.uxioSayHi()
+            .functions.buyDroid(4, 10)
             .buildTransaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
         )
 
@@ -533,12 +543,39 @@ class TestTxDecoder(TestCase):
         # Test `add_abi`
         db_tx_decoder.add_abi(example_abi)
         fn_name, arguments = db_tx_decoder.decode_transaction(example_data)
-        self.assertEqual(fn_name, "uxioSayHi")
-        self.assertFalse(arguments)
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
 
         # Test load a new DbTxDecoder
         ContractAbiFactory(abi=example_abi)
         db_tx_decoder = DbTxDecoder()
         fn_name, arguments = db_tx_decoder.decode_transaction(example_data)
-        self.assertEqual(fn_name, "uxioSayHi")
-        self.assertFalse(arguments)
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
+
+        # Swap ABI parameters
+        swapped_abi = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "numberOfDroids",
+                        "type": "uint256",
+                    },
+                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
+                ],
+                "name": "buyDroid",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+        ]
+
+        swapped_contract_abi = ContractAbiFactory(abi=swapped_abi)
+        contract = ContractFactory(contract_abi=swapped_contract_abi)
+        fn_name, arguments = db_tx_decoder.decode_transaction(
+            example_data, address=contract.address
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+        self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
