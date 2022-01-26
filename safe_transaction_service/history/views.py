@@ -1036,8 +1036,7 @@ class OwnersView(APIView):
 
 
 class DataDecoderView(GenericAPIView):
-    def get_serializer_class(self):
-        return serializers.DataDecoderSerializer
+    serializer_class = serializers.DataDecoderSerializer
 
     @swagger_auto_schema(
         responses={
@@ -1058,7 +1057,9 @@ class DataDecoderView(GenericAPIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors
             )
         else:
-            data_decoded = get_data_decoded_from_data(serializer.data["data"])
+            data_decoded = get_data_decoded_from_data(
+                serializer.data["data"], address=serializer.data["to"]
+            )
             if data_decoded:
                 return Response(status=status.HTTP_200_OK, data=data_decoded)
             else:

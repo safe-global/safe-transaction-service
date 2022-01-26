@@ -561,6 +561,8 @@ class DbTxDecoder(TxDecoder):
                     contract_selectors_with_abis
                     and selector in contract_selectors_with_abis
                 ):
+                    # If the selector is available in the abi specific for the address we will use that one
+                    # Otherwise we fallback to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
 
