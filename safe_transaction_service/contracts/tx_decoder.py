@@ -515,7 +515,7 @@ class TxDecoder(SafeTxDecoder):
             # selector is `0x6a761202` and parameters[2] is data
             try:
                 parameters[2]["value_decoded"] = self.get_data_decoded(
-                    data, address=parameters[0]
+                    data, address=parameters[0]["value"]
                 )
             except TxDecoderException:
                 logger.warning("Cannot decode `execTransaction`", exc_info=True)
