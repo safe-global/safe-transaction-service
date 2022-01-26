@@ -16,4 +16,4 @@ echo "==> $(date +%H:%M:%S) ==> Setting up service... "
 python manage.py setup_service
 
 echo "==> $(date +%H:%M:%S) ==> Running Celery worker <=="
-exec celery -A config.celery_app worker --loglevel $log_level --pool=gevent --concurrency=${CELERYD_CONCURRENCY:-500}
+exec celery -C -A config.celery_app worker --loglevel $log_level --pool=gevent --concurrency=${CELERYD_CONCURRENCY:-500}

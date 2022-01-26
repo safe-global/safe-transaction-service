@@ -11,4 +11,4 @@ fi
 
 sleep 10
 echo "==> $(date +%H:%M:%S) ==> Running Celery beat <=="
-exec celery -A config.celery_app beat -S django_celery_beat.schedulers:DatabaseScheduler --loglevel $log_level
+exec celery -C -A config.celery_app beat -S django_celery_beat.schedulers:DatabaseScheduler --loglevel $log_level
