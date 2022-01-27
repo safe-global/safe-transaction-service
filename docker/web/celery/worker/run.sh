@@ -15,5 +15,7 @@ python manage.py migrate --noinput
 echo "==> $(date +%H:%M:%S) ==> Setting up service... "
 python manage.py setup_service
 
-echo "==> $(date +%H:%M:%S) ==> Running Celery worker <=="
-exec celery -C -A config.celery_app worker --loglevel $log_level --pool=gevent --concurrency=${CELERYD_CONCURRENCY:-500}
+MAX_MEMORY_PER_CHILD="${WORKER_MAX_MEMORY_PER_CHILD:-2097152}"
+echo "==> $(date +%H:%M:%S) ==> Running Celery worker with a max_memory_per_child of ${MAX_MEMORY_PER_CHILD} <=="
+exec celery -C -A config.celery_app worker --loglevel $log_level --pool=gevent \
+     --concurrency=${CELERYD_CONCURRENCY:-500} --max-memory-per-child=${MAX_MEMORY_PER_CHILD}
