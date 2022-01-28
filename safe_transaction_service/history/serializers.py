@@ -39,10 +39,10 @@ from .models import (
 from .services.safe_service import SafeCreationInfo
 
 
-def get_data_decoded_from_data(data: bytes):
+def get_data_decoded_from_data(data: bytes, address: Optional[ChecksumAddress] = None):
     tx_decoder = get_db_tx_decoder()
     try:
-        return tx_decoder.get_data_decoded(data)
+        return tx_decoder.get_data_decoded(data, address=address)
     except TxDecoderException:
         return None
 
@@ -470,6 +470,7 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
 
 class DataDecoderSerializer(serializers.Serializer):
     data = HexadecimalField(allow_null=False, allow_blank=False, min_length=4)
+    to = EthereumAddressField(allow_null=True, required=False)
 
 
 # ================================================ #
@@ -503,8 +504,10 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
     def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
         return obj.internal_tx.block_number
 
-    def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
-        return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b"")
+    def get_data_decoded(self, obj: ModuleTransaction) -> Dict[str, Any]:
+        return get_data_decoded_from_data(
+            obj.data.tobytes() if obj.data else b"", address=obj.to
+        )
 
     def get_is_successful(self, obj: ModuleTransaction) -> bool:
         return not obj.failed
@@ -602,7 +605,9 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
         # If delegate call contract must be whitelisted (security)
         if obj.data_should_be_decoded():
-            return get_data_decoded_from_data(obj.data.tobytes() if obj.data else b"")
+            return get_data_decoded_from_data(
+                obj.data.tobytes() if obj.data else b"", address=obj.to
+            )
 
 
 class Erc20InfoSerializer(serializers.Serializer):
