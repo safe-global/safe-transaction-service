@@ -48,6 +48,12 @@ class TestContractAbi(TestCase):
         contract_abi.save(update_fields=["abi"])
         self.assertNotEqual(contract_abi.abi_hash, abi_hash)
 
+        description = "testing"
+        # Description will be updated
+        ContractAbi(abi={}, description=description).save()
+        contract_abi.refresh_from_db()
+        self.assertEqual(contract_abi.description, description)
+
 
 class TestContract(TestCase):
     @mock.patch.object(

@@ -77,6 +77,13 @@ class ContractAbi(models.Model):
         if isinstance(self.abi, str):
             self.abi = json.loads(self.abi)
         self.abi_hash = Web3.keccak(text=json.dumps(self.abi, separators=(",", ":")))
+        try:
+            # ABI already exists, overwrite
+            contract_abi = self.__class__.objects.get(abi_hash=self.abi_hash)
+            self.id = contract_abi.id
+            self.description = self.description or contract_abi.description
+        except self.__class__.DoesNotExist:
+            pass
         return super().save(*args, **kwargs)
 
 
