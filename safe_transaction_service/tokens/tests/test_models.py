@@ -44,9 +44,19 @@ class TestModels(TestCase):
             t.clean()
 
     def test_token_get_full_logo_uri(self):
-        t = TokenFactory()
-        t.logo_uri = "http://gnosis.io/image.png"
-        self.assertEqual(t.get_full_logo_uri(), t.logo_uri)
+        t = TokenFactory(logo=None)
+        self.assertIsNotNone(t.logo)  # <None ImageField>
+        self.assertFalse(t.logo)
+        self.assertEqual(
+            t.get_full_logo_uri(),
+            f"https://gnosis-safe-token-logos.s3.amazonaws.com/tokens/logos/{t.address}.png",
+        )
+
+        assets_url = "https://assets.gnosis.io"
+        with self.settings(AWS_S3_PUBLIC_URL=assets_url):
+            self.assertEqual(
+                t.get_full_logo_uri(), f"{assets_url}/tokens/logos/{t.address}.png"
+            )
 
     def test_token_trusted_spam_queryset(self):
         spam_tokens = [TokenFactory(spam=True), TokenFactory(spam=True)]

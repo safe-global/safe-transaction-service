@@ -237,11 +237,15 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
         # Test ENS (hardcoded)
         get_info_mock.return_value = None
-        token_info = collectibles_service.get_token_info(
-            list(ENS_CONTRACTS_WITH_TLD.keys())[0]
-        )
+        ens_token_address = list(ENS_CONTRACTS_WITH_TLD.keys())[0]
+        token_info = collectibles_service.get_token_info(ens_token_address)
         self.assertIsNotNone(token_info)
+        ens_logo_uri = "/media/tokens/logos/ENS.png"
+        self.assertEqual(token_info.logo_uri, ens_logo_uri)
         self.assertEqual(Token.objects.count(), 4)
+        self.assertEqual(
+            Token.objects.get(address=ens_token_address).logo.url, ens_logo_uri
+        )
 
     @mock.patch.object(Erc721Manager, "get_token_uris", autospec=True)
     def test_get_token_uris(self, get_token_uris_mock: MagicMock):

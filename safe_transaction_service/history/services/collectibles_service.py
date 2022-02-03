@@ -57,12 +57,12 @@ class Erc721InfoWithLogo:
     logo_uri: str
 
     @classmethod
-    def from_token(cls, token: Token, logo_uri: Optional[str] = None):
+    def from_token(cls, token: Token):
         return cls(
             token.address,
             token.name,
             token.symbol,
-            logo_uri if logo_uri else token.get_full_logo_uri(),
+            token.get_full_logo_uri(),
         )
 
 

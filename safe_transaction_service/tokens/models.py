@@ -1,12 +1,15 @@
 import logging
+import os
 from typing import Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db import models
 from django.db.models import Q
 
+from botocore.exceptions import ClientError
 from eth_typing import ChecksumAddress
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
@@ -20,6 +23,21 @@ from .clients.zerion_client import (
 from .constants import ENS_CONTRACTS_WITH_TLD
 
 logger = logging.getLogger(__name__)
+
+
+def get_token_logo_path(instance: "Token", filename):
+    # file will be uploaded to MEDIA_ROOT/<address>
+    _, extension = os.path.splitext(filename)
+    return f"tokens/logos/{instance.address}{extension}"  # extension includes '.'
+
+
+def get_file_storage():
+    if settings.AWS_CONFIGURED:
+        from django_s3_storage.storage import S3Storage
+
+        return S3Storage()
+    else:
+        return default_storage
 
 
 class PoolTokenManager(models.Manager):
@@ -68,7 +86,7 @@ class TokenManager(models.Manager):
                 address=token_address,
                 name="Ethereum Name Service",
                 symbol="ENS",
-                logo_uri="ENS.png",
+                logo="tokens/logos/ENS.png",
                 decimals=None,
                 trusted=True,
             )
@@ -107,10 +125,30 @@ class TokenManager(models.Manager):
             address=token_address, name=name, symbol=symbol, decimals=decimals
         )
 
+    def fix_missing_logos(self) -> int:
+        """
+        Syncs tokens with empty logos with files that exist on S3 and match the address
+
+        :return: Number of synced logos
+        """
+        synced_logos = 0
+        for token in self.without_logo():
+            filename = get_token_logo_path(token, f"{token.address}.png")
+            token.logo.name = filename
+            try:
+                if token.logo.size:
+                    synced_logos += 1
+                    token.save(update_fields=["logo"])
+                    logger.info("Found logo on url %s", token.logo.url)
+            except (ClientError, FileNotFoundError):  # Depending on aws or filesystem
+                logger.error("Error retrieving url %s", token.logo.url)
+        return synced_logos
+
 
 class TokenQuerySet(models.QuerySet):
     erc721_query = Q(decimals=None)
     erc20_query = ~erc721_query
+    no_logo_query = Q(logo=None) | Q(logo="")
 
     def erc20(self):
         return self.filter(self.erc20_query)
@@ -127,6 +165,12 @@ class TokenQuerySet(models.QuerySet):
     def trusted(self):
         return self.filter(trusted=True)
 
+    def with_logo(self):
+        return self.exclude(self.no_logo_query)
+
+    def without_logo(self):
+        return self.filter(self.no_logo_query)
+
 
 class Token(models.Model):
     objects = TokenManager.from_queryset(TokenQuerySet)()
@@ -137,7 +181,12 @@ class Token(models.Model):
     decimals = models.PositiveSmallIntegerField(
         db_index=True, null=True, blank=True
     )  # For ERC721 tokens `decimals=None`
-    logo_uri = models.CharField(blank=True, max_length=300, default="")
+    logo = models.ImageField(
+        blank=True,
+        default="",
+        upload_to=get_token_logo_path,
+        storage=get_file_storage,
+    )
     events_bugged = models.BooleanField(
         default=False
     )  # If `True` token does not send `Transfer` event sometimes,
@@ -182,16 +231,21 @@ class Token(models.Model):
         self.spam = True
         return self.save(update_fields=["spam"])
 
-    def get_full_logo_uri(self):
-        if urlparse(self.logo_uri).netloc:
-            # Absolute uri stored
-            return self.logo_uri
-        elif self.logo_uri:
-            # Just path/filename with extension stored
-            return urljoin(settings.TOKENS_LOGO_BASE_URI, self.logo_uri)
+    def get_full_logo_uri(self) -> str:
+        if self.logo:
+            return self.logo.url
+        elif settings.AWS_S3_PUBLIC_URL:
+            return urljoin(
+                settings.AWS_S3_PUBLIC_URL,
+                get_token_logo_path(
+                    self, self.address + settings.TOKENS_LOGO_EXTENSION
+                ),
+            )
         else:
-            # Generate logo uri based on configuration
+            # Old behaviour
             return urljoin(
                 settings.TOKENS_LOGO_BASE_URI,
-                self.address + settings.TOKENS_LOGO_EXTENSION,
+                get_token_logo_path(
+                    self, self.address + settings.TOKENS_LOGO_EXTENSION
+                ),
             )

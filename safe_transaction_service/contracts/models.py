@@ -30,6 +30,12 @@ from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 logger = getLogger(__name__)
 
 
+def get_contract_logo_path(instance: "Contract", filename):
+    # file will be uploaded to MEDIA_ROOT/<address>
+    _, extension = os.path.splitext(filename)
+    return f"contracts/logos/{instance.address}{extension}"  # extension includes '.'
+
+
 def get_file_storage():
     if settings.AWS_CONFIGURED:
         from django_s3_storage.storage import S3Storage
@@ -87,18 +93,13 @@ class ContractAbi(models.Model):
         return super().save(*args, **kwargs)
 
 
-def get_contract_logo_path(instance: "Contract", filename):
-    # file will be uploaded to MEDIA_ROOT/<address>
-    _, extension = os.path.splitext(filename)
-    return f"contracts/logos/{instance.address}{extension}"  # extension includes '.'
-
-
 class ContractManager(models.Manager):
     def create_from_address(
         self, address: str, network: Optional[EthereumNetwork] = None
     ) -> Contract:
         """
         Create contract and try to fetch information from APIs
+
         :param address:
         :param network:
         :return: Contract instance populated with all the information found
@@ -109,8 +110,8 @@ class ContractManager(models.Manager):
 
     def fix_missing_logos(self) -> int:
         """
-        Syncs contracts with empty logos with files that exist on S3 and match the address. This usually happens
-        when logos
+        Syncs contracts with empty logos with files that exist on S3 and match the address
+
         :return: Number of synced logos
         """
         synced_logos = 0
@@ -152,7 +153,7 @@ class ContractQuerySet(models.QuerySet):
         return self.trusted_for_delegate_call().values_list("address", flat=True)
 
 
-class Contract(models.Model):  # Known addresses by the service
+class Contract(models.Model):  # Known contract addresses by the service
     objects = ContractManager.from_queryset(ContractQuerySet)()
     address = EthereumAddressV2Field(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default="")
