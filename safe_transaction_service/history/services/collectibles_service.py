@@ -51,6 +51,10 @@ def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
 
 @dataclass
 class Erc721InfoWithLogo:
+    """
+    ERC721 info from Blockchain
+    """
+
     address: str
     name: str
     symbol: str
@@ -68,6 +72,10 @@ class Erc721InfoWithLogo:
 
 @dataclass
 class Collectible:
+    """
+    Collectible built from ERC721InfoWithLogo
+    """
+
     token_name: str
     token_symbol: str
     logo_uri: str
@@ -78,6 +86,10 @@ class Collectible:
 
 @dataclass
 class CollectibleWithMetadata(Collectible):
+    """
+    Collectible with metadata parsed if possible
+    """
+
     metadata: Dict[str, Any]
     name: Optional[str] = field(init=False)
     description: Optional[str] = field(init=False)
