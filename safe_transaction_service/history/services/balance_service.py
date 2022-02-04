@@ -269,10 +269,10 @@ class BalanceService:
             token_address = balance.token_address
             if not token_address:  # Ether
                 fiat_conversion = eth_price
-                fiat_balance = fiat_conversion * (balance.balance / 10 ** 18)
+                fiat_balance = fiat_conversion * (balance.balance / 10**18)
             else:
                 fiat_conversion = eth_price * token_eth_value
-                balance_with_decimals = balance.balance / 10 ** balance.token.decimals
+                balance_with_decimals = balance.balance / 10**balance.token.decimals
                 fiat_balance = fiat_conversion * balance_with_decimals
 
             balances_with_usd.append(
