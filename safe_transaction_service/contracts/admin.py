@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from safe_transaction_service.utils.admin import BinarySearchAdmin
+from safe_transaction_service.utils.admin import BinarySearchAdmin, HasLogoFilterAdmin
 
 from .models import Contract, ContractAbi
 
@@ -36,25 +36,6 @@ class HasAbiFilter(admin.SimpleListFilter):
             return queryset
 
 
-class HasLogoFilter(admin.SimpleListFilter):
-    title = "Has Logo"
-    parameter_name = "has_logo"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("YES", "Yes"),
-            ("NO", "No"),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == "NO":
-            return queryset.without_logo()
-        elif self.value() == "YES":
-            return queryset.with_logo()
-        else:
-            return queryset
-
-
 @admin.register(Contract)
 class ContractAdmin(BinarySearchAdmin):
     list_display = (
@@ -67,7 +48,7 @@ class ContractAdmin(BinarySearchAdmin):
         "abi_relevance",
         "contract_abi_id",
     )
-    list_filter = (HasAbiFilter, HasLogoFilter, "trusted_for_delegate_call")
+    list_filter = (HasAbiFilter, HasLogoFilterAdmin, "trusted_for_delegate_call")
     list_select_related = ("contract_abi",)
     ordering = ["address"]
     raw_id_fields = ("contract_abi",)

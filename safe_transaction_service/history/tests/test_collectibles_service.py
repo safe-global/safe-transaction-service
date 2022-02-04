@@ -59,7 +59,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
             safe_address = "0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7"
             ens_address = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85"
-            ens_logo_uri = "https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png"
+            ens_logo_uri = "/media/tokens/logos/ENS.png"
             ens_token_id = 93288724337340885726942883352789513739931149355867373088241393067029827792979
             dappcon_2020_address = "0x202d2f33449Bf46d6d32Ae7644aDA130876461a4"
             dappcon_token_id = 13
@@ -111,7 +111,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                     metadata={
                         "name": "safe-multisig.eth",
                         "description": ".eth ENS Domain",
-                        "image": "https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png",
+                        "image": collectibles_service.ENS_IMAGE_URL,
                     },
                 ),
                 CollectibleWithMetadata(
@@ -237,11 +237,15 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
         # Test ENS (hardcoded)
         get_info_mock.return_value = None
-        token_info = collectibles_service.get_token_info(
-            list(ENS_CONTRACTS_WITH_TLD.keys())[0]
-        )
+        ens_token_address = list(ENS_CONTRACTS_WITH_TLD.keys())[0]
+        token_info = collectibles_service.get_token_info(ens_token_address)
         self.assertIsNotNone(token_info)
+        ens_logo_uri = "/media/tokens/logos/ENS.png"
+        self.assertEqual(token_info.logo_uri, ens_logo_uri)
         self.assertEqual(Token.objects.count(), 4)
+        self.assertEqual(
+            Token.objects.get(address=ens_token_address).logo.url, ens_logo_uri
+        )
 
     @mock.patch.object(Erc721Manager, "get_token_uris", autospec=True)
     def test_get_token_uris(self, get_token_uris_mock: MagicMock):
