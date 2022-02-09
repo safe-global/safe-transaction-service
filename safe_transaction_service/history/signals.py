@@ -47,6 +47,7 @@ def bind_confirmation(
 ) -> None:
     """
     When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
+
     :param sender: Could be MultisigConfirmation or MultisigTransaction
     :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
     :param created: `True` if model has just been created, `False` otherwise
@@ -95,6 +96,11 @@ def build_webhook_payload(
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
 ) -> List[Dict[str, Any]]:
+    """
+    :param sender: Sender type
+    :param instance: Sender instance
+    :return: A list of webhooks generated from the instance provided
+    """
     payloads: List[Dict[str, Any]] = []
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
         payloads = [
@@ -162,8 +168,8 @@ def build_webhook_payload(
         payloads = [
             {
                 "address": instance.safe,
-                "module": instance.module,
                 "type": WebHookType.MODULE_TRANSACTION.name,
+                "module": instance.module,
                 "txHash": HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
             }
         ]
