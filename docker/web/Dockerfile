@@ -8,6 +8,7 @@ COPY requirements.txt ./
 RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
+        git \
 		libssl-dev \
         libpq-dev \
 		" \
