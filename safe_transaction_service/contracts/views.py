@@ -1,5 +1,4 @@
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
+from django.core.cache import cache as django_cache
 
 import django_filters
 from rest_framework.filters import OrderingFilter
@@ -7,6 +6,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 from . import pagination, serializers
 from .models import Contract
+from .signals import get_contract_cache_key
 
 
 class ContractView(RetrieveAPIView):
@@ -14,9 +14,12 @@ class ContractView(RetrieveAPIView):
     queryset = Contract.objects.select_related("contract_abi")
     serializer_class = serializers.ContractSerializer
 
-    @method_decorator(cache_page(60 * 60))  # Cache 1 hour
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+    def get(self, request, address, *args, **kwargs):
+        cache_key = get_contract_cache_key(address)
+        if not (response := django_cache.get(cache_key)):
+            response = super().get(request, address, *args, **kwargs)
+            django_cache.set(cache_key, response, timeout=60 * 60)  # Cache 1 hour
+        return response
 
 
 class ContractsView(ListAPIView):
