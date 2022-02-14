@@ -16,3 +16,4 @@ class TokenFactory(DjangoModelFactory):
     logo = factory.django.ImageField(color="yellow")
     trusted = False
     spam = False
+    copy_price = None

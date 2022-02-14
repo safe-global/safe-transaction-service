@@ -19,8 +19,12 @@ from .factories import ERC20TransferFactory, SafeContractFactory
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.balance_service = BalanceServiceProvider()
+
     def test_get_token_info(self):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
         token_address = Account.create().address
         self.assertIsNone(balance_service.get_token_info(token_address))
 
@@ -47,7 +51,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         get_native_coin_usd_price_mock: MagicMock,
         get_token_eth_value_mock: MagicMock,
     ):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
 
         safe_address = Account.create().address
         SafeContractFactory(address=safe_address)
@@ -164,7 +168,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         )
 
     def test_filter_addresses(self):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
         db_not_trusted_addresses = [
             TokenFactory(trusted=False, spam=False).address for _ in range(3)
         ]
