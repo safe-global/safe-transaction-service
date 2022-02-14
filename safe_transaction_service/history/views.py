@@ -1047,7 +1047,10 @@ class DataDecoderView(GenericAPIView):
     )
     def post(self, request, format=None):
         """
-        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
+        Returns decoded information using tx service internal ABI information given the tx
+        data as a `0x` prefixed hexadecimal string.
+        If address of the receiving contract is provided decoded data will be more accurate,
+        as in case of ABI collision service will know which ABI to use.
         """
 
         serializer = self.get_serializer(data=request.data)
