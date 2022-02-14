@@ -18,7 +18,11 @@ class ContractView(RetrieveAPIView):
         cache_key = get_contract_cache_key(address)
         if not (response := django_cache.get(cache_key)):
             response = super().get(request, address, *args, **kwargs)
-            django_cache.set(cache_key, response, timeout=60 * 60)  # Cache 1 hour
+            response.add_post_render_callback(
+                lambda r: django_cache.set(
+                    cache_key, r, timeout=60 * 60
+                )  # Cache 1 hour
+            )
         return response
 
 
