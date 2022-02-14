@@ -1,5 +1,5 @@
 boto3==1.20.50
-cachetools==4.2.4
+cachetools==5.0.0
 celery==5.2.3
 django==3.2.12
 django-authtools==1.7.0
