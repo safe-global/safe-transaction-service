@@ -1348,7 +1348,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 1)
 
         erc20_info = Erc20InfoWithLogo(
-            erc20.address, "UXIO", "UXI", 18, "http://logo_uri.es"
+            erc20.address, "UXIO", "UXI", 18, None, "http://logo_uri.es"
         )
         get_token_info_mock.return_value = erc20_info
 
@@ -1359,6 +1359,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         token_dict = asdict(erc20_info)
         del token_dict["address"]
+        del token_dict["copy_price"]
         self.assertCountEqual(
             response.data,
             [

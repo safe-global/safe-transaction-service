@@ -229,6 +229,7 @@ class PriceService:
     def get_token_eth_value(self, token_address: ChecksumAddress) -> float:
         """
         Uses multiple decentralized and centralized oracles to get token prices
+
         :param token_address:
         :return: Current ether value for a given `token_address`
         """

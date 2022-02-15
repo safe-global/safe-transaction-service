@@ -1,3 +1,4 @@
+from typing import Optional
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -5,6 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from eth_account import Account
+from eth_typing import ChecksumAddress
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
@@ -19,8 +21,13 @@ from .factories import ERC20TransferFactory, SafeContractFactory
 
 
 class TestBalanceService(EthereumTestCaseMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.balance_service = BalanceServiceProvider()
+
     def test_get_token_info(self):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
         token_address = Account.create().address
         self.assertIsNone(balance_service.get_token_info(token_address))
 
@@ -47,7 +54,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         get_native_coin_usd_price_mock: MagicMock,
         get_token_eth_value_mock: MagicMock,
     ):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
 
         safe_address = Account.create().address
         SafeContractFactory(address=safe_address)
@@ -163,8 +170,82 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
             ],
         )
 
+    @mock.patch.object(
+        PriceService, "get_token_eth_value", return_value=0.4, autospec=True
+    )
+    @mock.patch.object(
+        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
+    )
+    @mock.patch.object(timezone, "now", return_value=timezone.now())
+    def test_get_usd_balances_copy_price(
+        self,
+        timezone_now_mock: MagicMock,
+        get_native_coin_usd_price_mock: MagicMock,
+        get_token_eth_value_mock: MagicMock,
+    ):
+        balance_service = self.balance_service
+        safe_address = SafeContractFactory().address
+        random_address = Account.create().address
+
+        balances = balance_service.get_usd_balances(safe_address)
+        self.assertEqual(len(balances), 1)
+        self.assertIsNone(balances[0].token_address)
+        self.assertEqual(balances[0].balance, 0)
+
+        tokens_value = int(12 * 1e18)
+        erc20 = deploy_erc20(
+            self.w3, "Galactic Credit Standard", "GCS", safe_address, tokens_value
+        )
+        ERC20TransferFactory(address=erc20.address, to=safe_address)
+
+        def get_token_eth_value(
+            self, token_address: ChecksumAddress
+        ) -> Optional[float]:
+            if token_address == erc20.address:
+                return 0.4
+            elif token_address == random_address:
+                return 0.1
+
+        get_token_eth_value_mock.side_effect = get_token_eth_value
+        for expected_token_eth_value in (0.4, 0.1):
+            with self.subTest(expected_token_eth_value=expected_token_eth_value):
+                balances = balance_service.get_usd_balances(safe_address)
+                self.assertEqual(len(balances), 2)
+                self.assertCountEqual(
+                    balances,
+                    [
+                        BalanceWithFiat(
+                            None,
+                            None,
+                            0,
+                            1.0,
+                            timezone_now_mock.return_value,
+                            0.0,
+                            123.4,
+                        ),
+                        BalanceWithFiat(
+                            erc20.address,
+                            balance_service.get_token_info(erc20.address),
+                            tokens_value,
+                            expected_token_eth_value,
+                            timezone_now_mock.return_value,
+                            round(
+                                123.4
+                                * expected_token_eth_value
+                                * (tokens_value / 1e18),
+                                4,
+                            ),
+                            round(123.4 * expected_token_eth_value, 4),
+                        ),
+                    ],
+                )
+                token = Token.objects.get(address=erc20.address)
+                token.copy_price = random_address
+                token.save(update_fields=["copy_price"])
+                balance_service.cache_token_info.clear()
+
     def test_filter_addresses(self):
-        balance_service = BalanceServiceProvider()
+        balance_service = self.balance_service
         db_not_trusted_addresses = [
             TokenFactory(trusted=False, spam=False).address for _ in range(3)
         ]

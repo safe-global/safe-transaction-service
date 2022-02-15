@@ -40,6 +40,7 @@ class Erc20InfoWithLogo:
     name: str
     symbol: str
     decimals: int
+    copy_price: Optional[ChecksumAddress]
     logo_uri: str
 
     @classmethod
@@ -49,6 +50,7 @@ class Erc20InfoWithLogo:
             token.name,
             token.symbol,
             token.decimals,
+            token.copy_price,
             token.get_full_logo_uri(),
         )
 
@@ -58,6 +60,14 @@ class Balance:
     token_address: Optional[ChecksumAddress]  # For ether, `token_address` is `None`
     token: Optional[Erc20InfoWithLogo]
     balance: int
+
+    def get_price_address(self) -> ChecksumAddress:
+        """
+        :return: Address to use to retrieve the token price
+        """
+        if self.token and self.token.copy_price:
+            return self.token.copy_price
+        return self.token_address
 
 
 @dataclass
@@ -164,7 +174,10 @@ class BalanceService:
         number_eth_events = InternalTx.objects.ether_txs_for_address(
             safe_address
         ).count()
-        cache_key = f"balances:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
+        cache_key = (
+            f"balances:{safe_address}:{only_trusted}:{exclude_spam}:"
+            f"{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
+        )
         if balances := django_cache.get(cache_key):
             return balances
         else:
@@ -258,9 +271,9 @@ class BalanceService:
             logger.warning("Cannot get network ether price", exc_info=True)
             eth_price = 0
         balances_with_usd = []
-        token_addresses = [balance.token_address for balance in balances]
+        price_token_addresses = [balance.get_price_address() for balance in balances]
         token_eth_values_with_timestamp = (
-            self.price_service.get_cached_token_eth_values(token_addresses)
+            self.price_service.get_cached_token_eth_values(price_token_addresses)
         )
         for balance, token_eth_value_with_timestamp in zip(
             balances, token_eth_values_with_timestamp
