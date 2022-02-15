@@ -54,18 +54,20 @@ class Erc20InfoWithLogo:
             token.get_full_logo_uri(),
         )
 
-    def get_price_address(self) -> ChecksumAddress:
-        """
-        :return: Address to use to retrieve the token price
-        """
-        return self.copy_price or self.address
-
 
 @dataclass
 class Balance:
     token_address: Optional[ChecksumAddress]  # For ether, `token_address` is `None`
     token: Optional[Erc20InfoWithLogo]
     balance: int
+
+    def get_price_address(self) -> ChecksumAddress:
+        """
+        :return: Address to use to retrieve the token price
+        """
+        if self.token and self.token.copy_price:
+            return self.token.copy_price
+        return self.token_address
 
 
 @dataclass
@@ -269,9 +271,7 @@ class BalanceService:
             logger.warning("Cannot get network ether price", exc_info=True)
             eth_price = 0
         balances_with_usd = []
-        price_token_addresses = [
-            balance.token.get_price_address() for balance in balances
-        ]
+        price_token_addresses = [balance.get_price_address() for balance in balances]
         token_eth_values_with_timestamp = (
             self.price_service.get_cached_token_eth_values(price_token_addresses)
         )
