@@ -19,9 +19,14 @@ class ContractView(RetrieveAPIView):
         if not (response := django_cache.get(cache_key)):
             response = super().get(request, address, *args, **kwargs)
             response.add_post_render_callback(
-                lambda r: django_cache.set(
-                    cache_key, r, timeout=60 * 60
-                )  # Cache 1 hour
+                lambda r: (
+                    django_cache.set(
+                        cache_key, response, timeout=60 * 60
+                    ),  # Cache 1 hour:
+                    r,
+                )[
+                    1
+                ]  # Return r, if not redis has issues
             )
         return response
 
