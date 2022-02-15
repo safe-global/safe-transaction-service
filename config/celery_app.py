@@ -26,7 +26,7 @@ def on_celery_setup_logging(**kwargs):
 
 
 # set the default Django settings module for the 'celery' program.
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 
 app = Celery("safe_transaction_service")
 
