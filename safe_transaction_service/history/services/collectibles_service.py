@@ -118,8 +118,8 @@ class CollectibleWithMetadata(Collectible):
         for key, value in self.metadata.items():
             if (
                 key.lower().startswith("image")
-                and isinstance(self.metadata[key], str)
-                and self.metadata[key].startswith("http")
+                and isinstance(value, str)
+                and value.startswith("http")
             ):
                 return self.metadata[key]
 
@@ -363,7 +363,7 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return:
         """
-        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = dict()
+        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = {}
         collectibles = self.get_collectibles(
             safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
         )

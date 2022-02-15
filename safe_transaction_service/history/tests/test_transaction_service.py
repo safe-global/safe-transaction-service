@@ -201,7 +201,7 @@ class TestTransactionService(TestCase):
 
         # Test sorting
         queryset = transaction_service.get_all_tx_hashes(safe_address)
-        tx_hashes = list([q["safe_tx_hash"] for q in queryset])
+        tx_hashes = [q["safe_tx_hash"] for q in queryset]
         transactions = transaction_service.get_all_txs_from_hashes(
             safe_address, tx_hashes
         )
@@ -234,7 +234,7 @@ class TestTransactionService(TestCase):
         queryset = transaction_service.get_all_tx_hashes(
             safe_address, queued=False, trusted=False
         )
-        all_tx_hashes = list([q["safe_tx_hash"] for q in queryset])
+        all_tx_hashes = [q["safe_tx_hash"] for q in queryset]
 
         self.assertEqual(len(self.transaction_service.redis.keys("*")), 0)
         all_txs = transaction_service.get_all_txs_from_hashes(
@@ -281,7 +281,7 @@ class TestTransactionService(TestCase):
         queryset_2 = transaction_service.get_all_tx_hashes(
             safe_address, queued=False, trusted=False
         )
-        all_tx_hashes_2 = list([q["safe_tx_hash"] for q in queryset_2])
+        all_tx_hashes_2 = [q["safe_tx_hash"] for q in queryset_2]
 
         all_txs_2 = transaction_service.get_all_txs_from_hashes(
             safe_address, all_tx_hashes_2

@@ -274,7 +274,7 @@ class EthereumTxManager(models.Manager):
             gas_price=gas_price,
             gas_used=tx_receipt and tx_receipt["gasUsed"],
             logs=tx_receipt
-            and [clean_receipt_log(log) for log in tx_receipt.get("logs", list())],
+            and [clean_receipt_log(log) for log in tx_receipt.get("logs", [])],
             status=tx_receipt and tx_receipt.get("status"),
             transaction_index=tx_receipt and tx_receipt["transactionIndex"],
             data=data if data else None,
@@ -330,9 +330,7 @@ class EthereumTx(TimeStampedModel):
         if self.block is None:
             self.block = ethereum_block
             self.gas_used = tx_receipt["gasUsed"]
-            self.logs = [
-                clean_receipt_log(log) for log in tx_receipt.get("logs", list())
-            ]
+            self.logs = [clean_receipt_log(log) for log in tx_receipt.get("logs", [])]
             self.status = tx_receipt.get("status")
             self.transaction_index = tx_receipt["transactionIndex"]
             return self.save(

@@ -126,8 +126,7 @@ def get_db_tx_decoder() -> "DbTxDecoder":
         # http://www.gevent.org/api/gevent.threadpool.html
         pool = gevent.get_hub().threadpool
         return pool.spawn(_get_db_tx_decoder).get()
-    else:
-        return _get_db_tx_decoder()
+    return _get_db_tx_decoder()
 
 
 def is_db_tx_decoder_loaded() -> bool:
