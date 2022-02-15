@@ -379,8 +379,9 @@ class CollectiblesService:
                 except MetadataRetrievalException:
                     metadata = {}
                     logger.warning(
-                        f"Cannot retrieve token-uri={collectible.uri} "
-                        f"for token-address={collectible.address}"
+                        "Cannot retrieve token-uri=%s for token-address=%s",
+                        collectible.uri,
+                        collectible.address,
                     )
 
                 collectibles_with_metadata[
