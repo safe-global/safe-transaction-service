@@ -13,6 +13,8 @@ from django.utils.translation import gettext_lazy as _
 
 from botocore.exceptions import ClientError
 from cachetools import TTLCache, cachedmethod
+from imagekit.models import ProcessedImageField
+from pilkit.processors import Resize
 from web3 import Web3
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
@@ -158,11 +160,13 @@ class Contract(models.Model):  # Known contract addresses by the service
     address = EthereumAddressV2Field(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default="")
     display_name = models.CharField(max_length=200, blank=True, default="")
-    logo = models.ImageField(
+    logo = ProcessedImageField(
         blank=True,
         default="",
         upload_to=get_contract_logo_path,
         storage=get_file_storage,
+        format="PNG",
+        processors=[Resize(256, 256, upscale=False)],
     )
     contract_abi = models.ForeignKey(
         ContractAbi,

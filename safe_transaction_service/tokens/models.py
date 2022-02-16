@@ -11,6 +11,8 @@ from django.db.models import Q
 
 from botocore.exceptions import ClientError
 from eth_typing import ChecksumAddress
+from imagekit.models import ProcessedImageField
+from pilkit.processors import Resize
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
 from gnosis.eth.django.models import EthereumAddressV2Field
@@ -184,11 +186,13 @@ class Token(models.Model):
         blank=True,
         help_text="Number of decimals. For ERC721 tokens decimals must be `None`",
     )
-    logo = models.ImageField(
+    logo = ProcessedImageField(
         blank=True,
         default="",
         upload_to=get_token_logo_path,
         storage=get_file_storage,
+        format="PNG",
+        processors=[Resize(256, 256, upscale=False)],
     )
     events_bugged = models.BooleanField(
         default=False,
