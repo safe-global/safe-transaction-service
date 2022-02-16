@@ -138,13 +138,12 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         fiat_price_with_timestamp = FiatPriceWithTimestamp(
             48.1516, FiatCode.USD, timezone.now()
         )
-        fiat_price_with_timestamp_iterator = iter([fiat_price_with_timestamp])
         with mock.patch.object(
             PriceService,
             "get_cached_usd_values",
             autospec=True,
-            return_value=fiat_price_with_timestamp_iterator,
-        ):
+            return_value=iter([fiat_price_with_timestamp]),
+        ) as get_cached_usd_values_mock:
             response = self.client.get(
                 reverse("v1:tokens:price-usd", args=(token.address,))
             )
@@ -154,6 +153,26 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                 response.data["fiat_price"], str(fiat_price_with_timestamp.fiat_price)
             )
             self.assertTrue(response.data["timestamp"])
+            self.assertEqual(
+                get_cached_usd_values_mock.call_args.args[1], [token.address]
+            )
+
+            # Test copy price address
+            get_cached_usd_values_mock.return_value = iter([fiat_price_with_timestamp])
+            token.copy_price = Account.create().address
+            token.save(update_fields=["copy_price"])
+            response = self.client.get(
+                reverse("v1:tokens:price-usd", args=(token.address,))
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["fiat_code"], "USD")
+            self.assertEqual(
+                response.data["fiat_price"], str(fiat_price_with_timestamp.fiat_price)
+            )
+            self.assertTrue(response.data["timestamp"])
+            self.assertEqual(
+                get_cached_usd_values_mock.call_args.args[1], [token.copy_price]
+            )
 
     @mock.patch.object(
         PriceService, "get_native_coin_usd_price", return_value=321.2, autospec=True
