@@ -514,7 +514,7 @@ def swagger_safe_balance_schema(serializer_class):
     )
 
 
-class SafeBalanceView(APIView):
+class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
 
     def get_parameters(self) -> Tuple[bool, bool]:
@@ -557,7 +557,7 @@ class SafeBalanceView(APIView):
             safe_balances = self.get_result(
                 address, only_trusted=only_trusted, exclude_spam=exclude_spam
             )
-            serializer = self.serializer_class(safe_balances, many=True)
+            serializer = self.get_serializer(safe_balances, many=True)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
@@ -774,7 +774,7 @@ class DelegateListView(ListCreateAPIView):
         return super().post(request, **kwargs)
 
 
-class DelegateDeleteView(APIView):
+class DelegateDeleteView(GenericAPIView):
     serializer_class = serializers.DelegateDeleteSerializer
 
     @swagger_auto_schema(
@@ -803,7 +803,7 @@ class DelegateDeleteView(APIView):
             )
 
         request.data["delegate"] = delegate_address
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         deleted, _ = SafeContractDelegate.objects.filter(
             delegate=serializer.validated_data["delegate"],
@@ -922,7 +922,7 @@ class SafeIncomingTransferListView(SafeTransferListView):
         )
 
 
-class SafeCreationView(APIView):
+class SafeCreationView(GenericAPIView):
     serializer_class = serializers.SafeCreationInfoResponseSerializer
 
     @swagger_auto_schema(
@@ -953,11 +953,11 @@ class SafeCreationView(APIView):
         if not safe_creation_info:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.serializer_class(safe_creation_info)
+        serializer = self.get_serializer(safe_creation_info)
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeInfoView(APIView):
+class SafeInfoView(GenericAPIView):
     serializer_class = serializers.SafeInfoResponseSerializer
 
     @swagger_auto_schema(
@@ -986,7 +986,7 @@ class SafeInfoView(APIView):
 
         try:
             safe_info = SafeServiceProvider().get_safe_info(address)
-            serializer = self.serializer_class(safe_info)
+            serializer = self.get_serializer(safe_info)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
         except CannotGetSafeInfo:
             return Response(
@@ -1005,7 +1005,7 @@ class MasterCopiesView(ListAPIView):
     pagination_class = None
 
 
-class OwnersView(APIView):
+class OwnersView(GenericAPIView):
     serializer_class = serializers.OwnerResponseSerializer
 
     @swagger_auto_schema(
@@ -1030,7 +1030,7 @@ class OwnersView(APIView):
             )
 
         safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
-        serializer = self.serializer_class(data={"safes": safes_for_owner})
+        serializer = self.get_serializer(data={"safes": safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
@@ -1047,7 +1047,10 @@ class DataDecoderView(GenericAPIView):
     )
     def post(self, request, format=None):
         """
-        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
+        Returns decoded information using tx service internal ABI information given the tx
+        data as a `0x` prefixed hexadecimal string.
+        If address of the receiving contract is provided decoded data will be more accurate,
+        as in case of ABI collision service will know which ABI to use.
         """
 
         serializer = self.get_serializer(data=request.data)

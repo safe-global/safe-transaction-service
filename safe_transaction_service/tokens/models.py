@@ -11,6 +11,8 @@ from django.db.models import Q
 
 from botocore.exceptions import ClientError
 from eth_typing import ChecksumAddress
+from imagekit.models import ProcessedImageField
+from pilkit.processors import Resize
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
 from gnosis.eth.django.models import EthereumAddressV2Field
@@ -179,20 +181,32 @@ class Token(models.Model):
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
     decimals = models.PositiveSmallIntegerField(
-        db_index=True, null=True, blank=True
-    )  # For ERC721 tokens `decimals=None`
-    logo = models.ImageField(
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text="Number of decimals. For ERC721 tokens decimals must be `None`",
+    )
+    logo = ProcessedImageField(
         blank=True,
         default="",
         upload_to=get_token_logo_path,
         storage=get_file_storage,
+        format="PNG",
+        processors=[Resize(256, 256, upscale=False)],
     )
     events_bugged = models.BooleanField(
-        default=False
-    )  # If `True` token does not send `Transfer` event sometimes,
-    # like `WETH` on minting
-    spam = models.BooleanField(default=False)  # Spam and trusted cannot be both True
-    trusted = models.BooleanField(default=False)
+        default=False,
+        help_text="Set `True` if token does not send `Transfer` event sometimes (e.g. WETH on minting)",
+    )
+    spam = models.BooleanField(
+        default=False, help_text="Spam and trusted cannot be both True"
+    )
+    trusted = models.BooleanField(
+        default=False, help_text="Spam and trusted cannot be both True"
+    )
+    copy_price = EthereumAddressV2Field(
+        null=True, help_text="If provided, copy the price from the token"
+    )
 
     class Meta:
         indexes = [
@@ -249,3 +263,9 @@ class Token(models.Model):
                     self, self.address + settings.TOKENS_LOGO_EXTENSION
                 ),
             )
+
+    def get_price_address(self) -> ChecksumAddress:
+        """
+        :return: Address to use to retrieve the token price
+        """
+        return self.copy_price or self.address

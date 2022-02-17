@@ -6,9 +6,8 @@ from django.views.decorators.cache import cache_page
 import django_filters.rest_framework
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
@@ -62,7 +61,7 @@ class TokensView(ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class TokenPriceView(APIView):
+class TokenPriceView(GenericAPIView):
     serializer_class = serializers.TokenPriceResponseSerializer
     lookup_field = "address"
     queryset = Token.objects.all()
@@ -87,11 +86,12 @@ class TokenPriceView(APIView):
                 "fiat_price": str(price_service.get_native_coin_usd_price()),
                 "timestamp": timezone.now(),
             }
-        elif not Token.objects.filter(address=address).exists():
-            raise Http404
         else:
+            token = self.get_object()  # Raises 404 if not found
             fiat_price_with_timestamp = next(
-                PriceServiceProvider().get_cached_usd_values([address])
+                PriceServiceProvider().get_cached_usd_values(
+                    [token.get_price_address()]
+                )
             )
             data = {
                 "fiat_code": fiat_price_with_timestamp.fiat_code.name,
@@ -99,6 +99,6 @@ class TokenPriceView(APIView):
                 "timestamp": fiat_price_with_timestamp.timestamp,
             }
 
-        serializer = self.serializer_class(data=data)
+        serializer = self.get_serializer(data=data)
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
