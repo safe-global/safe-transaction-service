@@ -48,6 +48,7 @@ class IndexServiceProvider:
                 EthereumClientProvider(),
                 settings.ETH_REORG_BLOCKS,
                 settings.ETH_L2_NETWORK,
+                settings.ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD,
             )
         return cls.instance
 
@@ -64,10 +65,12 @@ class IndexService:
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
         eth_l2_network: bool,
+        alert_out_of_sync_events_threshold: float,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_l2_network = eth_l2_network
+        self.alert_out_of_sync_events_threshold = alert_out_of_sync_events_threshold
 
     def block_get_or_create_from_block_hash(self, block_hash: int):
         try:
@@ -104,10 +107,15 @@ class IndexService:
             erc20_block_number__lt=reference_block_number
         ).count()
         if out_of_sync_contracts > 0:
-            logger.error(
-                "%d Safe Contracts have ERC20/721 out of sync", out_of_sync_contracts
-            )
-            synced = False
+            total_number_of_contracts = SafeContract.objects.all().count()
+            proportion_out_of_sync = out_of_sync_contracts / total_number_of_contracts
+            # Ignore less than 10% of contracts out of sync
+            if proportion_out_of_sync >= self.alert_out_of_sync_events_threshold:
+                logger.error(
+                    "%d Safe Contracts have ERC20/721 out of sync",
+                    out_of_sync_contracts,
+                )
+                synced = False
 
         return synced
 
