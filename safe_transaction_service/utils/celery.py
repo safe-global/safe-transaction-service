@@ -13,8 +13,8 @@ class PatchedCeleryFormatterOriginal(TaskFormatter):  # pragma: no cover
 
 
 class PatchedCeleryFormatter(ColorFormatter):  # pragma: no cover
-    def __init__(self, fmt=None, datefmt=None, style="%"):
-        super().__init__(fmt=fmt, use_color=True)
+    def __init__(self, fmt=None, datefmt=None, style="%", use_color=False):
+        super().__init__(fmt=fmt, use_color=use_color)
 
     def format(self, record):
         task = get_current_task()
@@ -29,4 +29,4 @@ class PatchedCeleryFormatter(ColorFormatter):  # pragma: no cover
         else:
             record.__dict__.setdefault("task_name", "???")
             record.__dict__.setdefault("task_id", "???")
-        return ColorFormatter.format(self, record)
+        return super().format(record)
