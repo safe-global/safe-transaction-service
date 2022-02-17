@@ -410,6 +410,10 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
         )
     )
 
+# Percentage of Safes allowed to be out of sync without alerting. By default 10%
+ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
+    "ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD", default=0.1
+)
 
 # AWS S3 https://github.com/etianen/django-s3-storage
 # AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
