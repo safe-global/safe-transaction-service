@@ -5,3 +5,5 @@ ipdb
 ipython
 isort
 pre-commit
+pylint
+pylint-django

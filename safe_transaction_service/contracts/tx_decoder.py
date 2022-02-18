@@ -126,8 +126,7 @@ def get_db_tx_decoder() -> "DbTxDecoder":
         # http://www.gevent.org/api/gevent.threadpool.html
         pool = gevent.get_hub().threadpool
         return pool.spawn(_get_db_tx_decoder).get()
-    else:
-        return _get_db_tx_decoder()
+    return _get_db_tx_decoder()
 
 
 def is_db_tx_decoder_loaded() -> bool:
@@ -257,9 +256,11 @@ class SafeTxDecoder:
         :return: True if decoder updated, False otherwise
         """
         updated = False
-        for selector, abi in self._generate_selectors_with_abis_from_abi(abi).items():
+        for selector, new_abi in self._generate_selectors_with_abis_from_abi(
+            abi
+        ).items():
             if selector not in self.fn_selectors_with_abis:
-                self.fn_selectors_with_abis[selector] = abi
+                self.fn_selectors_with_abis[selector] = new_abi
                 updated = True
         return updated
 
@@ -406,9 +407,9 @@ class TxDecoder(SafeTxDecoder):
                 value_decoded
             )  # Return numbers as `str` for json compatibility
         elif isinstance(value_decoded, (list, tuple, set)):
-            value_decoded = list(
-                [self._parse_decoded_arguments(e) for e in value_decoded]
-            )  # Recursive parsing inside sequences
+            value_decoded = [
+                self._parse_decoded_arguments(e) for e in value_decoded
+            ]  # Recursive parsing inside sequences
         return value_decoded
 
     def get_supported_abis(self) -> Iterable[ABIFunction]:

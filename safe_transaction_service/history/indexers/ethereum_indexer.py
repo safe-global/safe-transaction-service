@@ -79,7 +79,6 @@ class EthereumIndexer(ABC):
         """
         :return: Database field for `database_queryset` to store scan status
         """
-        pass
 
     @property
     @abstractmethod
@@ -87,7 +86,6 @@ class EthereumIndexer(ABC):
         """
         :return: Queryset of objects being scanned
         """
-        pass
 
     @abstractmethod
     def find_relevant_elements(
@@ -106,7 +104,6 @@ class EthereumIndexer(ABC):
         :param current_block_number:
         :return: Set of relevant elements
         """
-        pass
 
     def process_element(self, element: Any) -> List[Any]:
         """
@@ -144,7 +141,7 @@ class EthereumIndexer(ABC):
 
         common_minimum_block_number = self.get_minimum_block_number(addresses)
         if common_minimum_block_number is None:  # Empty queryset
-            return
+            return None
 
         from_block_number = common_minimum_block_number + 1
         if (from_block_number + self.block_process_limit) >= (
@@ -266,7 +263,7 @@ class EthereumIndexer(ABC):
         """
         assert addresses, "Addresses cannot be empty!"
         assert all(
-            [Web3.isChecksumAddress(address) for address in addresses]
+            Web3.isChecksumAddress(address) for address in addresses
         ), f"An address has invalid checksum: {addresses}"
 
         current_block_number = (
