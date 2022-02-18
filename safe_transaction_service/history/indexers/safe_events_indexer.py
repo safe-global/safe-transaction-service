@@ -342,6 +342,6 @@ class SafeEventsIndexer(EventsIndexer):
                         decoded_element["transactionHash"].hex(),
                         exc,
                     )
-                    return
+                    return None
 
         return internal_tx

@@ -233,9 +233,9 @@ class PriceService:
         :param token_address:
         :return: Current ether value for a given `token_address`
         """
-        if (
-            token_address == "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-            or token_address == NULL_ADDRESS
+        if token_address in (
+            "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",  # Used by some oracles
+            NULL_ADDRESS,
         ):  # Ether
             return 1.0
 

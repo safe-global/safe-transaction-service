@@ -177,13 +177,14 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx-receipt with tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            elif tx_receipt.get("blockHash") is None:
+
+            if tx_receipt.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx-receipt with "
                     f"tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            else:
-                tx_receipts.append(tx_receipt)
+
+            tx_receipts.append(tx_receipt)
 
         # Get transactions for hashes not in db
         fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
@@ -197,14 +198,15 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            elif tx.get("blockHash") is None:
+
+            if tx.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx with "
                     f"tx-hash={HexBytes(tx_hash).hex()}"
                 )
-            else:
-                block_hashes.add(tx["blockHash"].hex())
-                txs.append(tx)
+
+            block_hashes.add(tx["blockHash"].hex())
+            txs.append(tx)
 
         blocks = self.ethereum_client.get_blocks(block_hashes)
         block_dict = {}
@@ -291,7 +293,7 @@ class IndexService:
         :return: Number of `SafeStatus` deleted
         """
         if not addresses:
-            return
+            return None
 
         return self._reprocess(addresses)
 

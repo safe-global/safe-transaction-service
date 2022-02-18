@@ -10,7 +10,7 @@ from web3 import Web3
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.safe_signature import SafeSignatureType
 
-from ..indexers.tx_processor import SafeTxProcessorProvider
+from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from ..models import (
     InternalTxDecoded,
     ModuleTransaction,
@@ -36,7 +36,7 @@ class TestSafeTxProcessor(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.tx_processor = SafeTxProcessorProvider()
+        cls.tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
 
     @classmethod
     def tearDownClass(cls):

@@ -61,23 +61,24 @@ class EnsClient:
 
         if not r.ok:
             return None
-        else:
-            """Example:
-            {
-                "data": {
-                    "domains": [
-                        {
-                            "labelName": "safe-multisig"
-                        }
-                    ]
-                }
+
+        """
+        Example:
+        {
+            "data": {
+                "domains": [
+                    {
+                        "labelName": "safe-multisig"
+                    }
+                ]
             }
-            """
-            data = r.json()
-            if data:
-                domains = data.get("data", {}).get("domains")
-                if domains:
-                    return domains[0].get("labelName")
+        }
+        """
+        data = r.json()
+        if data:
+            domains = data.get("data", {}).get("domains")
+            if domains:
+                return domains[0].get("labelName")
 
     def query_by_domain_hash(
         self, domain_hash: Union[str, bytes, int]
