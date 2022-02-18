@@ -20,11 +20,11 @@ from .factories import (
     SafeContractFactory,
     SafeMasterCopyFactory,
 )
-from .mocks.mocks_internal_tx_indexer import block_result
+from .mocks.mocks_internal_tx_indexer import block_child, block_parent
 
 
 class TestReorgService(TestCase):
-    @mock.patch.object(EthereumClient, "get_block", return_value=block_result[0])
+    @mock.patch.object(EthereumClient, "get_block")
     @mock.patch.object(
         EthereumClient, "current_block_number", new_callable=PropertyMock
     )
@@ -33,9 +33,17 @@ class TestReorgService(TestCase):
     ):
         reorg_service = ReorgServiceProvider()
 
-        block = block_result[0]
+        block = block_child
         block_number = block["number"]
-        get_block_mock.return_value = block
+
+        def get_block_fn(number: int, full_transactions=False):
+            if number == block_number:
+                return block_child
+
+            if number == block_number + 1:
+                return block_parent
+
+        get_block_mock.side_effect = get_block_fn
         current_block_number = block_number + 100
         current_block_number_mock.return_value = current_block_number
 

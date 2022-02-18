@@ -221,7 +221,7 @@ class EthereumBlockQuerySet(models.QuerySet):
         queryset = self.filter(confirmed=False)
         if to_block_number is not None:
             queryset = queryset.filter(number__lte=to_block_number)
-        return queryset.order_by("number")
+        return queryset
 
 
 class EthereumBlock(models.Model):
