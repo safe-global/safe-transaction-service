@@ -58,14 +58,21 @@ class ReorgService:
         """
         current_block_number = self.ethereum_client.current_block_number
         to_block = current_block_number - self.eth_reorg_blocks
-        for database_block in EthereumBlock.objects.not_confirmed(
-            to_block_number=to_block
-        ).only("number", "block_hash", "confirmed"):
+        for database_block in (
+            EthereumBlock.objects.not_confirmed(to_block_number=to_block)
+            .only("number", "block_hash", "confirmed")
+            .order_by("number")
+        ):
             blockchain_block = self.ethereum_client.get_block(
                 database_block.number, full_transactions=False
             )
-            if HexBytes(blockchain_block["hash"]) == HexBytes(
-                database_block.block_hash
+            blockchain_next_block = self.ethereum_client.get_block(
+                database_block.number + 1, full_transactions=False
+            )
+            if (
+                HexBytes(blockchain_block["hash"])
+                == HexBytes(blockchain_next_block["parentHash"])
+                == HexBytes(database_block.block_hash)
             ):
                 database_block.set_confirmed()
             else:
