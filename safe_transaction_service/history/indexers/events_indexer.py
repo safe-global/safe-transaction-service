@@ -51,7 +51,6 @@ class EventsIndexer(EthereumIndexer):
         """
         :return: Web3 ContractEvent to listen to
         """
-        pass
 
     @cached_property
     def events_to_listen(self) -> Dict[bytes, ContractEvent]:

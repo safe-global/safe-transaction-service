@@ -45,8 +45,7 @@ def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
         return urljoin(
             settings.IPFS_GATEWAY, uri.replace("ipfs://", "", 1)
         )  # Use ipfs gateway
-    else:
-        return uri
+    return uri
 
 
 @dataclass

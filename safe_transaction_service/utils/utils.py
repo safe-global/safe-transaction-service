@@ -30,7 +30,7 @@ def chunks_iterable(iterable: Iterable[Any], n: int) -> Iterable[Iterable[Any]]:
     while True:
         chunk = tuple(islice(it, n))
         if not chunk:
-            return
+            return None
         yield chunk
 
 

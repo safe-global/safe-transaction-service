@@ -55,7 +55,7 @@ def bind_confirmation(
     :return:
     """
     if not created:
-        return
+        return None
 
     if sender == MultisigTransaction:
         updated = (

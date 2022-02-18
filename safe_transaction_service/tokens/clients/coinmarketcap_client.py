@@ -37,7 +37,7 @@ class CoinMarketCapClient:
         with self.http_session.get(url, stream=True) as response:
             if not response.ok:
                 logger.warning("Image not found for url %s", url)
-                return
+                return None
             with open(os.path.join(taget_folder, local_filename), "wb") as f:
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:

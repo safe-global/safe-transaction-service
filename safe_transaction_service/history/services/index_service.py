@@ -285,7 +285,7 @@ class IndexService:
         :return: Number of `SafeStatus` deleted
         """
         if not addresses:
-            return
+            return None
 
         return self._reprocess(addresses)
 
