@@ -428,7 +428,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             logger.warning(
                 "Webhook failed with status-code=%d posting to url=%s with content=%s",
                 r.status_code,
-                full_url,
+                base_url,
                 r.content,
             )
 
