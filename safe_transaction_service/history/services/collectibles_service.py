@@ -121,7 +121,7 @@ class CollectibleWithMetadata(Collectible):
                 and isinstance(value, str)
                 and value.startswith("http")
             ):
-                return self.metadata[key]
+                return value
 
     def __post_init__(self):
         self.name = self.get_name()
@@ -193,14 +193,15 @@ class CollectiblesService:
                     raise MetadataRetrievalException(
                         f"Content-length={content_length} for uri={uri} is too big"
                     )
-                elif "application/json" not in content_type:
+
+                if "application/json" not in content_type:
                     raise MetadataRetrievalException(
                         f"Content-type={content_type} for uri={uri} is not valid, "
                         f'expected "application/json"'
                     )
-                else:
-                    logger.debug("Got metadata for uri=%s", uri)
-                    return response.json()
+
+                logger.debug("Got metadata for uri=%s", uri)
+                return response.json()
         except (IOError, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
 

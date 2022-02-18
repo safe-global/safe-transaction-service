@@ -511,7 +511,8 @@ class ERC721TransferManager(TokenTransferManager):
                 continue
             if erc721_event.to == erc721_event._from:
                 continue  # Nice try ¯\_(ツ)_/¯
-            elif erc721_event.to == address:
+
+            if erc721_event.to == address:
                 list_to_append = tokens_in
             else:
                 list_to_append = tokens_out

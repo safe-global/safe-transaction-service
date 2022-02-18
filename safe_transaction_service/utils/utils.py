@@ -59,8 +59,5 @@ def close_gevent_db_connection_decorator(f):
     return wrapper
 
 
-def parse_boolean_query_param(value: Union[bool, str]) -> bool:
-    if value in (True, "True", "true", "1"):
-        return True
-    else:
-        return False
+def parse_boolean_query_param(value: Union[bool, str, int]) -> bool:
+    return value in (True, "True", "true", "1", 1)
