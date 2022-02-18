@@ -564,6 +564,7 @@ class WebHookAdmin(BinarySearchAdmin):
     list_display = (
         "pk",
         "url",
+        "authorization",
         "address",
         "pending_outgoing_transaction",
         "new_confirmation",

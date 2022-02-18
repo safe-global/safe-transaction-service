@@ -323,3 +323,4 @@ class WebHookFactory(DjangoModelFactory):
     pending_outgoing_transaction = True
     new_executed_outgoing_transaction = True
     new_incoming_transaction = True
+    authorization = None

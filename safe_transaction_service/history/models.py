@@ -1638,6 +1638,12 @@ class WebHook(models.Model):
     objects = WebHookQuerySet.as_manager()
     address = EthereumAddressV2Field(db_index=True, null=True, blank=True)
     url = models.URLField()
+    authorization = models.CharField(
+        max_length=500,
+        null=True,
+        default=None,
+        help_text="Set HTTP Authorization header with the value",
+    )
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)
     pending_outgoing_transaction = models.BooleanField(default=True)

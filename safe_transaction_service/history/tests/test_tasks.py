@@ -15,6 +15,7 @@ from ..services import IndexService
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
+    get_webhook_http_session,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -113,6 +114,14 @@ class TestTasks(TestCase):
         # 3 webhooks: INCOMING_ETHER for Webhook with `to`, and then `INCOMING_ETHER` and `OUTGOING_ETHER`
         # for the WebHook without address set
         self.assertEqual(mock_post.call_count, 3)
+
+    def test_get_webhook_http_session(self):
+        session = get_webhook_http_session("http://random-url", None)
+        self.assertNotIn("Authorization", session.headers)
+
+        secret_token = "IDDQD"
+        session = get_webhook_http_session("http://random-url", secret_token)
+        self.assertEqual(session.headers["Authorization"], secret_token)
 
     def test_process_decoded_internal_txs_task(self):
         owner = Account.create().address
