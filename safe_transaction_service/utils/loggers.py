@@ -53,6 +53,20 @@ class LoggingMiddleware:
                 request.resolver_match.route if request.resolver_match else request.path
             )
             delta = get_milliseconds_now() - milliseconds
+            from safe_transaction_service.prometheus.metrics import get_metrics
+
+            prometheus_metrics = get_metrics()
+            prometheus_metrics.http_requests_total.labels(
+                method=request.method,
+                route=route,
+                path=request.path,
+                status=response.status_code,
+            ).inc()
+            prometheus_metrics.http_request_duration_seconds.labels(
+                method=request.method, route=route, path=request.path
+            ).observe(
+                delta / 1000
+            )  # Use seconds
             self.logger.info(
                 "MT::%s::%s::%s::%d::%s",
                 request.method,

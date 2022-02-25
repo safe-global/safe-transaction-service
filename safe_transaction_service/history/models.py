@@ -1155,6 +1155,9 @@ class MultisigTransactionQuerySet(models.QuerySet):
             .filter(nonce__gt=F("max_executed_nonce"), safe=safe_address)
         )
 
+    def trusted(self):
+        return self.filter(trusted=True)
+
 
 class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
@@ -1183,7 +1186,7 @@ class MultisigTransaction(TimeStampedModel):
     nonce = Uint256Field(db_index=True)
     failed = models.BooleanField(null=True, default=None, db_index=True)
     origin = models.CharField(
-        null=True, default=None, max_length=200
+        null=True, default=None, max_length=200, db_index=True
     )  # To store arbitrary data on the tx
     trusted = models.BooleanField(
         default=False, db_index=True

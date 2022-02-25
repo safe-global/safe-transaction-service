@@ -62,6 +62,10 @@ urlpatterns_v1 = [
 urlpatterns = swagger_urlpatterns + [
     path(settings.ADMIN_URL, admin.site.urls),
     path("api/v1/", include((urlpatterns_v1, "v1"))),
+    path(
+        "metrics/",
+        include("safe_transaction_service.prometheus.urls", namespace="prometheus"),
+    ),
     path("check/", lambda request: HttpResponse("Ok"), name="check"),
 ]
 

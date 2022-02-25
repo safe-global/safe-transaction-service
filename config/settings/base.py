@@ -89,6 +89,7 @@ LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
     "safe_transaction_service.notifications.apps.NotificationsConfig",
+    "safe_transaction_service.prometheus.apps.PrometheusConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
