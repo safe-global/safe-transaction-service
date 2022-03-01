@@ -15,7 +15,8 @@ class TokenAdmin(BinarySearchAdmin):
         "name",
         "symbol",
         "decimals",
+        "copy_price",
     )
     list_filter = ("trusted", "spam", "events_bugged", "decimals", HasLogoFilterAdmin)
     ordering = ("address",)
-    search_fields = ["=address", "symbol", "name"]
+    search_fields = ["=address", "symbol", "name", "=copy_price"]

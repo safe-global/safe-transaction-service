@@ -120,7 +120,8 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                         raise ValidationError(
                             f"Signature for owner={owner} is duplicated"
                         )
-                    elif owner not in valid_owners:
+
+                    if owner not in valid_owners:
                         owners_without_safe.append(owner)
                         # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
                         #                       f'Expected hash to sign {hash_to_sign.hex()}')

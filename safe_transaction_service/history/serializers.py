@@ -351,7 +351,8 @@ class DelegateSignatureCheckerMixin:
         safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
         if not safe_signatures:
             raise ValidationError("Signature is not valid")
-        elif len(safe_signatures) > 1:
+
+        if len(safe_signatures) > 1:
             raise ValidationError(
                 "More than one signatures detected, just one is expected"
             )
@@ -915,7 +916,8 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         safe_signatures = SafeSignature.parse_signature(signature, operation_hash)
         if not safe_signatures:
             raise ValidationError("Signature is not valid")
-        elif len(safe_signatures) > 1:
+
+        if len(safe_signatures) > 1:
             raise ValidationError(
                 "More than one signatures detected, just one is expected"
             )

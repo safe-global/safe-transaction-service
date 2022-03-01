@@ -364,9 +364,13 @@ def process_decoded_internal_txs_for_safe_task(
 
 
 @cache
-def get_webhook_http_session(webhook_url: str) -> requests.Session:
+def get_webhook_http_session(
+    webhook_url: str, authorization: Optional[str]
+) -> requests.Session:
     logger.debug("Getting http session for url=%s", webhook_url)
     session = requests.Session()
+    if authorization:
+        session.headers.update({"Authorization": authorization})
     adapter = requests.adapters.HTTPAdapter(
         pool_connections=1,  # Doing all the connections to the same url
         pool_maxsize=100,  # Number of concurrent connections
@@ -417,7 +421,9 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
                 "Sending webhook for base-url=%s and payload=%s", base_url, payload
             )
 
-        r = get_webhook_http_session(full_url).post(full_url, json=payload)
+        r = get_webhook_http_session(full_url, webhook.authorization).post(
+            full_url, json=payload
+        )
         if r.ok:
             logger.info(
                 "Webhook for base-url=%s and payload=%s was sent successfully",
@@ -428,7 +434,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             logger.warning(
                 "Webhook failed with status-code=%d posting to url=%s with content=%s",
                 r.status_code,
-                full_url,
+                base_url,
                 r.content,
             )
 

@@ -22,7 +22,7 @@ class FirebaseDeviceFactory(DjangoModelFactory):
     def safes(self, create, extracted, **kwargs):
         if not create:
             # Simple build, do nothing.
-            return
+            return None
 
         if extracted:
             # A list of groups were passed in, use them

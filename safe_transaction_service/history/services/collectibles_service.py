@@ -45,8 +45,7 @@ def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
         return urljoin(
             settings.IPFS_GATEWAY, uri.replace("ipfs://", "", 1)
         )  # Use ipfs gateway
-    else:
-        return uri
+    return uri
 
 
 @dataclass
@@ -118,10 +117,10 @@ class CollectibleWithMetadata(Collectible):
         for key, value in self.metadata.items():
             if (
                 key.lower().startswith("image")
-                and isinstance(self.metadata[key], str)
-                and self.metadata[key].startswith("http")
+                and isinstance(value, str)
+                and value.startswith("http")
             ):
-                return self.metadata[key]
+                return value
 
     def __post_init__(self):
         self.name = self.get_name()
@@ -193,14 +192,15 @@ class CollectiblesService:
                     raise MetadataRetrievalException(
                         f"Content-length={content_length} for uri={uri} is too big"
                     )
-                elif "application/json" not in content_type:
+
+                if "application/json" not in content_type:
                     raise MetadataRetrievalException(
                         f"Content-type={content_type} for uri={uri} is not valid, "
                         f'expected "application/json"'
                     )
-                else:
-                    logger.debug("Got metadata for uri=%s", uri)
-                    return response.json()
+
+                logger.debug("Got metadata for uri=%s", uri)
+                return response.json()
         except (IOError, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
 
@@ -363,7 +363,7 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return:
         """
-        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = dict()
+        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = {}
         collectibles = self.get_collectibles(
             safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
         )
@@ -379,8 +379,9 @@ class CollectiblesService:
                 except MetadataRetrievalException:
                     metadata = {}
                     logger.warning(
-                        f"Cannot retrieve token-uri={collectible.uri} "
-                        f"for token-address={collectible.address}"
+                        "Cannot retrieve token-uri=%s for token-address=%s",
+                        collectible.uri,
+                        collectible.address,
                     )
 
                 collectibles_with_metadata[

@@ -221,7 +221,7 @@ class EthereumBlockQuerySet(models.QuerySet):
         queryset = self.filter(confirmed=False)
         if to_block_number is not None:
             queryset = queryset.filter(number__lte=to_block_number)
-        return queryset.order_by("number")
+        return queryset
 
 
 class EthereumBlock(models.Model):
@@ -274,7 +274,7 @@ class EthereumTxManager(models.Manager):
             gas_price=gas_price,
             gas_used=tx_receipt and tx_receipt["gasUsed"],
             logs=tx_receipt
-            and [clean_receipt_log(log) for log in tx_receipt.get("logs", list())],
+            and [clean_receipt_log(log) for log in tx_receipt.get("logs", [])],
             status=tx_receipt and tx_receipt.get("status"),
             transaction_index=tx_receipt and tx_receipt["transactionIndex"],
             data=data if data else None,
@@ -330,9 +330,7 @@ class EthereumTx(TimeStampedModel):
         if self.block is None:
             self.block = ethereum_block
             self.gas_used = tx_receipt["gasUsed"]
-            self.logs = [
-                clean_receipt_log(log) for log in tx_receipt.get("logs", list())
-            ]
+            self.logs = [clean_receipt_log(log) for log in tx_receipt.get("logs", [])]
             self.status = tx_receipt.get("status")
             self.transaction_index = tx_receipt["transactionIndex"]
             return self.save(
@@ -513,7 +511,8 @@ class ERC721TransferManager(TokenTransferManager):
                 continue
             if erc721_event.to == erc721_event._from:
                 continue  # Nice try ¯\_(ツ)_/¯
-            elif erc721_event.to == address:
+
+            if erc721_event.to == address:
                 list_to_append = tokens_in
             else:
                 list_to_append = tokens_out
@@ -1638,6 +1637,12 @@ class WebHook(models.Model):
     objects = WebHookQuerySet.as_manager()
     address = EthereumAddressV2Field(db_index=True, null=True, blank=True)
     url = models.URLField()
+    authorization = models.CharField(
+        max_length=500,
+        null=True,
+        default=None,
+        help_text="Set HTTP Authorization header with the value",
+    )
     # Configurable webhook types to listen to
     new_confirmation = models.BooleanField(default=True)
     pending_outgoing_transaction = models.BooleanField(default=True)

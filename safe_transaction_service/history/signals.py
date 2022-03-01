@@ -55,7 +55,7 @@ def bind_confirmation(
     :return:
     """
     if not created:
-        return
+        return None
 
     if sender == MultisigTransaction:
         updated = (
@@ -139,7 +139,7 @@ def build_webhook_payload(
         outgoing_payload["type"] = WebHookType.OUTGOING_ETHER.name
         outgoing_payload["address"] = instance._from
         payloads = [incoming_payload, outgoing_payload]
-    elif sender == ERC20Transfer or sender == ERC721Transfer:
+    elif sender in (ERC20Transfer, ERC721Transfer):
         # INCOMING_TOKEN / OUTGOING_TOKEN
         incoming_payload = {
             "address": instance.to,
