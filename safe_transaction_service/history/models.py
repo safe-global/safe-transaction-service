@@ -407,17 +407,25 @@ class TokenTransfer(models.Model):
                 f"Not supported EventData, topic {topic.hex()} does not match expected {expected_topic.hex()}"
             )
 
-        return {
-            "timestamp": EthereumBlock.objects.get_timestamp_by_hash(
+        try:
+            timestamp = EthereumBlock.objects.get_timestamp_by_hash(
                 event_data["blockHash"]
-            ),
-            "block_number": event_data["blockNumber"],
-            "ethereum_tx_id": event_data["transactionHash"],
-            "log_index": event_data["logIndex"],
-            "address": event_data["address"],
-            "_from": event_data["args"]["from"],
-            "to": event_data["args"]["to"],
-        }
+            )
+            return {
+                "timestamp": timestamp,
+                "block_number": event_data["blockNumber"],
+                "ethereum_tx_id": event_data["transactionHash"],
+                "log_index": event_data["logIndex"],
+                "address": event_data["address"],
+                "_from": event_data["args"]["from"],
+                "to": event_data["args"]["to"],
+            }
+        except EthereumBlock.DoesNotExist:
+            # Block is not found and should be present on DB. Reorg
+            EthereumTx.objects.get(
+                event_data["transactionHash"]
+            ).block.set_not_confirmed()
+            raise
 
     @classmethod
     def from_decoded_event(cls, event_data: EventData):
