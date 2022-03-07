@@ -259,6 +259,15 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         safe_tx_hash = self.validated_data["contract_transaction_hash"]
         origin = self.validated_data["origin"]
         trusted = self.validated_data["trusted"]
+        if not trusted:
+            # Check user permission
+            if (
+                self.context
+                and (request := self.context.get("request"))
+                and (user := request.user)
+            ):
+                trusted = user.has_perm("history.create_trusted")
+
         multisig_transaction, created = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,
             defaults={
