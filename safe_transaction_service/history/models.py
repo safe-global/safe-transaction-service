@@ -1197,6 +1197,11 @@ class MultisigTransaction(TimeStampedModel):
         default=False, db_index=True
     )  # Txs proposed by a delegate or with one confirmation
 
+    class Meta:
+        permissions = [
+            ("create_trusted", "Can create trusted transactions"),
+        ]
+
     def __str__(self):
         return f"{self.safe} - {self.nonce} - {self.safe_tx_hash}"
 
