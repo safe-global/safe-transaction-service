@@ -13,7 +13,8 @@ from ..clients.zerion_client import (
     ZerionPoolMetadata,
     ZerionUniswapV2TokenAdapterClient,
 )
-from ..models import Token
+from ..models import Token, TokenManager
+from ..models import logger as token_model_logger
 from .factories import TokenFactory
 
 
@@ -157,3 +158,62 @@ class TestModels(TestCase):
         token = Token.objects.get(address="0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413")
         self.assertEqual(token.name, "�������������������������������\x01")
         self.assertEqual(token.symbol, "�������������������������������\x01")
+
+    @mock.patch.object(
+        Erc20Manager,
+        "get_info",
+        autospec=True,
+        return_value=Erc20Info(
+            name="Build\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            symbol="Build\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            decimals=0,
+        ),
+    )
+    def test_create_from_blockchain_with_string_null_data(self, get_info: MagicMock):
+        Token.objects.create_from_blockchain(
+            "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
+        )
+
+        token = Token.objects.get(address="0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413")
+        self.assertEqual(token.name, "Build�������������������������")
+        self.assertEqual(token.symbol, "Build���������")
+
+    @mock.patch.object(
+        Erc20Manager,
+        "get_info",
+        autospec=True,
+        return_value=Erc20Info(
+            name="",
+            symbol="SYMBOL",
+            decimals=15,
+        ),
+    )
+    def test_create_from_blockchain_with_empty_name(self, get_info: MagicMock):
+        self.assertIsNone(
+            Token.objects.create_from_blockchain(
+                "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
+            )
+        )
+
+    @mock.patch.object(TokenManager, "create", side_effect=ValueError)
+    @mock.patch.object(
+        Erc20Manager,
+        "get_info",
+        autospec=True,
+        return_value=Erc20Info(
+            name="PESETA",
+            symbol="PTA",
+            decimals=18,
+        ),
+    )
+    def test_create_from_blockchain_error(self, get_info: MagicMock, create: MagicMock):
+        with self.assertLogs(token_model_logger, level="ERROR") as cm:
+            self.assertIsNone(
+                Token.objects.create_from_blockchain(
+                    "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
+                )
+            )
+            self.assertIn(
+                "Problem creating token with address=0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413 name=PESETA symbol=PTA decimals=18",
+                cm.output[0],
+            )
