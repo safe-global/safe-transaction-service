@@ -224,7 +224,7 @@ class Token(models.Model):
         default=False, help_text="Spam and trusted cannot be both True"
     )
     copy_price = EthereumAddressV2Field(
-        null=True, help_text="If provided, copy the price from the token"
+        null=True, blank=True, help_text="If provided, copy the price from the token"
     )
 
     class Meta:
