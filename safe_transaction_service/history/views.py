@@ -1014,7 +1014,7 @@ class OwnersView(GenericAPIView):
             422: "Owner address checksum not valid",
         }
     )
-    @method_decorator(cache_page(60 * 60))  # 1 hour
+    @method_decorator(cache_page(settings.CACHE_OWNERS_VIEW_SECONDS))
     def get(self, request, address, *args, **kwargs):
         """
         Return Safes where the address provided is an owner
