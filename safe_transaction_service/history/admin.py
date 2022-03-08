@@ -95,7 +95,10 @@ class EthereumBlockAdmin(admin.ModelAdmin):
         "block_hash",
     )
     list_filter = ("confirmed",)
-    search_fields = ["number"]
+    search_fields = [
+        "number",
+        "=block_hash",
+    ]
     ordering = ["-number"]
 
 
