@@ -507,6 +507,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["transaction_hash"], multisig_tx.ethereum_tx.tx_hash
         )
         self.assertEqual(response.data["origin"], multisig_tx.origin)
+        self.assertFalse(response.data["trusted"])
         self.assertEqual(
             response.data["data_decoded"],
             {
@@ -846,6 +847,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["results"][0]["confirmations"][0]["signature"],
             data["signature"],
         )
+        self.assertTrue(response.data["results"][0]["trusted"])
 
         # Sign with a different user that sender
         random_user_account = Account.create()

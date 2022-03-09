@@ -570,6 +570,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
+    trusted = serializers.BooleanField()
     signatures = HexadecimalField(allow_null=True, required=False)
 
     def get_block_number(self, obj: MultisigTransaction) -> Optional[int]:
