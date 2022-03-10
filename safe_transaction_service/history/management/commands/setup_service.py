@@ -251,10 +251,10 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0x69f4D1788e39c87893C980c06EdF4b7f686e2938", 61768, "1.3.0"),
     ],
     EthereumNetwork.SHYFT: [
-        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 1000),  # v1.3.0
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 1000, "1.3.0+L2"),  # v1.3.0
     ],
     EthereumNetwork.SHYFT_TESTNET: [
-        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 2000000),  # v1.3.0
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 2000000, "1.3.0+L2"),  # v1.3.0
     ],
 }
 
