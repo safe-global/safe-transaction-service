@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ev 
+set -ev
 
 curl -s --output /dev/null --write-out "%{http_code}" \
     -H "Content-Type: application/json" \
