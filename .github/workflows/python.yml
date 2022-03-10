@@ -112,7 +112,7 @@ jobs:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/')
     steps:
     - uses: actions/checkout@v2
-    - name: Deploy Mainnet
+    - name: Deploy Staging
       if: github.ref == 'refs/heads/master'
       run: bash scripts/autodeploy.sh
       env:
