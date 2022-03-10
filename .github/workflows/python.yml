@@ -118,7 +118,7 @@ jobs:
       env:
         AUTODEPLOY_URL: ${{ secrets.AUTODEPLOY_URL }}
         AUTODEPLOY_TOKEN: ${{ secrets.AUTODEPLOY_TOKEN }}
-        TARGET_BRANCH: "master"
+        TARGET_BRANCH: "staging"
     - name: Deploy Develop
       if: github.ref == 'refs/heads/develop'
       run: bash scripts/autodeploy.sh
