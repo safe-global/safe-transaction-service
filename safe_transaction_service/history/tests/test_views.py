@@ -2033,7 +2033,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Test previous otp
         hash_to_sign = DelegateSignatureHelper.calculate_hash(
-            delegate_address, previous_topt=True
+            delegate_address, previous_totp=True
         )
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
         response = self.client.delete(
