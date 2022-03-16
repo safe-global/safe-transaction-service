@@ -85,6 +85,12 @@ THIRD_PARTY_APPS = [
     "django_s3_storage",
     "rest_framework.authtoken",
 ]
+ALLAUTH_APPS = [
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+]
 LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
@@ -189,6 +195,14 @@ FIXTURE_DIRS = (str(APPS_DIR / "fixtures"),)
 EMAIL_BACKEND = env(
     "DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
 )
+
+# AUTHENTICATION
+AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin, regardless of `allauth`
+    "django.contrib.auth.backends.ModelBackend",
+    # `allauth` specific authentication methods, such as login by e-mail
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 # ADMIN
 # ------------------------------------------------------------------------------
