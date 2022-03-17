@@ -29,7 +29,7 @@ services:
     command: docker/web/celery/worker/run.sh
 
   ganache:
-    image: trufflesuite/ganache-cli:latest
-    command: -d --defaultBalanceEther 10000 -a 10 --noVMErrorsOnRPCResponse --gasLimit 10000000 --host 0.0.0.0 --chainId 1337 --networkId 1337
+    image: trufflesuite/ganache:latest
+    command: --defaultBalanceEther 10000 --gasLimit 10000000 -a 10 --chain.chainId 1337 --chain.networkId 1337 -k berlin -d --host 0.0.0.0
     ports:
       - "8545:8545"
