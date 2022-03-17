@@ -196,7 +196,8 @@ EMAIL_BACKEND = env(
 ADMIN_URL = "admin/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#admins
 ADMINS = [
-    ("""Gnosis""", "dev@gnosis.pm"),
+    ("uxio.fuentefria", "uxio.fuentefria@gnosis.pm"),
+    ("richard", "richard.meissner@gnosis.pm"),
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#managers
 MANAGERS = ADMINS
