@@ -46,6 +46,7 @@ services:
     volumes:
       - nginx-shared:/nginx
     command: docker/web/run_web.sh
+    image: drboolean/safe-transaction-service
 
   worker: &worker
     build:
@@ -57,8 +58,10 @@ services:
       - db
       - redis
     command: docker/web/celery/worker/run.sh
+    image: drboolean/safe-transaction-service
 
   scheduler:
     <<: *worker
     command: docker/web/celery/scheduler/run.sh
+    image: drboolean/safe-transaction-service
 
