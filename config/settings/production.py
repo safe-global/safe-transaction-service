@@ -80,7 +80,7 @@ if SSO_ENABLED:
         # "django.contrib.auth.backends.ModelBackend",
     ]
     # When creating a user, give superuser permissions if username is in SSO_ADMIN
-    SSO_ADMINS = [username for username, _ in ADMINS]  # noqa F405
+    SSO_ADMINS = env.list("SSO_ADMINS", default=["richard", "uxio.fuentefria"])
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
