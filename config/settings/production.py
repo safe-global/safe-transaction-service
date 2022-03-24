@@ -63,6 +63,25 @@ X_FRAME_OPTIONS = "DENY"
 # https://docs.djangoproject.com/en/3.2/ref/settings/#csrf-trusted-origins
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
+# SSO (tested with https://github.com/buzzfeed/sso)
+# ------------------------------------------------------------------------------
+# Be really careful when enabling SSO. If the `SSO_USERNAME_HEADER` can be spoofed
+# auth is broken and anyone will be able to log in as any user
+SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
+SSO_USERNAME_HEADER = env.str("SSO_USERNAME_HEADER", default="HTTP_X_FORWARDED_USER")
+if SSO_ENABLED:
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+    MIDDLEWARE.append(  # noqa F405
+        "safe_transaction_service.utils.auth.CustomHeaderRemoteUserMiddleware"
+    )
+    AUTHENTICATION_BACKENDS = [
+        "safe_transaction_service.utils.auth.CustomRemoteUserBackend"
+        # "django.contrib.auth.backends.ModelBackend",
+    ]
+    # When creating a user, give superuser permissions if username is in SSO_ADMIN
+    SSO_ADMINS = env.list("SSO_ADMINS", default=["richard", "uxio.fuentefria"])
+
 # TEMPLATES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#templates

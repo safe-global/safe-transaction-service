@@ -66,13 +66,20 @@ class AboutView(APIView):
 
     renderer_classes = (JSONRenderer,)
 
-    @method_decorator(cache_page(60 * 60))  # 1 hour
+    # @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, format=None):
         content = {
             "name": "Safe Transaction Service",
             "version": __version__,
-            "api_version": self.request.version,
-            "secure": self.request.is_secure(),
+            "api_version": request.version,
+            "secure": request.is_secure(),
+            "host": request.get_host(),
+            "settings.USE_X_FORWARDED_HOST": settings.USE_X_FORWARDED_HOST,
+            "real_host": request.META["HTTP_X_FORWARDED_HOST"]
+            if "HTTP_X_FORWARDED_HOST" in request.META
+            else None,
+            "referer": request.META.get("HTTP_REFERER"),
+            "headers": [x for x in request.META.keys() if "FORWARD" in x],
             "settings": {
                 "AWS_CONFIGURED": settings.AWS_CONFIGURED,
                 "AWS_S3_BUCKET_NAME": settings.AWS_S3_BUCKET_NAME,
