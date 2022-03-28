@@ -33,34 +33,34 @@ class TestEnsClient(TestCase):
             {
                 "registrations": [
                     {
+                        "expiryDate": "2257309961",
                         "domain": {
-                            "isMigrated": True,
                             "labelName": "vivarox",
                             "labelhash": "0x3dad4bca5efcde980e9e7f3a9484749505648542b06c5f4f8b2dbdb767f67ba8",
                             "name": "vivarox.eth",
+                            "isMigrated": True,
                             "parent": {"name": "eth"},
                         },
-                        "expiryDate": "2257309961",
                     },
                     {
+                        "expiryDate": "2257310351",
                         "domain": {
-                            "isMigrated": True,
                             "labelName": "satoshinakamoto",
                             "labelhash": "0x595165e57d0d5a26f71f2f387c9e8208831fa957a18aad079218ce42a530bc6e",
                             "name": "satoshinakamoto.eth",
+                            "isMigrated": True,
                             "parent": {"name": "eth"},
                         },
-                        "expiryDate": "2257310351",
                     },
                     {
+                        "expiryDate": "2288867573",
                         "domain": {
-                            "isMigrated": True,
                             "labelName": "vitalik",
                             "labelhash": "0xaf2caa1c2ca1d027f1ac823b529d0a67cd144264b2789fa2ea4d63a67c7103cc",
                             "name": "vitalik.eth",
+                            "isMigrated": True,
                             "parent": {"name": "eth"},
                         },
-                        "expiryDate": "2257310621",
                     },
                 ]
             },
