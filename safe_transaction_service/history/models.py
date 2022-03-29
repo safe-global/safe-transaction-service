@@ -1538,17 +1538,18 @@ class SafeStatusQuerySet(models.QuerySet):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                    SELECT DISTINCT(address)
+                    SELECT address
                     FROM (
-                        SELECT address, owners,
-                                rank() OVER (PARTITION BY address ORDER BY nonce DESC, internal_tx_id DESC) AS pos
+                        SELECT DISTINCT ON(address) address, owners
                         FROM history_safestatus
                         WHERE address IN (
+                            -- Do a first filtering
                             SELECT address FROM history_safestatus
                             WHERE owners @> ARRAY[%s]::bytea[]
                         )
-                        ) AS ss
-                    WHERE pos = 1 AND owners @> ARRAY[%s]::bytea[];
+                        ORDER BY address, nonce DESC, internal_tx_id DESC
+                    ) AS sq
+                    WHERE owners @> ARRAY[%s]::bytea[];
                 """,
                 [HexBytes(owner_address), HexBytes(owner_address)],
             )
