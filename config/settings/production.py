@@ -68,8 +68,10 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 # Be really careful when enabling SSO. If the `SSO_USERNAME_HEADER` can be spoofed
 # auth is broken and anyone will be able to log in as any user
 SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
-SSO_USERNAME_HEADER = env.str("SSO_USERNAME_HEADER", default="HTTP_X_FORWARDED_USER")
 if SSO_ENABLED:
+    SSO_USERNAME_HEADER = env.str(
+        "SSO_USERNAME_HEADER", default="HTTP_X_FORWARDED_USER"
+    )
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
     MIDDLEWARE.append(  # noqa F405
