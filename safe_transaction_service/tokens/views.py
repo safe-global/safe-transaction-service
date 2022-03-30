@@ -89,9 +89,7 @@ class TokenPriceView(GenericAPIView):
         else:
             token = self.get_object()  # Raises 404 if not found
             fiat_price_with_timestamp = next(
-                PriceServiceProvider().get_cached_usd_values(
-                    [token.get_price_address()]
-                )
+                price_service.get_cached_usd_values([token.get_price_address()])
             )
             data = {
                 "fiat_code": fiat_price_with_timestamp.fiat_code.name,
