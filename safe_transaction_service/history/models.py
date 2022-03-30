@@ -17,6 +17,7 @@ from typing import (
     TypedDict,
     Union,
 )
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -1646,10 +1647,25 @@ class WebHookQuerySet(models.QuerySet):
         return self.filter(Q(address=address) | Q(address=None))
 
 
+def _validate_webhook_url(url: str) -> None:
+    result = urlparse(url)
+    if not all(
+        (
+            result.scheme
+            in (
+                "http",
+                "https",
+            ),
+            result.netloc,
+        )
+    ):
+        raise ValidationError(f"{url} is not a valid url")
+
+
 class WebHook(models.Model):
     objects = WebHookQuerySet.as_manager()
     address = EthereumAddressV2Field(db_index=True, null=True, blank=True)
-    url = models.URLField()
+    url = models.CharField(max_length=255, validators=[_validate_webhook_url])
     authorization = models.CharField(
         max_length=500,
         null=True,
