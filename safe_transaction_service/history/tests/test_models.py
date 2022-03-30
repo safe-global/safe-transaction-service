@@ -1127,3 +1127,8 @@ class TestWebHook(TestCase):
         self.assertCountEqual(
             WebHook.objects.matching_for_address(addresses[2]), [webhook_2]
         )
+
+    def test_optional_auth(self):
+        web_hook = WebHookFactory.create(authorization=None)
+
+        web_hook.full_clean()

@@ -1653,6 +1653,7 @@ class WebHook(models.Model):
     authorization = models.CharField(
         max_length=500,
         null=True,
+        blank=True,
         default=None,
         help_text="Set HTTP Authorization header with the value",
     )
