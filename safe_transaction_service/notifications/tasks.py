@@ -102,12 +102,11 @@ def send_notification_task(
     if not (address and payload):  # Both must be present
         return 0, 0
 
-    firebase_devices = FirebaseDevice.objects.filter(safes__address=address).exclude(
-        cloud_messaging_token=None
+    tokens = list(
+        FirebaseDevice.objects.filter(safes__address=address)
+        .exclude(cloud_messaging_token=None)
+        .values_list("cloud_messaging_token", flat=True)
     )  # TODO Use cache
-    tokens = [
-        firebase_device.cloud_messaging_token for firebase_device in firebase_devices
-    ]
 
     if is_pending_multisig_transaction(payload):
         send_notification_owner_task.delay(address, payload["safeTxHash"])
