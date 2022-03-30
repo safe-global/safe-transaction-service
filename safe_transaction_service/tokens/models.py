@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -112,20 +112,39 @@ class TokenManager(models.Manager):
                 )
                 return None
 
+        # Ignore tokens with empty name or symbol
+        if not erc_info.name or not erc_info.symbol:
+            logger.warning(
+                "Token with address=%s has not name or symbol", token_address
+            )
+            return None
+
+        name_and_symbol: List[str] = []
+        for text in (erc_info.name, erc_info.symbol):
+            if isinstance(text, str):
+                text = text.encode()
+            name_and_symbol.append(
+                text.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
+            )
+
+        name, symbol = name_and_symbol
         # If symbol is way bigger than name (by 5 characters), swap them (e.g. POAP)
-        name, symbol = erc_info.name, erc_info.symbol
-
-        if isinstance(name, bytes):
-            name = name.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
-
-        if isinstance(symbol, bytes):
-            symbol = symbol.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
-
         if (len(name) - len(symbol)) < -5:
             name, symbol = symbol, name
-        return self.create(
-            address=token_address, name=name, symbol=symbol, decimals=decimals
-        )
+
+        try:
+            return self.create(
+                address=token_address, name=name, symbol=symbol, decimals=decimals
+            )
+        except ValueError:
+            logger.error(
+                "Problem creating token with address=%s name=%s symbol=%s decimals=%s",
+                token_address,
+                name,
+                symbol,
+                decimals,
+            )
+            return None
 
     def fix_missing_logos(self) -> int:
         """
@@ -205,7 +224,7 @@ class Token(models.Model):
         default=False, help_text="Spam and trusted cannot be both True"
     )
     copy_price = EthereumAddressV2Field(
-        null=True, help_text="If provided, copy the price from the token"
+        null=True, blank=True, help_text="If provided, copy the price from the token"
     )
 
     class Meta:

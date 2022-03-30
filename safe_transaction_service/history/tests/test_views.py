@@ -3,6 +3,8 @@ from dataclasses import asdict
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 from django.utils import timezone
 
@@ -10,7 +12,7 @@ from eth_account import Account
 from hexbytes import HexBytes
 from requests import ReadTimeout
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
@@ -34,6 +36,7 @@ from ..serializers import DelegateSerializer, TransferType
 from ..services import BalanceService, CollectiblesService, SafeService
 from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
+from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
@@ -504,6 +507,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["transaction_hash"], multisig_tx.ethereum_tx.tx_hash
         )
         self.assertEqual(response.data["origin"], multisig_tx.origin)
+        self.assertFalse(response.data["trusted"])
         self.assertEqual(
             response.data["data_decoded"],
             {
@@ -843,6 +847,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["results"][0]["confirmations"][0]["signature"],
             data["signature"],
         )
+        self.assertTrue(response.data["results"][0]["trusted"])
 
         # Sign with a different user that sender
         random_user_account = Account.create()
@@ -874,7 +879,81 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-    def test_post_executed_transaction(self):
+    def test_post_multisig_transaction_with_trusted_user(self):
+        safe_owner_1 = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
+        data = {
+            "to": Account.create().address,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+            "sender": safe_owner_1.address,
+        }
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        response = SafeMultisigTransactionListView.as_view()(request, safe_address)
+        response.render()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertFalse(multisig_transaction_db.trusted)
+
+        # Create user
+        user = get_user_model().objects.create(
+            username="batman", password="very-private"
+        )
+        request = factory.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        force_authenticate(request, user=user)
+        response = SafeMultisigTransactionListView.as_view()(request, safe_address)
+        response.render()
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertFalse(multisig_transaction_db.trusted)
+
+        # Assign permissions to user
+        permission = Permission.objects.get(codename="create_trusted")
+        user.user_permissions.add(permission)
+        request = factory.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        user = get_user_model().objects.get()  # Flush permissions cache
+        force_authenticate(request, user=user)
+        response = SafeMultisigTransactionListView.as_view()(request, safe_address)
+        response.render()
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertTrue(multisig_transaction_db.trusted)
+
+    def test_post_multisig_transaction_executed(self):
         safe_owner_1 = Account.create()
         safe = self.deploy_test_safe(owners=[safe_owner_1.address])
         safe_address = safe.address
@@ -1954,7 +2033,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Test previous otp
         hash_to_sign = DelegateSignatureHelper.calculate_hash(
-            delegate_address, previous_topt=True
+            delegate_address, previous_totp=True
         )
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
         response = self.client.delete(

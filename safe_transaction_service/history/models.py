@@ -407,17 +407,25 @@ class TokenTransfer(models.Model):
                 f"Not supported EventData, topic {topic.hex()} does not match expected {expected_topic.hex()}"
             )
 
-        return {
-            "timestamp": EthereumBlock.objects.get_timestamp_by_hash(
+        try:
+            timestamp = EthereumBlock.objects.get_timestamp_by_hash(
                 event_data["blockHash"]
-            ),
-            "block_number": event_data["blockNumber"],
-            "ethereum_tx_id": event_data["transactionHash"],
-            "log_index": event_data["logIndex"],
-            "address": event_data["address"],
-            "_from": event_data["args"]["from"],
-            "to": event_data["args"]["to"],
-        }
+            )
+            return {
+                "timestamp": timestamp,
+                "block_number": event_data["blockNumber"],
+                "ethereum_tx_id": event_data["transactionHash"],
+                "log_index": event_data["logIndex"],
+                "address": event_data["address"],
+                "_from": event_data["args"]["from"],
+                "to": event_data["args"]["to"],
+            }
+        except EthereumBlock.DoesNotExist:
+            # Block is not found and should be present on DB. Reorg
+            EthereumTx.objects.get(
+                event_data["transactionHash"]
+            ).block.set_not_confirmed()
+            raise
 
     @classmethod
     def from_decoded_event(cls, event_data: EventData):
@@ -1189,6 +1197,11 @@ class MultisigTransaction(TimeStampedModel):
         default=False, db_index=True
     )  # Txs proposed by a delegate or with one confirmation
 
+    class Meta:
+        permissions = [
+            ("create_trusted", "Can create trusted transactions"),
+        ]
+
     def __str__(self):
         return f"{self.safe} - {self.nonce} - {self.safe_tx_hash}"
 
@@ -1317,7 +1330,7 @@ class MultisigConfirmation(TimeStampedModel):
     )  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressV2Field()
 
-    signature = HexField(null=True, default=None, max_length=2000)
+    signature = HexField(null=True, default=None, max_length=5000)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )

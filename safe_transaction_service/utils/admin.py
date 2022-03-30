@@ -34,7 +34,7 @@ class BinarySearchAdmin(admin.ModelAdmin):
                                 ]
                             }
                         )
-                except ValidationError:
+                except (ValidationError, ValueError):
                     pass
         return queryset, may_have_duplicates
 
