@@ -194,7 +194,7 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
 
     # Delegates must be notified too
     delegates = SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
-        address, safe_status.owners
+        address, owners_to_notify
     )
     users_to_notify = delegates | owners_to_notify
 
