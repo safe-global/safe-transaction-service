@@ -74,11 +74,6 @@ class AboutView(APIView):
             "api_version": request.version,
             "secure": request.is_secure(),
             "host": request.get_host(),
-            "settings.USE_X_FORWARDED_HOST": settings.USE_X_FORWARDED_HOST,
-            "real_host": request.META["HTTP_X_FORWARDED_HOST"]
-            if "HTTP_X_FORWARDED_HOST" in request.META
-            else None,
-            "referer": request.META.get("HTTP_REFERER"),
             "headers": [x for x in request.META.keys() if "FORWARD" in x],
             "settings": {
                 "AWS_CONFIGURED": settings.AWS_CONFIGURED,
@@ -95,6 +90,7 @@ class AboutView(APIView):
                 "ETH_L2_NETWORK": settings.ETH_L2_NETWORK,
                 "ETH_REORG_BLOCKS": settings.ETH_REORG_BLOCKS,
                 "NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH": settings.NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH,
+                "SSO_ENABLED": settings.SSO_ENABLED,
                 "TOKENS_LOGO_BASE_URI": settings.TOKENS_LOGO_BASE_URI,
                 "TOKENS_LOGO_EXTENSION": settings.TOKENS_LOGO_EXTENSION,
             },
