@@ -1,8 +1,8 @@
 -r requirements.txt
 coverage==6.3.2
-django-stubs==1.10.0
+django-stubs==1.10.1
 factory-boy==3.2.1
-faker==13.3.3
+faker==13.3.4
 mypy==0.942
 pytest==7.1.1
 pytest-celery==0.0.0

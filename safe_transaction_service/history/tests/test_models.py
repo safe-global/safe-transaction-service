@@ -1127,3 +1127,42 @@ class TestWebHook(TestCase):
         self.assertCountEqual(
             WebHook.objects.matching_for_address(addresses[2]), [webhook_2]
         )
+
+    def test_optional_auth(self):
+        web_hook = WebHookFactory.create(authorization=None)
+
+        web_hook.full_clean()
+
+    def test_invalid_urls(self) -> None:
+        param_list = [
+            "foo://bar",
+            "foo",
+            "://",
+        ]
+        for invalid_url in param_list:
+            with self.subTest(msg=f"{invalid_url} is not a valid url"):
+                with self.assertRaises(ValidationError):
+                    web_hook = WebHookFactory.create(url=invalid_url)
+                    web_hook.full_clean()
+
+            with self.subTest(msg=f"{invalid_url} is not a valid url"):
+                with self.assertRaises(ValidationError):
+                    web_hook = WebHookFactory.create(url=invalid_url)
+                    web_hook.full_clean()
+
+    def test_valid_urls(self) -> None:
+        param_list = [
+            "http://tx-service",
+            "https://tx-service",
+            "https://tx-service:8000",
+            "https://safe-transaction.mainnet.gnosis.io",
+            "http://mainnet-safe-transaction-web.safe.svc.cluster.local",
+        ]
+        for valid_url in param_list:
+            with self.subTest(msg=f"Valid url {valid_url} should not throw"):
+                web_hook = WebHookFactory.create(url=valid_url)
+                web_hook.full_clean()
+
+            with self.subTest(msg=f"Valid url {valid_url} should not throw"):
+                web_hook = WebHookFactory.create(url=valid_url)
+                web_hook.full_clean()
