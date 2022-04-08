@@ -1675,13 +1675,23 @@ class WebHook(models.Model):
         help_text="Set HTTP Authorization header with the value",
     )
     # Configurable webhook types to listen to
-    new_confirmation = models.BooleanField(default=True)
-    pending_outgoing_transaction = models.BooleanField(default=True)
-    new_executed_outgoing_transaction = models.BooleanField(default=True)
-    new_incoming_transaction = models.BooleanField(default=True)
-    new_safe = models.BooleanField(default=True)
-    new_module_transaction = models.BooleanField(default=True)
-    new_outgoing_transaction = models.BooleanField(default=True)
+    new_confirmation = models.BooleanField(default=True, help_text="New confirmation")
+    pending_multisig_transaction = models.BooleanField(
+        default=True, help_text="New pending multisig transaction"
+    )
+    new_executed_multisig_transaction = models.BooleanField(
+        default=True, help_text="New mined multisig transaction"
+    )
+    new_incoming_transaction = models.BooleanField(
+        default=True, help_text="New incoming transaction of eth/token"
+    )
+    new_safe = models.BooleanField(default=True, help_text="New Safe created")
+    new_module_transaction = models.BooleanField(
+        default=True, help_text="New mined module transaction"
+    )
+    new_outgoing_transaction = models.BooleanField(
+        default=True, help_text="New outgoing transaction of eth/token"
+    )
 
     class Meta:
         unique_together = (("address", "url"),)
@@ -1697,12 +1707,12 @@ class WebHook(models.Model):
             return False
         elif (
             webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION
-            and not self.pending_outgoing_transaction
+            and not self.pending_multisig_transaction
         ):
             return False
         elif (
             webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION
-            and not self.new_executed_outgoing_transaction
+            and not self.new_executed_multisig_transaction
         ):
             return False
         elif (

@@ -320,7 +320,7 @@ class WebHookFactory(DjangoModelFactory):
     url = factory.Sequence(lambda n: f"http://localhost/test/{n}")
     # Configurable webhook types to listen to
     new_confirmation = True
-    pending_outgoing_transaction = True
-    new_executed_outgoing_transaction = True
+    pending_multisig_transaction = True
+    new_executed_multisig_transaction = True
     new_incoming_transaction = True
     authorization = None
