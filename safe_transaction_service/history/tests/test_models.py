@@ -21,6 +21,7 @@ from ..models import (
     ERC721Transfer,
     EthereumBlock,
     EthereumBlockManager,
+    EthereumTx,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -46,6 +47,7 @@ from .factories import (
     SafeStatusFactory,
     WebHookFactory,
 )
+from .mocks.mocks_ethereum_tx import type_0_tx, type_2_tx
 from .mocks.mocks_internal_tx_indexer import block_result
 
 logger = logging.getLogger(__name__)
@@ -269,7 +271,42 @@ class TestSafeMasterCopy(TestCase):
 
 
 class TestEthereumTx(TestCase):
-    pass
+    def test_create_from_tx_dict(self):
+        for tx_mock in (type_0_tx, type_2_tx):
+            with self.subTest(tx_mock=tx_mock):
+                tx_dict = tx_mock["tx"]
+                ethereum_tx = EthereumTx.objects.create_from_tx_dict(tx_dict)
+                self.assertEqual(ethereum_tx.type, int(tx_dict["type"], 0))
+                self.assertEqual(ethereum_tx.gas_price, tx_dict["gasPrice"])
+                self.assertEqual(
+                    ethereum_tx.max_fee_per_gas, tx_dict.get("maxFeePerGas")
+                )
+                self.assertEqual(
+                    ethereum_tx.max_priority_fee_per_gas,
+                    tx_dict.get("maxPriorityFeePerGas"),
+                )
+                self.assertIsNone(ethereum_tx.gas_used)
+                self.assertIsNone(ethereum_tx.status)
+                self.assertIsNone(ethereum_tx.transaction_index)
+
+                tx_receipt = tx_mock["receipt"]
+                ethereum_tx.delete()
+                ethereum_tx = EthereumTx.objects.create_from_tx_dict(
+                    tx_dict, tx_receipt=tx_receipt
+                )
+                self.assertEqual(ethereum_tx.gas_price, tx_receipt["effectiveGasPrice"])
+                self.assertEqual(
+                    ethereum_tx.max_fee_per_gas, tx_dict.get("maxFeePerGas")
+                )
+                self.assertEqual(
+                    ethereum_tx.max_priority_fee_per_gas,
+                    tx_dict.get("maxPriorityFeePerGas"),
+                )
+                self.assertEqual(ethereum_tx.gas_used, tx_receipt["gasUsed"])
+                self.assertEqual(ethereum_tx.status, tx_receipt["status"])
+                self.assertEqual(
+                    ethereum_tx.transaction_index, tx_receipt["transactionIndex"]
+                )
 
 
 class TestTokenTransfer(TestCase):
