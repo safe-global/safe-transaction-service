@@ -57,11 +57,14 @@ class EthereumTxFactory(DjangoModelFactory):
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
     gas_price = factory.fuzzy.FuzzyInteger(1, 100)
+    max_fee_per_gas = None
+    max_priority_fee_per_gas = None
     data = factory.Sequence(lambda n: HexBytes("%x" % (n + 1000)))
     nonce = factory.Sequence(lambda n: n)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
     logs = factory.LazyFunction(lambda: [])
+    type = 0
 
 
 class TokenTransfer(DjangoModelFactory):

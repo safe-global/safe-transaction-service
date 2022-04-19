@@ -1,35 +1,56 @@
+from typing import Iterator
+
 from django.core.management.base import BaseCommand
-from django.db.models import Q
+
+from gnosis.eth import EthereumClientProvider
 
 from ...models import EthereumTx
-from ...services import IndexServiceProvider
 
 
 class Command(BaseCommand):
-    help = "Check all stored ethereum_txs have a valid receipt and block. Fixes them if a problem is found"
+    help = "Fix EIP1559 transactions"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ethereum_client = EthereumClientProvider()
+
+    def fix_ethereum_txs(self, ethereum_txs: Iterator[EthereumTx]):
+        if ethereum_txs:
+            txs = self.ethereum_client.get_transactions(
+                [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
+            )
+            for tx, ethereum_tx in zip(txs, ethereum_txs):
+                if tx and "maxFeePerGas" in tx:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Fixing tx with tx-hash={ethereum_tx.tx_hash}"
+                        )
+                    )
+                    ethereum_tx.max_fee_per_gas = tx.get("maxFeePerGas")
+                    ethereum_tx.max_priority_fee_per_gas = tx.get(
+                        "maxPriorityFeePerGas"
+                    )
+                    ethereum_tx.type = int(tx.get("type", "0x0"), 0)
+                    ethereum_tx.save(
+                        update_fields=[
+                            "max_fee_per_gas",
+                            "max_priority_fee_per_gas",
+                            "type",
+                        ]
+                    )
 
     def handle(self, *args, **options):
-        queryset = EthereumTx.objects.filter(Q(block=None) | Q(gas_used=None))
+        queryset = EthereumTx.objects.filter(type=0).order_by("-block_id")
         total = queryset.count()
         self.stdout.write(
             self.style.SUCCESS(f"Fixing ethereum txs. {total} remaining to be fixed")
         )
-        index_service = IndexServiceProvider()
-        ethereum_client = index_service.ethereum_client
+        ethereum_txs = []
         for i, ethereum_tx in enumerate(queryset.iterator()):
-            tx_receipt = ethereum_client.get_transaction_receipt(ethereum_tx.tx_hash)
-            block_hash = tx_receipt["blockHash"]
-            block = (
-                ethereum_tx.block
-                or index_service.block_get_or_create_from_block_hash(block_hash)
-            )
-            ethereum_tx.update_with_block_and_receipt(block, tx_receipt)
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Processing {i}/{total} with tx-hash={ethereum_tx.tx_hash}"
-                )
-            )
+            ethereum_txs.append(ethereum_tx)
+            if len(ethereum_txs) == 500:
+                self.fix_ethereum_txs(ethereum_txs)
+                ethereum_txs.clear()
+                self.stdout.write(self.style.SUCCESS(f"Processing {i}/{total}"))
 
-        self.stdout.write(
-            self.style.SUCCESS(f"End fixing txs. {total} have been fixed")
-        )
+        self.fix_ethereum_txs(ethereum_txs)

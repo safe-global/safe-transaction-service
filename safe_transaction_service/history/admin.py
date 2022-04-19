@@ -154,7 +154,7 @@ class EthereumTxAdmin(BinarySearchAdmin):
         MultisigConfirmationInline,
     )
     list_display = ("block_id", "tx_hash", "nonce", "_from", "to")
-    list_filter = ("status",)
+    list_filter = ("status", "type")
     search_fields = ["=tx_hash", "=_from", "=to"]
     ordering = ["-block_id"]
     raw_id_fields = ("block",)
