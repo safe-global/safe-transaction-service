@@ -57,11 +57,14 @@ class EthereumTxFactory(DjangoModelFactory):
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
     gas_price = factory.fuzzy.FuzzyInteger(1, 100)
+    max_fee_per_gas = None
+    max_priority_fee_per_gas = None
     data = factory.Sequence(lambda n: HexBytes("%x" % (n + 1000)))
     nonce = factory.Sequence(lambda n: n)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = factory.fuzzy.FuzzyInteger(0, 1000)
     logs = factory.LazyFunction(lambda: [])
+    type = 0
 
 
 class TokenTransfer(DjangoModelFactory):
@@ -320,7 +323,7 @@ class WebHookFactory(DjangoModelFactory):
     url = factory.Sequence(lambda n: f"http://localhost/test/{n}")
     # Configurable webhook types to listen to
     new_confirmation = True
-    pending_outgoing_transaction = True
-    new_executed_outgoing_transaction = True
+    pending_multisig_transaction = True
+    new_executed_multisig_transaction = True
     new_incoming_transaction = True
     authorization = None

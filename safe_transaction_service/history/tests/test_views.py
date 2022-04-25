@@ -508,6 +508,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.data["origin"], multisig_tx.origin)
         self.assertFalse(response.data["trusted"])
+        self.assertIsNone(response.data["max_fee_per_gas"])
+        self.assertIsNone(response.data["max_priority_fee_per_gas"])
         self.assertEqual(
             response.data["data_decoded"],
             {

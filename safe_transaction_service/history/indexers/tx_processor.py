@@ -161,10 +161,6 @@ class SafeTxProcessor(TxProcessor):
     ) -> Optional[str]:
         return SafeMasterCopy.objects.get_version_for_address(master_copy)
 
-    @cache
-    def get_chain_id(self) -> int:
-        return self.ethereum_client.w3.eth.chain_id
-
     def get_last_safe_status_for_address(
         self, address: ChecksumAddress
     ) -> Optional[SafeStatus]:
@@ -520,7 +516,7 @@ class SafeTxProcessor(TxProcessor):
                     HexBytes(arguments["signatures"]),
                     safe_nonce=nonce,
                     safe_version=safe_version,
-                    chain_id=self.get_chain_id(),
+                    chain_id=self.ethereum_client.get_chain_id(),
                 )
                 safe_tx_hash = safe_tx.safe_tx_hash
 

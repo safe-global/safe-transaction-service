@@ -259,29 +259,27 @@ class EthereumTxManager(models.Manager):
         ethereum_block: Optional[EthereumBlock] = None,
     ) -> "EthereumTx":
         data = HexBytes(tx.get("data") or tx.get("input"))
-        # Supporting EIP1559
-        if "gasPrice" in tx:
-            gas_price = tx["gasPrice"]
-        else:
-            assert tx_receipt, f"Tx-receipt is required for EIP1559 tx {tx}"
-            gas_price = tx_receipt.get("effectiveGasPrice")
-            assert gas_price is not None, f"Gas price for tx {tx} cannot be None"
-            gas_price = int(gas_price, 0)
+        logs = tx_receipt and [
+            clean_receipt_log(log) for log in tx_receipt.get("logs", [])
+        ]
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx["hash"]).hex(),
+            gas_used=tx_receipt and tx_receipt["gasUsed"],
             _from=tx["from"],
             gas=tx["gas"],
-            gas_price=gas_price,
-            gas_used=tx_receipt and tx_receipt["gasUsed"],
-            logs=tx_receipt
-            and [clean_receipt_log(log) for log in tx_receipt.get("logs", [])],
+            gas_price=(tx_receipt and tx_receipt.get("effectiveGasPrice", 0))
+            or tx.get("gasPrice", 0),
+            max_fee_per_gas=tx.get("maxFeePerGas"),
+            max_priority_fee_per_gas=tx.get("maxPriorityFeePerGas"),
+            logs=logs,
             status=tx_receipt and tx_receipt.get("status"),
             transaction_index=tx_receipt and tx_receipt["transactionIndex"],
             data=data if data else None,
             nonce=tx["nonce"],
             to=tx.get("to"),
             value=tx["value"],
+            type=int(tx.get("type", "0x0"), 0),
         )
 
 
@@ -304,10 +302,13 @@ class EthereumTx(TimeStampedModel):
     _from = EthereumAddressV2Field(null=True, db_index=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
+    max_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
+    max_priority_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
     data = models.BinaryField(null=True)
     nonce = Uint256Field()
     to = EthereumAddressV2Field(null=True, db_index=True)
     value = Uint256Field()
+    type = models.PositiveSmallIntegerField(default=0)
 
     def __str__(self):
         return "{} status={} from={} to={}".format(
@@ -330,6 +331,7 @@ class EthereumTx(TimeStampedModel):
     ):
         if self.block is None:
             self.block = ethereum_block
+            self.gas_price = tx_receipt["effectiveGasPrice"]
             self.gas_used = tx_receipt["gasUsed"]
             self.logs = [clean_receipt_log(log) for log in tx_receipt.get("logs", [])]
             self.status = tx_receipt.get("status")
@@ -337,6 +339,7 @@ class EthereumTx(TimeStampedModel):
             return self.save(
                 update_fields=[
                     "block",
+                    "gas_price",
                     "gas_used",
                     "logs",
                     "status",
@@ -1675,13 +1678,23 @@ class WebHook(models.Model):
         help_text="Set HTTP Authorization header with the value",
     )
     # Configurable webhook types to listen to
-    new_confirmation = models.BooleanField(default=True)
-    pending_outgoing_transaction = models.BooleanField(default=True)
-    new_executed_outgoing_transaction = models.BooleanField(default=True)
-    new_incoming_transaction = models.BooleanField(default=True)
-    new_safe = models.BooleanField(default=True)
-    new_module_transaction = models.BooleanField(default=True)
-    new_outgoing_transaction = models.BooleanField(default=True)
+    new_confirmation = models.BooleanField(default=True, help_text="New confirmation")
+    pending_multisig_transaction = models.BooleanField(
+        default=True, help_text="New pending multisig transaction"
+    )
+    new_executed_multisig_transaction = models.BooleanField(
+        default=True, help_text="New mined multisig transaction"
+    )
+    new_incoming_transaction = models.BooleanField(
+        default=True, help_text="New incoming transaction of eth/token"
+    )
+    new_safe = models.BooleanField(default=True, help_text="New Safe created")
+    new_module_transaction = models.BooleanField(
+        default=True, help_text="New mined module transaction"
+    )
+    new_outgoing_transaction = models.BooleanField(
+        default=True, help_text="New outgoing transaction of eth/token"
+    )
 
     class Meta:
         unique_together = (("address", "url"),)
@@ -1697,12 +1710,12 @@ class WebHook(models.Model):
             return False
         elif (
             webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION
-            and not self.pending_outgoing_transaction
+            and not self.pending_multisig_transaction
         ):
             return False
         elif (
             webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION
-            and not self.new_executed_outgoing_transaction
+            and not self.new_executed_multisig_transaction
         ):
             return False
         elif (

@@ -154,7 +154,7 @@ class EthereumTxAdmin(BinarySearchAdmin):
         MultisigConfirmationInline,
     )
     list_display = ("block_id", "tx_hash", "nonce", "_from", "to")
-    list_filter = ("status",)
+    list_filter = ("status", "type")
     search_fields = ["=tx_hash", "=_from", "=to"]
     ordering = ["-block_id"]
     raw_id_fields = ("block",)
@@ -569,18 +569,18 @@ class WebHookAdmin(BinarySearchAdmin):
         "url",
         "authorization",
         "address",
-        "pending_outgoing_transaction",
+        "pending_multisig_transaction",
         "new_confirmation",
-        "new_executed_outgoing_transaction",
+        "new_executed_multisig_transaction",
         "new_incoming_transaction",
         "new_safe",
         "new_module_transaction",
         "new_outgoing_transaction",
     )
     list_filter = (
-        "pending_outgoing_transaction",
+        "pending_multisig_transaction",
         "new_confirmation",
-        "new_executed_outgoing_transaction",
+        "new_executed_multisig_transaction",
         "new_incoming_transaction",
         "new_safe",
         "new_module_transaction",
