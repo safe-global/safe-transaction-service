@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "safe-transaction-service-helm.fullname" . }}
+  labels:
+    {{- include "safe-transaction-service-helm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "safe-transaction-service-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "safe-transaction-service-helm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "safe-transaction-service-helm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["docker/web/celery/worker/run.sh"]
+          env:
+            - name: DATABASE_URL
+              value: postgres://postgres:{{ .Values.global.postgresql.postgresqlPassword}}@{{ .Release.Name }}-postgresql:5432/{{ .Values.global.postgresql.postgresqlDatabase }}
+            - name: ETHEREUM_NODE_URL
+              value: {{ .Values.env.ethereumNodeUrl }}
+            - name: REDIS_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/0
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings.local
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
+            - name: CELERY_BROKER_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/1
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: scheduler
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["docker/web/celery/scheduler/run.sh"]
+          env:
+            - name: DATABASE_URL
+              value: postgres://postgres:{{ .Values.global.postgresql.postgresqlPassword}}@{{ .Release.Name }}-postgresql:5432/{{ .Values.global.postgresql.postgresqlDatabase }}
+            - name: ETHEREUM_NODE_URL
+              value: {{ .Values.env.ethereumNodeUrl }}
+            - name: REDIS_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/0
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings.local
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
+            - name: CELERY_BROKER_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/1
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["docker/web/run_web.sh"]
+          env:
+            - name: DATABASE_URL
+              value: postgres://postgres:{{ .Values.global.postgresql.postgresqlPassword}}@{{ .Release.Name }}-postgresql:5432/{{ .Values.global.postgresql.postgresqlDatabase }}
+            - name: ETHEREUM_NODE_URL
+              value: {{ .Values.env.ethereumNodeUrl }}
+            - name: REDIS_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/0
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings.local
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
+            - name: CELERY_BROKER_URL
+              value: redis://:{{ .Values.global.redis.password }}@{{ .Release.Name }}-redis-master:6379/1
+          ports:
+            - name: http
+              containerPort: 8888
+              protocol: TCP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

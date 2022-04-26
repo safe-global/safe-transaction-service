@@ -1,6 +1,15 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-t', 'us.gcr.io/$PROJECT_ID/safe-transaction-service:$COMMIT_SHA', '.', '-f', 'docker/web/Dockerfile' ]
+  args: [ 'build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/images/safe-transaction-service:$COMMIT_SHA', '.' ]
+- name: 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-builders-community/helm:3.8.1'
+  args: [ 'package', '-u', 'helm-chart']
+  env:
+  - 'SKIP_CLUSTER_CONFIG=true'
+- name: 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-builders-community/helm:3.8.1'
+  entrypoint: /bin/bash
+  args: ['-c', 'helm push /workspace/safe-transaction-service-*.tgz oci://us-central1-docker.pkg.dev/$PROJECT_ID/charts']
+  env:
+  - 'SKIP_CLUSTER_CONFIG=true'
 images:
-- us.gcr.io/$PROJECT_ID/safe-transaction-service:$COMMIT_SHA
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/images/safe-transaction-service:$COMMIT_SHA'
 timeout: 2000s
