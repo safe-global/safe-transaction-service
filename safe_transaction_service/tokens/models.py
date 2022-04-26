@@ -10,9 +10,11 @@ from django.db import models
 from django.db.models import Q
 
 from botocore.exceptions import ClientError
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
+from web3.exceptions import BadFunctionCallOutput
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
 from gnosis.eth.django.models import EthereumAddressV2Field
@@ -105,7 +107,11 @@ class TokenManager(models.Manager):
             )
             try:
                 erc_info = ethereum_client.erc721.get_info(token_address)
-                decimals = None
+                # Make sure ERC721 is not indexed as an ERC20 for a node misbehaving
+                try:
+                    decimals = ethereum_client.erc20.get_decimals(token_address)
+                except (ValueError, DecodingError, BadFunctionCallOutput):
+                    decimals = None
             except InvalidERC721Info:
                 logger.debug(
                     "Cannot find anything on blockchain for token=%s", token_address
