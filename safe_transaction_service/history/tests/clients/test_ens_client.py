@@ -24,6 +24,7 @@ class TestEnsClient(TestCase):
         self.assertEqual(len(EnsClient.domain_hash_to_hex_str(2)), 66)
 
     def test_query_by_account(self):
+        self.maxDiff = None
         ens_client = EnsClient(EthereumNetwork.RINKEBY.value)  # Mainnet
         if not ens_client.is_available():
             self.skipTest("ENS Rinkeby Client is not available")
@@ -53,7 +54,7 @@ class TestEnsClient(TestCase):
                         },
                     },
                     {
-                        "expiryDate": "2288867573",
+                        "expiryDate": "2320424525",
                         "domain": {
                             "labelName": "vitalik",
                             "labelhash": "0xaf2caa1c2ca1d027f1ac823b529d0a67cd144264b2789fa2ea4d63a67c7103cc",
