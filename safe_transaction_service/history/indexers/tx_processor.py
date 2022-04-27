@@ -25,6 +25,7 @@ from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
 )
@@ -163,13 +164,14 @@ class SafeTxProcessor(TxProcessor):
 
     def get_last_safe_status_for_address(
         self, address: ChecksumAddress
-    ) -> Optional[SafeStatus]:
-        safe_status = self.safe_status_cache.get(
-            address
-        ) or SafeStatus.objects.last_for_address(address)
-        if not safe_status:
+    ) -> Optional[SafeLastStatus]:
+        try:
+            safe_status = self.safe_status_cache.get(
+                address
+            ) or SafeLastStatus.objects.get(address=address)
+            return safe_status
+        except SafeLastStatus.DoesNotExist:
             logger.error("SafeStatus not found for address=%s", address)
-        return safe_status
 
     def is_version_breaking_signatures(
         self, old_safe_version: str, new_safe_version: str
@@ -233,11 +235,13 @@ class SafeTxProcessor(TxProcessor):
         )
 
     def store_new_safe_status(
-        self, safe_status: SafeStatus, internal_tx: InternalTx
-    ) -> SafeStatus:
-        safe_status.store_new(internal_tx)
-        self.safe_status_cache[safe_status.address] = safe_status
-        return self.safe_status_cache[safe_status.address]
+        self, safe_last_status: SafeStatus, internal_tx: InternalTx
+    ) -> SafeLastStatus:
+        safe_last_status.internal_tx = internal_tx
+        safe_last_status.save()
+        SafeStatus.objects.insert_from_last_status()
+        self.safe_status_cache[safe_last_status.address] = safe_last_status
+        return safe_last_status
 
     @transaction.atomic
     def process_decoded_transaction(
@@ -327,7 +331,7 @@ class SafeTxProcessor(TxProcessor):
                 )
                 logger.info("Found new Safe=%s", contract_address)
 
-            self.safe_status_cache[contract_address] = SafeStatus.objects.create(
+            safe_status = SafeStatus.objects.create(
                 internal_tx=internal_tx,
                 address=contract_address,
                 owners=owners,
@@ -336,6 +340,8 @@ class SafeTxProcessor(TxProcessor):
                 master_copy=master_copy,
                 fallback_handler=fallback_handler,
             )
+            self.safe_status_cache[contract_address] = safe_status
+            SafeLastStatus.objects.update_or_create_from_safe_status(safe_status)
         else:
             safe_status = self.get_last_safe_status_for_address(contract_address)
             if not safe_status:

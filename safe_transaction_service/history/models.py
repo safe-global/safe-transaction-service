@@ -1501,8 +1501,98 @@ class SafeContractDelegate(models.Model):
         )
 
 
+class SafeLastStatusManager(models.Manager):
+    def update_or_create_from_safe_status(
+        self, safe_status: "SafeStatus"
+    ) -> "SafeLastStatus":
+        obj, _ = self.update_or_create(
+            internal_tx=safe_status.internal_tx,
+            defaults={
+                "address": safe_status.contract_address,
+                "owners": safe_status.owners,
+                "threshold": safe_status.threshold,
+                "nonce": safe_status.nonce,
+                "master_copy": safe_status.master_copy,
+                "fallback_handler": safe_status.fallback_handler,
+            },
+        )
+        return obj
+
+
+class SafeLastStatus(models.Model):
+    objects = SafeLastStatusManager()
+    internal_tx = models.OneToOneField(
+        InternalTx,
+        on_delete=models.CASCADE,
+        related_name="safe_last_status",
+        primary_key=True,
+    )
+    address = EthereumAddressV2Field(db_index=True, unique=True)
+    owners = ArrayField(EthereumAddressV2Field())
+    threshold = Uint256Field()
+    nonce = Uint256Field(default=0)
+    master_copy = EthereumAddressV2Field()
+    fallback_handler = EthereumAddressV2Field()
+    guard = EthereumAddressV2Field(default=None, null=True)
+    enabled_modules = ArrayField(EthereumAddressV2Field(), default=list)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=["owners"]),
+        ]
+        verbose_name_plural = "Safe statuses"
+
+    def __str__(self):
+        return f"safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
+
+    @property
+    def block_number(self) -> int:
+        return self.internal_tx.ethereum_tx.block_id
+
+    def is_corrupted(self) -> bool:
+        """
+        SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
+        something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
+        adding owners and enabling a Module in the same contract `execTransaction`)
+
+        :return: `True` if corrupted, `False` otherwise
+        """
+        return (
+            self.__class__.objects.distinct("nonce")
+            .filter(address=self.address, nonce__lte=self.nonce)
+            .count()
+            <= self.nonce
+        )
+
+    def previous(self) -> Optional["SafeStatus"]:
+        """
+        :return: SafeStatus with the previous nonce
+        """
+        return (
+            self.__class__.objects.filter(address=self.address, nonce__lt=self.nonce)
+            .sorted_by_mined()
+            .first()
+        )
+
+    def store_new(self, internal_tx: InternalTx) -> None:
+        self.internal_tx = internal_tx
+        return self.save(force_insert=True)
+
+
 class SafeStatusManager(models.Manager):
-    pass
+    def insert_from_last_status(self, safe_last_status: SafeLastStatus) -> "SafeStatus":
+        obj, _ = self.create(
+            internal_tx=safe_last_status.internal_tx,
+            defaults={
+                "address": safe_last_status.contract_address,
+                "owners": safe_last_status.owners,
+                "threshold": safe_last_status.threshold,
+                "nonce": safe_last_status.nonce,
+                "master_copy": safe_last_status.master_copy,
+                "fallback_handler": safe_last_status.fallback_handler,
+            },
+        )
+        return obj
 
 
 class SafeStatusQuerySet(models.QuerySet):
@@ -1627,10 +1717,6 @@ class SafeStatus(models.Model):
             .sorted_by_mined()
             .first()
         )
-
-    def store_new(self, internal_tx: InternalTx) -> None:
-        self.internal_tx = internal_tx
-        return self.save(force_insert=True)
 
 
 class WebHookType(Enum):
