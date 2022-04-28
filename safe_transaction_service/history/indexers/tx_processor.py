@@ -100,7 +100,7 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
         }
-        self.safe_status_cache: Dict[str, SafeStatus] = {}
+        self.safe_last_status_cache: Dict[str, SafeStatus] = {}
         self.signature_breaking_versions = (  # Versions where signing changed
             Version("1.0.0"),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
             Version("1.3.0"),  # ChainId was included
@@ -108,10 +108,10 @@ class SafeTxProcessor(TxProcessor):
 
     def clear_cache(self, safe_address: Optional[str] = None):
         if safe_address:
-            if safe_address in self.safe_status_cache:
-                del self.safe_status_cache[safe_address]
+            if safe_address in self.safe_last_status_cache:
+                del self.safe_last_status_cache[safe_address]
         else:
-            self.safe_status_cache.clear()
+            self.safe_last_status_cache.clear()
 
     def is_failed(
         self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]
@@ -166,7 +166,7 @@ class SafeTxProcessor(TxProcessor):
         self, address: ChecksumAddress
     ) -> Optional[SafeLastStatus]:
         try:
-            safe_status = self.safe_status_cache.get(
+            safe_status = self.safe_last_status_cache.get(
                 address
             ) or SafeLastStatus.objects.get(address=address)
             return safe_status
@@ -237,10 +237,16 @@ class SafeTxProcessor(TxProcessor):
     def store_new_safe_status(
         self, safe_last_status: SafeStatus, internal_tx: InternalTx
     ) -> SafeLastStatus:
+        """
+        Updates `SafeLastStatus` and adds an entry to `SafeStatus`
+
+        :param safe_last_status:
+        :param internal_tx:
+        :return: Updated `SafeLastStatus`
+        """
         safe_last_status.internal_tx = internal_tx
         safe_last_status.save()
-        SafeStatus.objects.insert_from_last_status()
-        self.safe_status_cache[safe_last_status.address] = safe_last_status
+        self.safe_last_status_cache[safe_last_status.address] = safe_last_status
         return safe_last_status
 
     @transaction.atomic
@@ -331,17 +337,20 @@ class SafeTxProcessor(TxProcessor):
                 )
                 logger.info("Found new Safe=%s", contract_address)
 
-            safe_status = SafeStatus.objects.create(
-                internal_tx=internal_tx,
-                address=contract_address,
-                owners=owners,
-                threshold=threshold,
-                nonce=nonce,
-                master_copy=master_copy,
-                fallback_handler=fallback_handler,
+            safe_last_status = self.store_new_safe_status(
+                SafeLastStatus(
+                    internal_tx=internal_tx,
+                    address=contract_address,
+                    owners=owners,
+                    threshold=threshold,
+                    nonce=nonce,
+                    master_copy=master_copy,
+                    fallback_handler=fallback_handler,
+                ),
+                internal_tx,
             )
-            self.safe_status_cache[contract_address] = safe_status
-            SafeLastStatus.objects.update_or_create_from_safe_status(safe_status)
+
+            self.safe_last_status_cache[contract_address] = safe_last_status
         else:
             safe_status = self.get_last_safe_status_for_address(contract_address)
             if not safe_status:

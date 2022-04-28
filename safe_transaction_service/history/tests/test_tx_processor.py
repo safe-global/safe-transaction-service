@@ -24,8 +24,8 @@ from .factories import (
     InternalTxDecodedFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
+    SafeLastStatusFactory,
     SafeMasterCopyFactory,
-    SafeStatusFactory,
 )
 from .mocks.traces import call_trace, module_traces, rinkeby_traces
 
@@ -408,10 +408,10 @@ class TestSafeTxProcessor(TestCase):
 
     def test_process_module_tx(self):
         safe_tx_processor = self.tx_processor
-        safe_status = SafeStatusFactory()
+        safe_last_status = SafeLastStatusFactory()
         module_internal_tx_decoded = InternalTxDecodedFactory(
             function_name="execTransactionFromModule",
-            internal_tx___from=safe_status.address,
+            internal_tx___from=safe_last_status.address,
             internal_tx__to="0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
             internal_tx__trace_address="0,0,0,4",
             internal_tx__ethereum_tx__tx_hash="0x59f20a56a94ad4ee934468eb26b9148151289c97fefece779e05d98befd156f0",

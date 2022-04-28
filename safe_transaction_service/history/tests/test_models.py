@@ -633,13 +633,6 @@ class TestInternalTxDecoded(TestCase):
 
 
 class TestSafeStatus(TestCase):
-    def test_safe_status_store_new(self):
-        safe_status = SafeStatusFactory()
-        self.assertEqual(SafeStatus.objects.all().count(), 1)
-        internal_tx = InternalTxFactory()
-        safe_status.store_new(internal_tx)
-        self.assertEqual(SafeStatus.objects.all().count(), 2)
-
     def test_safe_status_is_corrupted(self):
         address = Account.create().address
         safe_status = SafeStatusFactory(nonce=0, address=address)

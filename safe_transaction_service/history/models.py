@@ -1514,6 +1514,8 @@ class SafeLastStatusManager(models.Manager):
                 "nonce": safe_status.nonce,
                 "master_copy": safe_status.master_copy,
                 "fallback_handler": safe_status.fallback_handler,
+                "guard": safe_status.fallback_handler,
+                "enabled_modules": safe_status.fallback_handler,
             },
         )
         return obj
@@ -1525,9 +1527,9 @@ class SafeLastStatus(models.Model):
         InternalTx,
         on_delete=models.CASCADE,
         related_name="safe_last_status",
-        primary_key=True,
+        unique=True,
     )
-    address = EthereumAddressV2Field(db_index=True, unique=True)
+    address = EthereumAddressV2Field(db_index=True, primary_key=True)
     owners = ArrayField(EthereumAddressV2Field())
     threshold = Uint256Field()
     nonce = Uint256Field(default=0)
@@ -1543,7 +1545,7 @@ class SafeLastStatus(models.Model):
         verbose_name_plural = "Safe statuses"
 
     def __str__(self):
-        return f"safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
+        return f"LastStatus: safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
 
     @property
     def block_number(self) -> int:
@@ -1569,30 +1571,14 @@ class SafeLastStatus(models.Model):
         :return: SafeStatus with the previous nonce
         """
         return (
-            self.__class__.objects.filter(address=self.address, nonce__lt=self.nonce)
+            SafeStatus.objects.filter(address=self.address, nonce__lt=self.nonce)
             .sorted_by_mined()
             .first()
         )
 
-    def store_new(self, internal_tx: InternalTx) -> None:
-        self.internal_tx = internal_tx
-        return self.save(force_insert=True)
-
 
 class SafeStatusManager(models.Manager):
-    def insert_from_last_status(self, safe_last_status: SafeLastStatus) -> "SafeStatus":
-        obj, _ = self.create(
-            internal_tx=safe_last_status.internal_tx,
-            defaults={
-                "address": safe_last_status.contract_address,
-                "owners": safe_last_status.owners,
-                "threshold": safe_last_status.threshold,
-                "nonce": safe_last_status.nonce,
-                "master_copy": safe_last_status.master_copy,
-                "fallback_handler": safe_last_status.fallback_handler,
-            },
-        )
-        return obj
+    pass
 
 
 class SafeStatusQuerySet(models.QuerySet):
@@ -1687,7 +1673,21 @@ class SafeStatus(models.Model):
         verbose_name_plural = "Safe statuses"
 
     def __str__(self):
-        return f"safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
+        return f"Status: safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
+
+    @classmethod
+    def from_last_status(cls, safe_last_status: SafeLastStatus) -> "SafeStatus":
+        return cls(
+            internal_tx=safe_last_status.internal_tx,
+            address=safe_last_status.address,
+            owners=safe_last_status.owners,
+            threshold=safe_last_status.threshold,
+            nonce=safe_last_status.nonce,
+            master_copy=safe_last_status.master_copy,
+            fallback_handler=safe_last_status.fallback_handler,
+            guard=safe_last_status.guard,
+            enabled_modules=safe_last_status.enabled_modules,
+        )
 
     @property
     def block_number(self) -> int:
