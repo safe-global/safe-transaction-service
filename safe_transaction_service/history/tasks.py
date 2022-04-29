@@ -351,7 +351,6 @@ def process_decoded_internal_txs_for_safe_task(
                         raise ValueError(message)
                     previous_safe_status = safe_status
 
-            tx_processor.clear_cache()  # TODO Fix this properly
             # Use slicing for memory issues
             while True:
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(

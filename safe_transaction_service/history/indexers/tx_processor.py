@@ -255,6 +255,7 @@ class SafeTxProcessor(TxProcessor):
     ) -> bool:
         processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
         internal_tx_decoded.set_processed()
+        self.clear_cache()
         return processed_successfully
 
     @transaction.atomic
@@ -279,6 +280,7 @@ class SafeTxProcessor(TxProcessor):
         InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
             processed=True
         )
+        self.clear_cache()
         return results
 
     def __process_decoded_transaction(
