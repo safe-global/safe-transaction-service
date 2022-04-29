@@ -2676,6 +2676,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 )
 
     def test_safe_info_view(self):
+        self.maxDiff = None
         invalid_address = "0x2A"
         response = self.client.get(
             reverse("v1:history:safe-info", args=(invalid_address,))
@@ -2711,7 +2712,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data,
             {
                 "address": safe_address,
-                "nonce": 0,
+                "nonce": safe_last_status.nonce,
                 "threshold": safe_last_status.threshold,
                 "owners": safe_last_status.owners,
                 "master_copy": safe_last_status.master_copy,
@@ -2731,7 +2732,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data,
             {
                 "address": safe_address,
-                "nonce": 0,
+                "nonce": safe_last_status.nonce,
                 "threshold": safe_last_status.threshold,
                 "owners": safe_last_status.owners,
                 "master_copy": safe_last_status.master_copy,
