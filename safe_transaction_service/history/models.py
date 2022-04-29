@@ -38,7 +38,7 @@ from model_utils.models import TimeStampedModel
 from packaging.version import Version
 from web3.types import EventData
 
-from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
+from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
     HexField,
@@ -46,6 +46,7 @@ from gnosis.eth.django.models import (
     Uint256Field,
 )
 from gnosis.safe import SafeOperation
+from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.contracts.models import Contract
@@ -1503,36 +1504,6 @@ class SafeContractDelegate(models.Model):
         )
 
 
-class SafeLastStatusManager(models.Manager):
-    def update_or_create_from_safe_status(
-        self, safe_status: "SafeStatus"
-    ) -> "SafeLastStatus":
-        obj, _ = self.update_or_create(
-            address=safe_status.address,
-            defaults={
-                "internal_tx": safe_status.internal_tx,
-                "owners": safe_status.owners,
-                "threshold": safe_status.threshold,
-                "nonce": safe_status.nonce,
-                "master_copy": safe_status.master_copy,
-                "fallback_handler": safe_status.fallback_handler,
-                "guard": safe_status.guard,
-                "enabled_modules": safe_status.enabled_modules,
-            },
-        )
-        return obj
-
-    def addresses_for_owner(self, owner_address: str) -> ValuesQuerySet[str]:
-        """
-        :param owner_address:
-        :return: Safes for an owner
-        """
-
-        return self.filter(owners__contains=[owner_address]).values_list(
-            "address", flat=True
-        )
-
-
 class SafeStatusBase(models.Model):
     internal_tx = models.OneToOneField(
         InternalTx,
@@ -1594,6 +1565,36 @@ class SafeStatusBase(models.Model):
         )
 
 
+class SafeLastStatusManager(models.Manager):
+    def update_or_create_from_safe_status(
+        self, safe_status: "SafeStatus"
+    ) -> "SafeLastStatus":
+        obj, _ = self.update_or_create(
+            address=safe_status.address,
+            defaults={
+                "internal_tx": safe_status.internal_tx,
+                "owners": safe_status.owners,
+                "threshold": safe_status.threshold,
+                "nonce": safe_status.nonce,
+                "master_copy": safe_status.master_copy,
+                "fallback_handler": safe_status.fallback_handler,
+                "guard": safe_status.guard,
+                "enabled_modules": safe_status.enabled_modules,
+            },
+        )
+        return obj
+
+    def addresses_for_owner(self, owner_address: str) -> ValuesQuerySet[str]:
+        """
+        :param owner_address:
+        :return: Safes for an owner
+        """
+
+        return self.filter(owners__contains=[owner_address]).values_list(
+            "address", flat=True
+        )
+
+
 class SafeLastStatus(SafeStatusBase):
     objects = SafeLastStatusManager()
 
@@ -1605,6 +1606,29 @@ class SafeLastStatus(SafeStatusBase):
 
     def __str__(self):
         return "LastStatus: " + self._to_str()
+
+    def get_safe_info(self) -> SafeInfo:
+        """
+        :return: SafeInfo built from SafeLastStatus (not requiring connection to Ethereum RPC)
+        """
+        try:
+            master_copy_version = SafeMasterCopy.objects.get(
+                address=self.master_copy
+            ).version
+        except SafeMasterCopy.DoesNotExist:
+            master_copy_version = "UNKNOWN"
+
+        return SafeInfo(
+            self.address,
+            self.fallback_handler,
+            self.guard or NULL_ADDRESS,
+            self.master_copy,
+            self.enabled_modules,
+            self.nonce,
+            self.owners,
+            self.threshold,
+            master_copy_version,
+        )
 
 
 class SafeStatusManager(models.Manager):

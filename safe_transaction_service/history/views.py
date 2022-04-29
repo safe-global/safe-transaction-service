@@ -54,7 +54,6 @@ from .services import (
     TransactionServiceProvider,
 )
 from .services.collectibles_service import CollectiblesServiceProvider
-from .services.safe_service import CannotGetSafeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -989,15 +988,15 @@ class SafeInfoView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         try:
-            safe_info = SafeServiceProvider().get_safe_info(address)
+            safe_info = SafeLastStatus.objects.get(address=address).get_safe_info()
             serializer = self.get_serializer(safe_info)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
-        except CannotGetSafeInfo:
+        except SafeLastStatus.DoesNotExist:
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 data={
                     "code": 50,
-                    "message": "Cannot get Safe info",
+                    "message": "Service is still indexing",
                     "arguments": [address],
                 },
             )
