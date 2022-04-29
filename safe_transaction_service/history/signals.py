@@ -290,6 +290,6 @@ def add_to_historical_table(
     :param kwargs:
     :return: SafeStatus
     """
-    safe_status = SafeStatus.from_last_status(instance)
+    safe_status = SafeStatus.from_status_instance(instance)
     safe_status.save()
     return safe_status

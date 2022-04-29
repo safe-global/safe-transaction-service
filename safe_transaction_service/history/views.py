@@ -43,8 +43,8 @@ from .models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     SafeMasterCopy,
-    SafeStatus,
     TransferDict,
 )
 from .serializers import get_data_decoded_from_data
@@ -1018,7 +1018,7 @@ class OwnersView(GenericAPIView):
             422: "Owner address checksum not valid",
         }
     )
-    @method_decorator(cache_page(settings.CACHE_OWNERS_VIEW_SECONDS))
+    @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
         """
         Return Safes where the address provided is an owner
@@ -1033,7 +1033,7 @@ class OwnersView(GenericAPIView):
                 },
             )
 
-        safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
+        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)
         serializer = self.get_serializer(data={"safes": safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

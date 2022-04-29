@@ -10,7 +10,7 @@ from eth_account import Account
 
 from gnosis.eth import EthereumClient, EthereumNetwork
 
-from ..models import SafeContract, SafeStatus
+from ..models import SafeContract, SafeLastStatus, SafeStatus
 from ..services import IndexService
 from ..tasks import (
     check_reorgs_task,
@@ -152,6 +152,7 @@ class TestTasks(TestCase):
         safe_address = safe_status_0.address
         safe_status_2 = SafeStatusFactory(nonce=2, address=safe_address)
         safe_status_5 = SafeStatusFactory(nonce=5, address=safe_address)
+        SafeLastStatus.objects.update_or_create_from_safe_status(safe_status_5)
         with patch.object(IndexService, "reindex_master_copies") as reindex_mock:
             with patch.object(IndexService, "reprocess_addresses") as reprocess_mock:
                 with self.assertLogs(logger=task_logger) as cm:

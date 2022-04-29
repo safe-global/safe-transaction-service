@@ -23,7 +23,7 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import Case, Count, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
@@ -31,11 +31,11 @@ from django.db.models.signals import post_save
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from django_stubs_ext import ValuesQuerySet
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from packaging.version import Version
-from web3 import Web3
 from web3.types import EventData
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC
@@ -1064,6 +1064,7 @@ class MultisigTransactionManager(models.Manager):
             SafeStatus.objects.filter(address=safe)
             .values_list("owners", flat=True)
             .distinct()
+            .iterator()
         ):
             owners_set.update(owners_list)
 
@@ -1135,6 +1136,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def with_confirmations_required(self):
         """
         Add confirmations required for execution when the tx was mined (threshold of the Safe at that point)
+
         :return: queryset with `confirmations_required: int` field
         """
         threshold_query = (
@@ -1506,23 +1508,32 @@ class SafeLastStatusManager(models.Manager):
         self, safe_status: "SafeStatus"
     ) -> "SafeLastStatus":
         obj, _ = self.update_or_create(
-            internal_tx=safe_status.internal_tx,
+            address=safe_status.address,
             defaults={
-                "address": safe_status.contract_address,
+                "internal_tx": safe_status.internal_tx,
                 "owners": safe_status.owners,
                 "threshold": safe_status.threshold,
                 "nonce": safe_status.nonce,
                 "master_copy": safe_status.master_copy,
                 "fallback_handler": safe_status.fallback_handler,
-                "guard": safe_status.fallback_handler,
-                "enabled_modules": safe_status.fallback_handler,
+                "guard": safe_status.guard,
+                "enabled_modules": safe_status.enabled_modules,
             },
         )
         return obj
 
+    def addresses_for_owner(self, owner_address: str) -> ValuesQuerySet[str]:
+        """
+        :param owner_address:
+        :return: Safes for an owner
+        """
 
-class SafeLastStatus(models.Model):
-    objects = SafeLastStatusManager()
+        return self.filter(owners__contains=[owner_address]).values_list(
+            "address", flat=True
+        )
+
+
+class SafeStatusBase(models.Model):
     internal_tx = models.OneToOneField(
         InternalTx,
         on_delete=models.CASCADE,
@@ -1539,13 +1550,10 @@ class SafeLastStatus(models.Model):
     enabled_modules = ArrayField(EthereumAddressV2Field(), default=list)
 
     class Meta:
-        indexes = [
-            GinIndex(fields=["owners"]),
-        ]
-        verbose_name_plural = "Safe statuses"
+        abstract = True
 
-    def __str__(self):
-        return f"LastStatus: safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
+    def _to_str(self):
+        return f"safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
 
     @property
     def block_number(self) -> int:
@@ -1560,21 +1568,43 @@ class SafeLastStatus(models.Model):
         :return: `True` if corrupted, `False` otherwise
         """
         return (
-            self.__class__.objects.distinct("nonce")
+            SafeStatus.objects.distinct("nonce")
             .filter(address=self.address, nonce__lte=self.nonce)
             .count()
             <= self.nonce
         )
 
-    def previous(self) -> Optional["SafeStatus"]:
+    @classmethod
+    def from_status_instance(
+        cls, safe_status_base: "SafeStatusBase"
+    ) -> Union["SafeStatus", "SafeLastStatus"]:
         """
-        :return: SafeStatus with the previous nonce
+        Converts from SafeStatus to SafeLastStatus and vice versa
         """
-        return (
-            SafeStatus.objects.filter(address=self.address, nonce__lt=self.nonce)
-            .sorted_by_mined()
-            .first()
+        return cls(
+            internal_tx=safe_status_base.internal_tx,
+            address=safe_status_base.address,
+            owners=safe_status_base.owners,
+            threshold=safe_status_base.threshold,
+            nonce=safe_status_base.nonce,
+            master_copy=safe_status_base.master_copy,
+            fallback_handler=safe_status_base.fallback_handler,
+            guard=safe_status_base.guard,
+            enabled_modules=safe_status_base.enabled_modules,
         )
+
+
+class SafeLastStatus(SafeStatusBase):
+    objects = SafeLastStatusManager()
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=["owners"]),
+        ]
+        verbose_name_plural = "Safe last statuses"
+
+    def __str__(self):
+        return "LastStatus: " + self._to_str()
 
 
 class SafeStatusManager(models.Manager):
@@ -1607,34 +1637,6 @@ class SafeStatusQuerySet(models.QuerySet):
             "internal_tx__trace_address",
         )
 
-    def addresses_for_owner(self, owner_address: str) -> Set[str]:
-        """
-        Use raw query to get the Safes for an owner. We order by the internal_tx_id instead of using JOIN to get
-        the internal tx index as a shortcut. It's not as accurate but should be enough
-
-        :param owner_address:
-        :return:
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                    SELECT address
-                    FROM (
-                        SELECT DISTINCT ON(address) address, owners
-                        FROM history_safestatus
-                        WHERE address IN (
-                            -- Do a first filtering
-                            SELECT address FROM history_safestatus
-                            WHERE owners @> ARRAY[%s]::bytea[]
-                        )
-                        ORDER BY address, nonce DESC, internal_tx_id DESC
-                    ) AS sq
-                    WHERE owners @> ARRAY[%s]::bytea[];
-                """,
-                [HexBytes(owner_address), HexBytes(owner_address)],
-            )
-            return {Web3.toChecksumAddress(row[0].hex()) for row in cursor.fetchall()}
-
     def last_for_every_address(self) -> QuerySet:
         return (
             self.distinct("address")  # Uses PostgreSQL `DISTINCT ON`
@@ -1646,67 +1648,30 @@ class SafeStatusQuerySet(models.QuerySet):
         return self.filter(address=address).sorted_by_mined().first()
 
 
-class SafeStatus(models.Model):
+class SafeStatus(SafeStatusBase):
     objects = SafeStatusManager.from_queryset(SafeStatusQuerySet)()
     internal_tx = models.OneToOneField(
         InternalTx,
         on_delete=models.CASCADE,
         related_name="safe_status",
         primary_key=True,
-    )
-    address = EthereumAddressV2Field(db_index=True)
-    owners = ArrayField(EthereumAddressV2Field())
-    threshold = Uint256Field()
-    nonce = Uint256Field(default=0)
-    master_copy = EthereumAddressV2Field()
-    fallback_handler = EthereumAddressV2Field()
-    guard = EthereumAddressV2Field(default=None, null=True)
-    enabled_modules = ArrayField(EthereumAddressV2Field(), default=list)
+    )  # Make internal_tx the primary key
+    address = EthereumAddressV2Field(db_index=True)  # Address is not the primary key
 
     class Meta:
         indexes = [
             Index(fields=["address", "-nonce"]),  # Index on address and nonce DESC
             Index(fields=["address", "-nonce", "-internal_tx"]),  # For Window search
-            GinIndex(fields=["owners"]),
         ]
         unique_together = (("internal_tx", "address"),)
         verbose_name_plural = "Safe statuses"
 
     def __str__(self):
-        return f"Status: safe={self.address} threshold={self.threshold} owners={self.owners} nonce={self.nonce}"
-
-    @classmethod
-    def from_last_status(cls, safe_last_status: SafeLastStatus) -> "SafeStatus":
-        return cls(
-            internal_tx=safe_last_status.internal_tx,
-            address=safe_last_status.address,
-            owners=safe_last_status.owners,
-            threshold=safe_last_status.threshold,
-            nonce=safe_last_status.nonce,
-            master_copy=safe_last_status.master_copy,
-            fallback_handler=safe_last_status.fallback_handler,
-            guard=safe_last_status.guard,
-            enabled_modules=safe_last_status.enabled_modules,
-        )
+        return "Status: " + self._to_str()
 
     @property
     def block_number(self) -> int:
         return self.internal_tx.ethereum_tx.block_id
-
-    def is_corrupted(self) -> bool:
-        """
-        SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
-        something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
-        adding owners and enabling a Module in the same contract `execTransaction`)
-
-        :return: `True` if corrupted, `False` otherwise
-        """
-        return (
-            self.__class__.objects.distinct("nonce")
-            .filter(address=self.address, nonce__lte=self.nonce)
-            .count()
-            <= self.nonce
-        )
 
     def previous(self) -> Optional["SafeStatus"]:
         """

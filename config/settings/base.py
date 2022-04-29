@@ -446,8 +446,3 @@ SWAGGER_SETTINGS = {
         "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
     },
 }
-
-# Cache
-CACHE_OWNERS_VIEW_SECONDS = env.int(
-    "CACHE_OWNERS_VIEW_SECONDS", default=60 * 60
-)  # 1 hour
