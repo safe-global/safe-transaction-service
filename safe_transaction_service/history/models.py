@@ -31,7 +31,6 @@ from django.db.models.signals import post_save
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from django_stubs_ext import ValuesQuerySet
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -1584,7 +1583,7 @@ class SafeLastStatusManager(models.Manager):
         )
         return obj
 
-    def addresses_for_owner(self, owner_address: str) -> ValuesQuerySet[str]:
+    def addresses_for_owner(self, owner_address: str) -> QuerySet[str]:
         """
         :param owner_address:
         :return: Safes for an owner
