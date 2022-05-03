@@ -126,7 +126,7 @@ def index_erc20_events_out_of_sync_task(
         number_events_processed = 0
         while not updated:
             try:
-                events_processed, updated = erc20_events_indexer.process_addresses(
+                events_processed, _, updated = erc20_events_indexer.process_addresses(
                     addresses, current_block_number
                 )
                 number_events_processed += len(events_processed)

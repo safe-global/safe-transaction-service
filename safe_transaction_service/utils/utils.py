@@ -8,7 +8,7 @@ from django.db import connection
 from gevent.monkey import saved
 
 
-def chunks(elements: List[Any], n: int):
+def chunks(elements: List[Any], n: int) -> Iterable[Any]:
     """
     :param elements: List
     :param n: Number of elements per chunk
