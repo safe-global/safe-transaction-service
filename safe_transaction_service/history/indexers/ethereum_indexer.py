@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Any, List, Optional, Sequence, Tuple
 
-from django.db.models import Min
+from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
 from web3 import Web3
@@ -153,16 +153,32 @@ class EthereumIndexer(ABC):
         if (current_block_number - common_minimum_block_number) <= self.confirmations:
             return  # We don't want problems with reorgs
 
-        to_block_number = min(
+        to_block_number = self.get_to_block_number(
+            from_block_number, current_block_number
+        )
+        return from_block_number, to_block_number
+
+    def get_to_block_number(
+        self, from_block_number: int, current_block_number: int
+    ) -> int:
+        """
+        :param from_block_number:
+        :param current_block_number:
+        :return: Top block number to process
+        """
+        return min(
             from_block_number + self.block_process_limit,
             current_block_number - self.confirmations,
         )
 
-        return from_block_number, to_block_number
-
     def get_minimum_block_number(
         self, addresses: Optional[Sequence[str]] = None
     ) -> Optional[int]:
+        """
+        :param addresses:
+        :return: Minimum block number for all the `addresses` provided. If not provided, return
+            minimum block number for every `address` on the table.
+        """
         logger.debug(
             "%s: Getting minimum-block-number for %d addresses",
             self.__class__.__name__,
@@ -183,9 +199,26 @@ class EthereumIndexer(ABC):
         )
         return minimum_block_number
 
+    def get_addresses_chunks(
+        self, monitored_addresses: QuerySet[MonitoredAddress]
+    ) -> List[List[MonitoredAddress]]:
+        """
+        :return: Addresses chunks for iterator of `MonitoredAddress`
+        """
+        # We need to cast the `iterable` to `list`, if not chunks will not work well when models are updated
+        monitored_addresses_list = list(monitored_addresses)
+
+        if self.query_chunk_size:
+            return chunks(monitored_addresses_list, self.query_chunk_size)
+
+        if monitored_addresses_list:
+            return [monitored_addresses_list]  # One `chunk`
+
+        return []
+
     def get_almost_updated_addresses(
         self, current_block_number: int
-    ) -> List[MonitoredAddress]:
+    ) -> QuerySet[MonitoredAddress]:
         """
         For addresses almost updated (< `updated_blocks_behind` blocks) we process them together
 
@@ -206,7 +239,7 @@ class EthereumIndexer(ABC):
 
     def get_not_updated_addresses(
         self, current_block_number: int
-    ) -> List[MonitoredAddress]:
+    ) -> QuerySet[MonitoredAddress]:
         """
         For addresses not updated (> `updated_blocks_behind` blocks) we process them one by one (node hangs)
 
@@ -253,13 +286,14 @@ class EthereumIndexer(ABC):
 
     def process_addresses(
         self, addresses: Sequence[str], current_block_number: Optional[int] = None
-    ) -> Tuple[Sequence[Any], bool]:
+    ) -> Tuple[Sequence[Any], int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
 
         :param addresses: Addresses to process
         :param current_block_number: To prevent fetching it again
-        :return: List of processed data and a boolean (`True` if no more blocks to scan, `False` otherwise)
+        :return: Tuple with a sequence of `processed data`, `last_block_number` processed
+            and `True` if no more blocks to scan, `False` otherwise
         """
         assert addresses, "Addresses cannot be empty!"
         assert all(
@@ -271,7 +305,7 @@ class EthereumIndexer(ABC):
         )
         parameters = self.get_block_numbers_for_search(addresses, current_block_number)
         if parameters is None:
-            return [], True
+            return [], current_block_number, True
         from_block_number, to_block_number = parameters
 
         updated = to_block_number == (current_block_number - self.confirmations)
@@ -349,7 +383,7 @@ class EthereumIndexer(ABC):
         processed_elements = self.process_elements(elements)
 
         self.update_monitored_address(addresses, from_block_number, to_block_number)
-        return processed_elements, updated
+        return processed_elements, to_block_number, updated
 
     def start(self) -> int:
         """
@@ -368,62 +402,85 @@ class EthereumIndexer(ABC):
         logger.debug(
             "%s: Retrieving almost updated monitored addresses", self.__class__.__name__
         )
-        # We need to cast the `iterable` to `list`, if not chunks will not work well when models are updated
-        almost_updated_monitored_addresses = list(
-            self.get_almost_updated_addresses(current_block_number)
+
+        almost_updated_addresses = self.get_almost_updated_addresses(
+            current_block_number
         )
-        if almost_updated_monitored_addresses:
+        if almost_updated_addresses:
             logger.info(
                 "%s: Processing %d almost updated addresses",
                 self.__class__.__name__,
-                len(almost_updated_monitored_addresses),
+                len(almost_updated_addresses),
             )
         else:
             logger.debug(
                 "%s: No almost updated addresses to process", self.__class__.__name__
             )
-        if self.query_chunk_size:
-            almost_updated_monitored_addresses_chunks = chunks(
-                almost_updated_monitored_addresses, self.query_chunk_size
-            )
-        elif almost_updated_monitored_addresses:
-            almost_updated_monitored_addresses_chunks = [
-                almost_updated_monitored_addresses
-            ]  # One `chunk`
-        else:
-            almost_updated_monitored_addresses_chunks = []
-
-        for almost_updated_addresses_chunk in almost_updated_monitored_addresses_chunks:
+        almost_updated_addresses_chunks = self.get_addresses_chunks(
+            almost_updated_addresses
+        )
+        for almost_updated_addresses_chunk in almost_updated_addresses_chunks:
             updated = False
             while not updated:
-                almost_updated_addresses = [
+                almost_updated_addresses_to_process = [
                     monitored_contract.address
                     for monitored_contract in almost_updated_addresses_chunk
                 ]
-                processed_elements, updated = self.process_addresses(
-                    almost_updated_addresses, current_block_number
+                processed_elements, _, updated = self.process_addresses(
+                    almost_updated_addresses_to_process, current_block_number
                 )
                 number_processed_elements += len(processed_elements)
 
         logger.debug(
             "%s: Retrieving not updated monitored addresses", self.__class__.__name__
         )
+
         not_updated_addresses = self.get_not_updated_addresses(current_block_number)
+
         if not_updated_addresses:
             logger.info(
-                "%s: Processing %d not updated addresses",
+                "%s: Processing %d not updated addresses total",
                 self.__class__.__name__,
                 len(not_updated_addresses),
             )
+
+            not_updated_addresses_chunks = self.get_addresses_chunks(
+                not_updated_addresses
+            )
+            for not_updated_addresses_chunk in not_updated_addresses_chunks:
+                logger.info(
+                    "%s: Processing first chunk of %d not updated addresses",
+                    self.__class__.__name__,
+                    len(not_updated_addresses_chunk),
+                )
+                from_block_number = self.get_minimum_block_number() + 1
+                updated = False
+                while not updated:
+                    # Estimate to_block_number
+                    to_block_number = self.get_to_block_number(
+                        from_block_number, current_block_number
+                    )
+
+                    # Only process addresses whose block is under the `to_block_number`, don't reprocess addresses
+                    not_updated_addresses_to_process = [
+                        monitored_contract.address
+                        for monitored_contract in not_updated_addresses_chunk
+                        if getattr(monitored_contract, self.database_field)
+                        < to_block_number
+                    ]
+                    # Get real `to_block_number` processed
+                    (
+                        processed_elements,
+                        to_block_number,
+                        updated,
+                    ) = self.process_addresses(
+                        not_updated_addresses_to_process, current_block_number
+                    )
+                    number_processed_elements += len(processed_elements)
+                    from_block_number = to_block_number + 1
         else:
             logger.debug(
                 "%s: No not updated addresses to process", self.__class__.__name__
             )
-        for monitored_contract in not_updated_addresses:
-            updated = False
-            while not updated:
-                processed_elements, updated = self.process_addresses(
-                    [monitored_contract.address], current_block_number
-                )
-                number_processed_elements += len(processed_elements)
+
         return number_processed_elements
