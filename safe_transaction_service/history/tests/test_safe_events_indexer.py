@@ -222,15 +222,15 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and addOwner
-        self.assertCountEqual(
-            safe_status.owners, [owner_account_1.address, owner_account_2.address]
+        self.assertEqual(
+            safe_status.owners, [owner_account_2.address, owner_account_1.address]
         )
         self.assertEqual(safe_status.nonce, 1)
 
         safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
-        self.assertCountEqual(safe_status.owners, [owner_account_1.address])
+        self.assertEqual(safe_status.owners, [owner_account_1.address])
         self.assertEqual(safe_status.nonce, 1)
 
         self.assertEqual(MultisigTransaction.objects.count(), 1)
