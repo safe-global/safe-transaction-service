@@ -87,7 +87,7 @@ class TestSafeTxProcessor(TestCase):
 
         self.assertEqual(SafeStatus.objects.count(), 3)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
-        self.assertCountEqual(safe_status.owners, [owner, new_owner])
+        self.assertEqual(safe_status.owners, [new_owner, owner])
         self.assertEqual(safe_status.nonce, 1)
         self.assertEqual(safe_status.threshold, threshold)
 
@@ -107,7 +107,7 @@ class TestSafeTxProcessor(TestCase):
         )
         self.assertEqual(SafeStatus.objects.count(), 5)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
-        self.assertCountEqual(safe_status.owners, [another_owner, new_owner])
+        self.assertEqual(safe_status.owners, [new_owner, another_owner])
         self.assertEqual(safe_status.nonce, 2)
         self.assertEqual(safe_status.threshold, threshold)
 
