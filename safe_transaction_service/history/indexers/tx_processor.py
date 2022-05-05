@@ -191,22 +191,22 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
-    def remove_owner(
-        self, internal_tx: InternalTx, safe_status: SafeStatus, owner: str
-    ):
+    def swap_owner(
+        self,
+        internal_tx: InternalTx,
+        safe_status: SafeStatus,
+        owner: ChecksumAddress,
+        new_owner: Optional[ChecksumAddress],
+    ) -> None:
         """
         :param internal_tx:
         :param safe_status:
         :param owner:
+        :param new_owner: If provided, `owner` will be replaced by `new_owner`. If not, `owner` will be removed
         :return:
         """
         contract_address = internal_tx._from
-        try:
-            safe_status.owners.remove(owner)
-            MultisigConfirmation.objects.remove_unused_confirmations(
-                contract_address, safe_status.nonce, owner
-            )
-        except ValueError as e:
+        if owner not in safe_status.owners:
             logger.error(
                 "Error processing trace=%s for contract=%s with tx-hash=%s. Cannot remove owner=%s . "
                 "Current owners=%s",
@@ -216,7 +216,21 @@ class SafeTxProcessor(TxProcessor):
                 owner,
                 safe_status.owners,
             )
-            raise OwnerCannotBeRemoved() from e
+            raise OwnerCannotBeRemoved(
+                f"Cannot remove owner {owner}. Current owners {safe_status.owners}"
+            )
+
+        if not new_owner:
+            safe_status.owners.remove(owner)
+        else:
+            # Replace owner by new_owner in the same place of the list
+            safe_status.owners = [
+                new_owner if current_owner == owner else current_owner
+                for current_owner in safe_status.owners
+            ]
+        MultisigConfirmation.objects.remove_unused_confirmations(
+            contract_address, safe_status.nonce, owner
+        )
 
     def store_new_safe_status(
         self, safe_status: SafeStatus, internal_tx: InternalTx
@@ -339,16 +353,15 @@ class SafeTxProcessor(TxProcessor):
                 )  # Event doesn't have threshold
                 owner = arguments["owner"]
                 if function_name == "addOwnerWithThreshold":
-                    safe_status.owners.append(owner)
+                    safe_status.owners.insert(0, owner)
                 else:  # removeOwner, removeOwnerWithThreshold
-                    self.remove_owner(internal_tx, safe_status, owner)
+                    self.swap_owner(internal_tx, safe_status, owner, None)
                 self.store_new_safe_status(safe_status, internal_tx)
             elif function_name == "swapOwner":
                 logger.debug("Processing owner swap")
                 old_owner = arguments["oldOwner"]
                 new_owner = arguments["newOwner"]
-                self.remove_owner(internal_tx, safe_status, old_owner)
-                safe_status.owners.append(new_owner)
+                self.swap_owner(internal_tx, safe_status, old_owner, new_owner)
                 self.store_new_safe_status(safe_status, internal_tx)
             elif function_name == "changeThreshold":
                 logger.debug("Processing threshold change")
