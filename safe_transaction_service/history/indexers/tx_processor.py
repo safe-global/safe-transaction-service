@@ -238,7 +238,7 @@ class SafeTxProcessor(TxProcessor):
         self, safe_last_status: SafeStatus, internal_tx: InternalTx
     ) -> SafeLastStatus:
         """
-        Updates `SafeLastStatus` and adds an entry to `SafeStatus`
+        Updates `SafeLastStatus`. An entry to `SafeStatus` is added too via a Django signal.
 
         :param safe_last_status:
         :param internal_tx:
