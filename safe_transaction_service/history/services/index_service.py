@@ -2,6 +2,7 @@ import logging
 from typing import Collection, List, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
@@ -260,7 +261,9 @@ class IndexService:
             queryset.delete()
 
         logger.info("Remove transactions automatically indexed")
-        queryset = MultisigTransaction.objects.exclude(ethereum_tx=None)
+        queryset = MultisigTransaction.objects.exclude(ethereum_tx=None).filter(
+            Q(origin=None) | Q(origin="")
+        )
         if addresses:
             queryset = queryset.filter(safe__in=addresses)
         queryset.delete()

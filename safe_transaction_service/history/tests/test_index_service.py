@@ -135,22 +135,32 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertIsNone(index_service.reprocess_addresses([]))
 
         safe_status = SafeStatusFactory()
-        MultisigTransactionFactory()  # It shouldn't be deleted
-        MultisigTransactionFactory(safe=safe_status.address)  # It should be deleted
+        MultisigTransactionFactory()  # It shouldn't be deleted (safe not matching)
+        MultisigTransactionFactory(
+            safe=safe_status.address, origin=None
+        )  # It should be deleted
         MultisigTransactionFactory(
             safe=safe_status.address, ethereum_tx=None
         )  # It shouldn't be deleted
+        MultisigTransactionFactory(
+            safe=safe_status.address, origin="Something"
+        )  # It shouldn't be deleted
+        self.assertEqual(MultisigTransaction.objects.count(), 4)
         self.assertIsNone(index_service.reprocess_addresses([safe_status.address]))
         self.assertEqual(SafeStatus.objects.count(), 0)
-        self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
 
     def test_reprocess_all(self):
         index_service: IndexService = self.index_service
         for _ in range(5):
             safe_status = SafeStatusFactory()
-            MultisigTransactionFactory(safe=safe_status.address)
-        MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
+            MultisigTransactionFactory(safe=safe_status.address, origin=None)
+            MultisigTransactionFactory(safe=safe_status.address, origin="")
 
+        MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
+        MultisigTransactionFactory(origin="Something")  # It shouldn't be deleted
+
+        self.assertEqual(MultisigTransaction.objects.count(), 12)
         self.assertIsNone(index_service.reprocess_all())
         self.assertEqual(SafeStatus.objects.count(), 0)
-        self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
