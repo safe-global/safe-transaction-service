@@ -9,6 +9,9 @@ else
     log_level="info"
 fi
 
-sleep 10
+
+echo "==> $(date +%H:%M:%S) ==> Installing flower for monitoring <=="
+pip install 'celery[flower]'
+sleep 5
 echo "==> $(date +%H:%M:%S) ==> Running Celery beat <=="
 exec celery -C -A config.celery_app beat -S django_celery_beat.schedulers:DatabaseScheduler --loglevel $log_level
