@@ -61,4 +61,6 @@ services:
   scheduler:
     <<: *worker
     command: docker/web/celery/scheduler/run.sh
+    ports:
+      - "5555:5555"
 
