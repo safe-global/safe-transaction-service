@@ -1,8 +1,11 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Generator, List, Optional, Sequence, Set
+from typing import Generator, Iterable, List, Optional, Sequence, Set
 
 from django.db import transaction
+
+from eth_typing import HexStr
+from web3.types import ParityFilterTrace
 
 from gnosis.eth import EthereumClient
 
@@ -10,6 +13,7 @@ from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
     get_safe_tx_decoder,
 )
+from safe_transaction_service.utils.utils import chunks
 
 from ..models import InternalTx, InternalTxDecoded, MonitoredAddress, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
@@ -215,6 +219,15 @@ class InternalTxIndexer(EthereumIndexer):
             except CannotDecode:
                 pass
 
+    def trace_transactions(
+        self, tx_hashes: Sequence[HexStr], batch_size: Optional[int]
+    ) -> Iterable[List[ParityFilterTrace]]:
+        batch_size = batch_size or len(tx_hashes)
+        for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
+            yield from self.ethereum_client.parity.trace_transactions(
+                list(tx_hash_chunk)
+            )
+
     def process_elements(self, tx_hashes: Sequence[str]) -> List[InternalTx]:
         # Prefetch ethereum txs
         if not tx_hashes:
@@ -228,10 +241,11 @@ class InternalTxIndexer(EthereumIndexer):
         internal_txs = (
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
             for ethereum_tx, traces in zip(
-                ethereum_txs, self.ethereum_client.parity.trace_transactions(tx_hashes)
+                ethereum_txs, self.trace_transactions(tx_hashes, batch_size=200)
             )
             for trace in self.ethereum_client.parity.filter_out_errored_traces(traces)
         )
+
         revelant_internal_txs_batch = (
             trace for trace in internal_txs if trace.is_relevant
         )
