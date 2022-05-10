@@ -790,7 +790,7 @@ class InternalTx(models.Model):
         EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
     )
     timestamp = models.DateTimeField(db_index=True)
-    block_number = models.PositiveIntegerField()
+    block_number = models.PositiveIntegerField(db_index=True)
     _from = EthereumAddressV2Field(null=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
