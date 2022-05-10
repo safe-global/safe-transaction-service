@@ -28,7 +28,7 @@ def init_safe_last_status(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("history", "0060_add_eip1559_fields_20220419_0955"),
+        ("history", "0061_alter_internaltx_block_number"),
     ]
 
     operations = [
