@@ -43,8 +43,8 @@ from .models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     SafeMasterCopy,
-    SafeStatus,
     TransferDict,
 )
 from .serializers import get_data_decoded_from_data
@@ -54,7 +54,6 @@ from .services import (
     TransactionServiceProvider,
 )
 from .services.collectibles_service import CollectiblesServiceProvider
-from .services.safe_service import CannotGetSafeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -989,15 +988,15 @@ class SafeInfoView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         try:
-            safe_info = SafeServiceProvider().get_safe_info(address)
+            safe_info = SafeLastStatus.objects.get(address=address).get_safe_info()
             serializer = self.get_serializer(safe_info)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
-        except CannotGetSafeInfo:
+        except SafeLastStatus.DoesNotExist:
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 data={
                     "code": 50,
-                    "message": "Cannot get Safe info",
+                    "message": "Service is still indexing",
                     "arguments": [address],
                 },
             )
@@ -1018,7 +1017,7 @@ class OwnersView(GenericAPIView):
             422: "Owner address checksum not valid",
         }
     )
-    @method_decorator(cache_page(settings.CACHE_OWNERS_VIEW_SECONDS))
+    @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
         """
         Return Safes where the address provided is an owner
@@ -1033,7 +1032,7 @@ class OwnersView(GenericAPIView):
                 },
             )
 
-        safes_for_owner = SafeStatus.objects.addresses_for_owner(address)
+        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)
         serializer = self.get_serializer(data={"safes": safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

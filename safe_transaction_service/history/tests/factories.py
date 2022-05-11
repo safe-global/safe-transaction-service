@@ -27,6 +27,7 @@ from ..models import (
     ProxyFactory,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
     TokenTransfer,
@@ -300,9 +301,9 @@ class SafeMasterCopyFactory(MonitoredAddressFactory):
         model = SafeMasterCopy
 
 
-class SafeStatusFactory(DjangoModelFactory):
+class SafeLastStatusFactory(DjangoModelFactory):
     class Meta:
-        model = SafeStatus
+        model = SafeLastStatus
 
     internal_tx = factory.SubFactory(InternalTxFactory)
     address = factory.LazyFunction(lambda: Account.create().address)
@@ -313,6 +314,11 @@ class SafeStatusFactory(DjangoModelFactory):
     fallback_handler = NULL_ADDRESS
     guard = NULL_ADDRESS
     enabled_modules = []
+
+
+class SafeStatusFactory(SafeLastStatusFactory):
+    class Meta:
+        model = SafeStatus
 
 
 class WebHookFactory(DjangoModelFactory):

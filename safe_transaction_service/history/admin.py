@@ -25,6 +25,7 @@ from .models import (
     ProxyFactory,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
     WebHook,
@@ -501,8 +502,8 @@ class SafeStatusModulesListFilter(admin.SimpleListFilter):
             return queryset.exclude(**parameters)
 
 
-@admin.register(SafeStatus)
-class SafeStatusAdmin(BinarySearchAdmin):
+@admin.register(SafeLastStatus)
+class SafeLastStatusAdmin(BinarySearchAdmin):
     actions = ["remove_and_index"]
     fields = (
         "internal_tx",
@@ -560,6 +561,11 @@ class SafeStatusAdmin(BinarySearchAdmin):
     def remove_and_index(self, request, queryset):
         safe_addresses = list(queryset.distinct().values_list("address", flat=True))
         IndexServiceProvider().reprocess_addresses(safe_addresses)
+
+
+@admin.register(SafeStatus)
+class SafeStatusAdmin(SafeLastStatusAdmin):
+    pass
 
 
 @admin.register(WebHook)

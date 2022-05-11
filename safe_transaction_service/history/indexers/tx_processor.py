@@ -25,6 +25,7 @@ from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
 )
@@ -99,7 +100,7 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
         }
-        self.safe_status_cache: Dict[str, SafeStatus] = {}
+        self.safe_last_status_cache: Dict[str, SafeStatus] = {}
         self.signature_breaking_versions = (  # Versions where signing changed
             Version("1.0.0"),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
             Version("1.3.0"),  # ChainId was included
@@ -107,10 +108,10 @@ class SafeTxProcessor(TxProcessor):
 
     def clear_cache(self, safe_address: Optional[str] = None):
         if safe_address:
-            if safe_address in self.safe_status_cache:
-                del self.safe_status_cache[safe_address]
+            if safe_address in self.safe_last_status_cache:
+                del self.safe_last_status_cache[safe_address]
         else:
-            self.safe_status_cache.clear()
+            self.safe_last_status_cache.clear()
 
     def is_failed(
         self, ethereum_tx: EthereumTx, safe_tx_hash: Union[str, bytes]
@@ -163,13 +164,14 @@ class SafeTxProcessor(TxProcessor):
 
     def get_last_safe_status_for_address(
         self, address: ChecksumAddress
-    ) -> Optional[SafeStatus]:
-        safe_status = self.safe_status_cache.get(
-            address
-        ) or SafeStatus.objects.last_for_address(address)
-        if not safe_status:
+    ) -> Optional[SafeLastStatus]:
+        try:
+            safe_status = self.safe_last_status_cache.get(
+                address
+            ) or SafeLastStatus.objects.get(address=address)
+            return safe_status
+        except SafeLastStatus.DoesNotExist:
             logger.error("SafeStatus not found for address=%s", address)
-        return safe_status
 
     def is_version_breaking_signatures(
         self, old_safe_version: str, new_safe_version: str
@@ -233,11 +235,19 @@ class SafeTxProcessor(TxProcessor):
         )
 
     def store_new_safe_status(
-        self, safe_status: SafeStatus, internal_tx: InternalTx
-    ) -> SafeStatus:
-        safe_status.store_new(internal_tx)
-        self.safe_status_cache[safe_status.address] = safe_status
-        return self.safe_status_cache[safe_status.address]
+        self, safe_last_status: SafeStatus, internal_tx: InternalTx
+    ) -> SafeLastStatus:
+        """
+        Updates `SafeLastStatus`. An entry to `SafeStatus` is added too via a Django signal.
+
+        :param safe_last_status:
+        :param internal_tx:
+        :return: Updated `SafeLastStatus`
+        """
+        safe_last_status.internal_tx = internal_tx
+        safe_last_status.save()
+        self.safe_last_status_cache[safe_last_status.address] = safe_last_status
+        return safe_last_status
 
     @transaction.atomic
     def process_decoded_transaction(
@@ -245,6 +255,7 @@ class SafeTxProcessor(TxProcessor):
     ) -> bool:
         processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
         internal_tx_decoded.set_processed()
+        self.clear_cache()
         return processed_successfully
 
     @transaction.atomic
@@ -269,6 +280,7 @@ class SafeTxProcessor(TxProcessor):
         InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
             processed=True
         )
+        self.clear_cache()
         return results
 
     def __process_decoded_transaction(
@@ -327,15 +339,20 @@ class SafeTxProcessor(TxProcessor):
                 )
                 logger.info("Found new Safe=%s", contract_address)
 
-            self.safe_status_cache[contract_address] = SafeStatus.objects.create(
-                internal_tx=internal_tx,
-                address=contract_address,
-                owners=owners,
-                threshold=threshold,
-                nonce=nonce,
-                master_copy=master_copy,
-                fallback_handler=fallback_handler,
+            safe_last_status = self.store_new_safe_status(
+                SafeLastStatus(
+                    internal_tx=internal_tx,
+                    address=contract_address,
+                    owners=owners,
+                    threshold=threshold,
+                    nonce=nonce,
+                    master_copy=master_copy,
+                    fallback_handler=fallback_handler,
+                ),
+                internal_tx,
             )
+
+            self.safe_last_status_cache[contract_address] = safe_last_status
         else:
             safe_status = self.get_last_safe_status_for_address(contract_address)
             if not safe_status:
