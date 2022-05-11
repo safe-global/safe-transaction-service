@@ -19,6 +19,7 @@ from ..models import (
     InternalTxType,
     MultisigConfirmation,
     MultisigTransaction,
+    SafeLastStatus,
     SafeStatus,
 )
 from .factories import SafeMasterCopyFactory
@@ -193,6 +194,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         self.assertEqual(SafeStatus.objects.count(), 1)
         safe_status = SafeStatus.objects.get()
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.master_copy, self.safe_contract.address)
         self.assertEqual(safe_status.owners, owners)
         self.assertEqual(safe_status.threshold, threshold)
@@ -222,6 +225,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and addOwner
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(
             safe_status.owners, [owner_account_2.address, owner_account_1.address]
         )
@@ -258,6 +263,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and changeThreshold
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 2)
         self.assertEqual(safe_status.threshold, 2)
 
@@ -293,6 +300,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction, removeOwner and changeThreshold
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 3)
         self.assertEqual(safe_status.threshold, 1)
         self.assertEqual(safe_status.owners, [owner_account_1.address])
@@ -339,6 +348,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and enableModule
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.enabled_modules, [module_address])
         self.assertEqual(safe_status.nonce, 4)
 
@@ -391,6 +402,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and setFallbackHandler
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.fallback_handler, new_fallback_handler)
         self.assertEqual(safe_status.enabled_modules, [module_address])
         self.assertEqual(safe_status.nonce, 5)
@@ -427,6 +440,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and disableModule
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 6)
         self.assertEqual(safe_status.enabled_modules, [])
 
@@ -492,6 +507,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 7)
         self.assertTrue(
             InternalTx.objects.filter(value=value, to=to).get().is_ether_transfer
@@ -523,6 +540,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         safe_status = SafeStatus.objects.last_for_address(
             safe_address
         )  # Processed execTransaction and setGuard
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 8)
         self.assertEqual(safe_status.guard, guard_address)
 

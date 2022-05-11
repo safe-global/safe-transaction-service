@@ -6,7 +6,7 @@ from gnosis.eth import EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe import Safe
 
-from ...models import MultisigTransaction, SafeStatus
+from ...models import MultisigTransaction, SafeLastStatus
 from ...services import IndexServiceProvider
 
 
@@ -51,7 +51,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         fix = options["fix"]
 
-        queryset = SafeStatus.objects.last_for_every_address()
+        queryset = SafeLastStatus.objects.all()
         count = queryset.count()
         batch = 100
         ethereum_client = EthereumClientProvider()

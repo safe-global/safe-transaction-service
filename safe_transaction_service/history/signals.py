@@ -21,6 +21,8 @@ from .models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeLastStatus,
+    SafeStatus,
     TokenTransfer,
     WebHookType,
 )
@@ -266,3 +268,28 @@ def process_webhook(
                     created,
                     instance,
                 )
+
+
+@receiver(
+    post_save,
+    sender=SafeLastStatus,
+    dispatch_uid="safe_last_status.add_to_historical_table",
+)
+def add_to_historical_table(
+    sender: Type[Model],
+    instance: SafeLastStatus,
+    created: bool,
+    **kwargs,
+) -> SafeStatus:
+    """
+    Add every `SafeLastStatus` entry to `SafeStatus` historical table
+
+    :param sender:
+    :param instance:
+    :param created:
+    :param kwargs:
+    :return: SafeStatus
+    """
+    safe_status = SafeStatus.from_status_instance(instance)
+    safe_status.save()
+    return safe_status

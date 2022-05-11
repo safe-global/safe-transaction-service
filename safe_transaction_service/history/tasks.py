@@ -20,7 +20,14 @@ from .indexers import (
 )
 from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
-from .models import EthereumBlock, InternalTxDecoded, SafeStatus, WebHook, WebHookType
+from .models import (
+    EthereumBlock,
+    InternalTxDecoded,
+    SafeLastStatus,
+    SafeStatus,
+    WebHook,
+    WebHookType,
+)
 from .services import (
     IndexingException,
     IndexServiceProvider,
@@ -297,8 +304,12 @@ def process_decoded_internal_txs_for_safe_task(
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
 
             # Check if something is wrong during indexing
-            last_safe_status = SafeStatus.objects.last_for_address(safe_address)
-            if last_safe_status and last_safe_status.is_corrupted():
+            try:
+                safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+            except SafeLastStatus.DoesNotExist:
+                safe_last_status = None
+
+            if safe_last_status and safe_last_status.is_corrupted():
                 tx_processor.clear_cache()
                 # Find first corrupted safe status
                 previous_safe_status: Optional[SafeStatus] = None
@@ -320,7 +331,7 @@ def process_decoded_internal_txs_for_safe_task(
                         )
                         if reindex_master_copies and previous_safe_status:
                             block_number = previous_safe_status.block_number
-                            to_block_number = last_safe_status.block_number
+                            to_block_number = safe_last_status.block_number
                             logger.info(
                                 "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , "
                                 "reindexing until block=%d",
@@ -340,7 +351,6 @@ def process_decoded_internal_txs_for_safe_task(
                         raise ValueError(message)
                     previous_safe_status = safe_status
 
-            tx_processor.clear_cache()  # TODO Fix this properly
             # Use slicing for memory issues
             while True:
                 internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(

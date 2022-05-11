@@ -20,7 +20,7 @@ from safe_transaction_service.history.tests.factories import (
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
     SafeContractFactory,
-    SafeStatusFactory,
+    SafeLastStatusFactory,
 )
 
 from ..tasks import (
@@ -123,7 +123,7 @@ class TestViews(TestCase):
             )
             self.assertIn("Cannot find threshold information", cm.output[0])
 
-        safe_status = SafeStatusFactory(
+        safe_status = SafeLastStatusFactory(
             address=safe_address, threshold=1, owners=owners
         )
         with self.assertLogs(logger=task_logger) as cm:
@@ -209,7 +209,7 @@ class TestViews(TestCase):
         safe_tx_hash = Web3.keccak(text="aloha").hex()
         safe_contract = SafeContractFactory()
         safe_address = safe_contract.address
-        safe_status = SafeStatusFactory(address=safe_address, threshold=3)
+        safe_status = SafeLastStatusFactory(address=safe_address, threshold=3)
         safe_contract_delegate = SafeContractDelegateFactory(
             safe_contract=safe_contract, delegator=safe_status.owners[0]
         )

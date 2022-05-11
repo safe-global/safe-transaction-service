@@ -28,6 +28,7 @@ from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContractDelegate,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
     WebHook,
@@ -43,6 +44,7 @@ from .factories import (
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
     SafeContractFactory,
+    SafeLastStatusFactory,
     SafeMasterCopyFactory,
     SafeStatusFactory,
     WebHookFactory,
@@ -632,14 +634,101 @@ class TestInternalTxDecoded(TestCase):
         )
 
 
-class TestSafeStatus(TestCase):
-    def test_safe_status_store_new(self):
-        safe_status = SafeStatusFactory()
-        self.assertEqual(SafeStatus.objects.all().count(), 1)
-        internal_tx = InternalTxFactory()
-        safe_status.store_new(internal_tx)
-        self.assertEqual(SafeStatus.objects.all().count(), 2)
+class TestLastSafeStatus(TestCase):
+    def test_insert(self):
+        self.assertEqual(SafeStatus.objects.count(), 0)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
+        SafeLastStatusFactory()
+        self.assertEqual(SafeStatus.objects.count(), 1)
+        self.assertEqual(SafeLastStatus.objects.count(), 1)
 
+    def test_update_or_create_from_safe_status(self):
+        safe_status = SafeStatusFactory(nonce=0)
+        self.assertEqual(SafeStatus.objects.count(), 1)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
+
+        safe_last_status = SafeLastStatus.objects.update_or_create_from_safe_status(
+            safe_status
+        )
+        self.assertEqual(SafeStatus.objects.count(), 1)
+        self.assertEqual(SafeLastStatus.objects.count(), 1)
+
+        self.assertEqual(safe_status.internal_tx, safe_last_status.internal_tx)
+        self.assertEqual(safe_status.address, safe_last_status.address)
+        self.assertEqual(safe_status.owners, safe_last_status.owners)
+        self.assertEqual(safe_status.threshold, safe_last_status.threshold)
+        self.assertEqual(safe_status.nonce, safe_last_status.nonce)
+        self.assertEqual(safe_status.master_copy, safe_last_status.master_copy)
+        self.assertEqual(
+            safe_status.fallback_handler, safe_last_status.fallback_handler
+        )
+        self.assertEqual(safe_status.guard, safe_last_status.guard)
+        self.assertEqual(safe_status.enabled_modules, safe_last_status.enabled_modules)
+
+        # Update SafeLastStatus
+        safe_last_status.internal_tx = InternalTxFactory()
+        safe_last_status.nonce = 1
+        safe_last_status.save()
+        self.assertEqual(SafeStatus.objects.count(), 2)
+        self.assertEqual(SafeLastStatus.objects.count(), 1)
+
+    def test_addresses_for_owner(self):
+        owner_address = Account.create().address
+        address = Account.create().address
+        address_2 = Account.create().address
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), []
+        )
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=0, owners=[owner_address]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), [address]
+        )
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(address=address, nonce=1)
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), []
+        )
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=2, owners=[owner_address]
+        )
+        safe_last_status_2 = SafeLastStatusFactory(
+            address=address_2, nonce=0, owners=[owner_address]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address),
+            [address, address_2],
+        )
+        # Remove the owner from one of the Safes
+        new_owner = Account.create().address
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=3, owners=[new_owner]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), [address_2]
+        )
+
+        # Add new owner for the other Safe
+        safe_last_status_2.delete()
+        safe_last_status_2 = SafeLastStatusFactory(
+            address=address_2, nonce=1, owners=[owner_address, new_owner]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), [address_2]
+        )
+
+        # Remove the owner from the other Safe
+        safe_last_status_2.delete()
+        SafeLastStatusFactory(address=address_2, nonce=2, owners=[new_owner])
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_owner(owner_address), []
+        )
+
+
+class TestSafeStatus(TestCase):
     def test_safe_status_is_corrupted(self):
         address = Account.create().address
         safe_status = SafeStatusFactory(nonce=0, address=address)
@@ -668,39 +757,6 @@ class TestSafeStatus(TestCase):
         SafeStatusFactory(address=address, nonce=2)
         self.assertEqual(SafeStatus.objects.last_for_address(address).nonce, 2)
         self.assertIsNone(SafeStatus.objects.last_for_address(Account.create().address))
-
-    def test_safe_status_addresses_for_owner(self):
-        owner_address = Account.create().address
-        address = Account.create().address
-        address_2 = Account.create().address
-        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
-        SafeStatusFactory(address=address, nonce=0, owners=[owner_address])
-        self.assertEqual(
-            SafeStatus.objects.addresses_for_owner(owner_address), {address}
-        )
-        SafeStatusFactory(address=address, nonce=1)
-        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
-        SafeStatusFactory(address=address, nonce=2, owners=[owner_address])
-        SafeStatusFactory(address=address_2, nonce=0, owners=[owner_address])
-        self.assertEqual(
-            SafeStatus.objects.addresses_for_owner(owner_address), {address, address_2}
-        )
-        # Remove the owner from one of the Safes
-        new_owner = Account.create().address
-        SafeStatusFactory(address=address, nonce=3, owners=[new_owner])
-        self.assertEqual(
-            SafeStatus.objects.addresses_for_owner(owner_address), {address_2}
-        )
-
-        # Add new owner for the other Safe
-        SafeStatusFactory(address=address_2, nonce=1, owners=[owner_address, new_owner])
-        self.assertEqual(
-            SafeStatus.objects.addresses_for_owner(owner_address), {address_2}
-        )
-
-        # Remove the owner from the other Safe
-        SafeStatusFactory(address=address_2, nonce=2, owners=[new_owner])
-        self.assertEqual(SafeStatus.objects.addresses_for_owner(owner_address), set())
 
     def test_safe_status_previous(self):
         safe_status_5 = SafeStatusFactory(nonce=5)
