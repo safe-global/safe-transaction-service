@@ -1,8 +1,11 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Generator, List, Optional, Sequence, Set
+from typing import Generator, Iterable, List, Optional, Sequence, Set
 
 from django.db import transaction
+
+from eth_typing import HexStr
+from web3.types import ParityFilterTrace
 
 from gnosis.eth import EthereumClient
 
@@ -10,6 +13,7 @@ from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
     get_safe_tx_decoder,
 )
+from safe_transaction_service.utils.utils import chunks
 
 from ..models import InternalTx, InternalTxDecoded, MonitoredAddress, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
@@ -22,19 +26,22 @@ class InternalTxIndexerProvider:
         if not hasattr(cls, "instance"):
             from django.conf import settings
 
-            block_process_limit = settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
+            block_process_limit: int = settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
+            trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
             blocks_to_reindex_again = 6
             if settings.ETH_INTERNAL_NO_FILTER:
                 cls.instance = InternalTxIndexerWithTraceBlock(
                     EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=min(block_process_limit, 500),
+                    block_process_limit=block_process_limit,
                     blocks_to_reindex_again=blocks_to_reindex_again,
+                    trace_txs_batch_size=trace_txs_batch_size,
                 )
             else:
                 cls.instance = InternalTxIndexer(
                     EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
                     block_process_limit=block_process_limit,
                     blocks_to_reindex_again=blocks_to_reindex_again,
+                    trace_txs_batch_size=trace_txs_batch_size,
                 )
         return cls.instance
 
@@ -50,6 +57,7 @@ class InternalTxIndexer(EthereumIndexer):
         self.number_trace_blocks = (
             10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
         )
+        self.trace_txs_batch_size: int = kwargs.pop("trace_txs_batch_size")
         super().__init__(*args, **kwargs)
 
     @property
@@ -215,6 +223,23 @@ class InternalTxIndexer(EthereumIndexer):
             except CannotDecode:
                 pass
 
+    def trace_transactions(
+        self, tx_hashes: Sequence[HexStr], batch_size: int
+    ) -> Iterable[List[ParityFilterTrace]]:
+        batch_size = batch_size or len(tx_hashes)  # If `0`, don't use batches
+        for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
+            tx_hash_chunk = list(tx_hash_chunk)
+            try:
+                yield from self.ethereum_client.parity.trace_transactions(tx_hash_chunk)
+            except IOError:
+                logger.error(
+                    "Problem calling `trace_transactions` with %d txs. "
+                    "Try lowering ETH_INTERNAL_TRACE_TXS_BATCH_SIZE",
+                    len(tx_hash_chunk),
+                    exc_info=True,
+                )
+                raise
+
     def process_elements(self, tx_hashes: Sequence[str]) -> List[InternalTx]:
         # Prefetch ethereum txs
         if not tx_hashes:
@@ -228,10 +253,14 @@ class InternalTxIndexer(EthereumIndexer):
         internal_txs = (
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
             for ethereum_tx, traces in zip(
-                ethereum_txs, self.ethereum_client.parity.trace_transactions(tx_hashes)
+                ethereum_txs,
+                self.trace_transactions(
+                    tx_hashes, batch_size=self.trace_txs_batch_size
+                ),
             )
             for trace in self.ethereum_client.parity.filter_out_errored_traces(traces)
         )
+
         revelant_internal_txs_batch = (
             trace for trace in internal_txs if trace.is_relevant
         )
