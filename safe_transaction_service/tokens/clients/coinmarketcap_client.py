@@ -89,7 +89,7 @@ class CoinMarketCapClient:
                 token
                 and token["is_active"]
                 and token["platform"]
-                and token["platform"]["symbol"] == "ETH"
+                and token["platform"]["name"] == "Ethereum"
             ):
                 try:
                     checksummed_address = to_checksum_address(
