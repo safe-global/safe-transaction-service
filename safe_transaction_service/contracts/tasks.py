@@ -36,7 +36,7 @@ def create_missing_contracts_with_metadata_task() -> int:
     for address in addresses:
         logger.info("Detected missing contract %s", address)
         create_or_update_contract_with_metadata_task.apply_async(
-            (address,), priority=5
+            (address,), priority=0
         )  # Lowest priority
         i += 1
     return i
@@ -55,7 +55,9 @@ def reindex_contracts_without_metadata_task() -> int:
         Contract.objects.without_metadata().values_list("address", flat=True).iterator()
     ):
         logger.info("Reindexing contract %s", address)
-        create_or_update_contract_with_metadata_task.apply_async((address,), priority=5)
+        create_or_update_contract_with_metadata_task.apply_async(
+            (address,), priority=0
+        )  # Lowest priority
         i += 1
     return i
 

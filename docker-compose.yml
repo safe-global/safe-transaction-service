@@ -23,6 +23,9 @@ services:
       - --save ""
       - --appendonly no
 
+  rabbitmq:
+    image: rabbitmq:alpine
+
   db:
     image: postgres:13-alpine
     ports:
