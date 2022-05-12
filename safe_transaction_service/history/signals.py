@@ -257,10 +257,12 @@ def process_webhook(
         if address := payload.get("address"):
             if is_relevant_notification(sender, instance, created):
                 send_webhook_task.apply_async(
-                    args=(address, payload), priority=4
+                    args=(address, payload), priority=1  # Almost lowest priority
                 )  # Almost the lowest priority
                 send_notification_task.apply_async(
-                    args=(address, payload), countdown=5, priority=4
+                    args=(address, payload),
+                    countdown=5,
+                    priority=1,  # Almost lowest priority
                 )
             else:
                 logger.debug(
