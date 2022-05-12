@@ -22,7 +22,19 @@ def init_safe_last_status(apps, schema_editor):
     )
 
     for safe_status in last_for_every_address.iterator():
-        SafeLastStatus.objects.update_or_create_from_safe_status(safe_status)
+        SafeLastStatus.objects.update_or_create(
+            address=safe_status.address,
+            defaults={
+                "internal_tx": safe_status.internal_tx,
+                "owners": safe_status.owners,
+                "threshold": safe_status.threshold,
+                "nonce": safe_status.nonce,
+                "master_copy": safe_status.master_copy,
+                "fallback_handler": safe_status.fallback_handler,
+                "guard": safe_status.guard,
+                "enabled_modules": safe_status.enabled_modules,
+            },
+        )
 
 
 class Migration(migrations.Migration):
