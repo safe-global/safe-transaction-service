@@ -228,7 +228,9 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 logger.info("%d decoded internal txs to process", count)
                 for (
                     safe_to_process
-                ) in InternalTxDecoded.objects.safes_pending_to_be_processed():
+                ) in (
+                    InternalTxDecoded.objects.safes_pending_to_be_processed().iterator()
+                ):
                     process_decoded_internal_txs_for_safe_task.delay(
                         safe_to_process, reindex_master_copies=False
                     )
