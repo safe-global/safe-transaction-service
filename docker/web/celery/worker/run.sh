@@ -20,5 +20,5 @@ MAX_TASKS_PER_CHILD="${MAX_TASKS_PER_CHILD:-1000000}"
 
 echo "==> $(date +%H:%M:%S) ==> Running Celery worker with a max_memory_per_child of ${MAX_MEMORY_PER_CHILD} <=="
 exec celery -C -A config.celery_app worker --loglevel $log_level --pool=gevent \
-     --concurrency=${CELERYD_CONCURRENCY:-500} --max-memory-per-child=${MAX_MEMORY_PER_CHILD} \
+     --concurrency=${CELERYD_CONCURRENCY:-1000} --max-memory-per-child=${MAX_MEMORY_PER_CHILD} \
      --max-tasks-per-child=${MAX_TASKS_PER_CHILD}
