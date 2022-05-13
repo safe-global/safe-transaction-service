@@ -59,11 +59,16 @@ services:
     depends_on:
       - db
       - redis
+      - rabbitmq
     command: docker/web/celery/worker/run.sh
 
   scheduler:
     <<: *worker
     command: docker/web/celery/scheduler/run.sh
+
+  flower:
+    <<: *worker
+    command: docker/web/celery/flower/run.sh
     ports:
       - "5555:5555"
 

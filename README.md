@@ -102,6 +102,9 @@ The service should be running in `localhost:8000`. You can test everything is se
 curl 'http://localhost:8000/api/v1/about/'
 ```
 
+You can go to http://localhost:5555/ to check the status of the task queue, also you can configure
+[prometheus metrics](https://flower.readthedocs.io/en/latest/prometheus-integration.html).
+
 For example, to set up a Göerli node:
 
 Run an OpenEthereum node in your local computer:
