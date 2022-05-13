@@ -215,7 +215,7 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="django://")
 # https://docs.celeryproject.org/en/stable/userguide/optimizing.html#broker-connection-pools
 # https://docs.celeryq.dev/en/latest/userguide/optimizing.html#broker-connection-pools
 CELERY_BROKER_POOL_LIMIT = env(
-    "CELERY_BROKER_POOL_LIMIT", default=env("CELERYD_CONCURRENCY", default=500)
+    "CELERY_BROKER_POOL_LIMIT", default=env("CELERYD_CONCURRENCY", default=1000)
 )
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://")
