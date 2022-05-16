@@ -22,7 +22,6 @@ docutils==0.18.1
 drf-yasg[validation]==1.20.0
 firebase-admin==5.2.0
 flower==1.0.0
-gnosis-py[django]==3.9.4
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.2
 hiredis==2.0.0
@@ -32,4 +31,5 @@ psycogreen==1.0.2
 psycopg2==2.9.3
 redis==4.3.0
 requests==2.27.1
+safe-eth-py[django]==4.0.0
 web3==5.29.0
