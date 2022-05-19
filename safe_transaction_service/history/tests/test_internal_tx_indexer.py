@@ -264,7 +264,7 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
         self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
         number_processed = tx_processor.process_decoded_transactions(
             internal_txs_decoded
@@ -278,7 +278,7 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(safe_status.threshold, 1)
 
         # Decode again now that Safe is indexed (with `setup` call)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
         self.assertEqual(
             len(internal_txs_decoded), 1
         )  # Safe indexed, execute tx can be decoded now
@@ -294,7 +294,7 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         tx_processor.process_decoded_transactions(
-            InternalTxDecoded.objects.pending_for_safes()
+            InternalTxDecoded.objects.pending_for_indexed_safes()
         )
         safe_contract: SafeContract = SafeContract.objects.first()
         self.assertGreater(safe_contract.erc20_block_number, 0)
@@ -303,7 +303,7 @@ class TestInternalTxIndexer(TestCase):
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
         self.assertEqual(internal_txs_decoded.count(), 2)
         self.assertEqual(internal_txs_decoded[0].function_name, "setup")
         tx_processor.process_decoded_transactions(internal_txs_decoded)

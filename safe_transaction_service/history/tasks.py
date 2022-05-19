@@ -221,19 +221,19 @@ def index_safe_events_task(self) -> Optional[int]:
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
-            count = InternalTxDecoded.objects.pending_for_safes().count()
+            count = 0
+            for (
+                safe_to_process
+            ) in InternalTxDecoded.objects.safes_pending_to_be_processed().iterator():
+                count += 1
+                process_decoded_internal_txs_for_safe_task.delay(
+                    safe_to_process, reindex_master_copies=False
+                )
+
             if not count:
                 logger.info("No decoded internal txs to process")
             else:
                 logger.info("%d decoded internal txs to process", count)
-                for (
-                    safe_to_process
-                ) in (
-                    InternalTxDecoded.objects.safes_pending_to_be_processed().iterator()
-                ):
-                    process_decoded_internal_txs_for_safe_task.delay(
-                        safe_to_process, reindex_master_copies=False
-                    )
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)

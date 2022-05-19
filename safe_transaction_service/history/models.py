@@ -791,7 +791,9 @@ class InternalTx(models.Model):
     )
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField(db_index=True)
-    _from = EthereumAddressV2Field(null=True)  # For SELF-DESTRUCT it can be null
+    _from = EthereumAddressV2Field(
+        null=True, db_index=True
+    )  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
     to = EthereumAddressV2Field(null=True)
@@ -954,24 +956,23 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             "internal_tx__trace_address",
         )
 
-    def pending_for_safes(self):
+    def pending_for_indexed_safes(self):
         """
-        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
+        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block,
+            only for indexed Safes (Safes in `SafeContract` model or InternalTxDecoded calling `setup` function)
         """
-        return (
-            self.not_processed()
-            .for_indexed_safes()
-            .select_related(
-                "internal_tx__ethereum_tx__block",
-            )
-            .order_by_processing_queue()
-        )
+        return self.not_processed().for_indexed_safes().order_by_processing_queue()
 
     def pending_for_safe(self, safe_address: str):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.pending_for_safes().filter(internal_tx___from=safe_address)
+        return (
+            self.not_processed()
+            .filter(internal_tx___from=safe_address)
+            .select_related("internal_tx")
+            .order_by_processing_queue()
+        )
 
     def safes_pending_to_be_processed(self) -> QuerySet:
         """
@@ -1019,7 +1020,7 @@ class InternalTxDecoded(models.Model):
 
     @property
     def block_number(self) -> Type[int]:
-        return self.internal_tx.ethereum_tx.block_id
+        return self.internal_tx.block_number
 
     @property
     def tx_hash(self) -> Type[int]:
@@ -1283,13 +1284,8 @@ class ModuleTransaction(TimeStampedModel):
             return f"{self.safe} - {self.to} - 0x{bytes(self.data).hex()[:6]}"
 
     @property
-    def execution_date(self) -> Optional[datetime.datetime]:
-        if (
-            self.internal_tx.ethereum_tx_id
-            and self.internal_tx.ethereum_tx.block_id is not None
-        ):
-            return self.internal_tx.ethereum_tx.block.timestamp
-        return None
+    def execution_date(self) -> datetime.datetime:
+        return self.internal_tx.timestamp
 
 
 class MultisigConfirmationManager(models.Manager):
