@@ -324,7 +324,7 @@ class SafeTxProcessor(TxProcessor):
                     or not safe_contract.erc20_block_number
                 ):
                     safe_contract.ethereum_tx = internal_tx.ethereum_tx
-                    safe_contract.erc20_block_number = internal_tx.ethereum_tx.block_id
+                    safe_contract.erc20_block_number = internal_tx.block_number
                     safe_contract.save(
                         update_fields=["ethereum_tx", "erc20_block_number"]
                     )
@@ -334,7 +334,7 @@ class SafeTxProcessor(TxProcessor):
                     address=contract_address,
                     ethereum_tx=internal_tx.ethereum_tx,
                     erc20_block_number=max(
-                        internal_tx.ethereum_tx.block_id - blocks_one_day, 0
+                        internal_tx.block_number - blocks_one_day, 0
                     ),
                 )
                 logger.info("Found new Safe=%s", contract_address)
@@ -464,7 +464,7 @@ class SafeTxProcessor(TxProcessor):
                 ModuleTransaction.objects.get_or_create(
                     internal_tx=internal_tx,
                     defaults={
-                        "created": internal_tx.ethereum_tx.block.timestamp,
+                        "created": internal_tx.timestamp,
                         "safe": contract_address,
                         "module": module_address,
                         "to": arguments["to"],
@@ -505,7 +505,7 @@ class SafeTxProcessor(TxProcessor):
                     multisig_transaction_hash=multisig_transaction_hash,
                     owner=owner,
                     defaults={
-                        "created": internal_tx.ethereum_tx.block.timestamp,
+                        "created": internal_tx.timestamp,
                         "ethereum_tx": ethereum_tx,
                         "signature": safe_signature.export_signature(),
                         "signature_type": safe_signature.signature_type.value,
@@ -556,7 +556,7 @@ class SafeTxProcessor(TxProcessor):
                 multisig_tx, _ = MultisigTransaction.objects.get_or_create(
                     safe_tx_hash=safe_tx_hash,
                     defaults={
-                        "created": internal_tx.ethereum_tx.block.timestamp,
+                        "created": internal_tx.timestamp,
                         "safe": contract_address,
                         "ethereum_tx": ethereum_tx,
                         "to": safe_tx.to,
@@ -595,7 +595,7 @@ class SafeTxProcessor(TxProcessor):
                         multisig_transaction_hash=safe_tx_hash,
                         owner=safe_signature.owner,
                         defaults={
-                            "created": internal_tx.ethereum_tx.block.timestamp,
+                            "created": internal_tx.timestamp,
                             "ethereum_tx": None,
                             "multisig_transaction": multisig_tx,
                             "signature": safe_signature.export_signature(),
