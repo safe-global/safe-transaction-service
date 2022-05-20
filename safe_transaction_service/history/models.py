@@ -925,18 +925,6 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return self.filter(internal_tx___from=safe_address)
 
-    def for_indexed_safes(self):
-        """
-        :return: Queryset of InternalTxDecoded for Safes already indexed or calling `setup`. Use this to index Safes
-        for the first time
-        """
-        return self.filter(
-            Q(
-                internal_tx___from__in=SafeContract.objects.values("address")
-            )  # Just Safes indexed
-            | Q(function_name="setup")  # This way we can index new Safes without events
-        )
-
     def not_processed(self):
         return self.filter(processed=False)
 
@@ -956,31 +944,28 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             "internal_tx__trace_address",
         )
 
-    def pending_for_indexed_safes(self):
+    def pending_for_safes(self):
         """
-        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block,
-            only for indexed Safes (Safes in `SafeContract` model or InternalTxDecoded calling `setup` function)
+        :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.not_processed().for_indexed_safes().order_by_processing_queue()
+        return self.not_processed().order_by_processing_queue()
 
     def pending_for_safe(self, safe_address: str):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
         return (
-            self.not_processed()
+            self.pending_for_safes()
             .filter(internal_tx___from=safe_address)
             .select_related("internal_tx")
-            .order_by_processing_queue()
         )
 
-    def safes_pending_to_be_processed(self) -> QuerySet:
+    def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:
         """
         :return: List of Safe addresses that have transactions pending to be processed
         """
         return (
             self.not_processed()
-            .for_indexed_safes()
             .values_list("internal_tx___from", flat=True)
             .distinct("internal_tx___from")
         )

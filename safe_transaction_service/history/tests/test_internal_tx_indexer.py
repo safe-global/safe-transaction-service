@@ -17,6 +17,7 @@ from ..models import (
     InternalTx,
     InternalTxDecoded,
     SafeContract,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
 )
@@ -264,37 +265,43 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
-        self.assertEqual(len(internal_txs_decoded), 1)  # Safe not indexed yet
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        self.assertEqual(len(internal_txs_decoded), 2)
         number_processed = tx_processor.process_decoded_transactions(
             internal_txs_decoded
         )  # Index using `setup` trace
-        self.assertEqual(len(number_processed), 1)  # Setup trace
+        self.assertEqual(len(number_processed), 2)  # Setup and execute trace
         self.assertEqual(SafeContract.objects.count(), 1)
+        self.assertEqual(SafeStatus.objects.count(), 2)
 
         safe_status = SafeStatus.objects.first()
         self.assertEqual(len(safe_status.owners), 1)
         self.assertEqual(safe_status.nonce, 0)
         self.assertEqual(safe_status.threshold, 1)
 
-        # Decode again now that Safe is indexed (with `setup` call)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
+        # Try to decode again without new traces, nothing should be decoded
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(
-            len(internal_txs_decoded), 1
+            len(internal_txs_decoded), 0
         )  # Safe indexed, execute tx can be decoded now
         number_processed = tx_processor.process_decoded_transactions(
             internal_txs_decoded
         )
-        self.assertEqual(len(number_processed), 1)  # Setup trace
+        self.assertEqual(len(number_processed), 0)  # Setup trace
         safe_status = SafeStatus.objects.get(nonce=1)
         self.assertEqual(len(safe_status.owners), 1)
         self.assertEqual(safe_status.threshold, 1)
+
+        safe_last_status = SafeLastStatus.objects.get()
+        self.assertEqual(
+            safe_last_status, SafeLastStatus.from_status_instance(safe_status)
+        )
 
     def test_tx_processor_using_internal_tx_indexer_with_existing_safe(self):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         tx_processor.process_decoded_transactions(
-            InternalTxDecoded.objects.pending_for_indexed_safes()
+            InternalTxDecoded.objects.pending_for_safes()
         )
         safe_contract: SafeContract = SafeContract.objects.first()
         self.assertGreater(safe_contract.erc20_block_number, 0)
@@ -303,7 +310,7 @@ class TestInternalTxIndexer(TestCase):
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_indexed_safes()
+        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(internal_txs_decoded.count(), 2)
         self.assertEqual(internal_txs_decoded[0].function_name, "setup")
         tx_processor.process_decoded_transactions(internal_txs_decoded)

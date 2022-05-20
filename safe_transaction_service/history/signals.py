@@ -249,13 +249,19 @@ def process_webhook(
     created: bool,
     **kwargs,
 ) -> None:
+    logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_webhook_payload(sender, instance)
     logger.debug(
-        "Built payloads %s for created=%s object=%s", payloads, created, instance
+        "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
     for payload in payloads:
         if address := payload.get("address"):
             if is_relevant_notification(sender, instance, created):
+                logger.debug(
+                    "Triggering send_webhook and send_notification tasks for created=%s object=%s",
+                    created,
+                    instance,
+                )
                 send_webhook_task.apply_async(
                     args=(address, payload), priority=2  # Almost lowest priority
                 )  # Almost the lowest priority
@@ -292,6 +298,11 @@ def add_to_historical_table(
     :param kwargs:
     :return: SafeStatus
     """
+    logger.debug(
+        "Storing created=%s object=%s on `SafeStatus` table",
+        created,
+        instance,
+    )
     safe_status = SafeStatus.from_status_instance(instance)
     safe_status.save()
     return safe_status
