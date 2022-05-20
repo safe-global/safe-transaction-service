@@ -231,9 +231,9 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 )
 
             if not count:
-                logger.info("No decoded internal txs to process")
+                logger.info("No Safes to process")
             else:
-                logger.info("%d decoded internal txs to process", count)
+                logger.info("%d Safes to process", count)
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -300,9 +300,6 @@ def process_decoded_internal_txs_for_safe_task(
                 "Start processing decoded internal txs for safe %s", safe_address
             )
             number_processed: int = 0
-            batch: int = (
-                100  # Process at most 100 decoded transactions for a single Safe
-            )
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
 
             # Check if something is wrong during indexing
@@ -353,18 +350,13 @@ def process_decoded_internal_txs_for_safe_task(
                         raise ValueError(message)
                     previous_safe_status = safe_status
 
-            # Use slicing for memory issues
-            while True:
-                internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
-                    safe_address
-                )[:batch]
-                if not internal_txs_decoded:
-                    break
-                number_processed += len(
-                    tx_processor.process_decoded_transactions(internal_txs_decoded)
-                )
-                if not number_processed:
-                    break
+            # Use iterator for memory issues
+            internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
+                safe_address
+            ).iterator()
+            number_processed = len(
+                tx_processor.process_decoded_transactions(internal_txs_decoded)
+            )
             logger.info("Processed %d decoded transactions", number_processed)
             if number_processed:
                 logger.info(

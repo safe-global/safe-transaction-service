@@ -189,7 +189,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         self.assertEqual(setup_internal_tx.trace_address, "1,0")
 
-        txs_decoded_queryset = InternalTxDecoded.objects.pending_for_indexed_safes()
+        txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         self.assertEqual(SafeStatus.objects.count(), 1)

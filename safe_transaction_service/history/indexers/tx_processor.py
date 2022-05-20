@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cache
 from logging import getLogger
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, Iterator, List, Optional, Sequence, Union
 
 from django.db import transaction
 
@@ -260,23 +260,21 @@ class SafeTxProcessor(TxProcessor):
 
     @transaction.atomic
     def process_decoded_transactions(
-        self, internal_txs_decoded: Sequence[InternalTxDecoded]
+        self, internal_txs_decoded: Iterator[InternalTxDecoded]
     ) -> List[bool]:
         """
         Optimize to process multiple transactions in a batch
         :param internal_txs_decoded:
         :return:
         """
-        results = [
-            self.__process_decoded_transaction(internal_tx_decoded)
-            for internal_tx_decoded in internal_txs_decoded
-        ]
+        internal_tx_ids = []
+        results = []
+
+        for internal_tx_decoded in internal_txs_decoded:
+            internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
+            results.append(self.__process_decoded_transaction(internal_tx_decoded))
 
         # Set all as decoded in the same batch
-        internal_tx_ids = [
-            internal_tx_decoded.internal_tx_id
-            for internal_tx_decoded in internal_txs_decoded
-        ]
         InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
             processed=True
         )
@@ -291,22 +289,26 @@ class SafeTxProcessor(TxProcessor):
         :param internal_tx_decoded: InternalTxDecoded to process. It will be set as `processed`
         :return: True if tx could be processed, False otherwise
         """
-        function_name = internal_tx_decoded.function_name
-        arguments = internal_tx_decoded.arguments
         internal_tx = internal_tx_decoded.internal_tx
-        contract_address = internal_tx._from
-        master_copy = internal_tx.to
-        if internal_tx.gas_used < 1000:
-            # When calling a non existing function, fallback of the proxy does not return any error but we can detect
-            # this kind of functions due to little gas used. Some of this transactions get decoded as they were
-            # valid in old versions of the proxies, like changes to `setup`
-            return False
-
-        processed_successfully = True
         logger.debug(
             "Start processing InternalTxDecoded in tx-hash=%s",
             HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id).hex(),
         )
+
+        if internal_tx.gas_used < 1000:
+            # When calling a non existing function, fallback of the proxy does not return any error but we can detect
+            # this kind of functions due to little gas used. Some of this transactions get decoded as they were
+            # valid in old versions of the proxies, like changes to `setup`
+            logger.debug(
+                "Calling a non existing function, will not process it",
+            )
+            return False
+
+        function_name = internal_tx_decoded.function_name
+        arguments = internal_tx_decoded.arguments
+        contract_address = internal_tx._from
+        master_copy = internal_tx.to
+        processed_successfully = True
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -339,7 +341,7 @@ class SafeTxProcessor(TxProcessor):
                 )
                 logger.info("Found new Safe=%s", contract_address)
 
-            safe_last_status = self.store_new_safe_status(
+            self.store_new_safe_status(
                 SafeLastStatus(
                     internal_tx=internal_tx,
                     address=contract_address,
@@ -351,13 +353,15 @@ class SafeTxProcessor(TxProcessor):
                 ),
                 internal_tx,
             )
-
-            self.safe_last_status_cache[contract_address] = safe_last_status
         else:
-            safe_status = self.get_last_safe_status_for_address(contract_address)
-            if not safe_status:
+            safe_last_status = self.get_last_safe_status_for_address(contract_address)
+            if not safe_last_status:
                 # Usually this happens from Safes coming from a not supported Master Copy
                 # TODO When archive node is available, build SafeStatus from blockchain status
+                logger.debug(
+                    "Cannot process trace as `SafeLastStatus` is not found for Safe=%s",
+                    contract_address,
+                )
                 processed_successfully = False
             elif function_name in (
                 "addOwnerWithThreshold",
@@ -365,34 +369,34 @@ class SafeTxProcessor(TxProcessor):
                 "removeOwnerWithThreshold",
             ):
                 logger.debug("Processing owner/threshold modification")
-                safe_status.threshold = (
-                    arguments["_threshold"] or safe_status.threshold
+                safe_last_status.threshold = (
+                    arguments["_threshold"] or safe_last_status.threshold
                 )  # Event doesn't have threshold
                 owner = arguments["owner"]
                 if function_name == "addOwnerWithThreshold":
-                    safe_status.owners.insert(0, owner)
+                    safe_last_status.owners.insert(0, owner)
                 else:  # removeOwner, removeOwnerWithThreshold
-                    self.swap_owner(internal_tx, safe_status, owner, None)
-                self.store_new_safe_status(safe_status, internal_tx)
+                    self.swap_owner(internal_tx, safe_last_status, owner, None)
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "swapOwner":
                 logger.debug("Processing owner swap")
                 old_owner = arguments["oldOwner"]
                 new_owner = arguments["newOwner"]
-                self.swap_owner(internal_tx, safe_status, old_owner, new_owner)
-                self.store_new_safe_status(safe_status, internal_tx)
+                self.swap_owner(internal_tx, safe_last_status, old_owner, new_owner)
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "changeThreshold":
                 logger.debug("Processing threshold change")
-                safe_status.threshold = arguments["_threshold"]
-                self.store_new_safe_status(safe_status, internal_tx)
+                safe_last_status.threshold = arguments["_threshold"]
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "changeMasterCopy":
                 logger.debug("Processing master copy change")
                 # TODO Ban address if it doesn't have a valid master copy
                 old_safe_version = self.get_safe_version_from_master_copy(
-                    safe_status.master_copy
+                    safe_last_status.master_copy
                 )
-                safe_status.master_copy = arguments["_masterCopy"]
+                safe_last_status.master_copy = arguments["_masterCopy"]
                 new_safe_version = self.get_safe_version_from_master_copy(
-                    safe_status.master_copy
+                    safe_last_status.master_copy
                 )
                 if (
                     old_safe_version
@@ -403,28 +407,28 @@ class SafeTxProcessor(TxProcessor):
                 ):
                     # Transactions queued not executed are not valid anymore
                     MultisigTransaction.objects.queued(contract_address).delete()
-                self.store_new_safe_status(safe_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "setFallbackHandler":
                 logger.debug("Setting FallbackHandler")
-                safe_status.fallback_handler = arguments["handler"]
-                self.store_new_safe_status(safe_status, internal_tx)
+                safe_last_status.fallback_handler = arguments["handler"]
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "setGuard":
-                safe_status.guard = (
+                safe_last_status.guard = (
                     arguments["guard"] if arguments["guard"] != NULL_ADDRESS else None
                 )
-                if safe_status.guard:
+                if safe_last_status.guard:
                     logger.debug("Setting Guard")
                 else:
                     logger.debug("Unsetting Guard")
-                self.store_new_safe_status(safe_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "enableModule":
                 logger.debug("Enabling Module")
-                safe_status.enabled_modules.append(arguments["module"])
-                self.store_new_safe_status(safe_status, internal_tx)
+                safe_last_status.enabled_modules.append(arguments["module"])
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "disableModule":
                 logger.debug("Disabling Module")
-                safe_status.enabled_modules.remove(arguments["module"])
-                self.store_new_safe_status(safe_status, internal_tx)
+                safe_last_status.enabled_modules.remove(arguments["module"])
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name in {
                 "execTransactionFromModule",
                 "execTransactionFromModuleReturnData",
@@ -518,14 +522,18 @@ class SafeTxProcessor(TxProcessor):
                 logger.debug("Processing transaction execution")
                 # Events for L2 Safes store information about nonce
                 nonce = (
-                    arguments["nonce"] if "nonce" in arguments else safe_status.nonce
+                    arguments["nonce"]
+                    if "nonce" in arguments
+                    else safe_last_status.nonce
                 )
                 if (
                     "baseGas" in arguments
                 ):  # `dataGas` was renamed to `baseGas` in v1.0.0
                     base_gas = arguments["baseGas"]
                     safe_version = (
-                        self.get_safe_version_from_master_copy(safe_status.master_copy)
+                        self.get_safe_version_from_master_copy(
+                            safe_last_status.master_copy
+                        )
                         or "1.0.0"
                     )
                 else:
@@ -613,8 +621,8 @@ class SafeTxProcessor(TxProcessor):
                             update_fields=["signature", "signature_type"]
                         )
 
-                safe_status.nonce = nonce + 1
-                self.store_new_safe_status(safe_status, internal_tx)
+                safe_last_status.nonce = nonce + 1
+                self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "execTransactionFromModule":
                 logger.debug("Not processing execTransactionFromModule")
                 # No side effects or nonce increasing, but trace will be set as processed
