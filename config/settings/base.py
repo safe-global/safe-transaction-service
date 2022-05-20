@@ -231,13 +231,11 @@ CELERY_IGNORE_RESULT = True
 CELERY_ALWAYS_EAGER = False
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#task-default-priority
 # Higher = more priority on RabbitMQ, opposite on Redis ¯\_(ツ)_/¯
-CELERY_TASK_DEFAULT_PRIORITY = 3
+CELERY_TASK_DEFAULT_PRIORITY = 5
 # https://docs.celeryproject.org/en/stable/userguide/configuration.html#task-queue-max-priority
 CELERY_TASK_QUEUE_MAX_PRIORITY = 10
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    "queue_order_strategy": "priority",
-}
+CELERY_BROKER_TRANSPORT_OPTIONS = {}
 
 
 # Django REST Framework
