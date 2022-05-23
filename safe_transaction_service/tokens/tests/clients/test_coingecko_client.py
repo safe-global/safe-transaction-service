@@ -7,6 +7,9 @@ from ...clients.coingecko_client import CoingeckoClient
 
 
 class TestCoingeckoClient(TestCase):
+    GNO_TOKEN_ADDRESS = "0x6810e776880C02933D47DB1b9fc05908e5386b96"
+    GNO_GNOSIS_CHAIN_ADDRESS = "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb"
+
     def test_coingecko_client(self):
         self.assertTrue(CoingeckoClient.supports_network(EthereumNetwork.MAINNET))
         self.assertTrue(CoingeckoClient.supports_network(EthereumNetwork.BINANCE))
@@ -16,8 +19,7 @@ class TestCoingeckoClient(TestCase):
         # Test Mainnet
         coingecko_client = CoingeckoClient()
         non_existing_token_address = "0xda2f8b8386302C354a90DB670E40beA3563AF454"
-        gno_token_address = "0x6810e776880C02933D47DB1b9fc05908e5386b96"
-        self.assertGreater(coingecko_client.get_token_price(gno_token_address), 0)
+        self.assertGreater(coingecko_client.get_token_price(self.GNO_TOKEN_ADDRESS), 0)
         with self.assertRaises(CannotGetPrice):
             coingecko_client.get_token_price(non_existing_token_address)
 
@@ -32,3 +34,19 @@ class TestCoingeckoClient(TestCase):
         polygon_coingecko_client = CoingeckoClient(EthereumNetwork.MATIC)
         bnb_pos_address = "0xb33EaAd8d922B1083446DC23f610c2567fB5180f"
         self.assertGreater(polygon_coingecko_client.get_token_price(bnb_pos_address), 0)
+
+    def test_get_logo_url(self):
+        # Test Mainnet
+        coingecko_client = CoingeckoClient()
+        self.assertIn(
+            "http", coingecko_client.get_token_logo_url(self.GNO_TOKEN_ADDRESS)
+        )
+        self.assertIsNone(
+            coingecko_client.get_token_logo_url(self.GNO_GNOSIS_CHAIN_ADDRESS)
+        )
+
+        # Test Gnosis Chain
+        coingecko_client = CoingeckoClient(EthereumNetwork.XDAI)
+        self.assertIn(
+            "http", coingecko_client.get_token_logo_url(self.GNO_GNOSIS_CHAIN_ADDRESS)
+        )
