@@ -24,7 +24,6 @@ class TestEnsClient(TestCase):
         self.assertEqual(len(EnsClient.domain_hash_to_hex_str(2)), 66)
 
     def test_query_by_account(self):
-        self.maxDiff = None
         ens_client = EnsClient(EthereumNetwork.RINKEBY.value)  # Mainnet
         if not ens_client.is_available():
             self.skipTest("ENS Rinkeby Client is not available")
