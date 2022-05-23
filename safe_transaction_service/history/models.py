@@ -1513,7 +1513,7 @@ class SafeStatusBase(models.Model):
     master_copy = EthereumAddressV2Field()
     fallback_handler = EthereumAddressV2Field()
     guard = EthereumAddressV2Field(default=None, null=True)
-    enabled_modules = ArrayField(EthereumAddressV2Field(), default=list)
+    enabled_modules = ArrayField(EthereumAddressV2Field(), default=list, blank=True)
 
     class Meta:
         abstract = True
