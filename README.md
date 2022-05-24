@@ -141,7 +141,7 @@ Services come with a basic administration web ui (provided by Django) by default
 
 A user must be created to get access:
 ```bash
-docker exec -it safe-transaction-service_web_1 python manage.py createsuperuser
+docker exec -it safe-transaction-service-web-1 python manage.py createsuperuser
 ```
 
 ## Safe Contract ABIs and addresses
