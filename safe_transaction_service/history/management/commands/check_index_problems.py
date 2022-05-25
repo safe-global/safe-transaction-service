@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.safe import Safe
+from gnosis.eth.contracts import get_safe_V1_3_0_contract
 
 from ...models import MultisigTransaction, SafeLastStatus
 from ...services import IndexServiceProvider
@@ -15,11 +15,9 @@ class Command(BaseCommand):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nonce_fn = (
-            Safe(NULL_ADDRESS, EthereumClientProvider())
-            .get_contract()
-            .functions.nonce()
-        )
+        self.nonce_fn = get_safe_V1_3_0_contract(
+            EthereumClientProvider().w3, address=NULL_ADDRESS
+        ).functions.nonce()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -64,7 +62,7 @@ class Command(BaseCommand):
             blockchain_nonce_payloads = self.build_nonce_payload(
                 [safe_status.address for safe_status in safe_statuses_list]
             )
-            blockchain_nonces = ethereum_client.batch_call_custom(
+            blockchain_nonces = ethereum_client.batch_call_manager.batch_call_custom(
                 blockchain_nonce_payloads, raise_exception=False
             )
 
