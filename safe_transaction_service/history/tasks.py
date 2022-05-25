@@ -385,7 +385,7 @@ def get_webhook_http_session(
         session.headers.update({"Authorization": authorization})
     adapter = requests.adapters.HTTPAdapter(
         pool_connections=1,  # Doing all the connections to the same url
-        pool_maxsize=100,  # Number of concurrent connections
+        pool_maxsize=500,  # Number of concurrent connections
         pool_block=False,
     )
     session.mount("http://", adapter)
