@@ -698,7 +698,7 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     modules = serializers.ListField(child=EthereumAddressField())
     fallback_handler = EthereumAddressField()
     guard = EthereumAddressField()
-    version = serializers.CharField()
+    version = serializers.CharField(allow_null=True)
 
 
 class MasterCopyResponseSerializer(serializers.Serializer):

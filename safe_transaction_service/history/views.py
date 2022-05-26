@@ -54,7 +54,7 @@ from .services import (
     TransactionServiceProvider,
 )
 from .services.collectibles_service import CollectiblesServiceProvider
-from .services.safe_service import CannotGetSafeInfo
+from .services.safe_service import CannotGetSafeInfoFromBlockchain
 
 logger = logging.getLogger(__name__)
 
@@ -989,28 +989,18 @@ class SafeInfoView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         try:
-            safe_info = SafeLastStatus.objects.get(address=address).get_safe_info()
-            if safe_info.nonce == 0:
-                # This works for:
-                # - Not indexed Safes
-                # - Not L2 Safes on L2 networks
-                raise SafeLastStatus.DoesNotExist
+            safe_info = SafeServiceProvider().get_safe_info(address)
             serializer = self.get_serializer(safe_info)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
-        except SafeLastStatus.DoesNotExist:
-            try:
-                safe_info = SafeServiceProvider().get_safe_info(address)
-                serializer = self.get_serializer(safe_info)
-                return Response(status=status.HTTP_200_OK, data=serializer.data)
-            except CannotGetSafeInfo:
-                return Response(
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    data={
-                        "code": 50,
-                        "message": "Cannot get Safe info from blockchain",
-                        "arguments": [address],
-                    },
-                )
+        except CannotGetSafeInfoFromBlockchain:
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 50,
+                    "message": "Cannot get Safe info from blockchain",
+                    "arguments": [address],
+                },
+            )
 
 
 class MasterCopiesView(ListAPIView):

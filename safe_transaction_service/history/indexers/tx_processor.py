@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from functools import cache
 from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
@@ -156,10 +155,13 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
-    @cache
     def get_safe_version_from_master_copy(
         self, master_copy: ChecksumAddress
     ) -> Optional[str]:
+        """
+        :param master_copy:
+        :return: Safe version for master copy address
+        """
         return SafeMasterCopy.objects.get_version_for_address(master_copy)
 
     def get_last_safe_status_for_address(
