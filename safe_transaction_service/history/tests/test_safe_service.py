@@ -9,13 +9,15 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..models import SafeMasterCopy
 from ..services.safe_service import (
-    CannotGetSafeInfo,
+    CannotGetSafeInfoFromBlockchain,
+    CannotGetSafeInfoFromDB,
     SafeCreationInfo,
     SafeInfo,
     SafeServiceProvider,
 )
-from .factories import InternalTxFactory
+from .factories import InternalTxFactory, SafeLastStatusFactory, SafeMasterCopyFactory
 from .mocks.traces import create_trace, creation_internal_txs
 
 
@@ -99,13 +101,14 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertIsNone(safe_creation_info.master_copy)
         self.assertIsNone(safe_creation_info.setup_data)
 
-    def test_get_safe_info(self):
+    def test_get_safe_info_from_blockchain(self):
+        SafeMasterCopy.objects.get_version_for_address.cache_clear()
         safe_address = Account.create().address
-        with self.assertRaises(CannotGetSafeInfo):
-            self.safe_service.get_safe_info(safe_address)
+        with self.assertRaises(CannotGetSafeInfoFromBlockchain):
+            self.safe_service.get_safe_info_from_blockchain(safe_address)
 
         safe = self.deploy_test_safe()
-        safe_info = self.safe_service.get_safe_info(safe.address)
+        safe_info = self.safe_service.get_safe_info_from_blockchain(safe.address)
         self.assertIsInstance(safe_info, SafeInfo)
         self.assertEqual(safe_info.address, safe.address)
         self.assertEqual(safe_info.owners, safe.retrieve_owners())
@@ -114,3 +117,24 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             safe_info.fallback_handler, self.compatibility_fallback_handler.address
         )
         self.assertEqual(safe_info.guard, NULL_ADDRESS)
+        self.assertEqual(safe_info.version, None)  # No SafeMasterCopy
+
+        version = "4.8.15162342"
+        SafeMasterCopyFactory(address=safe_info.master_copy, version=version)
+
+        safe_info = self.safe_service.get_safe_info_from_blockchain(safe.address)
+        self.assertEqual(safe_info.version, version)
+        SafeMasterCopy.objects.get_version_for_address.cache_clear()
+
+    def test_get_safe_info_from_db(self):
+        safe_address = Account.create().address
+        with self.assertRaises(CannotGetSafeInfoFromDB):
+            self.safe_service.get_safe_info_from_db(safe_address)
+
+        safe_last_status = SafeLastStatusFactory(address=safe_address, guard=None)
+        self.assertIsNone(safe_last_status.guard)
+
+        safe_info = self.safe_service.get_safe_info_from_db(safe_address)
+        self.assertIsInstance(safe_info, SafeInfo)
+        self.assertEqual(safe_info.guard, NULL_ADDRESS)
+        self.assertEqual(safe_info.version, None)

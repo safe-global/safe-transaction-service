@@ -2767,7 +2767,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "modules": safe_last_status.enabled_modules,
                 "fallback_handler": safe_last_status.fallback_handler,
                 "guard": safe_last_status.guard,
-                "version": "UNKNOWN",
+                "version": None,
             },
         )
 

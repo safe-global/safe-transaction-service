@@ -1,8 +1,9 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Optional, Tuple, Union
 
+from eth_typing import ChecksumAddress
 from web3 import Web3
 
 from gnosis.eth import EthereumClient
@@ -12,7 +13,7 @@ from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.safe import SafeInfo
 
 from ..exceptions import NodeConnectionException
-from ..models import InternalTx
+from ..models import InternalTx, SafeLastStatus, SafeMasterCopy
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ class SafeServiceException(Exception):
     pass
 
 
-class CannotGetSafeInfo(SafeServiceException):
+class CannotGetSafeInfoFromBlockchain(SafeServiceException):
+    pass
+
+
+class CannotGetSafeInfoFromDB(SafeServiceException):
     pass
 
 
@@ -116,14 +121,49 @@ class SafeService:
             creation_internal_tx.ethereum_tx_id,
         )
 
-    def get_safe_info(self, safe_address: str) -> SafeInfo:
+    def get_safe_info(self, safe_address: ChecksumAddress) -> SafeInfo:
+        """
+        :param safe_address:
+        :return: SafeInfo for the provided `safe_address`. First tries database, if not
+            found or if `nonce=0` it will try blockchain
+        :raises: CannotGetSafeInfoFromBlockchain
+        """
+        try:
+            safe_info = self.get_safe_info_from_db(safe_address)
+            if safe_info.nonce == 0:
+                # This works for:
+                # - Not indexed Safes
+                # - Not L2 Safes on L2 networks
+                raise CannotGetSafeInfoFromDB
+            return safe_info
+        except CannotGetSafeInfoFromDB:
+            return self.get_safe_info_from_blockchain(safe_address)
+
+    def get_safe_info_from_blockchain(self, safe_address: ChecksumAddress) -> SafeInfo:
+        """
+        :param safe_address:
+        :return: SafeInfo from blockchain
+        """
         try:
             safe = Safe(safe_address, self.ethereum_client)
-            return safe.retrieve_all_info()
+            safe_info = safe.retrieve_all_info()
+            # Return same master copy information than the db method
+            return replace(
+                safe_info,
+                version=SafeMasterCopy.objects.get_version_for_address(
+                    safe_info.master_copy
+                ),
+            )
         except IOError as exc:
             raise NodeConnectionException from exc
-        except CannotRetrieveSafeInfoException as e:
-            raise CannotGetSafeInfo from e
+        except CannotRetrieveSafeInfoException as exc:
+            raise CannotGetSafeInfoFromBlockchain(safe_address) from exc
+
+    def get_safe_info_from_db(self, safe_address: ChecksumAddress) -> SafeInfo:
+        try:
+            return SafeLastStatus.objects.get(address=safe_address).get_safe_info()
+        except SafeLastStatus.DoesNotExist as exc:
+            raise CannotGetSafeInfoFromDB(safe_address) from exc
 
     def _decode_proxy_factory(
         self, data: Union[bytes, str]

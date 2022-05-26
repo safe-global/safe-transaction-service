@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
-from functools import lru_cache
+from functools import cache, lru_cache
 from itertools import islice
 from logging import getLogger
 from typing import (
@@ -121,7 +121,7 @@ class BulkCreateSignalMixin:
     def bulk_create(
         self, objs, batch_size: Optional[int] = None, ignore_conflicts: bool = False
     ):
-        objs = list(objs)  # If not it won't be iterate later
+        objs = list(objs)  # If not it won't be iterated later
         result = super().bulk_create(
             objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts
         )
@@ -1372,6 +1372,7 @@ def validate_version(value: str):
 
 
 class SafeMasterCopyManager(models.Manager):
+    @cache
     def get_version_for_address(self, address: ChecksumAddress) -> Optional[str]:
         try:
             return self.filter(address=address).only("version").get().version
@@ -1591,12 +1592,9 @@ class SafeLastStatus(SafeStatusBase):
         """
         :return: SafeInfo built from SafeLastStatus (not requiring connection to Ethereum RPC)
         """
-        try:
-            master_copy_version = SafeMasterCopy.objects.get(
-                address=self.master_copy
-            ).version
-        except SafeMasterCopy.DoesNotExist:
-            master_copy_version = "UNKNOWN"
+        master_copy_version = SafeMasterCopy.objects.get_version_for_address(
+            self.master_copy
+        )
 
         return SafeInfo(
             self.address,
