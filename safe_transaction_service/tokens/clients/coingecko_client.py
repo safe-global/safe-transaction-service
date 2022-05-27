@@ -36,6 +36,8 @@ class CoingeckoClient:
             self.asset_platform = "optimistic-ethereum"
         elif network == EthereumNetwork.XDAI:
             self.asset_platform = "xdai"
+        elif network == EthereumNetwork.SMARTBCH:
+            self.asset_platform = "smartbch"
         else:
             self.asset_platform = "ethereum"
 
@@ -50,6 +52,7 @@ class CoingeckoClient:
             EthereumNetwork.MATIC,
             EthereumNetwork.OPTIMISTIC,
             EthereumNetwork.XDAI,
+            EthereumNetwork.SMARTBCH,
         )
 
     def _do_request(self, url: str) -> Dict[str, Any]:
@@ -126,6 +129,9 @@ class CoingeckoClient:
 
     def get_aoa_usd_price(self) -> float:
         return self.get_price("aurora")
+
+    def get_bch_usd_price(self) -> float:
+        return self.get_price("wrapped-bch")
 
     def get_bnb_usd_price(self) -> float:
         return self.get_price("binancecoin")

@@ -11,6 +11,7 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -45,6 +46,14 @@ from ..clients import (
     KucoinClient,
 )
 from ..tasks import EthValueWithTimestamp, calculate_token_eth_price_task
+
+
+class MistswapOracle(UniswapV2Oracle):
+    pair_init_code = HexBytes(
+        "0xacca68b46e4aa677641d8d20d81c9f4b252af83de62ff9e2fb58a9b648ee3537"
+    )
+    router_address = "0x5d0bF8d8c8b054080E2131D8b260a5c6959411B8"
+
 
 logger = get_task_logger(__name__)
 
@@ -97,6 +106,7 @@ class PriceService:
         self.mooniswap_oracle = MooniswapOracle(
             self.ethereum_client, self.uniswap_v2_oracle
         )
+        self.mistswap_oracle = MistswapOracle(self.ethereum_client)
         self.cache_eth_price = TTLCache(
             maxsize=2048, ttl=60 * 30
         )  # 30 minutes of caching
@@ -121,6 +131,10 @@ class PriceService:
                 self.aave_oracle,
                 self.kyber_oracle,
             )
+        elif self.ethereum_network == EthereumNetwork.SMARTBCH:
+            return (
+                self.mistswap_oracle,
+            )
         else:
             return (
                 self.uniswap_v2_oracle,
@@ -131,6 +145,8 @@ class PriceService:
     def enabled_price_pool_oracles(self) -> Tuple[PricePoolOracle]:
         if self.ethereum_network == EthereumNetwork.MAINNET:
             return self.uniswap_v2_oracle, self.balancer_oracle, self.mooniswap_oracle
+        elif self.ethereum_network == EthereumNetwork.SMARTBCH:
+            return (self.mistswap_oracle,)
         else:
             return tuple()
 
@@ -154,6 +170,9 @@ class PriceService:
 
     def get_aurora_usd_price(self) -> float:
         return self.coingecko_client.get_aoa_usd_price()
+
+    def get_bch_usd_price(self) -> float:
+        return self.coingecko_client.get_bch_usd_price()
 
     def get_binance_usd_price(self) -> float:
         try:
@@ -218,6 +237,11 @@ class PriceService:
             EthereumNetwork.ARBITRUM_TESTNET,
         ):
             return self.get_aurora_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.SMARTBCH,
+            EthereumNetwork.SMARTBCHTEST_TESTNET,
+        ):
+            return self.get_bch_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
