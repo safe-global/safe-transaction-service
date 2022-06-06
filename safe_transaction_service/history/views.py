@@ -989,7 +989,8 @@ class SafeInfoView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         try:
-            safe_info = SafeServiceProvider().get_safe_info(address)
+            # safe_info = SafeServiceProvider().get_safe_info(address)
+            safe_info = SafeServiceProvider().get_safe_info_from_blockchain(address)
             serializer = self.get_serializer(safe_info)
             return Response(status=status.HTTP_200_OK, data=serializer.data)
         except CannotGetSafeInfoFromBlockchain:

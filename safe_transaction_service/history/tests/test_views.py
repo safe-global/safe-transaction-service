@@ -18,7 +18,6 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
-from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -31,9 +30,14 @@ from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..helpers import DelegateSignatureHelper
-from ..models import MultisigConfirmation, MultisigTransaction, SafeContractDelegate
+from ..models import (
+    MultisigConfirmation,
+    MultisigTransaction,
+    SafeContractDelegate,
+    SafeMasterCopy,
+)
 from ..serializers import DelegateSerializer, TransferType
-from ..services import BalanceService, CollectiblesService, SafeService
+from ..services import BalanceService, CollectiblesService
 from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..views import SafeMultisigTransactionListView
@@ -2718,6 +2722,41 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
         )
 
+        # Test blockchain Safe
+        blockchain_safe = self.deploy_test_safe()
+        response = self.client.get(
+            reverse("v1:history:safe-info", args=(blockchain_safe.address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=blockchain_safe.address)
+        SafeMasterCopyFactory(
+            address=blockchain_safe.retrieve_master_copy_address(), version="1.25.0"
+        )
+        response = self.client.get(
+            reverse("v1:history:safe-info", args=(blockchain_safe.address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(
+            response.data,
+            {
+                "address": blockchain_safe.address,
+                "nonce": 0,
+                "threshold": blockchain_safe.retrieve_threshold(),
+                "owners": blockchain_safe.retrieve_owners(),
+                "master_copy": blockchain_safe.retrieve_master_copy_address(),
+                "modules": [],
+                "fallback_handler": blockchain_safe.retrieve_fallback_handler(),
+                "guard": NULL_ADDRESS,
+                "version": "1.25.0",
+            },
+        )
+
+        # Uncomment if this method is used again on `SafeInfoView`
+        """
         with mock.patch.object(SafeService, "get_safe_info") as get_safe_info_mock:
             safe_info_mock = SafeInfo(
                 safe_address,
@@ -2790,6 +2829,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "version": "1.3.0",
             },
         )
+        """
+        SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
     def test_master_copies_view(self):
         response = self.client.get(reverse("v1:history:master-copies"))
