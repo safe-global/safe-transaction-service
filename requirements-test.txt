@@ -1,5 +1,5 @@
 -r requirements.txt
-coverage==6.4
+coverage==6.4.1
 django-stubs==1.11.0
 factory-boy==3.2.1
 faker==13.12.0
