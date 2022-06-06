@@ -941,7 +941,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             "is_setup",
             "internal_tx__block_number",
             "internal_tx__ethereum_tx__transaction_index",
-            "internal_tx__trace_address",
+            "internal_tx_id",
         )
 
     def pending_for_safes(self):
@@ -1627,7 +1627,7 @@ class SafeStatusQuerySet(models.QuerySet):
             "-nonce",
             "-internal_tx__block_number",
             "-internal_tx__ethereum_tx__transaction_index",
-            "-internal_tx__trace_address",
+            "-internal_tx_id",
         )
 
     def sorted_reverse_by_mined(self):
@@ -1636,7 +1636,7 @@ class SafeStatusQuerySet(models.QuerySet):
             "nonce",
             "internal_tx__block_number",
             "internal_tx__ethereum_tx__transaction_index",
-            "internal_tx__trace_address",
+            "internal_tx_id",
         )
 
     def last_for_every_address(self) -> QuerySet:

@@ -180,7 +180,7 @@ class InternalTxAdmin(BinarySearchAdmin):
     ordering = [
         "-block_number",
         "-ethereum_tx__transaction_index",
-        "-trace_address",
+        "-pk",
     ]
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
@@ -226,7 +226,7 @@ class InternalTxDecodedAdmin(BinarySearchAdmin):
     ordering = [
         "-internal_tx__block_number",
         "-internal_tx__ethereum_tx__transaction_index",
-        "-internal_tx__trace_address",
+        "-internal_tx_id",
     ]
     raw_id_fields = ("internal_tx",)
     search_fields = [
