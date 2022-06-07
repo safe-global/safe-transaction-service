@@ -453,7 +453,9 @@ class EthereumIndexer(ABC):
                 )
 
                 # Not updated addresses are sorted by tx_block_number
-                minimum_block_number = not_updated_addresses_chunk[0].tx_block_number
+                minimum_block_number = getattr(
+                    not_updated_addresses_chunk[0], self.database_field
+                )
                 from_block_number = minimum_block_number + 1
                 updated = False
                 while not updated:
