@@ -1006,8 +1006,10 @@ class SafeInfoView(GenericAPIView):
 
 class MasterCopiesView(ListAPIView):
     serializer_class = serializers.MasterCopyResponseSerializer
-    queryset = SafeMasterCopy.objects.all()
     pagination_class = None
+
+    def get_queryset(self):
+        return SafeMasterCopy.objects.relevant()
 
 
 class OwnersView(GenericAPIView):
