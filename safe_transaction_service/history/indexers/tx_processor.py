@@ -170,7 +170,7 @@ class SafeTxProcessor(TxProcessor):
         try:
             safe_status = self.safe_last_status_cache.get(
                 address
-            ) or SafeLastStatus.objects.get_or_create(address)
+            ) or SafeLastStatus.objects.get_or_generate(address)
             return safe_status
         except SafeLastStatus.DoesNotExist:
             logger.error("SafeLastStatus not found for address=%s", address)
