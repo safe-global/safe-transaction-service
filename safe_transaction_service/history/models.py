@@ -1547,7 +1547,7 @@ class SafeStatusBase(models.Model):
 
 
 class SafeLastStatusManager(models.Manager):
-    def get_or_create(self, address: ChecksumAddress) -> "SafeLastStatus":
+    def get_or_generate(self, address: ChecksumAddress) -> "SafeLastStatus":
         """
         :param address:
         :return: `SafeLastStatus` if it exists. If not, it will try to build it from `SafeStatus` table

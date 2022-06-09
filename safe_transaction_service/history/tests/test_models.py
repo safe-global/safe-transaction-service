@@ -730,25 +730,25 @@ class TestLastSafeStatus(TestCase):
 
 
 class TestSafeLastStatus(TestCase):
-    def test_get_or_create(self):
+    def test_get_or_generate(self):
         address = Account.create().address
         with self.assertRaises(SafeLastStatus.DoesNotExist):
-            SafeLastStatus.objects.get_or_create(address)
+            SafeLastStatus.objects.get_or_generate(address)
 
         SafeStatusFactory(address=address, nonce=0)
         SafeStatusFactory(address=address, nonce=5)
         self.assertEqual(SafeLastStatus.objects.count(), 0)
         # SafeLastStatus should be created from latest SafeStatus
-        self.assertEqual(SafeLastStatus.objects.get_or_create(address).nonce, 5)
+        self.assertEqual(SafeLastStatus.objects.get_or_generate(address).nonce, 5)
         self.assertEqual(SafeLastStatus.objects.count(), 1)
 
         # SafeLastStatus was already created and will not be increased
         SafeStatusFactory(address=address, nonce=7)
-        self.assertEqual(SafeLastStatus.objects.get_or_create(address).nonce, 5)
+        self.assertEqual(SafeLastStatus.objects.get_or_generate(address).nonce, 5)
 
         SafeLastStatus.objects.all().delete()
         SafeLastStatusFactory(address=address, nonce=17)
-        self.assertEqual(SafeLastStatus.objects.get_or_create(address).nonce, 17)
+        self.assertEqual(SafeLastStatus.objects.get_or_generate(address).nonce, 17)
 
 
 class TestSafeStatus(TestCase):
