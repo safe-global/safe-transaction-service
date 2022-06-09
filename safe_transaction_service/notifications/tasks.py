@@ -163,7 +163,7 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
     assert safe_tx_hash, "Safe tx hash was not provided"
 
     try:
-        safe_last_status = SafeLastStatus.objects.get(address=address)
+        safe_last_status = SafeLastStatus.objects.get_or_create(address)
     except SafeLastStatus.DoesNotExist:
         logger.info("Cannot find threshold information for safe=%s", address)
         return 0, 0
