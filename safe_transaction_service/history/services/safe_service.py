@@ -161,7 +161,7 @@ class SafeService:
 
     def get_safe_info_from_db(self, safe_address: ChecksumAddress) -> SafeInfo:
         try:
-            return SafeLastStatus.objects.get(address=safe_address).get_safe_info()
+            return SafeLastStatus.objects.get_or_create(safe_address).get_safe_info()
         except SafeLastStatus.DoesNotExist as exc:
             raise CannotGetSafeInfoFromDB(safe_address) from exc
 
