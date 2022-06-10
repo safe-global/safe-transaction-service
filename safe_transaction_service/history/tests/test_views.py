@@ -36,7 +36,7 @@ from ..models import (
     SafeContractDelegate,
     SafeMasterCopy,
 )
-from ..serializers import DelegateSerializer, TransferType
+from ..serializers import TransferType
 from ..services import BalanceService, CollectiblesService
 from ..services.balance_service import Erc20InfoWithLogo
 from ..services.collectibles_service import CollectibleWithMetadata
@@ -1780,10 +1780,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         SafeContractFactory(address=safe_address)
-        with mock.patch.object(
-            DelegateSerializer,
-            "get_safe_owners",
-            autospec=True,
+        with mock.patch(
+            "safe_transaction_service.history.serializers.get_safe_owners",
             return_value=[Account.create().address],
         ) as get_safe_owners_mock:
             response = self.client.post(url, format="json", data=data)

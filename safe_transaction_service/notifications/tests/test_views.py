@@ -146,11 +146,11 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(
             reverse("v1:notifications:devices"), format="json", data=data
         )
-        # self.assertIn('is not an owner of any of the safes', str(response.data['non_field_errors']))
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["owners_registered"], [])
-        self.assertEqual(
-            response.data["owners_not_registered"], [owner_account.address]
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            f"Could not get Safe {safe_address} owners from blockchain, check contract exists on network",
+            response.data["non_field_errors"][0],
         )
 
         with mock.patch(
@@ -229,9 +229,11 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(
             reverse("v1:notifications:devices"), format="json", data=data
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["owners_registered"], [])
-        self.assertEqual(response.data["owners_not_registered"], [delegate.address])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            f"Could not get Safe {safe_address} owners from blockchain, check contract exists on network",
+            response.data["non_field_errors"][0],
+        )
 
         with mock.patch(
             "safe_transaction_service.notifications.serializers.get_safe_owners",
