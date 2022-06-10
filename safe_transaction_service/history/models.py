@@ -1580,10 +1580,20 @@ class SafeLastStatusManager(models.Manager):
         )
         return obj
 
+    def addresses_for_module(self, module_address: str) -> QuerySet[str]:
+        """
+        :param module_address:
+        :return: Safes where the provided `module_address` is enabled
+        """
+
+        return self.filter(enabled_modules__contains=[module_address]).values_list(
+            "address", flat=True
+        )
+
     def addresses_for_owner(self, owner_address: str) -> QuerySet[str]:
         """
         :param owner_address:
-        :return: Safes for an owner
+        :return: Safes where the provided `owner_address` is an owner
         """
 
         return self.filter(owners__contains=[owner_address]).values_list(
@@ -1597,6 +1607,7 @@ class SafeLastStatus(SafeStatusBase):
     class Meta:
         indexes = [
             GinIndex(fields=["owners"]),
+            GinIndex(fields=["enabled_modules"]),
         ]
         verbose_name_plural = "Safe last statuses"
 

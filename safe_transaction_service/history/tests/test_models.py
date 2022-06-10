@@ -673,6 +673,61 @@ class TestLastSafeStatus(TestCase):
         self.assertEqual(SafeStatus.objects.count(), 2)
         self.assertEqual(SafeLastStatus.objects.count(), 1)
 
+    def test_address_for_module(self):
+        module_address = Account.create().address
+        address = Account.create().address
+        address_2 = Account.create().address
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), []
+        )
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=0, enabled_modules=[module_address]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), [address]
+        )
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(address=address, nonce=1)
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), []
+        )
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=2, enabled_modules=[module_address]
+        )
+        safe_last_status_2 = SafeLastStatusFactory(
+            address=address_2, nonce=0, enabled_modules=[module_address]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address),
+            [address, address_2],
+        )
+        # Remove the module from one of the Safes
+        new_module = Account.create().address
+        safe_last_status.delete()
+        safe_last_status = SafeLastStatusFactory(
+            address=address, nonce=3, enabled_modules=[new_module]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), [address_2]
+        )
+
+        # Add new module for the other Safe
+        safe_last_status_2.delete()
+        safe_last_status_2 = SafeLastStatusFactory(
+            address=address_2, nonce=1, enabled_modules=[module_address, new_module]
+        )
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), [address_2]
+        )
+
+        # Remove the module from the other Safe
+        safe_last_status_2.delete()
+        SafeLastStatusFactory(address=address_2, nonce=2, enabled_modules=[new_module])
+        self.assertCountEqual(
+            SafeLastStatus.objects.addresses_for_module(module_address), []
+        )
+
     def test_addresses_for_owner(self):
         owner_address = Account.create().address
         address = Account.create().address

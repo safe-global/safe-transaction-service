@@ -1012,6 +1012,36 @@ class MasterCopiesView(ListAPIView):
         return SafeMasterCopy.objects.relevant()
 
 
+class ModulesView(GenericAPIView):
+    serializer_class = serializers.ModulesResponseSerializer
+
+    @swagger_auto_schema(
+        responses={
+            200: serializers.ModulesResponseSerializer(),
+            422: "Module address checksum not valid",
+        }
+    )
+    @method_decorator(cache_page(15))  # 15 seconds
+    def get(self, request, address, *args, **kwargs):
+        """
+        Return Safes where the module address provided is enabled
+        """
+        if not Web3.isChecksumAddress(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        safes_for_module = SafeLastStatus.objects.addresses_for_module(address)
+        serializer = self.get_serializer(data={"safes": safes_for_module})
+        assert serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
 class OwnersView(GenericAPIView):
     serializer_class = serializers.OwnerResponseSerializer
 

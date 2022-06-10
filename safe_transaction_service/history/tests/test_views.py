@@ -3037,6 +3037,37 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
+    def test_modules_view(self):
+        invalid_address = "0x2A"
+        response = self.client.get(
+            reverse("v1:history:modules", args=(invalid_address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        module_address = Account.create().address
+        response = self.client.get(
+            reverse("v1:history:modules", args=(module_address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["safes"], [])
+
+        safe_last_status = SafeLastStatusFactory(enabled_modules=[module_address])
+        response = self.client.get(
+            reverse("v1:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["safes"], [safe_last_status.address])
+
+        safe_status_2 = SafeLastStatusFactory(enabled_modules=[module_address])
+        SafeStatusFactory()  # Test that other SafeStatus don't appear
+        response = self.client.get(
+            reverse("v1:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(
+            response.data["safes"], [safe_last_status.address, safe_status_2.address]
+        )
+
     def test_owners_view(self):
         invalid_address = "0x2A"
         response = self.client.get(

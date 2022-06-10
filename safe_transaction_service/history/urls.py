@@ -112,6 +112,7 @@ urlpatterns = [
         views.SafeMultisigConfirmationsView.as_view(),
         name="multisig-transaction-confirmations",
     ),
+    path("modules/<str:address>/safes/", views.ModulesView.as_view(), name="modules"),
     path("owners/<str:address>/safes/", views.OwnersView.as_view(), name="owners"),
     path(
         "transactions/<str:safe_tx_hash>/",
