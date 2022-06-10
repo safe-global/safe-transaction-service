@@ -678,6 +678,10 @@ class MasterCopyResponseSerializer(serializers.Serializer):
     l2 = serializers.BooleanField()
 
 
+class ModulesResponseSerializer(serializers.Serializer):
+    safes = serializers.ListField(child=EthereumAddressField())
+
+
 class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
