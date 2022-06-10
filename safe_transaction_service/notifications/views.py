@@ -9,7 +9,7 @@ from safe_transaction_service.history.models import SafeContract
 
 from . import serializers
 from .models import FirebaseDevice
-from .utils import get_safe_owners
+from .serializers import get_safe_owners
 
 logger = logging.getLogger(__name__)
 
