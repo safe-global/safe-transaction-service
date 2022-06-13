@@ -5,7 +5,7 @@ django==3.2.13
 django-authtools==1.7.0
 django-cache-memoize==0.1.10
 django-celery-beat==2.3.0
-django-cors-headers==3.11.0
+django-cors-headers==3.13.0
 django-db-geventpool==4.0.1
 django-debug-toolbar
 django-debug-toolbar-force
