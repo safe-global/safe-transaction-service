@@ -20,8 +20,7 @@ services:
     ports:
       - "6379:6379"
     command:
-      - --save ""
-      - --appendonly no
+      - --appendonly yes
 
   rabbitmq:
     image: rabbitmq:alpine
@@ -50,17 +49,30 @@ services:
       - nginx-shared:/nginx
     command: docker/web/run_web.sh
 
-  worker: &worker
+  indexer-worker: &worker
     build:
       context: .
       dockerfile: docker/web/Dockerfile
     env_file:
       - .env
+    environment:
+      RUN_MIGRATIONS: 1
+      WORKER_QUEUES: "default,indexing"
     depends_on:
       - db
       - redis
       - rabbitmq
     command: docker/web/celery/worker/run.sh
+
+  contracts-tokens-worker:
+    <<: *worker
+    environment:
+      WORKER_QUEUES: "contracts,tokens"
+
+  notifications-webhooks-worker:
+    <<: *worker
+    environment:
+      WORKER_QUEUES: "notifications,webhooks"
 
   scheduler:
     <<: *worker

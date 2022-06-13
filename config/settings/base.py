@@ -236,6 +236,19 @@ CELERY_TASK_DEFAULT_PRIORITY = 5
 CELERY_TASK_QUEUE_MAX_PRIORITY = 10
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
 CELERY_BROKER_TRANSPORT_OPTIONS = {}
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_routes
+CELERY_ROUTES = (
+    [
+        (
+            "safe_transaction_service.history.tasks.send_webhook_task",
+            {"queue": "webhooks"},
+        ),
+        ("safe_transaction_service.history.tasks.*", {"queue": "indexing"}),
+        ("safe_transaction_service.contracts.tasks.*", {"queue": "contracts"}),
+        ("safe_transaction_service.notifications.tasks.*", {"queue": "notifications"}),
+        ("safe_transaction_service.tokens.tasks.*", {"queue": "tokens"}),
+    ],
+)
 
 
 # Django REST Framework
