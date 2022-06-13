@@ -466,3 +466,34 @@ class TestSafeTxProcessor(TestCase):
             self.assertEqual(
                 module_tx.value, module_internal_tx_decoded.arguments["value"]
             )
+
+    def test_store_new_safe_status(self):
+        # Create a new SafeLastStatus
+        safe_last_status = SafeLastStatusFactory(nonce=0)
+        safe_address = safe_last_status.address
+        safe_last_status_db = SafeLastStatus.objects.get()
+        self.assertEqual(safe_last_status_db.address, safe_address)
+        self.assertEqual(safe_last_status_db.nonce, 0)
+
+        # Increase nonce and store it
+        safe_last_status.nonce = 5
+        self.tx_processor.store_new_safe_status(
+            safe_last_status, safe_last_status.internal_tx
+        )
+        safe_last_status_db = SafeLastStatus.objects.get()
+        self.assertEqual(safe_last_status_db.address, safe_address)
+        self.assertEqual(safe_last_status_db.nonce, 5)
+
+        # Use the factory to create a new SafeLastStatus
+        new_safe_last_status = SafeLastStatusFactory(nonce=1)
+        # Remove it, as we want to use it to replace our previous SafeLastStatus
+        new_safe_last_status.delete()
+        self.assertNotEqual(new_safe_last_status.address, safe_address)
+        new_safe_last_status.address = safe_address
+
+        self.tx_processor.store_new_safe_status(
+            new_safe_last_status, new_safe_last_status.internal_tx
+        )
+        safe_last_status_db = SafeLastStatus.objects.get()
+        self.assertEqual(safe_last_status_db.address, safe_address)
+        self.assertEqual(safe_last_status_db.nonce, 1)
