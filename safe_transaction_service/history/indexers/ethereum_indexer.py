@@ -6,7 +6,6 @@ from typing import Any, Iterable, List, Optional, Sequence, Tuple
 from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
-from web3 import Web3
 
 from gnosis.eth import EthereumClient
 
@@ -293,9 +292,6 @@ class EthereumIndexer(ABC):
             and `True` if no more blocks to scan, `False` otherwise
         """
         assert addresses, "Addresses cannot be empty!"
-        assert all(
-            Web3.isChecksumAddress(address) for address in addresses
-        ), f"An address has invalid checksum: {addresses}"
 
         current_block_number = (
             current_block_number or self.ethereum_client.current_block_number
