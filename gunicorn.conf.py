@@ -16,6 +16,7 @@ def post_fork(server, worker):
     try:
         from psycogreen.gevent import patch_psycopg
 
+        worker.log.info("Making Psycopg2 Green")
         patch_psycopg()
         worker.log.info("Made Psycopg2 Green")
     except ImportError:
