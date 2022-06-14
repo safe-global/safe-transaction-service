@@ -20,19 +20,20 @@ WORKER_STOPPED = set()  # Worker status
 
 @celeryd_init.connect
 def configure_workers(sender=None, conf=None, **kwargs):
-    def patch_psycopg():
+    def worker_patch_psycopg():
         """
         Patch postgresql to be friendly with gevent
         """
         try:
             from psycogreen.gevent import patch_psycopg
 
-            logger.info("Patching psycopg for gevent")
+            logger.info("Patching Celery psycopg for gevent")
             patch_psycopg()
+            logger.info("Patched Celery psycopg for gevent")
         except ImportError:
             pass
 
-    patch_psycopg()
+    worker_patch_psycopg()
 
 
 @worker_shutting_down.connect
