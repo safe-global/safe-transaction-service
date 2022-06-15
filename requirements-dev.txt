@@ -1,5 +1,6 @@
 -r requirements.txt
 -r requirements-test.txt
+django-extensions
 flake8
 ipdb
 ipython
