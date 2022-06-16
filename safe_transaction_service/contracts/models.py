@@ -15,7 +15,6 @@ from botocore.exceptions import ClientError
 from cachetools import TTLCache, cachedmethod
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
-from web3 import Web3
 from web3._utils.normalizers import normalize_abi
 from web3.contract import Contract
 
@@ -28,6 +27,7 @@ from gnosis.eth.clients import (
 )
 from gnosis.eth.django.models import EthereumAddressV2Field, Keccak256Field
 from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
+from gnosis.eth.utils import fast_keccak
 
 logger = getLogger(__name__)
 
@@ -84,7 +84,9 @@ class ContractAbi(models.Model):
                 update_fields.append("abi_hash")
         if isinstance(self.abi, str):
             self.abi = json.loads(self.abi)
-        self.abi_hash = Web3.keccak(text=json.dumps(self.abi, separators=(",", ":")))
+        self.abi_hash = fast_keccak(
+            json.dumps(self.abi, separators=(",", ":")).encode()
+        )
         try:
             # ABI already exists, overwrite
             contract_abi = self.__class__.objects.get(abi_hash=self.abi_hash)

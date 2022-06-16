@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import InvalidERC20Info
+from gnosis.eth.utils import fast_to_checksum_address
 
 from ...models import Token
 
@@ -27,7 +28,7 @@ class Command(BaseCommand):
         ethereum_client = EthereumClientProvider()
 
         for token_address in tokens:
-            token_address = ethereum_client.w3.toChecksumAddress(token_address)
+            token_address = fast_to_checksum_address(token_address)
             try:
                 token = Token.objects.get(address=token_address)
                 self.stdout.write(

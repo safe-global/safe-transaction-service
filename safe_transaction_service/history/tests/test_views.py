@@ -17,6 +17,7 @@ from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
@@ -507,7 +508,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["confirmations"]), 0)
-        self.assertTrue(Web3.isChecksumAddress(response.data["executor"]))
+        self.assertTrue(fast_is_checksum_address(response.data["executor"]))
         self.assertEqual(
             response.data["transaction_hash"], multisig_tx.ethereum_tx.tx_hash
         )
@@ -553,7 +554,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count_unique_nonce"], 1)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
-        self.assertTrue(Web3.isChecksumAddress(response.data["results"][0]["executor"]))
+        self.assertTrue(
+            fast_is_checksum_address(response.data["results"][0]["executor"])
+        )
         self.assertEqual(
             response.data["results"][0]["transaction_hash"],
             multisig_tx.ethereum_tx.tx_hash,
