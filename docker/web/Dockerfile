@@ -2,7 +2,11 @@ FROM python:3.10-slim
 
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONUNBUFFERED=1
+
+# https://eth-hash.readthedocs.io/en/latest/quickstart.html#specify-backend-by-environment-variable
+# `pysha3` is way faster than `pycryptodome` for CPython
+ENV ETH_HASH_BACKEND=pysha3
 
 COPY requirements.txt ./
 RUN set -ex \

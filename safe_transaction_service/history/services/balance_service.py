@@ -11,9 +11,9 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
-from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.utils import fast_is_checksum_address
 
 from safe_transaction_service.tokens.clients import CannotGetPrice
 from safe_transaction_service.tokens.models import Token
@@ -197,7 +197,7 @@ class BalanceService:
         :param exclude_spam: If True, exclude spam tokens
         :return: `{'token_address': str, 'balance': int}`. For ether, `token_address` is `None`
         """
-        assert Web3.isChecksumAddress(
+        assert fast_is_checksum_address(
             safe_address
         ), f"Not valid address {safe_address} for getting balances"
 

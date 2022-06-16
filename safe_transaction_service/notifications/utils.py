@@ -2,7 +2,8 @@ from typing import Sequence
 from uuid import UUID
 
 from hexbytes import HexBytes
-from web3 import Web3
+
+from gnosis.eth.utils import fast_keccak
 
 
 def calculate_device_registration_hash(
@@ -16,4 +17,4 @@ def calculate_device_registration_hash(
     str_to_sign = (
         f"{prefix}{timestamp}{identifier}{cloud_messaging_token}{safes_to_str}"
     )
-    return Web3.keccak(text=str_to_sign)
+    return fast_keccak(str_to_sign.encode())
