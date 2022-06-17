@@ -445,7 +445,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             201: "Created or signature updated",
             400: "Invalid data",
             422: "Invalid ethereum address/User is not an owner/Invalid safeTxHash/"
-            "Invalid signature/Nonce already executed/Sender is not an owner",
+            "Invalid signature/Nonce already executed/Sender is not an owner or delegate",
         }
     )
     def post(self, request, address, format=None):
