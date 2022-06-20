@@ -191,6 +191,68 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         finally:
             del EthereumClientProvider.instance
 
+    @mock.patch.object(CollectiblesService, "get_metadata", autospec=True)
+    @mock.patch.object(CollectiblesService, "get_collectibles", autospec=True)
+    def test_get_collectibles_with_metadata(
+        self, get_collectibles_mock: MagicMock, get_metadata_mock: MagicMock
+    ):
+        collectibles_service = CollectiblesServiceProvider()
+        get_metadata_mock.return_value = "not-a-dictionary"
+        collectible = Collectible(
+            "GoldenSun",
+            "Djinn",
+            "http://random-address.org/logo.png",
+            Account.create().address,
+            28,
+            "http://random-address.org/info-28.json",
+        )
+        get_collectibles_mock.return_value = [collectible]
+        safe_address = Account.create().address
+
+        expected = [
+            CollectibleWithMetadata(
+                collectible.token_name,
+                collectible.token_symbol,
+                collectible.logo_uri,
+                collectible.address,
+                collectible.id,
+                collectible.uri,
+                {},
+            )
+        ]
+        self.assertListEqual(
+            collectibles_service.get_collectibles_with_metadata(safe_address), expected
+        )
+        get_metadata_mock.return_value = {}
+        self.assertListEqual(
+            collectibles_service.get_collectibles_with_metadata(safe_address), expected
+        )
+
+        metadata = {
+            "name": "Gust",
+            "description": "Jupiter Djinni",
+            "image": "http://random-address.org/logo-28.png",
+        }
+        get_metadata_mock.return_value = metadata
+        collectible_with_metadata = CollectibleWithMetadata(
+            collectible.token_name,
+            collectible.token_symbol,
+            collectible.logo_uri,
+            collectible.address,
+            collectible.id,
+            collectible.uri,
+            metadata,
+        )
+        self.assertEqual(collectible_with_metadata.name, "Gust")
+        self.assertEqual(collectible_with_metadata.description, "Jupiter Djinni")
+        self.assertEqual(
+            collectible_with_metadata.image_uri, "http://random-address.org/logo-28.png"
+        )
+        expected = [collectible_with_metadata]
+        self.assertListEqual(
+            collectibles_service.get_collectibles_with_metadata(safe_address), expected
+        )
+
     @mock.patch.object(Erc721Manager, "get_info", autospec=True)
     def test_get_token_info(self, get_info_mock: MagicMock):
         collectibles_service = CollectiblesServiceProvider()

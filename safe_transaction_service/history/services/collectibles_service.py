@@ -167,7 +167,7 @@ class CollectiblesService:
         prefix="collectibles-_retrieve_metadata_from_uri",
         cache_exceptions=(MetadataRetrievalException,),
     )  # 1 day
-    def _retrieve_metadata_from_uri(self, uri: str) -> Dict[Any, Any]:
+    def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
         Get metadata from URI. Currently just ipfs/http/https is supported
 
@@ -227,7 +227,7 @@ class CollectiblesService:
             name, symbol, logo_uri, token_address, token_id, token_metadata_uri
         )
 
-    def get_metadata(self, collectible: Collectible) -> Dict[Any, Any]:
+    def get_metadata(self, collectible: Collectible) -> Any:
         if tld := ENS_CONTRACTS_WITH_TLD.get(
             collectible.address
         ):  # Special case for ENS
@@ -376,10 +376,17 @@ class CollectiblesService:
                 collectible = future_to_collectible[future]
                 try:
                     metadata = future.result()
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                        logger.warning(
+                            "A dictionary metadata was expected on token-uri=%s for token-address=%s",
+                            collectible.uri,
+                            collectible.address,
+                        )
                 except MetadataRetrievalException:
                     metadata = {}
                     logger.warning(
-                        "Cannot retrieve token-uri=%s for token-address=%s",
+                        "Cannot retrieve metadata on token-uri=%s for token-address=%s",
                         collectible.uri,
                         collectible.address,
                     )
