@@ -10,7 +10,7 @@ django-db-geventpool==4.0.1
 django-debug-toolbar
 django-debug-toolbar-force
 django-environ==0.8.1
-django-filter==21.1
+django-filter==22.1
 django-imagekit==4.1.0
 django-model-utils==4.2.0
 django-redis==5.2.0
