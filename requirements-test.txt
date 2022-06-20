@@ -1,6 +1,6 @@
 -r requirements.txt
 coverage==6.4.1
-django-stubs==1.11.0
+django-stubs==1.12.0
 factory-boy==3.2.1
 faker==13.13.0
 mypy==0.942
