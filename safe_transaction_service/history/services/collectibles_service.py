@@ -1,4 +1,3 @@
-import concurrent
 import logging
 import operator
 from dataclasses import dataclass, field
@@ -9,9 +8,11 @@ from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db.models import Q
 
+import gevent
 import requests
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
+from eth_typing import ChecksumAddress
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -143,7 +144,7 @@ class CollectiblesServiceProvider:
 
 class CollectiblesService:
     ENS_IMAGE_URL = "https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png"
-    METDATA_MAX_CONTENT_LENGTH = int(
+    METADATA_MAX_CONTENT_LENGTH = int(
         0.2 * 1024 * 1024
     )  # 0.2Mb is the maximum metadata size allowed
 
@@ -153,13 +154,12 @@ class CollectiblesService:
         self.redis = redis
         self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
-        self.cache_uri_metadata = TTLCache(
+        self.cache_uri_metadata = TTLCache[str, Optional[Dict[str, Any]]](
             maxsize=4096, ttl=60 * 60 * 24
         )  # 1 day of caching
-        self.cache_token_info: TTLCache[str, Erc721InfoWithLogo] = TTLCache(
+        self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=60 * 30
         )  # 2 hours of caching
-        self.cache_token_uri: Dict[Tuple[str, int], str] = {}
 
     @cachedmethod(cache=operator.attrgetter("cache_uri_metadata"))
     @cache_memoize(
@@ -188,7 +188,7 @@ class CollectiblesService:
 
                 content_length = response.headers.get("content-length", 0)
                 content_type = response.headers.get("content-type", "")
-                if int(content_length) > self.METDATA_MAX_CONTENT_LENGTH:
+                if int(content_length) > self.METADATA_MAX_CONTENT_LENGTH:
                     raise MetadataRetrievalException(
                         f"Content-length={content_length} for uri={uri} is too big"
                     )
@@ -200,6 +200,13 @@ class CollectiblesService:
                     )
 
                 logger.debug("Got metadata for uri=%s", uri)
+
+                # Some requests don't provide `Content-Length` on the headers
+                if len(response.content) > self.METADATA_MAX_CONTENT_LENGTH:
+                    raise MetadataRetrievalException(
+                        f"Retrieved content for uri={uri} is too big"
+                    )
+
                 return response.json()
         except (IOError, ValueError) as e:
             raise MetadataRetrievalException(uri) from e
@@ -207,7 +214,7 @@ class CollectiblesService:
     def build_collectible(
         self,
         token_info: Optional[Erc721InfoWithLogo],
-        token_address: str,
+        token_address: ChecksumAddress,
         token_id: int,
         token_metadata_uri: Optional[str],
     ) -> Collectible:
@@ -243,7 +250,7 @@ class CollectiblesService:
 
     def _filter_addresses(
         self,
-        addresses_with_token_ids: Sequence[Tuple[str, int]],
+        addresses_with_token_ids: Sequence[Tuple[ChecksumAddress, int]],
         only_trusted: bool = False,
         exclude_spam: bool = False,
     ):
@@ -292,7 +299,10 @@ class CollectiblesService:
         ]
 
     def get_collectibles(
-        self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
     ) -> List[Collectible]:
         """
         :param safe_address:
@@ -314,7 +324,10 @@ class CollectiblesService:
             return collectibles
 
     def _get_collectibles(
-        self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
     ) -> List[Collectible]:
         """
         :param safe_address:
@@ -337,7 +350,7 @@ class CollectiblesService:
         logger.debug("Getting token_uris for %s", addresses_with_token_ids)
         # Chunk token uris to prevent stressing the node
         token_uris = []
-        for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 50):
+        for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
             token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
         logger.debug("Got token_uris for %s", addresses_with_token_ids)
         collectibles = []
@@ -353,7 +366,10 @@ class CollectiblesService:
         return collectibles
 
     def get_collectibles_with_metadata(
-        self, safe_address: str, only_trusted: bool = False, exclude_spam: bool = False
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
     ) -> List[CollectibleWithMetadata]:
         """
         Get collectibles using the owner, addresses and the token_ids
@@ -363,37 +379,34 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return:
         """
-        collectibles_with_metadata: Dict[(str, int), CollectibleWithMetadata] = {}
+        collectibles_with_metadata: List[CollectibleWithMetadata] = []
         collectibles = self.get_collectibles(
             safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
         )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            future_to_collectible = {
-                executor.submit(self.get_metadata, collectible): collectible
-                for collectible in collectibles
-            }
-            for future in concurrent.futures.as_completed(future_to_collectible):
-                collectible = future_to_collectible[future]
-                try:
-                    metadata = future.result()
-                    if not isinstance(metadata, dict):
-                        metadata = {}
-                        logger.warning(
-                            "A dictionary metadata was expected on token-uri=%s for token-address=%s",
-                            collectible.uri,
-                            collectible.address,
-                        )
-                except MetadataRetrievalException:
+        jobs = [
+            gevent.spawn(self.get_metadata, collectible) for collectible in collectibles
+        ]
+        _ = gevent.joinall(jobs)
+        for collectible, job in zip(collectibles, jobs):
+            try:
+                metadata = job.get()
+                if not isinstance(metadata, dict):
                     metadata = {}
                     logger.warning(
-                        "Cannot retrieve metadata on token-uri=%s for token-address=%s",
+                        "A dictionary metadata was expected on token-uri=%s for token-address=%s",
                         collectible.uri,
                         collectible.address,
                     )
+            except MetadataRetrievalException:
+                metadata = {}
+                logger.warning(
+                    "Cannot retrieve metadata on token-uri=%s for token-address=%s",
+                    collectible.uri,
+                    collectible.address,
+                )
 
-                collectibles_with_metadata[
-                    collectible.address, collectible.id
-                ] = CollectibleWithMetadata(
+            collectibles_with_metadata.append(
+                CollectibleWithMetadata(
                     collectible.token_name,
                     collectible.token_symbol,
                     collectible.logo_uri,
@@ -402,14 +415,14 @@ class CollectiblesService:
                     collectible.uri,
                     metadata,
                 )
-        return [
-            collectibles_with_metadata[collectible.address, collectible.id]
-            for collectible in collectibles
-        ]
+            )
+        return collectibles_with_metadata
 
     @cachedmethod(cache=operator.attrgetter("cache_token_info"))
     @cache_memoize(60 * 60, prefix="collectibles-get_token_info")  # 1 hour
-    def get_token_info(self, token_address: str) -> Optional[Erc721InfoWithLogo]:
+    def get_token_info(
+        self, token_address: ChecksumAddress
+    ) -> Optional[Erc721InfoWithLogo]:
         """
         :param token_address:
         :return: Erc721 name and symbol. If it cannot be found, `name=''` and `symbol=''`
@@ -422,7 +435,7 @@ class CollectiblesService:
                 return Erc721InfoWithLogo.from_token(token)
 
     def get_token_uris(
-        self, addresses_with_token_ids: Sequence[Tuple[str, int]]
+        self, addresses_with_token_ids: Sequence[Tuple[ChecksumAddress, int]]
     ) -> List[Optional[str]]:
         """
         Cache token_uris, as they shouldn't change
@@ -431,78 +444,82 @@ class CollectiblesService:
         :return: List of token_uris in the same other that `addresses_with_token_ids` were provided
         """
 
-        def get_redis_key(address_with_token_id: Tuple[str, int]) -> str:
+        def get_redis_key(address_with_token_id: Tuple[ChecksumAddress, int]) -> str:
             token_address, token_id = address_with_token_id
             return f"token-uri:{token_address}:{token_id}"
 
-        def get_not_found_cache() -> List[Tuple[str, int]]:
-            """
-            :return: address_with_token_id not found on the local cache
-            """
-            return [
-                address_with_token_id
-                for address_with_token_id in addresses_with_token_ids
-                if address_with_token_id not in self.cache_token_uri
-            ]
-
-        # Find uris in local cache
-        not_found_cache = get_not_found_cache()
-
         # Try finding missing token uris in redis
         redis_token_uris = self.redis.mget(
-            [
-                get_redis_key(address_with_token_id)
-                for address_with_token_id in not_found_cache
-            ]
-        )
-        # Redis does not allow `None`, so empty string is used
-        self.cache_token_uri.update(
-            {
-                address_with_token_id: token_uri.decode() if token_uri else None
-                for address_with_token_id, token_uri in zip(
-                    not_found_cache, redis_token_uris
-                )
-                if token_uri is not None
-            }
-        )
-
-        not_found_cache = [
-            address_with_token_id
+            get_redis_key(address_with_token_id)
             for address_with_token_id in addresses_with_token_ids
-            if address_with_token_id not in self.cache_token_uri
-        ]
+        )
+        # Redis does not allow `None`, so empty string is used for uris searched but not found
+        found_uris: Dict[Tuple[ChecksumAddress, int], Optional[str]] = {}
+        not_found_uris: List[Tuple[ChecksumAddress, int]] = []
+
+        for address_with_token_id, token_uri in zip(
+            addresses_with_token_ids, redis_token_uris
+        ):
+            if token_uri is None:
+                not_found_uris.append(address_with_token_id)
+            else:
+                found_uris[address_with_token_id] = (
+                    token_uri.decode() if token_uri else None
+                )
 
         try:
             # Find missing token uris in blockchain
             logger.debug(
-                "Getting token uris from blockchain for %d addresses with token ids",
-                len(not_found_cache),
+                "Getting token uris from blockchain for %d addresses with tokenIds",
+                len(not_found_uris),
             )
             blockchain_token_uris = {
                 address_with_token_id: token_uri if token_uri else None
                 for address_with_token_id, token_uri in zip(
-                    not_found_cache,
-                    self.ethereum_client.erc721.get_token_uris(not_found_cache),
+                    not_found_uris,
+                    self.ethereum_client.erc721.get_token_uris(not_found_uris),
                 )
             }
-            logger.debug("Got token uris")
-            if blockchain_token_uris:
-                self.cache_token_uri.update(blockchain_token_uris)
-                pipe = self.redis.pipeline()
-                redis_map_to_store = {
-                    get_redis_key(address_with_token_id): token_uri
-                    if token_uri is not None
-                    else ""
-                    for address_with_token_id, token_uri in blockchain_token_uris.items()
-                }
-                pipe.mset(redis_map_to_store)
-                for key in redis_map_to_store.keys():
-                    pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
-                pipe.execute()
-        except (IOError, ValueError) as exc:
-            raise NodeConnectionException from exc
+            logger.debug("Got token uris from blockchain")
+        except (IOError, ValueError):
+            logger.warning(
+                "Problem when getting token uris from blockchain, trying individually",
+                exc_info=True,
+            )
+            blockchain_token_uris = {}
+            for not_found_uri in not_found_uris:
+                try:
+                    token_uri = self.ethereum_client.erc721.get_token_uris(
+                        [not_found_uri]
+                    )[0]
+                    blockchain_token_uris[not_found_uri] = (
+                        token_uri if token_uri else None
+                    )
+                except ValueError:
+                    blockchain_token_uris[not_found_uri] = None
+                    logger.warning(
+                        "ValueError when getting token uri from blockchain for token and tokenId %s",
+                        not_found_uri,
+                        exc_info=True,
+                    )
+                except IOError as exc:
+                    raise NodeConnectionException from exc
+
+        if blockchain_token_uris:
+            pipe = self.redis.pipeline()
+            redis_map_to_store = {
+                get_redis_key(address_with_token_id): token_uri
+                if token_uri is not None
+                else ""
+                for address_with_token_id, token_uri in blockchain_token_uris.items()
+            }
+            pipe.mset(redis_map_to_store)
+            for key in redis_map_to_store.keys():
+                pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
+            pipe.execute()
+            found_uris.update(blockchain_token_uris)
 
         return [
-            self.cache_token_uri[address_with_token_id]
+            found_uris[address_with_token_id]
             for address_with_token_id in addresses_with_token_ids
         ]

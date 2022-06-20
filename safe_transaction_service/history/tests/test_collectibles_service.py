@@ -1,3 +1,4 @@
+from typing import List, Optional, Sequence, Tuple
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -228,6 +229,12 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             collectibles_service.get_collectibles_with_metadata(safe_address), expected
         )
 
+        get_metadata_mock.side_effect = MetadataRetrievalException
+        self.assertListEqual(
+            collectibles_service.get_collectibles_with_metadata(safe_address), expected
+        )
+        get_metadata_mock.side_effect = None
+
         metadata = {
             "name": "Gust",
             "description": "Jupiter Djinni",
@@ -323,7 +330,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         get_token_uris_mock.return_value = token_uris
         addresses_with_token_ids = [(Account.create().address, i) for i in range(3)]
         collectibles_service = CollectiblesServiceProvider()
-        self.assertFalse(collectibles_service.cache_token_uri)
         self.assertEqual(
             collectibles_service.get_token_uris(addresses_with_token_ids),
             expected_token_uris,
@@ -333,21 +339,48 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         redis_keys = redis.keys("token-uri:*")
         self.assertEqual(len(redis_keys), 3)
 
-        # Test cache
-        self.assertEqual(len(collectibles_service.cache_token_uri), 3)
-        get_token_uris_mock.return_value = []
-        for address_with_token_id, token_uri in zip(
-            addresses_with_token_ids, expected_token_uris
-        ):
-            self.assertEqual(
-                collectibles_service.cache_token_uri[address_with_token_id], token_uri
-            )
-
         # Test redis cache working
-        collectibles_service.cache_token_uri = {}
         self.assertEqual(
             collectibles_service.get_token_uris(addresses_with_token_ids),
             expected_token_uris,
+        )
+
+    @mock.patch.object(Erc721Manager, "get_token_uris", autospec=True)
+    def test_get_token_uris_value_error(self, get_token_uris_mock: MagicMock):
+        """
+        Test node error when retrieving the uris
+        """
+
+        def get_token_uris_fn(
+            self, token_addresses_with_token_ids: Sequence[Tuple[str, int]]
+        ) -> List[Optional[str]]:
+            if (
+                "0x9807559b75D5fcCEcf1bbe074FD0890EdDC1bf79",
+                8,
+            ) in token_addresses_with_token_ids:
+                raise ValueError
+            else:
+                return [
+                    f"https://random-url/{token_id}.json"
+                    for _, token_id in token_addresses_with_token_ids
+                ]
+
+        # Random addresses
+        addresses_with_token_ids = [
+            ("0xaa2475C106A01eA6972dBC9d6b975cD122b06b80", 4),
+            ("0x9807559b75D5fcCEcf1bbe074FD0890EdDC1bf79", 8),
+            ("0xD7E7f8F69dbaEe520182386099364046d1e1B80c", 15),
+        ]
+        get_token_uris_mock.side_effect = get_token_uris_fn
+        collectibles_service = CollectiblesServiceProvider()
+
+        self.assertEqual(
+            collectibles_service.get_token_uris(addresses_with_token_ids),
+            [
+                "https://random-url/4.json",
+                None,
+                "https://random-url/15.json",
+            ],
         )
 
     def test_retrieve_metadata_from_uri(self):
