@@ -1,3 +1,5 @@
+import itertools
+from collections import OrderedDict
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
@@ -24,6 +26,7 @@ from ..models import (
 from .factories import SafeMasterCopyFactory
 from .mocks.mocks_internal_tx_indexer import (
     block_result,
+    trace_blocks_filtered_0x5aC2_result,
     trace_blocks_result,
     trace_filter_result,
     trace_transactions_result,
@@ -152,11 +155,11 @@ class TestInternalTxIndexer(TestCase):
         )
         self.assertEqual(ethereum_tx.logs, [])
 
-        trace_filter_mock.assert_called_with(
+        trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.parity,
             from_block=1,
             to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
-            from_address=[safe_master_copy.address],
+            to_address=[safe_master_copy.address],
         )
         trace_block_mock.assert_called_with(
             internal_tx_indexer.ethereum_client.parity,
@@ -172,7 +175,10 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
 
     @mock.patch.object(
-        ParityManager, "trace_blocks", autospec=True, return_value=trace_blocks_result
+        ParityManager,
+        "trace_blocks",
+        autospec=True,
+        return_value=trace_blocks_filtered_0x5aC2_result,
     )
     @mock.patch.object(
         ParityManager, "trace_filter", autospec=True, return_value=trace_filter_result
@@ -189,31 +195,28 @@ class TestInternalTxIndexer(TestCase):
         trace_filter_mock: MagicMock,
         trace_block_mock: MagicMock,
     ):
-
         current_block_number = current_block_number_mock.return_value
         internal_tx_indexer = self.internal_tx_indexer
         addresses = ["0x5aC255889882aCd3da2aA939679E3f3d4cea221e"]
-        trace_filter_transactions = [
-            trace["transactionHash"] for trace in trace_filter_mock.return_value
-        ]
-        trace_block_transactions = [
-            trace["transactionHash"]
-            for sublist in trace_block_mock.return_value
-            for trace in sublist
-        ]
+        trace_filter_transactions = OrderedDict(
+            (trace["transactionHash"], []) for trace in trace_filter_mock.return_value
+        )
+        trace_block_transactions = OrderedDict(
+            (
+                (k, list(v))
+                for k, v in itertools.groupby(
+                    itertools.chain(*trace_block_mock.return_value),
+                    lambda x: x["transactionHash"],
+                )
+            )
+        )
 
         # Just trace filter
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, 1, current_block_number - 50
         )
-        self.assertCountEqual(set(trace_filter_transactions), elements)
-        trace_filter_mock.assert_any_call(
-            internal_tx_indexer.ethereum_client.parity,
-            from_block=1,
-            to_block=current_block_number - 50,
-            from_address=addresses,
-        )
-        trace_filter_mock.assert_any_call(
+        self.assertEqual(trace_filter_transactions, elements)
+        trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.parity,
             from_block=1,
             to_block=current_block_number - 50,
@@ -226,14 +229,15 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, current_block_number - 50, current_block_number
         )
-        self.assertCountEqual(
-            set(trace_filter_transactions).union(trace_block_transactions), elements
-        )
-        trace_filter_mock.assert_any_call(
+        print(trace_filter_transactions | trace_block_transactions)
+        print()
+        print(elements)
+        self.assertEqual(trace_filter_transactions | trace_block_transactions, elements)
+        trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.parity,
             from_block=current_block_number - 50,
             to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
-            from_address=addresses,
+            to_address=addresses,
         )
 
         trace_block_mock.assert_called_with(
@@ -253,7 +257,7 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, current_block_number - 3, current_block_number
         )
-        self.assertCountEqual(set(trace_block_transactions), elements)
+        self.assertEqual(trace_block_transactions, elements)
         trace_filter_mock.assert_not_called()
 
         trace_block_mock.assert_called_with(

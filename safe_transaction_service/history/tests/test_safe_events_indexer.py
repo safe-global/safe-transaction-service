@@ -10,7 +10,7 @@ from gnosis.eth.contracts import get_safe_V1_3_0_contract
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..indexers.safe_events_indexer import SafeEventsIndexer, SafeEventsIndexerProvider
+from ..indexers import SafeEventsIndexer, SafeEventsIndexerProvider
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (
     EthereumTxCallType,
