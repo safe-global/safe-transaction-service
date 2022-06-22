@@ -1,11 +1,11 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Generator, Iterable, List, Optional, Sequence, Set
+from typing import Dict, Generator, Iterable, List, Optional, Sequence, Set
 
 from django.db import transaction
 
 from eth_typing import HexStr
-from web3.types import ParityFilterTrace
+from web3.types import ParityBlockTrace, ParityFilterTrace
 
 from gnosis.eth import EthereumClient
 
@@ -30,19 +30,16 @@ class InternalTxIndexerProvider:
             trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
             blocks_to_reindex_again = 6
             if settings.ETH_INTERNAL_NO_FILTER:
-                cls.instance = InternalTxIndexerWithTraceBlock(
-                    EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=block_process_limit,
-                    blocks_to_reindex_again=blocks_to_reindex_again,
-                    trace_txs_batch_size=trace_txs_batch_size,
-                )
+                instance_class = InternalTxIndexerWithTraceBlock
             else:
-                cls.instance = InternalTxIndexer(
-                    EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-                    block_process_limit=block_process_limit,
-                    blocks_to_reindex_again=blocks_to_reindex_again,
-                    trace_txs_batch_size=trace_txs_batch_size,
-                )
+                instance_class = InternalTxIndexer
+
+            cls.instance = instance_class(
+                EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+                block_process_limit=block_process_limit,
+                blocks_to_reindex_again=blocks_to_reindex_again,
+                trace_txs_batch_size=trace_txs_batch_size,
+            )
         return cls.instance
 
     @classmethod
@@ -74,7 +71,7 @@ class InternalTxIndexer(EthereumIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> Set[str]:
+    ) -> OrderedDict[HexStr, Optional[ParityFilterTrace]]:
         current_block_number = (
             current_block_number or self.ethereum_client.current_block_number
         )
@@ -106,39 +103,48 @@ class InternalTxIndexer(EthereumIndexer):
                 trace_block_number,
                 to_block_number,
             )
-            return OrderedDict.fromkeys(
-                list(
-                    self._find_relevant_elements_using_trace_filter(
-                        addresses, from_block_number, trace_block_number
-                    )
+            relevant_elements = self._find_relevant_elements_using_trace_filter(
+                addresses, from_block_number, trace_block_number
+            )
+            relevant_elements.update(
+                self._find_relevant_elements_using_trace_block(
+                    addresses, trace_block_number, to_block_number
                 )
-                + list(
-                    self._find_relevant_elements_using_trace_block(
-                        addresses, trace_block_number, to_block_number
-                    )
-                )
-            ).keys()
+            )
+            return relevant_elements
 
     def _find_relevant_elements_using_trace_block(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
-    ) -> Set[str]:
+    ) -> OrderedDict[HexStr, ParityFilterTrace]:
         addresses_set = set(addresses)  # More optimal to use with `in`
         try:
             block_numbers = list(range(from_block_number, to_block_number + 1))
-            traces = self.ethereum_client.parity.trace_blocks(block_numbers)
-            tx_hashes = []
-            for block_number, trace_list in zip(block_numbers, traces):
-                if not trace_list:
+            blocks_traces: ParityBlockTrace = self.ethereum_client.parity.trace_blocks(
+                block_numbers
+            )
+            traces: OrderedDict[HexStr, ParityFilterTrace] = OrderedDict()
+            relevant_tx_hashes: Set[HexStr] = set()
+            for block_number, block_traces in zip(block_numbers, blocks_traces):
+                if not block_traces:
                     logger.warning("Empty `trace_block` for block=%d", block_number)
-                tx_hashes.extend(
-                    [
-                        trace["transactionHash"]
-                        for trace in trace_list
-                        if trace.get("action", {}).get("from") in addresses_set
-                        or trace.get("action", {}).get("to") in addresses_set
-                    ]
-                )
-            return OrderedDict.fromkeys(tx_hashes).keys()
+
+                for trace in block_traces:
+                    transaction_hash = trace.get("transactionHash")
+                    if transaction_hash:
+                        traces.setdefault(transaction_hash, []).append(trace)
+                        # We're only interested in traces related to the provided addresses
+                        if (
+                            trace.get("action", {}).get("from") in addresses_set
+                            or trace.get("action", {}).get("to") in addresses_set
+                        ):
+                            relevant_tx_hashes.add(transaction_hash)
+
+            # Remove not relevant traces
+            for tx_hash in list(traces.keys()):
+                if tx_hash not in relevant_tx_hashes:
+                    del traces[tx_hash]
+
+            return traces
         except IOError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_block`"
@@ -146,7 +152,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def _find_relevant_elements_using_trace_filter(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
-    ) -> Set[str]:
+    ) -> OrderedDict[HexStr, List]:
         """
         Search for tx hashes with internal txs (in and out) of a `address`
 
@@ -163,16 +169,11 @@ class InternalTxIndexer(EthereumIndexer):
         )
 
         try:
+            # We only need to search for traces `to` the provided addresses
             to_traces = self.ethereum_client.parity.trace_filter(
                 from_block=from_block_number,
                 to_block=to_block_number,
                 to_address=addresses,
-            )
-
-            from_traces = self.ethereum_client.parity.trace_filter(
-                from_block=from_block_number,
-                to_block=to_block_number,
-                from_address=addresses,
             )
         except IOError as e:
             raise FindRelevantElementsException(
@@ -180,19 +181,23 @@ class InternalTxIndexer(EthereumIndexer):
             ) from e
 
         # Log INFO if traces found, DEBUG if not
-        tx_hashes = OrderedDict.fromkeys(
-            [trace["transactionHash"] for trace in (to_traces + from_traces)]
-        ).keys()
-        log_fn = logger.info if len(tx_hashes) else logger.debug
+        traces: OrderedDict[HexStr, None] = OrderedDict()
+        for trace in to_traces:
+            transaction_hash = trace.get("transactionHash")
+            if transaction_hash:
+                # Leave this empty, as we are missing traces for the transaction and will need to be fetched later
+                traces[transaction_hash] = []
+
+        log_fn = logger.info if traces else logger.debug
         log_fn(
             "Found %d relevant txs with internal txs between block-number=%d and block-number=%d. Addresses=%s",
-            len(tx_hashes),
+            len(traces),
             from_block_number,
             to_block_number,
             addresses,
         )
 
-        return tx_hashes
+        return traces
 
     def _get_internal_txs_to_decode(
         self, tx_hashes: Sequence[str]
@@ -240,25 +245,38 @@ class InternalTxIndexer(EthereumIndexer):
                 )
                 raise
 
-    def process_elements(self, tx_hashes: Sequence[str]) -> List[InternalTx]:
+    def process_elements(
+        self, tx_hash_with_traces: OrderedDict[HexStr, Optional[ParityFilterTrace]]
+    ) -> List[InternalTx]:
         # Prefetch ethereum txs
-        if not tx_hashes:
+        if not tx_hash_with_traces:
             return []
 
-        logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
+        logger.debug(
+            "Prefetching and storing %d ethereum txs", len(tx_hash_with_traces)
+        )
+        tx_hashes = list(tx_hash_with_traces.keys())
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug("End prefetching and storing of ethereum txs")
 
         logger.debug("Prefetching of traces(internal txs)")
+        tx_hashes_missing_traces = [
+            tx_hash for tx_hash, trace in tx_hash_with_traces.items() if not trace
+        ]
+        missing_traces_lists = self.trace_transactions(
+            tx_hashes_missing_traces, batch_size=self.trace_txs_batch_size
+        )
+        for tx_hash_missing_traces, missing_traces in zip(
+            tx_hashes_missing_traces, missing_traces_lists
+        ):
+            tx_hash_with_traces[tx_hash_missing_traces] = missing_traces
+
         internal_txs = (
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
-            for ethereum_tx, traces in zip(
-                ethereum_txs,
-                self.trace_transactions(
-                    tx_hashes, batch_size=self.trace_txs_batch_size
-                ),
+            for ethereum_tx in ethereum_txs
+            for trace in self.ethereum_client.parity.filter_out_errored_traces(
+                tx_hash_with_traces[ethereum_tx.tx_hash]
             )
-            for trace in self.ethereum_client.parity.filter_out_errored_traces(traces)
         )
 
         revelant_internal_txs_batch = (
@@ -308,7 +326,7 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> Set[str]:
+    ) -> Dict[HexStr, ParityFilterTrace]:
         logger.debug(
             "Using trace_block from-block=%d to-block=%d",
             from_block_number,

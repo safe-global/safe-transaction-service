@@ -17,8 +17,8 @@ from .indexers import (
     FindRelevantElementsException,
     InternalTxIndexerProvider,
     ProxyFactoryIndexerProvider,
+    SafeEventsIndexerProvider,
 )
-from .indexers.safe_events_indexer import SafeEventsIndexerProvider
 from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import (
     EthereumBlock,
