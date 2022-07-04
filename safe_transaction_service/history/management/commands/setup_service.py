@@ -57,14 +57,14 @@ TASKS = [
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.index_internal_txs_task",
         "Index Internal Txs",
-        13,
+        5,
         IntervalSchedule.SECONDS,
         enabled=not settings.ETH_L2_NETWORK,
     ),
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.index_safe_events_task",
         "Index Safe events (L2)",
-        13,
+        5,
         IntervalSchedule.SECONDS,
         enabled=settings.ETH_L2_NETWORK,
     ),
