@@ -1125,6 +1125,12 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def not_executed(self):
         return self.filter(ethereum_tx=None)
 
+    def with_data(self):
+        return self.exclude(data=None)
+
+    def without_data(self):
+        return self.filter(data=None)
+
     def with_confirmations(self):
         return self.exclude(confirmations__isnull=True)
 
@@ -1182,7 +1188,7 @@ class MultisigTransaction(TimeStampedModel):
     )
     to = EthereumAddressV2Field(null=True, db_index=True)
     value = Uint256Field()
-    data = models.BinaryField(null=True, blank=True)
+    data = models.BinaryField(null=True, blank=True, editable=True)
     operation = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeOperation]
     )
