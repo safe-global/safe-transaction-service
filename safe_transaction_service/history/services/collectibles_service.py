@@ -265,9 +265,14 @@ class CollectiblesService:
         """
 
         # Cache based on the number of erc721 events
-        number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
-        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{number_erc721_events}"
+        # number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
+        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}:{offset}"
         if collectibles := django_cache.get(cache_key):
+            cache_key_count = (
+                f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
+            )
+            if paginator is not None:
+                paginator.set_count(django_cache.get(cache_key_count))
             return collectibles
         else:
             collectibles = self._get_collectibles(
@@ -312,10 +317,16 @@ class CollectiblesService:
         for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
             token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
         logger.debug("Got token_uris for %s", addresses_with_token_ids)
-
-        paginator.set_count(len(addresses_with_token_ids))
-        token_uris = token_uris[offset : offset + limit]
-        addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
+        if paginator is not None:
+            cache_key = (
+                f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
+            )
+            paginator.set_count(len(addresses_with_token_ids))
+            django_cache.set(
+                cache_key, len(addresses_with_token_ids), 60 * 10
+            )  # 10 minutes cache
+            token_uris = token_uris[offset : offset + limit]
+            addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
 
         collectibles = []
         for (token_address, token_id), token_uri in zip(
