@@ -27,6 +27,7 @@ from safe_transaction_service.utils.utils import chunks
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
 from ..models import ERC721Transfer
+from ..pagination import ListPagination
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,9 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
+        limit: int = 10,
+        offset: int = 0,
+        paginator: ListPagination = None,
     ) -> List[Collectible]:
         """
         :param safe_address:
@@ -267,7 +271,12 @@ class CollectiblesService:
             return collectibles
         else:
             collectibles = self._get_collectibles(
-                safe_address, only_trusted, exclude_spam
+                safe_address,
+                only_trusted,
+                exclude_spam,
+                limit=limit,
+                offset=offset,
+                paginator=paginator,
             )
             django_cache.set(cache_key, collectibles, 60 * 10)  # 10 minutes cache
             return collectibles
@@ -277,6 +286,9 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
+        limit: int = 10,
+        offset: int = 0,
+        paginator: ListPagination = None,
     ) -> List[Collectible]:
         """
         :param safe_address:
@@ -300,6 +312,11 @@ class CollectiblesService:
         for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
             token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
         logger.debug("Got token_uris for %s", addresses_with_token_ids)
+
+        paginator.set_count(len(addresses_with_token_ids))
+        token_uris = token_uris[offset : offset + limit]
+        addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
+
         collectibles = []
         for (token_address, token_id), token_uri in zip(
             addresses_with_token_ids, token_uris
@@ -317,6 +334,9 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
+        limit: int = 0,
+        offset: int = 0,
+        paginator: ListPagination = None,
     ) -> List[CollectibleWithMetadata]:
         """
         Get collectibles using the owner, addresses and the token_ids
@@ -328,8 +348,14 @@ class CollectiblesService:
         """
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
         collectibles = self.get_collectibles(
-            safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
+            safe_address,
+            only_trusted=only_trusted,
+            exclude_spam=exclude_spam,
+            limit=limit,
+            offset=offset,
+            paginator=paginator,
         )
+
         jobs = [
             gevent.spawn(self.get_metadata, collectible) for collectible in collectibles
         ]
