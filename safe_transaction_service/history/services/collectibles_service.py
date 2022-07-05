@@ -314,9 +314,6 @@ class CollectiblesService:
         logger.debug("Getting token_uris for %s", addresses_with_token_ids)
         # Chunk token uris to prevent stressing the node
         token_uris = []
-        for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
-            token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
-        logger.debug("Got token_uris for %s", addresses_with_token_ids)
         if paginator is not None:
             cache_key = (
                 f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
@@ -325,9 +322,11 @@ class CollectiblesService:
             django_cache.set(
                 cache_key, len(addresses_with_token_ids), 60 * 10
             )  # 10 minutes cache
-            token_uris = token_uris[offset : offset + limit]
             addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
 
+        for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
+            token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
+        logger.debug("Got token_uris for %s", addresses_with_token_ids)
         collectibles = []
         for (token_address, token_id), token_uri in zip(
             addresses_with_token_ids, token_uris
