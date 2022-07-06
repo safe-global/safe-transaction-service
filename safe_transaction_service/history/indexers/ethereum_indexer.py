@@ -34,7 +34,7 @@ class EthereumIndexer(ABC):
     def __init__(
         self,
         ethereum_client: EthereumClient,
-        confirmations: int = 1,
+        confirmations: int = 0,
         block_process_limit: int = 2000,
         block_process_limit_max: int = 0,
         blocks_to_reindex_again: int = 0,
@@ -44,7 +44,7 @@ class EthereumIndexer(ABC):
     ):
         """
         :param ethereum_client:
-        :param confirmations: Threshold of blocks to scan to prevent reorgs
+        :param confirmations: Don't index last `confirmations` blocks to prevent from reorgs
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
         :param block_process_limit: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
         :param blocks_to_reindex_again: Number of blocks to reindex every time the indexer runs, in case something
