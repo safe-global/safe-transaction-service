@@ -34,6 +34,7 @@ from .models import (
     WebHook,
 )
 from .services import IndexServiceProvider
+from .utils import HexField
 
 # By default, TokenAdmin doesn't allow key edition
 # IFF you have a service that requests from multiple safe-transaction-service
@@ -329,11 +330,7 @@ class MultisigTransactionDataListFilter(admin.SimpleListFilter):
 
 
 class MultisigTransactionAdminForm(forms.ModelForm):
-    def clean_data(self):
-        # Prevent default BinaryField form field to encode the data as a string
-        return (
-            HexBytes(self.cleaned_data["data"]) if self.cleaned_data["data"] else None
-        )
+    data = HexField(required=False)
 
 
 @admin.register(MultisigTransaction)
@@ -365,13 +362,13 @@ class MultisigTransactionAdmin(BinarySearchAdmin):
     readonly_fields = ("safe_tx_hash",)
     search_fields = ["=ethereum_tx__tx_hash", "=safe", "=to", "=safe_tx_hash"]
 
-    def get_object(
-        self, request: HttpRequest, object_id: str, from_field: Optional[str] = None
-    ) -> Optional[MultisigTransaction]:
-        obj = super().get_object(request, object_id, from_field)
-        # Convert BinaryField memoryview to hexadecimal for text field
-        obj.data = "0x" + bytes(obj.data).hex() if obj.data else None
-        return obj
+    @admin.display(boolean=True)
+    def executed(self, obj: MultisigTransaction):
+        return obj.executed
+
+    @admin.display(boolean=True)
+    def successful(self, obj: MultisigTransaction):
+        return not obj.failed
 
     def save_model(
         self, request: HttpRequest, obj: MultisigTransaction, form: Any, change: Any
@@ -401,14 +398,6 @@ class MultisigTransactionAdmin(BinarySearchAdmin):
         )
         obj.safe_tx_hash = safe_tx.safe_tx_hash
         return super().save_model(request, obj, form, change)
-
-    @admin.display(boolean=True)
-    def executed(self, obj: MultisigTransaction):
-        return obj.executed
-
-    @admin.display(boolean=True)
-    def successful(self, obj: MultisigTransaction):
-        return not obj.failed
 
 
 @admin.register(ModuleTransaction)
