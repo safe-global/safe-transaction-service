@@ -501,7 +501,10 @@ class ERC20Transfer(TokenTransfer):
 
 class ERC721TransferManager(TokenTransferManager):
     def erc721_owned_by(
-        self, address: ChecksumAddress
+        self,
+        address: ChecksumAddress,
+        only_trusted: Optional[bool] = None,
+        exclude_spam: Optional[bool] = None,
     ) -> List[Tuple[ChecksumAddress, int]]:
         """
         Returns erc721 owned by address, removing the ones sent
@@ -509,32 +512,36 @@ class ERC721TransferManager(TokenTransferManager):
         :return: List of tuples(token_address: str, token_id: int)
         """
 
+        owned_by_query = """
+        SELECT Q1.address, Q1.token_id
+        FROM (SELECT address,
+                     token_id,
+                     Count(*) AS count
+              FROM   history_erc721transfer
+              WHERE  "to" = %s AND "to" != "_from"
+              GROUP  BY address,
+                        token_id) Q1
+             LEFT JOIN (SELECT address,
+                               token_id,
+                               Count(*) AS count
+                        FROM   history_erc721transfer
+                        WHERE  "_from" = %s AND "to" != "_from"
+                        GROUP  BY address,
+                                  token_id) Q2
+                    ON Q1.address = Q2.address
+                       AND Q1.token_id = Q2.token_id
+        WHERE Q1.count > COALESCE(Q2.count, 0)
+        """
+
+        if only_trusted:
+            owned_by_query += " AND Q1.address IN (SELECT address FROM tokens_token WHERE trusted = TRUE)"
+        elif exclude_spam:
+            owned_by_query += " AND Q1.address NOT IN (SELECT address FROM tokens_token WHERE spam = TRUE)"
+
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
             # Queries all the ERC721 IN and all OUT and only returns the ones currently owned
-            cursor.execute(
-                """
-                SELECT Q1.address, Q1.token_id
-                FROM (SELECT address,
-                             token_id,
-                             Count(*) AS count
-                      FROM   history_erc721transfer
-                      WHERE  "to" = %s AND "to" != "_from"
-                      GROUP  BY address,
-                                token_id) Q1
-                     LEFT JOIN (SELECT address,
-                                       token_id,
-                                       Count(*) AS count
-                                FROM   history_erc721transfer
-                                WHERE  "_from" = %s AND "to" != "_from"
-                                GROUP  BY address,
-                                          token_id) Q2
-                            ON Q1.address = Q2.address
-                               AND Q1.token_id = Q2.token_id
-                WHERE Q1.count > COALESCE(Q2.count, 0)
-                """,
-                [hex_address, hex_address],
-            )
+            cursor.execute(owned_by_query, [hex_address, hex_address])
             return [
                 (fast_to_checksum_address(bytes(address)), int(token_id))
                 for address, token_id in cursor.fetchall()

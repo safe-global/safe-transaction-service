@@ -16,6 +16,7 @@ from gnosis.safe.safe_signature import SafeSignatureType
 from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 
+from ...tokens.tests.factories import TokenFactory
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -412,6 +413,46 @@ class TestTokenTransfer(TestCase):
         ERC721TransferFactory(_from=random_address, to=random_address, token_id=6)
         self.assertEqual(
             len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 1
+        )
+
+    def test_erc721_owned_by_trusted_spam(self):
+        random_address = Account.create().address
+        self.assertEqual(
+            ERC721Transfer.objects.erc721_owned_by(address=random_address), []
+        )
+        erc721_transfer = ERC721TransferFactory(to=random_address)
+        erc721_transfer_2 = ERC721TransferFactory(to=random_address)
+        token = TokenFactory(address=erc721_transfer.address, spam=True)
+        self.assertEqual(
+            len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 2
+        )
+        self.assertEqual(
+            len(
+                ERC721Transfer.objects.erc721_owned_by(
+                    address=random_address, exclude_spam=True
+                )
+            ),
+            1,
+        )
+
+        self.assertEqual(
+            len(
+                ERC721Transfer.objects.erc721_owned_by(
+                    address=random_address, only_trusted=True
+                )
+            ),
+            0,
+        )
+        token.trusted = True
+        token.spam = False
+        token.save(update_fields=["trusted", "spam"])
+        self.assertEqual(
+            len(
+                ERC721Transfer.objects.erc721_owned_by(
+                    address=random_address, only_trusted=True
+                )
+            ),
+            1,
         )
 
 
