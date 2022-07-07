@@ -6,7 +6,6 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
-from django.db.models import Q
 
 import gevent
 import requests
@@ -248,56 +247,6 @@ class CollectiblesService:
 
         return self._retrieve_metadata_from_uri(collectible.uri)
 
-    def _filter_addresses(
-        self,
-        addresses_with_token_ids: Sequence[Tuple[ChecksumAddress, int]],
-        only_trusted: bool = False,
-        exclude_spam: bool = False,
-    ):
-        """
-        :param addresses_with_token_ids:
-        :param only_trusted:
-        :param exclude_spam:
-        :return: ERC721 tokens filtered by spam or trusted
-        """
-        addresses_set = {
-            address_with_token_id[0]
-            for address_with_token_id in addresses_with_token_ids
-        }
-        base_queryset = Token.objects.filter(
-            Q(address__in=addresses_set) | Q(events_bugged=True)
-        ).order_by("name")
-        if only_trusted:
-            addresses = list(
-                base_queryset.erc721()
-                .filter(trusted=True)
-                .values_list("address", flat=True)
-            )
-        elif exclude_spam:
-            addresses = list(
-                base_queryset.erc721()
-                .filter(spam=False)
-                .values_list("address", flat=True)
-            )
-        else:
-            # There could be some addresses that are not in the list
-            addresses = set()
-            for token in base_queryset:
-                if token.is_erc721():
-                    addresses.add(token.address)
-                if (
-                    token.address in addresses_set
-                ):  # events_bugged tokens might not be on the `addresses_set`
-                    addresses_set.remove(token.address)
-            # Add unknown addresses
-            addresses.union(addresses_set)
-
-        return [
-            address_with_token_id
-            for address_with_token_id in addresses_with_token_ids
-            if address_with_token_id[0] in addresses
-        ]
-
     def get_collectibles(
         self,
         safe_address: ChecksumAddress,
@@ -335,17 +284,15 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return: Collectibles using the owner, addresses and the token_ids
         """
-        unfiltered_addresses_with_token_ids = ERC721Transfer.objects.erc721_owned_by(
-            safe_address
-        )
-        for address, _ in unfiltered_addresses_with_token_ids:
-            # Store tokens in database if not present
-            self.get_token_info(address)  # This is cached
-        addresses_with_token_ids = self._filter_addresses(
-            unfiltered_addresses_with_token_ids, only_trusted, exclude_spam
+        addresses_with_token_ids = ERC721Transfer.objects.erc721_owned_by(
+            safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
         )
         if not addresses_with_token_ids:
             return []
+
+        for address, _ in addresses_with_token_ids:
+            # Store tokens in database if not present
+            self.get_token_info(address)  # This is cached
 
         logger.debug("Getting token_uris for %s", addresses_with_token_ids)
         # Chunk token uris to prevent stressing the node

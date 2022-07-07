@@ -236,12 +236,15 @@ class Token(models.Model):
     class Meta:
         indexes = [
             models.Index(
-                name="token_trusted_idx", fields=["trusted"], condition=Q(trusted=True)
-            ),
-            models.Index(
                 name="token_events_bugged_idx",
                 fields=["events_bugged"],
                 condition=Q(events_bugged=True),
+            ),
+            models.Index(
+                name="token_spam_idx", fields=["spam"], condition=Q(spam=True)
+            ),
+            models.Index(
+                name="token_trusted_idx", fields=["trusted"], condition=Q(trusted=True)
             ),
         ]
 
