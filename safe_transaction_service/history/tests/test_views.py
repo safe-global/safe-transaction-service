@@ -1487,7 +1487,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:history:safe-collectibles", args=(safe_address,)), format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        # PAgination empty count should be 0
+        self.assertEqual(response.data["count"], 0)
 
         with mock.patch.object(
             CollectiblesService, "get_collectibles_with_metadata", autospec=True
@@ -1517,8 +1518,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
+            # Check results of paginated answer
             self.assertEqual(
-                response.data,
+                response.data["results"],
                 [
                     {
                         "address": token_address,

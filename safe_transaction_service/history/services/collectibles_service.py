@@ -344,7 +344,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
+        limit: int = 10,
         offset: int = 0,
         paginator: ListPagination = None,
     ) -> List[CollectibleWithMetadata]:
@@ -354,6 +354,9 @@ class CollectiblesService:
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
+        :param limit: number of tokens to return
+        :param offset: offset value
+        :param paginator: pagination class
         :return:
         """
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
