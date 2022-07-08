@@ -330,7 +330,7 @@ class CollectiblesService:
 
         return collectibles, count
 
-    def get_collectibles_with_metadata(
+    def _get_collectibles_with_metadata(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
@@ -344,9 +344,6 @@ class CollectiblesService:
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :param limit: number of tokens to return
-        :param offset: offset value
-        :param paginator: pagination class
         :return:
         """
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
@@ -391,6 +388,31 @@ class CollectiblesService:
                 )
             )
         return collectibles_with_metadata, count
+
+    def get_collectibles_with_metadata_v1(
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
+        limit: int = 0,
+        offset: int = 0,
+    ) -> List[CollectibleWithMetadata]:
+        collectibles, _ = self._get_collectibles_with_metadata(
+            safe_address, only_trusted, exclude_spam, limit, offset
+        )
+        return collectibles
+
+    def get_collectibles_with_metadata_v2(
+        self,
+        safe_address: ChecksumAddress,
+        only_trusted: bool = False,
+        exclude_spam: bool = False,
+        limit: int = 0,
+        offset: int = 0,
+    ) -> (List[CollectibleWithMetadata], int):
+        return self._get_collectibles_with_metadata(
+            safe_address, only_trusted, exclude_spam, limit, offset
+        )
 
     @cachedmethod(cache=operator.attrgetter("cache_token_info"))
     @cache_memoize(60 * 60, prefix="collectibles-get_token_info")  # 1 hour

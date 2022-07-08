@@ -584,10 +584,9 @@ class SafeCollectiblesView(SafeBalanceView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 
     def get_result(self, *args, **kwargs):
-        collectibles, _ = CollectiblesServiceProvider().get_collectibles_with_metadata(
+        return CollectiblesServiceProvider().get_collectibles_with_metadata_v1(
             *args, **kwargs
         )
-        return collectibles
 
     @swagger_safe_balance_schema(serializer_class)
     def get(self, *args, **kwargs):
@@ -634,7 +633,7 @@ class SafeCollectiblesViewV2(SafeBalanceView):
             (
                 safe_collectibles,
                 count,
-            ) = CollectiblesServiceProvider().get_collectibles_with_metadata(
+            ) = CollectiblesServiceProvider().get_collectibles_with_metadata_v2(
                 address, only_trusted, exclude_spam, limit, offset
             )
             paginator.set_count(count)
