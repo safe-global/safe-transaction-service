@@ -583,6 +583,23 @@ class SafeBalanceUsdView(SafeBalanceView):
 class SafeCollectiblesView(SafeBalanceView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 
+    def get_result(self, *args, **kwargs):
+        collectibles, _ = CollectiblesServiceProvider().get_collectibles_with_metadata(
+            *args, **kwargs
+        )
+        return collectibles
+
+    @swagger_safe_balance_schema(serializer_class)
+    def get(self, *args, **kwargs):
+        """
+        Get collectibles (ERC721 tokens) and information about them
+        """
+        return super().get(*args, **kwargs)
+
+
+class SafeCollectiblesViewV2(SafeBalanceView):
+    serializer_class = serializers.SafeCollectibleResponseSerializer
+
     @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
@@ -614,11 +631,13 @@ class SafeCollectiblesView(SafeBalanceView):
             offset = int(self.request.query_params.get("offset", "0"))
 
             paginator = pagination.ListPagination(self.request, limit, offset)
-            safe_collectibles = (
-                CollectiblesServiceProvider().get_collectibles_with_metadata(
-                    address, only_trusted, exclude_spam, limit, offset, paginator
-                )
+            (
+                safe_collectibles,
+                count,
+            ) = CollectiblesServiceProvider().get_collectibles_with_metadata(
+                address, only_trusted, exclude_spam, limit, offset
             )
+            paginator.set_count(count)
             serializer = self.get_serializer(safe_collectibles, many=True)
             return paginator.get_paginated_response(serializer.data)
 

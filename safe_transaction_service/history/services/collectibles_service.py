@@ -27,7 +27,6 @@ from safe_transaction_service.utils.utils import chunks
 from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
 from ..models import ERC721Transfer
-from ..pagination import ListPagination
 
 logger = logging.getLogger(__name__)
 
@@ -253,10 +252,9 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 10,
+        limit: int = 0,
         offset: int = 0,
-        paginator: ListPagination = None,
-    ) -> List[Collectible]:
+    ) -> (List[Collectible], int):
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -265,36 +263,34 @@ class CollectiblesService:
         """
 
         # Cache based on the number of erc721 events
-        # number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
-        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}:{offset}"
+        number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
+        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}{offset}:{number_erc721_events}"
+        cache_key_count = (
+            f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
+        )
         if collectibles := django_cache.get(cache_key):
-            cache_key_count = (
-                f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
-            )
-            if paginator is not None:
-                paginator.set_count(django_cache.get(cache_key_count))
-            return collectibles
+            count = django_cache.get(cache_key_count)
+            return collectibles, count
         else:
-            collectibles = self._get_collectibles(
+            collectibles, count = self._get_collectibles(
                 safe_address,
                 only_trusted,
                 exclude_spam,
                 limit=limit,
                 offset=offset,
-                paginator=paginator,
             )
             django_cache.set(cache_key, collectibles, 60 * 10)  # 10 minutes cache
-            return collectibles
+            django_cache.set(cache_key_count, count, 60 * 10)  # 10 minutes cache
+            return collectibles, count
 
     def _get_collectibles(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 10,
+        limit: int = 0,
         offset: int = 0,
-        paginator: ListPagination = None,
-    ) -> List[Collectible]:
+    ) -> (List[Collectible], int):
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -305,23 +301,18 @@ class CollectiblesService:
             safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
         )
         if not addresses_with_token_ids:
-            return []
+            return [], 0
 
         for address, _ in addresses_with_token_ids:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached
 
+        count = len(addresses_with_token_ids)
         logger.debug("Getting token_uris for %s", addresses_with_token_ids)
         # Chunk token uris to prevent stressing the node
         token_uris = []
-        if paginator is not None:
-            cache_key = (
-                f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
-            )
-            paginator.set_count(len(addresses_with_token_ids))
-            django_cache.set(
-                cache_key, len(addresses_with_token_ids), 60 * 10
-            )  # 10 minutes cache
+
+        if limit != 0:
             addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
 
         for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
@@ -337,17 +328,16 @@ class CollectiblesService:
             )
             collectibles.append(collectible)
 
-        return collectibles
+        return collectibles, count
 
     def get_collectibles_with_metadata(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 10,
+        limit: int = 0,
         offset: int = 0,
-        paginator: ListPagination = None,
-    ) -> List[CollectibleWithMetadata]:
+    ) -> (List[CollectibleWithMetadata], int):
         """
         Get collectibles using the owner, addresses and the token_ids
 
@@ -360,15 +350,13 @@ class CollectiblesService:
         :return:
         """
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
-        collectibles = self.get_collectibles(
+        collectibles, count = self.get_collectibles(
             safe_address,
             only_trusted=only_trusted,
             exclude_spam=exclude_spam,
             limit=limit,
             offset=offset,
-            paginator=paginator,
         )
-
         jobs = [
             gevent.spawn(self.get_metadata, collectible) for collectible in collectibles
         ]
@@ -402,7 +390,7 @@ class CollectiblesService:
                     metadata,
                 )
             )
-        return collectibles_with_metadata
+        return collectibles_with_metadata, count
 
     @cachedmethod(cache=operator.attrgetter("cache_token_info"))
     @cache_memoize(60 * 60, prefix="collectibles-get_token_info")  # 1 hour
