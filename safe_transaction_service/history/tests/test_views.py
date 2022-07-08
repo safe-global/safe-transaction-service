@@ -32,6 +32,7 @@ from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..helpers import DelegateSignatureHelper
 from ..models import (
+    ERC721Transfer,
     MultisigConfirmation,
     MultisigTransaction,
     SafeContractDelegate,
@@ -1475,7 +1476,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
-    def test_safe_collectibles(self):
+    # Test without pagination
+    def test_safe_collectibles_v1(self):
         safe_address = Account.create().address
         response = self.client.get(
             reverse("v1:history:safe-collectibles", args=(safe_address,)), format="json"
@@ -1538,6 +1540,93 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     }
                 ],
             )
+
+    # Test with pagination
+    def test_safe_collectibles_v2(self):
+        safe_address = Account.create().address
+
+        response = self.client.get(
+            reverse("v2:history:safe-collectibles", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        SafeContractFactory(address=safe_address)
+        ens_address = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85"
+
+        erc721_list = []
+        for token_id in range(1, 12):
+            erc721_list.append((ens_address, token_id))
+
+        with mock.patch.object(
+            ERC721Transfer.objects, "erc721_owned_by", return_value=erc721_list
+        ):
+            response = self.client.get(
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=20",
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 11)
+            self.assertEqual(len(response.data["results"]), 11)
+
+            response = self.client.get(
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=0",
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 11)
+            self.assertEqual(len(response.data["results"]), 5)
+            next = (
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=5"
+            )
+            self.assertIn(next, response.data["next"])
+            self.assertEquals(response.data["previous"], None)
+            for result, erc721 in zip(response.data["results"], erc721_list[0:5]):
+                self.assertEqual(result["address"], erc721[0])
+                self.assertEqual(int(result["id"]), erc721[1])
+
+            response = self.client.get(
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=5",
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 11)
+            self.assertEqual(len(response.data["results"]), 5)
+            next = (
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=10"
+            )
+            previous = (
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5"
+            )
+            self.assertIn(next, response.data["next"])
+            self.assertIn(previous, response.data["previous"])
+            for result, erc721 in zip(response.data["results"], erc721_list[5:10]):
+                self.assertEqual(result["address"], erc721[0])
+                self.assertEqual(int(result["id"]), erc721[1])
+
+            response = self.client.get(
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=10",
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 11)
+            self.assertEqual(len(response.data["results"]), 1)
+            previous = (
+                reverse("v2:history:safe-collectibles", args=(safe_address,))
+                + "?limit=5&offset=5"
+            )
+            self.assertEquals(response.data["next"], None)
+            self.assertIn(previous, response.data["previous"])
+            for result, erc721 in zip(response.data["results"], erc721_list[10:]):
+                self.assertEqual(result["address"], erc721[0])
+                self.assertEqual(int(result["id"]), erc721[1])
 
     def test_get_safe_delegate_list(self):
         safe_address = Account.create().address

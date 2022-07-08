@@ -394,9 +394,17 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
-        offset: int = 0,
     ) -> List[CollectibleWithMetadata]:
+        """
+         Get collectibles v1 returns no paginated response
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :return: collectibles
+        """
+
+        limit = 0
+        offset = 0
         collectibles, _ = self._get_collectibles_with_metadata(
             safe_address, only_trusted, exclude_spam, limit, offset
         )
@@ -410,6 +418,15 @@ class CollectiblesService:
         limit: int = 0,
         offset: int = 0,
     ) -> (List[CollectibleWithMetadata], int):
+        """
+         Get collectibles v2 returns  paginated response
+        :param safe_address:
+        :param only_trusted: If True, return balance only for trusted tokens
+        :param exclude_spam: If True, exclude spam tokens
+        :param limit: page size
+        :param offset: page position
+        :return: collectibles and count
+        """
         return self._get_collectibles_with_metadata(
             safe_address, only_trusted, exclude_spam, limit, offset
         )
