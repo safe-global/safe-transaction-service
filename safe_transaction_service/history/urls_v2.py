@@ -1,13 +1,13 @@
 from django.urls import path
 
-from . import views
+from . import views_v2
 
 app_name = "history"
 
 urlpatterns = [
     path(
         "safes/<str:address>/collectibles/",
-        views.SafeCollectiblesViewV2.as_view(),
+        views_v2.SafeCollectiblesView.as_view(),
         name="safe-collectibles",
     ),
 ]
