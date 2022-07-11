@@ -33,7 +33,7 @@ class Command(BaseCommand):
         contract_function = self.nonce_fn
 
         payloads = []
-        data = contract_function.buildTransaction({"gas": 0, "gasPrice": 0})["data"]
+        data = contract_function.build_transaction({"gas": 0, "gasPrice": 0})["data"]
         output_type = [output["type"] for output in contract_function.abi["outputs"]]
         fn_name = (contract_function.fn_name,)  # For debugging purposes
         for address in addresses:
