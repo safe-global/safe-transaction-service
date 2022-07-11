@@ -533,7 +533,7 @@ class TestTxDecoder(TestCase):
             Web3()
             .eth.contract(abi=example_abi)
             .functions.buyDroid(4, 10)
-            .buildTransaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
         )
 
         db_tx_decoder = DbTxDecoder()
