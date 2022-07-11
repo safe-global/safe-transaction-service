@@ -1583,7 +1583,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 + "?limit=5&offset=5"
             )
             self.assertIn(next, response.data["next"])
-            self.assertEquals(response.data["previous"], None)
+            self.assertEqual(response.data["previous"], None)
             for result, erc721 in zip(response.data["results"], erc721_list[0:5]):
                 self.assertEqual(result["address"], erc721[0])
                 self.assertEqual(int(result["id"]), erc721[1])
@@ -1622,7 +1622,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 reverse("v2:history:safe-collectibles", args=(safe_address,))
                 + "?limit=5&offset=5"
             )
-            self.assertEquals(response.data["next"], None)
+            self.assertEqual(response.data["next"], None)
             self.assertIn(previous, response.data["previous"])
             for result, erc721 in zip(response.data["results"], erc721_list[10:]):
                 self.assertEqual(result["address"], erc721[0])

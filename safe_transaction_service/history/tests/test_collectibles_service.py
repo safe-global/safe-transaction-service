@@ -68,7 +68,9 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             dappcon_logo_uri = Token(
                 address=dappcon_2020_address, name="", symbol=""
             ).get_full_logo_uri()
-            self.assertEqual(collectibles_service.get_collectibles(safe_address), [])
+            self.assertEqual(
+                collectibles_service.get_collectibles(safe_address), ([], 0)
+            )
 
             erc721_addresses = [
                 (dappcon_2020_address, dappcon_token_id),
@@ -98,7 +100,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                     uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
                 ),
             ]
-            collectibles = collectibles_service.get_collectibles(safe_address)
+            collectibles, _ = collectibles_service.get_collectibles(safe_address)
             self.assertEqual(len(collectibles), len(expected))
             self.assertCountEqual(collectibles, expected)
 
