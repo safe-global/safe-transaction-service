@@ -16,19 +16,57 @@ class ContractAdminTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        # Create superuser (alfred)
         cls.alfred = User.objects.create_superuser(
             "alfred", "alfred@example.com", "password"
         )
+        cls.contract1 = ContractFactory.create(
+            contract_abi=ContractAbiFactory.create(), logo=None
+        )
+        cls.contract2 = ContractFactory.create(contract_abi=None)
+        cls.contract3 = ContractFactory.create(contract_abi=ContractAbiFactory.create())
+        cls.contract_admin = ContractAdmin(Contract, site)
 
-    def test_lookup(self) -> None:
-        contract1 = ContractFactory.create(
-            contract_abi=ContractAbiFactory.create(description="Contract1")
-        )
-        contract2 = ContractFactory.create(
-            contract_abi=ContractAbiFactory.create(description="Contract2")
-        )
-        contract_admin = ContractAdmin(Contract, site)
+    def test_lookups(self) -> None:
         request = self.request_factory.get("/")
         request.user = self.alfred
-        self.assertEqual(1, 1)
+
+        changelist = self.contract_admin.get_changelist_instance(request)
+
+        filterspec = changelist.get_filters(request)
+        expected_choices = [("YES", "Yes"), ("NO", "No")]
+        self.assertEqual(filterspec[0][0].lookup_choices, expected_choices)
+        self.assertEqual(filterspec[0][1].lookup_choices, expected_choices)
+
+    def test_unfiltered_lookup(self) -> None:
+        request = self.request_factory.get("/")
+        request.user = self.alfred
+
+        changelist = self.contract_admin.get_changelist_instance(request)
+
+        # Queryset should contain all the contracts (no filter specified)
+        self.assertEqual(
+            set(changelist.get_queryset(request)),
+            {self.contract1, self.contract2, self.contract3},
+        )
+
+    def test_has_abi_filter_lookup(self) -> None:
+        request = self.request_factory.get("/", {"has_abi": "YES"})
+        request.user = self.alfred
+
+        changelist = self.contract_admin.get_changelist_instance(request)
+
+        # Queryset should contain contracts with ABI (contract1 and contract3)
+        self.assertEqual(
+            set(changelist.get_queryset(request)), {self.contract1, self.contract3}
+        )
+
+    def test_has_logo_filter_lookup(self) -> None:
+        request = self.request_factory.get("/", {"has_logo": "YES"})
+        request.user = self.alfred
+
+        changelist = self.contract_admin.get_changelist_instance(request)
+
+        # Queryset should contain contracts with logo (contract2 and contract3)
+        self.assertEqual(
+            set(changelist.get_queryset(request)), {self.contract2, self.contract3}
+        )
