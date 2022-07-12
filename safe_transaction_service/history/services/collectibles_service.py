@@ -254,7 +254,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> (List[Collectible], int):
+    ) -> Tuple[List[Collectible], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -297,7 +297,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> (List[Collectible], int):
+    ) -> Tuple[List[Collectible], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -347,7 +347,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> (List[CollectibleWithMetadata], int):
+    ) -> Tuple[List[CollectibleWithMetadata], int]:
         """
         Get collectibles using the owner, addresses and the token_ids
 
@@ -424,9 +424,9 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
+        limit: int = 10,
         offset: int = 0,
-    ) -> (List[CollectibleWithMetadata], int):
+    ) -> Tuple[List[CollectibleWithMetadata], int]:
         """
         Get collectibles paginated
 
