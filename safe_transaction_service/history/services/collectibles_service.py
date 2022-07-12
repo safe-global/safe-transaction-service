@@ -252,7 +252,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
+        limit: Optional[int] = None,
         offset: int = 0,
     ) -> (List[Collectible], int):
         """
@@ -295,7 +295,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
+        limit: Optional[int] = None,
         offset: int = 0,
     ) -> (List[Collectible], int):
         """
@@ -321,7 +321,8 @@ class CollectiblesService:
         # Chunk token uris to prevent stressing the node
         token_uris = []
 
-        if limit != 0:
+        # TODO Paginate on DB
+        if limit is not None:
             addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
 
         for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
@@ -344,8 +345,8 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = 0,
-        offset: Optional[int] = 0,
+        limit: Optional[int] = None,
+        offset: int = 0,
     ) -> (List[CollectibleWithMetadata], int):
         """
         Get collectibles using the owner, addresses and the token_ids

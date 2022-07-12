@@ -520,7 +520,6 @@ def swagger_safe_balance_schema(serializer_class):
 
 class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
-    pagination_class = pagination.ListPagination
 
     def get_parameters(self) -> Tuple[bool, bool]:
         """
