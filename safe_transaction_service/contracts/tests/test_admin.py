@@ -20,11 +20,14 @@ class ContractAdminTest(TestCase):
             "alfred", "alfred@example.com", "password"
         )
         cls.contract1 = ContractFactory.create(
-            contract_abi=ContractAbiFactory.create(), logo=None
+            contract_abi=ContractAbiFactory.create(relevance=3), logo=None
         )
         cls.contract2 = ContractFactory.create(contract_abi=None)
-        cls.contract3 = ContractFactory.create(contract_abi=ContractAbiFactory.create())
+        cls.contract3 = ContractFactory.create(
+            contract_abi=ContractAbiFactory.create(relevance=4)
+        )
         cls.contract_admin = ContractAdmin(Contract, site)
+        cls.contracts = {cls.contract1, cls.contract2, cls.contract3}
 
     def test_lookups(self) -> None:
         request = self.request_factory.get("/")
@@ -46,7 +49,7 @@ class ContractAdminTest(TestCase):
         # Queryset should contain all the contracts (no filter specified)
         self.assertEqual(
             set(changelist.get_queryset(request)),
-            {self.contract1, self.contract2, self.contract3},
+            self.contracts,
         )
 
     def test_has_abi_filter_lookup(self) -> None:
@@ -60,6 +63,15 @@ class ContractAdminTest(TestCase):
             set(changelist.get_queryset(request)), {self.contract1, self.contract3}
         )
 
+    def test_has_abi_exclusion_filter_lookup(self) -> None:
+        request = self.request_factory.get("/", {"has_abi": "NO"})
+        request.user = self.alfred
+
+        changelist = self.contract_admin.get_changelist_instance(request)
+
+        # Queryset should contain contracts with ABI (contract1 and contract3)
+        self.assertEqual(set(changelist.get_queryset(request)), {self.contract2})
+
     def test_has_logo_filter_lookup(self) -> None:
         request = self.request_factory.get("/", {"has_logo": "YES"})
         request.user = self.alfred
@@ -70,3 +82,12 @@ class ContractAdminTest(TestCase):
         self.assertEqual(
             set(changelist.get_queryset(request)), {self.contract2, self.contract3}
         )
+
+    def test_get_contracts_abi_relevance(self) -> None:
+        expected_relevances = map(
+            lambda i: None if (i.contract_abi is None) else i.contract_abi.relevance,
+            self.contracts,
+        )
+
+        relevances = map(lambda c: self.contract_admin.abi_relevance(c), self.contracts)
+        self.assertEqual(set(expected_relevances), set(relevances))
