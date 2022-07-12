@@ -538,6 +538,9 @@ class ERC721TransferManager(TokenTransferManager):
         elif exclude_spam:
             owned_by_query += " AND Q1.address NOT IN (SELECT address FROM tokens_token WHERE spam = TRUE)"
 
+        # Sort by token `address`, then by `token_id` to be stable
+        owned_by_query += " ORDER BY Q1.address, Q2.token_id"
+
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
             # Queries all the ERC721 IN and all OUT and only returns the ones currently owned

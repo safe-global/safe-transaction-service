@@ -1475,6 +1475,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
+    # Test without pagination
     def test_safe_collectibles(self):
         safe_address = Account.create().address
         response = self.client.get(
