@@ -266,6 +266,11 @@ class CollectiblesService:
 
         # Cache based on the number of erc721 events
         number_erc721_events = ERC721Transfer.objects.to_or_from(safe_address).count()
+
+        if number_erc721_events == 0:
+            # No need for further DB/Cache calls
+            return [], 0
+
         cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}{offset}:{number_erc721_events}"
         cache_key_count = (
             f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
@@ -422,7 +427,8 @@ class CollectiblesService:
         offset: int = 0,
     ) -> (List[CollectibleWithMetadata], int):
         """
-         Get collectibles paginated
+        Get collectibles paginated
+
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens

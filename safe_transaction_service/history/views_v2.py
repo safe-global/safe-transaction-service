@@ -46,10 +46,9 @@ class SafeCollectiblesView(GenericAPIView):
                 self.request.query_params.get("exclude_spam", False)
             )
 
-            limit = int(self.request.query_params.get("limit", "10"))
-            offset = int(self.request.query_params.get("offset", "0"))
-
-            paginator = pagination.ListPagination(self.request, limit, offset)
+            paginator = pagination.ListPagination(self.request)
+            limit = paginator.limit
+            offset = paginator.offset
             (
                 safe_collectibles,
                 count,

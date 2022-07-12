@@ -1,3 +1,5 @@
+from django.http import HttpRequest
+
 from rest_framework.pagination import LimitOffsetPagination
 
 
@@ -14,15 +16,12 @@ class SmallPagination(LimitOffsetPagination):
 class ListPagination(LimitOffsetPagination):
     max_limit = 10
 
-    def __init__(self, request, limit, offset):
+    def __init__(self, request: HttpRequest):
         super().__init__()
-        if limit < self.max_limit:
-            self.limit = limit
-        else:
-            self.limit = self.max_limit
-        self.offset = offset
         self.request = request
-        self.count = 0
+        self.limit = self.get_limit(request)
+        self.offset = self.get_offset(request)
+        self.count: int = 0
 
     def set_count(self, value):
         self.count = value
