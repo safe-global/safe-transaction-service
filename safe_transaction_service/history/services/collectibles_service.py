@@ -259,7 +259,9 @@ class CollectiblesService:
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :return: Collectibles using the owner, addresses and the token_ids
+        :param limit: page size
+        :param offset: page position
+        :return: Collectibles (using the owner, addresses and the token_ids) and count (total of collectibles)
         """
 
         # Cache based on the number of erc721 events
@@ -295,7 +297,9 @@ class CollectiblesService:
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :return: Collectibles using the owner, addresses and the token_ids
+        :param limit: page size
+        :param offset: page position
+        :return: Collectibles (using the owner, addresses and the token_ids) and count (total of collectibles)
         """
         addresses_with_token_ids = ERC721Transfer.objects.erc721_owned_by(
             safe_address, only_trusted=only_trusted, exclude_spam=exclude_spam
@@ -335,8 +339,8 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: int = 0,
-        offset: int = 0,
+        limit: Optional[int] = 0,
+        offset: Optional[int] = 0,
     ) -> (List[CollectibleWithMetadata], int):
         """
         Get collectibles using the owner, addresses and the token_ids
@@ -344,7 +348,9 @@ class CollectiblesService:
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
-        :return:
+        :param limit: page size
+        :param offset: page position
+        :return: collectibles and count
         """
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
         collectibles, count = self.get_collectibles(
@@ -389,7 +395,7 @@ class CollectiblesService:
             )
         return collectibles_with_metadata, count
 
-    def get_collectibles_with_metadata_v1(
+    def get_collectibles_with_metadata(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
@@ -402,15 +408,12 @@ class CollectiblesService:
         :param exclude_spam: If True, exclude spam tokens
         :return: collectibles
         """
-
-        limit = 0
-        offset = 0
         collectibles, _ = self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam, limit, offset
+            safe_address, only_trusted, exclude_spam
         )
         return collectibles
 
-    def get_collectibles_with_metadata_v2(
+    def get_collectibles_with_metadata_paginated(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
@@ -419,7 +422,7 @@ class CollectiblesService:
         offset: int = 0,
     ) -> (List[CollectibleWithMetadata], int):
         """
-         Get collectibles v2 returns  paginated response
+         Get collectibles paginated
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens

@@ -1477,7 +1477,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
     # Test without pagination
-    def test_safe_collectibles_v1(self):
+    def test_safe_collectibles(self):
         safe_address = Account.create().address
         response = self.client.get(
             reverse("v1:history:safe-collectibles", args=(safe_address,)), format="json"
@@ -1492,7 +1492,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 0)
 
         with mock.patch.object(
-            CollectiblesService, "get_collectibles_with_metadata_v1", autospec=True
+            CollectiblesService, "get_collectibles_with_metadata", autospec=True
         ) as function:
             token_name = "TokenName"
             token_symbol = "SYMBOL"
@@ -1542,7 +1542,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             )
 
     # Test with pagination
-    def test_safe_collectibles_v2(self):
+    def test_safe_collectibles_paginated(self):
         safe_address = Account.create().address
 
         response = self.client.get(

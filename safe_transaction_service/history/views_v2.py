@@ -53,7 +53,7 @@ class SafeCollectiblesView(GenericAPIView):
             (
                 safe_collectibles,
                 count,
-            ) = CollectiblesServiceProvider().get_collectibles_with_metadata_v2(
+            ) = CollectiblesServiceProvider().get_collectibles_with_metadata_paginated(
                 address, only_trusted, exclude_spam, limit, offset
             )
             paginator.set_count(count)

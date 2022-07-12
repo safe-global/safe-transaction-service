@@ -584,7 +584,7 @@ class SafeCollectiblesView(SafeBalanceView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 
     def get_result(self, *args, **kwargs):
-        return CollectiblesServiceProvider().get_collectibles_with_metadata_v1(
+        return CollectiblesServiceProvider().get_collectibles_with_metadata(
             *args, **kwargs
         )
 
