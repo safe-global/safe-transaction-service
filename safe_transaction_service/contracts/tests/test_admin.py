@@ -11,12 +11,12 @@ from safe_transaction_service.contracts.tests.factories import (
 from ..models import Contract
 
 
-class ContractAdminTest(TestCase):
+class TestContractAdmin(TestCase):
     request_factory = RequestFactory()
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.alfred = User.objects.create_superuser(
+        cls.superuser = User.objects.create_superuser(
             "alfred", "alfred@example.com", "password"
         )
         cls.contract1 = ContractFactory.create(
@@ -31,7 +31,7 @@ class ContractAdminTest(TestCase):
 
     def test_lookups(self) -> None:
         request = self.request_factory.get("/")
-        request.user = self.alfred
+        request.user = self.superuser
 
         changelist = self.contract_admin.get_changelist_instance(request)
 
@@ -42,7 +42,7 @@ class ContractAdminTest(TestCase):
 
     def test_unfiltered_lookup(self) -> None:
         request = self.request_factory.get("/")
-        request.user = self.alfred
+        request.user = self.superuser
 
         changelist = self.contract_admin.get_changelist_instance(request)
 
@@ -54,7 +54,7 @@ class ContractAdminTest(TestCase):
 
     def test_has_abi_filter_lookup(self) -> None:
         request = self.request_factory.get("/", {"has_abi": "YES"})
-        request.user = self.alfred
+        request.user = self.superuser
 
         changelist = self.contract_admin.get_changelist_instance(request)
 
@@ -65,7 +65,7 @@ class ContractAdminTest(TestCase):
 
     def test_has_abi_exclusion_filter_lookup(self) -> None:
         request = self.request_factory.get("/", {"has_abi": "NO"})
-        request.user = self.alfred
+        request.user = self.superuser
 
         changelist = self.contract_admin.get_changelist_instance(request)
 
@@ -74,7 +74,7 @@ class ContractAdminTest(TestCase):
 
     def test_has_logo_filter_lookup(self) -> None:
         request = self.request_factory.get("/", {"has_logo": "YES"})
-        request.user = self.alfred
+        request.user = self.superuser
 
         changelist = self.contract_admin.get_changelist_instance(request)
 
