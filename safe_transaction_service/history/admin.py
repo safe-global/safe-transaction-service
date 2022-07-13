@@ -1,14 +1,17 @@
-from typing import Optional
+from typing import Any, Optional
 
+from django import forms
 from django.contrib import admin
 from django.db.models import F, Q
 from django.db.models.functions import Greatest
 from django.db.transaction import atomic
+from django.http import HttpRequest
 
 from hexbytes import HexBytes
 from rest_framework.authtoken.admin import TokenAdmin
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.safe import SafeTx
 
 from safe_transaction_service.utils.admin import BinarySearchAdmin
 
@@ -31,6 +34,7 @@ from .models import (
     WebHook,
 )
 from .services import IndexServiceProvider
+from .utils import HexField
 
 # By default, TokenAdmin doesn't allow key edition
 # IFF you have a service that requests from multiple safe-transaction-service
@@ -308,9 +312,31 @@ class MultisigTransactionExecutedListFilter(admin.SimpleListFilter):
             return queryset.not_executed()
 
 
+class MultisigTransactionDataListFilter(admin.SimpleListFilter):
+    title = "Has data"
+    parameter_name = "has_data"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("YES", "Transaction has data"),
+            ("NO", "Transaction data is empty"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "YES":
+            return queryset.with_data()
+        elif self.value() == "NO":
+            return queryset.without_data()
+
+
+class MultisigTransactionAdminForm(forms.ModelForm):
+    data = HexField(required=False)
+
+
 @admin.register(MultisigTransaction)
 class MultisigTransactionAdmin(BinarySearchAdmin):
     date_hierarchy = "created"
+    form = MultisigTransactionAdminForm
     inlines = (MultisigConfirmationInline,)
     list_display = (
         "created",
@@ -322,12 +348,18 @@ class MultisigTransactionAdmin(BinarySearchAdmin):
         "ethereum_tx_id",
         "to",
         "value",
-        "data",
     )
-    list_filter = (MultisigTransactionExecutedListFilter, "failed", "trusted")
+    list_filter = (
+        MultisigTransactionExecutedListFilter,
+        MultisigTransactionDataListFilter,
+        "operation",
+        "failed",
+        "trusted",
+    )
     list_select_related = ("ethereum_tx",)
     ordering = ["-created"]
     raw_id_fields = ("ethereum_tx",)
+    readonly_fields = ("safe_tx_hash",)
     search_fields = ["=ethereum_tx__tx_hash", "=safe", "=to", "=safe_tx_hash"]
 
     @admin.display(boolean=True)
@@ -337,6 +369,35 @@ class MultisigTransactionAdmin(BinarySearchAdmin):
     @admin.display(boolean=True)
     def successful(self, obj: MultisigTransaction):
         return not obj.failed
+
+    def save_model(
+        self, request: HttpRequest, obj: MultisigTransaction, form: Any, change: Any
+    ) -> None:
+        if obj.safe_tx_hash:
+            # When modifying the primary key, another instance will be created so we delete the previous one if not executed
+            MultisigTransaction.objects.not_executed().filter(
+                safe_tx_hash=obj.safe_tx_hash
+            ).delete()
+
+        # Calculate new tx hash
+        # All the numbers are decimals, they need to be parsed as integers for SafeTx
+        safe_tx = SafeTx(
+            EthereumClientProvider(),
+            obj.safe,
+            obj.to,
+            int(obj.value),
+            obj.data,
+            int(obj.operation),
+            int(obj.safe_tx_gas),
+            int(obj.base_gas),
+            int(obj.gas_price),
+            obj.gas_token,
+            obj.refund_receiver,
+            obj.signatures,
+            safe_nonce=int(obj.nonce),
+        )
+        obj.safe_tx_hash = safe_tx.safe_tx_hash
+        return super().save_model(request, obj, form, change)
 
 
 @admin.register(ModuleTransaction)

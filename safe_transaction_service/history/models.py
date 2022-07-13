@@ -538,6 +538,9 @@ class ERC721TransferManager(TokenTransferManager):
         elif exclude_spam:
             owned_by_query += " AND Q1.address NOT IN (SELECT address FROM tokens_token WHERE spam = TRUE)"
 
+        # Sort by token `address`, then by `token_id` to be stable
+        owned_by_query += " ORDER BY Q1.address, Q2.token_id"
+
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
             # Queries all the ERC721 IN and all OUT and only returns the ones currently owned
@@ -1125,6 +1128,12 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def not_executed(self):
         return self.filter(ethereum_tx=None)
 
+    def with_data(self):
+        return self.exclude(data=None)
+
+    def without_data(self):
+        return self.filter(data=None)
+
     def with_confirmations(self):
         return self.exclude(confirmations__isnull=True)
 
@@ -1182,20 +1191,20 @@ class MultisigTransaction(TimeStampedModel):
     )
     to = EthereumAddressV2Field(null=True, db_index=True)
     value = Uint256Field()
-    data = models.BinaryField(null=True)
+    data = models.BinaryField(null=True, blank=True, editable=True)
     operation = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeOperation]
     )
     safe_tx_gas = Uint256Field()
     base_gas = Uint256Field()
     gas_price = Uint256Field()
-    gas_token = EthereumAddressV2Field(null=True)
-    refund_receiver = EthereumAddressV2Field(null=True)
-    signatures = models.BinaryField(null=True)  # When tx is executed
+    gas_token = EthereumAddressV2Field(null=True, blank=True)
+    refund_receiver = EthereumAddressV2Field(null=True, blank=True)
+    signatures = models.BinaryField(null=True, blank=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
-    failed = models.BooleanField(null=True, default=None, db_index=True)
+    failed = models.BooleanField(null=True, blank=True, default=None, db_index=True)
     origin = models.CharField(
-        null=True, default=None, max_length=200
+        null=True, blank=True, default=None, max_length=200
     )  # To store arbitrary data on the tx
     trusted = models.BooleanField(
         default=False, db_index=True
