@@ -14,7 +14,7 @@
             "envFile": ".env.test"
         },
         {
-            "name": "Run tests on current file",
+            "name": "Run current file tests",
             "type": "python",
             "request": "launch",
             "module": "pytest",
