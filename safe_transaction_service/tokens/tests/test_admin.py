@@ -43,3 +43,12 @@ class TestTokenAdmin(TestCase):
         self.assertEqual(
             set(changelist.get_queryset(request)), {self.token2, self.token3}
         )
+
+    def test_has_no_logo_filter_lookup(self) -> None:
+        request = self.request_factory.get("/", {"has_logo": "NO"})
+        request.user = self.superuser
+
+        changelist = self.token_admin.get_changelist_instance(request)
+
+        # Queryset should contain tokens with no logo (token1)
+        self.assertEqual(set(changelist.get_queryset(request)), {self.token1})
