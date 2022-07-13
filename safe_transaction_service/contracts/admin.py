@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from safe_transaction_service.utils.admin import BinarySearchAdmin, HasLogoFilterAdmin
+from gnosis.eth.django.admin import BinarySearchAdmin
+
+from safe_transaction_service.utils.admin import HasLogoFilterAdmin
 
 from .models import Contract, ContractAbi
 
