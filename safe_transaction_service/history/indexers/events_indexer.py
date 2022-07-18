@@ -40,10 +40,7 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault(
             "blocks_to_reindex_again", 10
         )  # Reindex last 10 blocks every run of the indexer
-        kwargs.setdefault(
-            "confirmations", 2
-        )  # Due to reorgs, wait for the last 2 blocks
-
+        kwargs.setdefault("query_chunk_size", settings.ETH_EVENTS_QUERY_CHUNK_SIZE)
         kwargs.setdefault(
             "updated_blocks_behind", settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
         )  # For last x blocks, consider them almost updated and process them first

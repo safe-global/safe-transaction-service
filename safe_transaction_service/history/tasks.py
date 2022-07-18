@@ -259,6 +259,13 @@ def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
                         to_block_number,
                     )
                     reindex_master_copies_task.delay(from_block_number, to_block_number)
+                    logger.info(
+                        "Reindexing erc20/721 events for last %d hours, from-block=%d to-block=%d",
+                        hours,
+                        from_block_number,
+                        to_block_number,
+                    )
+                    reindex_erc20_events_task.delay(from_block_number, to_block_number)
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -277,6 +284,27 @@ def reindex_master_copies_task(
                 to_block_number,
             )
             index_service.reindex_master_copies(
+                from_block_number=from_block_number,
+                to_block_number=to_block_number,
+            )
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def reindex_erc20_events_task(
+    self, from_block_number: int, to_block_number: int
+) -> None:
+    """
+    Reindexes master copies
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            index_service = IndexServiceProvider()
+            logger.info(
+                "Reindexing erc20/721 events from-block=%d to-block=%d",
+                from_block_number,
+                to_block_number,
+            )
+            index_service.reindex_erc20_events(
                 from_block_number=from_block_number,
                 to_block_number=to_block_number,
             )
