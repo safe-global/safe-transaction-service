@@ -312,18 +312,18 @@ class CollectiblesService:
         if not addresses_with_token_ids:
             return [], 0
 
+        count = len(addresses_with_token_ids)
+        # TODO Paginate on DB
+        if limit is not None:
+            addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
+
         for address, _ in addresses_with_token_ids:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached
 
-        count = len(addresses_with_token_ids)
         logger.debug("Getting token_uris for %s", addresses_with_token_ids)
         # Chunk token uris to prevent stressing the node
         token_uris = []
-
-        # TODO Paginate on DB
-        if limit is not None:
-            addresses_with_token_ids = addresses_with_token_ids[offset : offset + limit]
 
         for addresses_with_token_ids_chunk in chunks(addresses_with_token_ids, 25):
             token_uris.extend(self.get_token_uris(addresses_with_token_ids_chunk))
