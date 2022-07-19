@@ -39,7 +39,7 @@ class EthereumIndexer(ABC):
         block_process_limit_max: int = 0,
         blocks_to_reindex_again: int = 0,
         updated_blocks_behind: int = 20,
-        query_chunk_size: int = 200,
+        query_chunk_size: int = 5000,
         block_auto_process_limit: bool = True,
     ):
         """
@@ -54,7 +54,7 @@ class EthereumIndexer(ABC):
             `current block number` is 200, and last scan for an address was stopped on block 150, address
             is almost updated (200 - 100 < 150)
         :param query_chunk_size: Number of addresses to query for relevant data in the same request. By testing,
-            it seems that `200` can be a good value. If `0`, process all together
+            it seems that `5000` can be a good value. If `0`, process all together
         :param block_auto_process_limit: Auto increase or decrease the `block_process_limit`
             based on congestion algorithm
         """

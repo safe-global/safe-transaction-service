@@ -80,7 +80,8 @@ class EventsIndexer(EthereumIndexer):
             "topics": [filter_topics],
         }
 
-        if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
+        if not self.IGNORE_ADDRESSES_ON_LOG_FILTER and addresses:
+            # Search logs only for the provided addresses
             parameters["address"] = addresses
 
         return self.ethereum_client.slow_w3.eth.get_logs(parameters)

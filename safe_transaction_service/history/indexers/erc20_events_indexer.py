@@ -3,6 +3,7 @@ from collections import OrderedDict
 from logging import getLogger
 from typing import Iterator, List, Sequence
 
+import gevent
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
@@ -14,6 +15,7 @@ from web3.types import EventData, LogReceipt
 from gnosis.eth import EthereumClient
 
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.utils import chunks
 
 from ..models import ERC20Transfer, ERC721Transfer, SafeContract, TokenTransfer
 from .events_indexer import EventsIndexer
@@ -73,20 +75,20 @@ class Erc20EventsIndexer(EventsIndexer):
         :param to_block_number:
         :return:
         """
-        parameter_addresses = None if len(addresses) > 300 else addresses
-        transfer_events = self.ethereum_client.erc20.get_total_transfer_history(
-            parameter_addresses, from_block=from_block_number, to_block=to_block_number
-        )
-        if parameter_addresses:
-            return transfer_events  # Results are already filtered
-        else:
-            addresses = set(addresses)  # Faster to check with `in`
-            return [
-                transfer_event
-                for transfer_event in transfer_events
-                if transfer_event["args"]["to"] in addresses
-                or transfer_event["args"]["from"] in addresses
-            ]
+        jobs = [
+            gevent.spawn(
+                self.ethereum_client.erc20.get_total_transfer_history,
+                addresses_chunk,
+                from_block=from_block_number,
+                to_block=to_block_number,
+            )
+            for addresses_chunk in chunks(addresses, 5000)
+        ]
+        _ = gevent.joinall(jobs)
+        transfer_events = []
+        for job in jobs:
+            transfer_events.extend(job.get())
+        return transfer_events
 
     @cachedmethod(cache=operator.attrgetter("_cache_is_erc20"))
     @cache_memoize(60 * 60 * 24, prefix="erc20-events-indexer-is-erc20")  # 1 day
