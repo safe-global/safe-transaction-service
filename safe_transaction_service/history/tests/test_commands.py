@@ -208,12 +208,12 @@ class TestCommands(TestCase):
                 find_relevant_elements_mock.assert_any_call(
                     [safe_master_copy.address],
                     from_block_number,
-                    from_block_number + block_process_limit,
+                    from_block_number + block_process_limit - 1,
                 )
                 find_relevant_elements_mock.assert_any_call(
                     [safe_master_copy.address],
                     from_block_number + block_process_limit,
-                    from_block_number + block_process_limit * 2,
+                    current_block_number_mock.return_value,
                 )
                 self.assertEqual(find_relevant_elements_mock.call_count, 2)
 
@@ -250,12 +250,12 @@ class TestCommands(TestCase):
                     find_relevant_elements_mock.assert_any_call(
                         [safe_l2_master_copy.address],
                         from_block_number,
-                        from_block_number + block_process_limit,
+                        from_block_number + block_process_limit - 1,
                     )
                     find_relevant_elements_mock.assert_any_call(
                         [safe_l2_master_copy.address],
                         from_block_number + block_process_limit,
-                        from_block_number + block_process_limit * 2,
+                        current_block_number_mock.return_value,
                     )
                     self.assertEqual(find_relevant_elements_mock.call_count, 2)
         IndexServiceProvider.del_singleton()
@@ -312,12 +312,12 @@ class TestCommands(TestCase):
                 find_relevant_elements_mock.assert_any_call(
                     [safe_contract.address],
                     from_block_number,
-                    from_block_number + block_process_limit,
+                    from_block_number + block_process_limit - 1,
                 )
                 find_relevant_elements_mock.assert_any_call(
                     [safe_contract.address],
                     from_block_number + block_process_limit,
-                    from_block_number + block_process_limit * 2,
+                    current_block_number_mock.return_value,
                 )
                 self.assertEqual(find_relevant_elements_mock.call_count, 2)
         IndexServiceProvider.del_singleton()
