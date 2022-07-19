@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, OrderedDict, Sequence
 
 from django.conf import settings
 
+import gevent
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -12,6 +13,7 @@ from web3.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 
+from ...utils.utils import chunks
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -22,9 +24,11 @@ class EventsIndexer(EthereumIndexer):
     Indexes Ethereum events
     """
 
-    IGNORE_ADDRESSES_ON_LOG_FILTER: bool = (
-        False  # If True, don't use addresses to filter logs
-    )
+    # If True, don't use addresses to filter logs
+    # Be careful, some nodes have limitations
+    # https://docs.nodereal.io/nodereal/meganode/api-docs/bnb-smart-chain-api/eth_getlogs-bsc
+    # https://docs.infura.io/infura/networks/ethereum/json-rpc-methods/eth_getlogs#limitations
+    IGNORE_ADDRESSES_ON_LOG_FILTER: bool = False
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault(
@@ -39,10 +43,10 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault(
             "confirmations", 2
         )  # Due to reorgs, wait for the last 2 blocks
-        kwargs.setdefault("query_chunk_size", settings.ETH_EVENTS_QUERY_CHUNK_SIZE)
+
         kwargs.setdefault(
             "updated_blocks_behind", settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
-        )  # For last x blocks, process `query_chunk_size` elements together
+        )  # For last x blocks, consider them almost updated and process them first
         super().__init__(*args, **kwargs)
 
     @property
@@ -80,11 +84,26 @@ class EventsIndexer(EthereumIndexer):
             "topics": [filter_topics],
         }
 
-        if not self.IGNORE_ADDRESSES_ON_LOG_FILTER and addresses:
+        if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
             # Search logs only for the provided addresses
-            parameters["address"] = addresses
+            multiple_parameters = [
+                {**parameters, "address": addresses_chunk}
+                for addresses_chunk in chunks(addresses, self.query_chunk_size)
+            ]
 
-        return self.ethereum_client.slow_w3.eth.get_logs(parameters)
+            jobs = [
+                gevent.spawn(
+                    self.ethereum_client.slow_w3.eth.get_logs, single_parameters
+                )
+                for single_parameters in multiple_parameters
+            ]
+            _ = gevent.joinall(jobs)
+            events = []
+            for job in jobs:
+                events.extend(job.get())
+            return events
+        else:
+            return self.ethereum_client.slow_w3.eth.get_logs(parameters)
 
     def _find_elements_using_topics(
         self,

@@ -82,7 +82,7 @@ class Erc20EventsIndexer(EventsIndexer):
                 from_block=from_block_number,
                 to_block=to_block_number,
             )
-            for addresses_chunk in chunks(addresses, 5000)
+            for addresses_chunk in chunks(addresses, self.query_chunk_size)
         ]
         _ = gevent.joinall(jobs)
         transfer_events = []
