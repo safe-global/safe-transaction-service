@@ -334,14 +334,15 @@ class IndexService:
                 if to_block_number
                 else current_block_number
             )
-            block_number = from_block_number
-            while block_number < stop_block_number:
-                block_number = min(block_number, stop_block_number)
+            for block_number in range(
+                from_block_number, stop_block_number, block_process_limit
+            ):
                 elements = indexer.find_relevant_elements(
-                    addresses, block_number, block_number + block_process_limit
+                    addresses,
+                    block_number,
+                    min(block_number + block_process_limit - 1, stop_block_number),
                 )
                 indexer.process_elements(elements)
-                block_number += block_process_limit
                 logger.info(
                     "Current block number %d, found %d traces/events",
                     block_number,
