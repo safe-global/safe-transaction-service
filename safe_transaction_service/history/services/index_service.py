@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Collection, List, Optional, OrderedDict, Union
+from typing import Collection, List, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -303,17 +303,27 @@ class IndexService:
 
     def _reindex(
         self,
-        indexer_provider: Any,
+        indexer: "EthereumIndexer",  # noqa F821
         from_block_number: int,
         to_block_number: Optional[int] = None,
         block_process_limit: int = 100,
         addresses: Optional[ChecksumAddress] = None,
-    ):
+    ) -> int:
+        """
+        :param provider:
+        :param from_block_number:
+        :param to_block_number:
+        :param block_process_limit:
+        :param addresses:
+        :return: Number of reindexed elements
+        """
         assert (not to_block_number) or to_block_number > from_block_number
 
-        from ..indexers import EthereumIndexer
-
-        indexer: EthereumIndexer = indexer_provider()
+        ignore_addresses_on_log_filter = (
+            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER
+            if hasattr(indexer, "IGNORE_ADDRESSES_ON_LOG_FILTER")
+            else None
+        )
 
         if addresses:
             indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = (
@@ -324,6 +334,7 @@ class IndexService:
                 indexer.database_queryset.values_list("address", flat=True)
             )
 
+        element_number: int = 0
         if not addresses:
             logger.warning("No addresses to process")
         else:
@@ -348,11 +359,13 @@ class IndexService:
                     block_number,
                     len(elements),
                 )
+                element_number += len(elements)
 
             logger.info("End reindexing addresses %s", addresses)
 
         # We changed attributes on the indexer, so better restore it
-        indexer_provider.del_singleton()
+        indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = ignore_addresses_on_log_filter
+        return element_number
 
     def reindex_master_copies(
         self,
@@ -360,7 +373,7 @@ class IndexService:
         to_block_number: Optional[int] = None,
         block_process_limit: int = 100,
         addresses: Optional[ChecksumAddress] = None,
-    ) -> None:
+    ) -> int:
         """
         Reindexes master copies in parallel with the current running indexer, so service will have no missing txs
         while reindexing
@@ -372,16 +385,17 @@ class IndexService:
             all master copies will be used
         """
 
+        # TODO Refactor EthereumIndexer to fix circular imports
         from ..indexers import InternalTxIndexerProvider, SafeEventsIndexerProvider
 
-        indexer_provider = (
+        indexer = (
             SafeEventsIndexerProvider
             if self.eth_l2_network
             else InternalTxIndexerProvider
-        )
+        )()
 
         return self._reindex(
-            indexer_provider,
+            indexer,
             from_block_number,
             to_block_number=to_block_number,
             block_process_limit=block_process_limit,
@@ -394,7 +408,7 @@ class IndexService:
         to_block_number: Optional[int] = None,
         block_process_limit: int = 100,
         addresses: Optional[ChecksumAddress] = None,
-    ) -> None:
+    ) -> int:
         """
         Reindexes erc20/721 events parallel with the current running indexer, so service will have no missing
         events while reindexing
@@ -408,9 +422,9 @@ class IndexService:
 
         from ..indexers import Erc20EventsIndexerProvider
 
-        indexer_provider = Erc20EventsIndexerProvider
+        indexer = Erc20EventsIndexerProvider()
         return self._reindex(
-            indexer_provider,
+            indexer,
             from_block_number,
             to_block_number=to_block_number,
             block_process_limit=block_process_limit,
