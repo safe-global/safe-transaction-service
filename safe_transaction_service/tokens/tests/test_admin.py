@@ -16,13 +16,14 @@ class TestTokenAdmin(TestCase):
         cls.superuser = User.objects.create_superuser(
             "alfred", "alfred@example.com", "password"
         )
-
         cls.token1 = TokenFactory.create(logo=None)
         cls.token2 = TokenFactory.create()
         cls.token3 = TokenFactory.create()
-
-        cls.token_admin = TokenAdmin(Token, site)
         cls.tokens = {cls.token1, cls.token2, cls.token3}
+
+    def setUp(self) -> None:
+        self.token_admin = TokenAdmin(Token, site)
+        return super().setUp()
 
     def test_unfiltered_lookup(self) -> None:
         request = self.request_factory.get("/")

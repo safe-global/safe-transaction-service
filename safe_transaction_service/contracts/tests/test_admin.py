@@ -26,8 +26,11 @@ class TestContractAdmin(TestCase):
         cls.contract3 = ContractFactory.create(
             contract_abi=ContractAbiFactory.create(relevance=4)
         )
-        cls.contract_admin = ContractAdmin(Contract, site)
         cls.contracts = {cls.contract1, cls.contract2, cls.contract3}
+
+    def setUp(self) -> None:
+        self.contract_admin = ContractAdmin(Contract, site)
+        return super().setUp()
 
     def test_lookups(self) -> None:
         request = self.request_factory.get("/")

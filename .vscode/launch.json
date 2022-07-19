@@ -21,7 +21,6 @@
             "args": [
                 "--lf",
                 "-rxXs",
-                "--disable-warnings",
                 "${file}"
             ],
             "django": true,
