@@ -98,10 +98,10 @@ class EventsIndexer(EthereumIndexer):
                 for single_parameters in multiple_parameters
             ]
             _ = gevent.joinall(jobs)
-            events = []
+            log_receipts = []
             for job in jobs:
-                events.extend(job.get())
-            return events
+                log_receipts.extend(job.get())
+            return log_receipts
         else:
             return self.ethereum_client.slow_w3.eth.get_logs(parameters)
 
@@ -177,12 +177,12 @@ class EventsIndexer(EthereumIndexer):
             addresses, from_block_number, to_block_number
         )
 
-        len_events = len(log_receipts)
-        logger_fn = logger.info if len_events else logger.debug
+        len_log_receipts = len(log_receipts)
+        logger_fn = logger.info if len_log_receipts else logger.debug
         logger_fn(
             "%s: Found %d events from block-number=%d to block-number=%d for %d addresses: %s",
             self.__class__.__name__,
-            len_events,
+            len_log_receipts,
             from_block_number,
             to_block_number,
             len_addresses,
