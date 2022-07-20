@@ -75,6 +75,11 @@ class Erc20EventsIndexer(EventsIndexer):
         :param to_block_number:
         :return:
         """
+        if self.query_chunk_size:
+            addresses_chunks = chunks(addresses, self.query_chunk_size)
+        else:
+            addresses_chunks = [addresses]
+
         jobs = [
             gevent.spawn(
                 self.ethereum_client.erc20.get_total_transfer_history,
@@ -82,7 +87,7 @@ class Erc20EventsIndexer(EventsIndexer):
                 from_block=from_block_number,
                 to_block=to_block_number,
             )
-            for addresses_chunk in chunks(addresses, self.query_chunk_size)
+            for addresses_chunk in addresses_chunks
         ]
         _ = gevent.joinall(jobs)
         transfer_events = []

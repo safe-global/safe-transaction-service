@@ -83,9 +83,14 @@ class EventsIndexer(EthereumIndexer):
 
         if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
             # Search logs only for the provided addresses
+            if self.query_chunk_size:
+                addresses_chunks = chunks(addresses, self.query_chunk_size)
+            else:
+                addresses_chunks = [addresses]
+
             multiple_parameters = [
                 {**parameters, "address": addresses_chunk}
-                for addresses_chunk in chunks(addresses, self.query_chunk_size)
+                for addresses_chunk in addresses_chunks
             ]
 
             jobs = [
