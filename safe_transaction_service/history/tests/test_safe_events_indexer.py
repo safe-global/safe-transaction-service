@@ -36,7 +36,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
-        self.assertGreater(safe_events_indexer.confirmations, 0)
+        self.assertEqual(safe_events_indexer.confirmations, 0)
         self.assertGreater(safe_events_indexer.blocks_to_reindex_again, 0)
         self.assertIsNotNone(SafeEventsIndexerProvider.instance)
         SafeEventsIndexerProvider.del_singleton()

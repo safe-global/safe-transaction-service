@@ -77,8 +77,11 @@ class TestTasks(TestCase):
     def test_index_safe_events_task(self):
         self.assertEqual(index_safe_events_task.delay().result, 0)
 
+    @patch.object(IndexService, "reindex_erc20_events")
     @patch.object(IndexService, "reindex_master_copies")
-    def test_reindex_last_hours_task(self, reindex_master_copies_mock: MagicMock):
+    def test_reindex_last_hours_task(
+        self, reindex_master_copies_mock: MagicMock, reindex_erc20_events: MagicMock
+    ):
         now = timezone.now()
         one_hour_ago = now - timedelta(hours=1)
         one_day_ago = now - timedelta(days=1)
@@ -93,7 +96,11 @@ class TestTasks(TestCase):
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
         reindex_last_hours_task()
-        reindex_master_copies_mock.assert_called_with(
+        reindex_master_copies_mock.assert_called_once_with(
+            from_block_number=ethereum_block_1.number,
+            to_block_number=ethereum_block_3.number,
+        )
+        reindex_erc20_events.assert_called_once_with(
             from_block_number=ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
         )

@@ -37,7 +37,7 @@ class EthereumIndexer(ABC):
         block_process_limit_max: int = 0,
         blocks_to_reindex_again: int = 0,
         updated_blocks_behind: int = 20,
-        query_chunk_size: int = 5000,
+        query_chunk_size: Optional[int] = 5000,
         block_auto_process_limit: bool = True,
     ):
         """

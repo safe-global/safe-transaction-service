@@ -1,4 +1,8 @@
+from typing import Optional, Sequence
+
 from django.core.management.base import BaseCommand
+
+from eth_typing import ChecksumAddress
 
 from ...services import IndexServiceProvider
 
@@ -35,8 +39,16 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"Setting from-block-number to {from_block_number}")
         )
 
-        IndexServiceProvider().reindex_master_copies(
+        self.reindex(from_block_number, block_process_limit, options["addresses"])
+
+    def reindex(
+        self,
+        from_block_number: int,
+        block_process_limit: Optional[int],
+        addresses: Optional[Sequence[ChecksumAddress]],
+    ) -> None:
+        return IndexServiceProvider().reindex_master_copies(
             from_block_number,
             block_process_limit=block_process_limit,
-            addresses=options["addresses"],
+            addresses=addresses,
         )
