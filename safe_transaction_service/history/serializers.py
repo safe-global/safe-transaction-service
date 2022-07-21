@@ -245,8 +245,12 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
         # Retry thrice to get an estimation
         for _ in range(3):
             try:
-                safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
-                                                   self.validated_data['data'], self.validated_data['operation'])
+                # here use internal estimation method forcing the gas limit
+                # since getLatestBlock doesn't have a gasLimit on CELO
+                # see https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/safe.py#L763
+                safe_tx_gas = safe.estimate_tx_gas_with_safe(self.validated_data['to'], self.validated_data['value'],
+                                                             self.validated_data['data'], self.validated_data['operation'], 
+                                                             20_000_000) # 20 million, current CELO gasLimit
                 return {'safe_tx_gas': safe_tx_gas}
             except (IOError, ValueError) as _exc:
                 exc = _exc
