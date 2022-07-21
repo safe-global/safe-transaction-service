@@ -172,6 +172,7 @@ TEMPLATES = [
     },
 ]
 
+
 # CORS
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_HEADERS = list(default_cors_headers) + [
@@ -186,20 +187,13 @@ CORS_EXPOSE_HEADERS = ["etag"]
 # https://docs.djangoproject.com/en/dev/ref/settings/#fixture-dirs
 FIXTURE_DIRS = (str(APPS_DIR / "fixtures"),)
 
-# EMAIL
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-EMAIL_BACKEND = env(
-    "DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
-)
-
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL regex.
 ADMIN_URL = "admin/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#admins
 ADMINS = [
-    ("Gnosis Safe team", "safe@gnosis.io"),
+    ("Gnosis Safe team", "infra@safe.global"),
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#managers
 MANAGERS = ADMINS
@@ -374,7 +368,7 @@ LOGGING = {
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 
-# Ethereum
+# Ethereum RPC
 # ------------------------------------------------------------------------------
 ETHEREUM_NODE_URL = env("ETHEREUM_NODE_URL", default=None)
 ETHEREUM_TRACING_NODE_URL = env("ETHEREUM_TRACING_NODE_URL", default=None)
@@ -400,21 +394,19 @@ ETH_EVENTS_QUERY_CHUNK_SIZE = env.int(
 ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
-
-# Safe
-# ------------------------------------------------------------------------------
-# Number of blocks from the current block number needed to consider a transaction valid/stable
 ETH_REORG_BLOCKS = env.int(
     "ETH_REORG_BLOCKS", default=100 if ETH_L2_NETWORK else 10
-)  # L2 Networks have more reorgs
+)  # Number of blocks from the current block number needed to consider a block valid/stable
 
 # Tokens
+# ------------------------------------------------------------------------------
 TOKENS_LOGO_BASE_URI = env(
     "TOKENS_LOGO_BASE_URI", default="https://gnosis-safe-token-logos.s3.amazonaws.com/"
 )
 TOKENS_LOGO_EXTENSION = env("TOKENS_LOGO_EXTENSION", default=".png")
 
-# Slack notifications
+# Notifications
+# ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
 
 # Notifications
@@ -430,12 +422,13 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
         )
     )
 
-# Percentage of Safes allowed to be out of sync without alerting. By default 10%
 ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
     "ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD", default=0.1
-)
+)  # Percentage of Safes allowed to be out of sync without alerting. By default 10%
+
 
 # AWS S3 https://github.com/etianen/django-s3-storage
+# ------------------------------------------------------------------------------
 # AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default=None)
 AWS_S3_PUBLIC_URL = env(
