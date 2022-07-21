@@ -13,6 +13,7 @@ from rest_framework.test import APITestCase
 from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager, InvalidERC20Info
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..clients import CannotGetPrice
 from ..models import Token
 from ..services import PriceService
 from ..services.price_service import FiatCode, FiatPriceWithTimestamp
@@ -191,3 +192,19 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["fiat_code"], "USD")
         self.assertEqual(response.data["fiat_price"], "321.2")
         self.assertTrue(response.data["timestamp"])
+
+    @mock.patch.object(
+        PriceService,
+        "get_native_coin_usd_price",
+        side_effect=CannotGetPrice(),
+    )
+    def test_token_price_view_error(self, get_native_coin_usd_price_mock: MagicMock):
+        token_address = "0x0000000000000000000000000000000000000000"
+
+        response = self.client.get(
+            reverse("v1:tokens:price-usd", args=(token_address,))
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["message"], "Price retrieval failed")
+        self.assertEqual(response.data["arguments"], [token_address])
