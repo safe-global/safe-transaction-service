@@ -191,12 +191,6 @@ FIXTURE_DIRS = (str(APPS_DIR / "fixtures"),)
 # ------------------------------------------------------------------------------
 # Django Admin URL regex.
 ADMIN_URL = "admin/"
-# https://docs.djangoproject.com/en/dev/ref/settings/#admins
-ADMINS = [
-    ("Gnosis Safe team", "infra@safe.global"),
-]
-# https://docs.djangoproject.com/en/dev/ref/settings/#managers
-MANAGERS = ADMINS
 
 # Celery
 # ------------------------------------------------------------------------------
