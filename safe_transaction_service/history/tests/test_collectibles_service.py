@@ -399,15 +399,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             "image": "https://ipfs.io/ipfs/QmXKU5RBTrGaYn5M1iWQaeKuCKV34g417YDGN5Yh7Uxk4i",
         }
 
-        try:
-            self.assertEqual(
-                collectibles_service._retrieve_metadata_from_uri(ipfs_address),
-                expected_object,
-            )
-        except MetadataRetrievalException:
-            # Test a different IPFS provider
-            with self.settings(IPFS_GATEWAY="https://ipfs.io/ipfs/"):
-                self.assertEqual(
-                    collectibles_service._retrieve_metadata_from_uri(ipfs_address),
-                    expected_object,
-                )
+        self.assertEqual(
+            collectibles_service._retrieve_metadata_from_uri(ipfs_address),
+            expected_object,
+        )
