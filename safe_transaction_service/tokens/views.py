@@ -13,6 +13,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.utils import fast_is_checksum_address
 
 from . import filters, serializers
+from .clients import CannotGetPrice
 from .models import Token
 from .services import PriceServiceProvider
 from .tasks import get_token_info_from_blockchain_task
@@ -78,25 +79,34 @@ class TokenPriceView(GenericAPIView):
                     "arguments": [address],
                 },
             )
+        try:
+            price_service = PriceServiceProvider()
+            if address == NULL_ADDRESS:
+                data = {
+                    "fiat_code": "USD",
+                    "fiat_price": str(price_service.get_native_coin_usd_price()),
+                    "timestamp": timezone.now(),
+                }
+            else:
+                token = self.get_object()  # Raises 404 if not found
+                fiat_price_with_timestamp = next(
+                    price_service.get_cached_usd_values([token.get_price_address()])
+                )
+                data = {
+                    "fiat_code": fiat_price_with_timestamp.fiat_code.name,
+                    "fiat_price": str(fiat_price_with_timestamp.fiat_price),
+                    "timestamp": fiat_price_with_timestamp.timestamp,
+                }
+            serializer = self.get_serializer(data=data)
+            assert serializer.is_valid()
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
 
-        price_service = PriceServiceProvider()
-        if address == NULL_ADDRESS:
-            data = {
-                "fiat_code": "USD",
-                "fiat_price": str(price_service.get_native_coin_usd_price()),
-                "timestamp": timezone.now(),
-            }
-        else:
-            token = self.get_object()  # Raises 404 if not found
-            fiat_price_with_timestamp = next(
-                price_service.get_cached_usd_values([token.get_price_address()])
+        except CannotGetPrice:
+            return Response(
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                data={
+                    "code": 10,
+                    "message": "Price retrieval failed",
+                    "arguments": [address],
+                },
             )
-            data = {
-                "fiat_code": fiat_price_with_timestamp.fiat_code.name,
-                "fiat_price": str(fiat_price_with_timestamp.fiat_price),
-                "timestamp": fiat_price_with_timestamp.timestamp,
-            }
-
-        serializer = self.get_serializer(data=data)
-        assert serializer.is_valid()
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
