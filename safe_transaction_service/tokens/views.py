@@ -105,7 +105,7 @@ class TokenPriceView(GenericAPIView):
             return Response(
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 data={
-                    "code": 1,
+                    "code": 10,
                     "message": "Price retrieval failed",
                     "arguments": [address],
                 },
