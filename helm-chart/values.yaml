@@ -16,7 +16,7 @@ image:
   # -- Image pullpolicy
   pullPolicy: IfNotPresent
   # -- Image tag
-  tag: "61ee03ee2f712941c2b319d1cf2240c414a2177c"
+  tag: "3b5352aac075e90971c53be3c20085409cffdf38"
 
 # -- Image pull secrets
 imagePullSecrets: []
