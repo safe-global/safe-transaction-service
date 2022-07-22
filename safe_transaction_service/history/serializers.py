@@ -1,6 +1,10 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from web3 import Web3
+
+from django.conf import settings
+
 from drf_yasg.utils import swagger_serializer_method
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
@@ -17,6 +21,9 @@ from safe_transaction_service.contracts.tx_decoder import (TxDecoderException,
                                                            get_db_tx_decoder)
 from safe_transaction_service.tokens.serializers import \
     TokenInfoResponseSerializer
+
+from .celo_contracts.blockchain_parameters import (blockchain_parameters_proxy_address,
+                                                            blockchain_parameters_abi)
 
 from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper
@@ -236,17 +243,25 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
     value = serializers.IntegerField(min_value=0)
     data = HexadecimalField(default=None, allow_null=True, allow_blank=True)
     operation = serializers.IntegerField(min_value=0)
+    web3 = Web3(Web3.HTTPProvider(settings.ETHEREUM_NODE_URL))
+    blockchain_parameters = web3.eth.contract(address=blockchain_parameters_proxy_address, abi=blockchain_parameters_abi)
 
     def save(self, **kwargs):
         safe_address = self.context['safe_address']
         ethereum_client = EthereumClientProvider()
         safe = Safe(safe_address, ethereum_client)
         exc = None
+        gas_limit = self.blockchain_parameters.functions.blockGasLimit().call()
+
         # Retry thrice to get an estimation
         for _ in range(3):
             try:
-                safe_tx_gas = safe.estimate_tx_gas(self.validated_data['to'], self.validated_data['value'],
-                                                   self.validated_data['data'], self.validated_data['operation'])
+                # here use internal estimation method forcing the gas limit
+                # since getLatestBlock doesn't have a gasLimit on CELO
+                # see https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/safe.py#L763
+                safe_tx_gas = safe.estimate_tx_gas_with_safe(self.validated_data['to'], self.validated_data['value'],
+                                                             self.validated_data['data'], self.validated_data['operation'], 
+                                                             gas_limit)
                 return {'safe_tx_gas': safe_tx_gas}
             except (IOError, ValueError) as _exc:
                 exc = _exc
