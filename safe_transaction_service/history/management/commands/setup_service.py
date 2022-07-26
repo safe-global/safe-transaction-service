@@ -417,9 +417,9 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
         ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 93108),  # v1.3.0
     ],
     EthereumNetwork.KLAY_BAOBAB: [
-        ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 93821613), # v1.3.0
+        ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 93821613),  # v1.3.0
     ],
-     EthereumNetwork.KLAY_CYPRESS: [
+    EthereumNetwork.KLAY_CYPRESS: [
         ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 93506870),  # v1.3.0
     ],
 }
