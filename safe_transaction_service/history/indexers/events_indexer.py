@@ -40,7 +40,9 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault(
             "blocks_to_reindex_again", 10
         )  # Reindex last 10 blocks every run of the indexer
-        kwargs.setdefault("query_chunk_size", settings.ETH_EVENTS_QUERY_CHUNK_SIZE)
+        kwargs.setdefault(
+            "query_chunk_size", settings.ETH_EVENTS_QUERY_CHUNK_SIZE
+        )  # Number of elements to process together when calling `eth_getLogs`
         kwargs.setdefault(
             "updated_blocks_behind", settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
         )  # For last x blocks, consider them almost updated and process them first

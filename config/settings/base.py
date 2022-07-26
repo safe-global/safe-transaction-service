@@ -367,7 +367,7 @@ REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 ETHEREUM_NODE_URL = env("ETHEREUM_NODE_URL", default=None)
 ETHEREUM_TRACING_NODE_URL = env("ETHEREUM_TRACING_NODE_URL", default=None)
 ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env.int(
-    "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT", default=10000
+    "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT", default=10_000
 )
 ETH_INTERNAL_NO_FILTER = env.bool("ETH_INTERNAL_NO_FILTER", default=False)
 ETH_INTERNAL_TRACE_TXS_BATCH_SIZE = env.int(
@@ -383,8 +383,8 @@ ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX", default=0
 )  # Maximum number of blocks to process together when searching for events. 0 == no limit.
 ETH_EVENTS_QUERY_CHUNK_SIZE = env.int(
-    "ETH_EVENTS_QUERY_CHUNK_SIZE", default=0
-)  # Number of addresses 'almost updated' to update together. 0 == no limit
+    "ETH_EVENTS_QUERY_CHUNK_SIZE", default=5_000
+)  # Number of addresses to use as `getLogs` parameter. `0 == no limit`. By testing `5000` looks like a good default
 ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
