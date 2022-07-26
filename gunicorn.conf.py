@@ -1,8 +1,8 @@
 access_logfile = "-"
 error_logfile = "-"
-max_requests = 100000  # Restart a worker after it has processed a given number of requests (for memory leaks)
+max_requests = 20_000  # Restart a worker after it has processed a given number of requests (for memory leaks)
 max_requests_jitter = (
-    10000  # Randomize max_requests to prevent all workers restarting at the same time
+    10_000  # Randomize max_requests to prevent all workers restarting at the same time
 )
 # graceful_timeout = 90  # https://stackoverflow.com/a/24305939
 keep_alive = 2
