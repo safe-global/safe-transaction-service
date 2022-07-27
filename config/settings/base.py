@@ -174,7 +174,8 @@ TEMPLATES = [
 
 
 # CORS
-CORS_ORIGIN_ALLOW_ALL = True
+# ------------------------------------------------------------------------------
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_HEADERS = list(default_cors_headers) + [
     "if-match",
     "if-modified-since",
