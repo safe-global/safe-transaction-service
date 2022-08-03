@@ -78,6 +78,12 @@ def reindex_contracts_without_metadata_task() -> int:
 def create_or_update_contract_with_metadata_task(
     address: ChecksumAddress,
 ) -> ContractAction:
+    """
+    Creates or updates a contract using 3rd party information (contract name, ABI...)
+
+    :param address: Contract address
+    :return: ContractAction
+    """
     logger.info("Searching metadata for contract %s", address)
     ethereum_network = get_ethereum_network()
     try:

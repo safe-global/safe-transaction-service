@@ -24,7 +24,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import Case, Count, Index, JSONField, Max, Q, QuerySet
+from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
@@ -1112,7 +1112,7 @@ class MultisigTransactionManager(models.Manager):
         """
         return (
             self.exclude(data=None)
-            .exclude(to__in=Contract.objects.values("address"))
+            .exclude(Exists(Contract.objects.filter(address=OuterRef("to"))))
             .values_list("to", flat=True)
             .distinct()
         )
@@ -1258,7 +1258,7 @@ class ModuleTransactionManager(models.Manager):
         :return:
         """
         return (
-            self.exclude(module__in=Contract.objects.values("address"))
+            self.exclude(Exists(Contract.objects.filter(address=OuterRef("module"))))
             .values_list("module", flat=True)
             .distinct()
         )

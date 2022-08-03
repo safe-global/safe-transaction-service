@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 from django import forms
 from django.contrib import admin
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.db.models.functions import Greatest
 from django.db.transaction import atomic
 from django.http import HttpRequest
@@ -206,7 +206,11 @@ class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
         if self.value() == "YES":
             return queryset.filter(
                 Q(
-                    internal_tx___from__in=SafeContract.objects.values("address")
+                    Exists(
+                        SafeContract.objects.filter(
+                            address=OuterRef("internal_tx___from")
+                        )
+                    )
                 )  # Just Safes indexed
                 | Q(function_name="setup")  # Safes pending to be indexed
             )
