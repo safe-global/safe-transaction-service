@@ -188,7 +188,8 @@ class Contract(models.Model):  # Known contract addresses by the service
 
     def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
         """
-        Sync ABI from Sourcify, then from Etherscan and blockscout if available
+        Sync ABI from Sourcify, then from Etherscan and Blockscout if available
+
         :param network: Can be provided to save requests to the node
         :return: True if updated, False otherwise
         """

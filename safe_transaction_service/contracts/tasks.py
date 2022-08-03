@@ -1,3 +1,4 @@
+from enum import Enum
 from itertools import chain
 
 from django.db import IntegrityError, transaction
@@ -18,6 +19,12 @@ from safe_transaction_service.utils.utils import close_gevent_db_connection_deco
 from .models import Contract
 
 logger = get_task_logger(__name__)
+
+
+class ContractAction(Enum):
+    CREATED = 0
+    UPDATED = 1
+    NOT_MODIFIED = 2
 
 
 @app.shared_task()
@@ -68,7 +75,9 @@ def reindex_contracts_without_metadata_task() -> int:
     retry_kwargs={"max_retries": 5},
 )
 @close_gevent_db_connection_decorator
-def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
+def create_or_update_contract_with_metadata_task(
+    address: ChecksumAddress,
+) -> ContractAction:
     logger.info("Searching metadata for contract %s", address)
     ethereum_network = get_ethereum_network()
     try:
@@ -76,13 +85,13 @@ def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
             contract = Contract.objects.create_from_address(
                 address, network=ethereum_network
             )
-            action = "Created"
+            action = ContractAction.CREATED
     except IntegrityError:
         contract = Contract.objects.get(address=address)
         if contract.sync_abi_from_api():
-            action = "Updated"
+            action = ContractAction.UPDATED
         else:
-            action = "Not modified"
+            action = ContractAction.NOT_MODIFIED
 
     logger.info(
         "%s contract with address=%s name=%s abi-found=%s",
@@ -91,3 +100,4 @@ def create_or_update_contract_with_metadata_task(address: ChecksumAddress):
         contract.name,
         contract.contract_abi is not None,
     )
+    return action

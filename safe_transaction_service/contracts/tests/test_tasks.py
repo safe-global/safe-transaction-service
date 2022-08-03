@@ -11,7 +11,9 @@ from safe_transaction_service.history.tests.factories import MultisigTransaction
 
 from ..models import Contract
 from ..tasks import (
+    ContractAction,
     create_missing_contracts_with_metadata_task,
+    create_or_update_contract_with_metadata_task,
     reindex_contracts_without_metadata_task,
 )
 
@@ -55,3 +57,29 @@ class TestTasks(TestCase):
             self.assertEqual(
                 Contract.objects.filter(contract_abi_id=contract_abi_id).count(), 3
             )
+
+    def test_create_or_update_contract_with_metadata_task(self):
+        with mock.patch.object(
+            Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
+        ) as sourcify_mock:
+            random_address = Account.create().address
+
+            self.assertFalse(Contract.objects.filter(address=random_address).exists())
+            contract_action = create_or_update_contract_with_metadata_task(
+                random_address
+            )
+            self.assertEqual(contract_action, ContractAction.CREATED)
+            self.assertTrue(Contract.objects.filter(address=random_address).exists())
+
+            # Try with a contract already created
+            contract_action = create_or_update_contract_with_metadata_task(
+                random_address
+            )
+            self.assertEqual(contract_action, ContractAction.UPDATED)
+            self.assertTrue(Contract.objects.filter(address=random_address).exists())
+
+            sourcify_mock.side_effect = IOError
+            contract_action = create_or_update_contract_with_metadata_task(
+                random_address
+            )
+            self.assertEqual(contract_action, ContractAction.NOT_MODIFIED)
