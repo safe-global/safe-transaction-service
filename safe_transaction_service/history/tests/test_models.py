@@ -178,6 +178,16 @@ class TestMultisigTransaction(TestCase):
         multisig_transaction.save()
         self.assertEqual(multisig_transaction.owners, [account.address])
 
+    def test_multisend(self):
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 0)
+        MultisigTransactionFactory()
+
+        MultisigTransactionFactory(to="0x998739BFdAAdde7C933B942a68053933098f9EDa")
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 1)
+
+        MultisigTransactionFactory(to="0x40A2aCCbd92BCA938b02010E17A5b8929b49130D")
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 2)
+
     def test_queued(self):
         safe_address = Account.create().address
         queryset = MultisigTransaction.objects.queued(safe_address)
