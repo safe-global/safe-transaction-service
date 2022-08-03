@@ -1257,17 +1257,19 @@ class TestMultisigTransactions(TestCase):
         )
 
     def test_not_indexed_metadata_contract_addresses(self):
+        # Transaction must be trusted
+        MultisigTransactionFactory(data=b"12")
         self.assertFalse(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
         )
 
-        MultisigTransactionFactory(data=None)
+        MultisigTransactionFactory(trusted=True, data=None)
         self.assertFalse(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
         )
-        multisig_transaction = MultisigTransactionFactory(data=b"12")
+        multisig_transaction = MultisigTransactionFactory(trusted=True, data=b"12")
         MultisigTransactionFactory(
-            data=b"12", to=multisig_transaction.to
+            trusted=True, data=b"12", to=multisig_transaction.to
         )  # Check distinct
         self.assertCountEqual(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),
