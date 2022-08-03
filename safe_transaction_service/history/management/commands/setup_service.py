@@ -82,12 +82,6 @@ TASKS = [
         IntervalSchedule.SECONDS,
     ),
     CeleryTaskConfiguration(
-        "safe_transaction_service.history.tasks.index_erc20_events_out_of_sync_task",
-        "Index out of sync ERC20/ERC721 Events",
-        5,
-        IntervalSchedule.MINUTES,
-    ),
-    CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.reindex_last_hours_task",
         "Reindex master copies for the last hours",
         110,
