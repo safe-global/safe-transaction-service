@@ -77,14 +77,12 @@ def create_missing_multisend_contracts_with_metadata_task() -> int:
             if not Contract.objects.filter(address=address).exists():
                 addresses.add(address)
 
-    i = 0
     for address in addresses:
         logger.info("Detected missing contract %s called using MultiSend", address)
         create_or_update_contract_with_metadata_task.apply_async(
             (address,), priority=1
         )  # Lowest priority
-        i += 1
-    return i
+    return len(addresses)
 
 
 @app.shared_task()
