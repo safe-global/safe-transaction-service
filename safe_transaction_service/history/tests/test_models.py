@@ -178,6 +178,16 @@ class TestMultisigTransaction(TestCase):
         multisig_transaction.save()
         self.assertEqual(multisig_transaction.owners, [account.address])
 
+    def test_multisend(self):
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 0)
+        MultisigTransactionFactory()
+
+        MultisigTransactionFactory(to="0x998739BFdAAdde7C933B942a68053933098f9EDa")
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 1)
+
+        MultisigTransactionFactory(to="0x40A2aCCbd92BCA938b02010E17A5b8929b49130D")
+        self.assertEqual(MultisigTransaction.objects.multisend().count(), 2)
+
     def test_queued(self):
         safe_address = Account.create().address
         queryset = MultisigTransaction.objects.queued(safe_address)
@@ -1247,17 +1257,19 @@ class TestMultisigTransactions(TestCase):
         )
 
     def test_not_indexed_metadata_contract_addresses(self):
+        # Transaction must be trusted
+        MultisigTransactionFactory(data=b"12")
         self.assertFalse(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
         )
 
-        MultisigTransactionFactory(data=None)
+        MultisigTransactionFactory(trusted=True, data=None)
         self.assertFalse(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
         )
-        multisig_transaction = MultisigTransactionFactory(data=b"12")
+        multisig_transaction = MultisigTransactionFactory(trusted=True, data=b"12")
         MultisigTransactionFactory(
-            data=b"12", to=multisig_transaction.to
+            trusted=True, data=b"12", to=multisig_transaction.to
         )  # Check distinct
         self.assertCountEqual(
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses(),

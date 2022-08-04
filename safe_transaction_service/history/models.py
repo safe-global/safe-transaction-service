@@ -24,7 +24,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import Case, Count, Index, JSONField, Max, Q, QuerySet
+from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
@@ -1111,8 +1111,9 @@ class MultisigTransactionManager(models.Manager):
         :return:
         """
         return (
-            self.exclude(data=None)
-            .exclude(to__in=Contract.objects.values("address"))
+            self.trusted()
+            .exclude(data=None)
+            .exclude(Exists(Contract.objects.filter(address=OuterRef("to"))))
             .values_list("to", flat=True)
             .distinct()
         )
@@ -1139,6 +1140,20 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
     def without_confirmations(self):
         return self.filter(confirmations__isnull=True)
+
+    def trusted(self):
+        return self.filter(trusted=True)
+
+    def multisend(self):
+        # TODO Use MultiSend.MULTISEND_ADDRESSES + MultiSend MULTISEND_CALL_ONLY_ADDRESSES
+        return self.filter(
+            to__in=[
+                "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761",  # MultiSend v1.3.0
+                "0x998739BFdAAdde7C933B942a68053933098f9EDa",  # MultiSend v1.3.0 (EIP-155)
+                "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",  # MultiSend Call Only v1.3.0
+                "0xA1dabEF33b3B82c7814B6D82A79e50F4AC44102B",  # MultiSend Call Only v1.3.0 (EIP-155)
+            ]
+        )
 
     def with_confirmations_required(self):
         """
@@ -1258,7 +1273,7 @@ class ModuleTransactionManager(models.Manager):
         :return:
         """
         return (
-            self.exclude(module__in=Contract.objects.values("address"))
+            self.exclude(Exists(Contract.objects.filter(address=OuterRef("module"))))
             .values_list("module", flat=True)
             .distinct()
         )

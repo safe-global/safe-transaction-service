@@ -70,14 +70,15 @@ jobs:
         coverage run --source=$SOURCE_FOLDER -m py.test -rxXs --reruns 3
       env:
         SOURCE_FOLDER: safe_transaction_service
-        DJANGO_SETTINGS_MODULE: config.settings.test
+        CELERY_BROKER_URL: redis://localhost:6379/0
+        COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
         DATABASE_URL: psql://postgres:postgres@localhost/postgres
+        DJANGO_SETTINGS_MODULE: config.settings.test
+        ETHEREUM_MAINNET_NODE: ${{ secrets.ETHEREUM_MAINNET_NODE }}
         ETHEREUM_NODE_URL: http://localhost:8545
         ETHEREUM_TRACING_NODE_URL: http://localhost:8545
+        ETH_HASH_BACKEND: pysha3
         REDIS_URL: redis://localhost:6379/0
-        CELERY_BROKER_URL: redis://localhost:6379/0
-        ETHEREUM_MAINNET_NODE: ${{ secrets.ETHEREUM_MAINNET_NODE }}
-        COINMARKETCAP_API_TOKEN: ${{ secrets.COINMARKETCAP_API_TOKEN }}
     - name: Send results to coveralls
       continue-on-error: true  # Ignore coveralls problems
       run: coveralls --service=github

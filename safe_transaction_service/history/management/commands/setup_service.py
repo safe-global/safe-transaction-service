@@ -106,6 +106,12 @@ TASKS = [
         IntervalSchedule.HOURS,
     ),
     CeleryTaskConfiguration(
+        "safe_transaction_service.contracts.tasks.create_missing_multisend_contracts_with_metadata_task",
+        "Index contract names and ABIs from MultiSend transactions",
+        6,
+        IntervalSchedule.HOURS,
+    ),
+    CeleryTaskConfiguration(
         "safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata_task",
         "Reindex contracts with missing names or ABIs",
         7,
