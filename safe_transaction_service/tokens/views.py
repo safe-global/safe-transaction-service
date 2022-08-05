@@ -6,7 +6,7 @@ from django.views.decorators.cache import cache_page
 import django_filters.rest_framework
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
 from gnosis.eth.constants import NULL_ADDRESS
@@ -62,7 +62,7 @@ class TokensView(ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class TokenPriceView(GenericAPIView):
+class TokenPriceView(RetrieveAPIView):
     serializer_class = serializers.TokenPriceResponseSerializer
     lookup_field = "address"
     queryset = Token.objects.all()
