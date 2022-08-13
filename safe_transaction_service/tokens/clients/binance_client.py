@@ -30,6 +30,9 @@ class BinanceClient:
     def get_bnb_usd_price(self) -> float:
         return self._get_price("BNBUSDT")
 
+    def get_ada_usd_price(self) -> float:
+        return self._get_price("ADAUSDT")
+
     def get_eth_usd_price(self) -> float:
         """
         :return: current USD price for Ethereum
