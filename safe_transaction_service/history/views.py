@@ -268,7 +268,7 @@ class AllTransactionsListView(ListAPIView):
         by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
-        Ordering_fields: `[created]`  (https://www.django-rest-framework.org/api-guide/filtering/#orderingfilter)
+        Ordering_fields: `[created]`  eg: `created` or `-created`
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
