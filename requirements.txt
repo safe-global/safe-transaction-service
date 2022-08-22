@@ -22,7 +22,7 @@ drf-yasg[validation]==1.21.3
 firebase-admin==5.2.0
 flower==1.2.0
 gunicorn[gevent]==20.1.0
-hexbytes==0.2.3
+hexbytes==0.3.0
 hiredis==2.0.0
 packaging>=21.0
 pillow==9.2.0
