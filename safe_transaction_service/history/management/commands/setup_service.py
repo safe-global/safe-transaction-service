@@ -300,6 +300,10 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 4896727, "1.3.0+L2"),
         ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 4896733, "1.3.0"),
     ],
+    EthereumNetwork.CANDLE: [
+        ("0x94c50c586f325f73034F5141e2057ae19699E84a", 2953008, "1.3.0+L2"),
+        ("0x9d278455b4854f4194d8A45FCB32A6e0cb04b151", 2953013, "1.3.0"),
+    ],
 }
 
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
@@ -435,6 +439,9 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     ],
     EthereumNetwork.MILKOMEDA_C1_MAINNET: [
         ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 4896699),  # v1.3.0
+    ],
+    EthereumNetwork.CANDLE: [
+        ("0xa250070b51eEE0cEFbE3042182ad652504fEEF75", 2952983),  # v1.3.0
     ],
 }
 
