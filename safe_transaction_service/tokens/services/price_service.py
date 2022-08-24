@@ -179,6 +179,9 @@ class PriceService:
             except CannotGetPrice:
                 return self.coingecko_client.get_matic_usd_price()
 
+    def get_cronos_usd_price(self) -> float:
+        return self.kucoin_client.get_cro_usd_price()
+
     @cachedmethod(cache=operator.attrgetter("cache_eth_price"))
     @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
     def get_native_coin_usd_price(self) -> float:
@@ -218,6 +221,11 @@ class PriceService:
             EthereumNetwork.ARBITRUM_TESTNET,
         ):
             return self.get_aurora_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.CRONOS_TESTNET,
+            EthereumNetwork.CRONOS_MAINNET,
+        ):
+            return self.get_cronos_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
