@@ -1,7 +1,7 @@
-boto3==1.24.51
+boto3==1.24.56
 cachetools==5.2.0
 celery==5.2.7
-django==4.0.6
+django==4.0.7
 django-cache-memoize==0.1.10
 django-celery-beat==2.3.0
 django-cors-headers==3.13.0
@@ -30,5 +30,5 @@ psycogreen==1.0.2
 psycopg2==2.9.3
 redis==4.3.4
 requests==2.28.1
-safe-eth-py[django]==4.3.2
+safe-eth-py[django]==4.4.0
 web3==5.30.0

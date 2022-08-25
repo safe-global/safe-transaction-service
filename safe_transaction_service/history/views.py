@@ -174,6 +174,7 @@ class AllTransactionsListView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     )
+    ordering_fields = ["execution_date", "safe_nonce", "block", "created"]
     pagination_class = pagination.SmallPagination
     serializer_class = (
         serializers.AllTransactionsSchemaSerializer
@@ -267,6 +268,7 @@ class AllTransactionsListView(ListAPIView):
         by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
+        Ordering_fields: ["execution_date", "safe_nonce", "block", "created"] eg: `created` or `-created`
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
