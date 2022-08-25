@@ -81,7 +81,7 @@ def calculate_token_eth_price_task(
                         ).eth_value
                         * underlying_token.quantity
                     )
-
+        logger.debug("Calculated eth-price=%f for token=%s", eth_price, token_address)
         if not eth_price:
             logger.warning(
                 "Cannot calculate eth price for token=%s - Trying to use previous price",
@@ -97,7 +97,6 @@ def calculate_token_eth_price_task(
                 logger.warning("Cannot calculate eth price for token=%s", token_address)
                 return EthValueWithTimestamp(eth_price, now)
 
-        logger.debug("Calculated eth-price=%f for token=%s", eth_price, token_address)
         eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
         redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
         if not getattr(settings, "CELERY_ALWAYS_EAGER", False):
