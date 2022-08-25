@@ -82,7 +82,7 @@ def calculate_token_eth_price_task(
                         * underlying_token.quantity
                     )
         if not eth_price:
-            logger.warning("Cannot calculate eth price for token=%s", token_address)
+            logger.warning("Cannot calculate eth price for token=%s - Trying to use previous price", token_address)
             last_redis_value = redis.get(redis_key)
             if last_redis_value:
                 eth_price = EthValueWithTimestamp.from_string(
