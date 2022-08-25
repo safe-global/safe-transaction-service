@@ -81,18 +81,26 @@ def calculate_token_eth_price_task(
                         ).eth_value
                         * underlying_token.quantity
                     )
-        if eth_price:
-            eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
-            redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
-            if not getattr(settings, "CELERY_ALWAYS_EAGER", False):
-                # Recalculate price before cache expires and prevents recursion checking Celery Eager property
-                calculate_token_eth_price_task.apply_async(
-                    (token_address, redis_key),
-                    {"force_recalculation": True},
-                    countdown=redis_expiration_time - 300,
-                )
-        else:
+        if not eth_price:
             logger.warning("Cannot calculate eth price for token=%s", token_address)
+            last_redis_value = redis.get(redis_key)
+            if last_redis_value:
+                eth_price = EthValueWithTimestamp.from_string(
+                    last_redis_value.decode()
+                ).eth_value
+            else:
+                return EthValueWithTimestamp(eth_price, now)
+
+        eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
+        redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
+        if not getattr(settings, "CELERY_ALWAYS_EAGER", False):
+            # Recalculate price before cache expires and prevents recursion checking Celery Eager property
+            calculate_token_eth_price_task.apply_async(
+                (token_address, redis_key),
+                {"force_recalculation": True},
+                countdown=redis_expiration_time - 300,
+            )
+
         return EthValueWithTimestamp(eth_price, now)
     else:
         return EthValueWithTimestamp.from_string(redis.get(redis_key).decode())
