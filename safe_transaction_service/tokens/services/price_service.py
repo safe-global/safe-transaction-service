@@ -360,3 +360,30 @@ class PriceService:
                 FiatCode.USD,
                 token_eth_values_with_timestamp.timestamp,
             )
+
+    def get_eth_price_oracles(self, token_address: ChecksumAddress):
+        """
+        Calculate eth_price from oracles
+        :param token_address
+        """
+        return (
+            self.get_token_eth_value(token_address)
+            or self.get_token_usd_price(token_address)
+            / self.get_native_coin_usd_price()
+        )
+
+    def get_eth_price_composed_oracles(self, token_address: ChecksumAddress):
+        """
+        Calculate eth_price from composed oracles
+        :param token_address
+        """
+        eth_price = 0
+        if underlying_tokens := self.get_underlying_tokens(token_address):
+            for underlying_token in underlying_tokens:
+                # Find underlying token price and multiply by quantity
+                address = underlying_token.address
+                eth_price += (
+                    self.get_eth_price_oracles(address) * underlying_token.quantity
+                )
+
+        return eth_price
