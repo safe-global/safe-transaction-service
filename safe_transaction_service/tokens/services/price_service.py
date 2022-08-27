@@ -172,6 +172,9 @@ class PriceService:
                 return self.kucoin_client.get_ewt_usd_price()
             except CannotGetPrice:
                 return self.coingecko_client.get_ewt_usd_price()
+            
+    def get_cndl_usd_price(self) -> float:
+        return self.coingecko_client.get_candle_usd_price()
 
     def get_matic_usd_price(self) -> float:
         try:
@@ -208,6 +211,8 @@ class PriceService:
             return self.get_ewt_usd_price()
         elif self.ethereum_network in (EthereumNetwork.MATIC, EthereumNetwork.MUMBAI):
             return self.get_matic_usd_price()
+        elif self.ethereum_network in EthereumNetwork.CNDL:
+            return self.get_cndl_usd_price()
         elif self.ethereum_network == EthereumNetwork.BINANCE:
             return self.get_binance_usd_price()
         elif self.ethereum_network in (
