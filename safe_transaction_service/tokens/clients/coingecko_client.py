@@ -30,6 +30,8 @@ class CoingeckoClient:
             self.asset_platform = "avalanche"
         elif network == EthereumNetwork.BINANCE:
             self.asset_platform = "binance-smart-chain"
+        elif network == EthereumNetwork.CNDL:
+            self.asset_platform = "candle"
         elif network == EthereumNetwork.MATIC:
             self.asset_platform = "polygon-pos"
         elif network == EthereumNetwork.OPTIMISTIC:
@@ -47,6 +49,7 @@ class CoingeckoClient:
             EthereumNetwork.AVALANCHE,
             EthereumNetwork.BINANCE,
             EthereumNetwork.MAINNET,
+            EthereumNetwork.CNDL,
             EthereumNetwork.MATIC,
             EthereumNetwork.OPTIMISTIC,
             EthereumNetwork.XDAI,
@@ -132,6 +135,9 @@ class CoingeckoClient:
 
     def get_ewt_usd_price(self) -> float:
         return self.get_price("energy-web-token")
+        
+    def get_cndl_usd_price(self) -> float:
+        return self.get_price("cndl-network")
 
     def get_matic_usd_price(self) -> float:
         return self.get_price("matic-network")
