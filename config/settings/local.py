@@ -34,7 +34,7 @@ CACHES = {
 # django-debug-toolbar
 # ------------------------------------------------------------------------------
 # https://django-debug-toolbar.readthedocs.io/en/latest/installation.html#prerequisites
-INSTALLED_APPS += ["debug_toolbar", "django_extensions"]  # noqa F405
+INSTALLED_APPS += ["debug_toolbar"]  # noqa F405
 
 # https://django-debug-toolbar.readthedocs.io/en/latest/installation.html#middleware
 MIDDLEWARE += [  # noqa F405

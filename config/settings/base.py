@@ -82,6 +82,7 @@ DJANGO_APPS = [
     # 'django.contrib.humanize', # Handy template tags
 ]
 THIRD_PARTY_APPS = [
+    "django_extensions",
     "corsheaders",
     "rest_framework",
     "drf_yasg",
