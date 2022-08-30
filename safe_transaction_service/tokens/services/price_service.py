@@ -173,7 +173,7 @@ class PriceService:
             except CannotGetPrice:
                 return self.coingecko_client.get_ewt_usd_price()
             
-    def get_cndl_usd_price(self) -> float:
+    def get_candle_usd_price(self) -> float:
         return self.coingecko_client.get_candle_usd_price()
 
     def get_matic_usd_price(self) -> float:
