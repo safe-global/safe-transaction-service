@@ -49,7 +49,7 @@ class CoingeckoClient:
             EthereumNetwork.AVALANCHE,
             EthereumNetwork.BINANCE,
             EthereumNetwork.MAINNET,
-            EthereumNetwork.CNDL,
+            EthereumNetwork.CANDLE,
             EthereumNetwork.MATIC,
             EthereumNetwork.OPTIMISTIC,
             EthereumNetwork.XDAI,
@@ -136,8 +136,8 @@ class CoingeckoClient:
     def get_ewt_usd_price(self) -> float:
         return self.get_price("energy-web-token")
         
-    def get_cndl_usd_price(self) -> float:
-        return self.get_price("cndl-network")
+    def get_candle_usd_price(self) -> float:
+        return self.get_price("candle-network")
 
     def get_matic_usd_price(self) -> float:
         return self.get_price("matic-network")
