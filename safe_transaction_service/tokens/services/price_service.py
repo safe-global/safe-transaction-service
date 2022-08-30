@@ -155,6 +155,9 @@ class PriceService:
     def get_aurora_usd_price(self) -> float:
         return self.coingecko_client.get_aoa_usd_price()
 
+    def get_cardano_usd_price(self) -> float:
+        return self.binance_client.get_ada_usd_price()
+
     def get_binance_usd_price(self) -> float:
         try:
             return self.binance_client.get_bnb_usd_price()
@@ -178,6 +181,9 @@ class PriceService:
                 return self.binance_client.get_matic_usd_price()
             except CannotGetPrice:
                 return self.coingecko_client.get_matic_usd_price()
+
+    def get_cronos_usd_price(self) -> float:
+        return self.kucoin_client.get_cro_usd_price()
 
     @cachedmethod(cache=operator.attrgetter("cache_eth_price"))
     @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
@@ -213,11 +219,21 @@ class PriceService:
         elif self.ethereum_network == EthereumNetwork.AVALANCHE:
             return self.get_avalanche_usd_price()
         elif self.ethereum_network in (
+            EthereumNetwork.MILKOMEDA_C1_TESTNET,
+            EthereumNetwork.MILKOMEDA_C1_MAINNET,
+        ):
+            return self.get_cardano_usd_price()
+        elif self.ethereum_network in (
             EthereumNetwork.AURORA,
             EthereumNetwork.AURORA_BETANET,
             EthereumNetwork.ARBITRUM_TESTNET,
         ):
             return self.get_aurora_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.CRONOS_TESTNET,
+            EthereumNetwork.CRONOS_MAINNET,
+        ):
+            return self.get_cronos_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()

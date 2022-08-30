@@ -108,6 +108,26 @@ class TestPriceService(TestCase):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 1.3)
 
+        # Cronos
+        with mock.patch.object(KucoinClient, "get_cro_usd_price", return_value=4.4):
+            price_service.ethereum_network = EthereumNetwork.CRONOS_TESTNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
+
+            price_service.ethereum_network = EthereumNetwork.CRONOS_MAINNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
+
+        # Milkomeda
+        with mock.patch.object(BinanceClient, "get_ada_usd_price", return_value=5.5):
+            price_service.ethereum_network = EthereumNetwork.MILKOMEDA_C1_TESTNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 5.5)
+
+            price_service.ethereum_network = EthereumNetwork.MILKOMEDA_C1_MAINNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 5.5)
+
     @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
     @mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=5.0)
     def test_get_binance_usd_price(

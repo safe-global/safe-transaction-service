@@ -460,17 +460,13 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         # ApproveHash (no nonce) ------------------------------------------------------------------------------------
         random_hash = self.w3.keccak(text="Get schwifty")
-        tx = (
-            safe.get_contract()
-            .functions.approveHash(random_hash)
-            .build_transaction(
-                {
-                    "from": owner_account_1.address,
-                    "nonce": self.ethereum_client.get_nonce_for_account(
-                        owner_account_1.address
-                    ),
-                }
-            )
+        tx = safe.contract.functions.approveHash(random_hash).build_transaction(
+            {
+                "from": owner_account_1.address,
+                "nonce": self.ethereum_client.get_nonce_for_account(
+                    owner_account_1.address
+                ),
+            }
         )
         tx = owner_account_1.sign_transaction(tx)
         self.w3.eth.send_raw_transaction(tx["rawTransaction"])
