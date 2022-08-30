@@ -211,8 +211,8 @@ class PriceService:
             return self.get_ewt_usd_price()
         elif self.ethereum_network in (EthereumNetwork.MATIC, EthereumNetwork.MUMBAI):
             return self.get_matic_usd_price()
-        elif self.ethereum_network in EthereumNetwork.CNDL:
-            return self.get_cndl_usd_price()
+        elif self.ethereum_network in EthereumNetwork.CANDLE:
+            return self.get_candle_usd_price()
         elif self.ethereum_network == EthereumNetwork.BINANCE:
             return self.get_binance_usd_price()
         elif self.ethereum_network in (
