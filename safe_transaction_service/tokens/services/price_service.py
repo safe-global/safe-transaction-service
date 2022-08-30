@@ -361,10 +361,11 @@ class PriceService:
                 token_eth_values_with_timestamp.timestamp,
             )
 
-    def get_eth_price_oracles(self, token_address: ChecksumAddress):
+    def get_eth_price_from_oracles(self, token_address: ChecksumAddress) -> float:
         """
         Calculate eth_price from oracles
         :param token_address
+        :return: Current token price
         """
         return (
             self.get_token_eth_value(token_address)
@@ -372,10 +373,13 @@ class PriceService:
             / self.get_native_coin_usd_price()
         )
 
-    def get_eth_price_composed_oracles(self, token_address: ChecksumAddress):
+    def get_eth_price_from_composed_oracles(
+        self, token_address: ChecksumAddress
+    ) -> float:
         """
         Calculate eth_price from composed oracles
         :param token_address
+        :return: Current token price
         """
         eth_price = 0
         if underlying_tokens := self.get_underlying_tokens(token_address):
@@ -383,7 +387,7 @@ class PriceService:
                 # Find underlying token price and multiply by quantity
                 address = underlying_token.address
                 eth_price += (
-                    self.get_eth_price_oracles(address) * underlying_token.quantity
+                    self.get_eth_price_from_oracles(address) * underlying_token.quantity
                 )
 
         return eth_price
