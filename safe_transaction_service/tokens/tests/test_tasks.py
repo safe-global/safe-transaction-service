@@ -101,3 +101,37 @@ class TestTasks(TestCase):
         )
         self.assertEqual(eth_value_with_timestamp.eth_value, 0.0)
         del EthereumClientProvider.instance
+
+    @mock.patch.object(
+        PriceService, "get_token_eth_value", autospec=True, return_value=4815
+    )
+    @mock.patch.object(
+        PriceService, "get_token_usd_price", autospec=True, return_value=0.0
+    )
+    @mock.patch.object(timezone, "now", return_value=timezone.now())
+    def test_return_last_valid_token_price(
+        self,
+        timezone_now_mock: MagicMock,
+        get_token_usd_price: MagicMock,
+        get_token_eth_value_mock: MagicMock,
+    ):
+        random_token_address = Account.create().address
+        random_redis_key = Account.create().address
+        expected = EthValueWithTimestamp(
+            get_token_eth_value_mock.return_value, timezone_now_mock.return_value
+        )
+        self.assertEqual(
+            calculate_token_eth_price_task.delay(
+                random_token_address, random_redis_key
+            ).result,
+            expected,
+        )
+
+        get_token_eth_value_mock.return_value = 0.0
+
+        self.assertEqual(
+            calculate_token_eth_price_task.delay(
+                random_token_address, random_redis_key, True
+            ).result,
+            expected,
+        )
