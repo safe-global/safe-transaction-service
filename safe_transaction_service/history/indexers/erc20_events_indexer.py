@@ -3,7 +3,6 @@ from collections import OrderedDict
 from logging import getLogger
 from typing import Iterator, List, Sequence
 
-import gevent
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
@@ -80,20 +79,15 @@ class Erc20EventsIndexer(EventsIndexer):
         else:
             addresses_chunks = [addresses]
 
-        jobs = [
-            gevent.spawn(
-                self.ethereum_client.erc20.get_total_transfer_history,
+        return [
+            event
+            for addresses_chunk in addresses_chunks
+            for event in self.ethereum_client.erc20.get_total_transfer_history(
                 addresses_chunk,
                 from_block=from_block_number,
                 to_block=to_block_number,
             )
-            for addresses_chunk in addresses_chunks
         ]
-        _ = gevent.joinall(jobs)
-        transfer_events = []
-        for job in jobs:
-            transfer_events.extend(job.get())
-        return transfer_events
 
     @cachedmethod(cache=operator.attrgetter("_cache_is_erc20"))
     @cache_memoize(60 * 60 * 24, prefix="erc20-events-indexer-is-erc20")  # 1 day
