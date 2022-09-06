@@ -38,14 +38,14 @@ class EthereumIndexer(ABC):
         block_process_limit_max: int = 0,
         blocks_to_reindex_again: int = 0,
         updated_blocks_behind: int = 20,
-        query_chunk_size: Optional[int] = 5000,
+        query_chunk_size: Optional[int] = 1_000,
         block_auto_process_limit: bool = True,
     ):
         """
         :param ethereum_client:
         :param confirmations: Don't index last `confirmations` blocks to prevent from reorgs
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
-        :param block_process_limit: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
+        :param block_process_limit_max: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
         :param blocks_to_reindex_again: Number of blocks to reindex every time the indexer runs, in case something
             was missed.
         :param updated_blocks_behind: Number of blocks scanned for an address that can be behind and
@@ -294,14 +294,14 @@ class EthereumIndexer(ABC):
                     self.__class__.__name__,
                     self.block_process_limit,
                 )
-            elif delta < 1:
+            elif delta < 2:
                 self.block_process_limit *= 2
                 logger.info(
                     "%s: block_process_limit duplicated to %d",
                     self.__class__.__name__,
                     self.block_process_limit,
                 )
-            elif delta < 3:
+            elif delta < 5:
                 self.block_process_limit += 20
                 logger.info(
                     "%s: block_process_limit increased to %d",

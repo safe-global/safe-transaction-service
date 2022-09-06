@@ -385,8 +385,8 @@ ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX", default=0
 )  # Maximum number of blocks to process together when searching for events. 0 == no limit.
 ETH_EVENTS_QUERY_CHUNK_SIZE = env.int(
-    "ETH_EVENTS_QUERY_CHUNK_SIZE", default=5_000
-)  # Number of addresses to use as `getLogs` parameter. `0 == no limit`. By testing `5000` looks like a good default
+    "ETH_EVENTS_QUERY_CHUNK_SIZE", default=1_000
+)  # Number of addresses to use as `getLogs` parameter. `0 == no limit`. By testing `1_000` looks like a good default
 ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
