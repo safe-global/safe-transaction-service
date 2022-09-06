@@ -79,15 +79,18 @@ class Erc20EventsIndexer(EventsIndexer):
         else:
             addresses_chunks = [addresses]
 
-        return [
-            event
-            for addresses_chunk in addresses_chunks
-            for event in self.ethereum_client.erc20.get_total_transfer_history(
-                addresses_chunk,
-                from_block=from_block_number,
-                to_block=to_block_number,
-            )
-        ]
+        transfer_events = []
+        for addresses_chunk in addresses_chunks:
+            with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                transfer_events.extend(
+                    self.ethereum_client.erc20.get_total_transfer_history(
+                        addresses_chunk,
+                        from_block=from_block_number,
+                        to_block=to_block_number,
+                    )
+                )
+
+        return transfer_events
 
     @cachedmethod(cache=operator.attrgetter("_cache_is_erc20"))
     @cache_memoize(60 * 60 * 24, prefix="erc20-events-indexer-is-erc20")  # 1 day

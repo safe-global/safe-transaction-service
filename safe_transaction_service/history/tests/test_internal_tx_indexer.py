@@ -229,9 +229,6 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, current_block_number - 50, current_block_number
         )
-        print(trace_filter_transactions | trace_block_transactions)
-        print()
-        print(elements)
         self.assertEqual(trace_filter_transactions | trace_block_transactions, elements)
         trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.parity,

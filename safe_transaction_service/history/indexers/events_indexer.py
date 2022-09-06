@@ -94,15 +94,18 @@ class EventsIndexer(EthereumIndexer):
                 for addresses_chunk in addresses_chunks
             ]
 
-            return [
-                event
-                for single_parameters in multiple_parameters
-                for event in self.ethereum_client.slow_w3.eth.get_logs(
-                    single_parameters
-                )
-            ]
+            log_receipts = []
+
+            for single_parameters in multiple_parameters:
+                with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                    log_receipts.extend(
+                        self.ethereum_client.slow_w3.eth.get_logs(single_parameters)
+                    )
+
+            return log_receipts
         else:
-            return self.ethereum_client.slow_w3.eth.get_logs(parameters)
+            with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                return self.ethereum_client.slow_w3.eth.get_logs(parameters)
 
     def _find_elements_using_topics(
         self,
