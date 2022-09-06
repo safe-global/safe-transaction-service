@@ -119,9 +119,11 @@ class InternalTxIndexer(EthereumIndexer):
         addresses_set = set(addresses)  # More optimal to use with `in`
         try:
             block_numbers = list(range(from_block_number, to_block_number + 1))
-            blocks_traces: ParityBlockTrace = self.ethereum_client.parity.trace_blocks(
-                block_numbers
-            )
+
+            with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                blocks_traces: ParityBlockTrace = (
+                    self.ethereum_client.parity.trace_blocks(block_numbers)
+                )
             traces: OrderedDict[HexStr, ParityFilterTrace] = OrderedDict()
             relevant_tx_hashes: Set[HexStr] = set()
             for block_number, block_traces in zip(block_numbers, blocks_traces):
@@ -170,11 +172,12 @@ class InternalTxIndexer(EthereumIndexer):
 
         try:
             # We only need to search for traces `to` the provided addresses
-            to_traces = self.ethereum_client.parity.trace_filter(
-                from_block=from_block_number,
-                to_block=to_block_number,
-                to_address=addresses,
-            )
+            with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                to_traces = self.ethereum_client.parity.trace_filter(
+                    from_block=from_block_number,
+                    to_block=to_block_number,
+                    to_address=addresses,
+                )
         except IOError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_filter`"

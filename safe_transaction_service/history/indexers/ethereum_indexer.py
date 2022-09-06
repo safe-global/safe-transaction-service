@@ -1,5 +1,6 @@
 import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from logging import getLogger
 from typing import Any, List, Optional, Sequence, Tuple
 
@@ -261,56 +262,22 @@ class EthereumIndexer(ABC):
 
         return updated_addresses
 
-    def process_addresses(
-        self, addresses: Sequence[str], current_block_number: Optional[int] = None
-    ) -> Tuple[Sequence[Any], int, bool]:
+    @contextmanager
+    def auto_adjust_block_limit(self, from_block_number: int, to_block_number: int):
         """
-        Find and process relevant data for `addresses`, then store and return it
-
-        :param addresses: Addresses to process
-        :param current_block_number: To prevent fetching it again
-        :return: Tuple with a sequence of `processed data`, `last_block_number` processed
-            and `True` if no more blocks to scan, `False` otherwise
+        Optimize number of elements processed every time (block process limit)
+        based on how fast the block interval is retrieved
         """
-        assert addresses, "Addresses cannot be empty!"
 
-        current_block_number = (
-            current_block_number or self.ethereum_client.current_block_number
-        )
-        parameters = self.get_block_numbers_for_search(addresses, current_block_number)
-        if parameters is None:
-            return [], current_block_number, True
-        from_block_number, to_block_number = parameters
-
-        updated = to_block_number == (current_block_number - self.confirmations)
-
-        # Optimize number of elements processed every time (block process limit)
         # Check that we are processing the `block_process_limit`, if not, measures are not valid
-        if (
+        if not (
             self.block_auto_process_limit
             and (to_block_number - from_block_number) == self.block_process_limit
         ):
-            start = int(time.time())
+            yield
         else:
-            start = None
-
-        try:
-            elements = self.find_relevant_elements(
-                addresses,
-                from_block_number,
-                to_block_number,
-                current_block_number=current_block_number,
-            )
-        except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
-            self.block_process_limit = 1  # Set back to the very minimum
-            logger.info(
-                "%s: block_process_limit set back to %d",
-                self.__class__.__name__,
-                self.block_process_limit,
-            )
-            raise e
-
-        if start:
+            start = int(time.time())
+            yield
             delta = int(time.time()) - start
             if delta > 30:
                 self.block_process_limit = max(self.block_process_limit // 2, 1)
@@ -342,17 +309,56 @@ class EthereumIndexer(ABC):
                     self.block_process_limit,
                 )
 
-        if (
-            self.block_process_limit_max
-            and self.block_process_limit > self.block_process_limit_max
-        ):
-            self.block_process_limit = self.block_process_limit_max
+            if (
+                self.block_process_limit_max
+                and self.block_process_limit > self.block_process_limit_max
+            ):
+                self.block_process_limit = self.block_process_limit_max
+                logger.info(
+                    "%s: block_process_limit %d is bigger than block_process_limit_max %d, reducing",
+                    self.__class__.__name__,
+                    self.block_process_limit,
+                    self.block_process_limit_max,
+                )
+
+    def process_addresses(
+        self, addresses: Sequence[str], current_block_number: Optional[int] = None
+    ) -> Tuple[Sequence[Any], int, bool]:
+        """
+        Find and process relevant data for `addresses`, then store and return it
+
+        :param addresses: Addresses to process
+        :param current_block_number: To prevent fetching it again
+        :return: Tuple with a sequence of `processed data`, `last_block_number` processed
+            and `True` if no more blocks to scan, `False` otherwise
+        """
+        assert addresses, "Addresses cannot be empty!"
+
+        current_block_number = (
+            current_block_number or self.ethereum_client.current_block_number
+        )
+        parameters = self.get_block_numbers_for_search(addresses, current_block_number)
+        if parameters is None:
+            return [], current_block_number, True
+        from_block_number, to_block_number = parameters
+
+        updated = to_block_number == (current_block_number - self.confirmations)
+
+        try:
+            elements = self.find_relevant_elements(
+                addresses,
+                from_block_number,
+                to_block_number,
+                current_block_number=current_block_number,
+            )
+        except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
+            self.block_process_limit = 1  # Set back to the very minimum
             logger.info(
-                "%s: block_process_limit %d is bigger than block_process_limit_max %d, reducing",
+                "%s: block_process_limit set back to %d",
                 self.__class__.__name__,
                 self.block_process_limit,
-                self.block_process_limit_max,
             )
+            raise e
 
         processed_elements = self.process_elements(elements)
 
