@@ -313,7 +313,7 @@ class EthereumIndexer(ABC):
         if start:
             delta = int(time.time()) - start
             if delta > 30:
-                self.block_process_limit //= 2
+                self.block_process_limit = max(self.block_process_limit // 2, 1)
                 logger.info(
                     "%s: block_process_limit halved to %d",
                     self.__class__.__name__,
