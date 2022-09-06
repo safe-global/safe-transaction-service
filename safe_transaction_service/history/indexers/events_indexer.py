@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, OrderedDict, Sequence
 
 from django.conf import settings
 
-import gevent
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -95,17 +94,13 @@ class EventsIndexer(EthereumIndexer):
                 for addresses_chunk in addresses_chunks
             ]
 
-            jobs = [
-                gevent.spawn(
-                    self.ethereum_client.slow_w3.eth.get_logs, single_parameters
-                )
+            return [
+                event
                 for single_parameters in multiple_parameters
+                for event in self.ethereum_client.slow_w3.eth.get_logs(
+                    single_parameters
+                )
             ]
-            _ = gevent.joinall(jobs)
-            log_receipts = []
-            for job in jobs:
-                log_receipts.extend(job.get())
-            return log_receipts
         else:
             return self.ethereum_client.slow_w3.eth.get_logs(parameters)
 
