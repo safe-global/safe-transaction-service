@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, Tuple
 
 from django.conf import settings
-from django.db.models import Count
+from django.db.models import Count, Min
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -146,6 +146,41 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
         else:
             ethereum_client = EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
             return Response(self._get_info(ethereum_client))
+
+
+class ERC20IndexingView(GenericAPIView):
+    serializer_class = serializers.ERC20IndexingSerializer
+
+    def get(self, request):
+        """
+        Get current indexing status for ERC20/721 events
+        """
+        current_block_number = EthereumClientProvider().current_block_number
+        min_erc20_block_number = SafeContract.objects.aggregate(
+            min_erc20_block_number=Min("erc20_block_number")
+        )["min_erc20_block_number"]
+        if min_erc20_block_number is None:  # Still nothing indexed
+            min_erc20_block_number = current_block_number
+        synced = (
+            current_block_number - min_erc20_block_number
+        ) <= settings.ETH_REORG_BLOCKS
+
+        serializer = self.get_serializer(
+            {
+                "current_block_number": current_block_number,
+                "minimum_indexed_block_number": min_erc20_block_number,
+                "synced": synced,
+            }
+        )
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class MasterCopiesView(ListAPIView):
+    serializer_class = serializers.MasterCopyResponseSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return SafeMasterCopy.objects.relevant()
 
 
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
@@ -1004,14 +1039,6 @@ class SafeInfoView(GenericAPIView):
                     "arguments": [address],
                 },
             )
-
-
-class MasterCopiesView(ListAPIView):
-    serializer_class = serializers.MasterCopyResponseSerializer
-    pagination_class = None
-
-    def get_queryset(self):
-        return SafeMasterCopy.objects.relevant()
 
 
 class ModulesView(GenericAPIView):

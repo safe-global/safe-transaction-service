@@ -599,6 +599,12 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
             )
 
 
+class ERC20IndexingSerializer(serializers.Serializer):
+    current_block_number = serializers.IntegerField()
+    minimum_indexed_block_number = serializers.IntegerField()
+    synced = serializers.BooleanField()
+
+
 class Erc20InfoSerializer(serializers.Serializer):
     name = serializers.CharField()
     symbol = serializers.CharField()
