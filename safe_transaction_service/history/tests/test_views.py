@@ -1,7 +1,7 @@
 import logging
 from dataclasses import asdict
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -16,7 +16,7 @@ from rest_framework.test import APIRequestFactory, APITestCase, force_authentica
 from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.ethereum_client import EthereumClient, ParityManager
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
@@ -81,6 +81,42 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 self.assertEqual(response.data["chain_id"], 1337)
                 self.assertEqual(response.data["chain"], "GANACHE")
                 self.assertEqual(response.data["syncing"], False)
+
+    @mock.patch.object(
+        EthereumClient,
+        "current_block_number",
+        new_callable=PropertyMock,
+        return_value=2000,
+    )
+    def test_erc20_indexing_view(self, current_block_number_mock: PropertyMock):
+        url = reverse("v1:history:erc20-indexing")
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["minimum_indexed_block_number"], 2000)
+        self.assertEqual(response.data["synced"], True)
+
+        SafeContractFactory(erc20_block_number=500)
+
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["minimum_indexed_block_number"], 500)
+        self.assertEqual(response.data["synced"], False)
+
+        SafeContractFactory(erc20_block_number=10)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["minimum_indexed_block_number"], 10)
+        self.assertEqual(response.data["synced"], False)
+
+        SafeContractFactory(erc20_block_number=12)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["minimum_indexed_block_number"], 10)
+        self.assertEqual(response.data["synced"], False)
 
     def test_all_transactions_view(self):
         safe_address = Account.create().address
