@@ -11,7 +11,7 @@ from rest_framework import permissions
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Gnosis Safe Transaction Service API",
+        title="Safe Transaction Service API",
         default_version="v1",
         description="API to keep track of transactions sent via Gnosis Safe smart contracts",
         contact=openapi.Contact(email="safe@gnosis.io"),
