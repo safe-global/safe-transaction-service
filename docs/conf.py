@@ -1,4 +1,4 @@
-# Gnosis Safe Transaction Service documentation build configuration file, created by
+# Safe Transaction Service documentation build configuration file, created by
 # sphinx-quickstart.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -39,7 +39,7 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "Gnosis Safe Transaction Service"
+project = "Safe Transaction Service"
 copyright = """2018, Gnosis"""
 
 # The version info for the project you're documenting, acts as replacement for
@@ -218,7 +218,7 @@ man_pages = [
     (
         "index",
         "safe_transaction_service",
-        "Gnosis Safe Transaction Service Documentation",
+        "Safe Transaction Service Documentation",
         ["""Gnosis"""],
         1,
     )
@@ -237,9 +237,9 @@ texinfo_documents = [
     (
         "index",
         "safe_transaction_service",
-        "Gnosis Safe Transaction Service Documentation",
+        "Safe Transaction Service Documentation",
         """Gnosis""",
-        "Gnosis Safe Transaction Service",
+        "Safe Transaction Service",
         """Project to manage transactions for Gnosis Safe""",
         "Miscellaneous",
     )
