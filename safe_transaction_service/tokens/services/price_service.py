@@ -153,7 +153,10 @@ class PriceService:
             return self.coingecko_client.get_avax_usd_price()
 
     def get_aurora_usd_price(self) -> float:
-        return self.coingecko_client.get_aoa_usd_price()
+        try:
+            return self.binance_client.get_aurora_usd_price()
+        except CannotGetPrice:
+            return self.coingecko_client.get_aoa_usd_price()
 
     def get_cardano_usd_price(self) -> float:
         return self.binance_client.get_ada_usd_price()
