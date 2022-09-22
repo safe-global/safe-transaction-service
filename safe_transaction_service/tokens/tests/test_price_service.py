@@ -105,7 +105,7 @@ class TestPriceService(TestCase):
 
         # Aurora
         price_service.ethereum_network = EthereumNetwork.AURORA
-        with mock.patch.object(CoingeckoClient, "get_aoa_usd_price", return_value=1.3):
+        with mock.patch.object(BinanceClient, "get_aurora_usd_price", return_value=1.3):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 1.3)
 

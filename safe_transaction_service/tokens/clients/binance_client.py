@@ -27,11 +27,14 @@ class BinanceClient:
         except (ValueError, IOError) as e:
             raise CannotGetPrice from e
 
-    def get_bnb_usd_price(self) -> float:
-        return self._get_price("BNBUSDT")
-
     def get_ada_usd_price(self) -> float:
         return self._get_price("ADAUSDT")
+
+    def get_aurora_usd_price(self):
+        return self._get_price("NEARUSDT")
+
+    def get_bnb_usd_price(self) -> float:
+        return self._get_price("BNBUSDT")
 
     def get_eth_usd_price(self) -> float:
         """
