@@ -1,8 +1,6 @@
-from typing import Any, Dict, Iterable
-
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_V1_3_0_contract
 
@@ -13,57 +11,37 @@ from ...services import IndexServiceProvider
 class Command(BaseCommand):
     help = "Check nonce calculated by the indexer is the same that blockchain nonce"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.nonce_fn = get_safe_V1_3_0_contract(
-            EthereumClientProvider().w3, address=NULL_ADDRESS
-        ).functions.nonce()
-
     def add_arguments(self, parser):
         parser.add_argument(
             "--fix", help="Fix nonce problems", action="store_true", default=False
         )
 
-    def build_nonce_payload(self, addresses: Iterable[str]) -> Iterable[Dict[str, Any]]:
-        """
-        It looks like web3 takes time generating contract functions, so I do it this way
-        :param addresses:
-        :return:
-        """
-        contract_function = self.nonce_fn
-
-        payloads = []
-        data = contract_function.build_transaction({"gas": 0, "gasPrice": 0})["data"]
-        output_type = [output["type"] for output in contract_function.abi["outputs"]]
-        fn_name = (contract_function.fn_name,)  # For debugging purposes
-        for address in addresses:
-            payload = {
-                "to": address,
-                "data": data,
-                "output_type": output_type,
-                "fn_name": fn_name,
-            }
-            payloads.append(payload)
-        return payloads
+    def get_nonce_fn(self, ethereum_client: EthereumClient):
+        return get_safe_V1_3_0_contract(
+            ethereum_client.w3, address=NULL_ADDRESS
+        ).functions.nonce()
 
     def handle(self, *args, **options):
         fix = options["fix"]
 
         queryset = SafeLastStatus.objects.all()
         count = queryset.count()
-        batch = 100
-        ethereum_client = EthereumClientProvider()
+        batch = 1000
         index_service = IndexServiceProvider()
+        ethereum_client = index_service.ethereum_client
+        nonce_fn = self.get_nonce_fn(ethereum_client)
+        first_issue_block_number = ethereum_client.current_block_number
+        all_addresses_to_reindex = set()
 
         for i in range(0, count, batch):
             self.stdout.write(self.style.SUCCESS(f"Processed {i}/{count}"))
             safe_statuses = queryset[i : i + batch]
             safe_statuses_list = list(safe_statuses)  # Force retrieve queryset from DB
-            blockchain_nonce_payloads = self.build_nonce_payload(
-                [safe_status.address for safe_status in safe_statuses_list]
-            )
-            blockchain_nonces = ethereum_client.batch_call_manager.batch_call_custom(
-                blockchain_nonce_payloads, raise_exception=False
+
+            blockchain_nonces = ethereum_client.batch_call_same_function(
+                nonce_fn,
+                [safe_status.address for safe_status in safe_statuses_list],
+                raise_exception=False,
             )
 
             addresses_to_reindex = set()
@@ -88,7 +66,7 @@ class Command(BaseCommand):
                             f"cannot retrieve blockchain-nonce"
                         )
                     )
-                if nonce != blockchain_nonce:
+                elif nonce != blockchain_nonce:
                     self.stdout.write(
                         self.style.WARNING(
                             f"Safe={address} stored nonce={nonce} is "
@@ -105,10 +83,22 @@ class Command(BaseCommand):
                                 f"ethereum-tx-hash={last_valid_transaction.ethereum_tx_id}"
                             )
                         )
+                        first_issue_block_number = min(
+                            last_valid_transaction.ethereum_tx.block_id,
+                            first_issue_block_number,
+                        )
                     addresses_to_reindex.add(address)
 
             if fix and addresses_to_reindex:
+                all_addresses_to_reindex |= addresses_to_reindex
                 self.stdout.write(
                     self.style.SUCCESS(f"Fixing Safes={addresses_to_reindex}")
                 )
                 index_service.reprocess_addresses(addresses_to_reindex)
+
+        if all_addresses_to_reindex:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"First issue found on {first_issue_block_number} - Fixed Safes {all_addresses_to_reindex}"
+                )
+            )

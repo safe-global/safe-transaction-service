@@ -1070,7 +1070,8 @@ class MultisigTransactionManager(models.Manager):
             owners_set.update(owners_list)
 
         return (
-            MultisigTransaction.objects.filter(
+            MultisigTransaction.objects.executed()
+            .filter(
                 safe=safe,
                 confirmations__owner__in=owners_set,
                 confirmations__signature_type__in=[
@@ -1078,7 +1079,6 @@ class MultisigTransactionManager(models.Manager):
                     SafeSignatureType.ETH_SIGN.value,
                 ],
             )
-            .exclude(ethereum_tx=None)
             .order_by("-nonce")
             .first()
         )
