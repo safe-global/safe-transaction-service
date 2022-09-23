@@ -25,6 +25,11 @@ urlpatterns = [
         name="erc20-indexing",
     ),
     path(
+        "about/indexing/",
+        views.IndexingView.as_view(),
+        name="indexing",
+    ),
+    path(
         "analytics/multisig-transactions/by-safe/",
         views.AnalyticsMultisigTxsBySafeListView.as_view(),
         name="analytics-multisig-txs-by-safe",
