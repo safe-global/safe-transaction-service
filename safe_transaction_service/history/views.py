@@ -150,6 +150,7 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
 
 class ERC20IndexingView(GenericAPIView):
     serializer_class = serializers.ERC20IndexingSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     def get(self, request):
         """
@@ -557,6 +558,7 @@ def swagger_safe_balance_schema(serializer_class):
 
 class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     def get_parameters(self) -> Tuple[bool, bool]:
         """
@@ -965,6 +967,7 @@ class SafeIncomingTransferListView(SafeTransferListView):
 
 class SafeCreationView(GenericAPIView):
     serializer_class = serializers.SafeCreationInfoResponseSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     @swagger_auto_schema(
         responses={
@@ -1000,6 +1003,7 @@ class SafeCreationView(GenericAPIView):
 
 class SafeInfoView(GenericAPIView):
     serializer_class = serializers.SafeInfoResponseSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     @swagger_auto_schema(
         responses={
@@ -1043,6 +1047,7 @@ class SafeInfoView(GenericAPIView):
 
 class ModulesView(GenericAPIView):
     serializer_class = serializers.ModulesResponseSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     @swagger_auto_schema(
         responses={
@@ -1073,6 +1078,7 @@ class ModulesView(GenericAPIView):
 
 class OwnersView(GenericAPIView):
     serializer_class = serializers.OwnerResponseSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
 
     @swagger_auto_schema(
         responses={
