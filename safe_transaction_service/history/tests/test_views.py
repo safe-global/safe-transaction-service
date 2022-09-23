@@ -34,6 +34,7 @@ from ..helpers import DelegateSignatureHelper
 from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
+    SafeContract,
     SafeContractDelegate,
     SafeMasterCopy,
 )
@@ -93,7 +94,46 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["minimum_indexed_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 2000)
+        self.assertEqual(response.data["erc20_synced"], True)
+
+        SafeContractFactory(erc20_block_number=500)
+
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_synced"], False)
+
+        SafeContractFactory(erc20_block_number=10)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_synced"], False)
+
+        SafeContractFactory(erc20_block_number=12)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_synced"], False)
+
+    @mock.patch.object(
+        EthereumClient,
+        "current_block_number",
+        new_callable=PropertyMock,
+        return_value=2000,
+    )
+    def test_indexing_view(self, current_block_number_mock: PropertyMock):
+        url = reverse("v1:history:indexing")
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 2000)
+        self.assertEqual(response.data["erc20_synced"], True)
+        self.assertEqual(response.data["master_copies_block_number"], 2000)
+        self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], True)
 
         SafeContractFactory(erc20_block_number=500)
@@ -101,21 +141,72 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["minimum_indexed_block_number"], 500)
+        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_synced"], False)
+        self.assertEqual(response.data["master_copies_block_number"], 2000)
+        self.assertEqual(response.data["master_copies_synced"], True)
+        self.assertEqual(response.data["synced"], False)
+
+        safe_master_copy = SafeMasterCopyFactory(tx_block_number=1999)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_synced"], False)
+        self.assertEqual(response.data["master_copies_block_number"], 1999)
+        self.assertEqual(response.data["master_copies_synced"], True)
+        self.assertEqual(response.data["synced"], False)
+
+        safe_master_copy.tx_block_number = 600
+        safe_master_copy.save(update_fields=["tx_block_number"])
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_synced"], False)
+        self.assertEqual(response.data["master_copies_block_number"], 600)
+        self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
         SafeContractFactory(erc20_block_number=10)
+        SafeMasterCopyFactory(tx_block_number=9)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["minimum_indexed_block_number"], 10)
+        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_synced"], False)
+        self.assertEqual(response.data["master_copies_block_number"], 9)
+        self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
         SafeContractFactory(erc20_block_number=12)
+        SafeMasterCopyFactory(tx_block_number=11)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["minimum_indexed_block_number"], 10)
+        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_synced"], False)
+        self.assertEqual(response.data["master_copies_block_number"], 9)
+        self.assertEqual(response.data["master_copies_synced"], False)
+        self.assertEqual(response.data["synced"], False)
+
+        SafeContract.objects.update(erc20_block_number=1999)
+        SafeMasterCopy.objects.update(tx_block_number=1999)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 1999)
+        self.assertEqual(response.data["erc20_synced"], True)
+        self.assertEqual(response.data["master_copies_block_number"], 1999)
+        self.assertEqual(response.data["master_copies_synced"], True)
+        self.assertEqual(response.data["synced"], True)
+
+        SafeMasterCopyFactory(tx_block_number=48)
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_block_number"], 2000)
+        self.assertEqual(response.data["erc20_block_number"], 1999)
+        self.assertEqual(response.data["erc20_synced"], True)
+        self.assertEqual(response.data["master_copies_block_number"], 48)
+        self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
     def test_all_transactions_view(self):
