@@ -454,7 +454,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
             )
 
         r = get_webhook_http_session(full_url, webhook.authorization).post(
-            full_url, json=payload
+            full_url, json=payload, timeout=5
         )
         if r.ok:
             logger.info(

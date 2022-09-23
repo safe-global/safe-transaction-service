@@ -23,7 +23,9 @@ class Command(BaseCommand):
         if settings.SLACK_API_WEBHOOK:
             try:
                 r = requests.post(
-                    settings.SLACK_API_WEBHOOK, json={"text": startup_message}
+                    settings.SLACK_API_WEBHOOK,
+                    json={"text": startup_message},
+                    timeout=5,
                 )
                 if r.ok:
                     self.stdout.write(
