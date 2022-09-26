@@ -20,6 +20,7 @@ from gnosis.eth.oracles import (
     AaveOracle,
     BalancerOracle,
     ComposedPriceOracle,
+    CowswapOracle,
     CurveOracle,
     EnzymeOracle,
     KyberOracle,
@@ -30,8 +31,8 @@ from gnosis.eth.oracles import (
     PricePoolOracle,
     SushiswapOracle,
     UnderlyingToken,
-    UniswapOracle,
     UniswapV2Oracle,
+    UniswapV3Oracle,
     YearnOracle,
 )
 
@@ -80,23 +81,8 @@ class PriceService:
         self.redis = redis
         self.binance_client = BinanceClient()
         self.coingecko_client = CoingeckoClient(self.ethereum_network)
-        self.curve_oracle = CurveOracle(self.ethereum_client)
         self.kraken_client = KrakenClient()
         self.kucoin_client = KucoinClient()
-        self.kyber_oracle = KyberOracle(self.ethereum_client)
-        self.sushiswap_oracle = SushiswapOracle(self.ethereum_client)
-        self.uniswap_oracle = UniswapOracle(self.ethereum_client)
-        self.uniswap_v2_oracle = UniswapV2Oracle(self.ethereum_client)
-        self.pool_together_oracle = PoolTogetherOracle(self.ethereum_client)
-        self.yearn_oracle = YearnOracle(self.ethereum_client)
-        self.enzyme_oracle = EnzymeOracle(self.ethereum_client)
-        self.aave_oracle = AaveOracle(self.ethereum_client, self.uniswap_v2_oracle)
-        self.balancer_oracle = BalancerOracle(
-            self.ethereum_client, self.uniswap_v2_oracle
-        )
-        self.mooniswap_oracle = MooniswapOracle(
-            self.ethereum_client, self.uniswap_v2_oracle
-        )
         self.cache_eth_price = TTLCache(
             maxsize=2048, ttl=60 * 30
         )  # 30 minutes of caching
@@ -113,38 +99,46 @@ class PriceService:
 
     @cached_property
     def enabled_price_oracles(self) -> Tuple[PriceOracle]:
-        if self.ethereum_network == EthereumNetwork.MAINNET:
-            return (
-                self.uniswap_v2_oracle,
-                self.sushiswap_oracle,
-                self.uniswap_oracle,
-                self.aave_oracle,
-                self.kyber_oracle,
+        oracles = tuple(
+            Oracle(self.ethereum_client)
+            for Oracle in (
+                UniswapV3Oracle,
+                CowswapOracle,
+                UniswapV2Oracle,
+                SushiswapOracle,
+                KyberOracle,
             )
-        else:
-            return (
-                self.uniswap_v2_oracle,
-                self.kyber_oracle,
-            )  # There are versions in another networks
+            if Oracle.is_available(self.ethereum_client)
+        )
+        if oracles and AaveOracle.is_available(self.ethereum_client):
+            oracles = oracles + (AaveOracle(self.ethereum_client, oracles[0]),)
+
+        return oracles
 
     @cached_property
     def enabled_price_pool_oracles(self) -> Tuple[PricePoolOracle]:
-        if self.ethereum_network == EthereumNetwork.MAINNET:
-            return self.uniswap_v2_oracle, self.balancer_oracle, self.mooniswap_oracle
-        else:
+        if not self.enabled_price_oracles:
             return tuple()
+        oracles = tuple(
+            Oracle(self.ethereum_client, self.enabled_price_oracles[0])
+            for Oracle in (
+                BalancerOracle,
+                MooniswapOracle,
+            )
+        )
+
+        if UniswapV2Oracle.is_available(self.ethereum_client):
+            # Uses a different constructor that others pool oracles
+            oracles = (UniswapV2Oracle(self.ethereum_client),) + oracles
+        return oracles
 
     @cached_property
     def enabled_composed_price_oracles(self) -> Tuple[ComposedPriceOracle]:
-        if self.ethereum_network == EthereumNetwork.MAINNET:
-            return (
-                self.curve_oracle,
-                self.yearn_oracle,
-                self.pool_together_oracle,
-                self.enzyme_oracle,
-            )
-        else:
-            return tuple()
+        return tuple(
+            Oracle(self.ethereum_client)
+            for Oracle in (CurveOracle, YearnOracle, PoolTogetherOracle, EnzymeOracle)
+            if Oracle.is_available(self.ethereum_client)
+        )
 
     def get_avalanche_usd_price(self) -> float:
         try:

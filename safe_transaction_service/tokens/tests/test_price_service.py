@@ -5,14 +5,8 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from gnosis.eth import EthereumClient, EthereumNetwork
-from gnosis.eth.oracles import (
-    KyberOracle,
-    OracleException,
-    UnderlyingToken,
-    UniswapOracle,
-    UniswapV2Oracle,
-)
+from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
+from gnosis.eth.oracles import KyberOracle, OracleException, UnderlyingToken
 
 from safe_transaction_service.history.tests.utils import just_test_if_mainnet_node
 from safe_transaction_service.utils.redis import get_redis
@@ -30,11 +24,17 @@ from ..services.price_service import PriceService, PriceServiceProvider
 class TestPriceService(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.price_service = PriceServiceProvider()
         cls.redis = get_redis()
+        cls.ethereum_client = EthereumClientProvider()
 
     @classmethod
     def tearDownClass(cls) -> None:
+        PriceServiceProvider.del_singleton()
+
+    def setUp(self) -> None:
+        self.price_service = PriceServiceProvider()
+
+    def tearDown(self) -> None:
         PriceServiceProvider.del_singleton()
 
     @mock.patch.object(KrakenClient, "get_eth_usd_price", return_value=0.4)
@@ -197,35 +197,46 @@ class TestPriceService(TestCase):
         self.assertIsInstance(token_eth_value, float)
         self.assertGreater(token_eth_value, 0)
 
+    def test_available_price_oracles(self):
+        # Ganache should have no oracle enabled
+        self.assertEqual(len(self.price_service.enabled_price_oracles), 0)
+        self.assertEqual(len(self.price_service.enabled_price_pool_oracles), 0)
+        self.assertEqual(len(self.price_service.enabled_composed_price_oracles), 0)
+
+    def test_available_price_oracles_mainnet(self):
+        # Mainnet should have every oracle enabled
+        mainnet_node = just_test_if_mainnet_node()
+        price_service = PriceService(EthereumClient(mainnet_node), self.redis)
+        self.assertEqual(len(price_service.enabled_price_oracles), 6)
+        self.assertEqual(len(price_service.enabled_price_pool_oracles), 3)
+        self.assertEqual(len(price_service.enabled_composed_price_oracles), 4)
+
     @mock.patch.object(KyberOracle, "get_price", return_value=1.23, autospec=True)
     def test_token_eth_value_mocked(self, kyber_get_price_mock: MagicMock):
         price_service = self.price_service
+        oracle_1 = mock.MagicMock()
+        oracle_1.get_price.return_value = 1.23
+        oracle_2 = mock.MagicMock()
+        oracle_3 = mock.MagicMock()
+        price_service.enabled_price_oracles = (oracle_1, oracle_2, oracle_3)
+        self.assertEqual(len(price_service.enabled_price_oracles), 3)
         random_address = Account.create().address
         self.assertEqual(len(price_service.cache_token_eth_value), 0)
+
         self.assertEqual(price_service.get_token_eth_value(random_address), 1.23)
         self.assertEqual(price_service.cache_token_eth_value[(random_address,)], 1.23)
 
-        # Every oracle is not accesible
-        kyber_get_price_mock.side_effect = OracleException
-        with mock.patch.object(
-            UniswapOracle, "get_price", side_effect=OracleException, autospec=True
-        ):
-            with mock.patch.object(
-                UniswapV2Oracle, "get_price", side_effect=OracleException, autospec=True
-            ):
-                self.assertEqual(
-                    price_service.get_token_eth_value(random_address), 1.23
-                )
-                random_address_2 = Account.create().address
-                self.assertEqual(
-                    price_service.get_token_eth_value(random_address_2), 0.0
-                )
-                self.assertEqual(
-                    price_service.cache_token_eth_value[(random_address,)], 1.23
-                )
-                self.assertEqual(
-                    price_service.cache_token_eth_value[(random_address_2,)], 0.0
-                )
+        # Make every oracle fail
+        oracle_1.get_price.side_effect = OracleException
+        oracle_2.get_price.side_effect = OracleException
+        oracle_3.get_price.side_effect = OracleException
+
+        # Check cache
+        self.assertEqual(price_service.get_token_eth_value(random_address), 1.23)
+        random_address_2 = Account.create().address
+        self.assertEqual(price_service.get_token_eth_value(random_address_2), 0.0)
+        self.assertEqual(price_service.cache_token_eth_value[(random_address,)], 1.23)
+        self.assertEqual(price_service.cache_token_eth_value[(random_address_2,)], 0.0)
 
     @mock.patch.object(
         PriceService, "get_underlying_tokens", return_value=[], autospec=True
