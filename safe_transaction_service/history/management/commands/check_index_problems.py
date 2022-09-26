@@ -16,6 +16,13 @@ class Command(BaseCommand):
             "--fix", help="Fix nonce problems", action="store_true", default=False
         )
 
+        parser.add_argument(
+            "--force-batch-call",
+            help="Force batch call instead of multicall for nonce recovery",
+            action="store_true",
+            default=False,
+        )
+
     def get_nonce_fn(self, ethereum_client: EthereumClient):
         return get_safe_V1_3_0_contract(
             ethereum_client.w3, address=NULL_ADDRESS
@@ -23,6 +30,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         fix = options["fix"]
+        force_batch_call = options["force_batch_call"]
 
         queryset = SafeLastStatus.objects.all()
         count = queryset.count()
@@ -42,6 +50,7 @@ class Command(BaseCommand):
                 nonce_fn,
                 [safe_status.address for safe_status in safe_statuses_list],
                 raise_exception=False,
+                force_batch_call=force_batch_call,
             )
 
             addresses_to_reindex = set()
