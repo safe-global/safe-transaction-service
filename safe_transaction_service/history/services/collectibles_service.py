@@ -162,7 +162,7 @@ class CollectiblesService:
 
     @cachedmethod(cache=operator.attrgetter("cache_uri_metadata"))
     @cache_memoize(
-        60 * 60 * 24,
+        60 * 60 * 24 * 2,
         prefix="collectibles-_retrieve_metadata_from_uri",
         cache_exceptions=(MetadataRetrievalException,),
     )  # 1 day
