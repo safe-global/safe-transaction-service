@@ -39,6 +39,10 @@ class MetadataRetrievalException(CollectiblesServiceException):
     pass
 
 
+class MetadataRetrievalExceptionTimeout(CollectiblesServiceException):
+    pass
+
+
 def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
     if uri and uri.startswith("ipfs://"):
         uri = uri.replace("ipfs://ipfs/", "ipfs://")
@@ -160,55 +164,73 @@ class CollectiblesService:
             maxsize=4096, ttl=60 * 30
         )  # 2 hours of caching
 
+    def get_redis_metadata_timeout_key(self, uri: str):
+        return f"metadata_timeout:{uri}"
+
     @cachedmethod(cache=operator.attrgetter("cache_uri_metadata"))
     @cache_memoize(
         60 * 60 * 24 * 2,
         prefix="collectibles-_retrieve_metadata_from_uri",
         cache_exceptions=(MetadataRetrievalException,),
     )  # 1 day
-    def _retrieve_metadata_from_uri(self, uri: str) -> Any:
+    def _retrieve_metadata_from_uri(self, uri: str, force_retry: bool = False) -> Any:
         """
         Get metadata from URI. Currently just ipfs/http/https is supported
 
         :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
-        uri = ipfs_to_http(uri)
+        from ..tasks import chance_to_retrieve_metadata_from_uri
 
-        if not uri or not uri.startswith("http"):
-            raise MetadataRetrievalException(uri)
+        uri_http = ipfs_to_http(uri)
+        if (
+            not django_cache.get(self.get_redis_metadata_timeout_key(uri))
+            or force_retry
+        ):
+            if not uri_http or not uri_http.startswith("http"):
+                raise MetadataRetrievalException(uri_http)
 
-        try:
-            logger.debug("Getting metadata for uri=%s", uri)
-            with requests.get(uri, timeout=15, stream=True) as response:
-                if not response.ok:
-                    logger.debug("Cannot get metadata for uri=%s", uri)
-                    raise MetadataRetrievalException(uri)
+            try:
+                logger.debug("Getting metadata for uri=%s", uri_http)
+                with requests.get(uri_http, timeout=15, stream=True) as response:
+                    if not response.ok:
+                        logger.debug("Cannot get metadata for uri=%s", uri_http)
+                        raise MetadataRetrievalException(uri_http)
 
-                content_length = response.headers.get("content-length", 0)
-                content_type = response.headers.get("content-type", "")
-                if int(content_length) > self.METADATA_MAX_CONTENT_LENGTH:
-                    raise MetadataRetrievalException(
-                        f"Content-length={content_length} for uri={uri} is too big"
-                    )
+                    content_length = response.headers.get("content-length", 0)
+                    content_type = response.headers.get("content-type", "")
+                    if int(content_length) > self.METADATA_MAX_CONTENT_LENGTH:
+                        raise MetadataRetrievalException(
+                            f"Content-length={content_length} for uri={uri_http} is too big"
+                        )
 
-                if "application/json" not in content_type:
-                    raise MetadataRetrievalException(
-                        f"Content-type={content_type} for uri={uri} is not valid, "
-                        f'expected "application/json"'
-                    )
+                    if "application/json" not in content_type:
+                        raise MetadataRetrievalException(
+                            f"Content-type={content_type} for uri={uri_http} is not valid, "
+                            f'expected "application/json"'
+                        )
 
-                logger.debug("Got metadata for uri=%s", uri)
+                    logger.debug("Got metadata for uri=%s", uri_http)
 
-                # Some requests don't provide `Content-Length` on the headers
-                if len(response.content) > self.METADATA_MAX_CONTENT_LENGTH:
-                    raise MetadataRetrievalException(
-                        f"Retrieved content for uri={uri} is too big"
-                    )
+                    # Some requests don't provide `Content-Length` on the headers
+                    if len(response.content) > self.METADATA_MAX_CONTENT_LENGTH:
+                        raise MetadataRetrievalException(
+                            f"Retrieved content for uri={uri_http} is too big"
+                        )
 
-                return response.json()
-        except (IOError, ValueError) as e:
-            raise MetadataRetrievalException(uri) from e
+                    return response.json()
+            except (IOError, ValueError) as e:
+                django_cache.set(
+                    self.get_redis_metadata_timeout_key(uri),
+                    "Metadata timeout",
+                    60 * 60 * 24 * 2,
+                )
+                chance_to_retrieve_metadata_from_uri.apply_async(
+                    kwargs={"uri": uri}, countdown=5
+                )
+                raise MetadataRetrievalExceptionTimeout(uri_http) from e
+        else:
+            raise MetadataRetrievalExceptionTimeout(uri_http)
 
     def build_collectible(
         self,
@@ -384,6 +406,13 @@ class CollectiblesService:
                 metadata = {}
                 logger.warning(
                     "Cannot retrieve metadata on token-uri=%s for token-address=%s",
+                    collectible.uri,
+                    collectible.address,
+                )
+            except MetadataRetrievalExceptionTimeout:
+                metadata = {}
+                logger.warning(
+                    "Timeout retrieving metadata on token-uri=%s for token-address=%s, retrying asyncronous ",
                     collectible.uri,
                     collectible.address,
                 )

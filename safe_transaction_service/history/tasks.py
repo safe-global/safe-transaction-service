@@ -35,6 +35,7 @@ from .services import (
     ReorgService,
     ReorgServiceProvider,
 )
+from .services.collectibles_service import MetadataRetrievalExceptionTimeout
 
 logger = get_task_logger(__name__)
 
@@ -481,3 +482,27 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
 
         sent_requests += 1
     return sent_requests
+
+
+@app.shared_task(
+    bind=True,
+    soft_time_limit=SOFT_TIMEOUT,
+    autoretry_for=(MetadataRetrievalExceptionTimeout,),
+    time_limit=LOCK_TIMEOUT,
+    retry_backoff=5,
+    retry_kwargs={"max_retries": 5},
+)
+def chance_to_retrieve_metadata_from_uri(self, uri: str) -> bool:
+    """
+    Give more chances to get the metadata of collectible
+    """
+    from django.core.cache import cache as django_cache
+
+    from .services import CollectiblesServiceProvider
+
+    collectibles_service = CollectiblesServiceProvider()
+    collectibles_service._retrieve_metadata_from_uri.invalidate(uri)
+    metadata = collectibles_service._retrieve_metadata_from_uri(uri, True)
+    django_cache.delete(collectibles_service.get_redis_metadata_timeout_key(uri))
+
+    return metadata
