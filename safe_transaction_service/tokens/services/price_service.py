@@ -233,8 +233,8 @@ class PriceService:
             return self.get_cronos_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.FUSE_MAINNET,
-            EthereumNetwork.FUSE_SPARK
-        ): 
+            EthereumNetwork.FUSE_SPARK,
+        ):
             return self.coingecko_client.get_fuse_usd_price()
         else:
             try:

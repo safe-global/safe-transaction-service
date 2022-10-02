@@ -52,7 +52,7 @@ class CoingeckoClient:
             EthereumNetwork.MATIC,
             EthereumNetwork.OPTIMISTIC,
             EthereumNetwork.XDAI,
-            EthereumNetwork.FUSE_MAINNET
+            EthereumNetwork.FUSE_MAINNET,
         )
 
     def _do_request(self, url: str) -> Dict[str, Any]:
