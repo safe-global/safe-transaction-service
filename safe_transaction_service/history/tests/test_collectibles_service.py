@@ -246,6 +246,9 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             "image": "http://random-address.org/logo-28.png",
         }
         get_metadata_mock.return_value = metadata
+        # collectible cached by address + id
+        collectible.id = collectible.id + 1
+        get_collectibles_mock.return_value = [collectible], 0
         collectible_with_metadata = CollectibleWithMetadata(
             collectible.token_name,
             collectible.token_symbol,
@@ -261,6 +264,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             collectible_with_metadata.image_uri, "http://random-address.org/logo-28.png"
         )
         expected = [collectible_with_metadata]
+
         self.assertListEqual(
             collectibles_service.get_collectibles_with_metadata(safe_address),
             expected,

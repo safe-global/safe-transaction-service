@@ -1,3 +1,4 @@
+import json
 import logging
 import operator
 from dataclasses import dataclass, field
@@ -150,6 +151,9 @@ class CollectiblesService:
     METADATA_MAX_CONTENT_LENGTH = int(
         0.2 * 1024 * 1024
     )  # 0.2Mb is the maximum metadata size allowed
+    COLLECTIBLE_EXPIRATION = int(
+        60 * 60 * 24 * 2
+    )  # Keep collectibles by 2 days in cache
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
@@ -158,79 +162,59 @@ class CollectiblesService:
         self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
         self.cache_uri_metadata = TTLCache[str, Optional[Dict[str, Any]]](
-            maxsize=4096, ttl=60 * 60 * 24
+            maxsize=4096, ttl=self.COLLECTIBLE_EXPRIATION
         )  # 1 day of caching
         self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=60 * 30
         )  # 2 hours of caching
 
-    def get_redis_metadata_timeout_key(self, uri: str):
-        return f"metadata_timeout:{uri}"
+    def get_redis_metadata_key(self, address: str, id: int):
+        return f"metadata:{address}/{id}"
 
-    @cachedmethod(cache=operator.attrgetter("cache_uri_metadata"))
-    @cache_memoize(
-        60 * 60 * 24 * 2,
-        prefix="collectibles-_retrieve_metadata_from_uri",
-        cache_exceptions=(MetadataRetrievalException,),
-    )  # 1 day
-    def _retrieve_metadata_from_uri(self, uri: str, force_retry: bool = False) -> Any:
+    def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
         Get metadata from URI. Currently just ipfs/http/https is supported
 
         :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
-        from ..tasks import chance_to_retrieve_metadata_from_uri
 
-        uri_http = ipfs_to_http(uri)
-        if (
-            not django_cache.get(self.get_redis_metadata_timeout_key(uri))
-            or force_retry
-        ):
-            if not uri_http or not uri_http.startswith("http"):
-                raise MetadataRetrievalException(uri_http)
+        uri = ipfs_to_http(uri)
 
-            try:
-                logger.debug("Getting metadata for uri=%s", uri_http)
-                with requests.get(uri_http, timeout=15, stream=True) as response:
-                    if not response.ok:
-                        logger.debug("Cannot get metadata for uri=%s", uri_http)
-                        raise MetadataRetrievalException(uri_http)
+        if not uri or not uri.startswith("http"):
+            raise MetadataRetrievalException(uri)
 
-                    content_length = response.headers.get("content-length", 0)
-                    content_type = response.headers.get("content-type", "")
-                    if int(content_length) > self.METADATA_MAX_CONTENT_LENGTH:
-                        raise MetadataRetrievalException(
-                            f"Content-length={content_length} for uri={uri_http} is too big"
-                        )
+        try:
+            logger.debug("Getting metadata for uri=%s", uri)
+            with requests.get(uri, timeout=15, stream=True) as response:
+                if not response.ok:
+                    logger.debug("Cannot get metadata for uri=%s", uri)
+                    raise MetadataRetrievalException(uri)
 
-                    if "application/json" not in content_type:
-                        raise MetadataRetrievalException(
-                            f"Content-type={content_type} for uri={uri_http} is not valid, "
-                            f'expected "application/json"'
-                        )
+                content_length = response.headers.get("content-length", 0)
+                content_type = response.headers.get("content-type", "")
+                if int(content_length) > self.METADATA_MAX_CONTENT_LENGTH:
+                    raise MetadataRetrievalException(
+                        f"Content-length={content_length} for uri={uri} is too big"
+                    )
 
-                    logger.debug("Got metadata for uri=%s", uri_http)
+                if "application/json" not in content_type:
+                    raise MetadataRetrievalException(
+                        f"Content-type={content_type} for uri={uri} is not valid, "
+                        f'expected "application/json"'
+                    )
 
-                    # Some requests don't provide `Content-Length` on the headers
-                    if len(response.content) > self.METADATA_MAX_CONTENT_LENGTH:
-                        raise MetadataRetrievalException(
-                            f"Retrieved content for uri={uri_http} is too big"
-                        )
+                logger.debug("Got metadata for uri=%s", uri)
 
-                    return response.json()
-            except (IOError, ValueError) as e:
-                django_cache.set(
-                    self.get_redis_metadata_timeout_key(uri),
-                    "Metadata timeout",
-                    60 * 60 * 24 * 2,
-                )
-                chance_to_retrieve_metadata_from_uri.apply_async(
-                    kwargs={"uri": uri}, countdown=5
-                )
-                raise MetadataRetrievalExceptionTimeout(uri_http) from e
-        else:
-            raise MetadataRetrievalExceptionTimeout(uri_http)
+                # Some requests don't provide `Content-Length` on the headers
+                if len(response.content) > self.METADATA_MAX_CONTENT_LENGTH:
+                    raise MetadataRetrievalException(
+                        f"Retrieved content for uri={uri} is too big"
+                    )
+
+                return response.json()
+        except (IOError, ValueError) as e:
+            raise MetadataRetrievalExceptionTimeout(uri) from e
 
     def build_collectible(
         self,
@@ -380,6 +364,9 @@ class CollectiblesService:
         :param offset: page position
         :return: collectibles and count
         """
+        from ..tasks import retry_get_metadata_task
+
+        redis_pipe = self.redis.pipeline()
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
         collectibles, count = self.get_collectibles(
             safe_address,
@@ -388,11 +375,37 @@ class CollectiblesService:
             limit=limit,
             offset=offset,
         )
-        jobs = [
-            gevent.spawn(self.get_metadata, collectible) for collectible in collectibles
+        keys = [
+            self.get_redis_metadata_key(collectible.address, collectible.id)
+            for collectible in collectibles
         ]
+        cached_results = self.redis.mget(keys)
+
+        collectibles_no_cached = []
+        jobs = []
+        for cached, collectible in zip(cached_results, collectibles):
+            if cached:
+                collectible_cache = json.loads(cached)
+                collectibles_with_metadata.append(
+                    CollectibleWithMetadata(
+                        collectible_cache["token_name"],
+                        collectible_cache["token_symbol"],
+                        collectible_cache["logo_uri"],
+                        collectible_cache["address"],
+                        collectible_cache["id"],
+                        collectible_cache["uri"],
+                        collectible_cache["metadata"],
+                    )
+                )
+            else:
+                collectibles_no_cached.append(collectible)
+                jobs.append(gevent.spawn(self.get_metadata, collectible))
+                collectibles_with_metadata.append(None)  # Keeps the order
+
         _ = gevent.joinall(jobs)
-        for collectible, job in zip(collectibles, jobs):
+        collectibles_with_metadata_no_cached = []
+        redis_map_to_store = {}
+        for collectible, job in zip(collectibles_no_cached, jobs):
             try:
                 metadata = job.get()
                 if not isinstance(metadata, dict):
@@ -416,18 +429,37 @@ class CollectiblesService:
                     collectible.uri,
                     collectible.address,
                 )
-
-            collectibles_with_metadata.append(
-                CollectibleWithMetadata(
-                    collectible.token_name,
-                    collectible.token_symbol,
-                    collectible.logo_uri,
-                    collectible.address,
-                    collectible.id,
-                    collectible.uri,
-                    metadata,
+                retry_get_metadata_task.apply_async(
+                    kwargs={"address": collectible.address, "id": collectible.id},
+                    countdown=5,
                 )
+
+            collectible_with_metadata = CollectibleWithMetadata(
+                collectible.token_name,
+                collectible.token_symbol,
+                collectible.logo_uri,
+                collectible.address,
+                collectible.id,
+                collectible.uri,
+                metadata,
             )
+            collectibles_with_metadata_no_cached.append(collectible_with_metadata)
+            redis_pipe.set(
+                self.get_redis_metadata_key(collectible.address, collectible.id),
+                json.dumps(collectible_with_metadata.__dict__),
+                self.COLLECTIBLE_EXPIRATION,
+            )
+        redis_pipe.execute()
+
+        # Creates a collectibles metadata keeping the initial order
+        collectibles_no_cached_index = 0
+        for collectible_metadata_cached_index in range(len(collectibles_with_metadata)):
+            if collectibles_with_metadata[collectible_metadata_cached_index] is None:
+                collectibles_with_metadata[
+                    collectible_metadata_cached_index
+                ] = collectibles_with_metadata_no_cached[collectibles_no_cached_index]
+                collectibles_no_cached_index += 1
+
         return collectibles_with_metadata, count
 
     def get_collectibles_with_metadata(
@@ -567,7 +599,7 @@ class CollectiblesService:
             }
             pipe.mset(redis_map_to_store)
             for key in redis_map_to_store.keys():
-                pipe.expire(key, 60 * 60 * 24)  # 1 day of caching
+                pipe.expire(key, self.COLLECTIBLE_EXPRIATION)  # 1 day of caching
             pipe.execute()
             found_uris.update(blockchain_token_uris)
 
