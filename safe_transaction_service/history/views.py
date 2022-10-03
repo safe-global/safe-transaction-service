@@ -153,6 +153,7 @@ class ERC20IndexingView(GenericAPIView):
     serializer_class = serializers.ERC20IndexingStatusSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
+    @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request):
         """
         Get current indexing status for ERC20/721 events
@@ -167,6 +168,7 @@ class IndexingView(GenericAPIView):
     serializer_class = serializers.IndexingStatusSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
+    @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request):
         """
         Get current indexing status for ERC20/721 events
