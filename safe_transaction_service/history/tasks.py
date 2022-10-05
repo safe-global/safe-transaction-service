@@ -496,7 +496,7 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     autoretry_for=(MetadataRetrievalExceptionTimeout,),
     time_limit=LOCK_TIMEOUT,
     retry_backoff=3,
-    retry_kwargs={"max_retries": 3},
+    retry_kwargs={"max_retries": 4},
 )
 def retry_get_metadata_task(self, address: str, id: int) -> bool:
     """
