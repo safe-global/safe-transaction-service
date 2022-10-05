@@ -162,7 +162,7 @@ class CollectiblesService:
         self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
         self.cache_uri_metadata = TTLCache[str, Optional[Dict[str, Any]]](
-            maxsize=4096, ttl=self.COLLECTIBLE_EXPRIATION
+            maxsize=4096, ttl=self.COLLECTIBLE_EXPIRATION
         )  # 1 day of caching
         self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=60 * 30
@@ -431,7 +431,7 @@ class CollectiblesService:
                 )
                 retry_get_metadata_task.apply_async(
                     kwargs={"address": collectible.address, "id": collectible.id},
-                    countdown=5,
+                    countdown=30,  # 30 seconds later
                 )
 
             collectible_with_metadata = CollectibleWithMetadata(
@@ -599,7 +599,7 @@ class CollectiblesService:
             }
             pipe.mset(redis_map_to_store)
             for key in redis_map_to_store.keys():
-                pipe.expire(key, self.COLLECTIBLE_EXPRIATION)  # 1 day of caching
+                pipe.expire(key, self.COLLECTIBLE_EXPIRATION)  # 1 day of caching
             pipe.execute()
             found_uris.update(blockchain_token_uris)
 
