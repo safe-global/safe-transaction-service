@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -10,8 +11,10 @@ from eth_account import Account
 
 from gnosis.eth import EthereumClient, EthereumNetwork
 
+from ...utils.redis import get_redis
 from ..models import SafeContract, SafeLastStatus, SafeStatus
-from ..services import IndexService
+from ..services import CollectiblesService, CollectiblesServiceProvider, IndexService
+from ..services.collectibles_service import CollectibleWithMetadata
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
@@ -27,6 +30,7 @@ from ..tasks import (
     process_decoded_internal_txs_for_safe_task,
     process_decoded_internal_txs_task,
     reindex_last_hours_task,
+    retry_get_metadata_task,
 )
 from .factories import (
     ERC20TransferFactory,
@@ -193,3 +197,41 @@ class TestTasks(TestCase):
                         f"Safe-address={safe_address} Processing traces again after reindexing",
                         cm.output[5],
                     )
+
+    @patch.object(CollectiblesService, "get_metadata", autospec=True)
+    def test_retry_get_metadata_task(self, get_metadata_mock: MagicMock):
+        collectible_address = Account.create().address
+        collectible_id = 16
+
+        self.assertEqual(
+            retry_get_metadata_task(collectible_address, collectible_id), None
+        )
+
+        metadata = {
+            "name": "Octopus",
+            "description": "Atlantic Octopus",
+            "image": "http://random-address.org/logo-28.png",
+        }
+        get_metadata_mock.return_value = metadata
+        expected = CollectibleWithMetadata(
+            "Octopus",
+            "OCT",
+            "http://random-address.org/logo.png",
+            collectible_address,
+            collectible_id,
+            "http://random-address.org/info-28.json",
+            metadata,
+        )
+        redis = get_redis()
+        collectibles_service = CollectiblesServiceProvider()
+        redis.set(
+            collectibles_service.get_redis_metadata_key(
+                collectible_address, collectible_id
+            ),
+            json.dumps(expected.__dict__),
+            300,
+        )
+
+        self.assertEqual(
+            retry_get_metadata_task(collectible_address, collectible_id), expected
+        )
