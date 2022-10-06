@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from django.db.models import Case, F, OuterRef, QuerySet, Subquery, Value, When
+from django.db.models import Case, Exists, F, OuterRef, QuerySet, Subquery, Value, When
 from django.utils import timezone
 
 from redis import Redis
@@ -173,10 +173,10 @@ class TransactionService:
             )
 
         if trusted:  # Just show trusted transactions
-            multisig_safe_tx_ids = multisig_safe_tx_ids.filter(trusted=True)
+            multisig_safe_tx_ids = multisig_safe_tx_ids.trusted()
 
         if executed:
-            multisig_safe_tx_ids = multisig_safe_tx_ids.exclude(ethereum_tx__block=None)
+            multisig_safe_tx_ids = multisig_safe_tx_ids.executed()
 
         # Get module txs
         module_tx_ids = (
@@ -202,8 +202,8 @@ class TransactionService:
             .exclude(ethereum_tx=None)
             .values("ethereum_tx_id")
         )
-        module_hashes = ModuleTransaction.objects.filter(safe=safe_address).values(
-            "internal_tx__ethereum_tx_id"
+        module_hashes = ModuleTransaction.objects.filter(
+            safe=safe_address, internal_tx__ethereum_tx_id=OuterRef("ethereum_tx_id")
         )
 
         # Get incoming/outgoing tokens not included on Multisig or Module txs.
@@ -212,7 +212,7 @@ class TransactionService:
         erc20_tx_ids = (
             ERC20Transfer.objects.to_or_from(safe_address)
             .exclude(ethereum_tx__in=multisig_hashes)
-            .exclude(ethereum_tx__in=module_hashes)
+            .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
                 created=F("timestamp"),
@@ -229,7 +229,7 @@ class TransactionService:
         erc721_tx_ids = (
             ERC721Transfer.objects.to_or_from(safe_address)
             .exclude(ethereum_tx__in=multisig_hashes)
-            .exclude(ethereum_tx__in=module_hashes)
+            .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
                 created=F("timestamp"),
@@ -251,7 +251,7 @@ class TransactionService:
                 to=safe_address,
             )
             .exclude(ethereum_tx__in=multisig_hashes)
-            .exclude(ethereum_tx__in=module_hashes)
+            .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
                 created=F("timestamp"),
