@@ -685,6 +685,51 @@ class TestInternalTxDecoded(TestCase):
             InternalTxDecoded.objects.safes_pending_to_be_processed(), [safe_address_1]
         )
 
+    def test_out_of_order_for_safe(self):
+        random_safe = Account.create().address
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        i = InternalTxDecodedFactory(
+            internal_tx___from=random_safe,
+            internal_tx__block_number=10,
+            processed=False,
+        )
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        i.set_processed()
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        InternalTxDecodedFactory(
+            internal_tx___from=random_safe,
+            internal_tx__block_number=11,
+            processed=False,
+        )
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        InternalTxDecodedFactory(
+            internal_tx___from=random_safe, internal_tx__block_number=9, processed=False
+        )
+        self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+        i.processed = False
+        i.save(update_fields=["processed"])
+
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        InternalTxDecodedFactory(
+            internal_tx___from=random_safe, internal_tx__block_number=8, processed=True
+        )
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        InternalTxDecodedFactory(
+            internal_tx___from=random_safe, internal_tx__block_number=9, processed=True
+        )
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+        InternalTxDecodedFactory(
+            internal_tx___from=random_safe, internal_tx__block_number=10, processed=True
+        )
+        self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
 
 class TestLastSafeStatus(TestCase):
     def test_insert(self):
