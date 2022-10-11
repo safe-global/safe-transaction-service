@@ -599,7 +599,7 @@ class CollectiblesService:
             }
             pipe.mset(redis_map_to_store)
             for key in redis_map_to_store.keys():
-                pipe.expire(key, self.COLLECTIBLE_EXPIRATION)  # 1 day of caching
+                pipe.expire(key, self.COLLECTIBLE_EXPIRATION)
             pipe.execute()
             found_uris.update(blockchain_token_uris)
 
