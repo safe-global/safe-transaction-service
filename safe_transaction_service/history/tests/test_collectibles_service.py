@@ -247,7 +247,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         }
         get_metadata_mock.return_value = metadata
         # collectible cached by address + id
-        collectible.id = collectible.id + 1
+        collectible.id +=  1
         get_collectibles_mock.return_value = [collectible], 0
         collectible_with_metadata = CollectibleWithMetadata(
             collectible.token_name,
