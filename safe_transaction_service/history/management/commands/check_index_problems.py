@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from gnosis.eth import EthereumClient
@@ -33,6 +34,10 @@ class Command(BaseCommand):
         force_batch_call = options["force_batch_call"]
 
         queryset = SafeLastStatus.objects.all()
+        if settings.ETH_L2_NETWORK:
+            # Filter nonce=0 to exclude not initialized or non L2 Safes in a L2 network
+            queryset = queryset.exclude(nonce=0)
+
         count = queryset.count()
         batch = 1000
         index_service = IndexServiceProvider()

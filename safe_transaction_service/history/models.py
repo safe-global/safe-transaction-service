@@ -929,16 +929,36 @@ class InternalTx(models.Model):
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
-    pass
+    def out_of_order_for_safe(self, safe_address: ChecksumAddress):
+        """
+        :param safe_address:
+        :return: `True` if there are transactions out of order (processed transactions newer
+            than no processed transactions, due to a reindex), `False` otherwise
+        """
+
+        return (
+            self.for_safe(safe_address)
+            .not_processed()
+            .filter(
+                internal_tx__block_number__lt=self.for_safe(safe_address)
+                .processed()
+                .order_by("-internal_tx__block_number")
+                .values("internal_tx__block_number")[:1]
+            )
+            .exists()
+        )
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
-    def for_safe(self, safe_address: str):
+    def for_safe(self, safe_address: ChecksumAddress):
         """
         :param safe_address:
         :return: Queryset of all InternalTxDecoded for one Safe with `safe_address`
         """
         return self.filter(internal_tx___from=safe_address)
+
+    def processed(self):
+        return self.filter(processed=True)
 
     def not_processed(self):
         return self.filter(processed=False)
@@ -965,7 +985,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return self.not_processed().order_by_processing_queue()
 
-    def pending_for_safe(self, safe_address: str):
+    def pending_for_safe(self, safe_address: ChecksumAddress):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
@@ -1070,7 +1090,7 @@ class MultisigTransactionManager(models.Manager):
             owners_set.update(owners_list)
 
         return (
-            MultisigTransaction.objects.executed()
+            self.executed()
             .filter(
                 safe=safe,
                 confirmations__owner__in=owners_set,
