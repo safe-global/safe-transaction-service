@@ -197,10 +197,8 @@ class TransactionService:
             .order_by("-execution_date")
         )
 
-        multisig_hashes = (
-            MultisigTransaction.objects.filter(safe=safe_address)
-            .exclude(ethereum_tx=None)
-            .values("ethereum_tx_id")
+        multisig_hashes = MultisigTransaction.objects.filter(
+            safe=safe_address, ethereum_tx_id=OuterRef("ethereum_tx_id")
         )
         module_hashes = ModuleTransaction.objects.filter(
             safe=safe_address, internal_tx__ethereum_tx_id=OuterRef("ethereum_tx_id")
@@ -211,7 +209,7 @@ class TransactionService:
         # always appear as a MultisigTransaction
         erc20_tx_ids = (
             ERC20Transfer.objects.to_or_from(safe_address)
-            .exclude(ethereum_tx__in=multisig_hashes)
+            .exclude(Exists(multisig_hashes))
             .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
@@ -228,7 +226,7 @@ class TransactionService:
 
         erc721_tx_ids = (
             ERC721Transfer.objects.to_or_from(safe_address)
-            .exclude(ethereum_tx__in=multisig_hashes)
+            .exclude(Exists(multisig_hashes))
             .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
@@ -250,7 +248,7 @@ class TransactionService:
                 value__gt=0,
                 to=safe_address,
             )
-            .exclude(ethereum_tx__in=multisig_hashes)
+            .exclude(Exists(multisig_hashes))
             .exclude(Exists(module_hashes))
             .annotate(
                 execution_date=F("timestamp"),
