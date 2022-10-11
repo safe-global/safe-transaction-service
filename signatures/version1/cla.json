@@ -167,6 +167,14 @@
       "created_at": "2022-10-11T12:05:00Z",
       "repoId": 139428636,
       "pullRequestNo": 1109
+    },
+    {
+      "name": "oscar-gross",
+      "id": 103461654,
+      "comment_id": 1274601757,
+      "created_at": "2022-10-11T12:23:34Z",
+      "repoId": 139428636,
+      "pullRequestNo": 1106
     }
   ]
 }
