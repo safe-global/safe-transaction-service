@@ -476,7 +476,7 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
         ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 4860798),  # v1.3.0
     ],
     EthereumNetwork.KCC_TESTNET: [
-        ("0x12B4bd0ae3DE91400F941fcc2158c7E29B2514Ed", 5825652),  # v1.3.0
+        ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 12147567),  # v1.3.0
     ],
 }
 
