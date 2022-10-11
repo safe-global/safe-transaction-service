@@ -495,20 +495,25 @@ def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
     soft_time_limit=SOFT_TIMEOUT,
     autoretry_for=(MetadataRetrievalExceptionTimeout,),
     time_limit=LOCK_TIMEOUT,
-    retry_backoff=3,
+    retry_backoff=60,
     retry_kwargs={"max_retries": 4},
 )
 def retry_get_metadata_task(self, address: str, id: int) -> bool:
     """
-    Give more chances to get the metadata of collectible
+    Retry to get metadata from an uri that during the first try returned a timeout error.
+
+    :param address: collectible address
+    :param id: collectible id
     """
     from .services import CollectiblesServiceProvider
 
     collectibles_service = CollectiblesServiceProvider()
     redis_key = collectibles_service.get_redis_metadata_key(address, id)
     redis = get_redis()
+    # The collectible is shared with the task by redis cache.
+    # This avoid to have the collectible serialized on redis and also on rabbit.
     redis_collectible = redis.get(redis_key)
-
+    # If the collectible doesn't exist means that the cache was removed and should wait for first try from the view.
     if not redis_collectible:
         return None
 
