@@ -324,7 +324,14 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 13743076, "1.3.0+L2"),
         ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 13743082, "1.3.0"),
     ],
-
+    EthereumNetwork.KCC_MAINNET: [
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 4860807, "1.3.0+L2"),
+        ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 4860810, "1.3.0"),
+    ],
+    EthereumNetwork.KCC_TESTNET: [
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 12147586, "1.3.0+L2"),
+        ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 12147596, "1.3.0"),
+    ],
 }
 
 PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
@@ -478,6 +485,12 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     ],
     EthereumNetwork.CLOUDWALK_TESTNET: [
         ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 13743040),  # v1.3.0
+    ],
+    EthereumNetwork.KCC_MAINNET: [
+        ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 4860798),  # v1.3.0
+    ],
+    EthereumNetwork.KCC_TESTNET: [
+        ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 12147567),  # v1.3.0
     ],
 }
 
