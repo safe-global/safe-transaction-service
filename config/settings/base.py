@@ -237,6 +237,10 @@ CELERY_ROUTES = (
         ("safe_transaction_service.contracts.tasks.*", {"queue": "contracts"}),
         ("safe_transaction_service.notifications.tasks.*", {"queue": "notifications"}),
         ("safe_transaction_service.tokens.tasks.*", {"queue": "tokens"}),
+        (
+            "safe_transaction_service.history.tasks.retry_get_metadata_task",
+            {"queue": "tokens"},
+        ),
     ],
 )
 
