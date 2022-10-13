@@ -452,13 +452,11 @@ class CollectiblesService:
         redis_pipe.execute()
 
         # Creates a collectibles metadata keeping the initial order
-        collectibles_no_cached_index = 0
         for collectible_metadata_cached_index in range(len(collectibles_with_metadata)):
             if collectibles_with_metadata[collectible_metadata_cached_index] is None:
                 collectibles_with_metadata[
                     collectible_metadata_cached_index
-                ] = collectibles_with_metadata_not_cached[collectibles_no_cached_index]
-                collectibles_no_cached_index += 1
+                ] = collectibles_with_metadata_not_cached.pop(0)
 
         return collectibles_with_metadata, count
 
