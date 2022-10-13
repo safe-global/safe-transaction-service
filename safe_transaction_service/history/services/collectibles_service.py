@@ -154,7 +154,7 @@ class CollectiblesService:
     COLLECTIBLE_EXPIRATION = int(
         60 * 60 * 24 * 2
     )  # Keep collectibles by 2 days in cache
-    TOKEN_EXPIRATION = int(60 * 30)
+    TOKEN_EXPIRATION = int(60 * 60)
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
@@ -224,6 +224,13 @@ class CollectiblesService:
         token_id: int,
         token_metadata_uri: Optional[str],
     ) -> Collectible:
+        """
+        Build a collectible from the input parameters
+        :param token_info: information of collectible like name, symbol...
+        :param token_address:
+        :param token_id:
+        :param token_metadata_uri:
+        """
         if not token_metadata_uri:
             if token_address in CRYPTO_KITTIES_CONTRACT_ADDRESSES:
                 token_metadata_uri = f"https://api.cryptokitties.co/kitties/{token_id}"
@@ -241,6 +248,10 @@ class CollectiblesService:
         )
 
     def get_metadata(self, collectible: Collectible) -> Any:
+        """
+        Return metadata for a collectible
+        :param collectible
+        """
         if tld := ENS_CONTRACTS_WITH_TLD.get(
             collectible.address
         ):  # Special case for ENS
