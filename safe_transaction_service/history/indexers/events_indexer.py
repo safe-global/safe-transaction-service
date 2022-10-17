@@ -5,14 +5,17 @@ from typing import Any, Dict, List, Optional, OrderedDict, Sequence
 
 from django.conf import settings
 
+import gevent
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
+from gevent import pool
 from hexbytes import HexBytes
 from web3.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 
-from ...utils.utils import chunks
+from safe_transaction_service.utils.utils import chunks
+
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -45,6 +48,10 @@ class EventsIndexer(EthereumIndexer):
         kwargs.setdefault(
             "updated_blocks_behind", settings.ETH_EVENTS_UPDATED_BLOCK_BEHIND
         )  # For last x blocks, consider them almost updated and process them first
+
+        # Number of concurrent requests to `getLogs`
+        self.get_logs_concurrency = settings.ETH_EVENTS_GET_LOGS_CONCURRENCY
+
         super().__init__(*args, **kwargs)
 
     @property
@@ -94,15 +101,20 @@ class EventsIndexer(EthereumIndexer):
                 for addresses_chunk in addresses_chunks
             ]
 
-            log_receipts = []
+            gevent_pool = pool.Pool(self.get_logs_concurrency)
+            jobs = [
+                gevent_pool.spawn(
+                    self.ethereum_client.slow_w3.eth.get_logs, single_parameters
+                )
+                for single_parameters in multiple_parameters
+            ]
 
-            for single_parameters in multiple_parameters:
-                with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                    log_receipts.extend(
-                        self.ethereum_client.slow_w3.eth.get_logs(single_parameters)
-                    )
+            with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                # Check how long the first job takes
+                gevent.joinall(jobs[:1])
 
-            return log_receipts
+            gevent.joinall(jobs)
+            return [log_receipt for job in jobs for log_receipt in job.get()]
         else:
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
                 return self.ethereum_client.slow_w3.eth.get_logs(parameters)
