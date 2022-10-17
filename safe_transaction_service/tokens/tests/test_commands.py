@@ -28,7 +28,7 @@ coinmarketcap_client_mock = [
 relay_token_client_mock = [
     {
         "address": "0x6810e776880C02933D47DB1b9fc05908e5386b96",
-        "logoUri": "https://gnosis-safe-token-logos.s3.amazonaws.com/0x6810e776880C02933D47DB1b9fc05908e5386b96.png",
+        "logoUri": "https://tokens-logo.localhost/0x6810e776880C02933D47DB1b9fc05908e5386b96.png",
         "default": False,
         "name": "Gnosis",
         "symbol": "GNO",
@@ -39,7 +39,7 @@ relay_token_client_mock = [
     },
     {
         "address": "0x1A5F9352Af8aF974bFC03399e3767DF6370d82e4",
-        "logoUri": "https://gnosis-safe-token-logos.s3.amazonaws.com/0x1A5F9352Af8aF974bFC03399e3767DF6370d82e4.png",
+        "logoUri": "https://tokens-logo.localhost/0x1A5F9352Af8aF974bFC03399e3767DF6370d82e4.png",
         "default": True,
         "name": "OWL Token",
         "symbol": "OWL",

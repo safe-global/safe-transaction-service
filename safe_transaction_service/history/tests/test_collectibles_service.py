@@ -2,6 +2,7 @@ from typing import List, Optional, Sequence, Tuple
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.conf import settings
 from django.test import TestCase
 
 from eth_account import Account
@@ -57,7 +58,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
             # Caches empty
             self.assertFalse(collectibles_service.cache_token_info)
-            self.assertFalse(collectibles_service.cache_uri_metadata)
 
             safe_address = "0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7"
             ens_address = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85"
@@ -115,7 +115,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                     metadata={
                         "name": "safe-multisig.eth",
                         "description": ".eth ENS Domain",
-                        "image": collectibles_service.ENS_IMAGE_URL,
+                        "image": settings.TOKENS_ENS_IMAGE_URL,
                     },
                 ),
                 CollectibleWithMetadata(
@@ -190,7 +190,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
             # Caches not empty
             self.assertTrue(collectibles_service.cache_token_info)
-            self.assertTrue(collectibles_service.cache_uri_metadata)
         finally:
             del EthereumClientProvider.instance
 
