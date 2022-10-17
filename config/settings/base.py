@@ -400,10 +400,14 @@ ETH_REORG_BLOCKS = env.int(
 
 # Tokens
 # ------------------------------------------------------------------------------
-TOKENS_LOGO_BASE_URI = env(
-    "TOKENS_LOGO_BASE_URI", default="https://gnosis-safe-token-logos.s3.amazonaws.com/"
+TOKENS_LOGO_BASE_URI = env.str(
+    "TOKENS_LOGO_BASE_URI", default="https://tokens-logo.localhost/"
+)  # Used if AWS_S3_PUBLIC_URL is not defined
+TOKENS_LOGO_EXTENSION = env.str("TOKENS_LOGO_EXTENSION", default=".png")
+TOKENS_ENS_IMAGE_URL = env.str(
+    "TOKENS_ENS_IMAGE_URL",
+    default="https://safe-transaction-assets.safe.global/tokens/logos/ENS.png",
 )
-TOKENS_LOGO_EXTENSION = env("TOKENS_LOGO_EXTENSION", default=".png")
 
 # Notifications
 # ------------------------------------------------------------------------------

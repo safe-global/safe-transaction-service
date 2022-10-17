@@ -147,7 +147,6 @@ class CollectiblesServiceProvider:
 
 
 class CollectiblesService:
-    ENS_IMAGE_URL = "https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png"
     METADATA_MAX_CONTENT_LENGTH = int(
         0.2 * 1024 * 1024
     )  # 0.2Mb is the maximum metadata size allowed
@@ -162,12 +161,10 @@ class CollectiblesService:
         self.redis = redis
         self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
-        self.cache_uri_metadata = TTLCache[str, Optional[Dict[str, Any]]](
-            maxsize=4096, ttl=self.COLLECTIBLE_EXPIRATION
-        )  # 1 day of caching
         self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=self.TOKEN_EXPIRATION
-        )  # 2 hours of caching
+        )
+        self.ens_image_url = settings.TOKENS_ENS_IMAGE_URL
 
     def get_redis_metadata_key(self, address: str, id: int):
         return f"metadata:{address}/{id}"
@@ -260,7 +257,7 @@ class CollectiblesService:
                 "name": f"{label_name}.{tld}" if label_name else f".{tld}",
                 "description": ("" if label_name else "Unknown ")
                 + f".{tld} ENS Domain",
-                "image": self.ENS_IMAGE_URL,
+                "image": self.ens_image_url,
             }
 
         return self._retrieve_metadata_from_uri(collectible.uri)

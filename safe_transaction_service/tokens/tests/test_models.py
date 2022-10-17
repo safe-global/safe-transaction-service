@@ -50,7 +50,7 @@ class TestModels(TestCase):
         self.assertFalse(t.logo)
         self.assertEqual(
             t.get_full_logo_uri(),
-            f"https://gnosis-safe-token-logos.s3.amazonaws.com/tokens/logos/{t.address}.png",
+            f"https://tokens-logo.localhost/tokens/logos/{t.address}.png",
         )
 
         assets_url = "https://assets.gnosis.io"
