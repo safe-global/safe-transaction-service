@@ -441,7 +441,7 @@ class CollectiblesService:
                     collectible.address,
                 )
                 retry_get_metadata_task.apply_async(
-                    kwargs={"address": collectible.address, "id": collectible.id},
+                    (collectible.address, collectible.id),
                     countdown=random.randint(0, 60),  # Don't retry all at once
                 )
 
