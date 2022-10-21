@@ -1,7 +1,8 @@
+import dataclasses
 import json
 import logging
 import operator
-from dataclasses import dataclass, field
+import random
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin
 
@@ -53,7 +54,7 @@ def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
     return uri
 
 
-@dataclass
+@dataclasses.dataclass
 class Erc721InfoWithLogo:
     """
     ERC721 info from Blockchain
@@ -74,7 +75,7 @@ class Erc721InfoWithLogo:
         )
 
 
-@dataclass
+@dataclasses.dataclass
 class Collectible:
     """
     Collectible built from ERC721InfoWithLogo
@@ -88,16 +89,16 @@ class Collectible:
     uri: str
 
 
-@dataclass
+@dataclasses.dataclass
 class CollectibleWithMetadata(Collectible):
     """
     Collectible with metadata parsed if possible
     """
 
     metadata: Dict[str, Any]
-    name: Optional[str] = field(init=False)
-    description: Optional[str] = field(init=False)
-    image_uri: Optional[str] = field(init=False)
+    name: Optional[str] = dataclasses.field(init=False)
+    description: Optional[str] = dataclasses.field(init=False)
+    image_uri: Optional[str] = dataclasses.field(init=False)
 
     def get_name(self) -> Optional[str]:
         if self.metadata:
@@ -166,8 +167,8 @@ class CollectiblesService:
         )
         self.ens_image_url = settings.TOKENS_ENS_IMAGE_URL
 
-    def get_redis_metadata_key(self, address: str, id: int):
-        return f"metadata:{address}/{id}"
+    def get_metadata_cache_key(self, address: str, id: int):
+        return f"metadata:{address}:{id}"
 
     def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
@@ -244,7 +245,7 @@ class CollectiblesService:
             name, symbol, logo_uri, token_address, token_id, token_metadata_uri
         )
 
-    def get_metadata(self, collectible: Collectible) -> Any:
+    def get_metadata(self, collectible: Collectible | CollectibleWithMetadata) -> Any:
         """
         Return metadata for a collectible
         :param collectible
@@ -373,6 +374,8 @@ class CollectiblesService:
         :param offset: page position
         :return: collectibles and count
         """
+
+        # Async retry for getting metadata if fetching fails
         from ..tasks import retry_get_metadata_task
 
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
@@ -383,13 +386,13 @@ class CollectiblesService:
             limit=limit,
             offset=offset,
         )
-        keys = [
-            self.get_redis_metadata_key(collectible.address, collectible.id)
+        metadata_cache_keys = [
+            self.get_metadata_cache_key(collectible.address, collectible.id)
             for collectible in collectibles
         ]
-        cached_results = self.redis.mget(keys)
+        cached_results = self.redis.mget(metadata_cache_keys)
 
-        collectibles_no_cached = []
+        collectibles_not_cached = []
         jobs = []
         for cached, collectible in zip(cached_results, collectibles):
             if cached:
@@ -406,14 +409,14 @@ class CollectiblesService:
                     )
                 )
             else:
-                collectibles_no_cached.append(collectible)
+                collectibles_not_cached.append(collectible)
                 jobs.append(gevent.spawn(self.get_metadata, collectible))
                 collectibles_with_metadata.append(None)  # Keeps the order
 
         _ = gevent.joinall(jobs)
         collectibles_with_metadata_not_cached = []
         redis_pipe = self.redis.pipeline()
-        for collectible, job in zip(collectibles_no_cached, jobs):
+        for collectible, job in zip(collectibles_not_cached, jobs):
             try:
                 metadata = job.get()
                 if not isinstance(metadata, dict):
@@ -439,7 +442,7 @@ class CollectiblesService:
                 )
                 retry_get_metadata_task.apply_async(
                     kwargs={"address": collectible.address, "id": collectible.id},
-                    countdown=30,  # 30 seconds later
+                    countdown=random.randint(0, 60),  # Don't retry all at once
                 )
 
             collectible_with_metadata = CollectibleWithMetadata(
@@ -453,8 +456,8 @@ class CollectiblesService:
             )
             collectibles_with_metadata_not_cached.append(collectible_with_metadata)
             redis_pipe.set(
-                self.get_redis_metadata_key(collectible.address, collectible.id),
-                json.dumps(collectible_with_metadata.__dict__),
+                self.get_metadata_cache_key(collectible.address, collectible.id),
+                json.dumps(dataclasses.asdict(collectible_with_metadata)),
                 self.COLLECTIBLE_EXPIRATION,
             )
         redis_pipe.execute()
