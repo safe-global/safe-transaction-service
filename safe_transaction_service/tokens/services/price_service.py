@@ -159,6 +159,9 @@ class PriceService:
     def get_cardano_usd_price(self) -> float:
         return self.binance_client.get_ada_usd_price()
 
+    def get_algorand_usd_price(self) -> float:
+        return self.kraken_client.get_algo_usd_price()
+
     def get_binance_usd_price(self) -> float:
         try:
             return self.binance_client.get_bnb_usd_price()
@@ -260,7 +263,7 @@ class PriceService:
             EthereumNetwork.MILKOMEDA_A1_TESTNET,
             EthereumNetwork.MILKOMEDA_A1_MAINNET,
         ):
-            return self.kraken_client.get_algo_usd_price()
+            return self.get_algorand_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
