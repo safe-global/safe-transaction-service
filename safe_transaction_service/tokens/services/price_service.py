@@ -256,6 +256,11 @@ class PriceService:
             EthereumNetwork.METIS_TESTNET,
         ):
             return self.coingecko_client.get_metis_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.MILKOMEDA_A1_TESTNET,
+            EthereumNetwork.MILKOMEDA_A1_MAINNET,
+        ):
+            return self.kraken_client.get_algo_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
