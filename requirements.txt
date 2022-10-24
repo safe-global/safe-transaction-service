@@ -3,7 +3,7 @@ cachetools==5.2.0
 celery==5.2.7
 django==4.0.8
 django-cache-memoize==0.1.10
-django-celery-beat==2.3.0
+django-celery-beat==2.4.0
 django-cors-headers==3.13.0
 django-db-geventpool==4.0.1
 django-debug-toolbar
