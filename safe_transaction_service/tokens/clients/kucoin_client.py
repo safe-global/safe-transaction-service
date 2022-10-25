@@ -35,3 +35,10 @@ class KucoinClient:
         :raises: CannotGetPrice
         """
         return self._get_price("CRO-USDT")
+
+    def get_kcs_usd_price(self) -> float:
+        """
+        :return: current USD price for KuCoin Token
+        :raises: CannotGetPrice
+        """
+        return self._get_price("KCS-USDT")

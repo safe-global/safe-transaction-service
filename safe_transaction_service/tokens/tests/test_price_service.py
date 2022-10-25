@@ -119,6 +119,16 @@ class TestPriceService(TestCase):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
 
+        # KuCoin
+        with mock.patch.object(KucoinClient, "get_kcs_usd_price", return_value=4.4):
+            price_service.ethereum_network = EthereumNetwork.KCC_TESTNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
+
+            price_service.ethereum_network = EthereumNetwork.KCC_MAINNET
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
+
         # Milkomeda
         with mock.patch.object(BinanceClient, "get_ada_usd_price", return_value=5.5):
             price_service.ethereum_network = EthereumNetwork.MILKOMEDA_C1_TESTNET

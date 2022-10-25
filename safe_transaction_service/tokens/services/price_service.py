@@ -182,6 +182,12 @@ class PriceService:
     def get_cronos_usd_price(self) -> float:
         return self.kucoin_client.get_cro_usd_price()
 
+    def get_kcs_usd_price(self) -> float:
+        try:
+            return self.kucoin_client.get_kcs_usd_price()
+        except CannotGetPrice:
+            return self.coingecko_client.get_kcs_usd_price()
+
     @cachedmethod(cache=operator.attrgetter("cache_eth_price"))
     @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
     def get_native_coin_usd_price(self) -> float:
@@ -236,6 +242,11 @@ class PriceService:
             EthereumNetwork.FUSE_SPARK,
         ):
             return self.coingecko_client.get_fuse_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.KCC_MAINNET,
+            EthereumNetwork.KCC_TESTNET,
+        ):
+            return self.get_kcs_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.METIS,
             EthereumNetwork.METIS_TESTNET,
