@@ -2116,10 +2116,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )  # Data is missing
 
         data = {
-            # 'delegate': delegate_address,
-            "signature": "0x"
-            + "1" * 130,
+            "delegate": Account.create().address,
+            "signature": "0x" + "1" * 130,
         }
+        response = self.client.delete(
+            reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(
+            {
+                "code": 2,
+                "message": "Delegate address in body should match the one in the url",
+                "arguments": [data["delegate"], delegate_address],
+            },
+            response.data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        del data["delegate"]
         response = self.client.delete(
             reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
             format="json",

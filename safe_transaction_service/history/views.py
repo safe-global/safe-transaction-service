@@ -778,6 +778,19 @@ class SafeDelegateDestroyView(DestroyAPIView):
                 },
             )
 
+        body_delegate = request.data.get("delegate", delegate_address)
+        if (
+            body_delegate != delegate_address
+        ):  # Check delegate in body matches the one in url
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 2,
+                    "message": "Delegate address in body should match the one in the url",
+                    "arguments": [body_delegate, delegate_address],
+                },
+            )
+
         request.data["safe"] = address
         request.data["delegate"] = delegate_address
         serializer = self.get_serializer(data=request.data)
