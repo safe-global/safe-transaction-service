@@ -35,6 +35,7 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from packaging.version import Version
+from web3 import Web3
 from web3.types import EventData
 
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
@@ -51,6 +52,10 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.contracts.models import Contract
 
+from .celo_contracts.blockchain_parameters import (
+    blockchain_parameters_abi,
+    blockchain_parameters_proxy_address,
+)
 from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
@@ -152,6 +157,11 @@ class BulkCreateSignalMixin:
 
 
 class EthereumBlockManager(models.Manager):
+    web3 = Web3(Web3.HTTPProvider(settings.ETHEREUM_NODE_URL))
+    blockchain_parameters = web3.eth.contract(
+        address=blockchain_parameters_proxy_address, abi=blockchain_parameters_abi
+    )
+
     def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
         try:
             return self.get(block_hash=block["hash"])
@@ -168,9 +178,11 @@ class EthereumBlockManager(models.Manager):
         """
         try:
             with transaction.atomic():  # Needed for handling IntegrityError
+                gas_limit = self.blockchain_parameters.functions.blockGasLimit().call()
+
                 return super().create(
                     number=block["number"],
-                    gas_limit=block["gasLimit"],
+                    gas_limit=gas_limit,
                     gas_used=block["gasUsed"],
                     timestamp=datetime.datetime.fromtimestamp(
                         block["timestamp"], datetime.timezone.utc
