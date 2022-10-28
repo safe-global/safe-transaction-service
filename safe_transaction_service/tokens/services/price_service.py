@@ -29,6 +29,7 @@ from gnosis.eth.oracles import (
     PoolTogetherOracle,
     PriceOracle,
     PricePoolOracle,
+    SuperfluidOracle,
     SushiswapOracle,
     UnderlyingToken,
     UniswapV2Oracle,
@@ -110,8 +111,11 @@ class PriceService:
             )
             if Oracle.is_available(self.ethereum_client)
         )
-        if oracles and AaveOracle.is_available(self.ethereum_client):
-            oracles = oracles + (AaveOracle(self.ethereum_client, oracles[0]),)
+        if oracles:
+            if AaveOracle.is_available(self.ethereum_client):
+                oracles += (AaveOracle(self.ethereum_client, oracles[0]),)
+            if SuperfluidOracle.is_available(self.ethereum_client):
+                oracles += (SuperfluidOracle(self.ethereum_client, oracles[0]),)
 
         return oracles
 
