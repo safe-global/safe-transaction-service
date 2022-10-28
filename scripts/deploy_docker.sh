@@ -14,8 +14,11 @@ else
     docker pull gnosispm/$DOCKERHUB_PROJECT:staging && \
     docker build -t $DOCKERHUB_PROJECT -f docker/web/Dockerfile . --cache-from gnosispm/$DOCKERHUB_PROJECT:staging --build-arg BUILDKIT_INLINE_CACHE=1 || \
     docker build -t $DOCKERHUB_PROJECT -f docker/web/Dockerfile . --build-arg BUILDKIT_INLINE_CACHE=1
-    docker tag $DOCKERHUB_PROJECT gnosispm/$DOCKERHUB_PROJECT:latest
-    docker push gnosispm/$DOCKERHUB_PROJECT:latest
+    # Only push latest on release
+    case $1 in v*)
+        docker tag $DOCKERHUB_PROJECT gnosispm/$DOCKERHUB_PROJECT:latest
+        docker push gnosispm/$DOCKERHUB_PROJECT:latest
+    esac
 fi
 docker tag $DOCKERHUB_PROJECT gnosispm/$DOCKERHUB_PROJECT:$1
 docker push gnosispm/$DOCKERHUB_PROJECT:$1
