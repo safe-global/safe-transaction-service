@@ -566,7 +566,7 @@ def retry_get_metadata_task(
             )
         else:
             logger.debug(
-                "Cannot get the metadata from %s after %i retries",
+                "Timeout when getting metadata from %s after %i retries ",
                 collectible.uri,
                 retry_get_metadata_task.request.retries,
             )
