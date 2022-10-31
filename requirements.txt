@@ -26,7 +26,7 @@ gunicorn[gevent]==20.1.0
 hexbytes==0.2.3
 hiredis==2.0.0
 packaging>=21.0
-pillow==9.2.0
+pillow==9.3.0
 psycogreen==1.0.2
 psycopg2==2.9.5
 redis==4.3.4
