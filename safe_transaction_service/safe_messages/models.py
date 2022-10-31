@@ -3,6 +3,7 @@ from logging import getLogger
 from django.db import models
 from django.db.models import JSONField
 
+from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
 from gnosis.eth.django.models import EthereumAddressV2Field, HexField, Keccak256Field
@@ -28,6 +29,17 @@ class SafeMessage(TimeStampedModel):
 
     def __str__(self):
         return f"Safe Message {self.message_hash.hex()} - {self.description}"
+
+    def build_signature(self) -> bytes:
+        return b"".join(
+            [
+                HexBytes(signature)
+                for _, signature in sorted(
+                    self.confirmations.values_list("owner", "signature"),
+                    key=lambda tup: tup[0].lower(),
+                )
+            ]
+        )
 
 
 class SafeMessageConfirmation(TimeStampedModel):

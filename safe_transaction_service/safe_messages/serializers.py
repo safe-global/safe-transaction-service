@@ -1,14 +1,18 @@
 from rest_framework import serializers
 
 import gnosis.eth.django.serializers as eth_serializers
+from gnosis.safe.safe_signature import SafeSignatureType
+
+from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
 
 
 class SafeMessageConfirmationSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    display_name = serializers.CharField()
-    logo_uri = serializers.ImageField(source="logo")
-    contract_abi = ContractAbiSerializer()
-    trusted_for_delegate_call = serializers.BooleanField()
+    owner = eth_serializers.EthereumAddressField()
+    signature = eth_serializers.HexadecimalField()
+    signature_type = serializers.SerializerMethodField()
+
+    def get_signature_type(self, obj: SafeMessageConfirmation) -> str:
+        return SafeSignatureType(obj.signature_type).name
 
 
 class SafeMessageSerializer(serializers.Serializer):
