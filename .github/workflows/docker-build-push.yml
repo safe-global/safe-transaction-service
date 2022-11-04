@@ -38,6 +38,7 @@ jobs:
           platforms: linux/amd64
           push: true
           context: .
+          file: docker/web/Dockerfile
           tags: |
              us-west1-docker.pkg.dev/devopsre/clabs-public-images/safe-transaction-service:latest
              us-west1-docker.pkg.dev/devopsre/clabs-public-images/safe-transaction-service:${{ github.sha }}
