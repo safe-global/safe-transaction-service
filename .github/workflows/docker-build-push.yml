@@ -1,0 +1,43 @@
+name: Build and Push Docker image
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - 'feat/celo'
+
+jobs:
+  Build-Push-Docker:
+    runs-on: ubuntu-latest
+    permissions: # Must change the job token permissions to use JWT auth
+      id-token: write
+      contents: read
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+
+      - id: auth
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@ceee102ec2387dd9e844e01b530ccd4ec87ce955'
+        with:
+          workload_identity_provider: 'projects/1094498259535/locations/global/workloadIdentityPools/gh-safe-transaction-service/providers/github-by-repos'
+          service_account: 'safe-tx-service-images@devopsre.iam.gserviceaccount.com'
+          access_token_lifetime: '50m'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@877d4953d2c70a0ba7ef3290ae968eb24af233bb'
+
+      - name: 'Configure docker for gcloud auth'
+        run: 'gcloud auth configure-docker us-west1-docker.pkg.dev'
+
+      - id: docker-push-latest
+        name: Build Docker image and push to Google Artifact Registry
+        uses: docker/build-push-action@e551b19e49efd4e98792db7592c17c09b89db8d8
+        with:
+          platforms: linux/amd64
+          push: true
+          context: .
+          tags: |
+             us-west1-docker.pkg.dev/devopsre/clabs-public-images/safe-transaction-service:latest
+             us-west1-docker.pkg.dev/devopsre/clabs-public-images/safe-transaction-service:${{ github.sha }}
