@@ -1,7 +1,8 @@
+import dataclasses
 import json
 import logging
 import operator
-from dataclasses import dataclass, field
+import random
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin
 
@@ -53,7 +54,7 @@ def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
     return uri
 
 
-@dataclass
+@dataclasses.dataclass
 class Erc721InfoWithLogo:
     """
     ERC721 info from Blockchain
@@ -74,7 +75,7 @@ class Erc721InfoWithLogo:
         )
 
 
-@dataclass
+@dataclasses.dataclass
 class Collectible:
     """
     Collectible built from ERC721InfoWithLogo
@@ -88,16 +89,16 @@ class Collectible:
     uri: str
 
 
-@dataclass
+@dataclasses.dataclass
 class CollectibleWithMetadata(Collectible):
     """
     Collectible with metadata parsed if possible
     """
 
     metadata: Dict[str, Any]
-    name: Optional[str] = field(init=False)
-    description: Optional[str] = field(init=False)
-    image_uri: Optional[str] = field(init=False)
+    name: Optional[str] = dataclasses.field(init=False)
+    description: Optional[str] = dataclasses.field(init=False)
+    image_uri: Optional[str] = dataclasses.field(init=False)
 
     def get_name(self) -> Optional[str]:
         if self.metadata:
@@ -147,7 +148,6 @@ class CollectiblesServiceProvider:
 
 
 class CollectiblesService:
-    ENS_IMAGE_URL = "https://gnosis-safe-token-logos.s3.amazonaws.com/ENS.png"
     METADATA_MAX_CONTENT_LENGTH = int(
         0.2 * 1024 * 1024
     )  # 0.2Mb is the maximum metadata size allowed
@@ -162,15 +162,13 @@ class CollectiblesService:
         self.redis = redis
         self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
 
-        self.cache_uri_metadata = TTLCache[str, Optional[Dict[str, Any]]](
-            maxsize=4096, ttl=self.COLLECTIBLE_EXPIRATION
-        )  # 1 day of caching
         self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=self.TOKEN_EXPIRATION
-        )  # 2 hours of caching
+        )
+        self.ens_image_url = settings.TOKENS_ENS_IMAGE_URL
 
-    def get_redis_metadata_key(self, address: str, id: int):
-        return f"metadata:{address}/{id}"
+    def get_metadata_cache_key(self, address: str, id: int):
+        return f"metadata:{address}:{id}"
 
     def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
@@ -247,7 +245,7 @@ class CollectiblesService:
             name, symbol, logo_uri, token_address, token_id, token_metadata_uri
         )
 
-    def get_metadata(self, collectible: Collectible) -> Any:
+    def get_metadata(self, collectible: Collectible | CollectibleWithMetadata) -> Any:
         """
         Return metadata for a collectible
         :param collectible
@@ -260,7 +258,7 @@ class CollectiblesService:
                 "name": f"{label_name}.{tld}" if label_name else f".{tld}",
                 "description": ("" if label_name else "Unknown ")
                 + f".{tld} ENS Domain",
-                "image": self.ENS_IMAGE_URL,
+                "image": self.ens_image_url,
             }
 
         return self._retrieve_metadata_from_uri(collectible.uri)
@@ -376,6 +374,8 @@ class CollectiblesService:
         :param offset: page position
         :return: collectibles and count
         """
+
+        # Async retry for getting metadata if fetching fails
         from ..tasks import retry_get_metadata_task
 
         collectibles_with_metadata: List[CollectibleWithMetadata] = []
@@ -386,13 +386,13 @@ class CollectiblesService:
             limit=limit,
             offset=offset,
         )
-        keys = [
-            self.get_redis_metadata_key(collectible.address, collectible.id)
+        metadata_cache_keys = [
+            self.get_metadata_cache_key(collectible.address, collectible.id)
             for collectible in collectibles
         ]
-        cached_results = self.redis.mget(keys)
+        cached_results = self.redis.mget(metadata_cache_keys)
 
-        collectibles_no_cached = []
+        collectibles_not_cached = []
         jobs = []
         for cached, collectible in zip(cached_results, collectibles):
             if cached:
@@ -409,14 +409,14 @@ class CollectiblesService:
                     )
                 )
             else:
-                collectibles_no_cached.append(collectible)
+                collectibles_not_cached.append(collectible)
                 jobs.append(gevent.spawn(self.get_metadata, collectible))
                 collectibles_with_metadata.append(None)  # Keeps the order
 
         _ = gevent.joinall(jobs)
         collectibles_with_metadata_not_cached = []
         redis_pipe = self.redis.pipeline()
-        for collectible, job in zip(collectibles_no_cached, jobs):
+        for collectible, job in zip(collectibles_not_cached, jobs):
             try:
                 metadata = job.get()
                 if not isinstance(metadata, dict):
@@ -441,8 +441,8 @@ class CollectiblesService:
                     collectible.address,
                 )
                 retry_get_metadata_task.apply_async(
-                    kwargs={"address": collectible.address, "id": collectible.id},
-                    countdown=30,  # 30 seconds later
+                    (collectible.address, collectible.id),
+                    countdown=random.randint(0, 60),  # Don't retry all at once
                 )
 
             collectible_with_metadata = CollectibleWithMetadata(
@@ -456,8 +456,8 @@ class CollectiblesService:
             )
             collectibles_with_metadata_not_cached.append(collectible_with_metadata)
             redis_pipe.set(
-                self.get_redis_metadata_key(collectible.address, collectible.id),
-                json.dumps(collectible_with_metadata.__dict__),
+                self.get_metadata_cache_key(collectible.address, collectible.id),
+                json.dumps(dataclasses.asdict(collectible_with_metadata)),
                 self.COLLECTIBLE_EXPIRATION,
             )
         redis_pipe.execute()
