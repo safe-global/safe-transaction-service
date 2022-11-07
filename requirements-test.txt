@@ -9,4 +9,4 @@ pytest-celery==0.0.0
 pytest-django==4.5.2
 pytest-env==0.8.1
 pytest-rerunfailures==10.2
-pytest-sugar==0.9.5
+pytest-sugar==0.9.6
