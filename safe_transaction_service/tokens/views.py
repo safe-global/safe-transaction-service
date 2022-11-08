@@ -22,7 +22,7 @@ class TokenView(RetrieveAPIView):
     lookup_field = "address"
     queryset = Token.objects.all()
 
-    @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this should never change
+    @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this does not change often
     def get(self, request, *args, **kwargs):
         address = self.kwargs["address"]
         if not fast_is_checksum_address(address):
