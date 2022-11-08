@@ -1,4 +1,3 @@
-from django.http import Http404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -16,7 +15,6 @@ from . import filters, serializers
 from .clients import CannotGetPrice
 from .models import Token
 from .services import PriceServiceProvider
-from .tasks import get_token_info_from_blockchain_task
 
 
 class TokenView(RetrieveAPIView):
@@ -24,7 +22,7 @@ class TokenView(RetrieveAPIView):
     lookup_field = "address"
     queryset = Token.objects.all()
 
-    @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this should never change
+    @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this does not change often
     def get(self, request, *args, **kwargs):
         address = self.kwargs["address"]
         if not fast_is_checksum_address(address):
@@ -37,11 +35,7 @@ class TokenView(RetrieveAPIView):
                 },
             )
 
-        try:
-            return super().get(request, *args, **kwargs)
-        except Http404 as exc:  # Try to get info about the token
-            get_token_info_from_blockchain_task.delay(address)
-            raise exc
+        return super().get(request, *args, **kwargs)
 
 
 class TokensView(ListAPIView):

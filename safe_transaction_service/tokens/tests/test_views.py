@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 
-from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager, InvalidERC20Info
+from gnosis.eth.ethereum_client import Erc20Manager, InvalidERC20Info
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..clients import CannotGetPrice
@@ -75,16 +75,9 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(Token.objects.count(), 0)
 
-        random_address = Account.create().address  # Use new address to skip caching
-        get_token_info_mock.side_effect = None
-        get_token_info_mock.return_value = Erc20Info("UXIO", "UXI", 18)
         response = self.client.get(reverse("v1:tokens:detail", args=(random_address,)))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(Token.objects.count(), 1)
-
-        response = self.client.get(reverse("v1:tokens:detail", args=(random_address,)))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Token.objects.count(), 1)
+        self.assertEqual(Token.objects.count(), 0)
 
     def test_tokens_view(self):
         response = self.client.get(reverse("v1:tokens:list"))
