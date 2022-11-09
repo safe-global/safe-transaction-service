@@ -30,7 +30,7 @@ class SafeMessageSerializer(serializers.Serializer):
         if isinstance(value, dict):
             try:
                 eip712_encode_hash(value)
-            except:  # TODO Improve exception handling for eip712_encode_hash
+            except ValueError:
                 raise ValidationError(
                     f"Provided dictionary is not a valid EIP712 message {value}"
                 )
