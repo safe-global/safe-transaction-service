@@ -178,7 +178,7 @@ class EthereumBlockManager(models.Manager):
         """
         try:
             with transaction.atomic():  # Needed for handling IntegrityError
-                gas_limit = self.blockchain_parameters.functions.blockGasLimit().call()
+                gas_limit = 0
 
                 return super().create(
                     number=block["number"],
