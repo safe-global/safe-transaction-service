@@ -18,13 +18,13 @@ class SafeMessage(TimeStampedModel):
     """
 
     safe = EthereumAddressV2Field(db_index=True)
-    message_hash = Keccak256Field(db_index=True)
+    # Message hash is tied to Safe domain, so it's guaranteed to be unique
+    message_hash = Keccak256Field(db_index=True, unique=True)
     message = JSONField()  # String if EIP191, object if EIP712
     proposed_by = EthereumAddressV2Field()  # Owner proposing the message
     description = models.CharField(max_length=200, blank=True)
 
     class Meta:
-        unique_together = (("safe", "message_hash"),)
         ordering = ["created"]
 
     def __str__(self):

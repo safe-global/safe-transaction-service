@@ -1,4 +1,6 @@
 import django_filters
+from djangorestframework_camel_case.parser import CamelCaseJSONParser
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
@@ -10,10 +12,20 @@ from . import pagination, serializers
 from .models import SafeMessage
 
 
+class DisableCamelCaseForMessageParser(CamelCaseJSONParser):
+    json_underscoreize = {"ignore_fields": ("message",)}
+
+
+class DisableCamelCaseForMessageRenderer(CamelCaseJSONRenderer):
+    json_underscoreize = {"ignore_fields": ("message",)}
+
+
 class SafeMessageView(RetrieveAPIView):
     lookup_field = "id"
     queryset = SafeMessage.objects.prefetch_related("confirmations")
     serializer_class = serializers.SafeMessageResponseSerializer
+    parser_classes = (DisableCamelCaseForMessageParser,)
+    renderer_classes = (DisableCamelCaseForMessageRenderer,)
 
 
 class SafeMessagesView(ListCreateAPIView):
@@ -24,6 +36,8 @@ class SafeMessagesView(ListCreateAPIView):
     ordering = ["-created"]
     ordering_fields = ["created", "modified"]
     pagination_class = pagination.DefaultPagination
+    parser_classes = (DisableCamelCaseForMessageParser,)
+    renderer_classes = (DisableCamelCaseForMessageRenderer,)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
