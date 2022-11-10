@@ -35,6 +35,9 @@ class SafeMessageSignatureView(CreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        if getattr(self, "swagger_fake_view", False):
+            return context
+
         context["safe_message"] = get_object_or_404(SafeMessage, pk=self.kwargs["id"])
         return context
 
@@ -58,6 +61,9 @@ class SafeMessagesView(ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        if getattr(self, "swagger_fake_view", False):
+            return context
+
         context["safe_address"] = self.kwargs["address"]
         return context
 
