@@ -30,14 +30,14 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
     def test_safe_message_view(self):
         safe_message_id = 1
         response = self.client.get(
-            reverse("v1:safe_messages:detail", args=(safe_message_id,))
+            reverse("v1:safe_messages:message", args=(safe_message_id,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.json(), {"detail": "Not found."})
 
         safe_message = SafeMessageFactory()
         response = self.client.get(
-            reverse("v1:safe_messages:detail", args=(safe_message.id,))
+            reverse("v1:safe_messages:message", args=(safe_message.id,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -57,7 +57,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             safe_message=safe_message
         )
         response = self.client.get(
-            reverse("v1:safe_messages:detail", args=(safe_message.id,))
+            reverse("v1:safe_messages:message", args=(safe_message.id,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -98,7 +98,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             "signature": signature,
         }
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -117,7 +117,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
 
         get_owners_mock.return_value = [account.address]
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -126,7 +126,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
 
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -215,7 +215,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             "signature": signature,
         }
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -234,7 +234,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
 
         data["message"] = message
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -253,7 +253,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
 
         get_owners_mock.return_value = [account.address]
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -262,7 +262,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
 
         response = self.client.post(
-            reverse("v1:safe_messages:list", args=(safe_address,)),
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
             format="json",
             data=data,
         )
@@ -279,10 +279,102 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             },
         )
 
+    @mock.patch(
+        "safe_transaction_service.safe_messages.serializers.get_safe_owners",
+        return_value=[],
+    )
+    def test_safe_message_add_signature_view(self, get_owners_mock: MagicMock):
+        # Test not existing id
+        data = {"signature": "0x12"}
+        response = self.client.post(
+            reverse("v1:safe_messages:signatures", args=(1,)), format="json", data=data
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Test invalid signature
+        safe_message_confirmation = SafeMessageConfirmationFactory()
+        safe_message = safe_message_confirmation.safe_message
+        response = self.client.post(
+            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="1 owner signature was expected, 0 received",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Test same signature
+        data["signature"] = safe_message_confirmation.signature
+        response = self.client.post(
+            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string=f"Signature for owner {safe_message_confirmation.owner} already exists",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Test not existing owner
+        owner_account = Account.create()
+        data["signature"] = owner_account.signHash(safe_message.message_hash)[
+            "signature"
+        ].hex()
+        response = self.client.post(
+            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string=f"{owner_account.address} is not an owner of the Safe",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Test valid owner
+        get_owners_mock.return_value = [owner_account.address]
+        response = self.client.post(
+            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeMessage.objects.count(), 1)
+        self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
+        self.assertTrue(
+            SafeMessageConfirmation.objects.filter(
+                safe_message__safe=safe_message.safe, owner=owner_account.address
+            ).exists()
+        )
+
     def test_safe_messages_list_view(self):
         safe_address = Account.create().address
         response = self.client.get(
-            reverse("v1:safe_messages:list", args=(safe_address,))
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -292,7 +384,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         # Create a Safe message for a random Safe, it should not appear
         safe_message = SafeMessageFactory()
         response = self.client.get(
-            reverse("v1:safe_messages:list", args=(safe_address,))
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -300,7 +392,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         )
 
         response = self.client.get(
-            reverse("v1:safe_messages:list", args=(safe_message.safe,))
+            reverse("v1:safe_messages:safe-messages", args=(safe_message.safe,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -327,7 +419,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             safe_message=safe_message
         )
         response = self.client.get(
-            reverse("v1:safe_messages:list", args=(safe_message.safe,))
+            reverse("v1:safe_messages:safe-messages", args=(safe_message.safe,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(

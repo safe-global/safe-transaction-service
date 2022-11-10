@@ -1,9 +1,11 @@
+from django.shortcuts import get_object_or_404
+
 import django_filters
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, ListCreateAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
 from gnosis.eth.utils import fast_is_checksum_address
@@ -26,6 +28,22 @@ class SafeMessageView(RetrieveAPIView):
     serializer_class = serializers.SafeMessageResponseSerializer
     parser_classes = (DisableCamelCaseForMessageParser,)
     renderer_classes = (DisableCamelCaseForMessageRenderer,)
+
+
+class SafeMessageSignatureView(CreateAPIView):
+    lookup_field = "id"
+    serializer_class = serializers.SafeMessageSignatureSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["safe_message"] = get_object_or_404(SafeMessage, pk=self.kwargs["id"])
+        return context
+
+    def post(self, request, id, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class SafeMessagesView(ListCreateAPIView):

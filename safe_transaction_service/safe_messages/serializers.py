@@ -89,6 +89,40 @@ class SafeMessageSerializer(serializers.Serializer):
         return safe_message
 
 
+class SafeMessageSignatureSerializer(serializers.Serializer):
+    signature = eth_serializers.HexadecimalField(max_length=65)
+
+    def validate(self, attrs):
+        safe_message: SafeMessage = self.context["safe_message"]
+        attrs["safe_message"] = safe_message
+        signature = attrs["signature"]
+        safe_address = safe_message.safe
+        safe_message_hash = safe_message.message_hash
+
+        safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
+        if len(safe_signatures) != 1:
+            raise ValidationError(
+                f"1 owner signature was expected, {len(safe_signatures)} received"
+            )
+
+        owner = safe_signatures[0].owner
+        if SafeMessageConfirmation.objects.filter(
+            safe_message=safe_message, owner=owner
+        ).exists():
+            raise ValidationError(f"Signature for owner {owner} already exists")
+
+        owners = get_safe_owners(safe_address)
+        if owner not in owners:
+            raise ValidationError(f"{owner} is not an owner of the Safe")
+
+        attrs["owner"] = owner
+        attrs["signature_type"] = safe_signatures[0].signature_type.value
+        return attrs
+
+    def create(self, validated_data):
+        return SafeMessageConfirmation.objects.create(**validated_data)
+
+
 # Reponse serializers
 class SafeMessageConfirmationResponseSerializer(serializers.Serializer):
     owner = eth_serializers.EthereumAddressField()
