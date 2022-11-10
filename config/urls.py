@@ -57,6 +57,10 @@ urlpatterns_v1 = [
     path(
         "tokens/", include("safe_transaction_service.tokens.urls", namespace="tokens")
     ),
+    path(
+        "analytics/",
+        include("safe_transaction_service.analytics.urls", namespace="analytics"),
+    ),
 ]
 urlpatterns_v2 = [
     path("", include("safe_transaction_service.history.urls_v2", namespace="history"))
