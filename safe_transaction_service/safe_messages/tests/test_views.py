@@ -78,6 +78,35 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             },
         )
 
+    def test_safe_message_not_camel_case_view(self):
+        safe_message_confirmation = SafeMessageConfirmationFactory()
+        safe_message = safe_message_confirmation.safe_message
+        safe_message.message = {"test_not_camel": 2}
+        safe_message.save(update_fields=["message"])
+
+        # Response message should not be camelcased
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message.id,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "safe": safe_message.safe,
+                "messageHash": safe_message.message_hash,
+                "message": safe_message.message,
+                "proposedBy": safe_message.proposed_by,
+                "description": safe_message.description,
+                "confirmations": [
+                    {
+                        "owner": safe_message_confirmation.owner,
+                        "signature": safe_message_confirmation.signature,
+                        "signatureType": "ETH_SIGN",
+                    }
+                ],
+            },
+        )
+
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
         return_value=[],
@@ -418,6 +447,42 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
         )
+        response = self.client.get(
+            reverse("v1:safe_messages:safe-messages", args=(safe_message.safe,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "count": 1,
+                "next": None,
+                "previous": None,
+                "results": [
+                    {
+                        "safe": safe_message.safe,
+                        "messageHash": safe_message.message_hash,
+                        "message": safe_message.message,
+                        "proposedBy": safe_message.proposed_by,
+                        "description": safe_message.description,
+                        "confirmations": [
+                            {
+                                "owner": safe_message_confirmation.owner,
+                                "signature": safe_message_confirmation.signature,
+                                "signatureType": "ETH_SIGN",
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+
+    def test_safe_messages_list_not_camel_case_view(self):
+        safe_message_confirmation = SafeMessageConfirmationFactory()
+        safe_message = safe_message_confirmation.safe_message
+        safe_message.message = {"test_not_camel": 2}
+        safe_message.save(update_fields=["message"])
+
+        # Response message should not be camelcased
         response = self.client.get(
             reverse("v1:safe_messages:safe-messages", args=(safe_message.safe,))
         )

@@ -26,7 +26,6 @@ class SafeMessageView(RetrieveAPIView):
     lookup_field = "id"
     queryset = SafeMessage.objects.prefetch_related("confirmations")
     serializer_class = serializers.SafeMessageResponseSerializer
-    parser_classes = (DisableCamelCaseForMessageParser,)
     renderer_classes = (DisableCamelCaseForMessageRenderer,)
 
 
