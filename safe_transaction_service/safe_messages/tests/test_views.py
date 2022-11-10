@@ -210,10 +210,29 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         signature = account.signHash(safe_message_hash)["signature"].hex()
 
         data = {
-            "message": message,
+            "message": {},
             "description": description,
             "signature": signature,
         }
+        response = self.client.post(
+            reverse("v1:safe_messages:list", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data,
+            {
+                "message": [
+                    ErrorDetail(
+                        string="Provided dictionary is not a valid EIP712 message {}",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        data["message"] = message
         response = self.client.post(
             reverse("v1:safe_messages:list", args=(safe_address,)),
             format="json",
