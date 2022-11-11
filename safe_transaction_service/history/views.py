@@ -3,7 +3,6 @@ import logging
 from typing import Any, Dict, Tuple
 
 from django.conf import settings
-from django.db.models import Count
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -185,27 +184,6 @@ class MasterCopiesView(ListAPIView):
 
     def get_queryset(self):
         return SafeMasterCopy.objects.relevant()
-
-
-class AnalyticsMultisigTxsByOriginListView(ListAPIView):
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = filters.AnalyticsMultisigTxsByOriginFilter
-    pagination_class = None
-    queryset = (
-        MultisigTransaction.objects.values("origin")
-        .annotate(transactions=Count("*"))
-        .order_by("-transactions")
-    )
-    serializer_class = serializers.AnalyticsMultisigTxsByOriginResponseSerializer
-
-
-class AnalyticsMultisigTxsBySafeListView(ListAPIView):
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = filters.AnalyticsMultisigTxsBySafeFilter
-    queryset = (
-        MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-    )
-    serializer_class = serializers.AnalyticsMultisigTxsBySafeResponseSerializer
 
 
 class AllTransactionsListView(ListAPIView):

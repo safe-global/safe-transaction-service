@@ -29,16 +29,6 @@ urlpatterns = [
         views.IndexingView.as_view(),
         name="indexing",
     ),
-    path(
-        "analytics/multisig-transactions/by-safe/",
-        views.AnalyticsMultisigTxsBySafeListView.as_view(),
-        name="analytics-multisig-txs-by-safe",
-    ),
-    path(
-        "analytics/multisig-transactions/by-origin/",
-        views.AnalyticsMultisigTxsByOriginListView.as_view(),
-        name="analytics-multisig-txs-by-origin",
-    ),
     path("data-decoder/", views.DataDecoderView.as_view(), name="data-decoder"),
     path("delegates/", views.DelegateListView.as_view(), name="delegates"),
     path(
