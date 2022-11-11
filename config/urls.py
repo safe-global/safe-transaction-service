@@ -55,7 +55,7 @@ urlpatterns_v1 = [
         ),
     ),
     path(
-        "safe-messages/",
+        "messages/",
         include(
             "safe_transaction_service.safe_messages.urls", namespace="safe_messages"
         ),
