@@ -17,9 +17,9 @@ class SafeMessage(TimeStampedModel):
     Safe Message (EIP-191 or EIP-712) to build an EIP-1271 signature from
     """
 
-    safe = EthereumAddressV2Field(db_index=True)
     # Message hash is tied to Safe domain, so it's guaranteed to be unique
-    message_hash = Keccak256Field(db_index=True, unique=True)
+    message_hash = Keccak256Field(primary_key=True)
+    safe = EthereumAddressV2Field(db_index=True)
     message = JSONField()  # String if EIP191, object if EIP712
     proposed_by = EthereumAddressV2Field()  # Owner proposing the message
     description = models.CharField(max_length=200, blank=True)
@@ -54,7 +54,7 @@ class SafeMessageConfirmation(TimeStampedModel):
         default=None,
         related_name="confirmations",
     )
-    owner = EthereumAddressV2Field()
+    owner = EthereumAddressV2Field(db_index=True)
     signature = HexField(max_length=5000)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True

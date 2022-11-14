@@ -1,3 +1,4 @@
+import datetime
 import logging
 from unittest import mock
 from unittest.mock import MagicMock
@@ -26,28 +27,40 @@ from safe_transaction_service.safe_messages.tests.factories import (
 logger = logging.getLogger(__name__)
 
 
-class TestViews(EthereumTestCaseMixin, APITestCase):
+def datetime_to_str(value: datetime.datetime) -> str:
+    value = value.isoformat()
+    if value.endswith("+00:00"):
+        value = value[:-6] + "Z"
+    return value
+
+
+class TestMessageViews(EthereumTestCaseMixin, APITestCase):
     def test_safe_message_view(self):
-        safe_message_id = 1
+        safe_message_hash = (
+            "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
+        )
         response = self.client.get(
-            reverse("v1:safe_messages:message", args=(safe_message_id,))
+            reverse("v1:safe_messages:message", args=(safe_message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.json(), {"detail": "Not found."})
 
         safe_message = SafeMessageFactory()
         response = self.client.get(
-            reverse("v1:safe_messages:message", args=(safe_message.id,))
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.json(),
             {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
                 "safe": safe_message.safe,
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "description": safe_message.description,
+                "preparedSignature": None,
                 "confirmations": [],
             },
         )
@@ -57,19 +70,24 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             safe_message=safe_message
         )
         response = self.client.get(
-            reverse("v1:safe_messages:message", args=(safe_message.id,))
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.json(),
             {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
                 "safe": safe_message.safe,
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "description": safe_message.description,
+                "preparedSignature": safe_message_confirmation.signature,
                 "confirmations": [
                     {
+                        "created": datetime_to_str(safe_message_confirmation.created),
+                        "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
                         "signature": safe_message_confirmation.signature,
                         "signatureType": "ETH_SIGN",
@@ -86,19 +104,24 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
 
         # Response message should not be camelcased
         response = self.client.get(
-            reverse("v1:safe_messages:message", args=(safe_message.id,))
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.json(),
             {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
                 "safe": safe_message.safe,
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "description": safe_message.description,
+                "preparedSignature": safe_message_confirmation.signature,
                 "confirmations": [
                     {
+                        "created": datetime_to_str(safe_message_confirmation.created),
+                        "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
                         "signature": safe_message_confirmation.signature,
                         "signatureType": "ETH_SIGN",
@@ -313,10 +336,15 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         return_value=[],
     )
     def test_safe_message_add_signature_view(self, get_owners_mock: MagicMock):
-        # Test not existing id
+        # Test not existing message
+        safe_message_hash = (
+            "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
+        )
         data = {"signature": "0x12"}
         response = self.client.post(
-            reverse("v1:safe_messages:signatures", args=(1,)), format="json", data=data
+            reverse("v1:safe_messages:signatures", args=(safe_message_hash,)),
+            format="json",
+            data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -324,7 +352,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         safe_message_confirmation = SafeMessageConfirmationFactory()
         safe_message = safe_message_confirmation.safe_message
         response = self.client.post(
-            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
             data=data,
         )
@@ -344,7 +372,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         # Test same signature
         data["signature"] = safe_message_confirmation.signature
         response = self.client.post(
-            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
             data=data,
         )
@@ -367,7 +395,7 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
             "signature"
         ].hex()
         response = self.client.post(
-            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
             data=data,
         )
@@ -387,18 +415,22 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
         # Test valid owner
         get_owners_mock.return_value = [owner_account.address]
         response = self.client.post(
-            reverse("v1:safe_messages:signatures", args=(safe_message.id,)),
+            reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(SafeMessage.objects.count(), 1)
         self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
-        self.assertTrue(
-            SafeMessageConfirmation.objects.filter(
-                safe_message__safe=safe_message.safe, owner=owner_account.address
-            ).exists()
+        safe_message_confirmation = SafeMessageConfirmation.objects.get(
+            safe_message__safe=safe_message.safe, owner=owner_account.address
         )
+
+        # Check SafeMessage modified was updated with new signature
+        safe_message_modified = safe_message.modified
+        safe_message.refresh_from_db()
+        self.assertGreater(safe_message.modified, safe_message_modified)
+        self.assertEqual(safe_message_confirmation.modified, safe_message.modified)
 
     def test_safe_messages_list_view(self):
         safe_address = Account.create().address
@@ -432,11 +464,14 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
                 "previous": None,
                 "results": [
                     {
+                        "created": datetime_to_str(safe_message.created),
+                        "modified": datetime_to_str(safe_message.modified),
                         "safe": safe_message.safe,
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "description": safe_message.description,
+                        "preparedSignature": None,
                         "confirmations": [],
                     }
                 ],
@@ -459,13 +494,22 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
                 "previous": None,
                 "results": [
                     {
+                        "created": datetime_to_str(safe_message.created),
+                        "modified": datetime_to_str(safe_message.modified),
                         "safe": safe_message.safe,
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "description": safe_message.description,
+                        "preparedSignature": safe_message_confirmation.signature,
                         "confirmations": [
                             {
+                                "created": datetime_to_str(
+                                    safe_message_confirmation.created
+                                ),
+                                "modified": datetime_to_str(
+                                    safe_message_confirmation.modified
+                                ),
                                 "owner": safe_message_confirmation.owner,
                                 "signature": safe_message_confirmation.signature,
                                 "signatureType": "ETH_SIGN",
@@ -495,13 +539,22 @@ class TestViews(EthereumTestCaseMixin, APITestCase):
                 "previous": None,
                 "results": [
                     {
+                        "created": datetime_to_str(safe_message.created),
+                        "modified": datetime_to_str(safe_message.modified),
                         "safe": safe_message.safe,
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "description": safe_message.description,
+                        "preparedSignature": safe_message_confirmation.signature,
                         "confirmations": [
                             {
+                                "created": datetime_to_str(
+                                    safe_message_confirmation.created
+                                ),
+                                "modified": datetime_to_str(
+                                    safe_message_confirmation.modified
+                                ),
                                 "owner": safe_message_confirmation.owner,
                                 "signature": safe_message_confirmation.signature,
                                 "signatureType": "ETH_SIGN",

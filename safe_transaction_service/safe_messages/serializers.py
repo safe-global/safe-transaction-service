@@ -1,7 +1,8 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 from eth_account.messages import defunct_hash_message
 from eth_typing import Hash32
+from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -120,11 +121,20 @@ class SafeMessageSignatureSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        return SafeMessageConfirmation.objects.create(**validated_data)
+        safe_message_confirmation = SafeMessageConfirmation.objects.create(
+            **validated_data
+        )
+        safe_message = validated_data["safe_message"]
+        SafeMessage.objects.filter(pk=safe_message.pk).update(
+            modified=safe_message_confirmation.modified
+        )
+        return safe_message_confirmation
 
 
 # Reponse serializers
 class SafeMessageConfirmationResponseSerializer(serializers.Serializer):
+    created = serializers.DateTimeField()
+    modified = serializers.DateTimeField()
     owner = eth_serializers.EthereumAddressField()
     signature = eth_serializers.HexadecimalField()
     signature_type = serializers.SerializerMethodField()
@@ -134,12 +144,15 @@ class SafeMessageConfirmationResponseSerializer(serializers.Serializer):
 
 
 class SafeMessageResponseSerializer(serializers.Serializer):
+    created = serializers.DateTimeField()
+    modified = serializers.DateTimeField()
     safe = eth_serializers.EthereumAddressField()
     message_hash = eth_serializers.Sha3HashField()
     message = serializers.JSONField()
     proposed_by = eth_serializers.EthereumAddressField()
     description = serializers.CharField()
     confirmations = serializers.SerializerMethodField()
+    prepared_signature = serializers.SerializerMethodField()
 
     def get_confirmations(self, obj: SafeMessage) -> Dict[str, Any]:
         """
@@ -151,3 +164,13 @@ class SafeMessageResponseSerializer(serializers.Serializer):
         return SafeMessageConfirmationResponseSerializer(
             obj.confirmations, many=True
         ).data
+
+    def get_prepared_signature(self, obj: SafeMessage) -> Optional[str]:
+        """
+        Prepared signature sorted
+
+        :param obj: SafeMessage instance
+        :return: Serialized queryset
+        """
+        signature = HexBytes(obj.build_signature())
+        return HexBytes(signature).hex() if signature else None

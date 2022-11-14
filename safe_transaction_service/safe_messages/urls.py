@@ -1,17 +1,23 @@
-from django.urls import path
+from django.urls import include, path
 
 from . import views
 
 app_name = "safe_messages"
 
-urlpatterns = [
-    path("<int:id>/", views.SafeMessageView.as_view(), name="message"),
+extra_patterns = [
+    path("<str:message_hash>/", views.SafeMessageView.as_view(), name="message"),
     path(
-        "<int:id>/signatures/",
+        "<str:message_hash>/signatures/",
         views.SafeMessageSignatureView.as_view(),
         name="signatures",
     ),
+]
+
+urlpatterns = [
+    path("messages/", include(extra_patterns)),
     path(
-        "safes/<str:address>/", views.SafeMessagesView.as_view(), name="safe-messages"
+        "safes/<str:address>/messages/",
+        views.SafeMessagesView.as_view(),
+        name="safe-messages",
     ),
 ]

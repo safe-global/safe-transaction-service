@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 import django_filters
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import CreateAPIView, ListCreateAPIView, RetrieveAPIView
@@ -23,14 +24,13 @@ class DisableCamelCaseForMessageRenderer(CamelCaseJSONRenderer):
 
 
 class SafeMessageView(RetrieveAPIView):
-    lookup_field = "id"
+    lookup_url_kwarg = "message_hash"
     queryset = SafeMessage.objects.prefetch_related("confirmations")
     serializer_class = serializers.SafeMessageResponseSerializer
     renderer_classes = (DisableCamelCaseForMessageRenderer,)
 
 
 class SafeMessageSignatureView(CreateAPIView):
-    lookup_field = "id"
     serializer_class = serializers.SafeMessageSignatureSerializer
 
     def get_serializer_context(self):
@@ -38,10 +38,12 @@ class SafeMessageSignatureView(CreateAPIView):
         if getattr(self, "swagger_fake_view", False):
             return context
 
-        context["safe_message"] = get_object_or_404(SafeMessage, pk=self.kwargs["id"])
+        context["safe_message"] = get_object_or_404(
+            SafeMessage, pk=self.kwargs["message_hash"]
+        )
         return context
 
-    def post(self, request, id, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -85,6 +87,10 @@ class SafeMessagesView(ListCreateAPIView):
             )
         return super().get(request, address, *args, **kwargs)
 
+    @swagger_auto_schema(
+        request_body=serializers.SafeMessageSerializer,
+        responses={201: serializers.SafeMessageResponseSerializer},
+    )
     def post(self, request, address, *args, **kwargs):
         if not fast_is_checksum_address(address):
             return Response(
