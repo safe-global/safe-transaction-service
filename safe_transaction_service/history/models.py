@@ -1239,7 +1239,7 @@ class MultisigTransaction(TimeStampedModel):
     nonce = Uint256Field(db_index=True)
     failed = models.BooleanField(null=True, blank=True, default=None, db_index=True)
     origin = models.JSONField(
-        null=True, blank=True, default=None
+        null=False, default=dict
     )  # To store arbitrary data on the tx
     trusted = models.BooleanField(
         default=False, db_index=True
