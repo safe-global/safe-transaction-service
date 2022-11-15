@@ -2,7 +2,7 @@ import json
 
 from django.test import TestCase
 
-from safe_transaction_service.analytics.tasks import get_transactions_per_safe_task
+from safe_transaction_service.analytics.tasks import get_transactions_per_safe_app_task
 from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
 from safe_transaction_service.utils.redis import get_redis
 
@@ -32,7 +32,7 @@ class TestTasks(TestCase):
         MultisigTransactionFactory(origin=string_origin)
 
         # Execute the task to get data from database
-        get_transactions_per_safe_task()
+        get_transactions_per_safe_app_task()
         # Get the result from redis
         value = redis.get("analytics_transactions_per_safe_app")
         analytic = json.loads(value)

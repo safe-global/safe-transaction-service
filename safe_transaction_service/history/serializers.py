@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -234,7 +235,14 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
     def save(self, **kwargs):
         safe_tx_hash = self.validated_data["contract_transaction_hash"]
-        origin = self.validated_data["origin"]
+        # Origin field on db is a JsonField
+        if self.validated_data["origin"] is not None:
+            try:
+                origin = json.loads(self.validated_data["origin"])
+            except ValueError:
+                origin = json.loads(json.dumps(self.validated_data["origin"]))
+        else:
+            origin = {}
         trusted = self.validated_data["trusted"]
         if not trusted:
             # Check user permission
