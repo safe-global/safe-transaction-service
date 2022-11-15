@@ -12,16 +12,16 @@ class TestTasks(TestCase):
         redis = get_redis()
         origin_1 = {"url": "https://example1.com", "name": "afeApp1"}
         origin_2 = {"url": "https://example2.com", "name": "afeApp2"}
-        wrong_origin = "eoo"
+        string_origin = "eoo"
         expected = [
             {
-                "origin__name": "afeApp2",
-                "origin__url": "https://example2.com",
+                "name": "afeApp2",
+                "url": "https://example2.com",
                 "transactions": 7,
             },
             {
-                "origin__name": "afeApp1",
-                "origin__url": "https://example1.com",
+                "name": "afeApp1",
+                "url": "https://example1.com",
                 "transactions": 3,
             },
         ]
@@ -29,9 +29,11 @@ class TestTasks(TestCase):
             MultisigTransactionFactory(origin=origin_1)
         for _ in range(7):
             MultisigTransactionFactory(origin=origin_2)
-        MultisigTransactionFactory(origin=wrong_origin)
+        MultisigTransactionFactory(origin=string_origin)
 
+        # Execute the task to get data from database
         get_transactions_per_safe_task()
+        # Get the result from redis
         value = redis.get("analytics_transactions_per_safe_app")
         analytic = json.loads(value)
 
