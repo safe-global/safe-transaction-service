@@ -16,6 +16,8 @@ from gnosis.eth.contracts import get_safe_V1_0_0_contract, get_safe_V1_3_0_contr
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
+from safe_transaction_service.safe_messages import models as safe_message_models
+
 from ..models import (
     EthereumTx,
     InternalTx,
@@ -99,7 +101,7 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
         }
-        self.safe_last_status_cache: Dict[str, SafeStatus] = {}
+        self.safe_last_status_cache: Dict[str, SafeLastStatus] = {}
         self.signature_breaking_versions = (  # Versions where signing changed
             Version("1.0.0"),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
             Version("1.3.0"),  # ChainId was included
@@ -235,9 +237,10 @@ class SafeTxProcessor(TxProcessor):
         MultisigConfirmation.objects.remove_unused_confirmations(
             contract_address, safe_status.nonce, owner
         )
+        safe_message_models.SafeMessageConfirmation.objects.filter(owner=owner).delete()
 
     def store_new_safe_status(
-        self, safe_last_status: SafeStatus, internal_tx: InternalTx
+        self, safe_last_status: SafeLastStatus, internal_tx: InternalTx
     ) -> SafeLastStatus:
         """
         Updates `SafeLastStatus`. An entry to `SafeStatus` is added too via a Django signal.

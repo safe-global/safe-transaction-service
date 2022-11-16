@@ -10,6 +10,11 @@ from web3 import Web3
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.safe_signature import SafeSignatureType
 
+from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
+from safe_transaction_service.safe_messages.tests.factories import (
+    SafeMessageConfirmationFactory,
+)
+
 from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from ..models import (
     InternalTxDecoded,
@@ -117,7 +122,7 @@ class TestSafeTxProcessor(TestCase):
         self.assertEqual(safe_status.threshold, threshold)
 
         threshold = 1
-        # Check deleting the owner did delete this pending confirmation
+        # Check deleting the owner did delete this pending confirmation for both signature and transaction
         # It will insert a transaction we will remove after we check the confirmation was deleted
         unused_multisig_confirmation = MultisigConfirmationFactory(
             owner=another_owner,
@@ -125,6 +130,15 @@ class TestSafeTxProcessor(TestCase):
             multisig_transaction__nonce=safe_status.nonce + 1,
             multisig_transaction__safe=safe_address,
         )
+        # This will be deleted
+        unused_message_confirmation = SafeMessageConfirmationFactory(
+            owner=another_owner
+        )
+        # This won't be deleted
+        unused_message_confirmation_2 = SafeMessageConfirmationFactory(
+            safe_message=unused_message_confirmation.safe_message
+        )
+        self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
         number_confirmations = MultisigConfirmation.objects.count()
         tx_processor.process_decoded_transactions(
             [
@@ -144,6 +158,12 @@ class TestSafeTxProcessor(TestCase):
             MultisigConfirmation.objects.count(), number_confirmations + 1 - 1
         )
         unused_multisig_confirmation.multisig_transaction.delete()  # Remove this transaction inserted manually
+        self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
+        self.assertTrue(
+            SafeMessageConfirmation.objects.filter(
+                owner=unused_message_confirmation_2.owner
+            ).exists()
+        )
         self.assertEqual(SafeStatus.objects.count(), 7)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)

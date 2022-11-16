@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 from gnosis.eth.eip712 import eip712_encode_hash
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.safe import Safe
+from gnosis.safe.safe_signature import SafeSignatureEOA
 
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
@@ -23,6 +24,8 @@ from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
     SafeMessageFactory,
 )
+
+from .mocks import get_eip712_payload
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +93,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                         "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
                         "signature": safe_message_confirmation.signature,
-                        "signatureType": "ETH_SIGN",
+                        "signatureType": "EOA",
                     }
                 ],
             },
@@ -124,7 +127,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                         "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
                         "signature": safe_message_confirmation.signature,
-                        "signatureType": "ETH_SIGN",
+                        "signatureType": "EOA",
                     }
                 ],
             },
@@ -132,204 +135,111 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
 
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
-        return_value=[],
     )
-    def test_safe_messages_create_eip191_view(self, get_owners_mock: MagicMock):
+    def test_safe_messages_create_view(self, get_owners_mock: MagicMock):
         account = Account.create()
         safe_address = Account.create().address
-        message = "Text to sign message"
+        messages = ["Text to sign message", get_eip712_payload()]
         description = "Testing EIP191 message signing"
-        message_hash = defunct_hash_message(text=message)
+        message_hashes = [
+            defunct_hash_message(text=messages[0]),
+            eip712_encode_hash(messages[1]),
+        ]
         safe = Safe(safe_address, self.ethereum_client)
-        safe_message_hash = safe.get_message_hash(message_hash)
-        signature = account.signHash(safe_message_hash)["signature"].hex()
+        safe_message_hashes = [
+            safe.get_message_hash(message_hash) for message_hash in message_hashes
+        ]
+        signatures = [
+            account.signHash(safe_message_hash)["signature"].hex()
+            for safe_message_hash in safe_message_hashes
+        ]
 
-        data = {
-            "message": message,
-            "description": description,
-            "signature": signature,
-        }
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data,
-            {
-                "non_field_errors": [
-                    ErrorDetail(
-                        string=f"{account.address} is not an owner of the Safe",
-                        code="invalid",
+        sub_tests = ["create_eip191", "create_eip712"]
+
+        for sub_test, message, message_hash, safe_message_hash, signature in zip(
+            sub_tests, messages, message_hashes, safe_message_hashes, signatures
+        ):
+            SafeMessage.objects.all().delete()
+            get_owners_mock.return_value = []
+            with self.subTest(
+                sub_test,
+                message=message,
+                message_hash=message_hash,
+                safe_message_hash=safe_message_hash,
+                signature=signature,
+            ):
+                data = {
+                    "message": message,
+                    "description": description,
+                    "signature": signature,
+                }
+                response = self.client.post(
+                    reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(
+                    response.data,
+                    {
+                        "non_field_errors": [
+                            ErrorDetail(
+                                string=f"{account.address} is not an owner of the Safe",
+                                code="invalid",
+                            )
+                        ]
+                    },
+                )
+
+                # Test not valid signature
+                with mock.patch.object(
+                    SafeSignatureEOA, "is_valid", return_value=False
+                ):
+                    response = self.client.post(
+                        reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                        format="json",
+                        data=data,
                     )
-                ]
-            },
-        )
-
-        get_owners_mock.return_value = [account.address]
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(SafeMessage.objects.count(), 1)
-        self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
-
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data,
-            {
-                "non_field_errors": [
-                    ErrorDetail(
-                        string=f"Message with hash {safe_message_hash.hex()} for safe {safe_address} already exists in DB",
-                        code="invalid",
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                    self.assertEqual(
+                        response.data,
+                        {
+                            "non_field_errors": [
+                                ErrorDetail(
+                                    string=f'Signature={data["signature"]} for owner={account.address} is not valid',
+                                    code="invalid",
+                                )
+                            ]
+                        },
                     )
-                ]
-            },
-        )
 
-    @mock.patch(
-        "safe_transaction_service.safe_messages.serializers.get_safe_owners",
-        return_value=[],
-    )
-    def test_safe_messages_create_eip712_view(self, get_owners_mock: MagicMock):
-        def get_eip712_payload():
-            address = "0x8e12f01dae5fe7f1122dc42f2cb084f2f9e8aa03"
-            types = {
-                "EIP712Domain": [
-                    {"name": "name", "type": "string"},
-                    {"name": "version", "type": "string"},
-                    {"name": "chainId", "type": "uint256"},
-                    {"name": "verifyingContract", "type": "address"},
-                ],
-                "Mailbox": [
-                    {"name": "owner", "type": "address"},
-                    {"name": "messages", "type": "Message[]"},
-                ],
-                "Message": [
-                    {"name": "sender", "type": "address"},
-                    {"name": "subject", "type": "string"},
-                    {"name": "isSpam", "type": "bool"},
-                    {"name": "body", "type": "string"},
-                ],
-            }
+                get_owners_mock.return_value = [account.address]
+                response = self.client.post(
+                    reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(SafeMessage.objects.count(), 1)
+                self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
 
-            msgs = [
-                {
-                    "sender": address,
-                    "subject": "Hello World",
-                    "body": "The sparrow flies at midnight.",
-                    "isSpam": False,
-                },
-                {
-                    "sender": address,
-                    "subject": "You may have already Won! :dumb-emoji:",
-                    "body": "Click here for sweepstakes!",
-                    "isSpam": True,
-                },
-            ]
-
-            mailbox = {"owner": address, "messages": msgs}
-
-            payload = {
-                "types": types,
-                "primaryType": "Mailbox",
-                "domain": {
-                    "name": "MyDApp",
-                    "version": "3.0",
-                    "chainId": 41,
-                    "verifyingContract": address,
-                },
-                "message": mailbox,
-            }
-
-            return payload
-
-        account = Account.create()
-        safe_address = Account.create().address
-        message = get_eip712_payload()
-        description = "Testing EIP712 message signing"
-        message_hash = eip712_encode_hash(message)
-        safe = Safe(safe_address, self.ethereum_client)
-        safe_message_hash = safe.get_message_hash(message_hash)
-        signature = account.signHash(safe_message_hash)["signature"].hex()
-
-        data = {
-            "message": {},
-            "description": description,
-            "signature": signature,
-        }
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data,
-            {
-                "message": [
-                    ErrorDetail(
-                        string="Provided dictionary is not a valid EIP712 message {}",
-                        code="invalid",
-                    )
-                ]
-            },
-        )
-
-        data["message"] = message
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data,
-            {
-                "non_field_errors": [
-                    ErrorDetail(
-                        string=f"{account.address} is not an owner of the Safe",
-                        code="invalid",
-                    )
-                ]
-            },
-        )
-
-        get_owners_mock.return_value = [account.address]
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(SafeMessage.objects.count(), 1)
-        self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
-
-        response = self.client.post(
-            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data,
-            {
-                "non_field_errors": [
-                    ErrorDetail(
-                        string=f"Message with hash {safe_message_hash.hex()} for safe {safe_address} already exists in DB",
-                        code="invalid",
-                    )
-                ]
-            },
-        )
+                response = self.client.post(
+                    reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(
+                    response.data,
+                    {
+                        "non_field_errors": [
+                            ErrorDetail(
+                                string=f"Message with hash {safe_message_hash.hex()} for safe {safe_address} already exists in DB",
+                                code="invalid",
+                            )
+                        ]
+                    },
+                )
 
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
@@ -512,7 +422,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                                 ),
                                 "owner": safe_message_confirmation.owner,
                                 "signature": safe_message_confirmation.signature,
-                                "signatureType": "ETH_SIGN",
+                                "signatureType": "EOA",
                             }
                         ],
                     }
@@ -557,7 +467,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                                 ),
                                 "owner": safe_message_confirmation.owner,
                                 "signature": safe_message_confirmation.signature,
-                                "signatureType": "ETH_SIGN",
+                                "signatureType": "EOA",
                             }
                         ],
                     }

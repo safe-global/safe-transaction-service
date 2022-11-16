@@ -33,4 +33,4 @@ class SafeMessageConfirmationFactory(DjangoModelFactory):
             encode_defunct(text=o.safe_message.message)
         )["signature"].hex()
     )
-    signature_type = 3
+    signature_type = 2
