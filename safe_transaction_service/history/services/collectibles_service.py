@@ -167,8 +167,8 @@ class CollectiblesService:
         )
         self.ens_image_url = settings.TOKENS_ENS_IMAGE_URL
 
-    def get_metadata_cache_key(self, address: str, id: int):
-        return f"metadata:{address}:{id}"
+    def get_metadata_cache_key(self, address: str, token_id: int):
+        return f"metadata:{address}:{token_id}"
 
     def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """

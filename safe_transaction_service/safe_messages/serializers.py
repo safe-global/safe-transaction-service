@@ -33,14 +33,15 @@ class SafeMessageSerializer(serializers.Serializer):
             try:
                 eip712_encode_hash(value)
                 return value
-            except ValueError:
+            except ValueError as exc:
                 raise ValidationError(
                     f"Provided dictionary is not a valid EIP712 message {value}"
-                )
+                ) from exc
 
         raise ValidationError(f"Provided value is not a valid message {value}")
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
         message = attrs["message"]
         safe_address = self.context["safe_address"]
         signature = attrs["signature"]
@@ -94,6 +95,8 @@ class SafeMessageSignatureSerializer(serializers.Serializer):
     signature = eth_serializers.HexadecimalField(max_length=65)
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
+
         safe_message: SafeMessage = self.context["safe_message"]
         attrs["safe_message"] = safe_message
         signature = attrs["signature"]

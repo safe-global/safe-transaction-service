@@ -25,18 +25,15 @@ class HexField(forms.CharField):
         if self.strip:
             try:
                 value = HexBytes(value.strip())
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as exc:
                 raise exceptions.ValidationError(
                     self.error_messages["invalid"],
                     code="invalid",
-                )
+                ) from exc
         return value
 
     def prepare_value(self, value: memoryview) -> str:
-        if value:
-            return "0x" + bytes(value).hex()
-        else:
-            return ""
+        return "0x" + bytes(value).hex() if value else ""
 
 
 def clean_receipt_log(receipt_log: Dict[str, Any]) -> Optional[Dict[str, Any]]:

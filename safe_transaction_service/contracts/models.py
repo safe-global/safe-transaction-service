@@ -16,7 +16,6 @@ from cachetools import TTLCache, cachedmethod
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
 from web3._utils.normalizers import normalize_abi
-from web3.contract import Contract
 
 from gnosis.eth.clients import (
     BlockscoutClient,
@@ -56,7 +55,7 @@ def validate_abi(value: Dict[str, Any]):
         raise ValidationError(
             _("%(value)s is not a valid Ethereum Contract ABI: %(reason)s"),
             params={"value": value, "reason": str(exc)},
-        )
+        ) from exc
 
 
 class ContractAbi(models.Model):
@@ -100,7 +99,7 @@ class ContractAbi(models.Model):
 class ContractManager(models.Manager):
     def create_from_address(
         self, address: str, network: Optional[EthereumNetwork] = None
-    ) -> Contract:
+    ) -> "Contract":
         """
         Create contract and try to fetch information from APIs
 

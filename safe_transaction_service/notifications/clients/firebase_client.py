@@ -26,9 +26,8 @@ def get_firebase_client() -> "MessagingClient":
             settings.NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS,
             app_name=f"[SAFE-{created_count}]",
         )
-    else:
-        logger.warning("Using mocked messaging client")
-        return MockedClient()
+    logger.warning("Using mocked messaging client")
+    return MockedClient()
 
 
 class FirebaseClientPool:
