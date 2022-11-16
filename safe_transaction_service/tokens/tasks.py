@@ -21,7 +21,7 @@ logger = get_task_logger(__name__)
 
 
 @dataclass
-class EthValueWithTimestamp(object):
+class EthValueWithTimestamp:
     """
     Contains ethereum value for a token and the timestamp on when it was calculated
     """

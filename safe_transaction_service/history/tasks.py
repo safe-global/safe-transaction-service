@@ -68,8 +68,8 @@ def check_reorgs_task(self) -> Optional[int]:
                 return first_reorg_block_number
 
 
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
-def check_sync_status_task(self) -> bool:
+@app.shared_task(soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def check_sync_status_task() -> bool:
     """
     Check indexing status of the service
     """
@@ -103,12 +103,9 @@ def index_erc20_events_task(self) -> Optional[int]:
             return number_events
 
 
-@app.shared_task(
-    bind=True,
-)
+@app.shared_task
 @close_gevent_db_connection_decorator
 def index_erc20_events_out_of_sync_task(
-    self,
     block_process_limit: Optional[int] = None,
     block_process_limit_max: Optional[int] = None,
     addresses: Optional[ChecksumAddress] = None,
