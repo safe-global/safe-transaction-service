@@ -117,6 +117,12 @@ TASKS = [
         1,
         IntervalSchedule.HOURS,
     ),
+    CeleryTaskConfiguration(
+        "safe_transaction_service.analytics.tasks.get_transactions_per_safe_app_task",
+        "Run query to get number of transactions grouped by safe-app",
+        1,
+        IntervalSchedule.DAYS,
+    ),
 ]
 
 MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
