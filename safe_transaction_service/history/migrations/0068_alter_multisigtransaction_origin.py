@@ -17,6 +17,19 @@ def convert_str_to_json(apps, schema_editor):
         transaction.save()
 
 
+def convert_jsonfield_to_charfield(apps, schema_editor):
+    MultisigTransaction = apps.get_model("history", "MultisigTransaction")
+    MultisigTransaction.objects.filter(origin__exact="{}").update(origin=None)
+    transactions = (
+        MultisigTransaction.objects.exclude(origin__icontains="{")
+        .filter(origin__isnull=False)
+        .iterator()
+    )
+    for transaction in transactions:
+        transaction.origin = json.loads(transaction.origin)
+        transaction.save()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -25,7 +38,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(
-            convert_str_to_json, reverse_code=migrations.RunPython.noop
+            convert_str_to_json, reverse_code=convert_jsonfield_to_charfield
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
