@@ -10,19 +10,25 @@ from safe_transaction_service.utils.redis import get_redis
 class TestTasks(TestCase):
     def test_get_transactions_per_safe_apps(self):
         redis = get_redis()
-        origin_1 = {"url": "https://example1.com", "name": "afeApp1"}
-        origin_2 = {"url": "https://example2.com", "name": "afeApp2"}
-        string_origin = "eoo"
+        origin_1 = {"url": "https://example1.com", "name": "SafeApp1"}
+        origin_2 = {"url": "https://example2.com", "name": "SafeApp2"}
+        string_origin = "test"
         expected = [
             {
-                "name": "afeApp2",
+                "name": "SafeApp2",
                 "url": "https://example2.com",
-                "transactions": 7,
+                "total_tx": 7,
+                "tx_last_week": 7,
+                "tx_last_month": 7,
+                "tx_last_year": 7,
             },
             {
-                "name": "afeApp1",
+                "name": "SafeApp1",
                 "url": "https://example1.com",
-                "transactions": 3,
+                "total_tx": 3,
+                "tx_last_week": 3,
+                "tx_last_month": 3,
+                "tx_last_year": 3,
             },
         ]
         for _ in range(3):
