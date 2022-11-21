@@ -8,10 +8,10 @@ from .models import SafeMessage, SafeMessageConfirmation
 @admin.register(SafeMessage)
 class SafeMessageAdmin(BinarySearchAdmin):
     date_hierarchy = "created"
-    list_display = ("safe", "message_hash", "proposed_by", "description")
+    list_display = ("safe", "message_hash", "proposed_by", "message")
     ordering = ["-created"]
     readonly_fields = ("message_hash",)
-    search_fields = ["safe", "message_hash", "proposed_by", "description"]
+    search_fields = ["safe", "message_hash", "proposed_by", "message"]
 
 
 @admin.register(SafeMessageConfirmation)

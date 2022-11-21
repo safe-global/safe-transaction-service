@@ -1,9 +1,9 @@
 import factory
 from eth_account import Account
-from eth_account.messages import defunct_hash_message, encode_defunct
 from factory.django import DjangoModelFactory
 
 from ..models import SafeMessage, SafeMessageConfirmation
+from ..utils import get_safe_message_hash_for_message
 
 
 class SafeMessageFactory(DjangoModelFactory):
@@ -11,12 +11,13 @@ class SafeMessageFactory(DjangoModelFactory):
         model = SafeMessage
 
     safe = factory.LazyFunction(lambda: Account.create().address)
-    message_hash = factory.LazyAttribute(
-        lambda o: defunct_hash_message(text=o.message).hex()
-    )
     message = factory.Sequence(lambda n: f"message-{n}")
     proposed_by = factory.LazyFunction(lambda: Account.create().address)
-    description = factory.Faker("sentence", nb_words=5)
+    safe_app_id = factory.Sequence(lambda n: n)
+
+    @factory.lazy_attribute
+    def message_hash(self):
+        return get_safe_message_hash_for_message(self.safe, self.message).hex()
 
 
 class SafeMessageConfirmationFactory(DjangoModelFactory):
@@ -29,8 +30,8 @@ class SafeMessageConfirmationFactory(DjangoModelFactory):
     safe_message = factory.SubFactory(SafeMessageFactory)
     owner = factory.LazyAttribute(lambda o: o.signing_owner.address)
     signature = factory.LazyAttribute(
-        lambda o: o.signing_owner.sign_message(
-            encode_defunct(text=o.safe_message.message)
-        )["signature"].hex()
+        lambda o: o.signing_owner.signHash(o.safe_message.message_hash)[
+            "signature"
+        ].hex()
     )
     signature_type = 2
