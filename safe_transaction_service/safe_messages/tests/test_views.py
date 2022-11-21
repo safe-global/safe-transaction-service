@@ -25,7 +25,7 @@ from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageFactory,
 )
 
-from .mocks import get_eip712_payload
+from .mocks import get_eip712_payload_mock
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +39,11 @@ def datetime_to_str(value: datetime.datetime) -> str:
 
 class TestMessageViews(EthereumTestCaseMixin, APITestCase):
     def test_safe_message_view(self):
-        safe_message_hash = (
+        random_safe_message_hash = (
             "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
         )
         response = self.client.get(
-            reverse("v1:safe_messages:message", args=(safe_message_hash,))
+            reverse("v1:safe_messages:message", args=(random_safe_message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.json(), {"detail": "Not found."})
@@ -62,7 +62,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
-                "description": safe_message.description,
+                "safeAppId": safe_message.safe_app_id,
                 "preparedSignature": None,
                 "confirmations": [],
             },
@@ -85,7 +85,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
-                "description": safe_message.description,
+                "safeAppId": safe_message.safe_app_id,
                 "preparedSignature": safe_message_confirmation.signature,
                 "confirmations": [
                     {
@@ -119,7 +119,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                 "messageHash": safe_message.message_hash,
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
-                "description": safe_message.description,
+                "safeAppId": safe_message.safe_app_id,
                 "preparedSignature": safe_message_confirmation.signature,
                 "confirmations": [
                     {
@@ -139,7 +139,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
     def test_safe_messages_create_view(self, get_owners_mock: MagicMock):
         account = Account.create()
         safe_address = Account.create().address
-        messages = ["Text to sign message", get_eip712_payload()]
+        messages = ["Text to sign message", get_eip712_payload_mock()]
         description = "Testing EIP191 message signing"
         message_hashes = [
             defunct_hash_message(text=messages[0]),
@@ -380,7 +380,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
-                        "description": safe_message.description,
+                        "safeAppId": safe_message.safe_app_id,
                         "preparedSignature": None,
                         "confirmations": [],
                     }
@@ -410,7 +410,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
-                        "description": safe_message.description,
+                        "safeAppId": safe_message.safe_app_id,
                         "preparedSignature": safe_message_confirmation.signature,
                         "confirmations": [
                             {
@@ -455,7 +455,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                         "messageHash": safe_message.message_hash,
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
-                        "description": safe_message.description,
+                        "safeAppId": safe_message.safe_app_id,
                         "preparedSignature": safe_message_confirmation.signature,
                         "confirmations": [
                             {

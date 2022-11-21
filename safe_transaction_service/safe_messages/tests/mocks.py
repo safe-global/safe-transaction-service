@@ -1,4 +1,4 @@
-def get_eip712_payload():
+def get_eip712_payload_mock():
     address = "0x8e12f01dae5fe7f1122dc42f2cb084f2f9e8aa03"
     types = {
         "EIP712Domain": [

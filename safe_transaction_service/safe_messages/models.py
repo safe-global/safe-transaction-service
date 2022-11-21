@@ -22,13 +22,23 @@ class SafeMessage(TimeStampedModel):
     safe = EthereumAddressV2Field(db_index=True)
     message = JSONField()  # String if EIP191, object if EIP712
     proposed_by = EthereumAddressV2Field()  # Owner proposing the message
-    description = models.CharField(max_length=200, blank=True)
+    safe_app_id = models.PositiveIntegerField(blank=True, null=True)
 
     class Meta:
         ordering = ["created"]
 
     def __str__(self):
-        return f"Safe Message {self.message_hash.hex()} - {self.description}"
+        message_str = str(self.message)
+        message_size = 15
+        message = message_str[:message_size]
+        if len(message_str) > message_size:
+            message += "..."
+        message_hash = (
+            self.message_hash.hex()
+            if isinstance(self.message_hash, bytes)
+            else self.message_hash
+        )
+        return f"Safe Message {message_hash} - {message}"
 
     def build_signature(self) -> bytes:
         return b"".join(

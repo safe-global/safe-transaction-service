@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, Union
 
-from eth_account.messages import defunct_hash_message
-from eth_typing import Hash32, HexStr
+from eth_typing import HexStr
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -9,20 +8,18 @@ from rest_framework.exceptions import ValidationError
 import gnosis.eth.django.serializers as eth_serializers
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.eip712 import eip712_encode_hash
-from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
-from safe_transaction_service.safe_messages.models import (
-    SafeMessage,
-    SafeMessageConfirmation,
-)
 from safe_transaction_service.utils.serializers import get_safe_owners
+
+from .models import SafeMessage, SafeMessageConfirmation
+from .utils import get_safe_message_hash_for_message
 
 
 # Request serializers
 class SafeMessageSerializer(serializers.Serializer):
     message = serializers.JSONField()
-    description = serializers.CharField()
+    safe_app_id = serializers.IntegerField(allow_null=True, default=None)
     signature = eth_serializers.HexadecimalField(max_length=65)
 
     def validate_message(self, value: Union[str, Dict[str, Any]]):
@@ -46,15 +43,7 @@ class SafeMessageSerializer(serializers.Serializer):
         safe_address = self.context["safe_address"]
         signature = attrs["signature"]
         attrs["safe"] = safe_address
-
-        message_hash: Hash32 = (
-            defunct_hash_message(text=message)
-            if isinstance(message, str)
-            else eip712_encode_hash(message)
-        )
-        ethereum_client = EthereumClientProvider()
-        safe = Safe(safe_address, ethereum_client)
-        safe_message_hash = safe.get_message_hash(message_hash)
+        safe_message_hash = get_safe_message_hash_for_message(safe_address, message)
         attrs["message_hash"] = safe_message_hash
 
         if SafeMessage.objects.filter(message_hash=safe_message_hash).exists():
@@ -67,6 +56,8 @@ class SafeMessageSerializer(serializers.Serializer):
             raise ValidationError(
                 f"1 owner signature was expected, {len(safe_signatures)} received"
             )
+
+        ethereum_client = EthereumClientProvider()
         for safe_signature in safe_signatures:
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
@@ -107,13 +98,14 @@ class SafeMessageSignatureSerializer(serializers.Serializer):
         signature: HexStr = attrs["signature"]
         safe_address = safe_message.safe
         safe_message_hash = safe_message.message_hash
-        ethereum_client = EthereumClientProvider()
 
         safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
         if len(safe_signatures) != 1:
             raise ValidationError(
                 f"1 owner signature was expected, {len(safe_signatures)} received"
             )
+
+        ethereum_client = EthereumClientProvider()
         for safe_signature in safe_signatures:
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
@@ -164,7 +156,7 @@ class SafeMessageResponseSerializer(serializers.Serializer):
     message_hash = eth_serializers.Sha3HashField()
     message = serializers.JSONField()
     proposed_by = eth_serializers.EthereumAddressField()
-    description = serializers.CharField()
+    safe_app_id = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
 
