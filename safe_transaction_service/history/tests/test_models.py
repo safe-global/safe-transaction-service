@@ -1325,6 +1325,54 @@ class TestMultisigTransactions(TestCase):
             MultisigTransaction.objects.not_indexed_metadata_contract_addresses()
         )
 
+    def test_with_confirmations_required(self):
+        # This should never be picked
+        SafeStatusFactory(nonce=0, threshold=4)
+
+        multisig_transaction = MultisigTransactionFactory()
+        self.assertIsNone(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required
+        )
+
+        # SafeStatus not matching the EthereumTx
+        safe_status = SafeStatusFactory(nonce=1, threshold=8)
+        self.assertIsNone(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required
+        )
+
+        safe_status.internal_tx.ethereum_tx = multisig_transaction.ethereum_tx
+        safe_status.internal_tx.save(update_fields=["ethereum_tx"])
+
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            8,
+        )
+
+        # It will not be picked, as EthereumTx is not matching
+        SafeStatusFactory(nonce=2, threshold=15)
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            8,
+        )
+
+        # As EthereumTx is empty, the latest safe status will be used
+        multisig_transaction.ethereum_tx = None
+        multisig_transaction.save(update_fields=["ethereum_tx"])
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            15,
+        )
+
     def test_with_confirmations(self):
         multisig_transaction = MultisigTransactionFactory()
         self.assertEqual(MultisigTransaction.objects.with_confirmations().count(), 0)
