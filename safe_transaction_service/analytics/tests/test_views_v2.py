@@ -17,8 +17,8 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        origin_1 = {"url": "https://example1.com", "name": "afeApp1"}
-        origin_2 = {"url": "https://example2.com", "name": "afeApp2"}
+        origin_1 = {"url": "https://example1.com", "name": "SafeApp1"}
+        origin_2 = {"url": "https://example2.com", "name": "SafeApp2"}
 
         MultisigTransactionFactory(origin=origin_1)
         # Execute the periodic task
@@ -28,7 +28,14 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
-            {"name": origin_1["name"], "url": origin_1["url"], "transactions": 1},
+            {
+                "name": origin_1["name"],
+                "url": origin_1["url"],
+                "total_tx": 1,
+                "tx_last_month": 1,
+                "tx_last_week": 1,
+                "tx_last_year": 1,
+            },
         ]
         self.assertEqual(response.data, expected)
 
@@ -43,8 +50,22 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
-            {"name": origin_2["name"], "url": origin_2["url"], "transactions": 3},
-            {"name": origin_1["name"], "url": origin_1["url"], "transactions": 1},
+            {
+                "name": origin_2["name"],
+                "url": origin_2["url"],
+                "total_tx": 3,
+                "tx_last_month": 3,
+                "tx_last_week": 3,
+                "tx_last_year": 3,
+            },
+            {
+                "name": origin_1["name"],
+                "url": origin_1["url"],
+                "total_tx": 1,
+                "tx_last_month": 1,
+                "tx_last_week": 1,
+                "tx_last_year": 1,
+            },
         ]
         self.assertEqual(response.data, expected)
 
@@ -59,7 +80,21 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
-            {"name": origin_1["name"], "url": origin_1["url"], "transactions": 4},
-            {"name": origin_2["name"], "url": origin_2["url"], "transactions": 3},
+            {
+                "name": origin_1["name"],
+                "url": origin_1["url"],
+                "total_tx": 4,
+                "tx_last_month": 4,
+                "tx_last_week": 4,
+                "tx_last_year": 4,
+            },
+            {
+                "name": origin_2["name"],
+                "url": origin_2["url"],
+                "total_tx": 3,
+                "tx_last_month": 3,
+                "tx_last_week": 3,
+                "tx_last_year": 3,
+            },
         ]
         self.assertEqual(response.data, expected)
