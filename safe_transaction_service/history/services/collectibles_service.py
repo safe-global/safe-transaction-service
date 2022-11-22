@@ -478,14 +478,15 @@ class CollectiblesService:
         exclude_spam: bool = False,
     ) -> List[CollectibleWithMetadata]:
         """
-         Get collectibles v1 returns no paginated response
+        Get collectibles v1 returns no paginated response
+
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
         :return: collectibles
         """
         collectibles, _ = self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam
+            safe_address, only_trusted, exclude_spam, limit=50, offset=0
         )
         return collectibles
 
@@ -508,7 +509,7 @@ class CollectiblesService:
         :return: collectibles and count
         """
         return self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam, limit, offset
+            safe_address, only_trusted, exclude_spam, limit=limit, offset=offset
         )
 
     @cachedmethod(cache=operator.attrgetter("cache_token_info"))

@@ -509,7 +509,7 @@ class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView)
         return super().post(*args, **kwargs)
 
 
-def swagger_safe_balance_schema(serializer_class):
+def swagger_safe_balance_schema(serializer_class, deprecated: bool = False):
     _schema_token_trusted_param = openapi.Parameter(
         "trusted",
         openapi.IN_QUERY,
@@ -534,6 +534,7 @@ def swagger_safe_balance_schema(serializer_class):
             _schema_token_trusted_param,
             _schema_token_exclude_spam_param,
         ],
+        deprecated=deprecated,
     )
 
 
@@ -607,10 +608,11 @@ class SafeCollectiblesView(SafeBalanceView):
             *args, **kwargs
         )
 
-    @swagger_safe_balance_schema(serializer_class)
+    @swagger_safe_balance_schema(serializer_class, deprecated=True)
     def get(self, *args, **kwargs):
         """
-        Get collectibles (ERC721 tokens) and information about them
+        Get collectibles (ERC721 tokens) and information about them. Limited to 50 collectibles due to
+        performance issues, endpoint will be deprecated soon, please migrate to v2 endpoint.
         """
         return super().get(*args, **kwargs)
 
