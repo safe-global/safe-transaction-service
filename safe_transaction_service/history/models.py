@@ -24,17 +24,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import (
-    Case,
-    Count,
-    Exists,
-    ExpressionWrapper,
-    Index,
-    JSONField,
-    Max,
-    Q,
-    QuerySet,
-)
+from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
@@ -1191,22 +1181,25 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
         :return: queryset with `confirmations_required: int` field
         """
-        # ExpressionWrapper is a temporary fix https://code.djangoproject.com/ticket/31714
-        threshold_query = (
-            SafeStatus.objects.annotate(
-                multisig_tx_ethereum_tx=ExpressionWrapper(
-                    OuterRef("ethereum_tx"), output_field=EthereumAddressV2Field()
-                )
-            )
-            .filter(
-                Q(internal_tx__ethereum_tx=F("multisig_tx_ethereum_tx"))
-                | Q(multisig_tx_ethereum_tx__isnull=True)
-            )
+        threshold_safe_status_query = (
+            SafeStatus.objects.filter(internal_tx__ethereum_tx=OuterRef("ethereum_tx"))
             .sorted_reverse_by_mined()
             .values("threshold")
         )
 
-        return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
+        threshold_safe_last_status_query = SafeLastStatus.objects.filter(
+            address=OuterRef("safe")
+        ).values("threshold")
+
+        threshold_queries = Case(
+            When(
+                ethereum_tx__isnull=True,
+                then=Subquery(threshold_safe_last_status_query[:1]),
+            ),
+            default=Subquery(threshold_safe_status_query[:1]),
+        )
+
+        return self.annotate(confirmations_required=threshold_queries)
 
     def queued(self, safe_address: str):
         """

@@ -1363,9 +1363,24 @@ class TestMultisigTransactions(TestCase):
             8,
         )
 
-        # As EthereumTx is empty, the latest safe status will be used
+        # As EthereumTx is empty, the latest safe status will be used if available
         multisig_transaction.ethereum_tx = None
         multisig_transaction.save(update_fields=["ethereum_tx"])
+        self.assertIsNone(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required
+        )
+
+        # Not matching address should not return anything
+        SafeLastStatusFactory(nonce=2, threshold=16)
+        self.assertIsNone(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required
+        )
+
+        SafeLastStatusFactory(address=multisig_transaction.safe, nonce=2, threshold=15)
         self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
