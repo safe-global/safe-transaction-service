@@ -3,7 +3,6 @@ import logging
 from typing import Any, Dict, Tuple
 
 from django.conf import settings
-from django.db.models import Count
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -185,27 +184,6 @@ class MasterCopiesView(ListAPIView):
 
     def get_queryset(self):
         return SafeMasterCopy.objects.relevant()
-
-
-class AnalyticsMultisigTxsByOriginListView(ListAPIView):
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = filters.AnalyticsMultisigTxsByOriginFilter
-    pagination_class = None
-    queryset = (
-        MultisigTransaction.objects.values("origin")
-        .annotate(transactions=Count("*"))
-        .order_by("-transactions")
-    )
-    serializer_class = serializers.AnalyticsMultisigTxsByOriginResponseSerializer
-
-
-class AnalyticsMultisigTxsBySafeListView(ListAPIView):
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
-    filterset_class = filters.AnalyticsMultisigTxsBySafeFilter
-    queryset = (
-        MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-    )
-    serializer_class = serializers.AnalyticsMultisigTxsBySafeResponseSerializer
 
 
 class AllTransactionsListView(ListAPIView):
@@ -531,7 +509,7 @@ class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView)
         return super().post(*args, **kwargs)
 
 
-def swagger_safe_balance_schema(serializer_class):
+def swagger_safe_balance_schema(serializer_class, deprecated: bool = False):
     _schema_token_trusted_param = openapi.Parameter(
         "trusted",
         openapi.IN_QUERY,
@@ -556,6 +534,7 @@ def swagger_safe_balance_schema(serializer_class):
             _schema_token_trusted_param,
             _schema_token_exclude_spam_param,
         ],
+        deprecated=deprecated,
     )
 
 
@@ -629,10 +608,11 @@ class SafeCollectiblesView(SafeBalanceView):
             *args, **kwargs
         )
 
-    @swagger_safe_balance_schema(serializer_class)
+    @swagger_safe_balance_schema(serializer_class, deprecated=True)
     def get(self, *args, **kwargs):
         """
-        Get collectibles (ERC721 tokens) and information about them
+        Get collectibles (ERC721 tokens) and information about them. Limited to 50 collectibles due to
+        performance issues, endpoint will be deprecated soon, please migrate to v2 endpoint.
         """
         return super().get(*args, **kwargs)
 
@@ -775,6 +755,19 @@ class SafeDelegateDestroyView(DestroyAPIView):
                     "code": 1,
                     "message": "Checksum address validation failed",
                     "arguments": [address, delegate_address],
+                },
+            )
+
+        body_delegate = request.data.get("delegate", delegate_address)
+        if (
+            body_delegate != delegate_address
+        ):  # Check delegate in body matches the one in url
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 2,
+                    "message": "Delegate address in body should match the one in the url",
+                    "arguments": [body_delegate, delegate_address],
                 },
             )
 

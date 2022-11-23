@@ -21,7 +21,7 @@ logger = get_task_logger(__name__)
 
 
 @dataclass
-class EthValueWithTimestamp(object):
+class EthValueWithTimestamp:
     """
     Contains ethereum value for a token and the timestamp on when it was calculated
     """
@@ -111,21 +111,3 @@ def fix_pool_tokens_task() -> Optional[int]:
         if number:
             logger.info("%d pool token names were fixed", number)
         return number
-
-
-@app.shared_task()
-@close_gevent_db_connection_decorator
-def get_token_info_from_blockchain_task(token_address: ChecksumAddress) -> bool:
-    """
-    Retrieve token information from blockchain
-
-    :param token_address:
-    :return: `True` if found, `False` otherwise
-    """
-    redis = get_redis()
-    key = f"token-task:{token_address}"
-    if result := redis.get(key):
-        return bool(int(result))
-    token_found = bool(Token.objects.create_from_blockchain(token_address))
-    redis.setex(key, 60 * 60 * 6, int(token_found))  # Cache result 6 hours
-    return token_found

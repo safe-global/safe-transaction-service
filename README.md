@@ -3,6 +3,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)
 ![Django 3](https://img.shields.io/badge/Django-3-blue.svg)
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/safeglobal/safe-transaction-service?label=Docker&sort=semver)](https://hub.docker.com/r/safeglobal/safe-transaction-service)
 
 # Gnosis Transaction Service
 Keeps track of transactions sent via Gnosis Safe contracts. It uses events and

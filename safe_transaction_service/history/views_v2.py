@@ -33,28 +33,28 @@ class SafeCollectiblesView(GenericAPIView):
                     "arguments": [address],
                 },
             )
-        else:
-            try:
-                SafeContract.objects.get(address=address)
-            except SafeContract.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
 
-            only_trusted = parse_boolean_query_param(
-                self.request.query_params.get("trusted", False)
-            )
-            exclude_spam = parse_boolean_query_param(
-                self.request.query_params.get("exclude_spam", False)
-            )
+        try:
+            SafeContract.objects.get(address=address)
+        except SafeContract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-            paginator = pagination.ListPagination(self.request)
-            limit = paginator.limit
-            offset = paginator.offset
-            (
-                safe_collectibles,
-                count,
-            ) = CollectiblesServiceProvider().get_collectibles_with_metadata_paginated(
-                address, only_trusted, exclude_spam, limit, offset
-            )
-            paginator.set_count(count)
-            serializer = self.get_serializer(safe_collectibles, many=True)
-            return paginator.get_paginated_response(serializer.data)
+        only_trusted = parse_boolean_query_param(
+            self.request.query_params.get("trusted", False)
+        )
+        exclude_spam = parse_boolean_query_param(
+            self.request.query_params.get("exclude_spam", False)
+        )
+
+        paginator = pagination.ListPagination(self.request)
+        limit = paginator.limit
+        offset = paginator.offset
+        (
+            safe_collectibles,
+            count,
+        ) = CollectiblesServiceProvider().get_collectibles_with_metadata_paginated(
+            address, only_trusted, exclude_spam, limit, offset
+        )
+        paginator.set_count(count)
+        serializer = self.get_serializer(safe_collectibles, many=True)
+        return paginator.get_paginated_response(serializer.data)

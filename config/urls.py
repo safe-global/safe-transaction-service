@@ -55,7 +55,17 @@ urlpatterns_v1 = [
         ),
     ),
     path(
+        "",
+        include(
+            "safe_transaction_service.safe_messages.urls", namespace="safe_messages"
+        ),
+    ),
+    path(
         "tokens/", include("safe_transaction_service.tokens.urls", namespace="tokens")
+    ),
+    path(
+        "analytics/",
+        include("safe_transaction_service.analytics.urls", namespace="analytics"),
     ),
 ]
 urlpatterns_v2 = [

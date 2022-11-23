@@ -115,7 +115,7 @@ class InternalTxFactory(DjangoModelFactory):
     refund_address = NULL_ADDRESS
     tx_type = InternalTxType.CALL.value
     call_type = EthereumTxCallType.CALL.value
-    trace_address = factory.Sequence(lambda n: str(n))
+    trace_address = factory.Sequence(str)
     error = None
 
 
