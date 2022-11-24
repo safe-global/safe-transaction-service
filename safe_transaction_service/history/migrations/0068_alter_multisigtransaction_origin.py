@@ -5,21 +5,25 @@ import json
 from django.db import migrations, models
 
 
-def convert_str_to_json(apps, schema_editor):
+def prepare_migration_charfield_to_jsonfield(apps, schema_editor):
     MultisigTransaction = apps.get_model("history", "MultisigTransaction")
-    transactions = (
-        MultisigTransaction.objects.exclude(origin__icontains="{")
-        .filter(origin__isnull=False)
-        .iterator()
-    )
+    transactions = MultisigTransaction.objects.all().iterator()
     for transaction in transactions:
-        transaction.origin = json.dumps(transaction.origin)
-        transaction.save()
+        try:
+            json.loads(transaction.origin)
+        except Exception:
+            if transaction.origin == "" or transaction.origin is None:
+                transaction.origin = "{}"
+            else:
+                transaction.origin = json.dumps(transaction.origin)
+            transaction.save()
 
 
-def convert_jsonfield_to_charfield(apps, schema_editor):
+def repair_backward_migration(apps, schema_editor):
     MultisigTransaction = apps.get_model("history", "MultisigTransaction")
+    # Empty objects should be None
     MultisigTransaction.objects.filter(origin__exact="{}").update(origin=None)
+    # Remove duplicated quotes example: '"hello"'
     transactions = (
         MultisigTransaction.objects.exclude(origin__icontains="{")
         .filter(origin__isnull=False)
@@ -38,7 +42,8 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(
-            convert_str_to_json, reverse_code=convert_jsonfield_to_charfield
+            prepare_migration_charfield_to_jsonfield,
+            reverse_code=repair_backward_migration,
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
