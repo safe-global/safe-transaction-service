@@ -240,7 +240,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             try:
                 origin = json.loads(self.validated_data["origin"])
             except ValueError:
-                origin = json.loads(json.dumps(self.validated_data["origin"]))
+                origin = self.validated_data["origin"]
         else:
             origin = {}
         trusted = self.validated_data["trusted"]

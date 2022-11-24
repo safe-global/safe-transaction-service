@@ -1238,9 +1238,7 @@ class MultisigTransaction(TimeStampedModel):
     signatures = models.BinaryField(null=True, blank=True)  # When tx is executed
     nonce = Uint256Field(db_index=True)
     failed = models.BooleanField(null=True, blank=True, default=None, db_index=True)
-    origin = models.JSONField(
-        null=False, default=dict
-    )  # To store arbitrary data on the tx
+    origin = models.JSONField(default=dict)  # To store arbitrary data on the tx
     trusted = models.BooleanField(
         default=False, db_index=True
     )  # Txs proposed by a delegate or with one confirmation
