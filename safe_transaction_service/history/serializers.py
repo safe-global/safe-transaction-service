@@ -236,7 +236,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     def save(self, **kwargs):
         safe_tx_hash = self.validated_data["contract_transaction_hash"]
         # Origin field on db is a JsonField
-        if self.validated_data["origin"] is not None:
+        if self.validated_data["origin"]:
             try:
                 origin = json.loads(self.validated_data["origin"])
             except ValueError:
