@@ -7,15 +7,19 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
 
+from ...utils.redis import get_redis
 from ..tasks import get_transactions_per_safe_app_task
 
 
 class TestViewsV2(SafeTestCaseMixin, APITestCase):
     def test_analytics_multisig_txs_by_origin_view(self):
+        redis = get_redis()
+        redis.flushall()
         response = self.client.get(
             reverse("v2:analytics:analytics-multisig-txs-by-origin")
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
 
         origin_1 = {"url": "https://example1.com", "name": "SafeApp1"}
         origin_2 = {"url": "https://example2.com", "name": "SafeApp2"}

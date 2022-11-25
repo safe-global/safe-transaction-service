@@ -1,10 +1,10 @@
-import json
-
 from rest_framework.generics import ListAPIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
-from safe_transaction_service.utils.redis import get_redis
+from safe_transaction_service.analytics.services.analytics_service import (
+    AnalyticsService,
+)
 
 
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
@@ -13,10 +13,5 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
     serializer_class = None
 
     def get(self, request, format=None):
-        redis_key = "analytics_transactions_per_safe_app"
-        redis = get_redis()
-        analytic_result = redis.get(redis_key)
-        if analytic_result:
-            return Response(json.loads(analytic_result))
-        else:
-            return Response([])
+        analytics_service = AnalyticsService()
+        return Response(analytics_service.get_safe_transactions_per_safe_app())
