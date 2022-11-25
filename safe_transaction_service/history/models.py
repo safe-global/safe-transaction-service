@@ -1181,13 +1181,25 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
         :return: queryset with `confirmations_required: int` field
         """
-        threshold_query = (
+        threshold_safe_status_query = (
             SafeStatus.objects.filter(internal_tx__ethereum_tx=OuterRef("ethereum_tx"))
             .sorted_reverse_by_mined()
             .values("threshold")
         )
 
-        return self.annotate(confirmations_required=Subquery(threshold_query[:1]))
+        threshold_safe_last_status_query = SafeLastStatus.objects.filter(
+            address=OuterRef("safe")
+        ).values("threshold")
+
+        threshold_queries = Case(
+            When(
+                ethereum_tx__isnull=True,
+                then=Subquery(threshold_safe_last_status_query[:1]),
+            ),
+            default=Subquery(threshold_safe_status_query[:1]),
+        )
+
+        return self.annotate(confirmations_required=threshold_queries)
 
     def queued(self, safe_address: str):
         """
