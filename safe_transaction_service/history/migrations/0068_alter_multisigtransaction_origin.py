@@ -3,6 +3,7 @@
 import json
 
 from django.db import migrations, models
+from django.db.models import Q
 
 
 def prepare_migration_charfield_to_jsonfield(apps, schema_editor):
@@ -22,16 +23,16 @@ def prepare_migration_charfield_to_jsonfield(apps, schema_editor):
 def repair_backward_migration(apps, schema_editor):
     MultisigTransaction = apps.get_model("history", "MultisigTransaction")
     # Empty objects should be None
-    MultisigTransaction.objects.filter(origin__exact="{}").update(origin=None)
-    # Remove duplicated quotes example: '"hello"'
-    transactions = (
-        MultisigTransaction.objects.exclude(origin__icontains="{")
-        .filter(origin__isnull=False)
-        .iterator()
+    MultisigTransaction.objects.filter(Q(origin="{}") | Q(origin='"{}"')).update(
+        origin=None
     )
+    # Remove duplicated quotes example: '"hello"'
+    transactions = MultisigTransaction.objects.filter(origin__isnull=False).iterator()
     for transaction in transactions:
-        transaction.origin = json.loads(transaction.origin)
-        transaction.save()
+        value = json.loads(transaction.origin)
+        if type(value) == str:
+            transaction.origin = value
+            transaction.save()
 
 
 class Migration(migrations.Migration):

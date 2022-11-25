@@ -71,7 +71,7 @@ class TestMigrations(TestCase):
         MultisigTransactionNew = new_state.apps.get_model(
             "history", "MultisigTransaction"
         )
-        origins = ["TestString", {"url": "https://example.com", "name": "app"}, {}]
+        origins = ["{ TestString", {"url": "https://example.com", "name": "app"}, {}]
         for origin in origins:
             MultisigTransactionNew.objects.create(
                 safe_tx_hash=Web3.keccak(text=f"multisig-tx-{origin}").hex(),
