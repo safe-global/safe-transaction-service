@@ -323,7 +323,7 @@ class IndexService:
 
         logger.info("Remove transactions automatically indexed")
         queryset = MultisigTransaction.objects.exclude(ethereum_tx=None).filter(
-            Q(origin__exact={}) | Q(origin="")
+            Q(origin__exact={})
         )
         if addresses:
             queryset = queryset.filter(safe__in=addresses)

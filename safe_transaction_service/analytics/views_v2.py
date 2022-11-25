@@ -3,7 +3,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from safe_transaction_service.analytics.services.analytics_service import (
-    AnalyticsService,
+    get_analytics_service,
 )
 
 
@@ -13,5 +13,5 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
     serializer_class = None
 
     def get(self, request, format=None):
-        analytics_service = AnalyticsService()
+        analytics_service = get_analytics_service()
         return Response(analytics_service.get_safe_transactions_per_safe_app())
