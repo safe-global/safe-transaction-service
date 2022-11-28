@@ -1,6 +1,8 @@
+from django.contrib.auth.models import User
 from django.urls import reverse
 
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -18,6 +20,14 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         response = self.client.get(
             reverse("v2:analytics:analytics-multisig-txs-by-origin")
         )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        user, _ = User.objects.get_or_create(username="test", password="12345")
+        token, _ = Token.objects.get_or_create(user=user)
+        header = {"HTTP_AUTHORIZATION": "Token " + token.key}
+        response = self.client.get(
+            reverse("v2:analytics:analytics-multisig-txs-by-origin"), **header
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
@@ -28,7 +38,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         # Execute the periodic task
         get_transactions_per_safe_app_task()
         response = self.client.get(
-            reverse("v2:analytics:analytics-multisig-txs-by-origin")
+            reverse("v2:analytics:analytics-multisig-txs-by-origin"), **header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -50,7 +60,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         get_transactions_per_safe_app_task()
 
         response = self.client.get(
-            reverse("v2:analytics:analytics-multisig-txs-by-origin")
+            reverse("v2:analytics:analytics-multisig-txs-by-origin"), **header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -80,7 +90,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         get_transactions_per_safe_app_task()
         # Check sorting by the biggest
         response = self.client.get(
-            reverse("v2:analytics:analytics-multisig-txs-by-origin")
+            reverse("v2:analytics:analytics-multisig-txs-by-origin"), **header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
