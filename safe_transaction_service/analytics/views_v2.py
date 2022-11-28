@@ -9,8 +9,8 @@ from safe_transaction_service.analytics.services.analytics_service import (
 
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
     pagination_class = None
+    swagger_schema = None
     renderer_classes = (JSONRenderer,)
-    serializer_class = None
 
     def get(self, request, format=None):
         analytics_service = get_analytics_service()

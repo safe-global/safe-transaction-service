@@ -9,6 +9,7 @@ from safe_transaction_service.history.models import MultisigTransaction
 
 
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
+    swagger_schema = None
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.AnalyticsMultisigTxsByOriginFilter
     pagination_class = None
@@ -21,6 +22,7 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
 
 
 class AnalyticsMultisigTxsBySafeListView(ListAPIView):
+    swagger_schema = None
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.AnalyticsMultisigTxsBySafeFilter
     queryset = (
