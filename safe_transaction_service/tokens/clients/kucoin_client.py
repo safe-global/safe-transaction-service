@@ -29,6 +29,13 @@ class KucoinClient:
         """
         return self._get_price("EWT-USDT")
 
+    def get_celo_usd_price(self) -> float:
+        """
+        :return: current USD price for Celo
+        :raises: CannotGetPrice
+        """
+        return self._get_price("CELO-USDT")
+
     def get_cro_usd_price(self) -> float:
         """
         :return: current USD price for Cronos
