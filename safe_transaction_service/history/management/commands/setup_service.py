@@ -120,7 +120,7 @@ TASKS = [
     CeleryTaskConfiguration(
         "safe_transaction_service.analytics.tasks.get_transactions_per_safe_app_task",
         "Run query to get number of transactions grouped by safe-app",
-        1,
+        7,
         IntervalSchedule.DAYS,
     ),
 ]
