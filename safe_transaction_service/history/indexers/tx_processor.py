@@ -336,13 +336,10 @@ class SafeTxProcessor(TxProcessor):
                         update_fields=["ethereum_tx", "erc20_block_number"]
                     )
             except SafeContract.DoesNotExist:
-                blocks_one_day = int(24 * 60 * 60 / 15)  # 15 seconds block
                 SafeContract.objects.create(
                     address=contract_address,
                     ethereum_tx=internal_tx.ethereum_tx,
-                    erc20_block_number=max(
-                        internal_tx.block_number - blocks_one_day, 0
-                    ),
+                    erc20_block_number=internal_tx.block_number,
                 )
                 logger.info("Found new Safe=%s", contract_address)
 
