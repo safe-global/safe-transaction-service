@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import asdict
 from unittest import mock
@@ -1269,6 +1270,31 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             safe_tx_hash=safe_tx.safe_tx_hash
         )
         self.assertEqual(multisig_tx_db.origin, data["origin"])
+        data["origin"] = '{"url": "test", "name":"test"}'
+        data["nonce"] = 1
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_tx_db = MultisigTransaction.objects.get(
+            safe_tx_hash=safe_tx.safe_tx_hash
+        )
+        self.assertEqual(multisig_tx_db.origin, json.loads(data["origin"]))
 
     def test_post_multisig_transactions_with_multiple_signatures(self):
         safe_owners = [Account.create() for _ in range(4)]

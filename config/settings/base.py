@@ -44,6 +44,9 @@ FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default=None)
 # SSO
 SSO_ENABLED = False
 
+# Enable analytics endpoints
+ENABLE_ANALYTICS = env("ENABLE_ANALYTICS", default=False)
+
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases

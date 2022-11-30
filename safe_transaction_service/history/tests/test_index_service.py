@@ -137,7 +137,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         safe_status = SafeStatusFactory()
         MultisigTransactionFactory()  # It shouldn't be deleted (safe not matching)
         MultisigTransactionFactory(
-            safe=safe_status.address, origin=None
+            safe=safe_status.address, origin={}
         )  # It should be deleted
         MultisigTransactionFactory(
             safe=safe_status.address, ethereum_tx=None
@@ -154,13 +154,12 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         index_service: IndexService = self.index_service
         for _ in range(5):
             safe_status = SafeStatusFactory()
-            MultisigTransactionFactory(safe=safe_status.address, origin=None)
-            MultisigTransactionFactory(safe=safe_status.address, origin="")
+            MultisigTransactionFactory(safe=safe_status.address, origin={})
 
         MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
         MultisigTransactionFactory(origin="Something")  # It shouldn't be deleted
 
-        self.assertEqual(MultisigTransaction.objects.count(), 12)
+        self.assertEqual(MultisigTransaction.objects.count(), 7)
         self.assertIsNone(index_service.reprocess_all())
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 2)
