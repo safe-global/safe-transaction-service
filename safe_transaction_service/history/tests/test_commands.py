@@ -385,7 +385,7 @@ class TestCommands(TestCase):
             MultisigTransactionFactory(
                 origin="another-something", ethereum_tx=None
             )  # Will not be exported
-            MultisigTransactionFactory(origin=None)  # Will not be exported
+            MultisigTransactionFactory(origin={})  # Will not be exported
             buf = StringIO()
             call_command(command, arguments, stdout=buf)
             self.assertIn("Start exporting of 1", buf.getvalue())

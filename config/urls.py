@@ -63,14 +63,26 @@ urlpatterns_v1 = [
     path(
         "tokens/", include("safe_transaction_service.tokens.urls", namespace="tokens")
     ),
-    path(
-        "analytics/",
-        include("safe_transaction_service.analytics.urls", namespace="analytics"),
-    ),
 ]
 urlpatterns_v2 = [
-    path("", include("safe_transaction_service.history.urls_v2", namespace="history"))
+    path("", include("safe_transaction_service.history.urls_v2", namespace="history")),
 ]
+
+if settings.ENABLE_ANALYTICS:
+    urlpatterns_v1 += [
+        path(
+            "analytics/",
+            include("safe_transaction_service.analytics.urls", namespace="analytics"),
+        ),
+    ]
+    urlpatterns_v2 += [
+        path(
+            "analytics/",
+            include(
+                "safe_transaction_service.analytics.urls_v2", namespace="analytics"
+            ),
+        ),
+    ]
 
 urlpatterns = swagger_urlpatterns + [
     path(settings.ADMIN_URL, admin.site.urls),
