@@ -277,10 +277,9 @@ class EthereumIndexer(ABC):
 
         if updated_addresses != len(addresses):
             logger.warning(
-                "%s: Possible reorg - Cannot update all indexed addresses=%s... Updated %d/%d addresses "
+                "%s: Possible reorg - Cannot update all indexed addresses... Updated %d/%d addresses "
                 "from-block-number=%d to-block-number=%d",
                 self.__class__.__name__,
-                addresses[:10],
                 updated_addresses,
                 len(addresses),
                 from_block_number,

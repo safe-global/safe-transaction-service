@@ -1,7 +1,9 @@
 import operator
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterator, List, Sequence
+from typing import Iterator, List, Optional, Sequence
+
+from django.db.models import Min
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
@@ -14,6 +16,7 @@ from web3.types import EventData, LogReceipt
 from gnosis.eth import EthereumClient
 
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.redis import get_redis
 
 from ..models import ERC20Transfer, ERC721Transfer, SafeContract, TokenTransfer
 from .events_indexer import EventsIndexer
@@ -39,10 +42,15 @@ class Erc20EventsIndexerProvider:
 
 class Erc20EventsIndexer(EventsIndexer):
     _cache_is_erc20 = {}
+    LAST_INDEXED_BLOCK_NUMBER = "indexing:erc20:block_number"
 
     """
     Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.redis = get_redis()
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -173,3 +181,62 @@ class Erc20EventsIndexer(EventsIndexer):
             return range(
                 result_erc20 + result_erc721
             )  # TODO Hack to prevent returning `TokenTransfer` and using too much RAM
+
+    def get_minimum_block_number(
+        self, addresses: Optional[Sequence[str]] = None
+    ) -> Optional[int]:
+        if not (
+            last_indexed_block_number := self.redis.get(self.LAST_INDEXED_BLOCK_NUMBER)
+        ):
+            queryset = (
+                self.database_queryset.filter(address__in=addresses)
+                if addresses
+                else self.database_queryset
+            )
+            last_indexed_block_number = queryset.aggregate(
+                **{self.database_field: Min(self.database_field)}
+            )[self.database_field]
+        return int(last_indexed_block_number)
+
+    def update_monitored_address(
+        self, addresses: Sequence[str], from_block_number: int, to_block_number: int
+    ) -> int:
+        self.redis.set(self.LAST_INDEXED_BLOCK_NUMBER, to_block_number)
+        return 1
+
+    def start(self) -> int:
+        """
+        Find and process relevant data for existing database addresses
+
+        :return: Number of elements processed
+        """
+        current_block_number = self.ethereum_client.current_block_number
+        logger.debug(
+            "%s: Current RPC block number=%d",
+            self.__class__.__name__,
+            current_block_number,
+        )
+        number_processed_elements = 0
+
+        almost_updated_addresses = set(
+            SafeContract.objects.values_list("address", flat=True)
+        )
+        if almost_updated_addresses:
+            logger.info(
+                "%s: Processing %d addresses",
+                self.__class__.__name__,
+                len(almost_updated_addresses),
+            )
+            updated = False
+            while not updated:
+                processed_elements, _, updated = self.process_addresses(
+                    almost_updated_addresses,
+                    current_block_number=current_block_number,
+                )
+                number_processed_elements += len(processed_elements)
+            SafeContract.objects.update(erc20_block_number=current_block_number)
+        else:
+            logger.debug(
+                "%s: No almost updated addresses to process", self.__class__.__name__
+            )
+        return number_processed_elements

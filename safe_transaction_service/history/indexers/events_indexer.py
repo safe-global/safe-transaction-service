@@ -180,12 +180,11 @@ class EventsIndexer(EthereumIndexer):
         """
         len_addresses = len(addresses)
         logger.debug(
-            "%s: Filtering for events from block-number=%d to block-number=%d for %d addresses: %s",
+            "%s: Filtering for events from block-number=%d to block-number=%d for %d addresses",
             self.__class__.__name__,
             from_block_number,
             to_block_number,
             len_addresses,
-            addresses[:10],
         )
         log_receipts = self._find_elements_using_topics(
             addresses, from_block_number, to_block_number
@@ -194,13 +193,12 @@ class EventsIndexer(EthereumIndexer):
         len_log_receipts = len(log_receipts)
         logger_fn = logger.info if len_log_receipts else logger.debug
         logger_fn(
-            "%s: Found %d events from block-number=%d to block-number=%d for %d addresses: %s",
+            "%s: Found %d events from block-number=%d to block-number=%d for %d addresses",
             self.__class__.__name__,
             len_log_receipts,
             from_block_number,
             to_block_number,
             len_addresses,
-            addresses[:10],
         )
         return log_receipts
 
