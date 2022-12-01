@@ -108,11 +108,10 @@ class IndexService:
 
     def get_indexing_status(self) -> IndexingStatus:
         current_block_number = self.ethereum_client.current_block_number
-        erc20_block_number = SafeContract.objects.aggregate(
-            min_erc20_block_number=Min("erc20_block_number")
-        )["min_erc20_block_number"]
-        if erc20_block_number is None:  # Still nothing indexed
-            erc20_block_number = current_block_number
+        safe_contract = SafeContract.objects.first()
+        erc20_block_number = (
+            safe_contract.erc20_block_number if safe_contract else current_block_number
+        )
 
         master_copies_block_number = SafeMasterCopy.objects.relevant().aggregate(
             min_master_copies_block_number=Min("tx_block_number")
@@ -138,11 +137,10 @@ class IndexService:
 
     def get_erc20_indexing_status(self) -> ERC20IndexingStatus:
         current_block_number = self.ethereum_client.current_block_number
-        erc20_block_number = SafeContract.objects.aggregate(
-            min_erc20_block_number=Min("erc20_block_number")
-        )["min_erc20_block_number"]
-        if erc20_block_number is None:  # Still nothing indexed
-            erc20_block_number = current_block_number
+        safe_contract = SafeContract.objects.first()
+        erc20_block_number = (
+            safe_contract.erc20_block_number if safe_contract else current_block_number
+        )
         synced = (current_block_number - erc20_block_number) <= self.eth_reorg_blocks
 
         return ERC20IndexingStatus(
