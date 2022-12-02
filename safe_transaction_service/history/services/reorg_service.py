@@ -7,7 +7,8 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from ..models import EthereumBlock, ProxyFactory, SafeContract, SafeMasterCopy
+from ..helpers import Erc20IndexerStorage
+from ..models import EthereumBlock, ProxyFactory, SafeMasterCopy
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +44,13 @@ class ReorgService:
         :param eth_reorg_rewind_blocks: Number of blocks to rewind indexing when a reorg is found
         """
         self.ethereum_client = ethereum_client
+        self.erc20_indexer_storage = Erc20IndexerStorage(ethereum_client)
         self.eth_reorg_blocks = eth_reorg_blocks  #
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
         # Dictionary with Django model and attribute for reorgs
         self.reorg_models: Dict[models.Model, str] = {
             ProxyFactory: "tx_block_number",
-            SafeContract: "erc20_block_number",
+            # SafeContract: "erc20_block_number",
             SafeMasterCopy: "tx_block_number",
         }
 
@@ -92,6 +94,7 @@ class ReorgService:
             updated += model.objects.filter(**{field + "__gt": block_number}).update(
                 **{field: block_number}
             )
+        self.erc20_indexer_storage.set_last_indexed_block_number(block_number)
         return updated
 
     @transaction.atomic

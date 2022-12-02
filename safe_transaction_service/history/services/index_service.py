@@ -10,6 +10,7 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
+from ..helpers import Erc20IndexerStorage
 from ..models import (
     EthereumBlock,
     EthereumTx,
@@ -87,6 +88,7 @@ class IndexService:
         alert_out_of_sync_events_threshold: float,
     ):
         self.ethereum_client = ethereum_client
+        self.erc20_indexer_storage = Erc20IndexerStorage(self.ethereum_client)
         self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_l2_network = eth_l2_network
         self.alert_out_of_sync_events_threshold = alert_out_of_sync_events_threshold
@@ -108,10 +110,7 @@ class IndexService:
 
     def get_indexing_status(self) -> IndexingStatus:
         current_block_number = self.ethereum_client.current_block_number
-        safe_contract = SafeContract.objects.first()
-        erc20_block_number = (
-            safe_contract.erc20_block_number if safe_contract else current_block_number
-        )
+        erc20_block_number = self.erc20_indexer_storage.get_last_indexed_block_number()
 
         master_copies_block_number = SafeMasterCopy.objects.relevant().aggregate(
             min_master_copies_block_number=Min("tx_block_number")
@@ -137,10 +136,7 @@ class IndexService:
 
     def get_erc20_indexing_status(self) -> ERC20IndexingStatus:
         current_block_number = self.ethereum_client.current_block_number
-        safe_contract = SafeContract.objects.first()
-        erc20_block_number = (
-            safe_contract.erc20_block_number if safe_contract else current_block_number
-        )
+        erc20_block_number = self.erc20_indexer_storage.get_last_indexed_block_number()
         synced = (current_block_number - erc20_block_number) <= self.eth_reorg_blocks
 
         return ERC20IndexingStatus(

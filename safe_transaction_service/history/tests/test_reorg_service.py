@@ -5,13 +5,8 @@ from django.test import TestCase
 
 from gnosis.eth import EthereumClient
 
-from ..models import (
-    EthereumBlock,
-    EthereumTx,
-    ProxyFactory,
-    SafeContract,
-    SafeMasterCopy,
-)
+from ..helpers import Erc20IndexerStorage
+from ..models import EthereumBlock, EthereumTx, ProxyFactory, SafeMasterCopy
 from ..services import ReorgServiceProvider
 from .factories import (
     EthereumBlockFactory,
@@ -68,16 +63,21 @@ class TestReorgService(TestCase):
             SafeMasterCopyFactory(tx_block_number=300 * i)
 
         block_number = 5
-        reorg_service.reset_all_to_block(5)
+        reorg_service.reset_all_to_block(block_number)
 
         # All elements but 1 will be reset (with `tx_block_number=0` and `erc20_block_number=0`)
         self.assertEqual(
             ProxyFactory.objects.filter(tx_block_number=block_number).count(),
             elements - 1,
         )
+
+        # SafeContract are not updated anymore
+        # self.assertEqual(
+        #    SafeContract.objects.filter(erc20_block_number=block_number).count(),
+        #    elements - 1,
+        # )
         self.assertEqual(
-            SafeContract.objects.filter(erc20_block_number=block_number).count(),
-            elements - 1,
+            Erc20IndexerStorage(None).get_last_indexed_block_number(), block_number
         )
         self.assertEqual(
             SafeMasterCopy.objects.filter(tx_block_number=block_number).count(),

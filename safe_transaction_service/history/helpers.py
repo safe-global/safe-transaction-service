@@ -4,6 +4,33 @@ from typing import List
 from eth_typing import ChecksumAddress
 from eth_utils import keccak
 
+from gnosis.eth import EthereumClient
+
+from safe_transaction_service.utils.redis import get_redis
+
+
+class Erc20IndexerStorage:
+
+    LAST_INDEXED_BLOCK_NUMBER_KEY = "indexing:erc20:last-indexed-block-number"
+
+    def __init__(self, ethereum_client: EthereumClient):
+        self.redis = get_redis()
+        self.ethereum_client = ethereum_client
+
+    def get_last_indexed_block_number(self) -> int:
+        if last_indexed_block_number := self.redis.get(
+            self.LAST_INDEXED_BLOCK_NUMBER_KEY
+        ):
+            return int(last_indexed_block_number)
+
+        return max(self.ethereum_client.current_block_number - 1_000, 0)
+
+    def set_last_indexed_block_number(self, block_number: int):
+        return self.redis.set(self.LAST_INDEXED_BLOCK_NUMBER_KEY, block_number)
+
+    def flush_last_indexed_block_number(self):
+        return self.redis.delete(self.LAST_INDEXED_BLOCK_NUMBER_KEY)
+
 
 class DelegateSignatureHelper:
     @classmethod
