@@ -1,7 +1,9 @@
 from django.db.models import Count
 
 import django_filters
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
 
 from safe_transaction_service.analytics import serializers
 from safe_transaction_service.history import filters
@@ -13,6 +15,8 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.AnalyticsMultisigTxsByOriginFilter
     pagination_class = None
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
     queryset = (
         MultisigTransaction.objects.values("origin")
         .annotate(transactions=Count("*"))
@@ -23,6 +27,8 @@ class AnalyticsMultisigTxsByOriginListView(ListAPIView):
 
 class AnalyticsMultisigTxsBySafeListView(ListAPIView):
     swagger_schema = None
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.AnalyticsMultisigTxsBySafeFilter
     queryset = (

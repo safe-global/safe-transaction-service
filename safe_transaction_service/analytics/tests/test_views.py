@@ -1,7 +1,9 @@
+from django.contrib.auth.models import User
 from django.urls import reverse
 
 from eth_account import Account
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -13,9 +15,19 @@ from safe_transaction_service.history.tests.factories import (
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def setUp(self) -> None:
+        user, _ = User.objects.get_or_create(username="test", password="12345")
+        token, _ = Token.objects.get_or_create(user=user)
+        self.header = {"HTTP_AUTHORIZATION": "Token " + token.key}
+
     def test_analytics_multisig_txs_by_origin_view(self):
         response = self.client.get(
             reverse("v1:analytics:analytics-multisig-txs-by-origin")
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        response = self.client.get(
+            reverse("v1:analytics:analytics-multisig-txs-by-origin"), **self.header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -23,7 +35,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         origin_2 = "HAL 9000"
         multisig_transaction = MultisigTransactionFactory(origin=origin)
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-origin")
+            reverse("v1:analytics:analytics-multisig-txs-by-origin"), **self.header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -35,7 +47,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             MultisigTransactionFactory(origin=origin_2)
 
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-origin")
+            reverse("v1:analytics:analytics-multisig-txs-by-origin"), **self.header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -49,7 +61,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Check sorting by the biggest
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-origin")
+            reverse("v1:analytics:analytics-multisig-txs-by-origin"), **self.header
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -64,7 +76,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         MultisigTransactionFactory(origin=origin_3, safe=safe_address)
         response = self.client.get(
             reverse("v1:analytics:analytics-multisig-txs-by-origin")
-            + f"?safe={safe_address}"
+            + f"?safe={safe_address}",
+            **self.header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -74,7 +87,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         response = self.client.get(
             reverse("v1:analytics:analytics-multisig-txs-by-origin")
-            + f"?to={multisig_transaction.to}"
+            + f"?to={multisig_transaction.to}",
+            **self.header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = [
@@ -86,6 +100,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(
             reverse("v1:analytics:analytics-multisig-txs-by-safe")
         )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        response = self.client.get(
+            reverse("v1:analytics:analytics-multisig-txs-by-safe"), **self.header
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         safe_address_1 = Account.create().address
         safe_address_2 = Account.create().address
@@ -93,7 +112,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         MultisigTransactionFactory(safe=safe_address_1)
         MultisigTransactionFactory(safe=safe_address_1)
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-safe")
+            reverse("v1:analytics:analytics-multisig-txs-by-safe"), **self.header
         )
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -105,7 +124,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         MultisigTransactionFactory(safe=safe_address_1)
         safe_status_1 = SafeStatusFactory(address=safe_address_1)
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-safe")
+            reverse("v1:analytics:analytics-multisig-txs-by-safe"), **self.header
         )
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -121,7 +140,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         MultisigTransactionFactory(safe=safe_address_2)
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-safe")
+            reverse("v1:analytics:analytics-multisig-txs-by-safe"), **self.header
         )
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -140,7 +159,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_status_3 = SafeStatusFactory(address=safe_address_3)
         [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
         response = self.client.get(
-            reverse("v1:analytics:analytics-multisig-txs-by-safe")
+            reverse("v1:analytics:analytics-multisig-txs-by-safe"), **self.header
         )
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -167,7 +186,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         response = self.client.get(
             reverse("v1:analytics:analytics-multisig-txs-by-safe")
-            + f"?master_copy={safe_status_1.master_copy}"
+            + f"?master_copy={safe_status_1.master_copy}",
+            **self.header,
         )
         result = response.json()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
