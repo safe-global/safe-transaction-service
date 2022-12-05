@@ -231,18 +231,20 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 f"Calculated owners={signature_owners}"
             )
 
+        # Origin field on db is a JsonField
+        if attrs["origin"]:
+            try:
+                attrs["origin"] = json.loads(attrs["origin"])
+            except ValueError:
+                pass
+        else:
+            attrs["origin"] = {}
+
         return attrs
 
     def save(self, **kwargs):
         safe_tx_hash = self.validated_data["contract_transaction_hash"]
-        # Origin field on db is a JsonField
-        if self.validated_data["origin"]:
-            try:
-                origin = json.loads(self.validated_data["origin"])
-            except ValueError:
-                origin = self.validated_data["origin"]
-        else:
-            origin = {}
+        origin = self.validated_data["origin"]
         trusted = self.validated_data["trusted"]
         if not trusted:
             # Check user permission
