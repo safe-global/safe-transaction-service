@@ -9,7 +9,7 @@ from web3 import Web3
 from gnosis.eth import EthereumClient
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..models import EthereumTx, MultisigTransaction, SafeContract, SafeStatus
+from ..models import EthereumTx, MultisigTransaction, SafeStatus
 from ..services.index_service import (
     IndexService,
     IndexServiceProvider,
@@ -18,7 +18,6 @@ from ..services.index_service import (
 from .factories import (
     EthereumTxFactory,
     MultisigTransactionFactory,
-    SafeContractFactory,
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
@@ -94,6 +93,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         EthereumClient, "current_block_number", new_callable=PropertyMock
     )
     def test_is_service_synced(self, current_block_number_mock: PropertyMock):
+        self.index_service.erc20_indexer_storage.set_last_indexed_block_number(500)
         current_block_number_mock.return_value = 500
         self.assertTrue(self.index_service.is_service_synced())
         reorg_blocks = self.index_service.eth_reorg_blocks
@@ -106,29 +106,14 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         safe_master_copy.save(update_fields=["tx_block_number"])
         self.assertTrue(self.index_service.is_service_synced())
 
-        safe_contract = SafeContractFactory(
-            erc20_block_number=current_block_number_mock.return_value - reorg_blocks - 1
+        self.index_service.erc20_indexer_storage.set_last_indexed_block_number(
+            current_block_number_mock.return_value - reorg_blocks - 1
         )
         self.assertFalse(self.index_service.is_service_synced())
-        safe_contract.erc20_block_number = safe_contract.erc20_block_number + 1
-        safe_contract.save(update_fields=["erc20_block_number"])
-        self.assertTrue(self.index_service.is_service_synced())
-
-        # Less than 10% of contracts out of sync will be alright (by default). Try with 1 of 20 out of sync
-        SafeContract.objects.all().delete()
-        SafeContractFactory(
-            erc20_block_number=current_block_number_mock.return_value - reorg_blocks - 1
+        self.index_service.erc20_indexer_storage.set_last_indexed_block_number(
+            current_block_number_mock.return_value - reorg_blocks
         )
-        for _ in range(19):
-            safe_contract_synced = SafeContractFactory(
-                erc20_block_number=current_block_number_mock.return_value - reorg_blocks
-            )
         self.assertTrue(self.index_service.is_service_synced())
-
-        # Set one more of sync, so 2 of 20 out of sync
-        safe_contract_synced.erc20_block_number -= 1
-        safe_contract_synced.save(update_fields=["erc20_block_number"])
-        self.assertFalse(self.index_service.is_service_synced())
 
     def test_reprocess_addresses(self):
         index_service: IndexService = self.index_service

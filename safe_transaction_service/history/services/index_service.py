@@ -18,7 +18,6 @@ from ..models import (
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
-    SafeContract,
     SafeMasterCopy,
     SafeStatus,
 )
@@ -154,26 +153,19 @@ class IndexService:
         reference_block_number = (
             self.ethereum_client.current_block_number - self.eth_reorg_blocks
         )
-        synced = True
+        synced: bool = True
         for safe_master_copy in SafeMasterCopy.objects.relevant().filter(
             tx_block_number__lt=reference_block_number
         ):
             logger.error("Master Copy %s is out of sync", safe_master_copy.address)
             synced = False
 
-        out_of_sync_contracts = SafeContract.objects.filter(
-            erc20_block_number__lt=reference_block_number
-        ).count()
-        if out_of_sync_contracts > 0:
-            total_number_of_contracts = SafeContract.objects.all().count()
-            proportion_out_of_sync = out_of_sync_contracts / total_number_of_contracts
-            # Ignore less than 10% of contracts out of sync
-            if proportion_out_of_sync >= self.alert_out_of_sync_events_threshold:
-                logger.error(
-                    "%d Safe Contracts have ERC20/721 out of sync",
-                    out_of_sync_contracts,
-                )
-                synced = False
+        if (
+            self.erc20_indexer_storage.get_last_indexed_block_number()
+            < reference_block_number
+        ):
+            logger.error("Safe Contracts have ERC20/721 out of sync")
+            synced = False
 
         return synced
 
