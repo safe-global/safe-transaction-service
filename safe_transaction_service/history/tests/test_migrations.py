@@ -105,3 +105,9 @@ class TestMigrations(TestCase):
         # Empty object should be None
         hash = Web3.keccak(text=f"multisig-tx-{origins[2]}").hex()
         self.assertEqual(MultisigTransactionOld.objects.get(pk=hash).origin, None)
+
+    def test_migration_forward_0069(self):
+        pass
+
+    def test_migration_backward_0069(self):
+        pass

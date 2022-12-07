@@ -31,8 +31,9 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
-from ..helpers import DelegateSignatureHelper, Erc20IndexerStorage
+from ..helpers import DelegateSignatureHelper
 from ..models import (
+    IndexingStatus,
     MultisigConfirmation,
     MultisigTransaction,
     SafeContractDelegate,
@@ -90,10 +91,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         return_value=2000,
     )
     def test_erc20_indexing_view(self, current_block_number_mock: PropertyMock):
-        erc20_indexer_storage = Erc20IndexerStorage(self.ethereum_client)
-        erc20_indexer_storage.flush_last_indexed_block_number()
-
-        erc20_indexer_storage.set_last_indexed_block_number(2_000)
+        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
         url = reverse("v1:history:erc20-indexing")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -101,25 +99,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["erc20_block_number"], 2_000)
         self.assertEqual(response.data["erc20_synced"], True)
 
-        erc20_indexer_storage.flush_last_indexed_block_number()
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 2_000 - 1_000)
-        self.assertEqual(response.data["erc20_synced"], False)
-
-        erc20_indexer_storage.set_last_indexed_block_number(10)
+        IndexingStatus.objects.set_erc20_721_indexing_status(10)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2_000)
         self.assertEqual(response.data["erc20_block_number"], 10)
-        self.assertEqual(response.data["erc20_synced"], False)
-
-        erc20_indexer_storage.flush_last_indexed_block_number()
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 2_000 - 1_000)
         self.assertEqual(response.data["erc20_synced"], False)
 
     @mock.patch.object(
@@ -129,8 +113,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         return_value=2_000,
     )
     def test_indexing_view(self, current_block_number_mock: PropertyMock):
-        erc20_indexer_storage = Erc20IndexerStorage(self.ethereum_client)
-        erc20_indexer_storage.set_last_indexed_block_number(2_000)
+        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
         url = reverse("v1:history:indexing")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -141,7 +124,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], True)
 
-        erc20_indexer_storage.set_last_indexed_block_number(500)
+        IndexingStatus.objects.set_erc20_721_indexing_status(500)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
@@ -171,7 +154,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
-        erc20_indexer_storage.set_last_indexed_block_number(10)
+        IndexingStatus.objects.set_erc20_721_indexing_status(10)
         SafeMasterCopyFactory(tx_block_number=9)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -192,7 +175,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
-        erc20_indexer_storage.set_last_indexed_block_number(1_999)
+        IndexingStatus.objects.set_erc20_721_indexing_status(1_999)
         SafeMasterCopy.objects.update(tx_block_number=1999)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

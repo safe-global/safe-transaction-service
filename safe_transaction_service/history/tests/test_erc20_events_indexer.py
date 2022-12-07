@@ -6,7 +6,7 @@ from django.test import TestCase
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
-from ..models import ERC20Transfer, EthereumTx
+from ..models import ERC20Transfer, EthereumTx, IndexingStatus
 from .factories import SafeContractFactory
 
 
@@ -14,7 +14,6 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
     def test_erc20_events_indexer(self):
         erc20_events_indexer = Erc20EventsIndexerProvider()
         erc20_events_indexer.confirmations = 0
-        erc20_indexer_storage = erc20_events_indexer.erc20_indexer_storage
         self.assertEqual(erc20_events_indexer.start(), 0)
 
         account = self.ethereum_test_account
@@ -22,7 +21,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         erc20_contract = self.deploy_example_erc20(amount, account.address)
 
         safe_contract = SafeContractFactory()
-        erc20_indexer_storage.set_last_indexed_block_number(0)
+        IndexingStatus.objects.set_erc20_721_indexing_status(0)
         tx_hash = self.ethereum_client.erc20.send_tokens(
             safe_contract.address, amount, erc20_contract.address, account.key
         )
@@ -33,13 +32,14 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         )
 
         self.assertEqual(erc20_events_indexer.start(), 1)
-        safe_contract.refresh_from_db()
 
-        # Erc20 block number are not stored on SafeContract anymore
-        self.assertEqual(safe_contract.erc20_block_number, 0)
+        # Erc20/721 last indexed block number is stored on IndexingStatus
+        self.assertGreater(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 199
+        )
 
         self.assertEqual(
-            erc20_indexer_storage.get_last_indexed_block_number(),
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
             self.ethereum_client.current_block_number
             - erc20_events_indexer.confirmations,
         )

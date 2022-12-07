@@ -266,7 +266,6 @@ class SafeContractFactory(DjangoModelFactory):
 
     address = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
-    erc20_block_number = factory.LazyFunction(lambda: 0)
 
 
 class SafeContractDelegateFactory(DjangoModelFactory):

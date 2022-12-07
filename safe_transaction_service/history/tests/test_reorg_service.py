@@ -5,14 +5,18 @@ from django.test import TestCase
 
 from gnosis.eth import EthereumClient
 
-from ..helpers import Erc20IndexerStorage
-from ..models import EthereumBlock, EthereumTx, ProxyFactory, SafeMasterCopy
+from ..models import (
+    EthereumBlock,
+    EthereumTx,
+    IndexingStatus,
+    ProxyFactory,
+    SafeMasterCopy,
+)
 from ..services import ReorgServiceProvider
 from .factories import (
     EthereumBlockFactory,
     EthereumTxFactory,
     ProxyFactoryFactory,
-    SafeContractFactory,
     SafeMasterCopyFactory,
 )
 from .mocks.mocks_internal_tx_indexer import block_child, block_parent
@@ -59,7 +63,6 @@ class TestReorgService(TestCase):
         elements = 3
         for i in range(elements):
             ProxyFactoryFactory(tx_block_number=100 * i)
-            SafeContractFactory(erc20_block_number=200 * i)
             SafeMasterCopyFactory(tx_block_number=300 * i)
 
         block_number = 5
@@ -67,17 +70,12 @@ class TestReorgService(TestCase):
 
         # All elements but 1 will be reset (with `tx_block_number=0` and `erc20_block_number=0`)
         self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
+            block_number,
+        )
+        self.assertEqual(
             ProxyFactory.objects.filter(tx_block_number=block_number).count(),
             elements - 1,
-        )
-
-        # SafeContract are not updated anymore
-        # self.assertEqual(
-        #    SafeContract.objects.filter(erc20_block_number=block_number).count(),
-        #    elements - 1,
-        # )
-        self.assertEqual(
-            Erc20IndexerStorage(None).get_last_indexed_block_number(), block_number
         )
         self.assertEqual(
             SafeMasterCopy.objects.filter(tx_block_number=block_number).count(),
@@ -101,9 +99,9 @@ class TestReorgService(TestCase):
         self.assertEqual(EthereumTx.objects.count(), len(ethereum_blocks))
 
         proxy_factory = ProxyFactoryFactory(tx_block_number=reorg_block)
-        safe_contract = SafeContractFactory(
-            erc20_block_number=reorg_block - 500, ethereum_tx=safe_ethereum_tx
-        )
+        indexing_status = IndexingStatus.objects.get_erc20_721_indexing_status()
+        indexing_status.block_number = reorg_block - 500
+        indexing_status.save(update_fields=["block_number"])
         safe_master_copy = SafeMasterCopyFactory(tx_block_number=reorg_block + 500)
 
         reorg_service.recover_from_reorg(reorg_block)
@@ -121,8 +119,8 @@ class TestReorgService(TestCase):
             proxy_factory.tx_block_number,
             reorg_block - reorg_service.eth_reorg_rewind_blocks,
         )
-        safe_contract.refresh_from_db()
-        self.assertEqual(safe_contract.erc20_block_number, reorg_block - 500)
+        indexing_status.refresh_from_db()
+        self.assertEqual(indexing_status.block_number, reorg_block - 500)
         safe_master_copy.refresh_from_db()
         self.assertEqual(
             safe_master_copy.tx_block_number,

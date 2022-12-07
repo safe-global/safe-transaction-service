@@ -24,7 +24,17 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    Index,
+    JSONField,
+    Max,
+    Min,
+    Q,
+    QuerySet,
+)
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
@@ -107,6 +117,10 @@ class InternalTxType(Enum):
             raise ValueError(f"{tx_type} is not a valid InternalTxType")
 
 
+class IndexingStatusType(Enum):
+    ERC20_721_EVENTS = 0
+
+
 class TransferDict(TypedDict):
     block_number: int
     transaction_hash: HexBytes
@@ -149,6 +163,49 @@ class BulkCreateSignalMixin:
                 total += inserted
             else:
                 return total
+
+
+class IndexingStatusManager(models.Manager):
+    def get_erc20_721_indexing_status(self) -> "IndexingStatus":
+        try:
+            return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
+        except self.model.DoesNotExist:
+            # Start indexing on master copies minimum block number
+            min_master_copies_block_number = (
+                SafeMasterCopy.objects.relevant().aggregate(
+                    min_master_copies_block_number=Min("tx_block_number")
+                )["min_master_copies_block_number"]
+            )
+            block_number = (
+                min_master_copies_block_number if min_master_copies_block_number else 0
+            )
+            return self.create(
+                indexing_type=IndexingStatusType.ERC20_721_EVENTS.value,
+                block_number=block_number,
+            )
+
+    def set_erc20_721_indexing_status(self, block_number: int) -> bool:
+        updated = bool(
+            self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value).update(
+                block_number=block_number
+            )
+        )
+        if not updated:
+            # Maybe model does not exist
+            _, updated = self.update_or_create(
+                indexing_type=IndexingStatusType.ERC20_721_EVENTS.value,
+                defaults={"block_number": block_number},
+            )
+        return updated
+
+
+class IndexingStatus(models.Model):
+    objects = IndexingStatusManager()
+    indexing_type = models.PositiveSmallIntegerField(
+        primary_key=True,
+        choices=[(tag.value, tag.name) for tag in IndexingStatusType],
+    )
+    block_number = models.PositiveIntegerField(db_index=True)
 
 
 class EthereumBlockManager(models.Manager):
@@ -1480,9 +1537,6 @@ class SafeContract(models.Model):
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="safe_contracts"
     )
-    erc20_block_number = models.IntegerField(
-        default=0, db_index=True
-    )  # Block number of last scan of erc20
 
     def __str__(self):
         return f"Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}"
