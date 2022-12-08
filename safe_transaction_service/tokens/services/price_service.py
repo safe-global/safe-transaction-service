@@ -257,6 +257,7 @@ class PriceService:
         elif self.ethereum_network in (
             EthereumNetwork.METIS,
             EthereumNetwork.METIS_TESTNET,
+            EthereumNetwork.METIS_GOERLI_TESTNET,
         ):
             return self.coingecko_client.get_metis_usd_price()
         elif self.ethereum_network in (
