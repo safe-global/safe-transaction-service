@@ -19,6 +19,7 @@ from .models import (
     ERC721Transfer,
     EthereumBlock,
     EthereumTx,
+    IndexingStatus,
     InternalTx,
     InternalTxDecoded,
     ModuleTransaction,
@@ -86,6 +87,19 @@ class SafeContractDelegateInline(admin.TabularInline):
 
 
 # Admin models ------------------------------
+@admin.register(IndexingStatus)
+class IndexingStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "indexing_type",
+        "block_number",
+    )
+    list_filter = ("indexing_type",)
+    search_fields = [
+        "=block_number",
+    ]
+    ordering = ["-indexing_type"]
+
+
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "timestamp"
