@@ -454,9 +454,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             )
 
         response = super().get(request, *args, **kwargs)
-        response.data["count_unique_nonce"] = (
-            self.get_unique_nonce(address) if response.data["count"] else 0
-        )
+        response.data["count_unique_nonce"] = self.get_unique_nonce(address)
         return response
 
     @swagger_auto_schema(
