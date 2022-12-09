@@ -35,7 +35,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
         self.assertGreater(
-            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 199
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
         )
 
         self.assertEqual(

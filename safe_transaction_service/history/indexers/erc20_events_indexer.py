@@ -206,7 +206,7 @@ class Erc20EventsIndexer(EventsIndexer):
         :param current_block_number:
         :return: Monitored addresses to be processed
         """
-        return self.get_almost_updated_addresses(current_block_number)
+        return []
 
     def get_minimum_block_number(
         self, addresses: Optional[Sequence[str]] = None
@@ -219,40 +219,3 @@ class Erc20EventsIndexer(EventsIndexer):
         return int(
             IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number)
         )
-
-    def start(self) -> int:
-        """
-        Find and process relevant data for existing database addresses
-
-        :return: Number of elements processed
-        """
-        current_block_number = self.ethereum_client.current_block_number
-        logger.debug(
-            "%s: Current RPC block number=%d",
-            self.__class__.__name__,
-            current_block_number,
-        )
-        number_processed_elements = 0
-
-        almost_updated_addresses = set(
-            SafeContract.objects.values_list("address", flat=True)
-        )
-        if almost_updated_addresses:
-            logger.info(
-                "%s: Processing %d addresses",
-                self.__class__.__name__,
-                len(almost_updated_addresses),
-            )
-            updated = False
-            while not updated:
-                processed_elements, _, updated = self.process_addresses(
-                    almost_updated_addresses,
-                    current_block_number=current_block_number,
-                )
-                number_processed_elements += len(processed_elements)
-            # SafeContract.objects.update(erc20_block_number=current_block_number)
-        else:
-            logger.debug(
-                "%s: No almost updated addresses to process", self.__class__.__name__
-            )
-        return number_processed_elements
