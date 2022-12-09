@@ -25,9 +25,12 @@ def remove_indexing_status(apps, schema_editor):
     SafeContract = apps.get_model("history", "SafeContract")
     IndexingStatus = apps.get_model("history", "IndexingStatus")
 
-    block_number = IndexingStatus.objects.get(
-        indexing_type=IndexingStatusType.ERC20_721_EVENTS.value
-    ).block_number
+    try:
+        block_number = IndexingStatus.objects.get(
+            indexing_type=IndexingStatusType.ERC20_721_EVENTS.value
+        ).block_number
+    except IndexingStatus.DoesNotExist:
+        block_number = 0
     SafeContract.objects.update(erc20_block_number=block_number)
 
 
