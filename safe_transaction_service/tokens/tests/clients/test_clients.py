@@ -6,22 +6,16 @@ from requests import Session
 
 from gnosis.eth.tests.utils import just_test_if_mainnet_node
 
-from ...clients import (
-    BinanceClient,
-    CannotGetPrice,
-    CoingeckoClient,
-    KrakenClient,
-    KucoinClient,
-)
+from ...clients import CannotGetPrice, CoingeckoClient, KrakenClient, KucoinClient
 
 
 class TestClients(TestCase):
     def test_get_bnb_usd_price(self) -> float:
         just_test_if_mainnet_node()
-        binance_client = BinanceClient()
+        kucoin_client = KucoinClient()
         coingecko_client = CoingeckoClient()
 
-        price = binance_client.get_bnb_usd_price()
+        price = kucoin_client.get_bnb_usd_price()
         self.assertIsInstance(price, float)
         self.assertGreater(price, 0)
 
@@ -56,32 +50,22 @@ class TestClients(TestCase):
         self.assertIsInstance(price, float)
         self.assertGreater(price, 0)
 
-    def test_get_eth_usd_price_binance(self):
+    def test_get_eth_usd_price_kucoin(self):
         just_test_if_mainnet_node()
-        binance_client = BinanceClient()
+        kucoin_client = KucoinClient()
 
-        # Binance is used
-        eth_usd_price = binance_client.get_eth_usd_price()
+        eth_usd_price = kucoin_client.get_eth_usd_price()
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 
     def test_get_matic_usd_price(self) -> float:
         just_test_if_mainnet_node()
-        binance_client = BinanceClient()
-        kraken_client = KrakenClient()
-        coingecko_client = CoingeckoClient()
 
-        price = binance_client.get_matic_usd_price()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
-
-        price = kraken_client.get_matic_usd_price()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
-
-        price = coingecko_client.get_matic_usd_price()
-        self.assertIsInstance(price, float)
-        self.assertGreater(price, 0)
+        for provider in [KucoinClient(), KrakenClient(), CoingeckoClient()]:
+            with self.subTest(provider=provider):
+                price = provider.get_matic_usd_price()
+                self.assertIsInstance(price, float)
+                self.assertGreater(price, 0)
 
     def test_get_ewt_usd_price_coingecko(self) -> float:
         just_test_if_mainnet_node()

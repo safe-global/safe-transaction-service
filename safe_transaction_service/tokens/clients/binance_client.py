@@ -7,7 +7,7 @@ from .exceptions import CannotGetPrice
 logger = logging.getLogger(__name__)
 
 
-class BinanceClient:
+class BinanceClient:  # pragma: no cover
     def __init__(self):
         self.http_session = requests.Session()
 

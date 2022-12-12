@@ -22,6 +22,15 @@ class KucoinClient:
             logger.warning("Cannot get price from url=%s", url)
             raise CannotGetPrice from e
 
+    def get_eth_usd_price(self) -> float:
+        return self._get_price("ETH-USDT")
+
+    def get_aurora_usd_price(self) -> float:
+        return self._get_price("AURORA-USDT")
+
+    def get_bnb_usd_price(self) -> float:
+        return self._get_price("BNB-USDT")
+
     def get_ewt_usd_price(self) -> float:
         """
         :return: current USD price for Energy Web Token
@@ -42,3 +51,6 @@ class KucoinClient:
         :raises: CannotGetPrice
         """
         return self._get_price("KCS-USDT")
+
+    def get_matic_usd_price(self) -> float:
+        return self._get_price("MATIC-USDT")
