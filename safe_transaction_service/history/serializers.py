@@ -132,6 +132,18 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     )  # Signatures must be at least 65 bytes
     origin = serializers.CharField(max_length=200, allow_null=True, default=None)
 
+    def validate_origin(self, origin):
+        # Origin field on db is a JsonField
+        if origin:
+            try:
+                origin = json.loads(origin)
+            except ValueError:
+                pass
+        else:
+            origin = {}
+
+        return origin
+
     def validate(self, attrs):
         super().validate(attrs)
 
@@ -235,14 +247,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
     def save(self, **kwargs):
         safe_tx_hash = self.validated_data["contract_transaction_hash"]
-        # Origin field on db is a JsonField
-        if self.validated_data["origin"]:
-            try:
-                origin = json.loads(self.validated_data["origin"])
-            except ValueError:
-                origin = self.validated_data["origin"]
-        else:
-            origin = {}
+        origin = self.validated_data["origin"]
         trusted = self.validated_data["trusted"]
         if not trusted:
             # Check user permission
