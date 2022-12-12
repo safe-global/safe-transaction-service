@@ -1,7 +1,9 @@
 import operator
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterator, List, Sequence
+from typing import Iterator, List, Optional, Sequence
+
+from django.db.models import QuerySet
 
 from cache_memoize import cache_memoize
 from cachetools import cachedmethod
@@ -15,7 +17,14 @@ from gnosis.eth import EthereumClient
 
 from safe_transaction_service.tokens.models import Token
 
-from ..models import ERC20Transfer, ERC721Transfer, SafeContract, TokenTransfer
+from ..models import (
+    ERC20Transfer,
+    ERC721Transfer,
+    IndexingStatus,
+    MonitoredAddress,
+    SafeContract,
+    TokenTransfer,
+)
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -173,3 +182,40 @@ class Erc20EventsIndexer(EventsIndexer):
             return range(
                 result_erc20 + result_erc721
             )  # TODO Hack to prevent returning `TokenTransfer` and using too much RAM
+
+    def get_almost_updated_addresses(
+        self, current_block_number: int
+    ) -> QuerySet[MonitoredAddress]:
+        """
+
+        :param current_block_number:
+        :return: Monitored addresses to be processed
+        """
+
+        logger.debug("%s: Retrieving monitored addresses", self.__class__.__name__)
+
+        addresses = self.database_queryset.all()
+
+        logger.debug("%s: Retrieved monitored addresses", self.__class__.__name__)
+        return addresses
+
+    def get_not_updated_addresses(
+        self, current_block_number: int
+    ) -> QuerySet[MonitoredAddress]:
+        """
+        :param current_block_number:
+        :return: Monitored addresses to be processed
+        """
+        return []
+
+    def get_minimum_block_number(
+        self, addresses: Optional[Sequence[str]] = None
+    ) -> Optional[int]:
+        return IndexingStatus.objects.get_erc20_721_indexing_status().block_number
+
+    def update_monitored_address(
+        self, addresses: Sequence[str], from_block_number: int, to_block_number: int
+    ) -> int:
+        return int(
+            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number)
+        )

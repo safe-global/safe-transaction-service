@@ -51,7 +51,7 @@ class TestTasks(TestCase):
         self.assertIsNone(check_reorgs_task.delay().result, 0)
 
     def test_check_sync_status_task(self):
-        self.assertTrue(check_sync_status_task.delay().result)
+        self.assertFalse(check_sync_status_task.delay().result)
 
     def test_index_erc20_events_task(self):
         self.assertEqual(index_erc20_events_task.delay().result, 0)

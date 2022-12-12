@@ -7,7 +7,7 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
-from ..models import EthereumBlock, ProxyFactory, SafeContract, SafeMasterCopy
+from ..models import EthereumBlock, IndexingStatus, ProxyFactory, SafeMasterCopy
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,8 @@ class ReorgService:
         # Dictionary with Django model and attribute for reorgs
         self.reorg_models: Dict[models.Model, str] = {
             ProxyFactory: "tx_block_number",
-            SafeContract: "erc20_block_number",
+            # TODO Refactor this to accept a function
+            # IndexingStatus: "block_number",
             SafeMasterCopy: "tx_block_number",
         }
 
@@ -92,6 +93,9 @@ class ReorgService:
             updated += model.objects.filter(**{field + "__gt": block_number}).update(
                 **{field: block_number}
             )
+        if IndexingStatus.objects.set_erc20_721_indexing_status(block_number):
+            updated += 1
+
         return updated
 
     @transaction.atomic

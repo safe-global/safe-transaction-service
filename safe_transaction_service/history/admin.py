@@ -19,6 +19,7 @@ from .models import (
     ERC721Transfer,
     EthereumBlock,
     EthereumTx,
+    IndexingStatus,
     InternalTx,
     InternalTxDecoded,
     ModuleTransaction,
@@ -86,6 +87,19 @@ class SafeContractDelegateInline(admin.TabularInline):
 
 
 # Admin models ------------------------------
+@admin.register(IndexingStatus)
+class IndexingStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "indexing_type",
+        "block_number",
+    )
+    list_filter = ("indexing_type",)
+    search_fields = [
+        "=block_number",
+    ]
+    ordering = ["-indexing_type"]
+
+
 @admin.register(EthereumBlock)
 class EthereumBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "timestamp"
@@ -508,35 +522,17 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
 
 @admin.register(SafeContract)
 class SafeContractAdmin(BinarySearchAdmin):
-    actions = ["reindex", "reindex_last_day", "reindex_last_month"]
     inlines = (SafeContractDelegateInline,)
     list_display = (
         "created_block_number",
         "address",
         "ethereum_tx_id",
-        "erc20_block_number",
     )
     list_filter = (SafeContractERC20ListFilter,)
     list_select_related = ("ethereum_tx",)
     ordering = ["-ethereum_tx__block_id"]
     raw_id_fields = ("ethereum_tx",)
     search_fields = ["=address", "=ethereum_tx__tx_hash"]
-
-    @admin.action(description="Reindex from initial block")
-    def reindex(self, request, queryset):
-        queryset.exclude(ethereum_tx=None).update(
-            erc20_block_number=F("ethereum_tx__block_id")
-        )
-
-    @admin.action(description="Reindex last 24 hours")
-    def reindex_last_day(self, request, queryset):
-        queryset.update(erc20_block_number=Greatest(F("erc20_block_number") - 6000, 0))
-
-    @admin.action(description="Reindex last month")
-    def reindex_last_month(self, request, queryset):
-        queryset.update(
-            erc20_block_number=Greatest(F("erc20_block_number") - 200000, 0)
-        )
 
 
 @admin.register(SafeContractDelegate)

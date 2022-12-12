@@ -125,9 +125,9 @@ def index_erc20_events_out_of_sync_task(
     current_block_number = erc20_events_indexer.ethereum_client.current_block_number
     addresses = addresses or [
         x.address
-        for x in erc20_events_indexer.get_not_updated_addresses(current_block_number)[
-            :number_of_addresses
-        ]
+        for x in erc20_events_indexer.get_almost_updated_addresses(
+            current_block_number
+        )[:number_of_addresses]
     ]
 
     if not addresses:

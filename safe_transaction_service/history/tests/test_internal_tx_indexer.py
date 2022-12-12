@@ -16,6 +16,7 @@ from ..indexers.tx_processor import SafeTxProcessorProvider
 from ..models import (
     EthereumBlock,
     EthereumTx,
+    IndexingStatus,
     InternalTx,
     InternalTxDecoded,
     SafeContract,
@@ -304,16 +305,14 @@ class TestInternalTxIndexer(TestCase):
         tx_processor.process_decoded_transactions(
             InternalTxDecoded.objects.pending_for_safes()
         )
-        safe_contract: SafeContract = SafeContract.objects.first()
-        self.assertGreater(safe_contract.erc20_block_number, 0)
-        safe_contract.erc20_block_number = 0
-        safe_contract.save(update_fields=["erc20_block_number"])
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
+        )
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
         internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(internal_txs_decoded.count(), 2)
         self.assertEqual(internal_txs_decoded[0].function_name, "setup")
-        tx_processor.process_decoded_transactions(internal_txs_decoded)
-        safe_contract.refresh_from_db()
-        self.assertGreater(safe_contract.erc20_block_number, 0)
+        results = tx_processor.process_decoded_transactions(internal_txs_decoded)
+        self.assertEqual(results, [True, True])

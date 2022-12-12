@@ -326,20 +326,13 @@ class SafeTxProcessor(TxProcessor):
                 safe_contract: SafeContract = SafeContract.objects.get(
                     address=contract_address
                 )
-                if (
-                    not safe_contract.ethereum_tx_id
-                    or not safe_contract.erc20_block_number
-                ):
+                if not safe_contract.ethereum_tx_id:
                     safe_contract.ethereum_tx = internal_tx.ethereum_tx
-                    safe_contract.erc20_block_number = internal_tx.block_number
-                    safe_contract.save(
-                        update_fields=["ethereum_tx", "erc20_block_number"]
-                    )
+                    safe_contract.save(update_fields=["ethereum_tx"])
             except SafeContract.DoesNotExist:
                 SafeContract.objects.create(
                     address=contract_address,
                     ethereum_tx=internal_tx.ethereum_tx,
-                    erc20_block_number=internal_tx.block_number,
                 )
                 logger.info("Found new Safe=%s", contract_address)
 

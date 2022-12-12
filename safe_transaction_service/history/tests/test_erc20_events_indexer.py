@@ -6,7 +6,7 @@ from django.test import TestCase
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
-from ..models import ERC20Transfer, EthereumTx
+from ..models import ERC20Transfer, EthereumTx, IndexingStatus
 from .factories import SafeContractFactory
 
 
@@ -20,25 +20,26 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         amount = 10
         erc20_contract = self.deploy_example_erc20(amount, account.address)
 
-        # PostReceive signal will set the `erc20_block_number` to the `EthereumTx` block number
-        safe_contract = SafeContractFactory(ethereum_tx__block__number=0)
-        self.assertEqual(safe_contract.erc20_block_number, 0)
-
+        safe_contract = SafeContractFactory()
+        IndexingStatus.objects.set_erc20_721_indexing_status(0)
         tx_hash = self.ethereum_client.erc20.send_tokens(
             safe_contract.address, amount, erc20_contract.address, account.key
         )
 
-        self.assertEqual(safe_contract.erc20_block_number, 0)
         self.assertFalse(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
 
         self.assertEqual(erc20_events_indexer.start(), 1)
-        safe_contract.refresh_from_db()
+
+        # Erc20/721 last indexed block number is stored on IndexingStatus
+        self.assertGreater(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
+        )
 
         self.assertEqual(
-            safe_contract.erc20_block_number,
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
             self.ethereum_client.current_block_number
             - erc20_events_indexer.confirmations,
         )

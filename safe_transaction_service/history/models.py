@@ -107,6 +107,10 @@ class InternalTxType(Enum):
             raise ValueError(f"{tx_type} is not a valid InternalTxType")
 
 
+class IndexingStatusType(Enum):
+    ERC20_721_EVENTS = 0
+
+
 class TransferDict(TypedDict):
     block_number: int
     transaction_hash: HexBytes
@@ -149,6 +153,27 @@ class BulkCreateSignalMixin:
                 total += inserted
             else:
                 return total
+
+
+class IndexingStatusManager(models.Manager):
+    def get_erc20_721_indexing_status(self) -> "IndexingStatus":
+        return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
+
+    def set_erc20_721_indexing_status(self, block_number: int) -> bool:
+        return bool(
+            self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value).update(
+                block_number=block_number
+            )
+        )
+
+
+class IndexingStatus(models.Model):
+    objects = IndexingStatusManager()
+    indexing_type = models.PositiveSmallIntegerField(
+        primary_key=True,
+        choices=[(tag.value, tag.name) for tag in IndexingStatusType],
+    )
+    block_number = models.PositiveIntegerField(db_index=True)
 
 
 class EthereumBlockManager(models.Manager):
@@ -1480,9 +1505,6 @@ class SafeContract(models.Model):
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="safe_contracts"
     )
-    erc20_block_number = models.IntegerField(
-        default=0, db_index=True
-    )  # Block number of last scan of erc20
 
     def __str__(self):
         return f"Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}"
