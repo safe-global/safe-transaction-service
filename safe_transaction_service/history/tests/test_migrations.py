@@ -161,6 +161,31 @@ class TestMigrations(TestCase):
         IndexingStatus = new_state.apps.get_model("history", "IndexingStatus")
         self.assertEqual(IndexingStatus.objects.get().block_number, 4)
 
+    def test_migration_forward_0069_using_master_copies(self):
+        old_state = self.migrator.apply_initial_migration(
+            ("history", "0068_alter_multisigtransaction_origin")
+        )
+
+        SafeMasterCopy = old_state.apps.get_model("history", "SafeMasterCopy")
+        SafeMasterCopy.objects.create(
+            address=Account.create().address,
+            initial_block_number=15,
+            tx_block_number=23,
+            l2=False,
+        )
+        SafeMasterCopy.objects.create(
+            address=Account.create().address,
+            initial_block_number=16,
+            tx_block_number=42,
+            l2=True,
+        )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0069_indexingstatus_and_more"),
+        )
+        IndexingStatus = new_state.apps.get_model("history", "IndexingStatus")
+        self.assertEqual(IndexingStatus.objects.get().block_number, 15)
+
     def test_migration_backward_0069(self):
         new_state = self.migrator.apply_initial_migration(
             ("history", "0069_indexingstatus_and_more"),

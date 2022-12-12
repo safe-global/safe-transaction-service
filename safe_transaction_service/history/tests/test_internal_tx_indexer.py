@@ -308,7 +308,6 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
         )
-        IndexingStatus.objects.set_erc20_721_indexing_status(0)
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)

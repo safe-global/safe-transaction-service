@@ -24,17 +24,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import (
-    Case,
-    Count,
-    Exists,
-    Index,
-    JSONField,
-    Max,
-    Min,
-    Q,
-    QuerySet,
-)
+from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
@@ -167,36 +157,14 @@ class BulkCreateSignalMixin:
 
 class IndexingStatusManager(models.Manager):
     def get_erc20_721_indexing_status(self) -> "IndexingStatus":
-        try:
-            return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
-        except self.model.DoesNotExist:
-            # Start indexing on master copies minimum block number
-            min_master_copies_block_number = (
-                SafeMasterCopy.objects.relevant().aggregate(
-                    min_master_copies_block_number=Min("tx_block_number")
-                )["min_master_copies_block_number"]
-            )
-            block_number = (
-                min_master_copies_block_number if min_master_copies_block_number else 0
-            )
-            return self.create(
-                indexing_type=IndexingStatusType.ERC20_721_EVENTS.value,
-                block_number=block_number,
-            )
+        return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
 
     def set_erc20_721_indexing_status(self, block_number: int) -> bool:
-        updated = bool(
+        return bool(
             self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value).update(
                 block_number=block_number
             )
         )
-        if not updated:
-            # Maybe model does not exist
-            _, updated = self.update_or_create(
-                indexing_type=IndexingStatusType.ERC20_721_EVENTS.value,
-                defaults={"block_number": block_number},
-            )
-        return updated
 
 
 class IndexingStatus(models.Model):
