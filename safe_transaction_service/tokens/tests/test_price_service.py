@@ -11,13 +11,7 @@ from gnosis.eth.oracles import KyberOracle, OracleException, UnderlyingToken
 from safe_transaction_service.history.tests.utils import just_test_if_mainnet_node
 from safe_transaction_service.utils.redis import get_redis
 
-from ..clients import (
-    BinanceClient,
-    CannotGetPrice,
-    CoingeckoClient,
-    KrakenClient,
-    KucoinClient,
-)
+from ..clients import CannotGetPrice, CoingeckoClient, KrakenClient, KucoinClient
 from ..services.price_service import PriceService, PriceServiceProvider
 
 
@@ -38,7 +32,7 @@ class TestPriceService(TestCase):
         PriceServiceProvider.del_singleton()
 
     @mock.patch.object(KrakenClient, "get_eth_usd_price", return_value=0.4)
-    @mock.patch.object(BinanceClient, "get_eth_usd_price", return_value=0.5)
+    @mock.patch.object(KucoinClient, "get_eth_usd_price", return_value=0.5)
     def test_get_native_coin_usd_price(
         self, binance_mock: MagicMock, kraken_mock: MagicMock
     ):
@@ -59,7 +53,7 @@ class TestPriceService(TestCase):
         binance_mock.called_once()
         self.assertEqual(eth_usd_price, binance_mock.return_value)
 
-        # XDAI
+        # Gnosis Chain
         price_service.ethereum_network = EthereumNetwork.XDAI
         with mock.patch.object(KrakenClient, "get_dai_usd_price", return_value=1.5):
             price_service.cache_eth_price.clear()
@@ -85,7 +79,7 @@ class TestPriceService(TestCase):
 
         # BINANCE
         price_service.ethereum_network = EthereumNetwork.BINANCE
-        with mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=1.2):
+        with mock.patch.object(KucoinClient, "get_bnb_usd_price", return_value=1.2):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 1.2)
 
@@ -105,52 +99,36 @@ class TestPriceService(TestCase):
 
         # Aurora
         price_service.ethereum_network = EthereumNetwork.AURORA
-        with mock.patch.object(BinanceClient, "get_aurora_usd_price", return_value=1.3):
+        with mock.patch.object(KucoinClient, "get_aurora_usd_price", return_value=1.3):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 1.3)
 
         # Cronos
         with mock.patch.object(KucoinClient, "get_cro_usd_price", return_value=4.4):
-            price_service.ethereum_network = EthereumNetwork.CRONOS_TESTNET
-            price_service.cache_eth_price.clear()
-            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
-
             price_service.ethereum_network = EthereumNetwork.CRONOS_MAINNET
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
 
         # KuCoin
         with mock.patch.object(KucoinClient, "get_kcs_usd_price", return_value=4.4):
-            price_service.ethereum_network = EthereumNetwork.KCC_TESTNET
-            price_service.cache_eth_price.clear()
-            self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
-
             price_service.ethereum_network = EthereumNetwork.KCC_MAINNET
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 4.4)
 
         # Milkomeda Cardano
-        with mock.patch.object(BinanceClient, "get_ada_usd_price", return_value=5.5):
-            price_service.ethereum_network = EthereumNetwork.MILKOMEDA_C1_TESTNET
-            price_service.cache_eth_price.clear()
-            self.assertEqual(price_service.get_native_coin_usd_price(), 5.5)
-
+        with mock.patch.object(KrakenClient, "get_ada_usd_price", return_value=5.5):
             price_service.ethereum_network = EthereumNetwork.MILKOMEDA_C1_MAINNET
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_native_coin_usd_price(), 5.5)
 
         # Milkomeda Algorand
         with mock.patch.object(KrakenClient, "get_algo_usd_price", return_value=6.6):
-            price_service.ethereum_network = EthereumNetwork.MILKOMEDA_A1_TESTNET
-            price_service.cache_eth_price.clear()
-            self.assertEqual(price_service.get_algorand_usd_price(), 6.6)
-
             price_service.ethereum_network = EthereumNetwork.MILKOMEDA_A1_MAINNET
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_algorand_usd_price(), 6.6)
 
     @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
-    @mock.patch.object(BinanceClient, "get_bnb_usd_price", return_value=5.0)
+    @mock.patch.object(KucoinClient, "get_bnb_usd_price", return_value=5.0)
     def test_get_binance_usd_price(
         self,
         get_bnb_usd_price_binance_mock: MagicMock,
@@ -188,7 +166,7 @@ class TestPriceService(TestCase):
         self.assertEqual(price, 3.0)
 
     @mock.patch.object(CoingeckoClient, "get_matic_usd_price", return_value=3.0)
-    @mock.patch.object(BinanceClient, "get_matic_usd_price", return_value=7.0)
+    @mock.patch.object(KucoinClient, "get_matic_usd_price", return_value=7.0)
     @mock.patch.object(KrakenClient, "get_matic_usd_price", return_value=5.0)
     def test_get_matic_usd_price(
         self,
