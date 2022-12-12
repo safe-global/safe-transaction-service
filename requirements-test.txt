@@ -1,6 +1,6 @@
 -r requirements.txt
 coverage==6.5.0
-django-stubs==1.13.0
+django-stubs==1.13.1
 django-test-migrations==1.2.0
 factory-boy==3.2.1
 faker==15.3.4
