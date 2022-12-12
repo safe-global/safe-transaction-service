@@ -1,5 +1,10 @@
 name: Python CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
 
 jobs:
   linting:
