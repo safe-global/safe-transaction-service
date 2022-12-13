@@ -67,7 +67,7 @@ jobs:
       run: |
         python manage.py check
         python manage.py makemigrations --check --dry-run
-        coverage run --source=$SOURCE_FOLDER -m py.test -rxXs --reruns 3
+        coverage run --source=$SOURCE_FOLDER -m pytest -rxXs --reruns 3
       env:
         SOURCE_FOLDER: safe_transaction_service
         CELERY_BROKER_URL: redis://localhost:6379/0
