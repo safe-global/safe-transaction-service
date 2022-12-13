@@ -87,9 +87,13 @@ class Erc20EventsIndexer(EventsIndexer):
         parameter_addresses = (
             None if len(addresses) > self.query_chunk_size else addresses
         )
-        transfer_events = self.ethereum_client.erc20.get_total_transfer_history(
-            parameter_addresses, from_block=from_block_number, to_block=to_block_number
-        )
+
+        with self.auto_adjust_block_limit(from_block_number, to_block_number):
+            transfer_events = self.ethereum_client.erc20.get_total_transfer_history(
+                parameter_addresses,
+                from_block=from_block_number,
+                to_block=to_block_number,
+            )
 
         if parameter_addresses:
             return transfer_events
