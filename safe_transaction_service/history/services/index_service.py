@@ -17,6 +17,7 @@ from ..models import (
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
+    SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
 )
@@ -320,8 +321,13 @@ class IndexService:
         queryset.delete()
 
         logger.info("Remove Safe statuses")
-
         queryset = SafeStatus.objects.all()
+        if addresses:
+            queryset = queryset.filter(address__in=addresses)
+        queryset.delete()
+
+        logger.info("Remove Safe Last statuses")
+        queryset = SafeLastStatus.objects.all()
         if addresses:
             queryset = queryset.filter(address__in=addresses)
         queryset.delete()
