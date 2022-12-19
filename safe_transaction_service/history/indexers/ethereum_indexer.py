@@ -164,6 +164,11 @@ class EthereumIndexer(ABC):
         :param current_block_number:
         :return: Top block number to process
         """
+        if self.block_process_limit == 1:
+            return min(
+                from_block_number,
+                current_block_number - self.confirmations,
+            )
         return min(
             from_block_number + self.block_process_limit,
             current_block_number - self.confirmations,
