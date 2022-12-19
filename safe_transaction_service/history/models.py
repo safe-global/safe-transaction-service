@@ -1607,12 +1607,12 @@ class SafeStatusBase(models.Model):
 
         :return: `True` if corrupted, `False` otherwise
         """
-        return (
+        safe_status_count = (
             SafeStatus.objects.distinct("nonce")
             .filter(address=self.address, nonce__lte=self.nonce)
             .count()
-            <= self.nonce
         )
+        return safe_status_count and safe_status_count <= self.nonce
 
     @classmethod
     def from_status_instance(

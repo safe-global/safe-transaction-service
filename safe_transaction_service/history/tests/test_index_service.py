@@ -9,7 +9,13 @@ from web3 import Web3
 from gnosis.eth import EthereumClient
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..models import EthereumTx, IndexingStatus, MultisigTransaction, SafeStatus
+from ..models import (
+    EthereumTx,
+    IndexingStatus,
+    MultisigTransaction,
+    SafeLastStatus,
+    SafeStatus,
+)
 from ..services.index_service import (
     IndexService,
     IndexServiceProvider,
@@ -120,6 +126,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertIsNone(index_service.reprocess_addresses([]))
 
         safe_status = SafeStatusFactory()
+        SafeLastStatus.objects.get_or_generate(safe_status.address)
         MultisigTransactionFactory()  # It shouldn't be deleted (safe not matching)
         MultisigTransactionFactory(
             safe=safe_status.address, origin={}
@@ -133,12 +140,14 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 4)
         self.assertIsNone(index_service.reprocess_addresses([safe_status.address]))
         self.assertEqual(SafeStatus.objects.count(), 0)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 3)
 
     def test_reprocess_all(self):
         index_service: IndexService = self.index_service
         for _ in range(5):
             safe_status = SafeStatusFactory()
+            SafeLastStatus.objects.get_or_generate(safe_status.address)
             MultisigTransactionFactory(safe=safe_status.address, origin={})
 
         MultisigTransactionFactory(ethereum_tx=None)  # It shouldn't be deleted
@@ -147,4 +156,5 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 7)
         self.assertIsNone(index_service.reprocess_all())
         self.assertEqual(SafeStatus.objects.count(), 0)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 2)

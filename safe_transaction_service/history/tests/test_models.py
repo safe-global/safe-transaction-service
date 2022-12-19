@@ -901,6 +901,19 @@ class TestSafeLastStatus(TestCase):
         SafeLastStatusFactory(address=address, nonce=17)
         self.assertEqual(SafeLastStatus.objects.get_or_generate(address).nonce, 17)
 
+    def test_is_corrupted(self):
+        address = Account.create().address
+        SafeStatusFactory(address=address, nonce=0)
+        SafeStatusFactory(address=address, nonce=2)
+        safe_last_status = SafeLastStatus.objects.get_or_generate(address)
+        self.assertTrue(safe_last_status.is_corrupted())
+
+        SafeStatusFactory(address=address, nonce=1)
+        self.assertFalse(safe_last_status.is_corrupted())
+
+        SafeStatus.objects.all().delete()
+        self.assertFalse(safe_last_status.is_corrupted())
+
 
 class TestSafeStatus(TestCase):
     def test_safe_status_is_corrupted(self):
