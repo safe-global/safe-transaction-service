@@ -5,6 +5,8 @@ on:
       - master
       - develop
   pull_request:
+  release:
+    types: [ released ]
 
 jobs:
   linting:
