@@ -1811,6 +1811,7 @@ class WebHookType(Enum):
     MODULE_TRANSACTION = 7
     OUTGOING_ETHER = 8
     OUTGOING_TOKEN = 9
+    OFFCHAIN_MESSAGE_UPDATE = 10
 
 
 class WebHookQuerySet(models.QuerySet):
