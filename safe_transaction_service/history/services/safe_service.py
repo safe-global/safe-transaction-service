@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Union
 from eth_typing import ChecksumAddress
 from web3 import Web3
 
-from gnosis.eth import EthereumClient
+from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.contracts import get_cpk_factory_contract, get_proxy_factory_contract
 from gnosis.safe import Safe
 from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
@@ -48,13 +48,13 @@ class SafeServiceProvider:
         if not hasattr(cls, "instance"):
             from django.conf import settings
 
-            tracing_enabled = bool(settings.ETHEREUM_TRACING_NODE_URL)
-            node_url = (
-                settings.ETHEREUM_TRACING_NODE_URL
-                if tracing_enabled
-                else settings.ETHEREUM_NODE_URL
+            ethereum_client = EthereumClientProvider()
+            ethereum_tracing_client = (
+                EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
+                if settings.ETHEREUM_TRACING_NODE_URL
+                else None
             )
-            cls.instance = SafeService(EthereumClient(node_url), tracing_enabled)
+            cls.instance = SafeService(ethereum_client, ethereum_tracing_client)
         return cls.instance
 
     @classmethod
@@ -64,9 +64,18 @@ class SafeServiceProvider:
 
 
 class SafeService:
-    def __init__(self, ethereum_client: EthereumClient, tracing_enabled: bool):
+    def __init__(
+        self,
+        ethereum_client: EthereumClient,
+        ethereum_tracing_client: Optional[EthereumClient],
+    ):
+        """
+        :param ethereum_client: Used for regular RPC calls
+        :param ethereum_tracing_client: Used for RPC calls requiring trace methods. It's required to get
+            next or previous traces for a given `InternalTx` if not found on database
+        """
         self.ethereum_client = ethereum_client
-        self.tracing_enabled = tracing_enabled
+        self.ethereum_tracing_client = ethereum_tracing_client
         dummy_w3 = Web3()  # Not needed, just used to decode contracts
         self.proxy_factory_contract = get_proxy_factory_contract(dummy_w3)
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
@@ -203,10 +212,10 @@ class SafeService:
     def _get_next_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
         if child_trace := internal_tx.get_child(0):
             return child_trace
-        if not self.tracing_enabled:
+        if not self.ethereum_tracing_client:
             return None
         try:
-            next_traces = self.ethereum_client.parity.get_next_traces(
+            next_traces = self.ethereum_tracing_client.parity.get_next_traces(
                 internal_tx.ethereum_tx_id,
                 internal_tx.trace_address_as_list,
                 remove_calls=True,
@@ -220,10 +229,10 @@ class SafeService:
     def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
         if parent_trace := internal_tx.get_parent():
             return parent_trace
-        if not self.tracing_enabled:
+        if not self.ethereum_tracing_client:
             return None
         try:
-            previous_trace = self.ethereum_client.parity.get_previous_trace(
+            previous_trace = self.ethereum_tracing_client.parity.get_previous_trace(
                 internal_tx.ethereum_tx_id,
                 internal_tx.trace_address_as_list,
                 skip_delegate_calls=True,

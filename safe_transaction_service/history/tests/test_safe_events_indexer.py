@@ -32,7 +32,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         cls.safe_events_indexer = SafeEventsIndexer(
             cls.ethereum_client, confirmations=0, blocks_to_reindex_again=0
         )
-        cls.safe_tx_processor = SafeTxProcessor(cls.ethereum_client)
+        cls.safe_tx_processor = SafeTxProcessor(cls.ethereum_client, None)
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
