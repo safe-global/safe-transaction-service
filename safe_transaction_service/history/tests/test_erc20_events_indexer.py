@@ -11,8 +11,14 @@ from .factories import SafeContractFactory
 
 
 class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
+    def setUp(self) -> None:
+        self.erc20_events_indexer = Erc20EventsIndexerProvider()
+
+    def tearDown(self) -> None:
+        Erc20EventsIndexerProvider.del_singleton()
+
     def test_erc20_events_indexer(self):
-        erc20_events_indexer = Erc20EventsIndexerProvider()
+        erc20_events_indexer = self.erc20_events_indexer
         erc20_events_indexer.confirmations = 0
         self.assertEqual(erc20_events_indexer.start(), 0)
 
@@ -96,3 +102,10 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             self.assertEqual(
                 erc20_events_indexer._process_decoded_element(event), original_event
             )
+
+    def test_get_to_block_number(self):
+        self.erc20_events_indexer.block_process_limit = 1
+        self.assertEqual(self.erc20_events_indexer.get_to_block_number(5, 100), 5)
+
+        self.erc20_events_indexer.block_process_limit = 2
+        self.assertEqual(self.erc20_events_indexer.get_to_block_number(5, 100), 6)
