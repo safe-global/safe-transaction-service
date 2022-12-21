@@ -6,6 +6,8 @@ from functools import cache
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
+from django.conf import settings
+
 import requests
 from celery import app
 from celery.utils.log import get_task_logger
@@ -394,13 +396,22 @@ def process_decoded_internal_txs_for_safe_task(
                 tx_processor.clear_cache(safe_address)
                 index_service.reprocess_addresses([safe_address])
 
-            # Use iterator for memory issues
-            internal_txs_decoded = InternalTxDecoded.objects.pending_for_safe(
-                safe_address
-            ).iterator()
-            number_processed = len(
-                tx_processor.process_decoded_transactions(internal_txs_decoded)
-            )
+            # Use chunks for memory issues
+            number_processed = 0
+            while True:
+                internal_txs_decoded_queryset = (
+                    InternalTxDecoded.objects.pending_for_safe(safe_address)[
+                        : settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH
+                    ]
+                )
+                if not internal_txs_decoded_queryset:
+                    break
+                number_processed += len(
+                    tx_processor.process_decoded_transactions(
+                        internal_txs_decoded_queryset
+                    )
+                )
+
             logger.info("Processed %d decoded transactions", number_processed)
             if number_processed:
                 logger.info(
