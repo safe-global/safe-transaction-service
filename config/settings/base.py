@@ -405,6 +405,9 @@ ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
 ETH_REORG_BLOCKS = env.int(
     "ETH_REORG_BLOCKS", default=100 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable
+ETH_INTERNAL_TX_DECODED_PROCESS_BATCH = env.int(
+    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=500
+)  # Number of InternalTxDecoded to process together
 
 # Tokens
 # ------------------------------------------------------------------------------
