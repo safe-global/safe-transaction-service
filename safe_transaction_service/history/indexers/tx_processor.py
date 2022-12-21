@@ -10,7 +10,7 @@ from hexbytes import HexBytes
 from packaging.version import Version
 from web3 import Web3
 
-from gnosis.eth import EthereumClient
+from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import get_safe_V1_0_0_contract, get_safe_V1_3_0_contract
 from gnosis.safe import SafeTx
@@ -47,12 +47,13 @@ class SafeTxProcessorProvider:
         if not hasattr(cls, "instance"):
             from django.conf import settings
 
-            node_url = (
-                settings.ETHEREUM_TRACING_NODE_URL
+            ethereum_client = EthereumClientProvider()
+            ethereum_tracing_client = (
+                EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
                 if settings.ETHEREUM_TRACING_NODE_URL
-                else settings.ETHEREUM_NODE_URL
+                else None
             )
-            cls.instance = SafeTxProcessor(EthereumClient(node_url))
+            cls.instance = SafeTxProcessor(ethereum_client, ethereum_tracing_client)
         return cls.instance
 
     @classmethod
@@ -82,9 +83,20 @@ class SafeTxProcessor(TxProcessor):
     Processor for txs on Safe Contracts v0.0.1 - v1.0.0
     """
 
-    def __init__(self, ethereum_client: EthereumClient):
+    def __init__(
+        self,
+        ethereum_client: EthereumClient,
+        ethereum_tracing_client: Optional[EthereumClient],
+    ):
+        """
+        :param ethereum_client: Used for regular RPC calls
+        :param ethereum_tracing_client: Used for RPC calls requiring trace methods. It's required to get
+           previous traces for a given `InternalTx` if not found on database
+        """
+
         # This safe_tx_failure events allow us to detect a failed safe transaction
         self.ethereum_client = ethereum_client
+        self.ethereum_tracing_client = ethereum_tracing_client
         dummy_w3 = Web3()
         self.safe_tx_failure_events = [
             get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
@@ -437,11 +449,13 @@ class SafeTxProcessor(TxProcessor):
                 else:
                     # Regular Safe indexed using tracing
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
-                    # The trace that is been processed is the last one, so indexer needs to get the previous trace
-                    previous_trace = self.ethereum_client.parity.get_previous_trace(
-                        internal_tx.ethereum_tx_id,
-                        internal_tx.trace_address_as_list,
-                        skip_delegate_calls=True,
+                    # The trace that is being processed is the last one, so indexer needs to get the previous trace
+                    previous_trace = (
+                        self.ethereum_tracing_client.parity.get_previous_trace(
+                            internal_tx.ethereum_tx_id,
+                            internal_tx.trace_address_as_list,
+                            skip_delegate_calls=True,
+                        )
                     )
                     if not previous_trace:
                         message = (
@@ -481,10 +495,12 @@ class SafeTxProcessor(TxProcessor):
                 if "owner" in arguments:  # Event approveHash
                     owner = arguments["owner"]
                 else:
-                    previous_trace = self.ethereum_client.parity.get_previous_trace(
-                        internal_tx.ethereum_tx_id,
-                        internal_tx.trace_address_as_list,
-                        skip_delegate_calls=True,
+                    previous_trace = (
+                        self.ethereum_tracing_client.parity.get_previous_trace(
+                            internal_tx.ethereum_tx_id,
+                            internal_tx.trace_address_as_list,
+                            skip_delegate_calls=True,
+                        )
                     )
                     if not previous_trace:
                         message = (
