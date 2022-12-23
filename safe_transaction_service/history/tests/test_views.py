@@ -648,6 +648,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.json()["transactionHash"], multisig_tx.ethereum_tx.tx_hash
         )
+        # Test empty origin object
+        multisig_tx.origin = {}
+        multisig_tx.save(update_fields=["origin"])
+        response = self.client.get(
+            reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["origin"], json.dumps({}))
+        self.assertEqual(json.loads(response.data["origin"]), {})
+
+        # Test origin object
+        origin = {"app": "Testing App", "name": "Testing"}
+        multisig_tx.origin = origin
+        multisig_tx.save(update_fields=["origin"])
+        response = self.client.get(
+            reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["origin"], json.dumps(origin))
+        self.assertEqual(json.loads(response.data["origin"]), origin)
 
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address
