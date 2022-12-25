@@ -74,3 +74,10 @@ class KrakenClient:
         :raises: CannotGetPrice
         """
         return self._get_price("ALGOUSD")
+
+    def get_kava_usd_price(self):
+        """
+        :return: current USD price for Kava
+        :raises: CannotGetPrice
+        """
+        return self._get_price("KAVAUSD")
