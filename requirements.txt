@@ -1,4 +1,4 @@
-boto3==1.26.32
+boto3==1.26.37
 cachetools==5.2.0
 celery==5.2.7
 django==4.1.4
