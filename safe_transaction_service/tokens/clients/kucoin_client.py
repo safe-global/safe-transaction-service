@@ -23,12 +23,24 @@ class KucoinClient:
             raise CannotGetPrice from e
 
     def get_eth_usd_price(self) -> float:
+        """
+        :return: current USD price for ETH Coin
+        :raises: CannotGetPrice
+        """
         return self._get_price("ETH-USDT")
 
     def get_aurora_usd_price(self) -> float:
+        """
+        :return: current USD price for Aurora Coin
+        :raises: CannotGetPrice
+        """
         return self._get_price("AURORA-USDT")
 
     def get_bnb_usd_price(self) -> float:
+        """
+        :return: current USD price for Binance Coin
+        :raises: CannotGetPrice
+        """
         return self._get_price("BNB-USDT")
 
     def get_celo_usd_price(self) -> float:
@@ -60,4 +72,15 @@ class KucoinClient:
         return self._get_price("KCS-USDT")
 
     def get_matic_usd_price(self) -> float:
+        """
+        :return: current USD price for MATIC Token
+        :raises: CannotGetPrice
+        """
         return self._get_price("MATIC-USDT")
+
+    def get_xdc_usd_price(self) -> float:
+        """
+        :return: current USD price for XDC Token
+        :raises: CannotGetPrice
+        """
+        return self._get_price("XDC-USDT")

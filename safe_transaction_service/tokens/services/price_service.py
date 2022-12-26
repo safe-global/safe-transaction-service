@@ -185,6 +185,9 @@ class PriceService:
     def get_cronos_usd_price(self) -> float:
         return self.kucoin_client.get_cro_usd_price()
 
+    def get_xdc_usd_price(self) -> float:
+        return self.kucoin_client.get_xdc_usd_price()
+
     def get_kcs_usd_price(self) -> float:
         try:
             return self.kucoin_client.get_kcs_usd_price()
@@ -266,6 +269,11 @@ class PriceService:
             EthereumNetwork.CELO_BAKLAVA_TESTNET,
         ):
             return self.kucoin_client.get_celo_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.XDC,
+            EthereumNetwork.TXDC_TESTNET,
+        ):
+            return self.get_xdc_usd_price()
         else:
             try:
                 return self.kraken_client.get_eth_usd_price()
