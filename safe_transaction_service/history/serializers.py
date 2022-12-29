@@ -549,7 +549,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
     max_priority_fee_per_gas = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
-    origin = serializers.CharField()
+    origin = serializers.SerializerMethodField()
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
@@ -600,6 +600,9 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
 
     def get_is_successful(self, obj: MultisigTransaction) -> Optional[bool]:
         return None if obj.failed is None else not obj.failed
+
+    def get_origin(self, obj: MultisigTransaction) -> str:
+        return obj.origin if isinstance(obj.origin, str) else json.dumps(obj.origin)
 
     def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
         # If delegate call contract must be whitelisted (security)
