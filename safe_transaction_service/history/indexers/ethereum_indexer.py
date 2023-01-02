@@ -145,8 +145,16 @@ class EthereumIndexer(ABC):
         if (from_block_number + self.block_process_limit) >= (
             current_block_number - self.confirmations
         ):
+            reindex_blocks = self.blocks_to_reindex_again
+            if self.blocks_to_reindex_again >= self.block_process_limit:
+                # The following formula ensure that get_to_block_number reach last block
+                reindex_blocks = (
+                    (self.block_process_limit + from_block_number)
+                    - current_block_number
+                ) - 1
+
             # Reindex again when it's almost synced to prevent reorg/missing elements issues
-            from_block_number = max(from_block_number - self.blocks_to_reindex_again, 0)
+            from_block_number = max(from_block_number - reindex_blocks, 0)
 
         if (current_block_number - common_minimum_block_number) <= self.confirmations:
             return  # We don't want problems with reorgs
@@ -164,13 +172,8 @@ class EthereumIndexer(ABC):
         :param current_block_number:
         :return: Top block number to process
         """
-        if self.block_process_limit == 1:
-            return min(
-                from_block_number,
-                current_block_number - self.confirmations,
-            )
         return min(
-            from_block_number + self.block_process_limit,
+            from_block_number + self.block_process_limit - 1,
             current_block_number - self.confirmations,
         )
 
