@@ -69,12 +69,6 @@ urlpatterns_v2 = [
 ]
 
 if settings.ENABLE_ANALYTICS:
-    urlpatterns_v1 += [
-        path(
-            "analytics/",
-            include("safe_transaction_service.analytics.urls", namespace="analytics"),
-        ),
-    ]
     urlpatterns_v2 += [
         path(
             "analytics/",

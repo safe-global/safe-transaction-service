@@ -154,27 +154,3 @@ class ModuleTransactionFilter(filters.FilterSet):
         }
 
         filter_overrides = filter_overrides
-
-
-class AnalyticsMultisigTxsByOriginFilter(filters.FilterSet):
-    class Meta:
-        model = MultisigTransaction
-        fields = {
-            "safe": ["exact"],
-            "to": ["exact"],
-            "value": ["lt", "gt", "lte", "gte", "exact"],
-            "operation": ["exact"],
-            "failed": ["exact"],
-            "safe_tx_gas": ["lt", "gt", "lte", "gte", "exact"],
-            "base_gas": ["lt", "gt", "lte", "gte", "exact"],
-            "gas_price": ["lt", "gt", "lte", "gte", "exact"],
-            "gas_token": ["exact"],
-            "refund_receiver": ["exact"],
-            "trusted": ["exact"],
-        }
-
-        filter_overrides = filter_overrides
-
-
-class AnalyticsMultisigTxsBySafeFilter(filters.FilterSet):
-    master_copy = EthereumAddressFilter()
