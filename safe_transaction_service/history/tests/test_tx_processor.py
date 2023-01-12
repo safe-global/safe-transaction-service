@@ -9,10 +9,12 @@ from web3 import Web3
 
 from gnosis.eth.ethereum_client import ParityManager
 from gnosis.safe.safe_signature import SafeSignatureType
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
 from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
+    SafeMessageFactory,
 )
 
 from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
@@ -38,7 +40,7 @@ from .mocks.traces import call_trace, module_traces, rinkeby_traces
 logger = logging.getLogger(__name__)
 
 
-class TestSafeTxProcessor(TestCase):
+class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -131,8 +133,9 @@ class TestSafeTxProcessor(TestCase):
             multisig_transaction__safe=safe_address,
         )
         # This will be deleted
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
         unused_message_confirmation = SafeMessageConfirmationFactory(
-            owner=another_owner
+            owner=another_owner, safe_message=safe_message
         )
         # This won't be deleted
         unused_message_confirmation_2 = SafeMessageConfirmationFactory(

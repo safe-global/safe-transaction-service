@@ -12,9 +12,8 @@ from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 
 from gnosis.eth.eip712 import eip712_encode_hash
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
-from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignatureEOA
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
@@ -37,7 +36,7 @@ def datetime_to_str(value: datetime.datetime) -> str:
     return value
 
 
-class TestMessageViews(EthereumTestCaseMixin, APITestCase):
+class TestMessageViews(SafeTestCaseMixin, APITestCase):
     def test_safe_message_view(self):
         random_safe_message_hash = (
             "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
@@ -47,8 +46,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.json(), {"detail": "Not found."})
-
-        safe_message = SafeMessageFactory()
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
         response = self.client.get(
             reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
         )
@@ -100,8 +98,10 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
         )
 
     def test_safe_message_not_camel_case_view(self):
-        safe_message_confirmation = SafeMessageConfirmationFactory()
-        safe_message = safe_message_confirmation.safe_message
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
         safe_message.message = {"test_not_camel": 2}
         safe_message.save(update_fields=["message"])
 
@@ -138,14 +138,14 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
     )
     def test_safe_messages_create_view(self, get_owners_mock: MagicMock):
         account = Account.create()
-        safe_address = Account.create().address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         messages = ["Text to sign message", get_eip712_payload_mock()]
         description = "Testing EIP191 message signing"
         message_hashes = [
             defunct_hash_message(text=messages[0]),
             eip712_encode_hash(messages[1]),
         ]
-        safe = Safe(safe_address, self.ethereum_client)
         safe_message_hashes = [
             safe.get_message_hash(message_hash) for message_hash in message_hashes
         ]
@@ -259,8 +259,10 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         # Test invalid signature
-        safe_message_confirmation = SafeMessageConfirmationFactory()
-        safe_message = safe_message_confirmation.safe_message
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
         response = self.client.post(
             reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
@@ -353,7 +355,7 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
         )
 
         # Create a Safe message for a random Safe, it should not appear
-        safe_message = SafeMessageFactory()
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
         response = self.client.get(
             reverse("v1:safe_messages:safe-messages", args=(safe_address,))
         )
@@ -431,8 +433,10 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
         )
 
     def test_safe_messages_list_not_camel_case_view(self):
-        safe_message_confirmation = SafeMessageConfirmationFactory()
-        safe_message = safe_message_confirmation.safe_message
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
         safe_message.message = {"test_not_camel": 2}
         safe_message.save(update_fields=["message"])
 
@@ -470,6 +474,66 @@ class TestMessageViews(EthereumTestCaseMixin, APITestCase):
                                 "signatureType": "EOA",
                             }
                         ],
+                    }
+                ],
+            },
+        )
+
+    def test_safe_message_view_v1_1_1(self):
+        random_safe_message_hash = (
+            "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
+        )
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(random_safe_message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.json(), {"detail": "Not found."})
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe_v1_1_1().address)
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
+                "safe": safe_message.safe,
+                "messageHash": safe_message.message_hash,
+                "message": safe_message.message,
+                "proposedBy": safe_message.proposed_by,
+                "safeAppId": safe_message.safe_app_id,
+                "preparedSignature": None,
+                "confirmations": [],
+            },
+        )
+
+        # Add a confirmation
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
+                "safe": safe_message.safe,
+                "messageHash": safe_message.message_hash,
+                "message": safe_message.message,
+                "proposedBy": safe_message.proposed_by,
+                "safeAppId": safe_message.safe_app_id,
+                "preparedSignature": safe_message_confirmation.signature,
+                "confirmations": [
+                    {
+                        "created": datetime_to_str(safe_message_confirmation.created),
+                        "modified": datetime_to_str(safe_message_confirmation.modified),
+                        "owner": safe_message_confirmation.owner,
+                        "signature": safe_message_confirmation.signature,
+                        "signatureType": "EOA",
                     }
                 ],
             },

@@ -1,15 +1,22 @@
+from unittest import mock
+from unittest.mock import PropertyMock
+
 from django.test import TestCase
 
 from eth_account import Account
 from hexbytes import HexBytes
+
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..utils import get_safe_message_hash_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
 from .mocks import get_eip712_payload_mock
 
 
-class TestSafeMessage(TestCase):
+class TestSafeMessage(SafeTestCaseMixin, TestCase):
     def test_str(self):
+        # fast_keccak(encode_abi([DOMAIN_TYPEHASH_V1_3_0, ganache_chain_id, address])
+        mock_domain_separator = b"k(\x81\xf6l\xa4\xbbS-cS\xf5u\xb7\xc1F\xf7\xf5l\xfaC\xce\xd1\x06\xb1j\xe2O\x16a.\x03"
         # Use same safe_address so hash is always the same
         safe_address = "0x20a3C95188E1c053800e54575A508baCe65761A7"
         for input, expected in [
@@ -27,8 +34,13 @@ class TestSafeMessage(TestCase):
             ),
         ]:
             with self.subTest(input=input):
-                safe_message = SafeMessageFactory(safe=safe_address, message=input)
-                self.assertEqual(str(safe_message), expected)
+                with mock.patch(
+                    "gnosis.safe.Safe.domain_separator",
+                    return_value=mock_domain_separator,
+                    new_callable=PropertyMock,
+                ):
+                    safe_message = SafeMessageFactory(safe=safe_address, message=input)
+                    self.assertEqual(str(safe_message), expected)
 
     def test_factory(self):
         # 0x63EB7d344c819caAC85bAa1C28cC4C2c08776495
@@ -39,9 +51,9 @@ class TestSafeMessage(TestCase):
         owner_2_account = Account.from_key(
             "0xfe4a966a3bc93ccad16e2eacb867ba14f06cdf9a9957e6f0fdef1619494471df"
         )
-
+        safe_message_1 = SafeMessageFactory(safe=self.deploy_test_safe().address)
         safe_message_confirmation_1 = SafeMessageConfirmationFactory(
-            signing_owner=owner_1_account
+            signing_owner=owner_1_account, safe_message=safe_message_1
         )
         safe_message = safe_message_confirmation_1.safe_message
         message = safe_message.message
