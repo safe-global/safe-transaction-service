@@ -375,7 +375,7 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 14062208, "1.3.0"),
     ],
     EthereumNetwork.KAVA_EVM: [
-        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 2702059, "1.3.0+L2"),
+        ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 2116303, "1.3.0+L2"),
         ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 2116307, "1.3.0"),
     ],
     EthereumNetwork.KAVA_EVM_TESTNET: [
