@@ -478,3 +478,63 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 ],
             },
         )
+
+    def test_safe_message_view_v1_1_1(self):
+        random_safe_message_hash = (
+            "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
+        )
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(random_safe_message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.json(), {"detail": "Not found."})
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe_v1_1_1().address)
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
+                "safe": safe_message.safe,
+                "messageHash": safe_message.message_hash,
+                "message": safe_message.message,
+                "proposedBy": safe_message.proposed_by,
+                "safeAppId": safe_message.safe_app_id,
+                "preparedSignature": None,
+                "confirmations": [],
+            },
+        )
+
+        # Add a confirmation
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "created": datetime_to_str(safe_message.created),
+                "modified": datetime_to_str(safe_message.modified),
+                "safe": safe_message.safe,
+                "messageHash": safe_message.message_hash,
+                "message": safe_message.message,
+                "proposedBy": safe_message.proposed_by,
+                "safeAppId": safe_message.safe_app_id,
+                "preparedSignature": safe_message_confirmation.signature,
+                "confirmations": [
+                    {
+                        "created": datetime_to_str(safe_message_confirmation.created),
+                        "modified": datetime_to_str(safe_message_confirmation.modified),
+                        "owner": safe_message_confirmation.owner,
+                        "signature": safe_message_confirmation.signature,
+                        "signatureType": "EOA",
+                    }
+                ],
+            },
+        )
