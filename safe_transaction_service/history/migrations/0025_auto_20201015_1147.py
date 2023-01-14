@@ -7,28 +7,30 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0024_auto_20201014_1523'),
+        ("history", "0024_auto_20201014_1523"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='ethereumevent',
-            name='arguments',
+            model_name="ethereumevent",
+            name="arguments",
             field=models.JSONField(),
         ),
         migrations.AlterField(
-            model_name='ethereumtx',
-            name='logs',
-            field=django.contrib.postgres.fields.ArrayField(base_field=models.JSONField(), default=None, null=True, size=None),
+            model_name="ethereumtx",
+            name="logs",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.JSONField(), default=None, null=True, size=None
+            ),
         ),
         migrations.AlterField(
-            model_name='internaltxdecoded',
-            name='arguments',
+            model_name="internaltxdecoded",
+            name="arguments",
             field=models.JSONField(),
         ),
         migrations.AlterField(
-            model_name='multisigtransaction',
-            name='failed',
+            model_name="multisigtransaction",
+            name="failed",
             field=models.BooleanField(db_index=True, default=None, null=True),
         ),
     ]

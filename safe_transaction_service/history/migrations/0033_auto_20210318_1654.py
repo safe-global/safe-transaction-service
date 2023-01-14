@@ -10,17 +10,21 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0032_webhook_new_module_transaction'),
+        ("history", "0032_webhook_new_module_transaction"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='safestatus',
-            name='owners',
-            field=django.contrib.postgres.fields.ArrayField(base_field=gnosis.eth.django.models.EthereumAddressField(), size=None),
+            model_name="safestatus",
+            name="owners",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=gnosis.eth.django.models.EthereumAddressField(), size=None
+            ),
         ),
         migrations.AddIndex(
-            model_name='safestatus',
-            index=django.contrib.postgres.indexes.GinIndex(fields=['owners'], name='history_saf_owners_295490_gin'),
+            model_name="safestatus",
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["owners"], name="history_saf_owners_295490_gin"
+            ),
         ),
     ]

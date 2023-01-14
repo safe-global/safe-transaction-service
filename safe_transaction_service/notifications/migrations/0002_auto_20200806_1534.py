@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('notifications', '0001_initial'),
+        ("notifications", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='firebasedevice',
-            name='cloud_messaging_token',
+            model_name="firebasedevice",
+            name="cloud_messaging_token",
             field=models.CharField(max_length=200, null=True, unique=True),
         ),
     ]

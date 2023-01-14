@@ -9,24 +9,45 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('history', '0021_moduletransaction_failed'),
+        ("history", "0021_moduletransaction_failed"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='FirebaseDevice',
+            name="FirebaseDevice",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('cloud_messaging_token', models.CharField(max_length=200, unique=True)),
-                ('build_number', models.PositiveIntegerField(default=0)),
-                ('bundle', models.CharField(default='', max_length=100)),
-                ('device_type', models.PositiveSmallIntegerField(choices=[(0, 'ANDROID'), (1, 'IOS'), (2, 'WEB')])),
-                ('version', models.CharField(default='', max_length=50)),
-                ('safes', models.ManyToManyField(related_name='firebase_devices', to='history.SafeContract')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "cloud_messaging_token",
+                    models.CharField(max_length=200, unique=True),
+                ),
+                ("build_number", models.PositiveIntegerField(default=0)),
+                ("bundle", models.CharField(default="", max_length=100)),
+                (
+                    "device_type",
+                    models.PositiveSmallIntegerField(
+                        choices=[(0, "ANDROID"), (1, "IOS"), (2, "WEB")]
+                    ),
+                ),
+                ("version", models.CharField(default="", max_length=50)),
+                (
+                    "safes",
+                    models.ManyToManyField(
+                        related_name="firebase_devices", to="history.SafeContract"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Firebase Device',
-                'verbose_name_plural': 'Firebase Devices',
+                "verbose_name": "Firebase Device",
+                "verbose_name_plural": "Firebase Devices",
             },
         ),
     ]

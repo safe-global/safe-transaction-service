@@ -8,38 +8,40 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0013_multisigtransaction_fix_failed'),
+        ("history", "0013_multisigtransaction_fix_failed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='ethereumblock',
-            name='number',
+            model_name="ethereumblock",
+            name="number",
             field=models.PositiveIntegerField(primary_key=True, serialize=False),
         ),
         migrations.AlterField(
-            model_name='ethereumtx',
-            name='status',
+            model_name="ethereumtx",
+            name="status",
             field=models.IntegerField(db_index=True, default=None, null=True),
         ),
         migrations.AlterField(
-            model_name='ethereumtx',
-            name='tx_hash',
-            field=gnosis.eth.django.models.Sha3HashField(primary_key=True, serialize=False),
+            model_name="ethereumtx",
+            name="tx_hash",
+            field=gnosis.eth.django.models.Sha3HashField(
+                primary_key=True, serialize=False
+            ),
         ),
         migrations.AlterField(
-            model_name='internaltxdecoded',
-            name='function_name',
+            model_name="internaltxdecoded",
+            name="function_name",
             field=models.CharField(db_index=True, max_length=256),
         ),
         migrations.AlterField(
-            model_name='internaltxdecoded',
-            name='processed',
+            model_name="internaltxdecoded",
+            name="processed",
             field=models.BooleanField(db_index=True, default=False),
         ),
         migrations.AlterField(
-            model_name='multisigtransaction',
-            name='failed',
+            model_name="multisigtransaction",
+            name="failed",
             field=models.NullBooleanField(db_index=True, default=None),
         ),
     ]

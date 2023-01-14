@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Django: Run tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "--lf",
+                "-rxXs"
+            ],
+            "django": true,
+            "envFile": ".env.test"
+        },
+        {
+            "name": "Run current file tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "--lf",
+                "-rxXs",
+                "${file}"
+            ],
+            "django": true,
+            "envFile": ".env.test"
+        }
+    ]
+}

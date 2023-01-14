@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0008_ethereumtx_logs'),
+        ("history", "0008_ethereumtx_logs"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='multisigtransaction',
-            name='origin',
+            model_name="multisigtransaction",
+            name="origin",
             field=models.CharField(default=None, max_length=100, null=True),
         ),
     ]

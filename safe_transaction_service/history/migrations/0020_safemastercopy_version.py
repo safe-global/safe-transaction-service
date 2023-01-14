@@ -6,14 +6,14 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0019_transactions_data_none'),
+        ("history", "0019_transactions_data_none"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='safemastercopy',
-            name='version',
-            field=models.CharField(default='unknown', max_length=20),
+            model_name="safemastercopy",
+            name="version",
+            field=models.CharField(default="unknown", max_length=20),
             preserve_default=False,
         ),
     ]

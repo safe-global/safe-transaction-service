@@ -7,13 +7,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contracts', '0003_auto_20210122_1352'),
+        ("contracts", "0003_auto_20210122_1352"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='contract',
-            name='contract_abi',
-            field=models.ForeignKey(blank=True, default=None, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='contracts', to='contracts.contractabi'),
+            model_name="contract",
+            name="contract_abi",
+            field=models.ForeignKey(
+                blank=True,
+                default=None,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="contracts",
+                to="contracts.contractabi",
+            ),
         ),
     ]

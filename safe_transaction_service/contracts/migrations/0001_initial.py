@@ -12,25 +12,53 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ContractAbi',
+            name="ContractAbi",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('abi', models.JSONField(validators=[safe_transaction_service.contracts.models.validate_abi])),
-                ('description', models.CharField(blank=True, max_length=200)),
-                ('relevance', models.SmallIntegerField(default=100)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "abi",
+                    models.JSONField(
+                        validators=[
+                            safe_transaction_service.contracts.models.validate_abi
+                        ]
+                    ),
+                ),
+                ("description", models.CharField(blank=True, max_length=200)),
+                ("relevance", models.SmallIntegerField(default=100)),
             ],
         ),
         migrations.CreateModel(
-            name='Contract',
+            name="Contract",
             fields=[
-                ('address', gnosis.eth.django.models.EthereumAddressField(primary_key=True, serialize=False)),
-                ('name', models.CharField(blank=True, default='', max_length=200)),
-                ('contract_abi', models.ForeignKey(default=None, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='contracts', to='contracts.contractabi')),
+                (
+                    "address",
+                    gnosis.eth.django.models.EthereumAddressField(
+                        primary_key=True, serialize=False
+                    ),
+                ),
+                ("name", models.CharField(blank=True, default="", max_length=200)),
+                (
+                    "contract_abi",
+                    models.ForeignKey(
+                        default=None,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="contracts",
+                        to="contracts.contractabi",
+                    ),
+                ),
             ],
         ),
     ]

@@ -13,5 +13,6 @@ class ContractSerializer(serializers.Serializer):
     address = EthereumAddressField()
     name = serializers.CharField()
     display_name = serializers.CharField()
-    logo_uri = serializers.ImageField(source='logo')
+    logo_uri = serializers.ImageField(source="logo")
     contract_abi = ContractAbiSerializer()
+    trusted_for_delegate_call = serializers.BooleanField()

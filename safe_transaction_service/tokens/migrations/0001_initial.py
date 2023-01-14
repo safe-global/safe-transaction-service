@@ -9,19 +9,23 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Token',
+            name="Token",
             fields=[
-                ('address', gnosis.eth.django.models.EthereumAddressField(primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=60)),
-                ('symbol', models.CharField(max_length=60)),
-                ('decimals', models.PositiveSmallIntegerField(db_index=True)),
-                ('logo_uri', models.CharField(blank=True, default='', max_length=300)),
-                ('trusted', models.BooleanField(default=False)),
+                (
+                    "address",
+                    gnosis.eth.django.models.EthereumAddressField(
+                        primary_key=True, serialize=False
+                    ),
+                ),
+                ("name", models.CharField(max_length=60)),
+                ("symbol", models.CharField(max_length=60)),
+                ("decimals", models.PositiveSmallIntegerField(db_index=True)),
+                ("logo_uri", models.CharField(blank=True, default="", max_length=300)),
+                ("trusted", models.BooleanField(default=False)),
             ],
         ),
     ]

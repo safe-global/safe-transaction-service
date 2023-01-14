@@ -9,17 +9,23 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0028_auto_20201112_1613'),
+        ("history", "0028_auto_20201112_1613"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='safestatus',
-            name='owners',
-            field=django.contrib.postgres.fields.ArrayField(base_field=gnosis.eth.django.models.EthereumAddressField(), db_index=True, size=None),
+            model_name="safestatus",
+            name="owners",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=gnosis.eth.django.models.EthereumAddressField(),
+                db_index=True,
+                size=None,
+            ),
         ),
         migrations.AddIndex(
-            model_name='safestatus',
-            index=models.Index(fields=['address', '-nonce'], name='history_saf_address_aa71bd_idx'),
+            model_name="safestatus",
+            index=models.Index(
+                fields=["address", "-nonce"], name="history_saf_address_aa71bd_idx"
+            ),
         ),
     ]

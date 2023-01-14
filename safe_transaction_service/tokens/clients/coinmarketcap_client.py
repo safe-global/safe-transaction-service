@@ -5,7 +5,8 @@ from typing import Any, Dict, List
 from urllib.parse import urljoin
 
 import requests
-from eth_utils import to_checksum_address
+
+from gnosis.eth.utils import fast_to_checksum_address
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,14 @@ class CoinMarketCapToken:
 
 
 class CoinMarketCapClient:
-    base_url = 'https://pro-api.coinmarketcap.com/'
-    base_logo_uri = 'https://s2.coinmarketcap.com/static/img/coins/200x200/'
+    base_url = "https://pro-api.coinmarketcap.com/"
+    base_logo_uri = "https://s2.coinmarketcap.com/static/img/coins/200x200/"
 
     def __init__(self, api_token: str):
         self.api_token = api_token
         self.headers = {
-            'Accepts': 'application/json',
-            'X-CMC_PRO_API_KEY': api_token,
+            "Accepts": "application/json",
+            "X-CMC_PRO_API_KEY": api_token,
         }
         self.http_session = requests.Session()
 
@@ -37,8 +38,8 @@ class CoinMarketCapClient:
         with self.http_session.get(url, stream=True) as response:
             if not response.ok:
                 logger.warning("Image not found for url %s", url)
-                return
-            with open(os.path.join(taget_folder, local_filename), 'wb') as f:
+                return None
+            with open(os.path.join(taget_folder, local_filename), "wb") as f:
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
                         f.write(chunk)
@@ -64,31 +65,52 @@ class CoinMarketCapClient:
         ]
         :return:
         """
-        relative_url = 'v1/cryptocurrency/map'
+        relative_url = "v1/cryptocurrency/map"
         url = urljoin(self.base_url, relative_url)
         parameters = {
             # 'listing_status': 'active',
             # 'start': '1',
-            'limit': '5000',
+            "limit": "5000",
         }
 
         try:
-            return self.http_session.get(url, headers=self.headers, params=parameters).json().get('data', [])
+            return (
+                self.http_session.get(url, headers=self.headers, params=parameters)
+                .json()
+                .get("data", [])
+            )
         except IOError:
-            logger.warning('Problem getting tokens from coinmarketcap', exc_info=True)
+            logger.warning("Problem getting tokens from coinmarketcap", exc_info=True)
             return []
 
     def get_ethereum_tokens(self) -> List[CoinMarketCapToken]:
         tokens = []
         for token in self.get_map():
-            if token and token['is_active'] and token['platform'] and token['platform']['symbol'] == 'ETH':
+            if (
+                token
+                and token["is_active"]
+                and token["platform"]
+                and token["platform"]["name"] == "Ethereum"
+            ):
                 try:
-                    checksummed_address = to_checksum_address(token['platform']['token_address'])
-                    tokens.append(CoinMarketCapToken(token['id'], token['name'], token['symbol'], checksummed_address,
-                                                     urljoin(self.base_logo_uri, f'{token["id"]}.png'))
-                                  )
+                    checksummed_address = fast_to_checksum_address(
+                        token["platform"]["token_address"]
+                    )
+                    tokens.append(
+                        CoinMarketCapToken(
+                            token["id"],
+                            token["name"],
+                            token["symbol"],
+                            checksummed_address,
+                            urljoin(self.base_logo_uri, f'{token["id"]}.png'),
+                        )
+                    )
                 except ValueError:
-                    logger.warning('Invalid address %s for token %s with id %d', token['platform']['token_address'],
-                                   token['name'], token['id'])
+                    logger.warning(
+                        "Invalid address %s for token %s with id %d",
+                        token["platform"]["token_address"],
+                        token["name"],
+                        token["id"],
+                    )
 
         return tokens

@@ -8,18 +8,22 @@ import safe_transaction_service.contracts.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contracts', '0001_initial'),
+        ("contracts", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='contract',
-            name='display_name',
-            field=models.CharField(blank=True, default='', max_length=200),
+            model_name="contract",
+            name="display_name",
+            field=models.CharField(blank=True, default="", max_length=200),
         ),
         migrations.AddField(
-            model_name='contract',
-            name='logo',
-            field=models.ImageField(default=None, null=True, upload_to=safe_transaction_service.contracts.models.get_contract_logo_path),
+            model_name="contract",
+            name="logo",
+            field=models.ImageField(
+                default=None,
+                null=True,
+                upload_to=safe_transaction_service.contracts.models.get_contract_logo_path,
+            ),
         ),
     ]
