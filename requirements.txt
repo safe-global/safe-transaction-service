@@ -24,7 +24,7 @@ firebase-admin==6.0.1
 flower==1.2.0
 gunicorn[gevent]==20.1.0
 hexbytes==0.2.3
-hiredis==2.1.0
+hiredis==2.1.1
 packaging>=21.0
 pillow==9.4.0
 psycogreen==1.0.2
