@@ -318,8 +318,8 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx_decoded = None
         elif event_name == "ChangedMasterCopy":
             internal_tx_decoded.function_name = "changeMasterCopy"
-            internal_tx.arguments = {
-                "_masterCopy": args.get("singleton") or args.get("masterCopy")
+            internal_tx_decoded.arguments = {
+                "_masterCopy": args.get("masterCopy") or args.get("singleton")
             }
         else:
             # 'SignMsg', 'ExecutionFailure', 'ExecutionSuccess',
