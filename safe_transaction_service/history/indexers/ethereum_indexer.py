@@ -344,13 +344,13 @@ class EthereumIndexer(ABC):
                 self.block_process_limit_max
                 and self.block_process_limit > self.block_process_limit_max
             ):
-                self.block_process_limit = self.block_process_limit_max
                 logger.info(
                     "%s: block_process_limit %d is bigger than block_process_limit_max %d, reducing",
                     self.__class__.__name__,
                     self.block_process_limit,
                     self.block_process_limit_max,
                 )
+                self.block_process_limit = self.block_process_limit_max
 
     def process_addresses(
         self, addresses: Sequence[str], current_block_number: Optional[int] = None
