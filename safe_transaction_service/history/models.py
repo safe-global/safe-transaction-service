@@ -195,7 +195,8 @@ class EthereumBlockManager(models.Manager):
             with transaction.atomic():  # Needed for handling IntegrityError
                 return super().create(
                     number=block["number"],
-                    gas_limit=block["gasLimit"],
+                    # Some networks like CELO don't provide gasLimit
+                    gas_limit=block.get("gasLimit", 0),
                     gas_used=block["gasUsed"],
                     timestamp=datetime.datetime.fromtimestamp(
                         block["timestamp"], datetime.timezone.utc
@@ -288,14 +289,21 @@ class EthereumTxManager(models.Manager):
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
         ]
+
+        # Some networks like CELO provide a `null` gas_price
+        gas_price = (
+            (tx_receipt and tx_receipt.get("effectiveGasPrice", 0))
+            or tx.get("gasPrice", 0)
+            or 0
+        )
+
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx["hash"]).hex(),
             gas_used=tx_receipt and tx_receipt["gasUsed"],
             _from=tx["from"],
             gas=tx["gas"],
-            gas_price=(tx_receipt and tx_receipt.get("effectiveGasPrice", 0))
-            or tx.get("gasPrice", 0),
+            gas_price=gas_price,
             max_fee_per_gas=tx.get("maxFeePerGas"),
             max_priority_fee_per_gas=tx.get("maxPriorityFeePerGas"),
             logs=logs,
