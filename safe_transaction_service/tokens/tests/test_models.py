@@ -1,3 +1,4 @@
+from json import JSONDecodeError
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -13,9 +14,11 @@ from ..clients.zerion_client import (
     ZerionPoolMetadata,
     ZerionUniswapV2TokenAdapterClient,
 )
+from ..exceptions import TokenListRetrievalException
 from ..models import Token, TokenManager
 from ..models import logger as token_model_logger
-from .factories import TokenFactory
+from .factories import TokenFactory, TokenListFactory
+from .mocks import token_list_mock
 
 
 class TestModels(TestCase):
@@ -217,3 +220,36 @@ class TestModels(TestCase):
                 "Problem creating token with address=0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413 name=PESETA symbol=PTA decimals=18",
                 cm.output[0],
             )
+
+
+class TestTokenListModel(TestCase):
+    @mock.patch("requests.get")
+    def test_get_tokens(self, requests_get: MagicMock):
+        token_list = TokenListFactory()
+
+        requests_get.return_value.ok = False
+        with self.assertRaisesMessage(
+            TokenListRetrievalException, "when retrieving token list"
+        ):
+            token_list.get_tokens()
+
+        requests_get.side_effect = IOError
+        with self.assertRaisesMessage(
+            TokenListRetrievalException, "Problem retrieving"
+        ):
+            token_list.get_tokens()
+        requests_get.side_effect = None
+
+        requests_get.return_value.json.side_effect = JSONDecodeError("", "", 0)
+        requests_get.return_value.ok = True
+        with self.assertRaisesMessage(
+            TokenListRetrievalException, "Invalid JSON from token list "
+        ):
+            token_list.get_tokens()
+
+        requests_get.return_value.json.return_value = {}
+        requests_get.return_value.json.side_effect = None
+        self.assertEqual(token_list.get_tokens(), [])
+
+        requests_get.return_value.json.return_value = token_list_mock
+        self.assertEqual(len(token_list.get_tokens()), 35)
