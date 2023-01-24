@@ -118,6 +118,12 @@ TASKS = [
         IntervalSchedule.HOURS,
     ),
     CeleryTaskConfiguration(
+        "safe_transaction_service.tokens.tasks.update_token_info_from_token_list",
+        "Update Token info from token list",
+        1,
+        IntervalSchedule.DAYS,
+    ),
+    CeleryTaskConfiguration(
         "safe_transaction_service.analytics.tasks.get_transactions_per_safe_app_task",
         "Run query to get number of transactions grouped by safe-app",
         7,

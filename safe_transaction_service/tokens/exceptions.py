@@ -1,0 +1,2 @@
+class TokenListRetrievalException(Exception):
+    pass
