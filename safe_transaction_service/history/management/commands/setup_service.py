@@ -118,7 +118,7 @@ TASKS = [
         IntervalSchedule.HOURS,
     ),
     CeleryTaskConfiguration(
-        "safe_transaction_service.tokens.tasks.update_token_info_from_token_list",
+        "safe_transaction_service.tokens.tasks.update_token_info_from_token_list_task",
         "Update Token info from token list",
         1,
         IntervalSchedule.DAYS,

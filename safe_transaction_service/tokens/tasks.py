@@ -118,7 +118,7 @@ def fix_pool_tokens_task() -> Optional[int]:
 
 @app.shared_task()
 @close_gevent_db_connection_decorator
-def update_token_info_from_token_list() -> int:
+def update_token_info_from_token_list_task() -> int:
     """
     If there's at least one valid token list with at least 1 token, every token in the DB is marked as `not trusted`
     and then every token on the list is marked as `trusted`
