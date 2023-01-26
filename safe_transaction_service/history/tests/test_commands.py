@@ -389,3 +389,29 @@ class TestCommands(TestCase):
             buf = StringIO()
             call_command(command, arguments, stdout=buf)
             self.assertIn("Start exporting of 1", buf.getvalue())
+
+    @mock.patch(
+        "safe_transaction_service.history.management.commands.check_chainid_matches.get_ethereum_network"
+    )
+    def test_check_chainid_matches(self, get_ethereum_network_mock: MagicMock):
+        command = "check_chainid_matches"
+
+        # Create ChainId model
+        get_ethereum_network_mock.return_value = EthereumNetwork.MAINNET
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("EthereumRPC chainId 1 looks good", buf.getvalue())
+
+        # Use different chainId
+        get_ethereum_network_mock.return_value = EthereumNetwork.XDAI
+        with self.assertRaisesMessage(
+            CommandError,
+            "EthereumRPC chainId 100 does not match previously used chainId 1",
+        ):
+            call_command(command)
+
+        # Check again with the initial chainId
+        get_ethereum_network_mock.return_value = EthereumNetwork.MAINNET
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("EthereumRPC chainId 1 looks good", buf.getvalue())
