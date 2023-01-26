@@ -1197,6 +1197,9 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def trusted(self):
         return self.filter(trusted=True)
 
+    def not_trusted(self):
+        return self.filter(trusted=False)
+
     def multisend(self):
         # TODO Use MultiSend.MULTISEND_ADDRESSES + MultiSend MULTISEND_CALL_ONLY_ADDRESSES
         return self.filter(

@@ -94,6 +94,12 @@ TASKS = [
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
+        "safe_transaction_service.history.tasks.remove_not_trusted_multisig_txs_task",
+        "Remove older than 1 month not trusted Multisig Txs",
+        1,
+        IntervalSchedule.DAYS,
+    ),
+    CeleryTaskConfiguration(
         "safe_transaction_service.contracts.tasks.create_missing_contracts_with_metadata_task",
         "Index contract names and ABIs",
         1,
