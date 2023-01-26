@@ -251,8 +251,7 @@ class InternalTxDecodedAdmin(BinarySearchAdmin):
     ]
     raw_id_fields = ("internal_tx",)
     search_fields = [
-        "function_name",
-        "arguments",
+        "=function_name",
         "=internal_tx__to",
         "=internal_tx___from",
         "=internal_tx__ethereum_tx__tx_hash",
