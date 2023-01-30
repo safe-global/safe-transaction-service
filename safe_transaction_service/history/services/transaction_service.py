@@ -372,11 +372,7 @@ class TransactionService:
             if result := cached_txs.get(transaction_id):
                 return result
 
-            multisig_tx: MultisigTransaction
-            module_tx: ModuleTransaction
-            plain_ethereum_tx: EthereumTx
             result: Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]
-
             if result := multisig_txs.get(transaction_id):
                 # Populate transfers
                 result.transfers = transfer_dict[result.ethereum_tx_id]
