@@ -134,7 +134,11 @@ def is_relevant_notification(
     if (
         sender == MultisigTransaction
     ):  # Different logic, as `MultisigTransaction` can change from Pending to Executed
-        if instance.modified + timedelta(minutes=minutes) < timezone.now():
+        # Don't send notifications for `not trusted` transactions
+        if (
+            not instance.trusted
+            or instance.modified + timedelta(minutes=minutes) < timezone.now()
+        ):
             return False
     elif not created:
         return False
