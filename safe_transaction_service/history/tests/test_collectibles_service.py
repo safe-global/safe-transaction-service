@@ -31,10 +31,17 @@ from ..services.collectibles_service import (
     ipfs_to_http,
 )
 from .factories import ERC721TransferFactory
+from .mocks.mock_dappcon_nft import dappcon_nft_metadata_mock
 from .utils import just_test_if_mainnet_node
 
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
+    def setUp(self) -> None:
+        get_redis().flushall()
+
+    def tearDown(self) -> None:
+        get_redis().flushall()
+
     def test_ipfs_to_http(self):
         regular_url = "http://testing-url/path/?arguments"
         self.assertEqual(ipfs_to_http(regular_url), regular_url)
@@ -49,7 +56,12 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         self.assertNotIn("ipfs/ipfs", result)
         self.assertIn("ipfs/testing-url/path/?arguments", result)
 
-    def test_get_collectibles(self):
+    @mock.patch(
+        "safe_transaction_service.history.services.collectibles_service.CollectiblesService._retrieve_metadata_from_uri"
+    )
+    def test_get_collectibles(self, retrieve_metadata_from_uri_mock: MagicMock):
+        retrieve_metadata_from_uri_mock.return_value = dappcon_nft_metadata_mock
+
         mainnet_node = just_test_if_mainnet_node()
         try:
             ethereum_client = EthereumClient(mainnet_node)
@@ -125,44 +137,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                     address=dappcon_2020_address,
                     id=13,
                     uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
-                    metadata={
-                        "minted": "Minted on Mintbase.io",
-                        "image": "https://firebasestorage.googleapis.com/v0/b/thing-1d2be.appspot.com/o/token%2Fasset-1581932081565?alt=media&token=57b47904-1782-40e0-ab6d-4f8ca82e6884",
-                        "name": "Earlybird Ticket",
-                        "forSale": False,
-                        "minter": "",
-                        "external_url": "https://mintbase.io/my-market/0x202d2f33449bf46d6d32ae7644ada130876461a4",
-                        "fiatPrice": "$278.66",
-                        "tags": [],
-                        "mintedOn": {"_seconds": 1581932237, "_nanoseconds": 580000000},
-                        "amountToMint": 10,
-                        "contractAddress": "0x202d2f33449bf46d6d32ae7644ada130876461a4",
-                        "type": "ERC721",
-                        "attributes": [
-                            {
-                                "display_type": "date",
-                                "value": 1599516000,
-                                "trait_type": "Start Date",
-                            },
-                            {
-                                "display_type": "date",
-                                "value": 1599688800,
-                                "trait_type": "End Date",
-                            },
-                            {
-                                "value": "Holzmarktstraße 33, 10243 Berlin, Germany",
-                                "trait_type": "location",
-                            },
-                            {
-                                "value": "ChIJhz8mADlOqEcR2lw7-iNCoDM",
-                                "trait_type": "place_id",
-                            },
-                            {"value": "https://dappcon.io/", "trait_type": "website"},
-                        ],
-                        "price": "1.1",
-                        "description": "This NFT ticket gives you full access to the 3-day conference. \nDate: 8 - 10 September *** Location: Holzmarktstraße 33 I 10243 Berlin",
-                        "numAvailable": 0,
-                    },
+                    metadata=dappcon_nft_metadata_mock,
                 ),
             ]
             collectibles_with_metadata = (

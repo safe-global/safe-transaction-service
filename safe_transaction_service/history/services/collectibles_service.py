@@ -177,7 +177,6 @@ class CollectiblesService:
         :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
-
         uri = ipfs_to_http(uri)
 
         if not uri or not uri.startswith("http"):
