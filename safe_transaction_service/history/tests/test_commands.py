@@ -403,7 +403,7 @@ class TestCommands(TestCase):
         self.assertIn("EthereumRPC chainId 1 looks good", buf.getvalue())
 
         # Use different chainId
-        get_ethereum_network_mock.return_value = EthereumNetwork.XDAI
+        get_ethereum_network_mock.return_value = EthereumNetwork.GNOSIS
         with self.assertRaisesMessage(
             CommandError,
             "EthereumRPC chainId 100 does not match previously used chainId 1",

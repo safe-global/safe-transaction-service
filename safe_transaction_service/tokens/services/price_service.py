@@ -202,27 +202,27 @@ class PriceService:
 
         :return: USD price for Ether
         """
-        if self.ethereum_network == EthereumNetwork.XDAI:
+        if self.ethereum_network == EthereumNetwork.GNOSIS:
             try:
                 return self.kraken_client.get_dai_usd_price()
             except CannotGetPrice:
                 return 1  # DAI/USD should be close to 1
         elif self.ethereum_network in (
             EthereumNetwork.ENERGY_WEB_CHAIN,
-            EthereumNetwork.VOLTA,
+            EthereumNetwork.ENERGY_WEB_VOLTA_TESTNET,
         ):
             return self.get_ewt_usd_price()
-        elif self.ethereum_network in (EthereumNetwork.MATIC, EthereumNetwork.MUMBAI):
+        elif self.ethereum_network in (EthereumNetwork.POLYGON, EthereumNetwork.MUMBAI):
             return self.get_matic_usd_price()
-        elif self.ethereum_network == EthereumNetwork.BINANCE:
+        elif self.ethereum_network == EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET:
             return self.get_binance_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.GATHER_DEVNET,
-            EthereumNetwork.GATHER_TESTNET,
-            EthereumNetwork.GATHER_MAINNET,
+            EthereumNetwork.GATHER_DEVNET_NETWORK,
+            EthereumNetwork.GATHER_TESTNET_NETWORK,
+            EthereumNetwork.GATHER_MAINNET_NETWORK,
         ):
             return self.coingecko_client.get_gather_usd_price()
-        elif self.ethereum_network == EthereumNetwork.AVALANCHE:
+        elif self.ethereum_network == EthereumNetwork.AVALANCHE_C_CHAIN:
             return self.get_avalanche_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.MILKOMEDA_C1_TESTNET,
@@ -230,19 +230,18 @@ class PriceService:
         ):
             return self.get_cardano_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.AURORA,
-            EthereumNetwork.AURORA_BETANET,
-            EthereumNetwork.ARBITRUM_TESTNET,
+            EthereumNetwork.AURORA_MAINNET,
+            EthereumNetwork.ARBITRUM_RINKEBY,
         ):
             return self.get_aurora_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.CRONOS_TESTNET,
-            EthereumNetwork.CRONOS_MAINNET,
+            EthereumNetwork.CRONOS_MAINNET_BETA,
         ):
             return self.get_cronos_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.FUSE_MAINNET,
-            EthereumNetwork.FUSE_SPARK,
+            EthereumNetwork.FUSE_SPARKNET,
         ):
             return self.coingecko_client.get_fuse_usd_price()
         elif self.ethereum_network in (
@@ -251,9 +250,9 @@ class PriceService:
         ):
             return self.get_kcs_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.METIS,
-            EthereumNetwork.METIS_TESTNET,
+            EthereumNetwork.METIS_ANDROMEDA_MAINNET,
             EthereumNetwork.METIS_GOERLI_TESTNET,
+            EthereumNetwork.METIS_STARDUST_TESTNET,
         ):
             return self.coingecko_client.get_metis_usd_price()
         elif self.ethereum_network in (
@@ -262,9 +261,9 @@ class PriceService:
         ):
             return self.get_algorand_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.CELO,
-            EthereumNetwork.CELO_ALFAJORES,
-            EthereumNetwork.CELO_BAKLAVA,
+            EthereumNetwork.CELO_MAINNET,
+            EthereumNetwork.CELO_ALFAJORES_TESTNET,
+            EthereumNetwork.CELO_BAKLAVA_TESTNET,
         ):
             return self.kucoin_client.get_celo_usd_price()
         else:

@@ -38,7 +38,7 @@ class TestMigrations(TestCase):
 
     @mock.patch(
         "safe_transaction_service.tokens.migrations.0010_tokenlist.get_ethereum_network",
-        return_value=EthereumNetwork.ACA,
+        return_value=EthereumNetwork.AIOZ_NETWORK,
     )
     def test_migration_forward_0010_network_without_data(
         self, get_ethereum_network_mock: MagicMock

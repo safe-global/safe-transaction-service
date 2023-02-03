@@ -12,20 +12,20 @@ TOKEN_LIST_BY_NETWORK = {
         "https://tokens.coingecko.com/uniswap/all.json",
         "Coingecko",
     ),
-    EthereumNetwork.MATIC: (
+    EthereumNetwork.POLYGON: (
         "https://api-polygon-tokens.polygon.technology/tokenlists/polygonTokens.tokenlist.json",
         "Official",
     ),
-    EthereumNetwork.OPTIMISTIC: (
+    EthereumNetwork.OPTIMISM: (
         "https://static.optimism.io/optimism.tokenlist.json",
         "Official",
     ),
-    EthereumNetwork.XDAI: ("https://tokens.honeyswap.org/", "HoneySwap"),
-    EthereumNetwork.BINANCE: (
+    EthereumNetwork.GNOSIS: ("https://tokens.honeyswap.org/", "HoneySwap"),
+    EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET: (
         "https://tokens.pancakeswap.finance/pancakeswap-extended.json",
         "PancakeSwap",
     ),
-    EthereumNetwork.AURORA: ("https://aurora.dev/tokens.json", "Official"),
+    EthereumNetwork.AURORA_MAINNET: ("https://aurora.dev/tokens.json", "Official"),
 }
 
 
