@@ -77,7 +77,6 @@ class ReorgService:
             ):
                 database_block.set_confirmed()
             else:
-                logger.warning("Reorg found for block-number=%d", database_block.number)
                 return database_block.number
 
     def reset_all_to_block(self, block_number: int) -> int:
