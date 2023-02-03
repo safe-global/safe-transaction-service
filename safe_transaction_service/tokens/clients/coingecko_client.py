@@ -22,25 +22,25 @@ class CoingeckoClient:
 
     def __init__(self, network: Optional[EthereumNetwork] = None):
         self.http_session = requests.Session()
-        if network == EthereumNetwork.ARBITRUM:
+        if network == EthereumNetwork.ARBITRUM_ONE:
             self.asset_platform = "arbitrum-one"
-        elif network == EthereumNetwork.AURORA:
+        elif network == EthereumNetwork.AURORA_MAINNET:
             self.asset_platform = "aurora"
-        elif network == EthereumNetwork.AVALANCHE:
+        elif network == EthereumNetwork.AVALANCHE_C_CHAIN:
             self.asset_platform = "avalanche"
-        elif network == EthereumNetwork.BINANCE:
+        elif network == EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET:
             self.asset_platform = "binance-smart-chain"
-        elif network == EthereumNetwork.MATIC:
+        elif network == EthereumNetwork.POLYGON:
             self.asset_platform = "polygon-pos"
-        elif network == EthereumNetwork.OPTIMISTIC:
+        elif network == EthereumNetwork.OPTIMISM:
             self.asset_platform = "optimistic-ethereum"
-        elif network == EthereumNetwork.XDAI:
+        elif network == EthereumNetwork.GNOSIS:
             self.asset_platform = "xdai"
         elif network == EthereumNetwork.FUSE_MAINNET:
             self.asset_platform = "fuse"
         elif network == EthereumNetwork.KCC_MAINNET:
             self.asset_platform = "kucoin-community-chain"
-        elif network == EthereumNetwork.METIS:
+        elif network == EthereumNetwork.METIS_ANDROMEDA_MAINNET:
             self.asset_platform = "metis-andromeda"
         else:
             self.asset_platform = "ethereum"
@@ -48,17 +48,17 @@ class CoingeckoClient:
     @staticmethod
     def supports_network(network: EthereumNetwork):
         return network in (
-            EthereumNetwork.ARBITRUM,
-            EthereumNetwork.AURORA,
-            EthereumNetwork.AVALANCHE,
-            EthereumNetwork.BINANCE,
+            EthereumNetwork.ARBITRUM_ONE,
+            EthereumNetwork.AURORA_MAINNET,
+            EthereumNetwork.AVALANCHE_C_CHAIN,
+            EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET,
             EthereumNetwork.MAINNET,
-            EthereumNetwork.MATIC,
-            EthereumNetwork.OPTIMISTIC,
-            EthereumNetwork.XDAI,
+            EthereumNetwork.POLYGON,
+            EthereumNetwork.OPTIMISM,
+            EthereumNetwork.GNOSIS,
             EthereumNetwork.FUSE_MAINNET,
             EthereumNetwork.KCC_MAINNET,
-            EthereumNetwork.METIS,
+            EthereumNetwork.METIS_ANDROMEDA_MAINNET,
         )
 
     def _do_request(self, url: str) -> Dict[str, Any]:
