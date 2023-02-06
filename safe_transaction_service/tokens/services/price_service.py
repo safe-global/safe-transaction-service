@@ -289,9 +289,16 @@ class PriceService:
 
         for oracle in self.enabled_price_oracles:
             try:
-                return oracle.get_price(token_address)
-            except OracleException:
+                eth_value = oracle.get_price(token_address)
                 logger.info(
+                    "Retrieved eth-value=%.4f for token-address=%s from %s",
+                    eth_value,
+                    token_address,
+                    oracle.__class__.__name__,
+                )
+                return eth_value
+            except OracleException:
+                logger.debug(
                     "Cannot get eth value for token-address=%s from %s",
                     token_address,
                     oracle.__class__.__name__,
@@ -300,9 +307,16 @@ class PriceService:
         # Try pool tokens
         for oracle in self.enabled_price_pool_oracles:
             try:
-                return oracle.get_pool_token_price(token_address)
-            except OracleException:
+                eth_value = oracle.get_pool_token_price(token_address)
                 logger.info(
+                    "Retrieved eth-value=%.4f for token-address=%s from %s",
+                    eth_value,
+                    token_address,
+                    oracle.__class__.__name__,
+                )
+                return eth_value
+            except OracleException:
+                logger.debug(
                     "Cannot get eth value for token-address=%s from %s",
                     token_address,
                     oracle.__class__.__name__,
@@ -336,9 +350,16 @@ class PriceService:
         """
         for oracle in self.enabled_composed_price_oracles:
             try:
-                return oracle.get_underlying_tokens(token_address)
-            except OracleException:
+                underlying_tokens = oracle.get_underlying_tokens(token_address)
                 logger.info(
+                    "Retrieved underlying tokens %s for token-address=%s from %s",
+                    underlying_tokens,
+                    token_address,
+                    oracle.__class__.__name__,
+                )
+                return underlying_tokens
+            except OracleException:
+                logger.debug(
                     "Cannot get an underlying token for token-address=%s from %s",
                     token_address,
                     oracle.__class__.__name__,
