@@ -127,6 +127,16 @@ class TestPriceService(TestCase):
             price_service.cache_eth_price.clear()
             self.assertEqual(price_service.get_algorand_usd_price(), 6.6)
 
+        # XDC
+        with mock.patch.object(KucoinClient, "get_xdc_usd_price", return_value=7.7):
+            price_service.ethereum_network = EthereumNetwork.XINFIN_XDC_NETWORK
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_xdc_usd_price(), 7.7)
+
+            price_service.ethereum_network = EthereumNetwork.XDC_APOTHEM_NETWORK
+            price_service.cache_eth_price.clear()
+            self.assertEqual(price_service.get_xdc_usd_price(), 7.7)
+
     @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
     @mock.patch.object(KucoinClient, "get_bnb_usd_price", return_value=5.0)
     def test_get_binance_usd_price(
