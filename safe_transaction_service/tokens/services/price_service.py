@@ -270,8 +270,8 @@ class PriceService:
         ):
             return self.kucoin_client.get_celo_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.XDC,
-            EthereumNetwork.TXDC_TESTNET,
+            EthereumNetwork.XINFIN_XDC_NETWORK,
+            EthereumNetwork.XDC_APOTHEM_NETWORK,
         ):
             return self.get_xdc_usd_price()
         else:
