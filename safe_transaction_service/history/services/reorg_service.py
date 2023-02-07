@@ -1,7 +1,7 @@
 import logging
-from typing import Dict, Optional
+from typing import Callable, List, Optional
 
-from django.db import models, transaction
+from django.db import transaction
 
 from hexbytes import HexBytes
 
@@ -45,17 +45,23 @@ class ReorgService:
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks  #
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
-        # Dictionary with Django model and attribute for reorgs
-        self.reorg_models: Dict[models.Model, str] = {
-            ProxyFactory: "tx_block_number",
-            # TODO Refactor this to accept a function
-            # IndexingStatus: "block_number",
-            SafeMasterCopy: "tx_block_number",
-        }
+
+        # List with functions for database models to recover from reorgs
+        self.reorg_functions: List[Callable[[int], int]] = [
+            lambda block_number: ProxyFactory.objects.filter(
+                tx_block_number__gt=block_number
+            ).update(tx_block_number=block_number),
+            lambda block_number: SafeMasterCopy.objects.filter(
+                tx_block_number__gt=block_number
+            ).update(tx_block_number=block_number),
+            lambda block_number: int(
+                IndexingStatus.objects.set_erc20_721_indexing_status(block_number)
+            ),
+        ]
 
     def check_reorgs(self) -> Optional[int]:
         """
-        :return: Number of oldest block with reorg detected. `None` if not reorg found
+        :return: Number of the oldest block with reorg detected. `None` if not reorg found
         """
         current_block_number = self.ethereum_client.current_block_number
         to_block = current_block_number - self.eth_reorg_blocks
@@ -64,11 +70,9 @@ class ReorgService:
             .only("number", "block_hash", "confirmed")
             .order_by("number")
         ):
-            blockchain_block = self.ethereum_client.get_block(
-                database_block.number, full_transactions=False
-            )
-            blockchain_next_block = self.ethereum_client.get_block(
-                database_block.number + 1, full_transactions=False
+            blockchain_block, blockchain_next_block = self.ethereum_client.get_blocks(
+                [database_block.number, database_block.number + 1],
+                full_transactions=False,
             )
             if (
                 HexBytes(blockchain_block["hash"])
@@ -79,47 +83,38 @@ class ReorgService:
             else:
                 return database_block.number
 
+    @transaction.atomic
     def reset_all_to_block(self, block_number: int) -> int:
         """
-        Reset database fields to a block to start reindexing from that block. It's useful when you want to trigger
-        a indexation for txs that are not appearing on database but you don't want to delete anything
+        Reset database fields to a block to start reindexing from that block.
 
         :param block_number:
         :return: Number of updated models
         """
         updated = 0
-        for model, field in self.reorg_models.items():
-            updated += model.objects.filter(**{field + "__gt": block_number}).update(
-                **{field: block_number}
-            )
-        if IndexingStatus.objects.set_erc20_721_indexing_status(block_number):
-            updated += 1
+        for reorg_function in self.reorg_functions:
+            updated += reorg_function(block_number)
 
         return updated
 
     @transaction.atomic
-    def recover_from_reorg(self, first_reorg_block_number: int) -> int:
+    def recover_from_reorg(self, reorg_block_number: int) -> int:
         """
-        Reset database fields to a block to start reindexing from that block and remove blocks greater or equal
-        than `first_reorg_block_number`
+        Reset database fields to a block to start reindexing from that block
+        and remove blocks greater or equal than `reorg_block_number`.
 
-        :param first_reorg_block_number:
+        :param reorg_block_number:
         :return: Return number of elements updated
         """
         safe_reorg_block_number = max(
-            first_reorg_block_number - self.eth_reorg_rewind_blocks, 0
+            reorg_block_number - self.eth_reorg_rewind_blocks, 0
         )
 
-        updated = 0
-        for model, field in self.reorg_models.items():
-            updated += model.objects.filter(
-                **{field + "__gte": first_reorg_block_number}
-            ).update(**{field: safe_reorg_block_number})
-
-        EthereumBlock.objects.filter(number__gte=first_reorg_block_number).delete()
+        updated = self.reset_all_to_block(safe_reorg_block_number)
+        EthereumBlock.objects.filter(number__gte=reorg_block_number).delete()
         logger.warning(
             "Reorg of block-number=%d fixed, %d elements updated",
-            first_reorg_block_number,
+            reorg_block_number,
             updated,
         )
         return updated

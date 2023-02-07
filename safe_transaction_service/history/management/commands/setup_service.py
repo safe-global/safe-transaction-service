@@ -45,7 +45,7 @@ TASKS = [
     CeleryTaskConfiguration(
         "safe_transaction_service.history.tasks.check_reorgs_task",
         "Check Reorgs",
-        3,
+        1,
         IntervalSchedule.MINUTES,
     ),
     CeleryTaskConfiguration(
