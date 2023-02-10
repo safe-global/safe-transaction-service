@@ -30,7 +30,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
             ),
             (
                 get_eip712_payload_mock(),
-                "Safe Message 0xa960d416fc18f98d50878ab11a1991b70c0da13ccc15f7ba0100aeb63f6a0c24 - {'types': {'EIP...",
+                "Safe Message 0xbabb22f5c02a24db447b8f0136d6e26bb58cd6d068ebe8ab25c2221cfdf53e18 - {'types': {'EIP...",
             ),
         ]:
             with self.subTest(input=input):
