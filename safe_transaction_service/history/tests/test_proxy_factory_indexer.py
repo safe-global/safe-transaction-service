@@ -11,7 +11,7 @@ class TestProxyFactoryIndexer(SafeTestCaseMixin, TestCase):
     def test_proxy_factory_indexer(self):
         proxy_factory_indexer = ProxyFactoryIndexerProvider()
         proxy_factory_indexer.confirmations = 0
-        self.assertEqual(proxy_factory_indexer.start(), 0)
+        self.assertEqual(proxy_factory_indexer.start(), (0, 0))
 
         ProxyFactoryFactory(address=self.proxy_factory.address)
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
@@ -19,6 +19,9 @@ class TestProxyFactoryIndexer(SafeTestCaseMixin, TestCase):
         )
         safe_contract_address = ethereum_tx_sent.contract_address
         self.w3.eth.wait_for_transaction_receipt(ethereum_tx_sent.tx_hash)
-        self.assertEqual(proxy_factory_indexer.start(), 1)
+        from_block_number = proxy_factory_indexer.get_minimum_block_number() + 1
+        current_block_number = self.ethereum_client.current_block_number
+        blocks_processed = current_block_number - from_block_number
+        self.assertEqual(proxy_factory_indexer.start(), (1, blocks_processed))
         self.assertEqual(SafeContract.objects.count(), 1)
         self.assertTrue(SafeContract.objects.get(address=safe_contract_address))

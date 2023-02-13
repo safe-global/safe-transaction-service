@@ -56,7 +56,7 @@ class TestTasks(TestCase):
         self.assertFalse(check_sync_status_task.delay().result)
 
     def test_index_erc20_events_task(self):
-        self.assertEqual(index_erc20_events_task.delay().result, 0)
+        self.assertEqual(index_erc20_events_task.delay().result, (0, 0))
 
     def test_index_erc20_events_out_of_sync_task(self):
         with self.assertLogs(logger=task_logger) as cm:
@@ -76,13 +76,13 @@ class TestTasks(TestCase):
             )
 
     def test_index_internal_txs_task(self):
-        self.assertEqual(index_internal_txs_task.delay().result, 0)
+        self.assertEqual(index_internal_txs_task.delay().result, (0, 0))
 
     def test_index_new_proxies_task(self):
-        self.assertEqual(index_new_proxies_task.delay().result, 0)
+        self.assertEqual(index_new_proxies_task.delay().result, (0, 0))
 
     def test_index_safe_events_task(self):
-        self.assertEqual(index_safe_events_task.delay().result, 0)
+        self.assertEqual(index_safe_events_task.delay().result, (0, 0))
 
     @patch.object(IndexService, "reindex_erc20_events")
     @patch.object(IndexService, "reindex_master_copies")
