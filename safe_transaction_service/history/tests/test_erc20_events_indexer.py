@@ -8,6 +8,7 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus
 from .factories import SafeContractFactory
+from .utils import get_blocks_processed
 
 
 class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
@@ -30,9 +31,9 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-        from_block_number = erc20_events_indexer.get_minimum_block_number() + 1
-        current_block_number = self.ethereum_client.current_block_number
-        blocks_processed = current_block_number - from_block_number
+        blocks_processed = get_blocks_processed(
+            erc20_events_indexer, self.ethereum_client
+        )
         self.assertEqual(erc20_events_indexer.start(), (1, blocks_processed))
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
