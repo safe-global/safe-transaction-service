@@ -23,7 +23,6 @@ from ..models import (
     SafeStatus,
 )
 from .factories import SafeMasterCopyFactory
-from .utils import get_blocks_processed
 
 
 class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
@@ -175,11 +174,10 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
-
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - initial_block_number
         )
-
         self.assertEqual(self.safe_events_indexer.start(), (2, blocks_processed))
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
         self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory and setup
@@ -212,6 +210,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
         # Add an owner but don't update the threshold (nonce: 0) --------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         owner_account_2 = Account.create()
         data = HexBytes(
             self.safe_contract.functions.addOwnerWithThreshold(
@@ -222,8 +221,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, AddedOwner, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -255,6 +255,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
 
         # Change threshold (nonce: 1) ------------------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         data = HexBytes(
             self.safe_contract.functions.changeThreshold(2).build_transaction(
                 {"gas": 1, "gasPrice": 1}
@@ -264,8 +265,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -294,6 +296,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
         # Remove an owner and change threshold back to 1 (nonce: 2) --------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         data = HexBytes(
             self.safe_contract.functions.removeOwner(
                 SENTINEL_ADDRESS, owner_account_2.address, 1
@@ -304,8 +307,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.sign(owner_account_2.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, RemovedOwner, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (4, blocks_processed))
@@ -345,6 +349,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 4)
 
         # Enable module (nonce: 3) ---------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         module_address = Account.create().address
         data = HexBytes(
             self.safe_contract.functions.enableModule(module_address).build_transaction(
@@ -355,8 +360,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, EnabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -385,12 +391,14 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 5)
 
         # Check SafeReceived (ether received) on Safe -----------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         value = 1256
         self.ethereum_client.get_transaction_receipt(
             self.send_ether(safe_address, value)
         )
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeReceived
         self.assertEqual(self.safe_events_indexer.start(), (1, blocks_processed))
@@ -405,6 +413,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertTrue(internal_tx_queryset.get().is_ether_transfer)
 
         # Set fallback handler (nonce: 4) --------------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         new_fallback_handler = Account.create().address
         data = HexBytes(
             self.safe_contract.functions.setFallbackHandler(
@@ -415,8 +424,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, ChangedFallbackHandler, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -447,6 +457,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 6)
 
         # Disable Module (nonce: 5) ----------------------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         data = HexBytes(
             self.safe_contract.functions.disableModule(
                 SENTINEL_ADDRESS, module_address
@@ -456,8 +467,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, DisabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -486,6 +498,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 7)
 
         # ApproveHash (no nonce) ------------------------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         random_hash = self.w3.keccak(text="Get schwifty")
         tx = safe.contract.functions.approveHash(random_hash).build_transaction(
             {
@@ -497,8 +510,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         )
         tx = owner_account_1.sign_transaction(tx)
         self.w3.eth.send_raw_transaction(tx["rawTransaction"])
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: ApproveHash
         self.assertEqual(self.safe_events_indexer.start(), (1, blocks_processed))
@@ -519,14 +533,16 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         )  # A MultisigConfirmation was created
 
         # Send ether (nonce: 6) ----------------------------------------------------------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         data = b""
         value = 122
         to = Account.create().address
         multisig_tx = safe.build_multisig_tx(to, value, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (2, blocks_processed))
@@ -551,6 +567,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 9)
 
         # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
+        current_block = self.safe_events_indexer.ethereum_client.current_block_number
         guard_address = Account.create().address
         data = HexBytes(
             self.safe_contract.functions.setGuard(guard_address).build_transaction(
@@ -561,8 +578,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - current_block
         )
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, blocks_processed))
@@ -614,8 +632,9 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertTrue(self.safe_events_indexer._is_setup_indexed(safe_address))
         safe_l2_master_copy.tx_block_number = initial_block_number
         safe_l2_master_copy.save(update_fields=["tx_block_number"])
-        blocks_processed = get_blocks_processed(
-            self.safe_events_indexer, self.ethereum_client
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - initial_block_number
         )
         self.assertEqual(
             self.safe_events_indexer.start(), (0, blocks_processed)

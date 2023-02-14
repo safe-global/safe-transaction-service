@@ -8,7 +8,6 @@ from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus
 from .factories import SafeContractFactory
-from .utils import get_blocks_processed
 
 
 class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
@@ -31,8 +30,12 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-        blocks_processed = get_blocks_processed(
-            erc20_events_indexer, self.ethereum_client
+        erc20_721_indexing_block = (
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number
+        )
+        blocks_processed = (
+            erc20_events_indexer.ethereum_client.current_block_number
+            - erc20_721_indexing_block
         )
         self.assertEqual(erc20_events_indexer.start(), (1, blocks_processed))
 

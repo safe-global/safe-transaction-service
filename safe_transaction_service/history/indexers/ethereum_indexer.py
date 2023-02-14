@@ -486,16 +486,16 @@ class EthereumIndexer(ABC):
                 )
                 if start_block is None or from_block_number < start_block:
                     start_block = from_block_number
-                if last_block is None or to_block_number > last_block:
-                    last_block = to_block_number
 
                 number_processed_elements += len(processed_elements)
                 from_block_number = to_block_number + 1
+            if last_block is None or to_block_number > last_block:
+                last_block = to_block_number
         else:
             logger.debug(
                 "%s: No not updated addresses to process", self.__class__.__name__
             )
         if start_block and last_block:
-            number_of_blocks_processed = last_block - start_block
+            number_of_blocks_processed = last_block - start_block + 1
 
         return number_processed_elements, number_of_blocks_processed
