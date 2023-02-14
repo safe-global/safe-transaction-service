@@ -354,13 +354,13 @@ class EthereumIndexer(ABC):
 
     def process_addresses(
         self, addresses: Sequence[str], current_block_number: Optional[int] = None
-    ) -> Tuple[Sequence[Any], int, int, bool]:
+    ) -> Tuple[Sequence[Any], Optional[int], int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
 
         :param addresses: Addresses to process
         :param current_block_number: To prevent fetching it again
-        :return: Tuple with a sequence of `processed data`, `last_block_number` processed
+        :return: Tuple with a sequence of `processed data`, `first_block_number` processed,`last_block_number` processed
             and `True` if no more blocks to scan, `False` otherwise
         """
         assert addresses, "Addresses cannot be empty!"
@@ -400,7 +400,7 @@ class EthereumIndexer(ABC):
         """
         Find and process relevant data for existing database addresses
 
-        :return: Number of elements processed
+        :return: Number of elements processed and the number of blocks processed
         """
         current_block_number = self.ethereum_client.current_block_number
         logger.debug(
@@ -409,8 +409,9 @@ class EthereumIndexer(ABC):
             current_block_number,
         )
         number_processed_elements = 0
-        start_block = 0
-        last_block = 0
+        number_of_blocks_processed = 0
+        start_block: Optional[int] = None
+        last_block: Optional[int] = None
         almost_updated_addresses = list(
             self.get_almost_updated_addresses(current_block_number)
         )
@@ -436,7 +437,7 @@ class EthereumIndexer(ABC):
                     current_block_number=current_block_number,
                 )
                 number_processed_elements += len(processed_elements)
-                if start_block == 0:
+                if start_block is None:
                     start_block = from_block_number
             last_block = to_block_number
         else:
@@ -483,13 +484,18 @@ class EthereumIndexer(ABC):
                     not_updated_addresses_to_process,
                     current_block_number=current_block_number,
                 )
-                if from_block_number < start_block:
+                if start_block is None or from_block_number < start_block:
                     start_block = from_block_number
+                if last_block is None or to_block_number > last_block:
+                    last_block = to_block_number
+
                 number_processed_elements += len(processed_elements)
                 from_block_number = to_block_number + 1
         else:
             logger.debug(
                 "%s: No not updated addresses to process", self.__class__.__name__
             )
-        number_of_blocks_processed = last_block - start_block
+        if start_block and last_block:
+            number_of_blocks_processed = last_block - start_block
+
         return number_processed_elements, number_of_blocks_processed
