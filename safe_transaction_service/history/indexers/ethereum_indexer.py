@@ -495,7 +495,7 @@ class EthereumIndexer(ABC):
             logger.debug(
                 "%s: No not updated addresses to process", self.__class__.__name__
             )
-        if start_block and last_block:
+        if start_block is not None and last_block is not None:
             number_of_blocks_processed = last_block - start_block + 1
 
         return number_processed_elements, number_of_blocks_processed
