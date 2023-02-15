@@ -76,6 +76,9 @@ class TokenTransfer(DjangoModelFactory):
     address = factory.LazyFunction(lambda: Account.create().address)
     _from = factory.LazyFunction(lambda: Account.create().address)
     to = factory.LazyFunction(lambda: Account.create().address)
+    detail_hash = factory.Sequence(
+        lambda n: Web3.keccak(text=f"transfer_detail_hash_{n}").hex()
+    )
 
     class Meta:
         model = TokenTransfer
@@ -117,6 +120,9 @@ class InternalTxFactory(DjangoModelFactory):
     call_type = EthereumTxCallType.CALL.value
     trace_address = factory.Sequence(str)
     error = None
+    detail_hash = factory.Sequence(
+        lambda n: Web3.keccak(text=f"internal_detail_hash_{n}").hex()
+    )
 
 
 class InternalTxDecodedFactory(DjangoModelFactory):

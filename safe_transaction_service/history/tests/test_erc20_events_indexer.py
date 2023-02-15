@@ -3,7 +3,10 @@ from unittest import mock
 
 from django.test import TestCase
 
+from hexbytes import HexBytes
+
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from gnosis.eth.utils import fast_keccak_hex
 
 from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus
@@ -47,11 +50,14 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertTrue(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-
         self.assertEqual(
             ERC20Transfer.objects.to_or_from(safe_contract.address).count(), 1
         )
-
+        erc20_transfer = ERC20Transfer.objects.to_or_from(safe_contract.address)[0]
+        detail_hash = "0x" + fast_keccak_hex(
+            f"transfer_{HexBytes(erc20_transfer.ethereum_tx_id)}_{erc20_transfer.log_index}".encode()
+        )
+        self.assertEqual(erc20_transfer.detail_hash, detail_hash)
         # Test _process_decoded_element
         block_number = self.ethereum_client.get_transaction(tx_hash)["blockNumber"]
         event = self.ethereum_client.erc20.get_total_transfer_history(

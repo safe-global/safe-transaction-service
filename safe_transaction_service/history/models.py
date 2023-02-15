@@ -44,7 +44,7 @@ from gnosis.eth.django.models import (
     Keccak256Field,
     Uint256Field,
 )
-from gnosis.eth.utils import fast_to_checksum_address
+from gnosis.eth.utils import fast_keccak_hex, fast_to_checksum_address
 from gnosis.safe import SafeOperation
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
@@ -444,6 +444,7 @@ class TokenTransfer(models.Model):
     _from = EthereumAddressV2Field()
     to = EthereumAddressV2Field()
     log_index = models.PositiveIntegerField()
+    detail_hash = Keccak256Field(null=True)
 
     class Meta:
         abstract = True
@@ -470,6 +471,9 @@ class TokenTransfer(models.Model):
             timestamp = EthereumBlock.objects.get_timestamp_by_hash(
                 event_data["blockHash"]
             )
+            detail_hash = fast_keccak_hex(
+                f'transfer_{event_data["transactionHash"]}_{event_data["logIndex"]}'.encode()
+            )
             return {
                 "timestamp": timestamp,
                 "block_number": event_data["blockNumber"],
@@ -478,6 +482,7 @@ class TokenTransfer(models.Model):
                 "address": event_data["address"],
                 "_from": event_data["args"]["from"],
                 "to": event_data["args"]["to"],
+                "detail_hash": detail_hash,
             }
         except EthereumBlock.DoesNotExist:
             # Block is not found and should be present on DB. Reorg
@@ -689,6 +694,9 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         tx_type = InternalTxType.parse(trace["type"])
         call_type = EthereumTxCallType.parse_call_type(trace["action"].get("callType"))
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
+        detail_hash = fast_keccak_hex(
+            f'transfer_{trace["transactionHash"]}_{trace["traceAddress"]}'.encode()
+        )
         return InternalTx(
             ethereum_tx=ethereum_tx,
             timestamp=ethereum_tx.block.timestamp,
@@ -707,6 +715,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
             tx_type=tx_type.value,
             call_type=call_type.value if call_type else None,
             error=trace.get("error"),
+            detail_hash=detail_hash,
         )
 
     def get_or_create_from_trace(
@@ -827,6 +836,7 @@ class InternalTxQuerySet(models.QuerySet):
             "execution_date",
             "_token_id",
             "token_address",
+            "detail_hash",
         ]
         return (
             ether_queryset.values(*values)
@@ -886,6 +896,7 @@ class InternalTx(models.Model):
     )  # Call
     trace_address = models.CharField(max_length=600)  # Stringified traceAddress
     error = models.CharField(max_length=200, null=True)
+    detail_hash = Keccak256Field(null=True)
 
     class Meta:
         unique_together = (("ethereum_tx", "trace_address"),)
