@@ -731,7 +731,7 @@ class TransferResponseSerializer(serializers.Serializer):
     value = serializers.CharField(allow_null=True, source="_value")
     token_id = serializers.CharField(allow_null=True, source="_token_id")
     token_address = EthereumAddressField(allow_null=True, default=None)
-    detail_hash = Sha3HashField()
+    unique_hash = Sha3HashField()
 
     def get_fields(self):
         result = super().get_fields()

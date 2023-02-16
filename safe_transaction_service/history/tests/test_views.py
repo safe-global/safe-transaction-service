@@ -2340,7 +2340,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
-                    "detailHash": ethereum_erc_20_event.detail_hash,
+                    "uniqueHash": ethereum_erc_20_event.unique_hash,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2362,7 +2362,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
-                    "detailHash": internal_tx.detail_hash,
+                    "uniqueHash": internal_tx.unique_hash,
                     "transactionHash": internal_tx.ethereum_tx_id,
                     "blockNumber": internal_tx.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2393,7 +2393,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
-                    "detailHash": ethereum_erc_721_event.detail_hash,
+                    "uniqueHash": ethereum_erc_721_event.unique_hash,
                     "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_721_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2408,7 +2408,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
-                    "detailHash": ethereum_erc_20_event.detail_hash,
+                    "uniqueHash": ethereum_erc_20_event.unique_hash,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2430,7 +2430,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
-                    "detailHash": internal_tx.detail_hash,
+                    "uniqueHash": internal_tx.unique_hash,
                     "transactionHash": internal_tx.ethereum_tx_id,
                     "blockNumber": internal_tx.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2526,7 +2526,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": ethereum_erc_20_event_2.ethereum_tx.block_id,
-                "detailHash": ethereum_erc_20_event_2.detail_hash,
+                "uniqueHash": ethereum_erc_20_event_2.unique_hash,
                 "transactionHash": ethereum_erc_20_event_2.ethereum_tx_id,
                 "to": ethereum_erc_20_event_2.to,
                 "value": str(token_value),
@@ -2541,7 +2541,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
-                "detailHash": ethereum_erc_20_event.detail_hash,
+                "uniqueHash": ethereum_erc_20_event.unique_hash,
                 "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                 "to": safe_address,
                 "value": str(token_value),
@@ -2563,7 +2563,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": internal_tx_2.ethereum_tx.block_id,
-                "detailHash": internal_tx_2.detail_hash,
+                "uniqueHash": internal_tx_2.unique_hash,
                 "transactionHash": internal_tx_2.ethereum_tx_id,
                 "to": internal_tx_2.to,
                 "value": str(value),
@@ -2578,7 +2578,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": internal_tx.ethereum_tx.block_id,
-                "detailHash": internal_tx.detail_hash,
+                "uniqueHash": internal_tx.unique_hash,
                 "transactionHash": internal_tx.ethereum_tx_id,
                 "to": safe_address,
                 "value": str(value),
@@ -2609,7 +2609,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "transactionHash": ethereum_erc_721_event_2.ethereum_tx_id,
-                "detailHash": ethereum_erc_721_event_2.detail_hash,
+                "uniqueHash": ethereum_erc_721_event_2.unique_hash,
                 "blockNumber": ethereum_erc_721_event_2.ethereum_tx.block_id,
                 "to": ethereum_erc_721_event_2.to,
                 "value": None,
@@ -2623,7 +2623,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
                     "+00:00", "Z"
                 ),
-                "detailHash": ethereum_erc_721_event.detail_hash,
+                "uniqueHash": ethereum_erc_721_event.unique_hash,
                 "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
                 "blockNumber": ethereum_erc_721_event.ethereum_tx.block_id,
                 "to": safe_address,

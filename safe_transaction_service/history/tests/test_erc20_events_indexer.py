@@ -54,10 +54,10 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             ERC20Transfer.objects.to_or_from(safe_contract.address).count(), 1
         )
         erc20_transfer = ERC20Transfer.objects.to_or_from(safe_contract.address)[0]
-        detail_hash = "0x" + fast_keccak_hex(
+        unique_hash = "0x" + fast_keccak_hex(
             f"transfer_{HexBytes(erc20_transfer.ethereum_tx_id)}_{erc20_transfer.log_index}".encode()
         )
-        self.assertEqual(erc20_transfer.detail_hash, detail_hash)
+        self.assertEqual(erc20_transfer.unique_hash, unique_hash)
         # Test _process_decoded_element
         block_number = self.ethereum_client.get_transaction(tx_hash)["blockNumber"]
         event = self.ethereum_client.erc20.get_total_transfer_history(
