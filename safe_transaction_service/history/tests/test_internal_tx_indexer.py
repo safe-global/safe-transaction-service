@@ -9,6 +9,7 @@ from eth_typing import HexStr
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.utils import fast_keccak_hex
 
 from ..indexers import InternalTxIndexer, InternalTxIndexerProvider
 from ..indexers.internal_tx_indexer import InternalTxIndexerWithTraceBlock
@@ -129,6 +130,16 @@ class TestInternalTxIndexer(TestCase):
         # Just store useful traces 2 decoded + 1 contract creation + 2 ether transfers
         self.assertEqual(InternalTx.objects.count(), 5)
         self.assertEqual(InternalTxDecoded.objects.count(), 2)
+        ether_transactions = InternalTx.objects.filter(value__gt=0, tx_type=0)
+        for ether_transaction in ether_transactions:
+            unique_hash = "0x" + fast_keccak_hex(
+                f"transfer_{ether_transaction.ethereum_tx_id}_{ether_transaction.trace_address}".encode()
+            )
+            self.assertEqual(ether_transaction.unique_hash, unique_hash)
+
+        non_ether_transactions = InternalTx.objects.exclude(value__gt=0, tx_type=0)
+        for non_ether_transaction in non_ether_transactions:
+            self.assertEqual(non_ether_transaction.unique_hash, None)
         create_internal_tx = InternalTx.objects.get(
             contract_address="0x673Fd582FED2CD8201d58552B912F0D1DaA37bB2"
         )

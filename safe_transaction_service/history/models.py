@@ -694,12 +694,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         tx_type = InternalTxType.parse(trace["type"])
         call_type = EthereumTxCallType.parse_call_type(trace["action"].get("callType"))
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
-        unique_hash: Optional[str] = None
-        if tx_type.REWARD:
-            unique_hash = fast_keccak_hex(
-                f'transfer_{trace["transactionHash"]}_{trace["traceAddress"]}'.encode()
-            )
-        return InternalTx(
+        internal_tx = InternalTx(
             ethereum_tx=ethereum_tx,
             timestamp=ethereum_tx.block.timestamp,
             block_number=ethereum_tx.block_id,
@@ -717,8 +712,12 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
             tx_type=tx_type.value,
             call_type=call_type.value if call_type else None,
             error=trace.get("error"),
-            unique_hash=unique_hash,
         )
+        if internal_tx.is_ether_transfer:
+            internal_tx.unique_hash = fast_keccak_hex(
+                f'transfer_{trace["transactionHash"]}_{trace_address_str}'.encode()
+            )
+        return internal_tx
 
     def get_or_create_from_trace(
         self, trace: Dict[str, Any], ethereum_tx: EthereumTx
@@ -726,32 +725,30 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         tx_type = InternalTxType.parse(trace["type"])
         call_type = EthereumTxCallType.parse_call_type(trace["action"].get("callType"))
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
-        if tx_type.REWARD:
-            unique_hash = fast_keccak_hex(
-                f'transfer_{trace["transactionHash"]}_{trace["traceAddress"]}'.encode()
+        defaults = {
+            "timestamp": ethereum_tx.block.timestamp,
+            "block_number": ethereum_tx.block_id,
+            "_from": trace["action"].get("from"),
+            "gas": trace["action"].get("gas", 0),
+            "data": trace["action"].get("input") or trace["action"].get("init"),
+            "to": trace["action"].get("to") or trace["action"].get("address"),
+            "value": trace["action"].get("value") or trace["action"].get("balance", 0),
+            "gas_used": (trace.get("result") or {}).get("gasUsed", 0),
+            "contract_address": (trace.get("result") or {}).get("address"),
+            "code": (trace.get("result") or {}).get("code"),
+            "output": (trace.get("result") or {}).get("output"),
+            "refund_address": trace["action"].get("refundAddress"),
+            "tx_type": tx_type.value,
+            "call_type": call_type.value if call_type else None,
+            "error": trace.get("error"),
+        }
+        if defaults["value"] > 0 and defaults["tx_type"] == InternalTxType.CALL:
+            defaults["unique_hash"] = fast_keccak_hex(
+                f'transfer_{trace["transactionHash"]}_{trace_address_str}'.encode()
             )
+
         return self.get_or_create(
-            ethereum_tx=ethereum_tx,
-            trace_address=trace_address_str,
-            defaults={
-                "timestamp": ethereum_tx.block.timestamp,
-                "block_number": ethereum_tx.block_id,
-                "_from": trace["action"].get("from"),
-                "gas": trace["action"].get("gas", 0),
-                "data": trace["action"].get("input") or trace["action"].get("init"),
-                "to": trace["action"].get("to") or trace["action"].get("address"),
-                "value": trace["action"].get("value")
-                or trace["action"].get("balance", 0),
-                "gas_used": (trace.get("result") or {}).get("gasUsed", 0),
-                "contract_address": (trace.get("result") or {}).get("address"),
-                "code": (trace.get("result") or {}).get("code"),
-                "output": (trace.get("result") or {}).get("output"),
-                "refund_address": trace["action"].get("refundAddress"),
-                "tx_type": tx_type.value,
-                "call_type": call_type.value if call_type else None,
-                "error": trace.get("error"),
-                "unique_hash": unique_hash,
-            },
+            ethereum_tx=ethereum_tx, trace_address=trace_address_str, defaults=defaults
         )
 
 
