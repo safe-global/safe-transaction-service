@@ -30,14 +30,9 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-        erc20_721_indexing_block = (
-            IndexingStatus.objects.get_erc20_721_indexing_status().block_number
+        self.assertEqual(
+            erc20_events_indexer.start(), (1, self.ethereum_client.current_block_number)
         )
-        blocks_processed = (
-            erc20_events_indexer.ethereum_client.current_block_number
-            - erc20_721_indexing_block
-        )
-        self.assertEqual(erc20_events_indexer.start(), (1, blocks_processed))
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
         self.assertGreater(

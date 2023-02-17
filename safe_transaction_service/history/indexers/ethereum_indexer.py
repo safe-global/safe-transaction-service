@@ -409,7 +409,6 @@ class EthereumIndexer(ABC):
             current_block_number,
         )
         number_processed_elements = 0
-        number_of_blocks_processed = 0
         start_block: Optional[int] = None
         last_block: Optional[int] = None
         almost_updated_addresses = list(
@@ -497,5 +496,7 @@ class EthereumIndexer(ABC):
             )
         if start_block is not None and last_block is not None:
             number_of_blocks_processed = last_block - start_block + 1
+        else:
+            number_of_blocks_processed = 0
 
         return number_processed_elements, number_of_blocks_processed
