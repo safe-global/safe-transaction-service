@@ -77,7 +77,6 @@ class AboutView(APIView):
             "headers": [x for x in request.META.keys() if "FORWARD" in x],
             "settings": {
                 "AWS_CONFIGURED": settings.AWS_CONFIGURED,
-                "AWS_S3_BUCKET_NAME": settings.AWS_S3_BUCKET_NAME,
                 "AWS_S3_PUBLIC_URL": settings.AWS_S3_PUBLIC_URL,
                 "ETHEREUM_NODE_URL": settings.ETHEREUM_NODE_URL,
                 "ETHEREUM_TRACING_NODE_URL": settings.ETHEREUM_TRACING_NODE_URL,
