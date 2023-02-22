@@ -3,13 +3,14 @@ from typing import Dict, List, Sequence, Tuple
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db.models import Min
 
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import EthereumNetwork
 
-from ...models import ProxyFactory, SafeMasterCopy
+from ...models import IndexingStatus, ProxyFactory, SafeMasterCopy
 
 
 @dataclass
@@ -598,6 +599,7 @@ class Command(BaseCommand):
                 self.style.SUCCESS(f"Setting up {ethereum_network.name} safe addresses")
             )
             self._setup_safe_master_copies(MASTER_COPIES[ethereum_network])
+            self._setup_erc20_indexing()
         if ethereum_network in PROXY_FACTORIES:
             self.stdout.write(
                 self.style.SUCCESS(
@@ -645,3 +647,30 @@ class Command(BaseCommand):
                     "tx_block_number": initial_block_number,
                 },
             )
+
+    def _setup_erc20_indexing(self) -> bool:
+        """
+        Update ERC20/721 indexing status if `indexing block number` is less
+        than `Master copies` block deployments, as it sounds like a configuration error
+
+        :return: `True` if updated, `False` otherwise
+        """
+        indexing_status = IndexingStatus.objects.get_erc20_721_indexing_status()
+
+        queryset = (
+            SafeMasterCopy.objects.filter(l2=True)
+            if settings.ETH_L2_NETWORK
+            else SafeMasterCopy.objects.all()
+        )
+        min_master_copies_block_number = queryset.aggregate(
+            min_master_copies_block_number=Min("initial_block_number")
+        )["min_master_copies_block_number"]
+        block_number = (
+            min_master_copies_block_number if min_master_copies_block_number else 0
+        )
+
+        if indexing_status.block_number < block_number:
+            indexing_status.block_number = block_number
+            indexing_status.save(update_fields=["block_number"])
+            return True
+        return False
