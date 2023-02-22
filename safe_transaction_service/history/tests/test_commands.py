@@ -12,7 +12,7 @@ from django_celery_beat.models import PeriodicTask
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
-from ..models import ProxyFactory, SafeMasterCopy
+from ..models import IndexingStatus, ProxyFactory, SafeMasterCopy
 from ..services import IndexServiceProvider
 from ..tasks import logger as task_logger
 from .factories import (
@@ -323,7 +323,17 @@ class TestCommands(TestCase):
         IndexServiceProvider.del_singleton()
 
     def test_setup_service_mainnet(self):
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
+        )
         self._test_setup_service(EthereumNetwork.MAINNET)
+        first_safe_block_deployed = (
+            6569433  # 0.0.2 deployment block, first Safe contract
+        )
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
+            first_safe_block_deployed,
+        )
 
         # Check last master copy was created
         last_master_copy_address = "0x6851D6fDFAfD08c0295C392436245E5bc78B0185"
@@ -352,6 +362,23 @@ class TestCommands(TestCase):
         self.assertEqual(SafeMasterCopy.objects.count(), 8)
         self.assertEqual(SafeMasterCopy.objects.l2().count(), 1)
         self.assertEqual(ProxyFactory.objects.count(), 4)
+
+    def test_setup_service_mainnet_erc20_indexing_setup(self):
+        # Test IndexingStatus ERC20 is not modified if higher than the oldest master copy
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
+        )
+        first_safe_block_deployed = (
+            6569433  # 0.0.2 deployment block, first Safe contract
+        )
+        IndexingStatus.objects.set_erc20_721_indexing_status(
+            first_safe_block_deployed + 20
+        )
+        self._test_setup_service(EthereumNetwork.MAINNET)
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
+            first_safe_block_deployed + 20,
+        )
 
     def test_setup_service_rinkeby(self):
         self._test_setup_service(EthereumNetwork.RINKEBY)
