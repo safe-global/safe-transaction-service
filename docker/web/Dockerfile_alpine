@@ -1,5 +1,5 @@
 # Less size than Debian, slowest to build
-FROM python:3.10-alpine
+FROM python:3.11-alpine
 
 ENV PYTHONUNBUFFERED 1
 WORKDIR /app
