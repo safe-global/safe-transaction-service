@@ -510,7 +510,7 @@ class CollectiblesService:
         :return: collectibles
         """
         collectibles, _ = self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam, limit=50, offset=0
+            safe_address, only_trusted, exclude_spam, limit=10, offset=0
         )
         return collectibles
 
