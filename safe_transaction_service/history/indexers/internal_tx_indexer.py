@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 
 from eth_typing import HexStr
+from hexbytes import HexBytes
 from web3.types import ParityBlockTrace, ParityFilterTrace
 
 from gnosis.eth import EthereumClient
@@ -14,7 +15,7 @@ from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
     get_safe_tx_decoder,
 )
-from safe_transaction_service.utils.utils import chunks
+from safe_transaction_service.utils.utils import FixedSizeDict, chunks
 
 from ..models import InternalTx, InternalTxDecoded, MonitoredAddress, SafeMasterCopy
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
@@ -56,6 +57,23 @@ class InternalTxIndexer(EthereumIndexer):
             10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
         )
         self.tx_decoder = get_safe_tx_decoder()
+        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
+
+    def mark_as_processed(self, tx_hash: str) -> bool:
+        """
+        Mark a `tx_hash` as processed by the indexer
+
+        :param tx_hash:
+        :return: `True` if `tx_hash` was marked as processed, `False` if it was already processed
+        """
+
+        tx_id = HexBytes(tx_hash)
+
+        if tx_id in self._processed_element_cache:
+            return False
+        else:
+            self._processed_element_cache[tx_id] = None
+            return True
 
     @property
     def database_field(self):
@@ -258,14 +276,24 @@ class InternalTxIndexer(EthereumIndexer):
         logger.debug(
             "Prefetching and storing %d ethereum txs", len(tx_hash_with_traces)
         )
-        tx_hashes = list(tx_hash_with_traces.keys())
+
+        tx_hashes = []
+        tx_hashes_missing_traces = []
+        for tx_hash in list(tx_hash_with_traces.keys()):
+            # Check if transactions have already been processed
+            if self.mark_as_processed(tx_hash):
+                tx_hashes.append(tx_hash)
+                # Traces can be already populated if using `trace_block`, but with `trace_filter`
+                # some traces will be missing and `trace_transaction` needs to be called
+                if not tx_hash_with_traces[tx_hash]:
+                    tx_hashes_missing_traces.append(tx_hash)
+            else:
+                del tx_hash_with_traces[tx_hash]
+
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug("End prefetching and storing of ethereum txs")
 
         logger.debug("Prefetching of traces(internal txs)")
-        tx_hashes_missing_traces = [
-            tx_hash for tx_hash, trace in tx_hash_with_traces.items() if not trace
-        ]
         missing_traces_lists = self.trace_transactions(
             tx_hashes_missing_traces, batch_size=self.trace_txs_batch_size
         )

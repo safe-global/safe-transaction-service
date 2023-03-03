@@ -7,6 +7,12 @@ from hexbytes import HexBytes
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 
+from ..indexers import (
+    Erc20EventsIndexerProvider,
+    InternalTxIndexerProvider,
+    ProxyFactoryIndexerProvider,
+    SafeEventsIndexerProvider,
+)
 from ..models import EthereumBlock, IndexingStatus, ProxyFactory, SafeMasterCopy
 
 logger = logging.getLogger(__name__)
@@ -59,6 +65,14 @@ class ReorgService:
             ),
         ]
 
+        # Indexers to reset
+        self.indexer_providers = [
+            Erc20EventsIndexerProvider,
+            InternalTxIndexerProvider,
+            ProxyFactoryIndexerProvider,
+            SafeEventsIndexerProvider,
+        ]
+
     def check_reorgs(self) -> Optional[int]:
         """
         :return: Number of the oldest block with reorg detected. `None` if not reorg found
@@ -94,6 +108,10 @@ class ReorgService:
         updated = 0
         for reorg_function in self.reorg_functions:
             updated += reorg_function(block_number)
+
+        # Reset indexer status and caches
+        for indexer_provider in self.indexer_providers:
+            indexer_provider.del_singleton()
 
         return updated
 

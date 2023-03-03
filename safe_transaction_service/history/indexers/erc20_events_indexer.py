@@ -59,7 +59,7 @@ class Erc20EventsIndexer(EventsIndexer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._processed_transfer_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
+        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -76,20 +76,20 @@ class Erc20EventsIndexer(EventsIndexer):
     def database_queryset(self):
         return SafeContract.objects.all()
 
-    def is_processed(self, token_transfer: TokenTransfer) -> bool:
+    def mark_as_processed(self, token_transfer: TokenTransfer) -> bool:
         """
         :param token_transfer:
-        :return: `True` if `token_transfer` has already been processed by the indexer, `False` otherwise
+        :return: `True` if `event` was marked as processed, `False` if it was already processed
         """
 
         # Calculate id, collision should be almost impossible
         transfer_id = token_transfer.ethereum_tx_id + HexBytes(token_transfer.log_index)
 
-        if transfer_id in self._processed_transfer_cache:
-            return True
-        else:
-            self._processed_transfer_cache[transfer_id] = None
+        if transfer_id in self._processed_element_cache:
             return False
+        else:
+            self._processed_element_cache[transfer_id] = None
+            return True
 
     def _do_node_query(
         self,
@@ -145,7 +145,7 @@ class Erc20EventsIndexer(EventsIndexer):
         for log_receipt in log_receipts:
             try:
                 erc20_transfer = ERC20Transfer.from_decoded_event(log_receipt)
-                if not self.is_processed(erc20_transfer):
+                if self.mark_as_processed(erc20_transfer):
                     yield erc20_transfer
             except ValueError:
                 pass
@@ -156,7 +156,7 @@ class Erc20EventsIndexer(EventsIndexer):
         for log_receipt in log_receipts:
             try:
                 erc721_transfer = ERC721Transfer.from_decoded_event(log_receipt)
-                if not self.is_processed(erc721_transfer):
+                if self.mark_as_processed(erc721_transfer):
                     yield erc721_transfer
             except ValueError:
                 pass

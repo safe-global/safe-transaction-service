@@ -37,15 +37,12 @@ from .mocks.mocks_internal_tx_indexer import (
 
 
 class TestInternalTxIndexer(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.internal_tx_indexer = InternalTxIndexerProvider()
-        cls.internal_tx_indexer.blocks_to_reindex_again = 0
+    def setUp(self) -> None:
+        InternalTxIndexerProvider.del_singleton()
+        self.internal_tx_indexer = InternalTxIndexerProvider()
+        self.internal_tx_indexer.blocks_to_reindex_again = 0
 
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
+    def tearDown(self) -> None:
         InternalTxIndexerProvider.del_singleton()
 
     def test_internal_tx_indexer_provider(self):
@@ -61,6 +58,12 @@ class TestInternalTxIndexer(TestCase):
             )
 
     def return_sorted_blocks(self, hashes: HexStr):
+        """
+        Mock function helper
+
+        :param hashes:
+        :return:
+        """
         block_dict = {block["hash"].hex(): block for block in block_result}
         return [block_dict[provided_hash] for provided_hash in hashes]
 

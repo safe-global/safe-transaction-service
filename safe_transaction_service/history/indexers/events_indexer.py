@@ -51,15 +51,16 @@ class EventsIndexer(EthereumIndexer):
 
         # Number of concurrent requests to `getLogs`
         self.get_logs_concurrency = settings.ETH_EVENTS_GET_LOGS_CONCURRENCY
-        self._processed_event_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
+        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
         super().__init__(*args, **kwargs)
 
-    def is_processed(self, log_receipt: LogReceipt) -> bool:
+    def mark_as_processed(self, log_receipt: LogReceipt) -> bool:
         """
-        Check if event has already been processed by the indexer
+        Mark event as processed by the indexer
+
         :param log_receipt:
-        :return: `True` if `event` has already been processed by the indexer, `False` otherwise
+        :return: `True` if `event` was marked as processed, `False` if it was already processed
         """
 
         # Calculate id, collision should be almost impossible
@@ -67,11 +68,11 @@ class EventsIndexer(EthereumIndexer):
             log_receipt["logIndex"]
         )
 
-        if event_id in self._processed_event_cache:
-            return True
-        else:
-            self._processed_event_cache[event_id] = None
+        if event_id in self._processed_element_cache:
             return False
+        else:
+            self._processed_element_cache[event_id] = None
+            return True
 
     @property
     @abstractmethod
@@ -251,7 +252,7 @@ class EventsIndexer(EthereumIndexer):
         not_processed_log_receipts = [
             log_receipt
             for log_receipt in log_receipts
-            if not self.is_processed(log_receipt)
+            if self.mark_as_processed(log_receipt)
         ]
         decoded_elements: List[EventData] = self.decode_elements(
             not_processed_log_receipts
