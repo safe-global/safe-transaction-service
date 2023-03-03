@@ -14,7 +14,7 @@ from web3.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 
-from safe_transaction_service.utils.utils import chunks
+from safe_transaction_service.utils.utils import FixedSizeDict, chunks
 
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
@@ -51,8 +51,27 @@ class EventsIndexer(EthereumIndexer):
 
         # Number of concurrent requests to `getLogs`
         self.get_logs_concurrency = settings.ETH_EVENTS_GET_LOGS_CONCURRENCY
+        self._processed_event_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
         super().__init__(*args, **kwargs)
+
+    def is_processed(self, log_receipt: LogReceipt) -> bool:
+        """
+        Check if event has already been processed by the indexer
+        :param log_receipt:
+        :return: `True` if `event` has already been processed by the indexer, `False` otherwise
+        """
+
+        # Calculate id, collision should be almost impossible
+        event_id = HexBytes(log_receipt["transactionHash"]) + HexBytes(
+            log_receipt["logIndex"]
+        )
+
+        if event_id in self._processed_event_cache:
+            return True
+        else:
+            self._processed_event_cache[event_id] = None
+            return False
 
     @property
     @abstractmethod
@@ -229,9 +248,16 @@ class EventsIndexer(EthereumIndexer):
         if not log_receipts:
             return []
 
-        decoded_elements: List[EventData] = self.decode_elements(log_receipts)
+        not_processed_log_receipts = [
+            log_receipt
+            for log_receipt in log_receipts
+            if not self.is_processed(log_receipt)
+        ]
+        decoded_elements: List[EventData] = self.decode_elements(
+            not_processed_log_receipts
+        )
         tx_hashes = OrderedDict.fromkeys(
-            [event["transactionHash"] for event in log_receipts]
+            [event["transactionHash"] for event in not_processed_log_receipts]
         ).keys()
         logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
         self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
@@ -239,8 +265,7 @@ class EventsIndexer(EthereumIndexer):
         logger.debug("Processing %d decoded events", len(decoded_elements))
         processed_elements = []
         for decoded_element in decoded_elements:
-            processed_element = self._process_decoded_element(decoded_element)
-            if processed_element:
+            if processed_element := self._process_decoded_element(decoded_element):
                 processed_elements.append(processed_element)
         logger.debug("End processing %d decoded events", len(decoded_elements))
         return processed_elements
