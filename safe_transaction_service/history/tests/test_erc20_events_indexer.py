@@ -11,8 +11,15 @@ from .factories import SafeContractFactory
 
 
 class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
+    def setUp(self) -> None:
+        Erc20EventsIndexerProvider.del_singleton()
+        self.erc20_events_indexer = Erc20EventsIndexerProvider()
+
+    def tearDown(self) -> None:
+        Erc20EventsIndexerProvider.del_singleton()
+
     def test_erc20_events_indexer(self):
-        erc20_events_indexer = Erc20EventsIndexerProvider()
+        erc20_events_indexer = self.erc20_events_indexer
         erc20_events_indexer.confirmations = 0
         self.assertEqual(erc20_events_indexer.start(), 0)
 

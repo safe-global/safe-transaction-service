@@ -9,6 +9,7 @@ from cache_memoize import cache_memoize
 from cachetools import cachedmethod
 from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from web3.contract import ContractEvent
 from web3.exceptions import BadFunctionCallOutput
 from web3.types import EventData, LogReceipt
@@ -17,6 +18,7 @@ from gnosis.eth import EthereumClient
 
 from safe_transaction_service.tokens.models import Token
 
+from ...utils.utils import FixedSizeDict
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -47,11 +49,25 @@ class Erc20EventsIndexerProvider:
 
 
 class Erc20EventsIndexer(EventsIndexer):
-    _cache_is_erc20 = {}
+    """
+    Indexes `ERC20` and `ERC721` `Transfer` events.
 
+    ERC20 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 value)`
+    ERC721 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 indexed tokenId)`
+
+    As `event topic` is the same both events can be indexed together, and then tell
+    apart based on the `indexed` part as `indexed` elements are stored in a different way in the
+    `ethereum tx receipt`.
+
+    Note: Some `ERC721` do not `index` the `tokenId`, so decimals are checked
+    in `_is_erc20` to tell apart `ERC20` from `ERC721` contracts (`ERC721` don't have decimals).
     """
-    Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
-    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._cache_is_erc20 = FixedSizeDict(maxlen=40_000)
+        self._processed_transfer_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -67,6 +83,21 @@ class Erc20EventsIndexer(EventsIndexer):
     @property
     def database_queryset(self):
         return SafeContract.objects.all()
+
+    def is_processed(self, token_transfer: TokenTransfer) -> bool:
+        """
+        :param token_transfer:
+        :return: `True` if `token_transfer` has already been processed by the indexer, `False` otherwise
+        """
+
+        # Calculate id, collision should be almost impossible
+        transfer_id = token_transfer.ethereum_tx_id + HexBytes(token_transfer.log_index)
+
+        if transfer_id in self._processed_transfer_cache:
+            return True
+        else:
+            self._processed_transfer_cache[transfer_id] = None
+            return False
 
     def _do_node_query(
         self,
@@ -143,7 +174,9 @@ class Erc20EventsIndexer(EventsIndexer):
     ) -> Iterator[ERC20Transfer]:
         for log_receipt in log_receipts:
             try:
-                yield ERC20Transfer.from_decoded_event(log_receipt)
+                erc20_transfer = ERC20Transfer.from_decoded_event(log_receipt)
+                if not self.is_processed(erc20_transfer):
+                    yield erc20_transfer
             except ValueError:
                 pass
 
@@ -152,7 +185,9 @@ class Erc20EventsIndexer(EventsIndexer):
     ) -> Iterator[ERC721Transfer]:
         for log_receipt in log_receipts:
             try:
-                yield ERC721Transfer.from_decoded_event(log_receipt)
+                erc721_transfer = ERC721Transfer.from_decoded_event(log_receipt)
+                if not self.is_processed(erc721_transfer):
+                    yield erc721_transfer
             except ValueError:
                 pass
 
