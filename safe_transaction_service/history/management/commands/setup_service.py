@@ -256,9 +256,13 @@ MASTER_COPIES: Dict[EthereumNetwork, List[Tuple[str, int, str]]] = {
         ("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA", 173749, "1.3.0+L2"),
         ("0x69f4D1788e39c87893C980c06EdF4b7f686e2938", 173751, "1.3.0"),
     ],
-    EthereumNetwork.BOBA_NETWORK_RINKEBY_TESTNET: [
-        ("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA", 18854, "1.3.0+L2"),
-        ("0x69f4D1788e39c87893C980c06EdF4b7f686e2938", 18855, "1.3.0"),
+    EthereumNetwork.BOBA_BNB_MAINNET: [
+        ("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA", 22284, "1.3.0+L2"),
+        ("0x69f4D1788e39c87893C980c06EdF4b7f686e2938", 22285, "1.3.0"),
+    ],
+    EthereumNetwork.BOBA_AVAX: [
+        ("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA", 55746, "1.3.0+L2"),
+        ("0x69f4D1788e39c87893C980c06EdF4b7f686e2938", 55747, "1.3.0"),
     ],
     EthereumNetwork.BOBA_NETWORK: [
         ("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA", 170908, "1.3.0+L2"),
@@ -467,8 +471,11 @@ PROXY_FACTORIES: Dict[EthereumNetwork, List[Tuple[str, int]]] = {
     EthereumNetwork.OPTIMISM: [
         ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 173709),  # v1.3.0
     ],
-    EthereumNetwork.BOBA_NETWORK_RINKEBY_TESTNET: [
-        ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 18847),  # v1.3.0
+    EthereumNetwork.BOBA_BNB_MAINNET: [
+        ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 22831),  # v1.3.0
+    ],
+    EthereumNetwork.BOBA_AVAX: [
+        ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 55739),  # v1.3.0
     ],
     EthereumNetwork.BOBA_NETWORK: [
         ("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC", 170895),  # v1.3.0
