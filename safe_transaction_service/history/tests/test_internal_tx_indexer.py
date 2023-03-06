@@ -24,7 +24,7 @@ from ..models import (
     SafeMasterCopy,
     SafeStatus,
 )
-from .factories import SafeMasterCopyFactory
+from .factories import EthereumTxFactory, SafeMasterCopyFactory
 from .mocks.mocks_internal_tx_indexer import (
     block_result,
     trace_blocks_filtered_0x5aC2_result,
@@ -319,3 +319,37 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(internal_txs_decoded[0].function_name, "setup")
         results = tx_processor.process_decoded_transactions(internal_txs_decoded)
         self.assertEqual(results, [True, True])
+
+    def test_mark_as_processed(self):
+        """
+        Test not reprocessing of processed events
+        """
+
+        # Transform mock to dictionary tx_hash -> traces
+        tx_hash_with_traces = {}
+        for trace_transaction_result in trace_transactions_result:
+            tx_hash = trace_transaction_result[0]["transactionHash"]
+            tx_hash_with_traces[tx_hash] = trace_transaction_result
+            # Create transaction in db so not fetching of transaction is needed
+            EthereumTxFactory(tx_hash=tx_hash)
+
+        # After the first processing transactions will be cached to prevent reprocessing
+        self.assertEqual(len(self.internal_tx_indexer._processed_element_cache), 0)
+        self.assertEqual(
+            len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 2
+        )
+        self.assertEqual(len(self.internal_tx_indexer._processed_element_cache), 2)
+
+        # Transactions are cached and will not be reprocessed
+        self.assertEqual(
+            len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 0
+        )
+        self.assertEqual(
+            len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 0
+        )
+
+        # Cleaning the cache will reprocess the transactions again
+        self.internal_tx_indexer._processed_element_cache.clear()
+        self.assertEqual(
+            len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 2
+        )

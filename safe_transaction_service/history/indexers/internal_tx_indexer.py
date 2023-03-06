@@ -269,9 +269,16 @@ class InternalTxIndexer(EthereumIndexer):
     def process_elements(
         self, tx_hash_with_traces: OrderedDict[HexStr, Optional[ParityFilterTrace]]
     ) -> List[InternalTx]:
+        """
+        :param tx_hash_with_traces:
+        :return: Inserted `InternalTx` objects
+        """
         # Prefetch ethereum txs
         if not tx_hash_with_traces:
             return []
+
+        # Copy as we might modify it
+        tx_hash_with_traces = dict(tx_hash_with_traces)
 
         logger.debug(
             "Prefetching and storing %d ethereum txs", len(tx_hash_with_traces)

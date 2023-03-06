@@ -13,6 +13,7 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from ..indexers import SafeEventsIndexer, SafeEventsIndexerProvider
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (
+    EthereumTx,
     EthereumTxCallType,
     InternalTx,
     InternalTxDecoded,
@@ -22,17 +23,19 @@ from ..models import (
     SafeLastStatus,
     SafeStatus,
 )
-from .factories import SafeMasterCopyFactory
+from .factories import EthereumTxFactory, SafeMasterCopyFactory
+from .mocks.mocks_safe_events_indexer import safe_events_mock
 
 
 class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.safe_events_indexer = SafeEventsIndexer(
-            cls.ethereum_client, confirmations=0, blocks_to_reindex_again=0
+    def setUp(self) -> None:
+        self.safe_events_indexer = SafeEventsIndexer(
+            self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
         )
-        cls.safe_tx_processor = SafeTxProcessor(cls.ethereum_client, None)
+        self.safe_tx_processor = SafeTxProcessor(self.ethereum_client, None)
+
+    def tearDown(self) -> None:
+        SafeEventsIndexerProvider.del_singleton()
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
@@ -601,4 +604,36 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTx.objects.count(), expected_internal_txs)
         self.assertEqual(
             InternalTxDecoded.objects.count(), expected_internal_txs_decoded
+        )
+
+    def test_mark_as_processed(self):
+        # SafeEventsIndexer does not use bulk saving into database,
+        # so mark_as_processed is just a optimization but not critical
+
+        # Create transaction in db so not fetching of transaction is needed
+        for safe_event in safe_events_mock:
+            tx_hash = safe_event["transactionHash"]
+            block_hash = safe_event["blockHash"]
+            if not EthereumTx.objects.filter(tx_hash=tx_hash).exists():
+                EthereumTxFactory(tx_hash=tx_hash, block__block_hash=block_hash)
+
+        # After the first processing transactions will be cached to prevent reprocessing
+        self.assertEqual(len(self.safe_events_indexer._processed_element_cache), 0)
+        self.assertEqual(
+            len(self.safe_events_indexer.process_elements(safe_events_mock)), 28
+        )
+        self.assertEqual(len(self.safe_events_indexer._processed_element_cache), 28)
+
+        # Transactions are cached and will not be reprocessed
+        self.assertEqual(
+            len(self.safe_events_indexer.process_elements(safe_events_mock)), 0
+        )
+        self.assertEqual(
+            len(self.safe_events_indexer.process_elements(safe_events_mock)), 0
+        )
+
+        # Even if we empty the cache, events will not be reprocessed again
+        self.safe_events_indexer._processed_element_cache.clear()
+        self.assertEqual(
+            len(self.safe_events_indexer.process_elements(safe_events_mock)), 0
         )
