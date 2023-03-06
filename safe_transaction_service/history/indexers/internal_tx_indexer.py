@@ -59,15 +59,18 @@ class InternalTxIndexer(EthereumIndexer):
         self.tx_decoder = get_safe_tx_decoder()
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
-    def mark_as_processed(self, tx_hash: str) -> bool:
+    def mark_as_processed(
+        self, tx_hash: HexBytes, block_hash: Optional[HexBytes]
+    ) -> bool:
         """
         Mark a `tx_hash` as processed by the indexer
 
         :param tx_hash:
+        :param block_hash:
         :return: `True` if `tx_hash` was marked as processed, `False` if it was already processed
         """
 
-        tx_id = HexBytes(tx_hash)
+        tx_id = HexBytes(tx_hash) + HexBytes(block_hash or 0)
 
         if tx_id in self._processed_element_cache:
             return False
@@ -288,7 +291,13 @@ class InternalTxIndexer(EthereumIndexer):
         tx_hashes_missing_traces = []
         for tx_hash in list(tx_hash_with_traces.keys()):
             # Check if transactions have already been processed
-            if self.mark_as_processed(tx_hash):
+            # Provide block_hash if available as a mean to prevent reorgs
+            block_hash = (
+                tx_hash_with_traces[tx_hash][0]["blockHash"]
+                if tx_hash_with_traces[tx_hash]
+                else None
+            )
+            if self.mark_as_processed(tx_hash, block_hash):
                 tx_hashes.append(tx_hash)
                 # Traces can be already populated if using `trace_block`, but with `trace_filter`
                 # some traces will be missing and `trace_transaction` needs to be called

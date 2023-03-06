@@ -5,7 +5,6 @@ from typing import Iterator, List, Optional, Sequence
 from django.db.models import QuerySet
 
 from eth_typing import ChecksumAddress
-from hexbytes import HexBytes
 from web3.contract import ContractEvent
 from web3.types import EventData, LogReceipt
 
@@ -76,21 +75,6 @@ class Erc20EventsIndexer(EventsIndexer):
     def database_queryset(self):
         return SafeContract.objects.all()
 
-    def mark_as_processed(self, token_transfer: TokenTransfer) -> bool:
-        """
-        :param token_transfer:
-        :return: `True` if `event` was marked as processed, `False` if it was already processed
-        """
-
-        # Calculate id, collision should be almost impossible
-        transfer_id = token_transfer.ethereum_tx_id + HexBytes(token_transfer.log_index)
-
-        if transfer_id in self._processed_element_cache:
-            return False
-        else:
-            self._processed_element_cache[transfer_id] = None
-            return True
-
     def _do_node_query(
         self,
         addresses: List[ChecksumAddress],
@@ -144,9 +128,7 @@ class Erc20EventsIndexer(EventsIndexer):
     ) -> Iterator[ERC20Transfer]:
         for log_receipt in log_receipts:
             try:
-                erc20_transfer = ERC20Transfer.from_decoded_event(log_receipt)
-                if self.mark_as_processed(erc20_transfer):
-                    yield erc20_transfer
+                yield ERC20Transfer.from_decoded_event(log_receipt)
             except ValueError:
                 pass
 
@@ -155,9 +137,7 @@ class Erc20EventsIndexer(EventsIndexer):
     ) -> Iterator[ERC721Transfer]:
         for log_receipt in log_receipts:
             try:
-                erc721_transfer = ERC721Transfer.from_decoded_event(log_receipt)
-                if self.mark_as_processed(erc721_transfer):
-                    yield erc721_transfer
+                yield ERC721Transfer.from_decoded_event(log_receipt)
             except ValueError:
                 pass
 
@@ -181,11 +161,18 @@ class Erc20EventsIndexer(EventsIndexer):
             logger.debug("End prefetching and storing of ethereum txs")
 
             logger.debug("Storing TokenTransfer objects")
+            not_processed_log_receipts = [
+                log_receipt
+                for log_receipt in log_receipts
+                if self.mark_as_processed(log_receipt)
+            ]
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
-                self.events_to_erc20_transfer(log_receipts), ignore_conflicts=True
+                self.events_to_erc20_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
             )
             result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
-                self.events_to_erc721_transfer(log_receipts), ignore_conflicts=True
+                self.events_to_erc721_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
             )
             logger.debug("Stored TokenTransfer objects")
             return range(

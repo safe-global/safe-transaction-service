@@ -64,8 +64,11 @@ class EventsIndexer(EthereumIndexer):
         """
 
         # Calculate id, collision should be almost impossible
-        event_id = HexBytes(log_receipt["transactionHash"]) + HexBytes(
-            log_receipt["logIndex"]
+        # Add blockHash to prevent reorg issues
+        event_id = (
+            HexBytes(log_receipt["blockHash"])
+            + HexBytes(log_receipt["transactionHash"])
+            + HexBytes(log_receipt["logIndex"])
         )
 
         if event_id in self._processed_element_cache:
@@ -249,6 +252,7 @@ class EventsIndexer(EthereumIndexer):
         if not log_receipts:
             return []
 
+        # Ignore already processed events
         not_processed_log_receipts = [
             log_receipt
             for log_receipt in log_receipts
