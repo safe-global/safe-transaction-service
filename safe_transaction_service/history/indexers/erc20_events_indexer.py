@@ -50,9 +50,6 @@ class Erc20EventsIndexer(EventsIndexer):
     As `event topic` is the same both events can be indexed together, and then tell
     apart based on the `indexed` part as `indexed` elements are stored in a different way in the
     `ethereum tx receipt`.
-
-    Note: Some `ERC721` do not `index` the `tokenId`, so decimals are checked
-    in `_is_erc20` to tell apart `ERC20` from `ERC721` contracts (`ERC721` don't have decimals).
     """
 
     def __init__(self, *args, **kwargs):
