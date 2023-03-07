@@ -65,15 +65,26 @@ class EventsIndexer(EthereumIndexer):
 
         # Calculate id, collision should be almost impossible
         # Add blockHash to prevent reorg issues
-        event_id = (
-            HexBytes(log_receipt["blockHash"])
-            + HexBytes(log_receipt["transactionHash"])
-            + HexBytes(log_receipt["logIndex"])
-        )
+        block_hash = HexBytes(log_receipt["blockHash"])
+        tx_hash = HexBytes(log_receipt["transactionHash"])
+        log_index = log_receipt["logIndex"]
+        event_id = block_hash + tx_hash + HexBytes(log_index)
 
         if event_id in self._processed_element_cache:
+            logger.debug(
+                "Event with tx-hash=%s log-index=%d on block=%s was already processed",
+                tx_hash.hex(),
+                log_index,
+                block_hash.hex(),
+            )
             return False
         else:
+            logger.debug(
+                "Marking event with tx-hash=%s log-index=%d on block=%s as processed",
+                tx_hash.hex(),
+                log_index,
+                block_hash.hex(),
+            )
             self._processed_element_cache[event_id] = None
             return True
 

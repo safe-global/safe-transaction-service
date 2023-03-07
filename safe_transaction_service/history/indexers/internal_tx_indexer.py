@@ -70,11 +70,23 @@ class InternalTxIndexer(EthereumIndexer):
         :return: `True` if `tx_hash` was marked as processed, `False` if it was already processed
         """
 
-        tx_id = HexBytes(tx_hash) + HexBytes(block_hash or 0)
+        tx_hash = HexBytes(tx_hash)
+        block_hash = HexBytes(block_hash or 0)
+        tx_id = tx_hash + block_hash
 
         if tx_id in self._processed_element_cache:
+            logger.debug(
+                "Tx with tx-hash=%s on block=%s was already processed",
+                tx_hash.hex(),
+                block_hash.hex(),
+            )
             return False
         else:
+            logger.debug(
+                "Marking tx with tx-hash=%s on block=%s as processed",
+                tx_hash.hex(),
+                block_hash.hex(),
+            )
             self._processed_element_cache[tx_id] = None
             return True
 
