@@ -53,7 +53,6 @@ from .services import (
     SafeServiceProvider,
     TransactionServiceProvider,
 )
-from .services.collectibles_service import CollectiblesServiceProvider
 from .services.safe_service import CannotGetSafeInfoFromBlockchain
 
 logger = logging.getLogger(__name__)
@@ -593,23 +592,6 @@ class SafeBalanceUsdView(SafeBalanceView):
     def get(self, *args, **kwargs):
         """
         Get balance for Ether and ERC20 tokens with USD fiat conversion
-        """
-        return super().get(*args, **kwargs)
-
-
-class SafeCollectiblesView(SafeBalanceView):
-    serializer_class = serializers.SafeCollectibleResponseSerializer
-
-    def get_result(self, *args, **kwargs):
-        return CollectiblesServiceProvider().get_collectibles_with_metadata(
-            *args, **kwargs
-        )
-
-    @swagger_safe_balance_schema(serializer_class, deprecated=True)
-    def get(self, *args, **kwargs):
-        """
-        Get collectibles (ERC721 tokens) and information about them. Limited to 50 collectibles due to
-        performance issues, endpoint will be deprecated soon, please migrate to v2 endpoint.
         """
         return super().get(*args, **kwargs)
 

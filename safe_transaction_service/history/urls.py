@@ -88,11 +88,6 @@ urlpatterns = [
         name="safe-balances-usd",
     ),
     path(
-        "safes/<str:address>/collectibles/",
-        views.SafeCollectiblesView.as_view(),
-        name="safe-collectibles",
-    ),
-    path(
         "safes/<str:address>/delegates/",
         views.SafeDelegateListView.as_view(),
         name="safe-delegates",

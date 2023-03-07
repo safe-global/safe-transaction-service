@@ -141,27 +141,34 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                 ),
             ]
             collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata(safe_address)
+                collectibles_service.get_collectibles_with_metadata_paginated(
+                    safe_address
+                )
             )
-            self.assertCountEqual(collectibles_with_metadata, expected)
+            self.assertCountEqual(collectibles_with_metadata[0], expected)
+            self.assertEqual(collectibles_with_metadata[1], 2)
 
-            # Set ens trusted
+            # Set ens trusted to only retrieve trusted tokens
             Token.objects.filter(address=ens_address).update(trusted=True)
             collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata(
+                collectibles_service.get_collectibles_with_metadata_paginated(
                     safe_address, only_trusted=True
                 )
             )
-            self.assertCountEqual(collectibles_with_metadata, expected[:1])
 
-            # Set ens spam
+            self.assertCountEqual(collectibles_with_metadata[0], expected[:1])
+            self.assertEqual(collectibles_with_metadata[1], 1)
+
+            # Set ens spam so it will be excluded
             Token.objects.filter(address=ens_address).update(trusted=False, spam=True)
             collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata(
+                collectibles_service.get_collectibles_with_metadata_paginated(
                     safe_address, exclude_spam=True
                 )
             )
-            self.assertCountEqual(collectibles_with_metadata, expected[1:])
+
+            self.assertCountEqual(collectibles_with_metadata[0], expected[1:])
+            self.assertEqual(collectibles_with_metadata[1], 1)
 
             # Caches not empty
             self.assertTrue(collectibles_service.cache_token_info)
@@ -170,7 +177,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
     @mock.patch.object(CollectiblesService, "get_metadata", autospec=True)
     @mock.patch.object(CollectiblesService, "get_collectibles", autospec=True)
-    def test_get_collectibles_with_metadata(
+    def test_get_collectibles_with_metadata_paginated(
         self, get_collectibles_mock: MagicMock, get_metadata_mock: MagicMock
     ):
         collectibles_service = CollectiblesServiceProvider()
@@ -183,7 +190,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             28,
             "http://random-address.org/info-28.json",
         )
-        get_collectibles_mock.return_value = [collectible], 0
+        get_collectibles_mock.return_value = [collectible], 1
         safe_address = Account.create().address
 
         expected = [
@@ -197,19 +204,28 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                 {},
             )
         ]
+        collectibles_with_metadata_paginated = (
+            collectibles_service.get_collectibles_with_metadata_paginated(safe_address)
+        )
         self.assertListEqual(
-            collectibles_service.get_collectibles_with_metadata(safe_address),
+            collectibles_with_metadata_paginated[0],
             expected,
         )
+        self.assertEqual(collectibles_with_metadata_paginated[1], 1)
+
         get_metadata_mock.return_value = {}
         self.assertListEqual(
-            collectibles_service.get_collectibles_with_metadata(safe_address),
+            collectibles_service.get_collectibles_with_metadata_paginated(safe_address)[
+                0
+            ],
             expected,
         )
 
         get_metadata_mock.side_effect = MetadataRetrievalException
         self.assertListEqual(
-            collectibles_service.get_collectibles_with_metadata(safe_address),
+            collectibles_service.get_collectibles_with_metadata_paginated(safe_address)[
+                0
+            ],
             expected,
         )
         get_metadata_mock.side_effect = None
@@ -222,7 +238,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         get_metadata_mock.return_value = metadata
         # collectible cached by address + id
         collectible.id += 1
-        get_collectibles_mock.return_value = [collectible], 0
+        get_collectibles_mock.return_value = [collectible], 5
         collectible_with_metadata = CollectibleWithMetadata(
             collectible.token_name,
             collectible.token_symbol,
@@ -239,10 +255,14 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         )
         expected = [collectible_with_metadata]
 
+        collectibles_with_metadata_paginated = (
+            collectibles_service.get_collectibles_with_metadata_paginated(safe_address)
+        )
         self.assertListEqual(
-            collectibles_service.get_collectibles_with_metadata(safe_address),
+            collectibles_with_metadata_paginated[0],
             expected,
         )
+        self.assertEqual(collectibles_with_metadata_paginated[1], 5)
 
     @mock.patch.object(Erc721Manager, "get_info", autospec=True)
     def test_get_token_info(self, get_info_mock: MagicMock):
