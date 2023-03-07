@@ -495,25 +495,6 @@ class CollectiblesService:
 
         return collectibles_with_metadata, count
 
-    def get_collectibles_with_metadata(
-        self,
-        safe_address: ChecksumAddress,
-        only_trusted: bool = False,
-        exclude_spam: bool = False,
-    ) -> List[CollectibleWithMetadata]:
-        """
-        Get collectibles v1 returns no paginated response
-
-        :param safe_address:
-        :param only_trusted: If True, return balance only for trusted tokens
-        :param exclude_spam: If True, exclude spam tokens
-        :return: collectibles
-        """
-        collectibles, _ = self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam, limit=10, offset=0
-        )
-        return collectibles
-
     def get_collectibles_with_metadata_paginated(
         self,
         safe_address: ChecksumAddress,
