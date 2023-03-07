@@ -14,7 +14,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
     def test_erc20_events_indexer(self):
         erc20_events_indexer = Erc20EventsIndexerProvider()
         erc20_events_indexer.confirmations = 0
-        self.assertEqual(erc20_events_indexer.start(), 0)
+        self.assertEqual(erc20_events_indexer.start(), (0, 0))
 
         account = self.ethereum_test_account
         amount = 10
@@ -30,8 +30,9 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-
-        self.assertEqual(erc20_events_indexer.start(), 1)
+        self.assertEqual(
+            erc20_events_indexer.start(), (1, self.ethereum_client.current_block_number)
+        )
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
         self.assertGreater(

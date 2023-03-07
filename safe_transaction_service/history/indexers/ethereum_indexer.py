@@ -354,13 +354,13 @@ class EthereumIndexer(ABC):
 
     def process_addresses(
         self, addresses: Sequence[str], current_block_number: Optional[int] = None
-    ) -> Tuple[Sequence[Any], int, bool]:
+    ) -> Tuple[Sequence[Any], Optional[int], int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
 
         :param addresses: Addresses to process
         :param current_block_number: To prevent fetching it again
-        :return: Tuple with a sequence of `processed data`, `last_block_number` processed
+        :return: Tuple with a sequence of `processed data`, `first_block_number` processed,`last_block_number` processed
             and `True` if no more blocks to scan, `False` otherwise
         """
         assert addresses, "Addresses cannot be empty!"
@@ -370,7 +370,7 @@ class EthereumIndexer(ABC):
         )
         parameters = self.get_block_numbers_for_search(addresses, current_block_number)
         if parameters is None:
-            return [], current_block_number, True
+            return [], None, current_block_number, True
         from_block_number, to_block_number = parameters
 
         updated = to_block_number == (current_block_number - self.confirmations)
@@ -394,13 +394,13 @@ class EthereumIndexer(ABC):
         processed_elements = self.process_elements(elements)
 
         self.update_monitored_address(addresses, from_block_number, to_block_number)
-        return processed_elements, to_block_number, updated
+        return processed_elements, from_block_number, to_block_number, updated
 
-    def start(self) -> int:
+    def start(self) -> Tuple[int, int]:
         """
         Find and process relevant data for existing database addresses
 
-        :return: Number of elements processed
+        :return: Number of elements processed and the number of blocks processed
         """
         current_block_number = self.ethereum_client.current_block_number
         logger.debug(
@@ -409,7 +409,8 @@ class EthereumIndexer(ABC):
             current_block_number,
         )
         number_processed_elements = 0
-
+        start_block: Optional[int] = None
+        last_block: Optional[int] = None
         almost_updated_addresses = list(
             self.get_almost_updated_addresses(current_block_number)
         )
@@ -425,11 +426,19 @@ class EthereumIndexer(ABC):
                     monitored_contract.address
                     for monitored_contract in almost_updated_addresses
                 ]
-                processed_elements, _, updated = self.process_addresses(
+                (
+                    processed_elements,
+                    from_block_number,
+                    to_block_number,
+                    updated,
+                ) = self.process_addresses(
                     almost_updated_addresses_to_process,
                     current_block_number=current_block_number,
                 )
                 number_processed_elements += len(processed_elements)
+                if start_block is None:
+                    start_block = from_block_number
+            last_block = to_block_number
         else:
             logger.debug(
                 "%s: No almost updated addresses to process", self.__class__.__name__
@@ -468,16 +477,26 @@ class EthereumIndexer(ABC):
                 (
                     processed_elements,
                     to_block_number,
+                    from_block_number,
                     updated,
                 ) = self.process_addresses(
                     not_updated_addresses_to_process,
                     current_block_number=current_block_number,
                 )
+                if start_block is None or from_block_number < start_block:
+                    start_block = from_block_number
+
                 number_processed_elements += len(processed_elements)
                 from_block_number = to_block_number + 1
+            if last_block is None or to_block_number > last_block:
+                last_block = to_block_number
         else:
             logger.debug(
                 "%s: No not updated addresses to process", self.__class__.__name__
             )
+        if start_block is not None and last_block is not None:
+            number_of_blocks_processed = last_block - start_block + 1
+        else:
+            number_of_blocks_processed = 0
 
-        return number_processed_elements
+        return number_processed_elements, number_of_blocks_processed
