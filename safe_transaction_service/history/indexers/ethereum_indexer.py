@@ -169,6 +169,7 @@ class EthereumIndexer(ABC):
         """
         :param from_block_number:
         :param current_block_number:
+
         :return: Top block number to process
         """
         return min(
@@ -478,7 +479,7 @@ class EthereumIndexer(ABC):
                     monitored_contract.address
                     for monitored_contract in not_updated_addresses
                     if getattr(monitored_contract, self.database_field)
-                    < to_block_number_expected
+                    <= to_block_number_expected
                 ]
                 # Get real `to_block_number` processed
                 (

@@ -177,7 +177,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
-        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+        self.assertEqual(self.safe_events_indexer.start(), (2, 2))
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
         self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory and setup
         create_internal_tx = InternalTx.objects.filter(
@@ -584,6 +584,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         blocks_processed = (
             self.safe_events_indexer.ethereum_client.current_block_number
             - initial_block_number
+            + 1
         )
         self.assertEqual(
             self.safe_events_indexer.start(), (0, blocks_processed)
