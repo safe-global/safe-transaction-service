@@ -160,7 +160,6 @@ class EthereumIndexer(ABC):
             )
             from_block_number = max(from_block_number - blocks_to_reindex, 0)
 
-        print(from_block_number, to_block_number)
         return from_block_number, to_block_number
 
     def get_to_block_number(
@@ -507,5 +506,4 @@ class EthereumIndexer(ABC):
         else:
             number_of_blocks_processed = 0
 
-        print("processed", last_block, start_block, number_of_blocks_processed)
         return number_processed_elements, number_of_blocks_processed
