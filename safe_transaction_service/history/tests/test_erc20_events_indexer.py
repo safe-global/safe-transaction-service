@@ -36,7 +36,8 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
         self.assertEqual(
-            erc20_events_indexer.start(), (1, self.ethereum_client.current_block_number)
+            erc20_events_indexer.start(),
+            (1, self.ethereum_client.current_block_number + 1),
         )
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
@@ -47,7 +48,8 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertEqual(
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
             self.ethereum_client.current_block_number
-            - erc20_events_indexer.confirmations,
+            - erc20_events_indexer.confirmations
+            + 1,
         )
         self.assertTrue(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertTrue(

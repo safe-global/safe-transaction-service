@@ -210,5 +210,5 @@ class Erc20EventsIndexer(EventsIndexer):
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
     ) -> int:
         return int(
-            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number)
+            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number + 1)
         )
