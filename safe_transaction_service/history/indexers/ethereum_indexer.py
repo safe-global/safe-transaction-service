@@ -494,7 +494,7 @@ class EthereumIndexer(ABC):
                     start_block = from_block_number
 
                 number_processed_elements += len(processed_elements)
-                from_block_number = to_block_number + 1
+                from_block_number += 1
             if last_block is None or to_block_number > last_block:
                 last_block = to_block_number
         else:
