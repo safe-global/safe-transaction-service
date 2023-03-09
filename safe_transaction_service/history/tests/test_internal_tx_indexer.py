@@ -161,7 +161,7 @@ class TestInternalTxIndexer(TestCase):
 
         trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.parity,
-            from_block=1,
+            from_block=0,
             to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
             to_address=[safe_master_copy.address],
         )
