@@ -63,6 +63,16 @@ urlpatterns = [
         name="transfers",
     ),
     path(
+        "transfer/<str:transfer_id>",
+        views.TransferView.as_view(),
+        name="transfer",
+    ),
+    path(
+        "module-transaction/<str:module_transaction_id>",
+        views.ModuleTransactionView.as_view(),
+        name="module-transaction",
+    ),
+    path(
         "safes/<str:address>/module-transactions/",
         views.SafeModuleTransactionListView.as_view(),
         name="module-transactions",

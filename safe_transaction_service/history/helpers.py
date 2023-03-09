@@ -1,8 +1,12 @@
+import re
 import time
 from typing import List
 
 from eth_typing import ChecksumAddress
 from eth_utils import keccak
+
+from safe_transaction_service.history.models import TransferDict
+from safe_transaction_service.tokens.models import Token
 
 
 class DelegateSignatureHelper:
@@ -48,3 +52,35 @@ class DelegateSignatureHelper:
             cls.calculate_hash(delegate, previous_totp=True),
             cls.calculate_hash(delegate, eth_sign=True, previous_totp=True),
         ]
+
+
+def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:
+    """
+    Check if transfer_id starts with 'e' or 'i' followed by keccak256 and appended by optional digits separated by commas
+
+    :param unique_transfer_id:
+    :return: True in case valide unique_transfer_id or False in other case
+    """
+    return re.match(r"^(e|i)[a-fA-F0-9]{64}(\d+(,\d+)*)?$", unique_transfer_id)
+
+
+def add_tokens_to_transfers(transfers: TransferDict) -> TransferDict:
+    """
+    Add tokens to transfer if is a token transfer
+
+    :param transfers:
+    :return: transfers with tokens
+    """
+    tokens = {
+        token.address: token
+        for token in Token.objects.filter(
+            address__in={
+                transfer["token_address"]
+                for transfer in transfers
+                if transfer["token_address"]
+            }
+        )
+    }
+    for transfer in transfers:
+        transfer["token"] = tokens.get(transfer["token_address"])
+    return transfers
