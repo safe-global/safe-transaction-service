@@ -137,23 +137,29 @@ class EthereumIndexer(ABC):
             current_block_number or self.ethereum_client.current_block_number
         )
 
-        common_minimum_block_number = self.get_minimum_block_number(addresses)
-        if common_minimum_block_number is None:  # Empty queryset
+        from_block_number = self.get_minimum_block_number(addresses)
+        if from_block_number is None:  # Empty queryset
             return None
 
-        from_block_number = common_minimum_block_number + 1
-        if (from_block_number + self.block_process_limit) >= (
-            current_block_number - self.confirmations
-        ):
-            # Reindex again when it's almost synced to prevent reorg/missing elements issues
-            from_block_number = max(from_block_number - self.blocks_to_reindex_again, 0)
-
-        if (current_block_number - common_minimum_block_number) <= self.confirmations:
+        if (current_block_number - from_block_number) < self.confirmations:
             return  # We don't want problems with reorgs
 
         to_block_number = self.get_to_block_number(
             from_block_number, current_block_number
         )
+
+        # Reindex again when it's almost synced to prevent reorg/missing elements issues
+        if (
+            from_block_number + self.block_process_limit
+            > current_block_number - self.confirmations
+        ):
+            # Check if there's room on `block_process_limit` to reindex some blocks
+            blocks_to_reindex = min(
+                self.block_process_limit - (to_block_number - from_block_number + 1),
+                self.blocks_to_reindex_again,
+            )
+            from_block_number = max(from_block_number - blocks_to_reindex, 0)
+
         return from_block_number, to_block_number
 
     def get_to_block_number(
@@ -162,10 +168,11 @@ class EthereumIndexer(ABC):
         """
         :param from_block_number:
         :param current_block_number:
+
         :return: Top block number to process
         """
         return min(
-            from_block_number + self.block_process_limit,
+            from_block_number + self.block_process_limit - 1,
             current_block_number - self.confirmations,
         )
 
@@ -240,7 +247,7 @@ class EthereumIndexer(ABC):
         )
 
         not_updated_addresses = self.database_queryset.filter(
-            **{self.database_field + "__lt": current_block_number - self.confirmations}
+            **{self.database_field + "__lte": current_block_number - self.confirmations}
         ).order_by(self.database_field)
 
         logger.debug(
@@ -264,6 +271,9 @@ class EthereumIndexer(ABC):
             self.__class__.__name__,
         )
 
+        # Keep indexing going on the next block
+        new_to_block_number = to_block_number + 1
+
         updated_addresses = self.database_queryset.filter(
             **{
                 "address__in": addresses,
@@ -271,9 +281,9 @@ class EthereumIndexer(ABC):
                 + "__gte": from_block_number
                 - 1,  # Protect in case of reorg
                 self.database_field
-                + "__lte": to_block_number,  # Don't update to a lower block number
+                + "__lt": new_to_block_number,  # Don't update to a lower block number
             }
-        ).update(**{self.database_field: to_block_number})
+        ).update(**{self.database_field: new_to_block_number})
 
         if updated_addresses != len(addresses):
             logger.warning(
@@ -283,7 +293,7 @@ class EthereumIndexer(ABC):
                 updated_addresses,
                 len(addresses),
                 from_block_number,
-                to_block_number,
+                new_to_block_number,
             )
 
         logger.debug(
@@ -400,7 +410,7 @@ class EthereumIndexer(ABC):
         """
         Find and process relevant data for existing database addresses
 
-        :return: Number of elements processed and the number of blocks processed
+        :return: (number of elements processed, number of blocks processed)
         """
         current_block_number = self.ethereum_client.current_block_number
         logger.debug(
@@ -455,10 +465,7 @@ class EthereumIndexer(ABC):
             )
 
             # Not updated addresses are sorted by tx_block_number
-            minimum_block_number = getattr(
-                not_updated_addresses[0], self.database_field
-            )
-            from_block_number = minimum_block_number + 1
+            from_block_number = getattr(not_updated_addresses[0], self.database_field)
             updated = False
             while not updated:
                 # Estimate to_block_number
@@ -471,7 +478,7 @@ class EthereumIndexer(ABC):
                     monitored_contract.address
                     for monitored_contract in not_updated_addresses
                     if getattr(monitored_contract, self.database_field)
-                    < to_block_number_expected
+                    <= to_block_number_expected
                 ]
                 # Get real `to_block_number` processed
                 (
@@ -487,7 +494,7 @@ class EthereumIndexer(ABC):
                     start_block = from_block_number
 
                 number_processed_elements += len(processed_elements)
-                from_block_number = to_block_number + 1
+                from_block_number += 1
             if last_block is None or to_block_number > last_block:
                 last_block = to_block_number
         else:

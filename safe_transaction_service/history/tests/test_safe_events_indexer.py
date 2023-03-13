@@ -157,7 +157,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
                 payment_receiver,
             ).build_transaction({"gas": 1, "gasPrice": 1})["data"]
         )
-        initial_block_number = self.ethereum_client.current_block_number
+        initial_block_number = self.ethereum_client.current_block_number + 1
         safe_l2_master_copy = SafeMasterCopyFactory(
             address=self.safe_contract.address,
             initial_block_number=initial_block_number,
@@ -584,6 +584,7 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         blocks_processed = (
             self.safe_events_indexer.ethereum_client.current_block_number
             - initial_block_number
+            + 1
         )
         self.assertEqual(
             self.safe_events_indexer.start(), (0, blocks_processed)
