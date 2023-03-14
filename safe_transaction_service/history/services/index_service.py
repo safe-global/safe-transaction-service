@@ -135,17 +135,6 @@ class IndexService:
             synced=erc20_synced and master_copies_synced,
         )
 
-    def get_erc20_indexing_status(self) -> ERC20IndexingStatus:
-        current_block_number = self.ethereum_client.current_block_number
-        erc20_block_number = self.get_erc20_721_current_indexing_block_number()
-        synced = (current_block_number - erc20_block_number) <= self.eth_reorg_blocks
-
-        return ERC20IndexingStatus(
-            current_block_number=current_block_number,
-            erc20_block_number=erc20_block_number,
-            erc20_synced=synced,
-        )
-
     def is_service_synced(self) -> bool:
         """
         :return: `True` if master copies and ERC20/721 are synced, `False` otherwise

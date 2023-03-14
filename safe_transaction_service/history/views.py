@@ -146,21 +146,6 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
             return Response(self._get_info(ethereum_client))
 
 
-class ERC20IndexingView(GenericAPIView):
-    serializer_class = serializers.ERC20IndexingStatusSerializer
-    pagination_class = None  # Don't show limit/offset in swagger
-
-    @method_decorator(cache_page(15))  # 15 seconds
-    def get(self, request):
-        """
-        Get current indexing status for ERC20/721 events
-        """
-        index_service = IndexServiceProvider()
-
-        serializer = self.get_serializer(index_service.get_erc20_indexing_status())
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
-
-
 class IndexingView(GenericAPIView):
     serializer_class = serializers.IndexingStatusSerializer
     pagination_class = None  # Don't show limit/offset in swagger
