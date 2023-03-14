@@ -87,28 +87,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         EthereumClient,
         "current_block_number",
         new_callable=PropertyMock,
-        return_value=2000,
-    )
-    def test_erc20_indexing_view(self, current_block_number_mock: PropertyMock):
-        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
-        url = reverse("v1:history:erc20-indexing")
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_synced"], True)
-
-        IndexingStatus.objects.set_erc20_721_indexing_status(10)
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 10)
-        self.assertEqual(response.data["erc20_synced"], False)
-
-    @mock.patch.object(
-        EthereumClient,
-        "current_block_number",
-        new_callable=PropertyMock,
         return_value=2_000,
     )
     def test_indexing_view(self, current_block_number_mock: PropertyMock):
