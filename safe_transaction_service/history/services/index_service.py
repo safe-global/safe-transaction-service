@@ -109,15 +109,28 @@ class IndexService:
     def get_erc20_721_current_indexing_block_number(self) -> int:
         return IndexingStatusDb.objects.get_erc20_721_indexing_status().block_number
 
-    def get_indexing_status(self) -> IndexingStatus:
-        current_block_number = self.ethereum_client.current_block_number
-        erc20_block_number = self.get_erc20_721_current_indexing_block_number()
-
-        master_copies_block_number = SafeMasterCopy.objects.relevant().aggregate(
+    def get_master_copies_current_indexing_block_number(self) -> Optional[int]:
+        return SafeMasterCopy.objects.relevant().aggregate(
             min_master_copies_block_number=Min("tx_block_number")
         )["min_master_copies_block_number"]
-        if master_copies_block_number is None:  # Still nothing indexed
+
+    def get_indexing_status(self) -> IndexingStatus:
+        current_block_number = self.ethereum_client.current_block_number
+
+        # Indexing points to the next block to be indexed, we need the previous ones
+        erc20_block_number = min(
+            self.get_erc20_721_current_indexing_block_number() - 1, current_block_number
+        )
+
+        if (
+            master_copies_current_indexing_block_number := self.get_master_copies_current_indexing_block_number()
+            is None
+        ):
             master_copies_block_number = current_block_number
+        else:
+            master_copies_block_number = min(
+                master_copies_current_indexing_block_number - 1, current_block_number
+            )
 
         erc20_synced = (
             current_block_number - erc20_block_number <= self.eth_reorg_blocks
