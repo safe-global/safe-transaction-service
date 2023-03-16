@@ -1,7 +1,5 @@
 from django.test import TestCase
 
-from _pytest.outcomes import importorskip
-
 from gnosis.eth import EthereumNetwork
 
 from safe_transaction_service.history.tests.utils import skip_on
@@ -46,8 +44,6 @@ class TestCoingeckoClient(TestCase):
         polygon_coingecko_client = CoingeckoClient(EthereumNetwork.POLYGON)
         bnb_pos_address = "0xb33EaAd8d922B1083446DC23f610c2567fB5180f"
         self.assertGreater(polygon_coingecko_client.get_token_price(bnb_pos_address), 0)
-
-    importorskip
 
     @skip_on(CoingeckoRateLimitError, reason="Coingecko rate limit reached")
     def test_get_logo_url(self):
