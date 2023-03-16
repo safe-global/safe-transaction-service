@@ -11,6 +11,7 @@ from gnosis.eth import EthereumNetwork
 from safe_transaction_service.tokens.clients.exceptions import (
     CannotGetPrice,
     Coingecko404,
+    CoingeckoRateLimitError,
     CoingeckoRequestError,
 )
 
@@ -66,7 +67,9 @@ class CoingeckoClient:
             response = self.http_session.get(url, timeout=10)
             if not response.ok:
                 if response.status_code == 404:
-                    raise Coingecko404
+                    raise Coingecko404(url)
+                if response.status_code == 429:
+                    raise CoingeckoRateLimitError(url)
                 raise CoingeckoRequestError(url)
             return response.json()
         except (ValueError, IOError) as e:
