@@ -119,17 +119,18 @@ class IndexService:
 
         # Indexing points to the next block to be indexed, we need the previous ones
         erc20_block_number = min(
-            self.get_erc20_721_current_indexing_block_number() - 1, current_block_number
+            max(self.get_erc20_721_current_indexing_block_number() - 1, 0),
+            current_block_number,
         )
 
         if (
             master_copies_current_indexing_block_number := self.get_master_copies_current_indexing_block_number()
-            is None
-        ):
+        ) is None:
             master_copies_block_number = current_block_number
         else:
             master_copies_block_number = min(
-                master_copies_current_indexing_block_number - 1, current_block_number
+                max(master_copies_current_indexing_block_number - 1, 0),
+                current_block_number,
             )
 
         erc20_synced = (
