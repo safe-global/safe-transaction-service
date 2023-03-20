@@ -148,5 +148,24 @@ docker exec -it safe-transaction-service-web-1 python manage.py createsuperuser
 
 If you face issues installing the `grpc` dependency locally (required by this project) on a M1 chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
 
+## FAQ
+### Why `/v1/safes/{address}` endpoint shows a nonce that indicates that a transaction was executed but the transaction is not shown or marked as executed in the other endpoints?
+`/v1/safes/{address}` endpoint uses `eth_call` from the RPC to get the current information for a Safe, so there's
+no delay and as soon as a transaction is executed it will be updated. The other endpoints rely on polling, indexing
+decoding and processing of traces/events and take more (shouldn't be more than half a minute).
+
+### If I add my chain to [safe-eth-py](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) will you support it?
+No, for a chain to be supported we need to set up a dedicated infra for that network
+and [have a proper RPC](https://docs.safe.global/learn/infrastructure/rpc-requirements)
+
+### How can I interact with service?
+Aside from using standard HTTP requests:
+- [Safe API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/safe-service-client)
+- [Safe-eth-py](https://github.com/safe-global/safe-eth-py)
+- [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
+
+### What chains do you officially support?
+https://docs.safe.global/learn/safe-core/safe-core-api/available-services
+
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-transaction-service/graphs/contributors)
