@@ -154,6 +154,12 @@ If you face issues installing the `grpc` dependency locally (required by this pr
 no delay and as soon as a transaction is executed it will be updated. The other endpoints rely on polling, indexing
 decoding and processing of traces/events and take more (shouldn't be more than half a minute).
 
+### How do you handle reorgs?
+When indexed every block is marked as `not confirmed` unless it has some depth (configured via `ETH_REORG_BLOCKS` environment variable).
+`Not confirmed` blocks are checked periodically to check if the blockchain `blockHash` for that `number`
+changed before it reachs the desired number of `confirmations`, if that's the case, all blocks from that block and the transactions related
+are deleted and indexing is restarted to the last `confirmed` block.
+
 ### If I add my chain to [safe-eth-py](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) will you support it?
 No, for a chain to be supported we need to set up a dedicated infra for that network
 and [have a proper RPC](https://docs.safe.global/learn/infrastructure/rpc-requirements)
