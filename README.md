@@ -152,7 +152,7 @@ If you face issues installing the `grpc` dependency locally (required by this pr
 ### Why `/v1/safes/{address}` endpoint shows a nonce that indicates that a transaction was executed but the transaction is not shown or marked as executed in the other endpoints?
 `/v1/safes/{address}` endpoint uses `eth_call` from the RPC to get the current information for a Safe, so there's
 no delay and as soon as a transaction is executed it will be updated. The other endpoints rely on polling, indexing
-decoding and processing of traces/events and take more (shouldn't be more than half a minute).
+decoding and processing of traces/events and take longer (shouldn't be more than half a minute).
 
 ### How do you handle reorgs?
 When indexed every block is marked as `not confirmed` unless it has some depth (configured via `ETH_REORG_BLOCKS` environment variable).
