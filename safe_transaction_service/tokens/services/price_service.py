@@ -188,6 +188,9 @@ class PriceService:
     def get_cronos_usd_price(self) -> float:
         return self.kucoin_client.get_cro_usd_price()
 
+    def get_kraken_sgb_price(self) -> float:
+        return self.kraken_client.get_sgb_usd_price()
+
     def get_xdc_usd_price(self) -> float:
         return self.kucoin_client.get_xdc_usd_price()
 
@@ -289,6 +292,12 @@ class PriceService:
             EthereumNetwork.XDC_APOTHEM_NETWORK,
         ):
             return self.get_xdc_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.FLR_COSTON,
+            EthereumNetwork.SGB_SONGBIRD,
+            EthereumNetwork.FLR_FLARE,
+        ):
+            return self.get_kraken_sgb_price()
         else:
             return self.get_ether_usd_price()
 
