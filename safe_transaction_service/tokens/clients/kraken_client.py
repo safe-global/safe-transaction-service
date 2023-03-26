@@ -74,3 +74,10 @@ class KrakenClient:
         :raises: CannotGetPrice
         """
         return self._get_price("ALGOUSD")
+
+    def get_sgb_usd_price(self):
+        """
+        :return: current USD price for Flare Songbird
+        :raises: CannotGetPrice
+        """
+        return self._get_price("SGBUSD")
