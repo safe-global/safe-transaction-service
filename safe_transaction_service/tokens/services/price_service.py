@@ -278,9 +278,9 @@ class PriceService:
         ):
             return self.get_xdc_usd_price()
         elif self.ethereum_network in (
-            EthereumNetwork.FLR_COSTON,
-            EthereumNetwork.SGB_SONGBIRD,
-            EthereumNetwork.FLR_FLARE,
+            EthereumNetwork.FLARE_TESTNET_COSTON,
+            EthereumNetwork.SONGBIRD_CANARY_NETWORK,
+            EthereumNetwork.FLARE_MAINNET,
         ):
             return self.get_kraken_sgb_price()
         else:
