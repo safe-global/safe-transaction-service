@@ -23,26 +23,19 @@ from .mocks.mocks_internal_tx_indexer import block_child, block_parent
 
 
 class TestReorgService(TestCase):
-    @mock.patch.object(EthereumClient, "get_block")
+    @mock.patch.object(EthereumClient, "get_blocks")
     @mock.patch.object(
         EthereumClient, "current_block_number", new_callable=PropertyMock
     )
     def test_check_reorgs(
-        self, current_block_number_mock: PropertyMock, get_block_mock: MagicMock
+        self, current_block_number_mock: PropertyMock, get_blocks_mock: MagicMock
     ):
         reorg_service = ReorgServiceProvider()
 
         block = block_child
         block_number = block["number"]
 
-        def get_block_fn(number: int, full_transactions=False):
-            if number == block_number:
-                return block_child
-
-            if number == block_number + 1:
-                return block_parent
-
-        get_block_mock.side_effect = get_block_fn
+        get_blocks_mock.return_value = [block_child, block_parent]
         current_block_number = block_number + 100
         current_block_number_mock.return_value = current_block_number
 
@@ -114,15 +107,10 @@ class TestReorgService(TestCase):
         self.assertEqual(EthereumTx.objects.count(), 2)
 
         # Check that indexer rewound needed blocks
+        expected_rewind_block = reorg_block - reorg_service.eth_reorg_rewind_blocks
         proxy_factory.refresh_from_db()
-        self.assertEqual(
-            proxy_factory.tx_block_number,
-            reorg_block - reorg_service.eth_reorg_rewind_blocks,
-        )
         indexing_status.refresh_from_db()
-        self.assertEqual(indexing_status.block_number, reorg_block - 500)
         safe_master_copy.refresh_from_db()
-        self.assertEqual(
-            safe_master_copy.tx_block_number,
-            reorg_block - reorg_service.eth_reorg_rewind_blocks,
-        )
+        self.assertEqual(proxy_factory.tx_block_number, expected_rewind_block)
+        self.assertEqual(indexing_status.block_number, expected_rewind_block)
+        self.assertEqual(safe_master_copy.tx_block_number, expected_rewind_block)

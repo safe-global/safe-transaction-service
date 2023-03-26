@@ -24,44 +24,24 @@ class TestEnsClient(TestCase):
         self.assertEqual(len(EnsClient.domain_hash_to_hex_str(2)), 66)
 
     def test_query_by_account(self):
-        ens_client = EnsClient(EthereumNetwork.RINKEBY.value)  # Mainnet
+        ens_client = EnsClient(EthereumNetwork.GOERLI.value)  # Mainnet
         if not ens_client.is_available():
-            self.skipTest("ENS Rinkeby Client is not available")
+            self.skipTest("ENS Goerli Client is not available")
 
         self.assertEqual(
-            ens_client.query_by_account("0x4323E6b155BCf0b25f8c4C0B37dA808e3550b521"),
+            ens_client.query_by_account("0x0D28d3C544757B9DBb99AC33FcB774534D7C8a7D"),
             {
                 "registrations": [
                     {
-                        "expiryDate": "2257309961",
+                        "expiryDate": "2308985592",
                         "domain": {
-                            "labelName": "vivarox",
-                            "labelhash": "0x3dad4bca5efcde980e9e7f3a9484749505648542b06c5f4f8b2dbdb767f67ba8",
-                            "name": "vivarox.eth",
+                            "labelName": "safe-tx-service",
+                            "labelhash": "0x4d9600e939c494d5af0e62d974199a3674381907b1a7469ff900d13ff74f04d1",
+                            "name": "safe-tx-service.eth",
                             "isMigrated": True,
                             "parent": {"name": "eth"},
                         },
-                    },
-                    {
-                        "expiryDate": "2257310351",
-                        "domain": {
-                            "labelName": "satoshinakamoto",
-                            "labelhash": "0x595165e57d0d5a26f71f2f387c9e8208831fa957a18aad079218ce42a530bc6e",
-                            "name": "satoshinakamoto.eth",
-                            "isMigrated": True,
-                            "parent": {"name": "eth"},
-                        },
-                    },
-                    {
-                        "expiryDate": "2320424525",
-                        "domain": {
-                            "labelName": "vitalik",
-                            "labelhash": "0xaf2caa1c2ca1d027f1ac823b529d0a67cd144264b2789fa2ea4d63a67c7103cc",
-                            "name": "vitalik.eth",
-                            "isMigrated": True,
-                            "parent": {"name": "eth"},
-                        },
-                    },
+                    }
                 ]
             },
         )
@@ -82,8 +62,6 @@ class TestEnsClient(TestCase):
 
     def test_is_available(self):
         for ethereum_network in (
-            EthereumNetwork.ROPSTEN,
-            EthereumNetwork.RINKEBY,
             EthereumNetwork.GOERLI,
             EthereumNetwork.MAINNET,
         ):

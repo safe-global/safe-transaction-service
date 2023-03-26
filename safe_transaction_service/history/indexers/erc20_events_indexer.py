@@ -1,22 +1,16 @@
-import operator
 from collections import OrderedDict
 from logging import getLogger
 from typing import Iterator, List, Optional, Sequence
 
 from django.db.models import QuerySet
 
-from cache_memoize import cache_memoize
-from cachetools import cachedmethod
-from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from web3.contract import ContractEvent
-from web3.exceptions import BadFunctionCallOutput
 from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient
 
-from safe_transaction_service.tokens.models import Token
-
+from ...utils.utils import FixedSizeDict
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -47,11 +41,21 @@ class Erc20EventsIndexerProvider:
 
 
 class Erc20EventsIndexer(EventsIndexer):
-    _cache_is_erc20 = {}
+    """
+    Indexes `ERC20` and `ERC721` `Transfer` events.
 
+    ERC20 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 value)`
+    ERC721 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 indexed tokenId)`
+
+    As `event topic` is the same both events can be indexed together, and then tell
+    apart based on the `indexed` part as `indexed` elements are stored in a different way in the
+    `ethereum tx receipt`.
     """
-    Indexes ERC20 and ERC721 `Transfer` Event (as ERC721 has the same topic)
-    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -107,36 +111,14 @@ class Erc20EventsIndexer(EventsIndexer):
             or transfer_event["args"]["from"] in addresses_set
         ]
 
-    @cachedmethod(cache=operator.attrgetter("_cache_is_erc20"))
-    @cache_memoize(60 * 60 * 24, prefix="erc20-events-indexer-is-erc20")  # 1 day
-    def _is_erc20(self, token_address: str) -> bool:
-        try:
-            token = Token.objects.get(address=token_address)
-            return token.is_erc20()
-        except Token.DoesNotExist:
-            try:
-                decimals = self.ethereum_client.erc20.get_decimals(token_address)
-                return decimals is not None
-            except (ValueError, BadFunctionCallOutput, DecodingError):
-                return False
-
-    def _process_decoded_element(self, event: EventData) -> EventData:
+    def _process_decoded_element(self, decoded_element: EventData) -> None:
         """
-        :param event: Be careful, it will be modified instead of copied
-        :return: The same event if it's a ERC20/ERC721. Tries to tell apart if it's not defined (`unknown` instead
-            of `value` or `tokenId`)
-        """
-        event_args = event["args"]
-        if "unknown" in event_args:  # Not standard event
-            event_args["value"] = event_args.pop("unknown")
+        Not used as `process_elements` is redefined using custom processors
 
-        if self._is_erc20(event["address"]):
-            if "tokenId" in event_args:
-                event_args["value"] = event_args.pop("tokenId")
-        else:
-            if "value" in event_args:
-                event_args["tokenId"] = event_args.pop("value")
-        return event
+        :param decoded_element:
+        :return:
+        """
+        pass
 
     def events_to_erc20_transfer(
         self, log_receipts: Sequence[EventData]
@@ -176,11 +158,18 @@ class Erc20EventsIndexer(EventsIndexer):
             logger.debug("End prefetching and storing of ethereum txs")
 
             logger.debug("Storing TokenTransfer objects")
+            not_processed_log_receipts = [
+                log_receipt
+                for log_receipt in log_receipts
+                if self.mark_as_processed(log_receipt)
+            ]
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
-                self.events_to_erc20_transfer(log_receipts), ignore_conflicts=True
+                self.events_to_erc20_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
             )
             result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
-                self.events_to_erc721_transfer(log_receipts), ignore_conflicts=True
+                self.events_to_erc721_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
             )
             logger.debug("Stored TokenTransfer objects")
             return range(
@@ -221,5 +210,5 @@ class Erc20EventsIndexer(EventsIndexer):
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
     ) -> int:
         return int(
-            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number)
+            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number + 1)
         )

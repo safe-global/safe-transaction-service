@@ -1,20 +1,25 @@
-import copy
-from unittest import mock
-
 from django.test import TestCase
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
-from ..indexers import Erc20EventsIndexer, Erc20EventsIndexerProvider
+from ..indexers import Erc20EventsIndexerProvider
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus
-from .factories import SafeContractFactory
+from .factories import EthereumTxFactory, SafeContractFactory
+from .mocks.mocks_erc20_events_indexer import log_receipt_mock
 
 
 class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
+    def setUp(self) -> None:
+        Erc20EventsIndexerProvider.del_singleton()
+        self.erc20_events_indexer = Erc20EventsIndexerProvider()
+
+    def tearDown(self) -> None:
+        Erc20EventsIndexerProvider.del_singleton()
+
     def test_erc20_events_indexer(self):
-        erc20_events_indexer = Erc20EventsIndexerProvider()
+        erc20_events_indexer = self.erc20_events_indexer
         erc20_events_indexer.confirmations = 0
-        self.assertEqual(erc20_events_indexer.start(), 0)
+        self.assertEqual(erc20_events_indexer.start(), (0, 0))
 
         account = self.ethereum_test_account
         amount = 10
@@ -30,8 +35,10 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
-
-        self.assertEqual(erc20_events_indexer.start(), 1)
+        self.assertEqual(
+            erc20_events_indexer.start(),
+            (1, self.ethereum_client.current_block_number + 1),
+        )
 
         # Erc20/721 last indexed block number is stored on IndexingStatus
         self.assertGreater(
@@ -41,7 +48,8 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertEqual(
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
             self.ethereum_client.current_block_number
-            - erc20_events_indexer.confirmations,
+            - erc20_events_indexer.confirmations
+            + 1,
         )
         self.assertTrue(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertTrue(
@@ -52,47 +60,36 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             ERC20Transfer.objects.to_or_from(safe_contract.address).count(), 1
         )
 
-        # Test _process_decoded_element
         block_number = self.ethereum_client.get_transaction(tx_hash)["blockNumber"]
         event = self.ethereum_client.erc20.get_total_transfer_history(
             from_block=block_number, to_block=block_number
         )[0]
         self.assertIn("value", event["args"])
 
-        original_event = copy.deepcopy(event)
-        event["args"]["unknown"] = event["args"].pop("value")
+    def test_mark_as_processed(self):
+        # Create transaction in db so not fetching of transaction is needed
+        for log_receipt in log_receipt_mock:
+            tx_hash = log_receipt["transactionHash"]
+            block_hash = log_receipt["blockHash"]
+            EthereumTxFactory(tx_hash=tx_hash, block__block_hash=block_hash)
 
+        # After the first processing transactions will be cached to prevent reprocessing
+        self.assertEqual(len(self.erc20_events_indexer._processed_element_cache), 0)
         self.assertEqual(
-            erc20_events_indexer._process_decoded_element(event), original_event
+            len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 1
+        )
+        self.assertEqual(len(self.erc20_events_indexer._processed_element_cache), 1)
+
+        # Transactions are cached and will not be reprocessed
+        self.assertEqual(
+            len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 0
+        )
+        self.assertEqual(
+            len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 0
         )
 
-        # Test ERC721
-        event = self.ethereum_client.erc20.get_total_transfer_history(
-            from_block=block_number, to_block=block_number
-        )[0]
-        with mock.patch.object(
-            Erc20EventsIndexer, "_is_erc20", autospec=True, return_value=False
-        ):
-            # Convert event to erc721
-            event["args"]["tokenId"] = event["args"].pop("value")
-            original_event = copy.deepcopy(event)
-            event["args"]["unknown"] = event["args"].pop("tokenId")
-
-            self.assertEqual(
-                erc20_events_indexer._process_decoded_element(event), original_event
-            )
-
-        event = self.ethereum_client.erc20.get_total_transfer_history(
-            from_block=block_number, to_block=block_number
-        )[0]
-        with mock.patch.object(
-            Erc20EventsIndexer, "_is_erc20", autospec=True, return_value=True
-        ):
-            # Convert event to erc721
-            original_event = copy.deepcopy(event)
-            event["args"]["tokenId"] = event["args"].pop("value")
-
-            # ERC721 event will be converted to ERC20
-            self.assertEqual(
-                erc20_events_indexer._process_decoded_element(event), original_event
-            )
+        # Cleaning the cache will reprocess the transactions again
+        self.erc20_events_indexer._processed_element_cache.clear()
+        self.assertEqual(
+            len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 1
+        )

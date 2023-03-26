@@ -7,7 +7,7 @@ from logging import getLogger
 from typing import (
     Any,
     Dict,
-    Iterable,
+    Iterator,
     List,
     Optional,
     Sequence,
@@ -135,19 +135,23 @@ class BulkCreateSignalMixin:
         return result
 
     def bulk_create_from_generator(
-        self, objs: Iterable[Any], batch_size: int = 100, ignore_conflicts: bool = False
+        self, objs: Iterator[Any], batch_size: int = 100, ignore_conflicts: bool = False
     ) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
         they will be brought to RAM. This approach is more friendly
+
         :return: Count of inserted elements
         """
         assert batch_size is not None and batch_size > 0
+        iterator = iter(
+            objs
+        )  # Make sure we are not slicing the same elements if a sequence is provided
         total = 0
         while True:
             if inserted := len(
                 self.bulk_create(
-                    islice(objs, batch_size), ignore_conflicts=ignore_conflicts
+                    islice(iterator, batch_size), ignore_conflicts=ignore_conflicts
                 )
             ):
                 total += inserted
@@ -174,6 +178,18 @@ class IndexingStatus(models.Model):
         choices=[(tag.value, tag.name) for tag in IndexingStatusType],
     )
     block_number = models.PositiveIntegerField(db_index=True)
+
+
+class Chain(models.Model):
+    """
+    This model keeps track of the chainId used to configure the service, to prevent issues if a wrong ethereum
+    RPC is configured later
+    """
+
+    chain_id = models.BigIntegerField(primary_key=True)
+
+    def __str__(self):
+        return f"ChainId {self.chain_id}"
 
 
 class EthereumBlockManager(models.Manager):
@@ -261,7 +277,16 @@ class EthereumBlock(models.Model):
     block_hash = Keccak256Field(unique=True)
     parent_hash = Keccak256Field(unique=True)
     # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
-    confirmed = models.BooleanField(default=False, db_index=True)
+    confirmed = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            Index(
+                name="history_block_confirmed_idx",
+                fields=["confirmed"],
+                condition=Q(confirmed=False),
+            ),
+        ]
 
     def __str__(self):
         return f"Block number={self.number} on {self.timestamp}"
