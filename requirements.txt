@@ -29,7 +29,7 @@ packaging>=21.0
 pillow==9.4.0
 psycogreen==1.0.2
 psycopg2==2.9.5
-redis==4.5.1
+redis==4.5.3
 requests==2.28.2
 safe-eth-py[django]==5.1.0
 web3==5.31.3
