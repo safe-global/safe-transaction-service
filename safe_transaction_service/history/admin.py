@@ -15,6 +15,7 @@ from gnosis.eth.django.admin import BinarySearchAdmin
 from gnosis.safe import SafeTx
 
 from .models import (
+    Chain,
     ERC20Transfer,
     ERC721Transfer,
     EthereumBlock,
@@ -98,6 +99,11 @@ class IndexingStatusAdmin(admin.ModelAdmin):
         "=block_number",
     ]
     ordering = ["-indexing_type"]
+
+
+@admin.register(Chain)
+class ChainAdmin(admin.ModelAdmin):
+    list_display = ("chain_id",)
 
 
 @admin.register(EthereumBlock)
@@ -251,8 +257,7 @@ class InternalTxDecodedAdmin(BinarySearchAdmin):
     ]
     raw_id_fields = ("internal_tx",)
     search_fields = [
-        "function_name",
-        "arguments",
+        "=function_name",
         "=internal_tx__to",
         "=internal_tx___from",
         "=internal_tx__ethereum_tx__tx_hash",

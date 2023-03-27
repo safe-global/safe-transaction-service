@@ -93,6 +93,7 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
 ]
 LOCAL_APPS = [
+    "safe_transaction_service.analytics.apps.AnalyticsConfig",
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
     "safe_transaction_service.notifications.apps.NotificationsConfig",

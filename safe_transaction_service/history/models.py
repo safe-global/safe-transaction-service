@@ -7,7 +7,7 @@ from logging import getLogger
 from typing import (
     Any,
     Dict,
-    Iterable,
+    Iterator,
     List,
     Optional,
     Sequence,
@@ -135,19 +135,23 @@ class BulkCreateSignalMixin:
         return result
 
     def bulk_create_from_generator(
-        self, objs: Iterable[Any], batch_size: int = 100, ignore_conflicts: bool = False
+        self, objs: Iterator[Any], batch_size: int = 100, ignore_conflicts: bool = False
     ) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
         they will be brought to RAM. This approach is more friendly
+
         :return: Count of inserted elements
         """
         assert batch_size is not None and batch_size > 0
+        iterator = iter(
+            objs
+        )  # Make sure we are not slicing the same elements if a sequence is provided
         total = 0
         while True:
             if inserted := len(
                 self.bulk_create(
-                    islice(objs, batch_size), ignore_conflicts=ignore_conflicts
+                    islice(iterator, batch_size), ignore_conflicts=ignore_conflicts
                 )
             ):
                 total += inserted
@@ -176,6 +180,18 @@ class IndexingStatus(models.Model):
     block_number = models.PositiveIntegerField(db_index=True)
 
 
+class Chain(models.Model):
+    """
+    This model keeps track of the chainId used to configure the service, to prevent issues if a wrong ethereum
+    RPC is configured later
+    """
+
+    chain_id = models.BigIntegerField(primary_key=True)
+
+    def __str__(self):
+        return f"ChainId {self.chain_id}"
+
+
 class EthereumBlockManager(models.Manager):
     def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
         try:
@@ -195,7 +211,8 @@ class EthereumBlockManager(models.Manager):
             with transaction.atomic():  # Needed for handling IntegrityError
                 return super().create(
                     number=block["number"],
-                    gas_limit=block["gasLimit"],
+                    # Some networks like CELO don't provide gasLimit
+                    gas_limit=block.get("gasLimit", 0),
                     gas_used=block["gasUsed"],
                     timestamp=datetime.datetime.fromtimestamp(
                         block["timestamp"], datetime.timezone.utc
@@ -260,7 +277,16 @@ class EthereumBlock(models.Model):
     block_hash = Keccak256Field(unique=True)
     parent_hash = Keccak256Field(unique=True)
     # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
-    confirmed = models.BooleanField(default=False, db_index=True)
+    confirmed = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            Index(
+                name="history_block_confirmed_idx",
+                fields=["confirmed"],
+                condition=Q(confirmed=False),
+            ),
+        ]
 
     def __str__(self):
         return f"Block number={self.number} on {self.timestamp}"
@@ -288,14 +314,21 @@ class EthereumTxManager(models.Manager):
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
         ]
+
+        # Some networks like CELO provide a `null` gas_price
+        gas_price = (
+            (tx_receipt and tx_receipt.get("effectiveGasPrice", 0))
+            or tx.get("gasPrice", 0)
+            or 0
+        )
+
         return super().create(
             block=ethereum_block,
             tx_hash=HexBytes(tx["hash"]).hex(),
             gas_used=tx_receipt and tx_receipt["gasUsed"],
             _from=tx["from"],
             gas=tx["gas"],
-            gas_price=(tx_receipt and tx_receipt.get("effectiveGasPrice", 0))
-            or tx.get("gasPrice", 0),
+            gas_price=gas_price,
             max_fee_per_gas=tx.get("maxFeePerGas"),
             max_priority_fee_per_gas=tx.get("maxPriorityFeePerGas"),
             logs=logs,
@@ -836,7 +869,9 @@ class InternalTx(models.Model):
     )  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
-    to = EthereumAddressV2Field(null=True)
+    to = EthereumAddressV2Field(
+        null=True
+    )  # Already exists a multicolumn index for field
     value = Uint256Field()
     gas_used = Uint256Field()
     contract_address = EthereumAddressV2Field(null=True, db_index=True)  # Create
@@ -1188,6 +1223,9 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
     def trusted(self):
         return self.filter(trusted=True)
+
+    def not_trusted(self):
+        return self.filter(trusted=False)
 
     def multisend(self):
         # TODO Use MultiSend.MULTISEND_ADDRESSES + MultiSend MULTISEND_CALL_ONLY_ADDRESSES

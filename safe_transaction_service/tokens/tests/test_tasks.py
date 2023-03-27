@@ -15,12 +15,16 @@ from gnosis.eth.ethereum_client import (
 
 from ...history.tests.utils import just_test_if_mainnet_node
 from ...utils.redis import get_redis
+from ..models import TokenList
 from ..services import PriceService, PriceServiceProvider
 from ..tasks import (
     EthValueWithTimestamp,
     calculate_token_eth_price_task,
     fix_pool_tokens_task,
+    update_token_info_from_token_list_task,
 )
+from .factories import TokenFactory, TokenListFactory
+from .mocks import token_list_mock
 
 logger = logging.getLogger(__name__)
 
@@ -135,3 +139,29 @@ class TestTasks(TestCase):
             ).result,
             expected,
         )
+
+    @mock.patch(
+        "safe_transaction_service.tokens.tasks.get_ethereum_network",
+        return_value=EthereumNetwork.MAINNET,
+    )
+    @mock.patch.object(
+        TokenList, "get_tokens", autospec=True, return_value=token_list_mock["tokens"]
+    )
+    def test_update_token_info_from_token_list_task(
+        self, get_tokens_mock: MagicMock, get_ethereum_network_mock: MagicMock
+    ):
+        TokenListFactory()
+        # No tokens in database, so nothing is updated
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 0)
+
+        # Create random token, it won't be updated as it's not matching any token on the list
+        TokenFactory()
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 0)
+
+        # Create a token in the list, it should be updated
+        TokenFactory(address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
+
+        # Create another token in the list, both should be updated
+        TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 2)

@@ -17,3 +17,10 @@ class TokenFactory(DjangoModelFactory):
     trusted = False
     spam = False
     copy_price = None
+
+
+class TokenListFactory(DjangoModelFactory):
+    class Meta:
+        model = models.TokenList
+
+    url = factory.Faker("url")

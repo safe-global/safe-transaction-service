@@ -19,7 +19,7 @@ def get_transactions_per_safe_app_task():
     today = timezone.now()
     last_week = today - relativedelta(days=7)
     last_month = today - relativedelta(months=1)
-    last_year = today - relativedelta(years=3)
+    last_year = today - relativedelta(years=1)
 
     queryset = (
         MultisigTransaction.objects.filter(origin__name__isnull=False)

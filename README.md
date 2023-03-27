@@ -20,7 +20,8 @@ a transaction that is pending to be sent to the blockchain.
 
 ## Index of contents
 
-- [Docs]( https://docs.gnosis-safe.io/backend/service-architecture)
+- [Docs](https://docs.gnosis-safe.io/backend/service-architecture)
+- [Deploying the service](https://github.com/safe-global/safe-infrastructure)
 
 ## Setup for development
 Use a virtualenv if possible:
@@ -63,14 +64,17 @@ docker-compose build --force-rm
 docker-compose up
 ```
 
-If the network is not supported yet [contracts can be deployed using the deployment instructions
-](https://github.com/safe-global/safe-contracts/tree/v1.3.0/contracts)
-and then a PR should be provided to this service [adding the deployment block number and the address (address
-will be the same for every network)](safe_transaction_service/history/management/commands/setup_service.py). Only
-`ProxyFactory` and `GnosisSafeL2` must be configured. `+L2` must be added to the Safe contract versions, so the service
-knows the contract can be indexed using events.
-
 For more parameters check [base.py](config/settings/base.py) file.
+
+### Setup for a custom network
+
+- If the network is not supported yet [contracts can be deployed using the deployment instructions
+](https://github.com/safe-global/safe-contracts/tree/v1.3.0/contracts)
+and then a PR should be provided [adding the deployment block number and the address](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) (address will be the same for every network).
+- Only `ProxyFactory` and `GnosisSafeL2` must be configured. `+L2` must be added to the `Safe L2` contract versions, so the service knows the contract can be indexed using events. For us to accept the PR network must be on https://github.com/ethereum-lists/chains .
+- You can always set this up later using the **admin panel** if your network is not supported, going to the **Master Copies** and **Proxy Factories**.
+- **We recommend** using event indexing for every network where transaction fees are not relevant, so a tracing node is not required and everything can be indexed using events with the `Safe L2` version.
+
 
 ## Setup for production (tracing mode)
 This is the recommended configuration for running a production Transaction service. `docker-compose` is required
@@ -125,18 +129,6 @@ docker-compose build --force-rm
 docker-compose up
 ```
 
-## Setup for private network
-Instructions for production still apply, but some additional steps are required:
-- Deploy the last version of the [Safe Contracts](https://github.com/safe-global/safe-contracts) on your private network.
-- [Add their addresses and the number of the block they were deployed
-](safe_transaction_service/history/management/commands/setup_service.py) (to optimize initial indexing).
-Service is currently configured to support _Mainnet_, _Rinkeby_, _Goerli_, _Kovan_, _xDai_, _Polygon_, _EWC_...
-- If you have a custom `network id` you can change this line
-`ethereum_network = ethereum_client.get_network()` to `ethereum_network_id = ethereum_client.w3.net.version` and use
-the `network id` instead of the `Enum`.
-- Only contracts that need to be configured are the **ProxyFactory** that will be used to deploy the contracts and
-the **GnosisSafe/GnosisSafeL2**.
-
 ## Use admin interface
 Services come with a basic administration web ui (provided by Django) by default on http://localhost:8000/admin/
 
@@ -149,7 +141,6 @@ docker exec -it safe-transaction-service-web-1 python manage.py createsuperuser
 - [v1.3.0](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe.json)
 - [v1.3.0 L2](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe_l2.json)
 - [Other related contracts and previous Safe versions](https://github.com/safe-global/safe-deployments/blob/main/src/assets)
-
 
 ## Troubleshooting
 

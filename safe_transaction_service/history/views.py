@@ -53,7 +53,6 @@ from .services import (
     SafeServiceProvider,
     TransactionServiceProvider,
 )
-from .services.collectibles_service import CollectiblesServiceProvider
 from .services.safe_service import CannotGetSafeInfoFromBlockchain
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,6 @@ class AboutView(APIView):
             "headers": [x for x in request.META.keys() if "FORWARD" in x],
             "settings": {
                 "AWS_CONFIGURED": settings.AWS_CONFIGURED,
-                "AWS_S3_BUCKET_NAME": settings.AWS_S3_BUCKET_NAME,
                 "AWS_S3_PUBLIC_URL": settings.AWS_S3_PUBLIC_URL,
                 "ETHEREUM_NODE_URL": settings.ETHEREUM_NODE_URL,
                 "ETHEREUM_TRACING_NODE_URL": settings.ETHEREUM_TRACING_NODE_URL,
@@ -146,21 +144,6 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
         else:
             ethereum_client = EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
             return Response(self._get_info(ethereum_client))
-
-
-class ERC20IndexingView(GenericAPIView):
-    serializer_class = serializers.ERC20IndexingStatusSerializer
-    pagination_class = None  # Don't show limit/offset in swagger
-
-    @method_decorator(cache_page(15))  # 15 seconds
-    def get(self, request):
-        """
-        Get current indexing status for ERC20/721 events
-        """
-        index_service = IndexServiceProvider()
-
-        serializer = self.get_serializer(index_service.get_erc20_indexing_status())
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class IndexingView(GenericAPIView):
@@ -594,23 +577,6 @@ class SafeBalanceUsdView(SafeBalanceView):
     def get(self, *args, **kwargs):
         """
         Get balance for Ether and ERC20 tokens with USD fiat conversion
-        """
-        return super().get(*args, **kwargs)
-
-
-class SafeCollectiblesView(SafeBalanceView):
-    serializer_class = serializers.SafeCollectibleResponseSerializer
-
-    def get_result(self, *args, **kwargs):
-        return CollectiblesServiceProvider().get_collectibles_with_metadata(
-            *args, **kwargs
-        )
-
-    @swagger_safe_balance_schema(serializer_class, deprecated=True)
-    def get(self, *args, **kwargs):
-        """
-        Get collectibles (ERC721 tokens) and information about them. Limited to 50 collectibles due to
-        performance issues, endpoint will be deprecated soon, please migrate to v2 endpoint.
         """
         return super().get(*args, **kwargs)
 

@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import json
 import logging
@@ -170,17 +171,40 @@ class CollectiblesService:
     def get_metadata_cache_key(self, address: str, token_id: int):
         return f"metadata:{address}:{token_id}"
 
+    def _decode_base64_uri(self, uri: str) -> Optional[Dict[str, Any]]:
+        """
+        Decodes data:application/json;base64 uris
+
+        :param uri: Base64 uri
+        :return: `Dict` if `base 64 json` is valid, `None` otherwise
+        """
+        pattern = "data:application/json;base64,"
+
+        if uri and uri.startswith(pattern):
+            try:
+                return json.loads(base64.b64decode(uri[len(pattern) :]))
+            except ValueError:
+                # b64decode can raise ValueError and binascii.Error (inherits from ValueError)
+                # json.loads can raise a JSONDecodeError (inherits from ValueError)
+                return None
+
     def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
-        Get metadata from URI. Currently just ipfs/http/https is supported
+        Get metadata from URI. IPFS, HTTP/S, and BASE64/JSON are supported
 
         :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
+        if not uri:
+            raise MetadataRetrievalException("Empty URI")
+
+        # Check base64
+        if base_64_decoded := self._decode_base64_uri(uri):
+            return base_64_decoded
 
         uri = ipfs_to_http(uri)
 
-        if not uri or not uri.startswith("http"):
+        if not uri.startswith("http"):
             raise MetadataRetrievalException(uri)
 
         try:
@@ -470,25 +494,6 @@ class CollectiblesService:
                 ] = collectibles_with_metadata_not_cached.pop(0)
 
         return collectibles_with_metadata, count
-
-    def get_collectibles_with_metadata(
-        self,
-        safe_address: ChecksumAddress,
-        only_trusted: bool = False,
-        exclude_spam: bool = False,
-    ) -> List[CollectibleWithMetadata]:
-        """
-        Get collectibles v1 returns no paginated response
-
-        :param safe_address:
-        :param only_trusted: If True, return balance only for trusted tokens
-        :param exclude_spam: If True, exclude spam tokens
-        :return: collectibles
-        """
-        collectibles, _ = self._get_collectibles_with_metadata(
-            safe_address, only_trusted, exclude_spam, limit=50, offset=0
-        )
-        return collectibles
 
     def get_collectibles_with_metadata_paginated(
         self,

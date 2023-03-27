@@ -1,3 +1,4 @@
+import functools
 import os
 
 import pytest
@@ -32,3 +33,26 @@ def just_test_if_mainnet_node() -> str:
             )
     just_test_if_mainnet_node.checked = True
     return mainnet_node_url
+
+
+def skip_on(exception, reason="Test skipped due to a controlled exception"):
+    """
+    Decorator to skip a test if an exception is raised instead of failing it
+
+    :param exception:
+    :param reason:
+    :return:
+    """
+
+    def decorator_func(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                # Run the test
+                return f(*args, **kwargs)
+            except exception:
+                pytest.skip(reason)
+
+        return wrapper
+
+    return decorator_func

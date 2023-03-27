@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from celery import app
@@ -10,12 +11,14 @@ from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 
 from gnosis.eth.ethereum_client import EthereumNetwork
+from gnosis.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
-from .models import Token
+from .exceptions import TokenListRetrievalException
+from .models import Token, TokenList
 
 logger = get_task_logger(__name__)
 
@@ -111,3 +114,36 @@ def fix_pool_tokens_task() -> Optional[int]:
         if number:
             logger.info("%d pool token names were fixed", number)
         return number
+
+
+@app.shared_task()
+@close_gevent_db_connection_decorator
+def update_token_info_from_token_list_task() -> int:
+    """
+    If there's at least one valid token list with at least 1 token, every token in the DB is marked as `not trusted`
+    and then every token on the list is marked as `trusted`
+
+    :return: Number of tokens marked as `trusted`
+    """
+    tokens = []
+    for token_list in TokenList.objects.all():
+        try:
+            tokens += token_list.get_tokens()
+        except TokenListRetrievalException:
+            logger.error("Cannot read tokens from %s", token_list)
+
+    if not tokens:
+        return 0
+
+    # Make sure current chainId matches the one in the list
+    ethereum_network = get_ethereum_network()
+
+    token_addresses = [
+        fast_to_checksum_address(token["address"])
+        for token in tokens
+        if token["chainId"] == ethereum_network.value
+    ]
+
+    with transaction.atomic():
+        Token.objects.update(trusted=False)
+        return Token.objects.filter(address__in=token_addresses).update(trusted=True)

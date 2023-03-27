@@ -40,9 +40,8 @@ from ..models import (
     SafeMasterCopy,
 )
 from ..serializers import TransferType
-from ..services import BalanceService, CollectiblesService
+from ..services import BalanceService
 from ..services.balance_service import Erc20InfoWithLogo
-from ..services.collectibles_service import CollectibleWithMetadata
 from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
@@ -88,32 +87,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         EthereumClient,
         "current_block_number",
         new_callable=PropertyMock,
-        return_value=2000,
-    )
-    def test_erc20_indexing_view(self, current_block_number_mock: PropertyMock):
-        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
-        url = reverse("v1:history:erc20-indexing")
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_synced"], True)
-
-        IndexingStatus.objects.set_erc20_721_indexing_status(10)
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["current_block_number"], 2_000)
-        self.assertEqual(response.data["erc20_block_number"], 10)
-        self.assertEqual(response.data["erc20_synced"], False)
-
-    @mock.patch.object(
-        EthereumClient,
-        "current_block_number",
-        new_callable=PropertyMock,
         return_value=2_000,
     )
     def test_indexing_view(self, current_block_number_mock: PropertyMock):
-        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
+        IndexingStatus.objects.set_erc20_721_indexing_status(2_005)
         url = reverse("v1:history:indexing")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -128,17 +105,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_block_number"], 499)
         self.assertEqual(response.data["erc20_synced"], False)
         self.assertEqual(response.data["master_copies_block_number"], 2000)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], False)
 
-        safe_master_copy = SafeMasterCopyFactory(tx_block_number=1999)
+        safe_master_copy = SafeMasterCopyFactory(tx_block_number=2000)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_block_number"], 499)
         self.assertEqual(response.data["erc20_synced"], False)
         self.assertEqual(response.data["master_copies_block_number"], 1999)
         self.assertEqual(response.data["master_copies_synced"], True)
@@ -148,20 +125,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_master_copy.save(update_fields=["tx_block_number"])
         response = self.client.get(url, format="json")
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["erc20_block_number"], 500)
+        self.assertEqual(response.data["erc20_block_number"], 499)
         self.assertEqual(response.data["erc20_synced"], False)
-        self.assertEqual(response.data["master_copies_block_number"], 600)
+        self.assertEqual(response.data["master_copies_block_number"], 599)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
         IndexingStatus.objects.set_erc20_721_indexing_status(10)
-        SafeMasterCopyFactory(tx_block_number=9)
+        SafeMasterCopyFactory(tx_block_number=8)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_block_number"], 9)
         self.assertEqual(response.data["erc20_synced"], False)
-        self.assertEqual(response.data["master_copies_block_number"], 9)
+        self.assertEqual(response.data["master_copies_block_number"], 7)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
@@ -169,14 +146,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
-        self.assertEqual(response.data["erc20_block_number"], 10)
+        self.assertEqual(response.data["erc20_block_number"], 9)
         self.assertEqual(response.data["erc20_synced"], False)
-        self.assertEqual(response.data["master_copies_block_number"], 9)
+        self.assertEqual(response.data["master_copies_block_number"], 7)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
-        IndexingStatus.objects.set_erc20_721_indexing_status(1_999)
-        SafeMasterCopy.objects.update(tx_block_number=1999)
+        IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
+        SafeMasterCopy.objects.update(tx_block_number=2_000)
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["current_block_number"], 2000)
@@ -192,7 +169,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["current_block_number"], 2000)
         self.assertEqual(response.data["erc20_block_number"], 1999)
         self.assertEqual(response.data["erc20_synced"], True)
-        self.assertEqual(response.data["master_copies_block_number"], 48)
+        self.assertEqual(response.data["master_copies_block_number"], 47)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
 
@@ -1635,71 +1612,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 },
             ],
         )
-
-    # Test without pagination
-    def test_safe_collectibles(self):
-        safe_address = Account.create().address
-        response = self.client.get(
-            reverse("v1:history:safe-collectibles", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-        SafeContractFactory(address=safe_address)
-        response = self.client.get(
-            reverse("v1:history:safe-collectibles", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
-
-        with mock.patch.object(
-            CollectiblesService, "get_collectibles_with_metadata", autospec=True
-        ) as function:
-            token_name = "TokenName"
-            token_symbol = "SYMBOL"
-            token_address = Account.create().address
-            logo_uri = f"http://token.org/{token_address}.png"
-            token_id = 54
-            token_uri = f"http://token.org/token-id/{token_id}"
-            image = "http://token.org/token-id/1/image"
-            name = "Test token name"
-            description = "Test token description"
-            function.return_value = [
-                CollectibleWithMetadata(
-                    token_name,
-                    token_symbol,
-                    logo_uri,
-                    token_address,
-                    token_id,
-                    token_uri,
-                    {"image": image, "name": name, "description": description},
-                )
-            ]
-            response = self.client.get(
-                reverse("v1:history:safe-collectibles", args=(safe_address,)),
-                format="json",
-            )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(
-                response.data,
-                [
-                    {
-                        "address": token_address,
-                        "token_name": token_name,
-                        "token_symbol": token_symbol,
-                        "logo_uri": logo_uri,
-                        "id": str(token_id),
-                        "uri": token_uri,
-                        "name": name,
-                        "description": description,
-                        "image_uri": image,
-                        "metadata": {
-                            "image": image,
-                            "name": name,
-                            "description": description,
-                        },
-                    }
-                ],
-            )
 
     def test_get_safe_delegate_list(self):
         safe_address = Account.create().address

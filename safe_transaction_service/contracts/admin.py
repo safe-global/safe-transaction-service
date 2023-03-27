@@ -5,6 +5,7 @@ from gnosis.eth.django.admin import BinarySearchAdmin
 from safe_transaction_service.utils.admin import HasLogoFilterAdmin
 
 from .models import Contract, ContractAbi
+from .tasks import create_or_update_contract_with_metadata_task
 
 
 @admin.register(ContractAbi)
@@ -40,6 +41,7 @@ class HasAbiFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(BinarySearchAdmin):
+    actions = ["find_abi"]
     list_display = (
         "address",
         "name",
@@ -60,6 +62,13 @@ class ContractAdmin(BinarySearchAdmin):
         "contract_abi__abi",
         "contract_abi__description",
     ]
+
+    @admin.action(description="Find ABI if missing")
+    def find_abi(self, request, queryset):
+        for contract_address in queryset.without_metadata().values_list(
+            "address", flat=True
+        ):
+            create_or_update_contract_with_metadata_task.delay(contract_address)
 
     def abi_relevance(self, obj: Contract):
         if obj.contract_abi_id:

@@ -20,11 +20,6 @@ urlpatterns = [
         "about/master-copies/", views.MasterCopiesView.as_view(), name="master-copies"
     ),
     path(
-        "about/erc20-indexing/",
-        views.ERC20IndexingView.as_view(),
-        name="erc20-indexing",
-    ),
-    path(
         "about/indexing/",
         views.IndexingView.as_view(),
         name="indexing",
@@ -86,11 +81,6 @@ urlpatterns = [
         "safes/<str:address>/balances/usd/",
         views.SafeBalanceUsdView.as_view(),
         name="safe-balances-usd",
-    ),
-    path(
-        "safes/<str:address>/collectibles/",
-        views.SafeCollectiblesView.as_view(),
-        name="safe-collectibles",
     ),
     path(
         "safes/<str:address>/delegates/",

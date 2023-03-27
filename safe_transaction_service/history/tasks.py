@@ -1,12 +1,14 @@
 import contextlib
 import dataclasses
+import datetime
 import json
 import random
 from functools import cache
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.utils import timezone
 
 import requests
 from celery import app
@@ -29,6 +31,7 @@ from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 from .models import (
     EthereumBlock,
     InternalTxDecoded,
+    MultisigTransaction,
     SafeLastStatus,
     SafeStatus,
     WebHook,
@@ -54,20 +57,18 @@ logger = get_task_logger(__name__)
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def check_reorgs_task(self) -> Optional[int]:
     """
-    :return: Number of oldest block with reorg detected. `None` if not reorg found
+    :return: Number of the oldest block with reorg detected. `None` if not reorg found
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start checking of reorgs")
             reorg_service: ReorgService = ReorgServiceProvider()
-            first_reorg_block_number = reorg_service.check_reorgs()
-            if first_reorg_block_number:
-                logger.warning(
-                    "Reorg found for block-number=%d", first_reorg_block_number
-                )
+            reorg_block_number = reorg_service.check_reorgs()
+            if reorg_block_number:
+                logger.warning("Reorg found for block-number=%d", reorg_block_number)
                 # Stopping running tasks is not possible with gevent
-                reorg_service.recover_from_reorg(first_reorg_block_number)
-                return first_reorg_block_number
+                reorg_service.recover_from_reorg(reorg_block_number)
+                return reorg_block_number
 
 
 @app.shared_task(soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -89,20 +90,23 @@ def check_sync_status_task() -> bool:
     default_retry_delay=15,
     retry_kwargs={"max_retries": 3},
 )
-def index_erc20_events_task(self) -> Optional[int]:
+def index_erc20_events_task(self) -> Optional[Tuple[int, int]]:
     """
     Find and process ERC20/721 events for monitored addresses
 
-    :return: Number of addresses processed
+    :return: Tuple Number of addresses processed, number of blocks processed
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of erc20/721 events")
-            number_events = Erc20EventsIndexerProvider().start()
-            logger.info(
+            (
+                number_events,
+                number_of_blocks_processed,
+            ) = Erc20EventsIndexerProvider().start()
+            logger.debug(
                 "Indexing of erc20/721 events task processed %d events", number_events
             )
-            return number_events
+            return number_events, number_of_blocks_processed
 
 
 @app.shared_task
@@ -143,7 +147,12 @@ def index_erc20_events_out_of_sync_task(
         number_events_processed = 0
         while not updated:
             try:
-                events_processed, _, updated = erc20_events_indexer.process_addresses(
+                (
+                    events_processed,
+                    _,
+                    _,
+                    updated,
+                ) = erc20_events_indexer.process_addresses(
                     addresses, current_block_number
                 )
                 number_events_processed += len(events_processed)
@@ -165,21 +174,24 @@ def index_erc20_events_out_of_sync_task(
     default_retry_delay=15,
     retry_kwargs={"max_retries": 3},
 )
-def index_internal_txs_task(self) -> Optional[int]:
+def index_internal_txs_task(self) -> Optional[Tuple[int, int]]:
     """
     Find and process internal txs for monitored addresses
-    :return: Number of addresses processed
+    :return: Tuple of number of addresses processed and number of blocks processed
     """
 
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of internal txs")
-            number_traces = InternalTxIndexerProvider().start()
+            (
+                number_traces,
+                number_of_blocks_processed,
+            ) = InternalTxIndexerProvider().start()
             logger.info("Find internal txs task processed %d traces", number_traces)
             if number_traces:
                 logger.info("Calling task to process decoded traces")
                 process_decoded_internal_txs_task.delay()
-            return number_traces
+            return number_traces, number_of_blocks_processed
 
 
 @app.shared_task(
@@ -190,16 +202,19 @@ def index_internal_txs_task(self) -> Optional[int]:
     default_retry_delay=15,
     retry_kwargs={"max_retries": 3},
 )
-def index_new_proxies_task(self) -> Optional[int]:
+def index_new_proxies_task(self) -> Optional[Tuple[int, int]]:
     """
-    :return: Number of proxies created
+    :return: Tuple of number of proxies created and number of blocks processed
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of new proxies")
-            number_proxies = ProxyFactoryIndexerProvider().start()
+            (
+                number_proxies,
+                number_of_blocks_processed,
+            ) = ProxyFactoryIndexerProvider().start()
             logger.info("Proxy indexing found %d proxies", number_proxies)
-            return number_proxies
+            return number_proxies, number_of_blocks_processed
 
 
 @app.shared_task(
@@ -210,21 +225,21 @@ def index_new_proxies_task(self) -> Optional[int]:
     default_retry_delay=15,
     retry_kwargs={"max_retries": 3},
 )
-def index_safe_events_task(self) -> Optional[int]:
+def index_safe_events_task(self) -> Optional[Tuple[int, int]]:
     """
     Find and process for monitored addresses
-    :return: Number of addresses processed
+    :return: Tuple of number of addresses processed and number of blocks processed
     """
 
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of Safe events")
-            number = SafeEventsIndexerProvider().start()
+            number, number_of_blocks_processed = SafeEventsIndexerProvider().start()
             logger.info("Find Safe events processed %d events", number)
             if number:
                 logger.info("Calling task to process decoded traces")
                 process_decoded_internal_txs_task.delay()
-            return number
+            return number, number_of_blocks_processed
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -275,7 +290,10 @@ def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
                         from_block_number,
                         to_block_number,
                     )
-                    reindex_erc20_events_task.delay(from_block_number, to_block_number)
+                    # countdown of 30 minutes to execute this reindex after mastercopies reindex is finished
+                    reindex_erc20_events_task.apply_async(
+                        (from_block_number, to_block_number), countdown=60 * 30
+                    )
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
@@ -580,3 +598,17 @@ def retry_get_metadata_task(
             )
         return None
     return collectible_with_metadata
+
+
+@app.shared_task()
+@close_gevent_db_connection_decorator
+def remove_not_trusted_multisig_txs_task(
+    time_delta: datetime.timedelta = datetime.timedelta(days=30),
+) -> int:
+    logger.info("Deleting Multisig Transactions older than %s", time_delta)
+    deleted, _ = (
+        MultisigTransaction.objects.not_trusted()
+        .filter(modified__lt=timezone.now() - time_delta)
+        .delete()
+    )
+    return deleted

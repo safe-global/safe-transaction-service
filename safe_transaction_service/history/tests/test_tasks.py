@@ -1,7 +1,7 @@
 import dataclasses
+import datetime
 import json
 import logging
-from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
@@ -13,7 +13,7 @@ from eth_account import Account
 from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ...utils.redis import get_redis
-from ..models import SafeContract, SafeLastStatus, SafeStatus
+from ..models import MultisigTransaction, SafeContract, SafeLastStatus, SafeStatus
 from ..services import CollectiblesService, CollectiblesServiceProvider, IndexService
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..tasks import (
@@ -31,6 +31,7 @@ from ..tasks import (
     process_decoded_internal_txs_for_safe_task,
     process_decoded_internal_txs_task,
     reindex_last_hours_task,
+    remove_not_trusted_multisig_txs_task,
     retry_get_metadata_task,
 )
 from .factories import (
@@ -38,6 +39,7 @@ from .factories import (
     EthereumBlockFactory,
     InternalTxDecodedFactory,
     InternalTxFactory,
+    MultisigTransactionFactory,
     SafeContractFactory,
     SafeStatusFactory,
     WebHookFactory,
@@ -54,7 +56,7 @@ class TestTasks(TestCase):
         self.assertFalse(check_sync_status_task.delay().result)
 
     def test_index_erc20_events_task(self):
-        self.assertEqual(index_erc20_events_task.delay().result, 0)
+        self.assertEqual(index_erc20_events_task.delay().result, (0, 0))
 
     def test_index_erc20_events_out_of_sync_task(self):
         with self.assertLogs(logger=task_logger) as cm:
@@ -74,13 +76,13 @@ class TestTasks(TestCase):
             )
 
     def test_index_internal_txs_task(self):
-        self.assertEqual(index_internal_txs_task.delay().result, 0)
+        self.assertEqual(index_internal_txs_task.delay().result, (0, 0))
 
     def test_index_new_proxies_task(self):
-        self.assertEqual(index_new_proxies_task.delay().result, 0)
+        self.assertEqual(index_new_proxies_task.delay().result, (0, 0))
 
     def test_index_safe_events_task(self):
-        self.assertEqual(index_safe_events_task.delay().result, 0)
+        self.assertEqual(index_safe_events_task.delay().result, (0, 0))
 
     @patch.object(IndexService, "reindex_erc20_events")
     @patch.object(IndexService, "reindex_master_copies")
@@ -88,9 +90,9 @@ class TestTasks(TestCase):
         self, reindex_master_copies_mock: MagicMock, reindex_erc20_events: MagicMock
     ):
         now = timezone.now()
-        one_hour_ago = now - timedelta(hours=1)
-        one_day_ago = now - timedelta(days=1)
-        one_week_ago = now - timedelta(weeks=1)
+        one_hour_ago = now - datetime.timedelta(hours=1)
+        one_day_ago = now - datetime.timedelta(days=1)
+        one_week_ago = now - datetime.timedelta(weeks=1)
 
         reindex_last_hours_task()
         reindex_master_copies_mock.assert_not_called()
@@ -271,3 +273,26 @@ class TestTasks(TestCase):
             json.loads(redis.get(metadata_cache_key)), dataclasses.asdict(expected)
         )
         redis.delete(metadata_cache_key)
+
+    def test_remove_not_trusted_multisig_txs_task(self):
+        self.assertEqual(remove_not_trusted_multisig_txs_task.delay().result, 0)
+
+        MultisigTransactionFactory(trusted=False)
+        MultisigTransactionFactory(trusted=True)
+
+        self.assertEqual(remove_not_trusted_multisig_txs_task.delay().result, 0)
+
+        multisig_tx_expected_to_be_deleted = MultisigTransactionFactory(
+            trusted=False, modified=timezone.now() - datetime.timedelta(days=32)
+        )
+        MultisigTransactionFactory(
+            trusted=True, modified=timezone.now() - datetime.timedelta(days=32)
+        )
+
+        self.assertEqual(remove_not_trusted_multisig_txs_task.delay().result, 1)
+
+        self.assertFalse(
+            MultisigTransaction.objects.filter(
+                safe_tx_hash=multisig_tx_expected_to_be_deleted.safe_tx_hash
+            ).exists()
+        )
