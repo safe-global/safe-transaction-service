@@ -613,7 +613,7 @@ trace_transactions_result = [
 
 block_child = {
     "author": "0x0000000000000000000000000000000000000000",
-    "difficulty": 1,
+    "difficulty": 0,
     "gasLimit": 9990236,
     "gasUsed": 765379,
     "hash": HexBytes(
@@ -667,7 +667,7 @@ block_child = {
 
 block_parent = {
     "author": "0x0000000000000000000000000000000000000000",
-    "difficulty": 1,
+    "difficulty": 0,
     "proofOfAuthorityData": HexBytes(
         "0xd88301090c846765746888676f312e31332e38856c696e7578000000000000005f130b1ee6f353c659a48aa6bb3d94af0b335d4d8c8c5c5c68ef0c4dcdc5b49b2a0ccd8ed3d115460d53aaa5abcf514c26ccbcdf46cfb82e40f27c288ebf60ac01"
     ),
@@ -719,7 +719,7 @@ block_result = [
     block_child,
     {
         "author": "0x0000000000000000000000000000000000000000",
-        "difficulty": 1,
+        "difficulty": 0,
         "gasLimit": 10003834,
         "gasUsed": 2405566,
         "hash": HexBytes(
@@ -780,7 +780,7 @@ block_result = [
     },
     {
         "author": "0x0000000000000000000000000000000000000000",
-        "difficulty": 2,
+        "difficulty": 0,
         "gasLimit": 10000000,
         "gasUsed": 518179,
         "hash": HexBytes(
