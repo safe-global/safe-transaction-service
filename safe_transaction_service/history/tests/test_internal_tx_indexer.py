@@ -169,7 +169,7 @@ class TestInternalTxIndexer(TestCase):
             internal_tx_indexer.ethereum_client.parity,
             list(
                 range(
-                    current_block_number - internal_tx_indexer.number_trace_blocks,
+                    current_block_number - internal_tx_indexer.number_trace_blocks + 1,
                     current_block_number + 1 - internal_tx_indexer.confirmations,
                 )
             ),
@@ -245,7 +245,7 @@ class TestInternalTxIndexer(TestCase):
             internal_tx_indexer.ethereum_client.parity,
             list(
                 range(
-                    current_block_number - internal_tx_indexer.number_trace_blocks,
+                    current_block_number - internal_tx_indexer.number_trace_blocks + 1,
                     current_block_number + 1,
                 )
             ),

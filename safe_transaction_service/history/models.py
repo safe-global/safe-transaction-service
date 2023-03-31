@@ -139,7 +139,7 @@ class BulkCreateSignalMixin:
     ) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
-        they will be brought to RAM. This approach is more friendly
+        they will be brought to RAM. This approach is more RAM friendly.
 
         :return: Count of inserted elements
         """

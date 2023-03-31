@@ -418,7 +418,7 @@ class EthereumIndexer(ABC):
             self.__class__.__name__,
             current_block_number,
         )
-        number_processed_elements = 0
+        total_number_processed_elements = 0
         start_block: Optional[int] = None
         last_block: Optional[int] = None
         almost_updated_addresses = list(
@@ -445,7 +445,15 @@ class EthereumIndexer(ABC):
                     almost_updated_addresses_to_process,
                     current_block_number=current_block_number,
                 )
-                number_processed_elements += len(processed_elements)
+                number_processed_elements = len(processed_elements)
+                logger.debug(
+                    "%s: Processed %d elements for almost updated addresses. From-block-number=%d to-block-number=%d",
+                    self.__class__.__name__,
+                    number_processed_elements,
+                    from_block_number,
+                    to_block_number,
+                )
+                total_number_processed_elements += number_processed_elements
                 if start_block is None:
                     start_block = from_block_number
             last_block = to_block_number
@@ -493,7 +501,15 @@ class EthereumIndexer(ABC):
                 if start_block is None or from_block_number < start_block:
                     start_block = from_block_number
 
-                number_processed_elements += len(processed_elements)
+                number_processed_elements = len(processed_elements)
+                logger.debug(
+                    "%s: Processed %d elements for not updated addresses. From-block-number=%d to-block-number=%d",
+                    self.__class__.__name__,
+                    number_processed_elements,
+                    from_block_number,
+                    to_block_number,
+                )
+                total_number_processed_elements += number_processed_elements
                 from_block_number += 1
             if last_block is None or to_block_number > last_block:
                 last_block = to_block_number
@@ -506,4 +522,4 @@ class EthereumIndexer(ABC):
         else:
             number_of_blocks_processed = 0
 
-        return number_processed_elements, number_of_blocks_processed
+        return total_number_processed_elements, number_of_blocks_processed
