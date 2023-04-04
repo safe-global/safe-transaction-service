@@ -173,5 +173,8 @@ Aside from using standard HTTP requests:
 ### What chains do you officially support?
 https://docs.safe.global/learn/safe-core/safe-core-api/available-services
 
+### What means banned field in SafeContract model?
+The `banned` field in the `SafeContract` model is used to prevent indexing of certain Safes that have an unsupported `MasterCopy` or unverified proxies that have issues during indexing. This field does not remove the banned Safe and indexing can be resumed once the issue has been resolved.
+
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-transaction-service/graphs/contributors)

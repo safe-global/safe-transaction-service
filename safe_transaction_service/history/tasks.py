@@ -32,6 +32,7 @@ from .models import (
     EthereumBlock,
     InternalTxDecoded,
     MultisigTransaction,
+    SafeContract,
     SafeLastStatus,
     SafeStatus,
     WebHook,
@@ -247,13 +248,20 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             count = 0
+            banned_safes = set(SafeContract.objects.get_banned_safes())
             for (
                 safe_to_process
             ) in InternalTxDecoded.objects.safes_pending_to_be_processed().iterator():
-                count += 1
-                process_decoded_internal_txs_for_safe_task.delay(
-                    safe_to_process, reindex_master_copies=False
-                )
+                if safe_to_process not in banned_safes:
+                    count += 1
+                    process_decoded_internal_txs_for_safe_task.delay(
+                        safe_to_process, reindex_master_copies=False
+                    )
+                else:
+                    logger.info(
+                        "Ignoring decoded internal txs for banned safe %s",
+                        safe_to_process,
+                    )
 
             if not count:
                 logger.info("No Safes to process")
@@ -355,6 +363,7 @@ def process_decoded_internal_txs_for_safe_task(
             logger.info(
                 "Start processing decoded internal txs for safe %s", safe_address
             )
+
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
             index_service: IndexService = IndexServiceProvider()
 
