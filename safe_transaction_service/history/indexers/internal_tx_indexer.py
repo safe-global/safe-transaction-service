@@ -111,24 +111,14 @@ class InternalTxIndexer(EthereumIndexer):
         # Use `trace_block` for last `number_trace_blocks` blocks and `trace_filter` for the others
         trace_block_number = max(current_block_number - self.number_trace_blocks, 0)
         if from_block_number > trace_block_number:  # Just trace_block
-            logger.debug(
-                "Using trace_block from-block=%d to-block=%d",
-                from_block_number,
-                to_block_number,
-            )
             return self._find_relevant_elements_using_trace_block(
                 addresses, from_block_number, to_block_number
             )
         elif to_block_number < trace_block_number:  # Just trace_filter
-            logger.debug(
-                "Using trace_filter from-block=%d to-block=%d",
-                from_block_number,
-                to_block_number,
-            )
             return self._find_relevant_elements_using_trace_filter(
                 addresses, from_block_number, to_block_number
             )
-        else:  # trace_filter for old blocks and trace_filter for the most recent ones
+        else:  # trace_filter for old blocks and trace_block for the most recent ones
             logger.debug(
                 "Using trace_filter from-block=%d to-block=%d and trace_block from-block=%d to-block=%d",
                 from_block_number,
@@ -141,7 +131,7 @@ class InternalTxIndexer(EthereumIndexer):
             )
             relevant_elements.update(
                 self._find_relevant_elements_using_trace_block(
-                    addresses, trace_block_number, to_block_number
+                    addresses, trace_block_number + 1, to_block_number
                 )
             )
             return relevant_elements
@@ -150,6 +140,11 @@ class InternalTxIndexer(EthereumIndexer):
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
     ) -> OrderedDict[HexStr, ParityFilterTrace]:
         addresses_set = set(addresses)  # More optimal to use with `in`
+        logger.debug(
+            "Using trace_block from-block=%d to-block=%d",
+            from_block_number,
+            to_block_number,
+        )
         try:
             block_numbers = list(range(from_block_number, to_block_number + 1))
 
@@ -197,10 +192,9 @@ class InternalTxIndexer(EthereumIndexer):
         :return: Tx hashes of txs with internal txs relevant for the `addresses`
         """
         logger.debug(
-            "Searching for internal txs from block-number=%d to block-number=%d - Addresses=%s",
+            "Using trace_filter from-block=%d to-block=%d",
             from_block_number,
             to_block_number,
-            addresses,
         )
 
         try:
@@ -239,22 +233,19 @@ class InternalTxIndexer(EthereumIndexer):
         self, tx_hashes: Sequence[str]
     ) -> Generator[InternalTxDecoded, None, None]:
         """
-        Use generator to be more RAM friendly
+        Retrieve relevant `InternalTxs` and if possible decode them to return `InternalTxsDecoded`
+
+        :return: A `InternalTxDecoded` generator to be more RAM friendly
         """
-        for internal_tx in InternalTx.objects.can_be_decoded().filter(
-            ethereum_tx__in=tx_hashes
+        for internal_tx in (
+            InternalTx.objects.can_be_decoded()
+            .filter(ethereum_tx__in=tx_hashes)
+            .iterator()
         ):
             try:
                 function_name, arguments = self.tx_decoder.decode_transaction(
                     bytes(internal_tx.data)
                 )
-                if (
-                    internal_tx.pk is None
-                ):  # pk is not populated on `bulk_create ignore_conflicts=True`
-                    internal_tx = InternalTx.objects.get(
-                        ethereum_tx=internal_tx.ethereum_tx,
-                        trace_address=internal_tx.trace_address,
-                    )
                 yield InternalTxDecoded(
                     internal_tx=internal_tx,
                     function_name=function_name,
@@ -288,7 +279,6 @@ class InternalTxIndexer(EthereumIndexer):
         :param tx_hash_with_traces:
         :return: Inserted `InternalTx` objects
         """
-        # Prefetch ethereum txs
         if not tx_hash_with_traces:
             return []
 
@@ -316,6 +306,7 @@ class InternalTxIndexer(EthereumIndexer):
                 if not tx_hash_with_traces[tx_hash]:
                     tx_hashes_missing_traces.append(tx_hash)
             else:
+                # Trace was already processed
                 del tx_hash_with_traces[tx_hash]
 
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
@@ -338,19 +329,22 @@ class InternalTxIndexer(EthereumIndexer):
             )
         )
 
-        revelant_internal_txs_batch = (
-            trace for trace in internal_txs if trace.is_relevant
-        )
         logger.debug("End prefetching of traces(internal txs)")
 
-        logger.debug("Storing traces")
         with transaction.atomic():
+            logger.debug("Storing traces")
+            revelant_internal_txs_batch = (
+                trace for trace in internal_txs if trace.is_relevant
+            )
             traces_stored = InternalTx.objects.bulk_create_from_generator(
                 revelant_internal_txs_batch, ignore_conflicts=True
             )
             logger.debug("End storing of %d traces", traces_stored)
 
             logger.debug("Start decoding and storing of decoded traces")
+            #  Pass `tx_hashes` instead of `InternalTxs` to `_get_internal_txs_to_decode`
+            #  as they must be retrieved again.
+            #  `bulk_create` with `ignore_conflicts=True` do not populate the `pk` when storing objects
             internal_txs_decoded = InternalTxDecoded.objects.bulk_create_from_generator(
                 self._get_internal_txs_to_decode(tx_hashes), ignore_conflicts=True
             )
@@ -386,11 +380,6 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
         to_block_number: int,
         current_block_number: Optional[int] = None,
     ) -> Dict[HexStr, ParityFilterTrace]:
-        logger.debug(
-            "Using trace_block from-block=%d to-block=%d",
-            from_block_number,
-            to_block_number,
-        )
         return self._find_relevant_elements_using_trace_block(
             addresses, from_block_number, to_block_number
         )
