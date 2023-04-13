@@ -19,48 +19,28 @@ logger = logging.getLogger(__name__)
 
 
 class CoingeckoClient:
+    ASSET_BY_NETWORK = {
+        EthereumNetwork.ARBITRUM_ONE: "arbitrum-one",
+        EthereumNetwork.AURORA_MAINNET: "aurora",
+        EthereumNetwork.AVALANCHE_C_CHAIN: "avalanche",
+        EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET: "binance-smart-chain",
+        EthereumNetwork.FUSE_MAINNET: "fuse",
+        EthereumNetwork.GNOSIS: "xdai",
+        EthereumNetwork.KCC_MAINNET: "kucoin-community-chain",
+        EthereumNetwork.MAINNET: "ethereum",
+        EthereumNetwork.METIS_ANDROMEDA_MAINNET: "metis-andromeda",
+        EthereumNetwork.OPTIMISM: "optimistic-ethereum",
+        EthereumNetwork.POLYGON: "polygon-pos",
+    }
     base_url = "https://api.coingecko.com/"
 
     def __init__(self, network: Optional[EthereumNetwork] = None):
         self.http_session = requests.Session()
-        if network == EthereumNetwork.ARBITRUM_ONE:
-            self.asset_platform = "arbitrum-one"
-        elif network == EthereumNetwork.AURORA_MAINNET:
-            self.asset_platform = "aurora"
-        elif network == EthereumNetwork.AVALANCHE_C_CHAIN:
-            self.asset_platform = "avalanche"
-        elif network == EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET:
-            self.asset_platform = "binance-smart-chain"
-        elif network == EthereumNetwork.POLYGON:
-            self.asset_platform = "polygon-pos"
-        elif network == EthereumNetwork.OPTIMISM:
-            self.asset_platform = "optimistic-ethereum"
-        elif network == EthereumNetwork.GNOSIS:
-            self.asset_platform = "xdai"
-        elif network == EthereumNetwork.FUSE_MAINNET:
-            self.asset_platform = "fuse"
-        elif network == EthereumNetwork.KCC_MAINNET:
-            self.asset_platform = "kucoin-community-chain"
-        elif network == EthereumNetwork.METIS_ANDROMEDA_MAINNET:
-            self.asset_platform = "metis-andromeda"
-        else:
-            self.asset_platform = "ethereum"
+        self.asset_platform = self.ASSET_BY_NETWORK.get(network, "ethereum")
 
-    @staticmethod
-    def supports_network(network: EthereumNetwork):
-        return network in (
-            EthereumNetwork.ARBITRUM_ONE,
-            EthereumNetwork.AURORA_MAINNET,
-            EthereumNetwork.AVALANCHE_C_CHAIN,
-            EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET,
-            EthereumNetwork.MAINNET,
-            EthereumNetwork.POLYGON,
-            EthereumNetwork.OPTIMISM,
-            EthereumNetwork.GNOSIS,
-            EthereumNetwork.FUSE_MAINNET,
-            EthereumNetwork.KCC_MAINNET,
-            EthereumNetwork.METIS_ANDROMEDA_MAINNET,
-        )
+    @classmethod
+    def supports_network(cls, network: EthereumNetwork):
+        return network in cls.ASSET_BY_NETWORK
 
     def _do_request(self, url: str) -> Dict[str, Any]:
         try:
