@@ -45,35 +45,38 @@ class TestPriceService(TestCase):
         self.assertEqual(len(price_service.enabled_price_pool_oracles), 3)
         self.assertEqual(len(price_service.enabled_composed_price_oracles), 4)
 
-    @mock.patch.object(KrakenClient, "get_eth_usd_price", return_value=0.4)
-    @mock.patch.object(KucoinClient, "get_eth_usd_price", return_value=0.5)
-    def test_get_native_coin_usd_price(
-        self, binance_mock: MagicMock, kraken_mock: MagicMock
-    ):
+    @mock.patch.object(KrakenClient, "get_ether_usd_price", return_value=0.4)
+    @mock.patch.object(KucoinClient, "get_ether_usd_price", return_value=0.5)
+    def test_get_ether_usd_price(self, kucoin_mock: MagicMock, kraken_mock: MagicMock):
         price_service = self.price_service
-
-        # Unsupported network (Ganache)
-        eth_usd_price = price_service.get_native_coin_usd_price()
+        eth_usd_price = price_service.get_ether_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
-        binance_mock.assert_not_called()
+        kucoin_mock.assert_not_called()
 
         kraken_mock.side_effect = CannotGetPrice
 
-        # cache_native_coin_usd_price is working
+        # cache_ether_usd_price is working
         eth_usd_price = price_service.get_native_coin_usd_price()
         self.assertEqual(eth_usd_price, kraken_mock.return_value)
 
-        # Clear cache_native_coin_usd_price, but cache_ether_usd_price is still there
-        price_service.cache_native_coin_usd_price.clear()
-        self.assertEqual(eth_usd_price, kraken_mock.return_value)
-        binance_mock.assert_not_called()
-
-        # Clear both caches and test binance is now called
-        price_service.cache_native_coin_usd_price.clear()
+        # Clear cache_ether_usd_price
         price_service.cache_ether_usd_price.clear()
-        eth_usd_price = price_service.get_native_coin_usd_price()
-        binance_mock.called_once()
-        self.assertEqual(eth_usd_price, binance_mock.return_value)
+        self.assertEqual(eth_usd_price, kraken_mock.return_value)
+        kucoin_mock.assert_not_called()
+
+    def test_get_native_coin_usd_price(self):
+        price_service = self.price_service
+
+        # Unsupported network (Ganache)
+        with mock.patch.object(
+            KrakenClient, "get_ether_usd_price", return_value=1_600
+        ) as kraken_mock:
+            price_service.cache_native_coin_usd_price.clear()
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1_600)
+
+            # Test cache is working
+            kraken_mock.side_effect = CannotGetPrice
+            self.assertEqual(price_service.get_native_coin_usd_price(), 1_600)
 
         # Gnosis Chain
         price_service.ethereum_network = EthereumNetwork.GNOSIS

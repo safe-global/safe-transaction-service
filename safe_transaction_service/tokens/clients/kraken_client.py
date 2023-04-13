@@ -47,7 +47,7 @@ class KrakenClient:
         """
         return self._get_price("DAIUSD")
 
-    def get_eth_usd_price(self) -> float:
+    def get_ether_usd_price(self) -> float:
         """
         :return: current USD price for Ethereum
         :raises: CannotGetPrice

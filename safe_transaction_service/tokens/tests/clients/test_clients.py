@@ -32,12 +32,12 @@ class TestClients(TestCase):
         self.assertIsInstance(price, float)
         self.assertGreater(price, 0)
 
-    def test_get_eth_usd_price_kraken(self):
+    def test_get_ether_usd_price_kraken(self):
         just_test_if_mainnet_node()
         kraken_client = KrakenClient()
 
         # Kraken is used
-        eth_usd_price = kraken_client.get_eth_usd_price()
+        eth_usd_price = kraken_client.get_ether_usd_price()
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 
@@ -50,11 +50,11 @@ class TestClients(TestCase):
         self.assertIsInstance(price, float)
         self.assertGreater(price, 0)
 
-    def test_get_eth_usd_price_kucoin(self):
+    def test_get_ether_usd_price_kucoin(self):
         just_test_if_mainnet_node()
         kucoin_client = KucoinClient()
 
-        eth_usd_price = kucoin_client.get_eth_usd_price()
+        eth_usd_price = kucoin_client.get_ether_usd_price()
         self.assertIsInstance(eth_usd_price, float)
         self.assertGreater(eth_usd_price, 0)
 

@@ -198,15 +198,15 @@ class PriceService:
             return self.coingecko_client.get_kcs_usd_price()
 
     @cachedmethod(cache=operator.attrgetter("cache_ether_usd_price"))
-    @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
+    @cache_memoize(60 * 30, prefix="balances-get_ether_usd_price")  # 30 minutes
     def get_ether_usd_price(self) -> float:
         """
         :return: USD Price for Ether
         """
         try:
-            return self.kraken_client.get_eth_usd_price()
+            return self.kraken_client.get_ether_usd_price()
         except CannotGetPrice:
-            return self.kucoin_client.get_eth_usd_price()
+            return self.kucoin_client.get_ether_usd_price()
 
     @cachedmethod(cache=operator.attrgetter("cache_native_coin_usd_price"))
     @cache_memoize(60 * 30, prefix="balances-get_native_coin_usd_price")  # 30 minutes
