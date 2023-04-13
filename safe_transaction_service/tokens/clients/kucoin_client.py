@@ -22,7 +22,7 @@ class KucoinClient:
             logger.warning("Cannot get price from url=%s", url)
             raise CannotGetPrice from e
 
-    def get_eth_usd_price(self) -> float:
+    def get_ether_usd_price(self) -> float:
         """
         :return: current USD price for ETH Coin
         :raises: CannotGetPrice

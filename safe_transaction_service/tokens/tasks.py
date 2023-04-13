@@ -66,9 +66,11 @@ def calculate_token_eth_price_task(
     )  # Expire in 15 minutes
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
-        eth_price = price_service.get_eth_price_from_oracles(token_address)
+        eth_price = price_service.get_token_eth_price_from_oracles(token_address)
         if not eth_price:
-            eth_price = price_service.get_eth_price_from_composed_oracles(token_address)
+            eth_price = price_service.get_token_eth_price_from_composed_oracles(
+                token_address
+            )
 
         logger.debug("Calculated eth-price=%f for token=%s", eth_price, token_address)
         if not eth_price:
