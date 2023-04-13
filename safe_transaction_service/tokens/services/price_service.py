@@ -428,16 +428,16 @@ class PriceService:
         :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
         """
         try:
-            ether_usd_price = self.get_ether_usd_price()
+            native_coin_usd_price = self.get_native_coin_usd_price()
         except CannotGetPrice:
             logger.warning("Cannot get Ether USD price", exc_info=True)
-            ether_usd_price = 0
+            native_coin_usd_price = 0
 
         for token_eth_values_with_timestamp in self.get_token_cached_eth_values(
             token_addresses
         ):
             yield FiatPriceWithTimestamp(
-                ether_usd_price * token_eth_values_with_timestamp.eth_value,
+                native_coin_usd_price * token_eth_values_with_timestamp.eth_value,
                 FiatCode.USD,
                 token_eth_values_with_timestamp.timestamp,
             )
