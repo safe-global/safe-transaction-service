@@ -3,13 +3,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from functools import cached_property
+from logging import getLogger
 from typing import Iterator, List, Optional, Sequence, Tuple
 
 from django.utils import timezone
 
 from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
-from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from redis import Redis
 
@@ -42,7 +42,7 @@ from safe_transaction_service.utils.redis import get_redis
 from ..clients import CannotGetPrice, CoingeckoClient, KrakenClient, KucoinClient
 from ..tasks import EthValueWithTimestamp, calculate_token_eth_price_task
 
-logger = get_task_logger(__name__)
+logger = getLogger(__name__)
 
 
 class FiatCode(Enum):
@@ -77,7 +77,10 @@ class PriceService:
         self.coingecko_client = CoingeckoClient(self.ethereum_network)
         self.kraken_client = KrakenClient()
         self.kucoin_client = KucoinClient()
-        self.cache_eth_price = TTLCache(
+        self.cache_ether_usd_price = TTLCache(
+            maxsize=2048, ttl=60 * 30
+        )  # 30 minutes of caching
+        self.cache_native_coin_usd_price = TTLCache(
             maxsize=2048, ttl=60 * 30
         )  # 30 minutes of caching
         self.cache_token_eth_value = TTLCache(
@@ -194,14 +197,26 @@ class PriceService:
         except CannotGetPrice:
             return self.coingecko_client.get_kcs_usd_price()
 
-    @cachedmethod(cache=operator.attrgetter("cache_eth_price"))
+    @cachedmethod(cache=operator.attrgetter("cache_ether_usd_price"))
     @cache_memoize(60 * 30, prefix="balances-get_eth_usd_price")  # 30 minutes
+    def get_ether_usd_price(self) -> float:
+        """
+        :return: USD Price for Ether
+        """
+        try:
+            return self.kraken_client.get_eth_usd_price()
+        except CannotGetPrice:
+            return self.kucoin_client.get_eth_usd_price()
+
+    @cachedmethod(cache=operator.attrgetter("cache_native_coin_usd_price"))
+    @cache_memoize(60 * 30, prefix="balances-get_native_coin_usd_price")  # 30 minutes
     def get_native_coin_usd_price(self) -> float:
         """
         Get USD price for native coin. It depends on the ethereum network:
             - On mainnet, use ETH/USD
             - On xDAI, use DAI/USD.
             - On EWT/VOLTA, use EWT/USD
+            - ...
 
         :return: USD price for Ether
         """
@@ -275,10 +290,7 @@ class PriceService:
         ):
             return self.get_xdc_usd_price()
         else:
-            try:
-                return self.kraken_client.get_eth_usd_price()
-            except CannotGetPrice:
-                return self.kucoin_client.get_eth_usd_price()
+            return self.get_ether_usd_price()
 
     @cachedmethod(cache=operator.attrgetter("cache_token_eth_value"))
     @cache_memoize(60 * 30, prefix="balances-get_token_eth_value")  # 30 minutes
@@ -340,7 +352,7 @@ class PriceService:
         :param token_address:
         :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
         """
-        if self.coingecko_client.supports_network(EthereumNetwork.MAINNET):
+        if self.coingecko_client.supports_network(self.ethereum_network):
             try:
                 return self.coingecko_client.get_token_price(token_address)
             except CannotGetPrice:
@@ -373,7 +385,7 @@ class PriceService:
                     oracle.__class__.__name__,
                 )
 
-    def get_cached_token_eth_values(
+    def get_token_cached_eth_values(
         self, token_addresses: Sequence[ChecksumAddress]
     ) -> Iterator[EthValueWithTimestamp]:
         """
@@ -406,7 +418,7 @@ class PriceService:
                 else:
                     yield EthValueWithTimestamp(0.0, timezone.now())
 
-    def get_cached_usd_values(
+    def get_token_cached_usd_values(
         self, token_addresses: Sequence[ChecksumAddress]
     ) -> Iterator[FiatPriceWithTimestamp]:
         """
@@ -416,39 +428,36 @@ class PriceService:
         :return: eth prices with timestamp if ready on cache, `0.` and None otherwise
         """
         try:
-            eth_price = self.get_native_coin_usd_price()
+            ether_usd_price = self.get_ether_usd_price()
         except CannotGetPrice:
-            logger.warning("Cannot get network ether price", exc_info=True)
-            eth_price = 0
+            logger.warning("Cannot get Ether USD price", exc_info=True)
+            ether_usd_price = 0
 
-        for token_eth_values_with_timestamp in self.get_cached_token_eth_values(
+        for token_eth_values_with_timestamp in self.get_token_cached_eth_values(
             token_addresses
         ):
             yield FiatPriceWithTimestamp(
-                eth_price * token_eth_values_with_timestamp.eth_value,
+                ether_usd_price * token_eth_values_with_timestamp.eth_value,
                 FiatCode.USD,
                 token_eth_values_with_timestamp.timestamp,
             )
 
-    def get_eth_price_from_oracles(self, token_address: ChecksumAddress) -> float:
+    def get_token_eth_price_from_oracles(self, token_address: ChecksumAddress) -> float:
         """
-        Calculate eth_price from oracles
         :param token_address
-        :return: Current token price
+        :return: Token/Ether price from oracles
         """
         return (
             self.get_token_eth_value(token_address)
-            or self.get_token_usd_price(token_address)
-            / self.get_native_coin_usd_price()
+            or self.get_token_usd_price(token_address) / self.get_ether_usd_price()
         )
 
-    def get_eth_price_from_composed_oracles(
+    def get_token_eth_price_from_composed_oracles(
         self, token_address: ChecksumAddress
     ) -> float:
         """
-        Calculate eth_price from composed oracles
         :param token_address
-        :return: Current token price
+        :return: Token/Ether price from composed oracles
         """
         eth_price = 0
         if underlying_tokens := self.get_underlying_tokens(token_address):
@@ -456,7 +465,8 @@ class PriceService:
                 # Find underlying token price and multiply by quantity
                 address = underlying_token.address
                 eth_price += (
-                    self.get_eth_price_from_oracles(address) * underlying_token.quantity
+                    self.get_token_eth_price_from_oracles(address)
+                    * underlying_token.quantity
                 )
 
         return eth_price

@@ -261,7 +261,7 @@ class BalanceService:
         :param exclude_spam: If True, exclude spam tokens
         :return: List of BalanceWithFiat
         """
-        # TODO Use price service get_cached_usd_values
+        # TODO Use price service get_token_cached_usd_values
         balances: List[Balance] = self.get_balances(
             safe_address, only_trusted, exclude_spam
         )
@@ -273,7 +273,7 @@ class BalanceService:
         balances_with_usd = []
         price_token_addresses = [balance.get_price_address() for balance in balances]
         token_eth_values_with_timestamp = (
-            self.price_service.get_cached_token_eth_values(price_token_addresses)
+            self.price_service.get_token_cached_eth_values(price_token_addresses)
         )
         for balance, token_eth_value_with_timestamp in zip(
             balances, token_eth_values_with_timestamp
