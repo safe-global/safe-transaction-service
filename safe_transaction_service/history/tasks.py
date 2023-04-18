@@ -292,7 +292,7 @@ def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
                     )
                     # countdown of 30 minutes to execute this reindex after mastercopies reindex is finished
                     reindex_erc20_events_task.apply_async(
-                        (from_block_number, to_block_number), countdown=60 * 30
+                        (from_block_number, to_block_number), countdown=60 * 20
                     )
 
 
