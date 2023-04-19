@@ -1538,11 +1538,28 @@ class SafeMasterCopy(MonitoredAddress):
         ordering = ["tx_block_number"]
 
 
+class SafeContractManager(models.Manager):
+    def get_banned_safes(self) -> QuerySet[ChecksumAddress]:
+        return self.filter(banned=True).values_list("address", flat=True)
+
+
 class SafeContract(models.Model):
+    objects = SafeContractManager()
     address = EthereumAddressV2Field(primary_key=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="safe_contracts"
     )
+    # Avoid to index events from problematic safes like non verified contracts
+    banned = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            Index(
+                name="history_safe_banned_idx",
+                fields=["banned"],
+                condition=Q(banned=True),
+            ),
+        ]
 
     def __str__(self):
         return f"Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}"

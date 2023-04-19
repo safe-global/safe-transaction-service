@@ -160,6 +160,25 @@ class TestTasks(TestCase):
         self.assertEqual(safe_status.owners, [owner])
         self.assertEqual(safe_status.threshold, threshold)
 
+    def test_process_decoded_internal_txs_for_banned_safe(self):
+        owner = Account.create().address
+        safe_address = Account.create().address
+        fallback_handler = Account.create().address
+        master_copy = Account.create().address
+        threshold = 1
+        InternalTxDecodedFactory(
+            function_name="setup",
+            owner=owner,
+            threshold=threshold,
+            fallback_handler=fallback_handler,
+            internal_tx__to=master_copy,
+            internal_tx___from=safe_address,
+        )
+        SafeContractFactory(address=safe_address, banned=True)
+        self.assertTrue(SafeContract.objects.get(address=safe_address).banned)
+        process_decoded_internal_txs_task.delay()
+        self.assertEqual(SafeStatus.objects.filter(address=safe_address).count(), 0)
+
     def test_process_decoded_internal_txs_for_safe_task(self):
         # Test corrupted SafeStatus
         safe_status_0 = SafeStatusFactory(nonce=0)
