@@ -270,7 +270,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
-def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
+def reindex_mastercopies_last_hours_task(self, hours: int = 2) -> Optional[int]:
     """
     Reindexes last hours for master copies to prevent indexing issues
     """
@@ -292,6 +292,24 @@ def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
                         to_block_number,
                     )
                     reindex_master_copies_task.delay(from_block_number, to_block_number)
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def reindex_erc20_erc721_last_hours_task(self, hours: int = 2) -> Optional[int]:
+    """
+    Reindexes last hours for erx20 and erc721 to prevent indexing issues
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            if ethereum_block := EthereumBlock.objects.oldest_than(
+                seconds=60 * 60 * hours
+            ).first():
+                from_block_number = ethereum_block.number
+                to_block_number = (
+                    EthereumBlock.objects.order_by("-timestamp").first().number
+                )
+                assert to_block_number >= from_block_number
+                if to_block_number != from_block_number:
                     logger.info(
                         "Reindexing erc20/721 events for last %d hours, from-block=%d to-block=%d",
                         hours,
@@ -299,9 +317,7 @@ def reindex_last_hours_task(self, hours: int = 2) -> Optional[int]:
                         to_block_number,
                     )
                     # countdown of 30 minutes to execute this reindex after mastercopies reindex is finished
-                    reindex_erc20_events_task.apply_async(
-                        (from_block_number, to_block_number), countdown=60 * 20
-                    )
+                    reindex_erc20_events_task.delay(from_block_number, to_block_number)
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
