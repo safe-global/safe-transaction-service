@@ -642,3 +642,24 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             len(self.safe_events_indexer.process_elements(safe_events_mock)), 0
         )
+
+    def test_auto_adjust_block_limit(self):
+        self.safe_events_indexer.block_process_limit = 1
+        self.safe_events_indexer.block_process_limit_max = 5
+        with self.safe_events_indexer.auto_adjust_block_limit(100, 100):
+            pass
+
+        self.assertEqual(self.safe_events_indexer.block_process_limit, 2)
+
+        with self.safe_events_indexer.auto_adjust_block_limit(100, 101):
+            pass
+        self.assertEqual(self.safe_events_indexer.block_process_limit, 4)
+
+        # Check it cannot go further than `block_process_limit_max`
+        with self.safe_events_indexer.auto_adjust_block_limit(100, 103):
+            pass
+        self.assertEqual(self.safe_events_indexer.block_process_limit, 5)
+
+        with self.safe_events_indexer.auto_adjust_block_limit(100, 104):
+            pass
+        self.assertEqual(self.safe_events_indexer.block_process_limit, 5)
