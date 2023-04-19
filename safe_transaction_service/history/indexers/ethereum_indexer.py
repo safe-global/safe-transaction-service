@@ -313,8 +313,9 @@ class EthereumIndexer(ABC):
         # Check that we are processing the `block_process_limit`, if not, measures are not valid
         if not (
             self.block_auto_process_limit
-            and (to_block_number - from_block_number) == self.block_process_limit
+            and (1 + to_block_number - from_block_number) == self.block_process_limit
         ):
+            # Auto adjustment disabled
             yield
         else:
             start = int(time.time())
