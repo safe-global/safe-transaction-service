@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from eth_abi import decode as decode_abi
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-from web3.contract import ContractEvent
+from web3.contract.contract import ContractEvent
 from web3.types import EventData
 
 from gnosis.eth import EthereumClient

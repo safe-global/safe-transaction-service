@@ -10,7 +10,7 @@ from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from gevent import pool
 from hexbytes import HexBytes
-from web3.contract import ContractEvent
+from web3.contract.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 

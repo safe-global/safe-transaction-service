@@ -5,7 +5,7 @@ from typing import Iterator, List, Optional, Sequence
 from django.db.models import QuerySet
 
 from eth_typing import ChecksumAddress
-from web3.contract import ContractEvent
+from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient
