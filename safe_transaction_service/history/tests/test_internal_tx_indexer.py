@@ -119,13 +119,15 @@ class TestInternalTxIndexer(TestCase):
         )
         self.assertIsNone(current_block_number_mock.assert_called_with())
 
-        internal_tx_indexer.start()  # No SafeMasterCopy to index
+        self.assertEqual(
+            internal_tx_indexer.start(), (0, 0)
+        )  # No SafeMasterCopy to index
 
         safe_master_copy: SafeMasterCopy = SafeMasterCopyFactory(
             address="0x5aC255889882aCd3da2aA939679E3f3d4cea221e"
         )
         self.assertEqual(safe_master_copy.tx_block_number, 0)
-        internal_tx_indexer.start()
+        self.assertEqual(internal_tx_indexer.start(), (3, 2001))
 
         self.assertEqual(EthereumTx.objects.count(), len(transactions_result))
         self.assertEqual(EthereumBlock.objects.count(), len(block_result))
