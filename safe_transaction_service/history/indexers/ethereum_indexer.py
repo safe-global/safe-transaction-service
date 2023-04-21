@@ -492,8 +492,8 @@ class EthereumIndexer(ABC):
                 # Get real `to_block_number` processed
                 (
                     processed_elements,
-                    to_block_number,
                     from_block_number,
+                    to_block_number,
                     updated,
                 ) = self.process_addresses(
                     not_updated_addresses_to_process,
