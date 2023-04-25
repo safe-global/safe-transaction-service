@@ -31,6 +31,8 @@ class CoingeckoClient:
         EthereumNetwork.METIS_ANDROMEDA_MAINNET: "metis-andromeda",
         EthereumNetwork.OPTIMISM: "optimistic-ethereum",
         EthereumNetwork.POLYGON: "polygon-pos",
+        EthereumNetwork.POLYGON_ZKEVM: "polygon-zkevm",
+        EthereumNetwork.CELO_MAINNET: "celo",
     }
     base_url = "https://api.coingecko.com/"
 
