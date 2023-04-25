@@ -270,7 +270,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
-def reindex_mastercopies_last_hours_task(self, hours: int = 2) -> Optional[int]:
+def reindex_mastercopies_last_hours_task(self, hours: float = 2.5) -> Optional[int]:
     """
     Reindexes last hours for master copies to prevent indexing issues
     """
@@ -295,7 +295,7 @@ def reindex_mastercopies_last_hours_task(self, hours: int = 2) -> Optional[int]:
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
-def reindex_erc20_erc721_last_hours_task(self, hours: int = 2) -> Optional[int]:
+def reindex_erc20_erc721_last_hours_task(self, hours: float = 2.5) -> Optional[int]:
     """
     Reindexes last hours for erx20 and erc721 to prevent indexing issues
     """
