@@ -49,13 +49,13 @@ class InternalTxIndexer(EthereumIndexer):
         kwargs.setdefault(
             "block_process_limit", settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
         )
-        kwargs.setdefault("blocks_to_reindex_again", 6)
+        kwargs.setdefault(
+            "blocks_to_reindex_again", settings.ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN
+        )
         super().__init__(*args, **kwargs)
 
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
-        self.number_trace_blocks: int = (
-            10  # Use `trace_block` for last `number_trace_blocks` blocks indexing
-        )
+        self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
