@@ -92,15 +92,23 @@ class EventsIndexer(EthereumIndexer):
     @abstractmethod
     def contract_events(self) -> List[ContractEvent]:
         """
-        :return: Web3 ContractEvent to listen to
+        :return: List of Web3.py `ContractEvent` to listen to
         """
 
     @cached_property
-    def events_to_listen(self) -> Dict[bytes, ContractEvent]:
-        return {
-            HexBytes(event_abi_to_log_topic(event.abi)).hex(): event
-            for event in self.contract_events
-        }
+    def events_to_listen(self) -> Dict[bytes, List[ContractEvent]]:
+        """
+        Build a dictionary with a `topic` and a list of ABIs to use for decoding. One single topic can have
+        multiple ways of decoding as events with different `indexed` parameters must be decoded
+        in a different way
+
+        :return: Dictionary with `topic` as the key and a list of `ContractEvent`
+        """
+        events_to_listen = {}
+        for event in self.contract_events:
+            key = HexBytes(event_abi_to_log_topic(event.abi)).hex()
+            events_to_listen.setdefault(key, []).append(event)
+        return events_to_listen
 
     def _do_node_query(
         self,
@@ -236,21 +244,35 @@ class EventsIndexer(EthereumIndexer):
         )
         return log_receipts
 
+    def decode_element(self, log_receipt: LogReceipt) -> Optional[EventData]:
+        """
+        :param log_receipt:
+        :return: Decode `log_receipt` using all the possible ABIs for the topic. Returns `EventData` if successful,
+            or `None` if decoding was not possible
+        """
+        for event_to_listen in self.events_to_listen[log_receipt["topics"][0].hex()]:
+            # Try to decode using all the existing ABIs
+            try:
+                return event_to_listen.processLog(log_receipt)
+            except LogTopicError:
+                continue
+
+        logger.error(
+            "Unexpected log format for log-receipt %s",
+            log_receipt,
+        )
+        return None
+
     def decode_elements(self, log_receipts: Sequence[LogReceipt]) -> List[EventData]:
+        """
+        :param log_receipts:
+        :return: Decode `log_receipts` and return a list of `EventData`. If a `log_receipt` cannot be decoded
+            `EventData` it will be skipped
+        """
         decoded_elements = []
         for log_receipt in log_receipts:
-            try:
-                decoded_elements.append(
-                    self.events_to_listen[log_receipt["topics"][0].hex()].processLog(
-                        log_receipt
-                    )
-                )
-            except LogTopicError:
-                logger.error(
-                    "Unexpected log format for log-receipt %s",
-                    log_receipt,
-                    exc_info=True,
-                )
+            if decoded_element := self.decode_element(log_receipt):
+                decoded_elements.append(decoded_element)
         return decoded_elements
 
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
