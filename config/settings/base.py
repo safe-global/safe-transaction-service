@@ -236,17 +236,40 @@ CELERY_ROUTES = (
     [
         (
             "safe_transaction_service.history.tasks.retry_get_metadata_task",
-            {"queue": "tokens"},
+            {"queue": "tokens", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.history.tasks.send_webhook_task",
-            {"queue": "webhooks"},
+            {"queue": "webhooks, 'delivery_mode': 'transient'"},
         ),
-        ("safe_transaction_service.history.tasks.*", {"queue": "indexing"}),
-        ("safe_transaction_service.contracts.tasks.*", {"queue": "contracts"}),
-        ("safe_transaction_service.notifications.tasks.*", {"queue": "notifications"}),
-        ("safe_transaction_service.tokens.tasks.*", {"queue": "tokens"}),
-        ("safe_transaction_service.analytics.tasks.*", {"queue": "contracts"}),
+        (
+            "safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task",
+            {"queue": "indexing"},
+        ),
+        (
+            "safe_transaction_service.history.tasks.reindex_erc20_erc721_last_hours_task",
+            {"queue": "indexing"},
+        ),
+        (
+            "safe_transaction_service.history.tasks.*",
+            {"queue": "indexing", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.contracts.tasks.*",
+            {"queue": "contracts", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.notifications.tasks.*",
+            {"queue": "notifications", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.tokens.tasks.*",
+            {"queue": "tokens", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.analytics.tasks.*",
+            {"queue": "contracts", "delivery_mode": "transient"},
+        ),
     ],
 )
 
