@@ -45,7 +45,7 @@ def clean_receipt_log(receipt_log: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     parsed_log = {
         "address": receipt_log["address"],
-        "data": receipt_log["data"],
+        "data": receipt_log["data"].hex(),
         "topics": [topic.hex() for topic in receipt_log["topics"]],
     }
     return parsed_log

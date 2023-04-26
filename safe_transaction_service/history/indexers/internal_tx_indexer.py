@@ -149,7 +149,7 @@ class InternalTxIndexer(EthereumIndexer):
             block_numbers = list(range(from_block_number, to_block_number + 1))
 
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                blocks_traces: BlockTrace = self.ethereum_client.parity.trace_blocks(
+                blocks_traces: BlockTrace = self.ethereum_client.tracing.trace_blocks(
                     block_numbers
                 )
             traces: OrderedDict[HexStr, FilterTrace] = OrderedDict()
@@ -200,7 +200,7 @@ class InternalTxIndexer(EthereumIndexer):
         try:
             # We only need to search for traces `to` the provided addresses
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                to_traces = self.ethereum_client.parity.trace_filter(
+                to_traces = self.ethereum_client.tracing.trace_filter(
                     from_block=from_block_number,
                     to_block=to_block_number,
                     to_address=addresses,
@@ -262,7 +262,9 @@ class InternalTxIndexer(EthereumIndexer):
         for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
             tx_hash_chunk = list(tx_hash_chunk)
             try:
-                yield from self.ethereum_client.parity.trace_transactions(tx_hash_chunk)
+                yield from self.ethereum_client.tracing.trace_transactions(
+                    tx_hash_chunk
+                )
             except IOError:
                 logger.error(
                     "Problem calling `trace_transactions` with %d txs. "
@@ -324,7 +326,7 @@ class InternalTxIndexer(EthereumIndexer):
         internal_txs = (
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
             for ethereum_tx in ethereum_txs
-            for trace in self.ethereum_client.parity.filter_out_errored_traces(
+            for trace in self.ethereum_client.tracing.filter_out_errored_traces(
                 tx_hash_with_traces[ethereum_tx.tx_hash]
             )
         )

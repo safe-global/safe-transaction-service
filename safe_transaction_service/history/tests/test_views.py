@@ -17,7 +17,7 @@ from rest_framework.test import APIRequestFactory, APITestCase, force_authentica
 from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.ethereum_client import EthereumClient, ParityManager
+from gnosis.eth.ethereum_client import EthereumClient, TracingManager
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
@@ -2600,7 +2600,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         with mock.patch.object(
-            ParityManager, "trace_transaction", autospec=True, return_value=[]
+            TracingManager, "trace_transaction", autospec=True, return_value=[]
         ):
             # Insert create contract internal tx
             internal_tx = InternalTxFactory(
@@ -2631,7 +2631,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         another_trace = dict(call_trace)
         another_trace["traceAddress"] = [0, 0, 0]
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=[another_trace],
@@ -2646,7 +2646,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         another_trace_2 = dict(call_trace)
         another_trace_2["traceAddress"] = [0]
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=[another_trace, another_trace_2],

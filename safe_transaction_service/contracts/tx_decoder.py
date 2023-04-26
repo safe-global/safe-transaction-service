@@ -18,6 +18,7 @@ from typing import (
 
 import gevent
 from cachetools import TTLCache, cachedmethod
+from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
@@ -199,7 +200,7 @@ class SafeTxDecoder:
         try:
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
-            decoded = self.dummy_w3.codec.decode_abi(types, cast(HexBytes, params))
+            decoded = decode_abi(types, cast(HexBytes, params))
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
         except (ValueError, DecodingError) as exc:

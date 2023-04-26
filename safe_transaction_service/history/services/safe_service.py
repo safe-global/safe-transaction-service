@@ -215,7 +215,7 @@ class SafeService:
         if not self.ethereum_tracing_client:
             return None
         try:
-            next_traces = self.ethereum_tracing_client.parity.get_next_traces(
+            next_traces = self.ethereum_tracing_client.tracing.get_next_traces(
                 internal_tx.ethereum_tx_id,
                 internal_tx.trace_address_as_list,
                 remove_calls=True,
@@ -232,7 +232,7 @@ class SafeService:
         if not self.ethereum_tracing_client:
             return None
         try:
-            previous_trace = self.ethereum_tracing_client.parity.get_previous_trace(
+            previous_trace = self.ethereum_tracing_client.tracing.get_previous_trace(
                 internal_tx.ethereum_tx_id,
                 internal_tx.trace_address_as_list,
                 skip_delegate_calls=True,

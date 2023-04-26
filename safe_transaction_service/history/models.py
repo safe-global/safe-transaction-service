@@ -338,7 +338,7 @@ class EthereumTxManager(models.Manager):
             nonce=tx["nonce"],
             to=tx.get("to"),
             value=tx["value"],
-            type=int(tx.get("type", "0x0"), 0),
+            type=tx.get("type", 0),
         )
 
 

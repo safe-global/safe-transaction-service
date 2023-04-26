@@ -451,7 +451,7 @@ class SafeTxProcessor(TxProcessor):
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                     # The trace that is being processed is the last one, so indexer needs to get the previous trace
                     previous_trace = (
-                        self.ethereum_tracing_client.parity.get_previous_trace(
+                        self.ethereum_tracing_client.tracing.get_previous_trace(
                             internal_tx.ethereum_tx_id,
                             internal_tx.trace_address_as_list,
                             skip_delegate_calls=True,
@@ -496,7 +496,7 @@ class SafeTxProcessor(TxProcessor):
                     owner = arguments["owner"]
                 else:
                     previous_trace = (
-                        self.ethereum_tracing_client.parity.get_previous_trace(
+                        self.ethereum_tracing_client.tracing.get_previous_trace(
                             internal_tx.ethereum_tx_id,
                             internal_tx.trace_address_as_list,
                             skip_delegate_calls=True,

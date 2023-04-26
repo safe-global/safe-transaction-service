@@ -7,7 +7,7 @@ from eth_account import Account
 from eth_utils import keccak
 from web3 import Web3
 
-from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.ethereum_client import TracingManager
 from gnosis.safe.safe_signature import SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -253,7 +253,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 7)
 
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=rinkeby_traces,
@@ -299,7 +299,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         # Not needed
         # approve_hash_call_trace['transactionHash'] = approve_hash_decoded_tx.internal_tx.ethereum_tx_id
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=[approve_hash_previous_call_trace],
@@ -467,7 +467,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             self.assertEqual(ModuleTransaction.objects.count(), 0)
 
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=module_traces,
