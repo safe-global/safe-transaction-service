@@ -2,7 +2,7 @@ from typing import List
 
 from eth_typing import ChecksumAddress
 from rest_framework.exceptions import ValidationError
-from web3.exceptions import BadFunctionCallOutput
+from web3.exceptions import Web3Exception
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe import Safe
@@ -18,7 +18,7 @@ def get_safe_owners(safe_address: ChecksumAddress) -> List[ChecksumAddress]:
     safe = Safe(safe_address, ethereum_client)
     try:
         return safe.retrieve_owners(block_identifier="latest")
-    except BadFunctionCallOutput as e:
+    except Web3Exception as e:
         raise ValidationError(
             f"Could not get Safe {safe_address} owners from blockchain, check contract exists on network "
             f"{ethereum_client.get_network().name}"
@@ -40,7 +40,7 @@ def get_safe_version(safe_address: ChecksumAddress) -> str:
     safe = Safe(safe_address, ethereum_client)
     try:
         return safe.retrieve_version()
-    except BadFunctionCallOutput as e:
+    except Web3Exception as e:
         raise ValidationError(
             f"Could not get Safe {safe_address} version from blockchain, check contract exists on network "
             f"{ethereum_client.get_network().name}"

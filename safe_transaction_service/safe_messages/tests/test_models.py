@@ -62,7 +62,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
             message_hash,
             get_safe_message_hash_for_message(safe_message.safe, message).hex(),
         )
-        recovered_owner = Account.recoverHash(
+        recovered_owner = Account._recover_hash(
             safe_message.message_hash,
             signature=safe_message_confirmation_1.signature,
         )
@@ -80,7 +80,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         safe_message_confirmation_2 = SafeMessageConfirmationFactory(
             signing_owner=owner_2_account, safe_message=safe_message
         )
-        recovered_owner = Account.recoverHash(
+        recovered_owner = Account._recover_hash(
             safe_message.message_hash,
             signature=safe_message_confirmation_2.signature,
         )

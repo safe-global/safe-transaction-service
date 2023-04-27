@@ -16,7 +16,7 @@ from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
-from web3.exceptions import BadFunctionCallOutput
+from web3.exceptions import Web3Exception
 
 from gnosis.eth import EthereumClientProvider, InvalidERC20Info, InvalidERC721Info
 from gnosis.eth.django.models import EthereumAddressV2Field
@@ -113,7 +113,7 @@ class TokenManager(models.Manager):
                 # Make sure ERC721 is not indexed as an ERC20 for a node misbehaving
                 try:
                     decimals = ethereum_client.erc20.get_decimals(token_address)
-                except (ValueError, DecodingError, BadFunctionCallOutput):
+                except (Web3Exception, DecodingError, ValueError):
                     decimals = None
             except InvalidERC721Info:
                 logger.debug(

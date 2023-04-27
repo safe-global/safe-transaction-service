@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 from eth_abi.exceptions import DecodingError
-from web3.exceptions import BadFunctionCallOutput
+from web3.exceptions import Web3Exception
 
 from gnosis.eth import EthereumClientProvider
 
@@ -18,7 +18,7 @@ def fix_token_decimals(apps, schema_editor):
             if decimals != token.decimals:
                 token.decimals = decimals
                 token.save(update_fields=["decimals"])
-        except (ValueError, BadFunctionCallOutput, DecodingError):
+        except (Web3Exception, DecodingError, ValueError):
             token.decimals = None
             token.save(update_fields=["decimals"])
 

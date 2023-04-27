@@ -289,7 +289,7 @@ class TestEthereumTx(TestCase):
             with self.subTest(tx_mock=tx_mock):
                 tx_dict = tx_mock["tx"]
                 ethereum_tx = EthereumTx.objects.create_from_tx_dict(tx_dict)
-                self.assertEqual(ethereum_tx.type, int(tx_dict["type"], 0))
+                self.assertEqual(ethereum_tx.type, tx_dict["type"], 0)
                 self.assertEqual(ethereum_tx.gas_price, tx_dict["gasPrice"])
                 self.assertEqual(
                     ethereum_tx.max_fee_per_gas, tx_dict.get("maxFeePerGas")

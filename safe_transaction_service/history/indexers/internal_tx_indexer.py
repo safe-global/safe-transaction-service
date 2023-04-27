@@ -104,7 +104,7 @@ class InternalTxIndexer(EthereumIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> OrderedDict[HexStr, Optional[FilterTrace]]:
+    ) -> OrderedDict[HexBytes, Optional[FilterTrace]]:
         current_block_number = (
             current_block_number or self.ethereum_client.current_block_number
         )
@@ -138,7 +138,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def _find_relevant_elements_using_trace_block(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
-    ) -> OrderedDict[HexStr, FilterTrace]:
+    ) -> OrderedDict[HexBytes, FilterTrace]:
         addresses_set = set(addresses)  # More optimal to use with `in`
         logger.debug(
             "Using trace_block from-block=%d to-block=%d",
@@ -211,7 +211,7 @@ class InternalTxIndexer(EthereumIndexer):
             ) from e
 
         # Log INFO if traces found, DEBUG if not
-        traces: OrderedDict[HexStr, None] = OrderedDict()
+        traces: OrderedDict[HexBytes, None] = OrderedDict()
         for trace in to_traces:
             transaction_hash = trace.get("transactionHash")
             if transaction_hash:
@@ -275,8 +275,8 @@ class InternalTxIndexer(EthereumIndexer):
                 raise
 
     def process_elements(
-        self, tx_hash_with_traces: OrderedDict[HexStr, Optional[FilterTrace]]
-    ) -> List[InternalTx]:
+        self, tx_hash_with_traces: OrderedDict[HexBytes, Optional[FilterTrace]]
+    ) -> List[HexBytes]:
         """
         :param tx_hash_with_traces:
         :return: Inserted `InternalTx` objects
@@ -327,7 +327,7 @@ class InternalTxIndexer(EthereumIndexer):
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
             for ethereum_tx in ethereum_txs
             for trace in self.ethereum_client.tracing.filter_out_errored_traces(
-                tx_hash_with_traces[ethereum_tx.tx_hash]
+                tx_hash_with_traces[HexBytes(ethereum_tx.tx_hash)]
             )
         )
 

@@ -43,6 +43,7 @@ def clean_receipt_log(receipt_log: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     :param receipt_log:
     :return:
     """
+
     parsed_log = {
         "address": receipt_log["address"],
         "data": receipt_log["data"].hex(),

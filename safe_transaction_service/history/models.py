@@ -310,6 +310,7 @@ class EthereumTxManager(models.Manager):
         tx_receipt: Optional[Dict[str, Any]] = None,
         ethereum_block: Optional[EthereumBlock] = None,
     ) -> "EthereumTx":
+        print(tx, tx_receipt)
         data = HexBytes(tx.get("data") or tx.get("input"))
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
