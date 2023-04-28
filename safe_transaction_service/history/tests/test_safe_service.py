@@ -6,7 +6,7 @@ from django.test import TestCase
 from eth_account import Account
 
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.ethereum_client import ParityManager
+from gnosis.eth.ethereum_client import TracingManager
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import SafeMasterCopy
@@ -36,7 +36,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
         with mock.patch.object(
-            ParityManager,
+            TracingManager,
             "trace_transaction",
             autospec=True,
             return_value=[create_trace],
@@ -81,7 +81,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(bytes(safe_creation.setup_data), b"1234")
 
     @mock.patch.object(
-        ParityManager, "trace_transaction", return_value=creation_internal_txs
+        TracingManager, "trace_transaction", return_value=creation_internal_txs
     )
     def test_get_safe_creation_info_with_next_trace(
         self, trace_transaction_mock: MagicMock

@@ -2,7 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import List, Optional, Sequence
 
-from web3.contract import ContractEvent
+from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
 
 from gnosis.eth import EthereumClient

@@ -7,7 +7,7 @@ from django.db import transaction
 
 from eth_typing import HexStr
 from hexbytes import HexBytes
-from web3.types import ParityBlockTrace, ParityFilterTrace
+from web3.types import BlockTrace, FilterTrace
 
 from gnosis.eth import EthereumClient
 
@@ -104,7 +104,7 @@ class InternalTxIndexer(EthereumIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> OrderedDict[HexStr, Optional[ParityFilterTrace]]:
+    ) -> OrderedDict[HexBytes, Optional[FilterTrace]]:
         current_block_number = (
             current_block_number or self.ethereum_client.current_block_number
         )
@@ -138,7 +138,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def _find_relevant_elements_using_trace_block(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
-    ) -> OrderedDict[HexStr, ParityFilterTrace]:
+    ) -> OrderedDict[HexBytes, FilterTrace]:
         addresses_set = set(addresses)  # More optimal to use with `in`
         logger.debug(
             "Using trace_block from-block=%d to-block=%d",
@@ -149,10 +149,10 @@ class InternalTxIndexer(EthereumIndexer):
             block_numbers = list(range(from_block_number, to_block_number + 1))
 
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                blocks_traces: ParityBlockTrace = (
-                    self.ethereum_client.parity.trace_blocks(block_numbers)
+                blocks_traces: BlockTrace = self.ethereum_client.tracing.trace_blocks(
+                    block_numbers
                 )
-            traces: OrderedDict[HexStr, ParityFilterTrace] = OrderedDict()
+            traces: OrderedDict[HexStr, FilterTrace] = OrderedDict()
             relevant_tx_hashes: Set[HexStr] = set()
             for block_number, block_traces in zip(block_numbers, blocks_traces):
                 if not block_traces:
@@ -200,7 +200,7 @@ class InternalTxIndexer(EthereumIndexer):
         try:
             # We only need to search for traces `to` the provided addresses
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                to_traces = self.ethereum_client.parity.trace_filter(
+                to_traces = self.ethereum_client.tracing.trace_filter(
                     from_block=from_block_number,
                     to_block=to_block_number,
                     to_address=addresses,
@@ -211,7 +211,7 @@ class InternalTxIndexer(EthereumIndexer):
             ) from e
 
         # Log INFO if traces found, DEBUG if not
-        traces: OrderedDict[HexStr, None] = OrderedDict()
+        traces: OrderedDict[HexBytes, None] = OrderedDict()
         for trace in to_traces:
             transaction_hash = trace.get("transactionHash")
             if transaction_hash:
@@ -257,12 +257,14 @@ class InternalTxIndexer(EthereumIndexer):
 
     def trace_transactions(
         self, tx_hashes: Sequence[HexStr], batch_size: int
-    ) -> Iterable[List[ParityFilterTrace]]:
+    ) -> Iterable[List[FilterTrace]]:
         batch_size = batch_size or len(tx_hashes)  # If `0`, don't use batches
         for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
             tx_hash_chunk = list(tx_hash_chunk)
             try:
-                yield from self.ethereum_client.parity.trace_transactions(tx_hash_chunk)
+                yield from self.ethereum_client.tracing.trace_transactions(
+                    tx_hash_chunk
+                )
             except IOError:
                 logger.error(
                     "Problem calling `trace_transactions` with %d txs. "
@@ -273,8 +275,8 @@ class InternalTxIndexer(EthereumIndexer):
                 raise
 
     def process_elements(
-        self, tx_hash_with_traces: OrderedDict[HexStr, Optional[ParityFilterTrace]]
-    ) -> List[InternalTx]:
+        self, tx_hash_with_traces: OrderedDict[HexBytes, Optional[FilterTrace]]
+    ) -> List[HexBytes]:
         """
         :param tx_hash_with_traces:
         :return: Inserted `InternalTx` objects
@@ -324,8 +326,8 @@ class InternalTxIndexer(EthereumIndexer):
         internal_txs = (
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
             for ethereum_tx in ethereum_txs
-            for trace in self.ethereum_client.parity.filter_out_errored_traces(
-                tx_hash_with_traces[ethereum_tx.tx_hash]
+            for trace in self.ethereum_client.tracing.filter_out_errored_traces(
+                tx_hash_with_traces[HexBytes(ethereum_tx.tx_hash)]
             )
         )
 
@@ -379,7 +381,7 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> Dict[HexStr, ParityFilterTrace]:
+    ) -> Dict[HexStr, FilterTrace]:
         return self._find_relevant_elements_using_trace_block(
             addresses, from_block_number, to_block_number
         )

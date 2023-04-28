@@ -106,7 +106,7 @@ class AboutEthereumRPCView(APIView):
 
     def _get_info(self, ethereum_client: EthereumClient) -> Dict[str, Any]:
         try:
-            client_version = ethereum_client.w3.clientVersion
+            client_version = ethereum_client.w3.client_version
         except (IOError, ValueError):
             client_version = "Error getting client version"
 

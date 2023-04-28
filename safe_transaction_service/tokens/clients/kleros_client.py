@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Sequence
 
+from hexbytes import HexBytes
+
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 
@@ -62,7 +64,7 @@ class KlerosClient:
         token_ids: List[bytes]
         has_more: bool
         token_ids, has_more = self.kleros_contract.functions.queryTokens(
-            b"",
+            HexBytes("0" * 64),  # bytes32
             token_count,
             [
                 False,  # Include absent tokens in result.

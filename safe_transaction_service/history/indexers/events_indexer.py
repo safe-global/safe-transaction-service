@@ -10,7 +10,7 @@ from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from gevent import pool
 from hexbytes import HexBytes
-from web3.contract import ContractEvent
+from web3.contract.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 
@@ -253,7 +253,7 @@ class EventsIndexer(EthereumIndexer):
         for event_to_listen in self.events_to_listen[log_receipt["topics"][0].hex()]:
             # Try to decode using all the existing ABIs
             try:
-                return event_to_listen.processLog(log_receipt)
+                return event_to_listen.process_log(log_receipt)
             except LogTopicError:
                 continue
 
