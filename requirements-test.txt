@@ -1,5 +1,5 @@
 -r requirements.txt
-coverage==7.2.3
+coverage==7.2.5
 django-stubs==1.16.0
 django-test-migrations==1.2.0
 factory-boy==3.2.1
