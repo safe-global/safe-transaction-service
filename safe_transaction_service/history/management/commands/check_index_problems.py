@@ -14,7 +14,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--fix", help="Fix nonce problems", action="store_true", default=False
+            "--dont-fix",
+            help="Don't fix nonce problems",
+            action="store_true",
+            default=False,
+        )
+
+        parser.add_argument(
+            "--dont-reindex",
+            help="Don't reindex missing transactions",
+            action="store_true",
+            default=False,
         )
 
         parser.add_argument(
@@ -24,14 +34,23 @@ class Command(BaseCommand):
             default=False,
         )
 
+        parser.add_argument(
+            "--block-process-limit",
+            type=int,
+            help="Number of blocks to query each time if reindexing",
+            default=100,
+        )
+
     def get_nonce_fn(self, ethereum_client: EthereumClient):
         return get_safe_V1_3_0_contract(
             ethereum_client.w3, address=NULL_ADDRESS
         ).functions.nonce()
 
     def handle(self, *args, **options):
-        fix = options["fix"]
+        fix = not options["dont_fix"]
+        reindex = not options["dont_reindex"]
         force_batch_call = options["force_batch_call"]
+        block_process_limit = options["block_process_limit"]
 
         queryset = SafeLastStatus.objects.all()
         if settings.ETH_L2_NETWORK:
@@ -44,7 +63,7 @@ class Command(BaseCommand):
         ethereum_client = index_service.ethereum_client
         nonce_fn = self.get_nonce_fn(ethereum_client)
         first_issue_block_number = ethereum_client.current_block_number
-        all_addresses_to_reindex = set()
+        all_problematic_addresses = set()
 
         for i in range(0, count, batch):
             self.stdout.write(self.style.SUCCESS(f"Processed {i}/{count}"))
@@ -103,16 +122,29 @@ class Command(BaseCommand):
                         )
                     addresses_to_reindex.add(address)
 
+            if reindex and addresses_to_reindex:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Reindexing from-block-number={first_issue_block_number} Safes={addresses_to_reindex}"
+                    )
+                )
+                index_service.reindex_master_copies(
+                    first_issue_block_number,
+                    block_process_limit=block_process_limit,
+                    addresses=list(addresses_to_reindex),
+                )
+
             if fix and addresses_to_reindex:
-                all_addresses_to_reindex |= addresses_to_reindex
                 self.stdout.write(
                     self.style.SUCCESS(f"Fixing Safes={addresses_to_reindex}")
                 )
                 index_service.reprocess_addresses(addresses_to_reindex)
 
-        if all_addresses_to_reindex:
+            all_problematic_addresses |= addresses_to_reindex
+
+        if all_problematic_addresses:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"First issue found on {first_issue_block_number} - Fixed Safes {all_addresses_to_reindex}"
+                    f"First issue found on {first_issue_block_number} - Problematic Safes {all_problematic_addresses}"
                 )
             )
