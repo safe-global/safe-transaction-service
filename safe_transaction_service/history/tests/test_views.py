@@ -393,6 +393,33 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["results"][0]["transfers"][0]["token_id"])
         self.assertEqual(response.data["results"][0]["transfers"][0]["value"], "0")
 
+    def test_all_transactions_duplicated_module_view(self):
+        """
+        Test 2 module transactions with the same tx_hash
+        """
+        safe_address = Account.create().address
+        module_transaction_1 = ModuleTransactionFactory(safe=safe_address)
+        module_transaction_2 = ModuleTransactionFactory(
+            safe=safe_address,
+            internal_tx__ethereum_tx=module_transaction_1.internal_tx.ethereum_tx,
+        )
+
+        self.assertEqual(
+            module_transaction_1.internal_tx.ethereum_tx,
+            module_transaction_2.internal_tx.ethereum_tx,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?queued=False&trusted=True"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), response.data["count"], 2)
+        self.assertEqual(
+            {module_transaction_1.module, module_transaction_2.module},
+            {module_tx["module"] for module_tx in response.data["results"]},
+        )
+
     def test_get_module_transactions(self):
         safe_address = Account.create().address
         response = self.client.get(

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from django.db.models import Case, Exists, F, OuterRef, QuerySet, Subquery, Value, When
 from django.utils import timezone
 
+from eth_typing import HexStr
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -59,15 +60,15 @@ class TransactionService:
         copyreg.pickle(memoryview, lambda val: (memoryview, (bytes(val),)))
 
     #  Cache methods ---------------------------------
-    def get_cache_key(self, safe_address: str, tx_hash: str):
-        return f"tx-service:{safe_address}:{tx_hash}"
+    def get_cache_key(self, safe_address: str, tx_id: str):
+        return f"tx-service:{safe_address}:{tx_id}"
 
     def get_txs_from_cache(
-        self, safe_address: str, hashes_to_search: Sequence[str]
+        self, safe_address: str, ids_to_search: Sequence[str]
     ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
         keys_to_search = [
-            self.get_cache_key(safe_address, hash_to_search)
-            for hash_to_search in hashes_to_search
+            self.get_cache_key(safe_address, id_to_search)
+            for id_to_search in ids_to_search
         ]
         return [
             pickle.loads(data) if data else None
@@ -77,8 +78,8 @@ class TransactionService:
     def store_txs_in_cache(
         self,
         safe_address: str,
-        hashes_with_txs: Tuple[
-            str, Union[EthereumTx, MultisigTransaction, ModuleTransaction]
+        ids_with_txs: Tuple[
+            str, List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]
         ],
     ):
         """
@@ -86,14 +87,17 @@ class TransactionService:
         MultisigTransaction it will be `SafeTxHash`) and expire then in one hour
 
         :param safe_address:
-        :param hashes_with_txs:
+        :param ids_with_txs:
         """
         # Just store executed transactions older than 10 minutes
         to_store = {
-            self.get_cache_key(safe_address, tx_hash): pickle.dumps(tx)
-            for tx_hash, tx in hashes_with_txs
-            if tx.execution_date
-            and (tx.execution_date + timedelta(minutes=10)) < timezone.now()
+            self.get_cache_key(safe_address, tx_hash): pickle.dumps(txs)
+            for tx_hash, txs in ids_with_txs
+            if all(
+                tx.execution_date
+                and (tx.execution_date + timedelta(minutes=10)) < timezone.now()
+                for tx in txs
+            )
         }
         if to_store:
             pipe = self.redis.pipeline()
@@ -104,7 +108,7 @@ class TransactionService:
 
     # End of cache methods ----------------------------
 
-    def get_all_tx_hashes(
+    def get_all_tx_identifiers(
         self,
         safe_address: str,
         executed: bool = False,
@@ -112,14 +116,14 @@ class TransactionService:
         trusted: bool = True,
     ) -> QuerySet:
         """
-        Build a queryset with hashes for every tx for a Safe for paginated filtering. In the case of
-        Multisig Transactions, as some of them are not mined, we use the SafeTxHash
+        Build a queryset with identifiers (`safeTxHash` or `txHash`) for every tx for a Safe for paginated filtering.
+        In the case of Multisig Transactions, as some of them are not mined, we use the `safeTxHash`.
         Criteria for building this list:
           - Return only multisig txs with `nonce < current Safe Nonce`
           - The endpoint should only show incoming transactions that have been mined
           - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
           date the execution date of the transaction with the same nonce that has been executed should be taken.
-          - Incoming and outgoing transfers or Eth/tokens must be under a multisig/module tx if triggered by one.
+          - Incoming and outgoing transfers or Eth/tokens must be under a Multisig/Module Tx if triggered by one.
           Otherwise they should have their own entry in the list using a EthereumTx
 
         :param safe_address:
@@ -276,33 +280,33 @@ class TransactionService:
         # the same `execution_date` that the mined tx
         return queryset
 
-    def get_all_txs_from_hashes(
-        self, safe_address: str, hashes_to_search: Sequence[str]
+    def get_all_txs_from_identifiers(
+        self, safe_address: str, ids_to_search: Sequence[str]
     ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
         """
         Now that we know how to paginate, we retrieve the real transactions
 
         :param safe_address:
-        :param hashes_to_search:
+        :param ids_to_search: `SafeTxHash` for MultisigTransactions, `txHash` for other transactions
         :return:
         """
         cached_txs = {
-            hash_to_search: cached_tx
-            for hash_to_search, cached_tx in zip(
-                hashes_to_search,
-                self.get_txs_from_cache(safe_address, hashes_to_search),
+            id_to_search: cached_tx
+            for id_to_search, cached_tx in zip(
+                ids_to_search,
+                self.get_txs_from_cache(safe_address, ids_to_search),
             )
             if cached_tx
         }
-        hashes_not_cached = [
+        id_not_cached = [
             hash_to_search
-            for hash_to_search in hashes_to_search
+            for hash_to_search in ids_to_search
             if hash_to_search not in cached_txs
         ]
-        multisig_txs = {
-            multisig_tx.safe_tx_hash: multisig_tx
+        id_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {
+            multisig_tx.safe_tx_hash: [multisig_tx]
             for multisig_tx in MultisigTransaction.objects.filter(
-                safe=safe_address, safe_tx_hash__in=hashes_not_cached
+                safe=safe_address, safe_tx_hash__in=id_not_cached
             )
             .with_confirmations_required()
             .prefetch_related("confirmations")
@@ -310,37 +314,40 @@ class TransactionService:
             .order_by("-nonce", "-created")
         }
 
-        module_txs = {
-            module_tx.internal_tx.ethereum_tx_id: module_tx
-            for module_tx in ModuleTransaction.objects.filter(
-                safe=safe_address, internal_tx__ethereum_tx__in=hashes_not_cached
-            ).select_related("internal_tx")
-        }
+        id_with_module_txs: Dict[HexStr, List[ModuleTransaction]] = {}
+        for module_tx in ModuleTransaction.objects.filter(
+            safe=safe_address, internal_tx__ethereum_tx__in=id_not_cached
+        ).select_related("internal_tx"):
+            id_with_module_txs.setdefault(
+                module_tx.internal_tx.ethereum_tx_id, []
+            ).append(module_tx)
 
-        plain_ethereum_txs = {
-            ethereum_tx.tx_hash: ethereum_tx
+        id_with_plain_ethereum_txs: Dict[HexStr, List[EthereumTx]] = {
+            ethereum_tx.tx_hash: [ethereum_tx]
             for ethereum_tx in EthereumTx.objects.filter(
-                tx_hash__in=hashes_not_cached
+                tx_hash__in=id_not_cached
             ).select_related("block")
         }
 
         # We also need the in/out transfers for the MultisigTxs
-        all_hashes = hashes_not_cached + [
-            multisig_tx.ethereum_tx_id for multisig_tx in multisig_txs.values()
+        all_ids = id_not_cached + [
+            multisig_tx.ethereum_tx_id
+            for multisig_txs in id_with_multisig_txs.values()
+            for multisig_tx in multisig_txs
         ]
 
         erc20_queryset = (
             ERC20Transfer.objects.to_or_from(safe_address)
             .token_txs()
-            .filter(ethereum_tx__in=all_hashes)
+            .filter(ethereum_tx__in=all_ids)
         )
         erc721_queryset = (
             ERC721Transfer.objects.to_or_from(safe_address)
             .token_txs()
-            .filter(ethereum_tx__in=all_hashes)
+            .filter(ethereum_tx__in=all_ids)
         )
         ether_queryset = InternalTx.objects.ether_txs_for_address(safe_address).filter(
-            ethereum_tx__in=all_hashes
+            ethereum_tx__in=all_ids
         )
 
         # Build dict of transfers for optimizing access
@@ -366,25 +373,36 @@ class TransactionService:
             transfer["token"] = tokens.get(transfer["token_address"])
 
         # Build the list
-        def get_the_transaction(
+        def get_the_transactions(
             transaction_id: str,
-        ) -> Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]:
+        ) -> List[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]:
+            """
+            :param transaction_id:
+            :return: Transactions for the transaction id
+            """
             if result := cached_txs.get(transaction_id):
                 return result
 
             result: Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]
-            if result := multisig_txs.get(transaction_id):
-                # Populate transfers
-                result.transfers = transfer_dict[result.ethereum_tx_id]
+            if result := id_with_multisig_txs.get(transaction_id):
+                for multisig_tx in result:
+                    # Populate transfers
+                    multisig_tx.transfers = transfer_dict[multisig_tx.ethereum_tx_id]
                 return result
 
-            if result := module_txs.get(transaction_id):
-                result.transfers = transfer_dict[result.internal_tx.ethereum_tx_id]
+            if result := id_with_module_txs.get(transaction_id):
+                for module_tx in result:
+                    # Populate transfers
+                    module_tx.transfers = transfer_dict[
+                        module_tx.internal_tx.ethereum_tx_id
+                    ]
                 return result
 
-            if result := plain_ethereum_txs.get(transaction_id):
+            if result := id_with_plain_ethereum_txs.get(transaction_id):
                 # If no Multisig or Module tx found, fallback to simple tx
-                result.transfers = transfer_dict[result.tx_hash]
+                for ethereum_tx in result:
+                    # Populate transfers
+                    ethereum_tx.transfers = transfer_dict[ethereum_tx.tx_hash]
                 return result
 
             # This cannot happen if logic is ok
@@ -393,13 +411,13 @@ class TransactionService:
                     "Tx not found, problem merging all transactions together"
                 )
 
-        hash_with_txs = [
-            (hash_to_search, get_the_transaction(hash_to_search))
-            for hash_to_search in hashes_to_search
+        ids_with_txs = [
+            (id_to_search, get_the_transactions(id_to_search))
+            for id_to_search in ids_to_search
         ]
-        self.store_txs_in_cache(safe_address, hash_with_txs)
+        self.store_txs_in_cache(safe_address, ids_with_txs)
         return list(
-            dict.fromkeys(tx for _, tx in hash_with_txs)
+            dict.fromkeys(tx for (_, txs) in ids_with_txs for tx in txs)
         )  # Sorted already by execution_date
 
     def serialize_all_txs(
