@@ -24,6 +24,7 @@ from ..models import (
     EthereumBlockManager,
     EthereumTx,
     EthereumTxCallType,
+    IndexingStatus,
     InternalTx,
     InternalTxDecoded,
     MultisigConfirmation,
@@ -39,6 +40,7 @@ from .factories import (
     ERC721TransferFactory,
     EthereumBlockFactory,
     EthereumTxFactory,
+    IndexingStatusFactory,
     InternalTxDecodedFactory,
     InternalTxFactory,
     MultisigConfirmationFactory,
@@ -139,6 +141,16 @@ class TestModelMixins(TestCase):
             ),
             number,
         )
+
+
+class TestIndexingStatus(TestCase):
+    def test_indexing_status(self):
+        indexing_status = IndexingStatus.objects.get()
+        self.assertEqual(str(indexing_status), "ERC20_721_EVENTS - 0")
+
+        with self.assertRaises(IntegrityError):
+            # IndexingStatus should be inserted with a migration and `indexing_type` is unique
+            IndexingStatusFactory(indexing_type=0)
 
 
 class TestMultisigTransaction(TestCase):

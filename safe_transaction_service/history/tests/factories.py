@@ -18,6 +18,8 @@ from ..models import (
     EthereumBlock,
     EthereumTx,
     EthereumTxCallType,
+    IndexingStatus,
+    IndexingStatusType,
     InternalTx,
     InternalTxDecoded,
     InternalTxType,
@@ -33,6 +35,14 @@ from ..models import (
     TokenTransfer,
     WebHook,
 )
+
+
+class IndexingStatusFactory(DjangoModelFactory):
+    class Meta:
+        model = IndexingStatus
+
+    indexing_type = factory.fuzzy.FuzzyChoice([tag.value for tag in IndexingStatusType])
+    block_number = 0
 
 
 class EthereumBlockFactory(DjangoModelFactory):
