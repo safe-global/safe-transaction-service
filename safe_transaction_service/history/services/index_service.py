@@ -382,9 +382,8 @@ class IndexService:
         )
 
         if addresses:
-            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = (
-                False  # Just process addresses provided
-            )
+            # Just process addresses provided
+            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False
         else:
             addresses = list(
                 indexer.database_queryset.values_list("address", flat=True)
