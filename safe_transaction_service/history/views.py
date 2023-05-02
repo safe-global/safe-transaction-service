@@ -233,7 +233,7 @@ class AllTransactionsListView(ListAPIView):
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
         queryset = self.filter_queryset(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe, executed=executed, queued=queued, trusted=trusted
             )
         )
@@ -242,8 +242,12 @@ class AllTransactionsListView(ListAPIView):
         if not page:
             return self.get_paginated_response([])
 
-        all_tx_hashes = [element["safe_tx_hash"] for element in page]
-        all_txs = transaction_service.get_all_txs_from_hashes(safe, all_tx_hashes)
+        # Tx identifiers are retrieved using `safe_tx_hash` attribute name due to how Django
+        # handles `UNION` of all the Transaction models using the first model attribute name
+        all_tx_identifiers = [element["safe_tx_hash"] for element in page]
+        all_txs = transaction_service.get_all_txs_from_identifiers(
+            safe, all_tx_identifiers
+        )
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
         return self.get_paginated_response(all_txs_serialized)
 

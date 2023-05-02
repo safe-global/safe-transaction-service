@@ -29,10 +29,10 @@ class TestTransactionService(TestCase):
         super().tearDown()
         self.transaction_service.redis.flushall()
 
-    def test_get_all_tx_hashes(self):
+    def test_get_all_tx_identifiers(self):
         transaction_service: TransactionService = self.transaction_service
         safe_address = Account.create().address
-        self.assertFalse(transaction_service.get_all_tx_hashes(safe_address))
+        self.assertFalse(transaction_service.get_all_tx_identifiers(safe_address))
 
         # Factories create the models using current datetime, so as the txs are returned sorted they should be
         # in the reverse order that they were created
@@ -64,7 +64,7 @@ class TestTransactionService(TestCase):
 
         # As there is no multisig tx trusted, just module txs and transfers are returned
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=True
             ).count(),
             4,
@@ -74,24 +74,24 @@ class TestTransactionService(TestCase):
         higher_nonce_safe_multisig_transaction.trusted = True
         higher_nonce_safe_multisig_transaction.save()
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=True
             ).count(),
             4,
         )
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=True, trusted=True
             ).count(),
             5,
         )
 
-        queryset = transaction_service.get_all_tx_hashes(
+        queryset = transaction_service.get_all_tx_identifiers(
             safe_address, queued=True, trusted=False
         )
         self.assertEqual(queryset.count(), 9)
 
-        queryset = transaction_service.get_all_tx_hashes(
+        queryset = transaction_service.get_all_tx_identifiers(
             safe_address, queued=False, trusted=False
         )
         self.assertEqual(queryset.count(), 7)
@@ -120,12 +120,12 @@ class TestTransactionService(TestCase):
         ]
         self.assertEqual(all_tx_hashes, expected_hashes)
 
-        queryset = transaction_service.get_all_tx_hashes(
+        queryset = transaction_service.get_all_tx_identifiers(
             safe_address, trusted=True, queued=False
         )
         self.assertEqual(queryset.count(), 4)
 
-    def test_get_all_tx_hashes_executed(self):
+    def test_get_all_tx_identifiers_executed(self):
         transaction_service: TransactionService = self.transaction_service
         safe_address = Account.create().address
 
@@ -133,13 +133,13 @@ class TestTransactionService(TestCase):
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=False
             ).count(),
             0,
         )
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=True, trusted=False
             ).count(),
             2,
@@ -147,7 +147,7 @@ class TestTransactionService(TestCase):
         # Mine tx with higher nonce, all should appear
         MultisigTransactionFactory(safe=safe_address)
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=False
             ).count(),
             3,
@@ -155,13 +155,13 @@ class TestTransactionService(TestCase):
 
         # Only one is executed
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, executed=True, queued=False, trusted=False
             ).count(),
             1,
         )
 
-    def test_get_all_tx_hashes_queued(self):
+    def test_get_all_tx_identifiers_queued(self):
         transaction_service: TransactionService = self.transaction_service
         safe_address = Account.create().address
 
@@ -169,13 +169,13 @@ class TestTransactionService(TestCase):
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         MultisigTransactionFactory(safe=safe_address, ethereum_tx=None)
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=False
             ).count(),
             0,
         )
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=True, trusted=False
             ).count(),
             2,
@@ -184,7 +184,7 @@ class TestTransactionService(TestCase):
         # Mine tx with higher nonce, all should appear
         MultisigTransactionFactory(safe=safe_address)
         self.assertEqual(
-            transaction_service.get_all_tx_hashes(
+            transaction_service.get_all_tx_identifiers(
                 safe_address, queued=False, trusted=False
             ).count(),
             3,
@@ -200,18 +200,18 @@ class TestTransactionService(TestCase):
         )
 
         # Test sorting
-        queryset = transaction_service.get_all_tx_hashes(safe_address)
+        queryset = transaction_service.get_all_tx_identifiers(safe_address)
         tx_hashes = [q["safe_tx_hash"] for q in queryset]
-        transactions = transaction_service.get_all_txs_from_hashes(
+        transactions = transaction_service.get_all_txs_from_identifiers(
             safe_address, tx_hashes
         )
         self.assertEqual(transactions[0].nonce, 1)
         self.assertEqual(transactions[1].nonce, 0)
 
-    def test_get_all_txs_from_hashes(self):
+    def test_get_all_txs_from_identifiers(self):
         transaction_service: TransactionService = self.transaction_service
         safe_address = Account.create().address
-        self.assertFalse(transaction_service.get_all_tx_hashes(safe_address))
+        self.assertFalse(transaction_service.get_all_tx_identifiers(safe_address))
 
         # Factories create the models using current datetime, so as the txs are returned sorted they should be
         # in the reverse order that they were created
@@ -231,17 +231,17 @@ class TestTransactionService(TestCase):
             MultisigTransactionFactory()
         )  # Should not appear, it's for another Safe
 
-        queryset = transaction_service.get_all_tx_hashes(
+        queryset = transaction_service.get_all_tx_identifiers(
             safe_address, queued=False, trusted=False
         )
         all_tx_hashes = [q["safe_tx_hash"] for q in queryset]
 
         self.assertEqual(len(self.transaction_service.redis.keys("*")), 0)
-        all_txs = transaction_service.get_all_txs_from_hashes(
+        all_txs = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes
         )
         self.assertEqual(len(self.transaction_service.redis.keys("*")), 1)
-        all_txs = transaction_service.get_all_txs_from_hashes(
+        all_txs = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes
         )  # Force caching
         self.assertEqual(len(self.transaction_service.redis.keys("*")), 1)
@@ -278,12 +278,12 @@ class TestTransactionService(TestCase):
             ethereum_tx=module_transaction.internal_tx.ethereum_tx,
         )
 
-        queryset_2 = transaction_service.get_all_tx_hashes(
+        queryset_2 = transaction_service.get_all_tx_identifiers(
             safe_address, queued=False, trusted=False
         )
         all_tx_hashes_2 = [q["safe_tx_hash"] for q in queryset_2]
 
-        all_txs_2 = transaction_service.get_all_txs_from_hashes(
+        all_txs_2 = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes_2
         )
         self.assertEqual(len(all_txs_2), 6)
