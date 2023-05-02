@@ -179,6 +179,10 @@ class IndexingStatus(models.Model):
     )
     block_number = models.PositiveIntegerField(db_index=True)
 
+    def __str__(self):
+        indexing_status_type = IndexingStatusType(self.indexing_type).name
+        return f"{indexing_status_type} - {self.block_number}"
+
 
 class Chain(models.Model):
     """
