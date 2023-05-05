@@ -132,43 +132,56 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         ERC20TransferFactory(address=erc20_2.address, to=safe_address)
         ERC20TransferFactory(address=erc20_3.address, to=safe_address)
-        balances = balance_service.get_usd_balances(safe_address)
-        token_info = balance_service.get_token_info(erc20.address)
-        self.assertCountEqual(
-            balances,
-            [
-                BalanceWithFiat(
-                    None, None, value, 1.0, timezone_now_mock.return_value, 0.0, 123.4
-                ),
-                BalanceWithFiat(
-                    erc20_3.address,
-                    token_info_3,
-                    tokens_value,
-                    0.4,
-                    timezone_now_mock.return_value,
-                    round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                    round(123.4 * 0.4, 4),
-                ),
-                BalanceWithFiat(
-                    erc20.address,
-                    token_info,
-                    tokens_value,
-                    0.4,
-                    timezone_now_mock.return_value,
-                    round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                    round(123.4 * 0.4, 4),
-                ),
-                BalanceWithFiat(
-                    erc20_2.address,
-                    token_info_2,
-                    tokens_value,
-                    0.4,
-                    timezone_now_mock.return_value,
-                    round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                    round(123.4 * 0.4, 4),
-                ),
-            ],
-        )
+        for tokens_erc20_get_balances_batch in (1, 2000):
+            with self.subTest(
+                TOKENS_ERC20_GET_BALANCES_BATCH=tokens_erc20_get_balances_batch
+            ):
+                with self.settings(
+                    TOKENS_ERC20_GET_BALANCES_BATCH=tokens_erc20_get_balances_batch
+                ):
+                    balances = balance_service.get_usd_balances(safe_address)
+                    token_info = balance_service.get_token_info(erc20.address)
+                    self.assertCountEqual(
+                        balances,
+                        [
+                            BalanceWithFiat(
+                                None,
+                                None,
+                                value,
+                                1.0,
+                                timezone_now_mock.return_value,
+                                0.0,
+                                123.4,
+                            ),
+                            BalanceWithFiat(
+                                erc20_3.address,
+                                token_info_3,
+                                tokens_value,
+                                0.4,
+                                timezone_now_mock.return_value,
+                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                                round(123.4 * 0.4, 4),
+                            ),
+                            BalanceWithFiat(
+                                erc20.address,
+                                token_info,
+                                tokens_value,
+                                0.4,
+                                timezone_now_mock.return_value,
+                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                                round(123.4 * 0.4, 4),
+                            ),
+                            BalanceWithFiat(
+                                erc20_2.address,
+                                token_info_2,
+                                tokens_value,
+                                0.4,
+                                timezone_now_mock.return_value,
+                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
+                                round(123.4 * 0.4, 4),
+                            ),
+                        ],
+                    )
 
     @mock.patch.object(
         PriceService, "get_token_eth_value", return_value=0.4, autospec=True
