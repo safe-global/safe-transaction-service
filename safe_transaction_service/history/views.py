@@ -305,6 +305,7 @@ class ModuleTransactionView(RetrieveAPIView):
             400: "Invalid moduleTransactionId",
         }
     )
+    @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, module_transaction_id: str, *args, **kwargs) -> Response:
         """
         :return: module transaction filtered by module_transaction_id
@@ -927,6 +928,7 @@ class TransferView(RetrieveAPIView):
             400: "Invalid transferId",
         }
     )
+    @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, transfer_id: str, *args, **kwargs) -> Response:
         """
         :return: transfer filtered by transfer_id
