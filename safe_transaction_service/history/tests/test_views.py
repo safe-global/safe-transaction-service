@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from eth_account import Account
+from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
 from requests import ReadTimeout
 from rest_framework import status
@@ -469,6 +470,63 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+    def test_get_module_transaction(self):
+        wrong_module_transaction_id = "wrong_module_transaction_id"
+        url = reverse(
+            "v1:history:module-transaction", args=(wrong_module_transaction_id,)
+        )
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        no_exist_module_transaction_id = (
+            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
+        )
+        url = reverse(
+            "v1:history:module-transaction", args=(no_exist_module_transaction_id,)
+        )
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        safe_address = Account.create().address
+        ethereum_tx_hash = (
+            "0xef060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx, trace_address="0,0,0,0"
+        )
+        module_transaction = ModuleTransactionFactory(
+            internal_tx=internal_tx, safe=safe_address
+        )
+        module_transaction_id = (
+            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a0,0,0,0"
+        )
+        url = reverse("v1:history:module-transaction", args=(module_transaction_id,))
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            {
+                "created": module_transaction.created.isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "executionDate": module_transaction.internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "blockNumber": module_transaction.internal_tx.ethereum_tx.block_id,
+                "isSuccessful": not module_transaction.failed,
+                "transactionHash": module_transaction.internal_tx.ethereum_tx_id,
+                "safe": safe_address,
+                "module": module_transaction.module,
+                "to": module_transaction.to,
+                "value": str(module_transaction.value),
+                "data": module_transaction.data.hex(),
+                "operation": module_transaction.operation,
+                "dataDecoded": None,
+                "moduleTransactionId": module_transaction_id,
+            },
+        )
 
     def test_get_multisig_confirmation(self):
         random_safe_tx_hash = Web3.keccak(text="enxebre").hex()
@@ -2223,7 +2281,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         value = 2
         InternalTxFactory(to=safe_address, value=0)
-        internal_tx = InternalTxFactory(to=safe_address, value=value)
+        ethereum_tx_hash = (
+            "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx, trace_address="0,1", to=safe_address, value=value
+        )
+        internal_tx_transfer_id = (
+            "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1"
+        )
         InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
@@ -2263,7 +2330,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         token_value = 6
-        ethereum_erc_20_event = ERC20TransferFactory(to=safe_address, value=token_value)
+        erc20_tx_hash = (
+            "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
+        ethereum_erc_20_event = ERC20TransferFactory(
+            ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
+        )
+        erc20_transfer_id = (
+            "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
+        )
         token = TokenFactory(address=ethereum_erc_20_event.address)
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
@@ -2279,6 +2355,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
+                    "transferId": erc20_transfer_id,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2300,6 +2377,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
+                    "transferId": internal_tx_transfer_id,
                     "transactionHash": internal_tx.ethereum_tx_id,
                     "blockNumber": internal_tx.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2313,8 +2391,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         token_id = 17
+        erc721_tx_hash = (
+            "0x6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
         ethereum_erc_721_event = ERC721TransferFactory(
-            to=safe_address, token_id=token_id
+            ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=123
+        )
+        erc721_transfer_id = (
+            "e6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59123"
         )
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
@@ -2330,6 +2415,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
+                    "transferId": erc721_transfer_id,
                     "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_721_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2344,6 +2430,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
+                    "transferId": erc20_transfer_id,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                     "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2365,6 +2452,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
                         "+00:00", "Z"
                     ),
+                    "transferId": internal_tx_transfer_id,
                     "transactionHash": internal_tx.ethereum_tx_id,
                     "blockNumber": internal_tx.ethereum_tx.block_id,
                     "to": safe_address,
@@ -2388,7 +2476,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         value = 2
         InternalTxFactory(to=safe_address, value=0)
-        internal_tx = InternalTxFactory(to=safe_address, value=value)
+        ethereum_tx_hash = (
+            "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx, trace_address="0,1,1", to=safe_address, value=value
+        )
+        internal_tx_transfer_id = (
+            "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1,1"
+        )
         InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
@@ -2433,7 +2530,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         # Add from tx
-        internal_tx_2 = InternalTxFactory(_from=safe_address, value=value)
+        ethereum_tx_hash_2 = (
+            "0x5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        ethereum_tx_2 = EthereumTxFactory(tx_hash=ethereum_tx_hash_2)
+        internal_tx_2 = InternalTxFactory(
+            ethereum_tx=ethereum_tx_2, _from=safe_address, value=value, trace_address=""
+        )
+        internal_tx_2_transfer_id = (
+            "i5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
         )
@@ -2443,9 +2549,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["results"][1]["value"], str(value))
 
         token_value = 6
-        ethereum_erc_20_event = ERC20TransferFactory(to=safe_address, value=token_value)
+        erc20_tx_hash = (
+            "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
+        ethereum_erc_20_event = ERC20TransferFactory(
+            ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
+        )
+        erc20_transfer_id = (
+            "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
+        )
+        erc20_tx_hash_2 = (
+            "0x8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc20_tx_2 = EthereumTxFactory(tx_hash=erc20_tx_hash_2)
         ethereum_erc_20_event_2 = ERC20TransferFactory(
-            _from=safe_address, value=token_value
+            ethereum_tx=erc20_tx_2,
+            _from=safe_address,
+            value=token_value,
+            log_index=1299,
+        )
+        erc20_transfer_id_2 = (
+            "e8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d591299"
         )
         token = TokenFactory(address=ethereum_erc_20_event.address)
         response = self.client.get(
@@ -2460,6 +2585,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": ethereum_erc_20_event_2.ethereum_tx.block_id,
+                "transferId": erc20_transfer_id_2,
                 "transactionHash": ethereum_erc_20_event_2.ethereum_tx_id,
                 "to": ethereum_erc_20_event_2.to,
                 "value": str(token_value),
@@ -2474,6 +2600,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
+                "transferId": erc20_transfer_id,
                 "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
                 "to": safe_address,
                 "value": str(token_value),
@@ -2495,6 +2622,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": internal_tx_2.ethereum_tx.block_id,
+                "transferId": internal_tx_2_transfer_id,
                 "transactionHash": internal_tx_2.ethereum_tx_id,
                 "to": internal_tx_2.to,
                 "value": str(value),
@@ -2509,6 +2637,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "blockNumber": internal_tx.ethereum_tx.block_id,
+                "transferId": internal_tx_transfer_id,
                 "transactionHash": internal_tx.ethereum_tx_id,
                 "to": safe_address,
                 "value": str(value),
@@ -2521,11 +2650,25 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.json()["results"], expected_results)
 
         token_id = 17
-        ethereum_erc_721_event = ERC721TransferFactory(
-            to=safe_address, token_id=token_id
+        erc721_tx_hash = (
+            "0x1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
         )
+        erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
+        ethereum_erc_721_event = ERC721TransferFactory(
+            ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=0
+        )
+        erc721_transfer_id = (
+            "e1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590"
+        )
+        erc721_tx_hash_2 = (
+            "0x2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc721_tx_2 = EthereumTxFactory(tx_hash=erc721_tx_hash_2)
         ethereum_erc_721_event_2 = ERC721TransferFactory(
-            _from=safe_address, token_id=token_id
+            ethereum_tx=erc721_tx_2, _from=safe_address, token_id=token_id, log_index=2
+        )
+        erc721_transfer_id_2 = (
+            "e2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d592"
         )
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
@@ -2539,6 +2682,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "transactionHash": ethereum_erc_721_event_2.ethereum_tx_id,
+                "transferId": erc721_transfer_id_2,
                 "blockNumber": ethereum_erc_721_event_2.ethereum_tx.block_id,
                 "to": ethereum_erc_721_event_2.to,
                 "value": None,
@@ -2553,6 +2697,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "+00:00", "Z"
                 ),
                 "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
+                "transferId": erc721_transfer_id,
                 "blockNumber": ethereum_erc_721_event.ethereum_tx.block_id,
                 "to": safe_address,
                 "value": None,
@@ -2612,6 +2757,133 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertGreater(len(response.data["results"]), 0)
         for result in response.data["results"]:
             self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
+
+    def test_get_transfer_view(self):
+        transfer_id = FuzzyText(length=6).fuzz()
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        safe_address = Account.create().address
+        ethereum_tx_hash = (
+            "0x4f6754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx, to=safe_address, trace_address="0"
+        )
+        # Test 404
+        wrong_transfer_id = (
+            "e3a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d592"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(wrong_transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Test getting ether incomming transfer
+        transfer_id = (
+            "i4f6754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_result = {
+            "type": TransferType.ETHER_TRANSFER.name,
+            "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "blockNumber": internal_tx.ethereum_tx.block_id,
+            "transferId": transfer_id,
+            "transactionHash": internal_tx.ethereum_tx_id,
+            "to": safe_address,
+            "value": str(internal_tx.value),
+            "tokenId": None,
+            "tokenAddress": None,
+            "from": internal_tx._from,
+            "tokenInfo": None,
+        }
+        self.assertEqual(response.json(), expected_result)
+
+        # Test filtering ERC20 transfer by transfer_id
+        erc20_tx_hash = (
+            "0x406754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
+        ethereum_erc_20_event = ERC20TransferFactory(
+            ethereum_tx=erc20_tx, to=safe_address, log_index=20
+        )
+        token = TokenFactory(address=ethereum_erc_20_event.address)
+        transfer_id = (
+            "e406754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5920"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_result = {
+            "type": TransferType.ERC20_TRANSFER.name,
+            "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
+            "transferId": transfer_id,
+            "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
+            "to": safe_address,
+            "value": str(ethereum_erc_20_event.value),
+            "tokenId": None,
+            "tokenAddress": ethereum_erc_20_event.address,
+            "from": ethereum_erc_20_event._from,
+            "tokenInfo": {
+                "type": "ERC20",
+                "address": token.address,
+                "name": token.name,
+                "symbol": token.symbol,
+                "decimals": token.decimals,
+                "logoUri": token.get_full_logo_uri(),
+            },
+        }
+        self.assertEqual(response.json(), expected_result)
+
+        # Test filtering ERC721 transfer by transfer_id
+        token_id = 17
+        erc721_tx_hash = (
+            "0x306754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+        )
+        erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
+        ethereum_erc_721_event = ERC721TransferFactory(
+            ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=721
+        )
+        transfer_id = (
+            "e306754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59721"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_result = {
+            "type": TransferType.ERC721_TRANSFER.name,
+            "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
+            "transferId": transfer_id,
+            "blockNumber": ethereum_erc_721_event.ethereum_tx.block_id,
+            "to": safe_address,
+            "value": None,
+            "tokenId": str(token_id),
+            "tokenAddress": ethereum_erc_721_event.address,
+            "from": ethereum_erc_721_event._from,
+            "tokenInfo": None,
+        }
+        self.assertEqual(response.json(), expected_result)
 
     def test_safe_creation_view(self):
         invalid_address = "0x2A"

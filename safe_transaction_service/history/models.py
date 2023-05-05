@@ -120,6 +120,9 @@ class TransferDict(TypedDict):
     execution_date: datetime.datetime
     _token_id: int
     token_address: str
+    # Next parameters will be used to build a unique transfer id
+    _log_index: int
+    _trace_address: str
 
 
 class BulkCreateSignalMixin:
@@ -435,6 +438,26 @@ class TokenTransferQuerySet(models.QuerySet):
     def token_txs(self):
         raise NotImplementedError
 
+    def token_transfer_values(
+        self,
+        erc20_queryset: QuerySet,
+        erc721_queryset: QuerySet,
+    ) -> TransferDict:
+        values = [
+            "block",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+            "_log_index",
+        ]
+        return erc20_queryset.values(*values).union(
+            erc721_queryset.values(*values), all=True
+        )
+
 
 class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
     def tokens_used_by_address(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
@@ -512,6 +535,8 @@ class ERC20TransferQuerySet(TokenTransferQuerySet):
             execution_date=F("timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=F("address"),
+            _log_index=F("log_index"),
+            _trace_address=RawSQL("NULL", ()),
         )
 
 
@@ -622,6 +647,8 @@ class ERC721TransferQuerySet(TokenTransferQuerySet):
             execution_date=F("timestamp"),
             _token_id=F("token_id"),
             token_address=F("address"),
+            _log_index=F("log_index"),
+            _trace_address=RawSQL("NULL", ()),
         )
 
 
@@ -758,6 +785,8 @@ class InternalTxQuerySet(models.QuerySet):
             execution_date=F("timestamp"),
             _token_id=RawSQL("NULL::numeric", ()),
             token_address=Value(None, output_field=EthereumAddressV2Field()),
+            _log_index=RawSQL("NULL::numeric", ()),
+            _trace_address=F("trace_address"),
         )
 
     def ether_txs_for_address(self, address: str):
@@ -835,6 +864,8 @@ class InternalTxQuerySet(models.QuerySet):
             "execution_date",
             "_token_id",
             "token_address",
+            "_log_index",
+            "_trace_address",
         ]
         return (
             ether_queryset.values(*values)
@@ -842,6 +873,24 @@ class InternalTxQuerySet(models.QuerySet):
             .union(erc721_queryset.values(*values), all=True)
             .order_by("-block")
         )
+
+    def ether_txs_values(
+        self,
+        ether_queryset: QuerySet,
+    ) -> TransferDict:
+        values = [
+            "block",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+            "_log_index",
+            "_trace_address",
+        ]
+        return ether_queryset.values(*values)
 
     def can_be_decoded(self):
         """
