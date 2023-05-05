@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Sequence
 
+from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db.models import Q
 
@@ -23,6 +24,7 @@ from safe_transaction_service.tokens.services.price_service import (
     PriceServiceProvider,
 )
 from safe_transaction_service.utils.redis import get_redis
+from safe_transaction_service.utils.utils import chunks
 
 from ..exceptions import NodeConnectionException
 from ..models import ERC20Transfer, InternalTx, MultisigTransaction
@@ -210,9 +212,22 @@ class BalanceService:
         )
 
         try:
-            raw_balances = self.ethereum_client.erc20.get_balances(
-                safe_address, erc20_addresses
-            )
+            raw_balances = []
+            # With a lot of addresses an HTTP 413 error will be raised
+            for erc20_addresses_chunk in chunks(
+                erc20_addresses, settings.TOKENS_ERC20_GET_BALANCES_BATCH
+            ):
+                balances = self.ethereum_client.erc20.get_balances(
+                    safe_address, erc20_addresses_chunk
+                )
+
+                # Skip ether transfer if already there
+                raw_balances.extend(balances[1:] if raw_balances else balances)
+
+            # Return ether balance if there are no tokens
+            if not raw_balances:
+                raw_balances = self.ethereum_client.erc20.get_balances(safe_address, [])
+            # First element should be the ether transfer
         except (IOError, ValueError) as exc:
             raise NodeConnectionException from exc
 
