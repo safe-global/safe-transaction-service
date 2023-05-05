@@ -100,7 +100,12 @@ class Erc20EventsIndexer(EventsIndexer):
             )
 
         if parameter_addresses:
-            return transfer_events
+            return [
+                transfer_event
+                for transfer_event in transfer_events
+                if transfer_event["blockHash"]
+                != transfer_event["transactionHash"]  # CELO ERC20 indexing
+            ]
 
         # Every ERC20/721 event is returned, we need to filter ourselves
         addresses_set = set(addresses)
