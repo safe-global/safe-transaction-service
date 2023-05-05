@@ -460,6 +460,9 @@ TOKENS_ENS_IMAGE_URL = env.str(
     "TOKENS_ENS_IMAGE_URL",
     default="https://safe-transaction-assets.safe.global/tokens/logos/ENS.png",
 )
+TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
+    "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
+)  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
 
 # Notifications
 # ------------------------------------------------------------------------------
