@@ -480,7 +480,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         no_exist_module_transaction_id = (
-            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
+            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a0"
         )
         url = reverse(
             "v1:history:module-transaction", args=(no_exist_module_transaction_id,)
@@ -2759,7 +2759,38 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
 
     def test_get_transfer_view(self):
+        # test wrong random transfer_id
         transfer_id = FuzzyText(length=6).fuzz()
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # test internal_tx transfer_id empty trace_address
+        transfer_id = (
+            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # test invalid erc20 transfer_id empty log_index
+        transfer_id = (
+            "e27e15ba8dea473d98c80a6b45d372c0f3c6f8c184177044c935c37eb419d7216"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # test invalid erc20 transfer id wrong log index
+        transfer_id = (
+            "e27e15ba8dea473d98c80a6b45d372c0f3c6f8c184177044c935c37eb419d72161,1"
+        )
         response = self.client.get(
             reverse("v1:history:transfer", args=(transfer_id,)),
             format="json",

@@ -56,12 +56,18 @@ class DelegateSignatureHelper:
 
 def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:
     """
-    Check if transfer_id starts with 'e' or 'i' followed by keccak256 and appended by optional digits separated by commas
+    Check if transfer_id starts with 'e' or 'i' followed by keccak256 and ended by digits or digits separated by commas
 
     :param unique_transfer_id:
-    :return: True in case valide unique_transfer_id or False in other case
+    :return: ``True`` for a valid ``unique_transfer_id``, ``False`` otherwise
     """
-    return re.match(r"^(e|i)[a-fA-F0-9]{64}(\d+(,\d+)*)?$", unique_transfer_id)
+    token_transfer_id_pattern = r"^(e)([a-fA-F0-9]{64})(\d+)"
+    internal_transfer_id_pattern = r"^(i)([a-fA-F0-9]{64})(\d+)(,\d+)*"
+
+    return bool(
+        re.fullmatch(token_transfer_id_pattern, unique_transfer_id)
+        or re.fullmatch(internal_transfer_id_pattern, unique_transfer_id)
+    )
 
 
 def add_tokens_to_transfers(transfers: TransferDict) -> TransferDict:

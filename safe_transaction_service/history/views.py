@@ -317,7 +317,7 @@ class ModuleTransactionView(RetrieveAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
                 data={
                     "code": 1,
-                    "message": "module_transaction_id is too short",
+                    "message": "module_transaction_id is not valid",
                     "arguments": [module_transaction_id],
                 },
             )
