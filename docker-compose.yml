@@ -23,7 +23,10 @@ services:
       - --appendonly yes
 
   rabbitmq:
-    image: rabbitmq:alpine
+    image: rabbitmq:management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 
   db:
     image: postgres:13-alpine

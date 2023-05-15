@@ -47,3 +47,6 @@ LOGGING["loggers"] = {  # noqa F405
         "level": "DEBUG",
     }
 }
+
+EVENTS_QUEUE_HOST = "rabbitmq"
+EVENTS_QUEUE_ASYNC_CONNECTION = False
