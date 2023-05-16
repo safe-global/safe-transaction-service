@@ -240,7 +240,7 @@ CELERY_ROUTES = (
         ),
         (
             "safe_transaction_service.history.tasks.send_webhook_task",
-            {"queue": "webhooks, 'delivery_mode': 'transient'"},
+            {"queue": "webhooks", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task",
