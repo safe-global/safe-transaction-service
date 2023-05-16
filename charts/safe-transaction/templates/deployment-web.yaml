@@ -1,0 +1,135 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "safe-transaction.fullname" . }}-web
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "safe-transaction.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- .Values.commonLabels | toYaml | nindent 4 }}
+    {{- end }}
+{{- if .Values.commonAnnotations }}
+  annotations:
+    {{- .Values.commonAnnotations | toYaml | nindent 4 }}
+{{- end }}
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: {{ .Values.strategy }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: web
+      app.kubernetes.io/instance: {{ include "safe-transaction.name" . }}
+      app.kubernetes.io/name: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: web
+        app.kubernetes.io/instance: {{ include "safe-transaction.name" . }}
+        app.kubernetes.io/name: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: txs
+        image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [ docker/web/run_web.sh ]
+        workingDir: /app
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile: 
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
+        {{- if .Values.resources }}
+        resources: {{- toYaml .Values.resources | nindent 12 }}
+        {{- else }}
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ include "safe-transaction.fullname" . }}
+          - secretRef:
+              {{- if .Values.config.secretReferenceKey }}
+              name: {{ .Values.config.secretReferenceKey }}
+              {{- else }}
+              name: {{ include "safe-transaction.fullname" . }}
+              {{- end }}
+          - secretRef:
+              name: {{ include "safe-transaction.postgres-secret" . }}
+          - secretRef:
+              name: {{ include "safe-transaction.redis-secret" . }}
+          - secretRef:
+              name: {{ include "safe-transaction.rabbitmq-secret" . }}
+        ports:
+        - containerPort: 8888
+          name: gunicorn
+          protocol: TCP
+        volumeMounts:
+          - name: content-volume
+            mountPath: /nginx
+          - name: tmp-volume
+            mountPath: /tmp
+      - name: web
+        image: "registry.hub.docker.com/library/nginx:alpine"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.resources }}
+        resources: {{- toYaml .Values.resources | nindent 12 }}
+        {{- else }}
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        {{- end }}
+        # env:
+        #   - name: NGINX_ENTRYPOINT_QUIET_LOGS
+        #     value: "true"
+        ports:
+        - containerPort: {{ .Values.service.ports.number }}
+          name: {{ .Values.service.ports.name }}
+          protocol: TCP
+        volumeMounts:
+          - name: nginx-volume
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+          - name: content-volume
+            mountPath: /nginx
+          - name: tmp-volume
+            mountPath: /tmp
+          - name: cache-volume
+            mountPath: /var/cache/nginx
+      serviceAccountName: {{ include "safe-transaction.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: content-volume
+          emptyDir: {}
+        - name: tmp-volume
+          emptyDir: {} 
+        - name: nginx-volume
+          configMap:
+            name: {{ include "safe-transaction.fullname" . }}-nginx
+        - name: cache-volume
+          emptyDir: {} 
+

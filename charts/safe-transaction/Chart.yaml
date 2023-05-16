@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: safe-transaction
+version: 0.1.1
+appVersion: v4.18.6
+description: A Helm chart for transaction service
+type: application
+icon: "https://raw.githubusercontent.com/safe-global/safe-core-sdk/main/assets/logo.png"

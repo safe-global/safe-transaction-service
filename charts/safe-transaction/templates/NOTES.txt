@@ -1,0 +1,1 @@
+[INFO] Safe Transaction Service Helm chart deployed successfully

@@ -1,0 +1,177 @@
+## @section Common parameters
+##
+
+## @param nameOverride String to partially override common.names.fullname
+##
+nameOverride: ""
+## @param fullnameOverride String to fully override common.names.fullname
+##
+fullnameOverride: ""
+
+
+
+## @section Installation Parameters
+##
+
+## @param replicas Replicas for deployment
+##
+replicas: 1
+
+## @param strategy Strategy for deployment
+##
+strategy: "RollingUpdate"
+
+## @param commonLabels [object] Labels to add to all related objects
+##
+commonLabels: {}
+
+## @param commonAnnotations [object] Annotations to to all related objects
+##
+commonAnnotations: {}
+
+## @param nodeSelector Object containing node selection constraint to deployment
+## https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+##
+nodeSelector: {}
+
+## @param resources Resource specification to deployment
+##
+resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+## @param tolerations Tolerations specifications to deployment
+##
+tolerations: []
+
+## @param affinity Affinity specifications to deployment
+##
+affinity: {}
+
+image:
+  ## @param image.registry Docker registry to deployment
+  ##
+  registry: registry.hub.docker.com
+
+  ## @param image.repository Docker image repository to deployment
+  ##
+  repository: safeglobal/safe-transaction-service
+
+  ## @param image.tag Docker image tag to deployment
+  ##
+  tag: ""
+
+  ## @param image.pullPolicy Pull policy to deployment as deinfed in 
+  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  pullPolicy: IfNotPresent
+
+service:
+  ## @param service.type service type
+  ##
+  type: ClusterIP
+  ports:
+    ## @param service.ports.number service port number
+    ##  
+    number: 80
+    ## @param service.ports.name service port name
+    ##
+    name: nginx
+  ## @param service.sessionAffinity Control where client requests go, to the same pod or round-robin
+  ## Values: ClientIP or None
+  ## ref: https://kubernetes.io/docs/user-guide/services/
+  ##
+  sessionAffinity: None
+
+ingress:
+  ## @param ingress.ingressClassName Name of the ingress class name to be used
+  ##
+  ingressClassName: ""
+
+  ## @param ingress.hostname Default host for the ingress record
+  ##
+  hostname: safe.cluster.local
+
+  ## @param ingress.annotations Annotations to be added to ingress resources
+  ## @skipingress.annotations
+  ##
+  annotations: {}
+
+## @section Configuration Parameters
+##
+config:
+  ## @param config.secretKey Transaction Service Secret Key. You should generate a random string of 50+ characters for this value in prod.
+  secretKey: ""
+
+  ## @param config.secretReferenceKey Reference to an existing secret containing the following entries: DJANGO_SECRET_KEY
+  secretReferenceKey: ""
+
+  ## @param config.debug Enable debug
+  debug: true
+
+  ## @param config.ethL2Network Log Level
+  ethL2Network: 1
+
+  ## @param config.ethereumRpcUrl
+  ethereumRpcUrl: https://primary.gnosis-chain.rpc.hoprtech.net
+
+
+  ## @param config.extraEnvVars Add additional extra environment vairables to the configMap
+  ##
+  extraEnvVars: {}
+
+  django:
+    ## @param config.django.allowedHosts Allowed hosts
+    allowedHosts: "*"
+  postgres:
+    ## @param config.postgres.secretReferenceKey Reference to an existing secret containing the following entry: DATABASE_URL
+    # Format: psql://postgres:postgres@txs-db:5432/postgres
+    secretReferenceKey: ""
+    ## @param config.postgres.username PostgreSQL user
+    username: ""
+    ## @param config.postgres.password PostgreSQL user's password
+    password: ""
+    ## @param config.postgres.database PostgreSQL database name
+    database: safe-transaction
+    ## @param config.postgres.host PostgreSQL server host
+    host: ""
+    ## @param config.postgres.port PostgreSQL server port
+    port: "5432"
+  redis:
+    ## @param config.redis.secretReferenceKey Reference to an existing secret containing the following entries: REDIS_URL
+    # Format redis://<pass>@safe-transaction-redis.safe.svc.cluster.stage:6379
+    secretReferenceKey: ""
+    ## @param config.redis.username Redis username
+    username: default
+    ## @param config.redis.password Redis user's password
+    password: ""
+    ## @param config.redis.database Redis database number
+    database: 0
+    ## @param config.redis.host Redis server host
+    host: ""
+    ## @param config.redis.port Redis server port
+    port: "6379"
+    ## @param config.redis.storageClassName StorageClassName
+    storageClassName: ""
+  rabbitmq:
+    ## @param config.rabbitmq.secretReferenceKey Reference to an existing secret containing the following entry: CELERY_BROKER_URL
+    # Format amqp://<user>:<password>@rabbitmq-ha-cluster/safe
+    secretReferenceKey: ""
+    ## @param config.rabbitmq.username RabbitMQ user
+    username: ""
+    ## @param config.rabbitmq.password RabbitMQ user's password
+    password: ""
+    ## @param config.rabbitmq.virtualHost RabbitMQ virtual host name
+    virtualHost: /
+    ## @param config.rabbitmq.host RabbitMQ server host
+    host: ""
+
+
