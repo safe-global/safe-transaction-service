@@ -125,8 +125,8 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
                     id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
                     uri=None,
                     metadata={
-                        "name": "safe-multisig.eth",
-                        "description": ".eth ENS Domain",
+                        "name": ".eth",
+                        "description": "Unknown .eth ENS Domain",
                         "image": settings.TOKENS_ENS_IMAGE_URL,
                     },
                 ),
