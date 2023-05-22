@@ -359,9 +359,10 @@ class TestCommands(TestCase):
             last_proxy_factory.tx_block_number, last_proxy_factory_initial_block
         )
 
-        self.assertEqual(SafeMasterCopy.objects.count(), 8)
-        self.assertEqual(SafeMasterCopy.objects.l2().count(), 1)
-        self.assertEqual(ProxyFactory.objects.count(), 4)
+        # At May 2023 we support 9 Master Copies, 2 L2 Master Copies and 5 Proxy Factories
+        self.assertEqual(SafeMasterCopy.objects.count(), 9)
+        self.assertEqual(SafeMasterCopy.objects.l2().count(), 2)
+        self.assertEqual(ProxyFactory.objects.count(), 5)
 
     def test_setup_service_mainnet_erc20_indexing_setup(self):
         # Test IndexingStatus ERC20 is not modified if higher than the oldest master copy
