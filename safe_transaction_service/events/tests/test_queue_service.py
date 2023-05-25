@@ -22,6 +22,7 @@ class TestQueueService(TestCase):
     def test_send_unsent_messages(self):
         queue_service = QueueServiceProvider()
         messages_to_send = 10
+        queue_service.remove_unsent_events()
         with mock.patch.object(
             Channel,
             "basic_publish",
@@ -33,12 +34,12 @@ class TestQueueService(TestCase):
             # Shouldn't add this message to unsent_messages list
             self.assertFalse(queue_service.send_event(payload, fail_retry=False))
 
-            self.assertEquals(len(queue_service.unsent_messages), messages_to_send)
-            self.assertEquals(queue_service.send_unsent_messages(), 0)
+            self.assertEquals(len(queue_service.unsent_events), messages_to_send)
+            self.assertEquals(queue_service.send_unsent_events(), 0)
 
         # After reconnection should send messages
-        self.assertEquals(queue_service.send_unsent_messages(), messages_to_send)
-        self.assertEquals(len(queue_service.unsent_messages), 0)
+        self.assertEquals(queue_service.send_unsent_events(), messages_to_send)
+        self.assertEquals(len(queue_service.unsent_events), 0)
         for i in range(messages_to_send):
             payload = f"not sent {i}"
             _, _, body = queue_service._channel.basic_get(self.queue, auto_ack=True)

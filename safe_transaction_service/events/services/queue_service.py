@@ -38,7 +38,7 @@ class QueueService:
     def __init__(self):
         self._channel = None
         self._connection: GeventConnection = None
-        self.unsent_messages = []
+        self.unsent_events = []
         credentials = PlainCredentials(
             settings.EVENTS_QUEUE_USERNAME, settings.EVENTS_QUEUE_PASSWORD
         )
@@ -59,7 +59,7 @@ class QueueService:
         if self._channel is None or not self._channel.is_open:
             logger.warning("Connection is still not initialized")
             if fail_retry:
-                self.unsent_messages.append(payload)
+                self.unsent_events.append(payload)
             return False
 
         try:
@@ -71,26 +71,29 @@ class QueueService:
         except pika.exceptions.ConnectionClosedByBroker:
             logger.warning("Event can not be sended due there is no channel opened")
             if fail_retry:
-                self.unsent_messages.append(payload)
+                self.unsent_events.append(payload)
             return False
 
-    def send_unsent_messages(self) -> int:
+    def send_unsent_events(self) -> int:
         """
         If connection is ready send the unsent messages list due connection broken
 
         :return: number of messages sent
         """
-        sent_messages = 0
-        if self._channel.is_open and len(self.unsent_messages) > 0:
-            logger.info("Sending %i not sent messages", len(self.unsent_messages))
-            for unsent_message in list(self.unsent_messages):
+        sent_events = 0
+        if self._channel.is_open and len(self.unsent_events) > 0:
+            logger.info("Sending %i not sent messages", len(self.unsent_events))
+            for unsent_message in list(self.unsent_events):
                 if self.send_event(unsent_message, fail_retry=False):
-                    self.unsent_messages.remove(unsent_message)
-                    sent_messages += 1
+                    self.unsent_events.remove(unsent_message)
+                    sent_events += 1
                 else:
                     break
 
-        return sent_messages
+        return sent_events
+
+    def remove_unsent_events(self):
+        self.unsent_events = []
 
 
 class AsyncQueueService(QueueService):
@@ -222,7 +225,7 @@ class AsyncQueueService(QueueService):
 
         """
         logger.info("Exchange declared: %s", self.EXCHANGE_NAME)
-        self.send_unsent_messages()
+        self.send_unsent_events()
 
 
 class SyncQueueService(QueueService):
