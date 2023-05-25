@@ -3,6 +3,8 @@ import json
 from typing import Any, Dict, Optional, Sequence
 from uuid import UUID
 
+from django.conf import settings
+
 from hexbytes import HexBytes
 
 from gnosis.eth.utils import fast_keccak
@@ -16,6 +18,9 @@ class SafeNotification:
         self.address = address
         self.payload = payload
         self.redis_key = self._get_redis_key(address, payload)
+        self.expiration_time_seconds = (
+            settings.NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS
+        )
 
     def _get_redis_key(self, address: Optional[str], payload: Dict[str, Any]) -> str:
         """
@@ -36,11 +41,13 @@ class SafeNotification:
 
     def set_duplicated(self) -> bool:
         """
-        Stores key with an expiration time of 2 hours (if not set)
+        Stores key with an expiration time if not set
 
         :return: ``True`` if key was not set before, ``False`` otherwise
         """
-        return bool(self.redis.set(self.redis_key, 1, ex=60 * 60 * 2, nx=True))
+        return bool(
+            self.redis.set(self.redis_key, 1, ex=self.expiration_time_seconds, nx=True)
+        )
 
 
 def mark_notification_as_processed(

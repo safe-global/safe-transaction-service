@@ -472,6 +472,10 @@ SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
 NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH = env(
     "NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH", default=None
 )
+NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS = env.int(
+    "NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS", default=60 * 60 * 2  # 2 hours
+)  # Don't allow the same notification to be sent during the expiration time due to reorgs and reindexing
+
 if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
     import json
 
