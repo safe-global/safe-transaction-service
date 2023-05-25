@@ -48,5 +48,4 @@ LOGGING["loggers"] = {  # noqa F405
     }
 }
 
-EVENTS_QUEUE_HOST = "rabbitmq"
 EVENTS_QUEUE_ASYNC_CONNECTION = False

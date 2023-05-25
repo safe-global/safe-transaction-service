@@ -53,6 +53,15 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      rabbitmq:
+        image: rabbitmq:alpine
+        options: >-
+          --health-cmd "rabbitmqctl await_startup"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - "5672:5672"
     steps:
     - name: Setup and run ganache
       run: |
@@ -86,6 +95,7 @@ jobs:
         ETHEREUM_TRACING_NODE_URL: http://localhost:8545
         ETH_HASH_BACKEND: pysha3
         REDIS_URL: redis://localhost:6379/0
+        EVENTS_QUEUE_HOST: localhost
     - name: Send results to coveralls
       continue-on-error: true  # Ignore coveralls problems
       run: coveralls --service=github
