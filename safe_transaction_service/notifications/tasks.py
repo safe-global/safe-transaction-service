@@ -77,6 +77,16 @@ def send_notification_task(
     if not (address and payload):  # Both must be present
         return 0, 0
 
+    # Make sure notification has not been sent before
+    if not mark_notification_as_processed(address, payload):
+        # Notification was processed already
+        logger.info(
+            "Duplicated notification about Safe=%s with payload=%s",
+            address,
+            payload,
+        )
+        return 0, 0
+
     tokens = list(
         FirebaseDevice.objects.filter(safes__address=address)
         .exclude(cloud_messaging_token=None)
@@ -87,17 +97,6 @@ def send_notification_task(
         send_notification_owner_task.delay(address, payload["safeTxHash"])
 
     if not (tokens and filter_notification(payload)):
-        return 0, 0
-
-    # Make sure notification has not been sent before
-    if not mark_notification_as_processed(address, payload):
-        # Notification was processed already
-        logger.info(
-            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
-            address,
-            payload,
-            tokens,
-        )
         return 0, 0
 
     with FirebaseClientPool() as firebase_client:
@@ -192,14 +191,14 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
         "safeTxHash": safe_tx_hash,
         "chainId": str(get_chain_id()),
     }
+
     # Make sure notification has not been sent before
     if not mark_notification_as_processed(address, payload):
         # Notification was processed already
         logger.info(
-            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
+            "Duplicated notification about Safe=%s with payload=%s",
             address,
             payload,
-            tokens,
         )
         return 0, 0
 
