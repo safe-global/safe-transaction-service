@@ -7,11 +7,12 @@ from ..utils import SafeNotification, mark_notification_as_processed
 
 class TestUtils(TestCase):
     @classmethod
-    def setUpClass(cls) -> None:
+    def setUpClass(cls):
+        super().setUpClass()
         get_redis().flushall()
 
-    @classmethod
-    def tearDownClass(cls) -> None:
+    def tearDown(self):
+        super().tearDown()
         get_redis().flushall()
 
     def test_mark_notification_as_processed(self):
