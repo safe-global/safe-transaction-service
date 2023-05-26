@@ -236,15 +236,15 @@ class TestTransactionService(TestCase):
         )
         all_tx_hashes = [q["safe_tx_hash"] for q in queryset]
 
-        self.assertEqual(len(self.transaction_service.redis.keys("*")), 0)
+        self.assertEqual(len(self.transaction_service.redis.keys("tx-service:*")), 0)
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes
         )
-        self.assertEqual(len(self.transaction_service.redis.keys("*")), 1)
+        self.assertEqual(len(self.transaction_service.redis.keys("tx-service:*")), 1)
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes
         )  # Force caching
-        self.assertEqual(len(self.transaction_service.redis.keys("*")), 1)
+        self.assertEqual(len(self.transaction_service.redis.keys("tx-service:*")), 1)
         self.assertEqual(len(all_txs), 6)
         tx_types = [
             MultisigTransaction,
