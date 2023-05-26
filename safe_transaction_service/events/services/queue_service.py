@@ -219,11 +219,11 @@ class AsyncQueueService(QueueService):
     def on_exchange_declareok(self, _unused_frame):
         """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
         command.
+        Send unsent messages that cannot be sent as due connection errors.
 
         :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
-        :param str|unicode userdata: Extra user data (exchange name)
-
         """
+
         logger.info("Exchange declared: %s", self.EXCHANGE_NAME)
         self.send_unsent_events()
 
