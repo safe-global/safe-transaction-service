@@ -496,10 +496,7 @@ ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
 
 # Events
 # ------------------------------------------------------------------------------
-EVENTS_QUEUE_HOST = env("EVENTS_QUEUE_HOST", default=None)
-EVENTS_QUEUE_PORT = env("EVENTS_QUEUE_PORT", default=5672)
-EVENTS_QUEUE_USERNAME = env("EVENTS_QUEUE_USERNAME", default="guest")
-EVENTS_QUEUE_PASSWORD = env("EVENTS_QUEUE_PASSWORD", default="guest")
+EVENTS_QUEUE_URL_HOST = env("EVENTS_QUEUE_URL_HOST", default=None)
 EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
 EVENTS_QUEUE_RABBITMQ_EXCHANGE_NAME = env(
     "EVENTS_QUEUE_RABBITMQ_EXCHANGE_NAME", default="amq.fanout"

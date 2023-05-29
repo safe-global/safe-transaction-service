@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from django.conf import settings
 
 import pika.exceptions
-from pika import BlockingConnection, ConnectionParameters, PlainCredentials
+from pika import BlockingConnection, URLParameters
 from pika.adapters.gevent_connection import GeventConnection
 from pika.channel import Channel
 from pika.exchange_type import ExchangeType
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class QueueServiceProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            if settings.EVENTS_QUEUE_HOST:
+            if settings.EVENTS_QUEUE_URL_HOST:
                 if settings.EVENTS_QUEUE_ASYNC_CONNECTION:
                     cls.instance = AsyncQueueService()
                 else:
@@ -39,14 +39,7 @@ class QueueService:
         self._channel = None
         self._connection: GeventConnection = None
         self.unsent_events = []
-        credentials = PlainCredentials(
-            settings.EVENTS_QUEUE_USERNAME, settings.EVENTS_QUEUE_PASSWORD
-        )
-        self._connection_parameters = ConnectionParameters(
-            host=settings.EVENTS_QUEUE_HOST,
-            port=settings.EVENTS_QUEUE_PORT,
-            credentials=credentials,
-        )
+        self._connection_parameters = URLParameters(settings.EVENTS_QUEUE_URL_HOST)
 
     def send_event(
         self, payload: Dict[str, Any], fail_retry: Optional[bool] = True
