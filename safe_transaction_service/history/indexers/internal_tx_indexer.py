@@ -210,7 +210,7 @@ class InternalTxIndexer(EthereumIndexer):
                 "Request error calling `trace_filter`"
             ) from e
         except ValueError as e:
-            # For example, Goerli returns:
+            # For example, Infura returns:
             #   ValueError: {'code': -32005, 'data': {'from': '0x6BBCE1', 'limit': 10000, 'to': '0x7072DB'}, 'message': 'query returned more than 10000 results. Try with this block range [0x6BBCE1, 0x7072DB].'}
             logger.warning(
                 "%s: Value error retrieving trace_filter results from-block=%d to-block=%d : %s",
