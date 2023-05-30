@@ -209,6 +209,20 @@ class InternalTxIndexer(EthereumIndexer):
             raise FindRelevantElementsException(
                 "Request error calling `trace_filter`"
             ) from e
+        except ValueError as e:
+            # For example, Infura returns:
+            #   ValueError: {'code': -32005, 'data': {'from': '0x6BBCE1', 'limit': 10000, 'to': '0x7072DB'}, 'message': 'query returned more than 10000 results. Try with this block range [0x6BBCE1, 0x7072DB].'}
+            logger.warning(
+                "%s: Value error retrieving trace_filter results from-block=%d to-block=%d : %s",
+                self.__class__.__name__,
+                from_block_number,
+                to_block_number,
+                e,
+            )
+            raise FindRelevantElementsException(
+                f"Request error retrieving trace_filter results "
+                f"from-block={from_block_number} to-block={to_block_number}"
+            ) from e
 
         # Log INFO if traces found, DEBUG if not
         traces: OrderedDict[HexBytes, None] = OrderedDict()
