@@ -95,7 +95,7 @@ jobs:
         ETHEREUM_TRACING_NODE_URL: http://localhost:8545
         ETH_HASH_BACKEND: pysha3
         REDIS_URL: redis://localhost:6379/0
-        EVENTS_QUEUE_URL_HOST: amqp://guest:guest@localhost:5672/
+        EVENTS_QUEUE_URL: amqp://guest:guest@localhost:5672/
     - name: Send results to coveralls
       continue-on-error: true  # Ignore coveralls problems
       run: coveralls --service=github

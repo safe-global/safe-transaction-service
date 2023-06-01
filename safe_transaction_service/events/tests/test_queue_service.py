@@ -16,7 +16,7 @@ class TestQueueService(TestCase):
         self.queue = "test_queue"
         self.queue_service._channel.queue_declare(self.queue)
         self.queue_service._channel.queue_bind(
-            self.queue, self.queue_service.EXCHANGE_NAME
+            self.queue, self.queue_service.exchange_name
         )
 
     def test_send_unsent_messages(self):

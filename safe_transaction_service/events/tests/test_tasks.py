@@ -11,7 +11,7 @@ from safe_transaction_service.events.tests.test_queue_service import TestQueueSe
 
 
 class TestTasks(TestQueueService, TestCase):
-    def test_send_event_to_queue(self):
+    def test_send_event_to_queue_task(self):
         self.assertFalse(send_event_to_queue_task(None))
         payload = {"event": "test_event_task", "type": "event task type"}
         with mock.patch.object(
@@ -19,7 +19,7 @@ class TestTasks(TestQueueService, TestCase):
         ) as mock_publish:
             self.assertTrue(send_event_to_queue_task(payload))
             mock_publish.assert_called_once_with(
-                exchange=self.queue_service.EXCHANGE_NAME,
+                exchange=self.queue_service.exchange_name,
                 routing_key="",
                 body=json.dumps(payload),
                 properties=None,

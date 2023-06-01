@@ -496,11 +496,9 @@ ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
 
 # Events
 # ------------------------------------------------------------------------------
-EVENTS_QUEUE_URL_HOST = env("EVENTS_QUEUE_URL_HOST", default=None)
+EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
 EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
-EVENTS_QUEUE_RABBITMQ_EXCHANGE_NAME = env(
-    "EVENTS_QUEUE_RABBITMQ_EXCHANGE_NAME", default="amq.fanout"
-)
+EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
 
 # AWS S3 https://github.com/etianen/django-s3-storage
 # ------------------------------------------------------------------------------
