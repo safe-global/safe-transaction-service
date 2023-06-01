@@ -195,6 +195,8 @@ class IndexService:
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
     ) -> List["EthereumTx"]:
+
+        logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
             [HexBytes(tx_hash).hex() for tx_hash in tx_hashes]
@@ -204,6 +206,7 @@ class IndexService:
         )
         for db_ethereum_tx in db_ethereum_txs:
             ethereum_txs_dict[db_ethereum_tx.tx_hash] = db_ethereum_tx
+        logger.debug("Found %d existing txs on DB", len(db_ethereum_txs))
 
         # Retrieve from the node the txs missing from database
         tx_hashes_not_in_db = [
@@ -211,10 +214,12 @@ class IndexService:
             for tx_hash, ethereum_tx in ethereum_txs_dict.items()
             if not ethereum_tx
         ]
+        logger.debug("Retrieve from RPC %d missing txs on DB", len(tx_hashes_not_in_db))
         if not tx_hashes_not_in_db:
             return list(ethereum_txs_dict.values())
 
         # Get receipts for hashes not in db
+        logger.debug("Get tx receipts for hashes not on db")
         tx_receipts = []
         for tx_hash, tx_receipt in zip(
             tx_hashes_not_in_db,
@@ -236,6 +241,7 @@ class IndexService:
 
             tx_receipts.append(tx_receipt)
 
+        logger.debug("Got tx receipts. Now getting transactions not on db")
         # Get transactions for hashes not in db
         fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_hashes = set()
@@ -257,6 +263,7 @@ class IndexService:
 
             block_hashes.add(tx["blockHash"].hex())
             txs.append(tx)
+        logger.debug("Got txs from RPC. Getting %d blocks", len(block_hashes))
 
         blocks = self.ethereum_client.get_blocks(block_hashes)
         block_dict = {}
@@ -270,6 +277,10 @@ class IndexService:
                 )
             assert block_hash == block["hash"].hex()
             block_dict[block["hash"]] = block
+
+        logger.debug(
+            "Got blocks from RPC. Inserting blocks. Creating txs or updating them if they have not receipt"
+        )
 
         # Create new transactions or update them if they have no receipt
         current_block_number = self.ethereum_client.current_block_number
@@ -294,6 +305,7 @@ class IndexService:
                 # For txs stored before being mined
                 ethereum_tx.update_with_block_and_receipt(ethereum_block, tx_receipt)
                 ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
+        logger.debug("Blocks, transactions and receipts were inserted")
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic

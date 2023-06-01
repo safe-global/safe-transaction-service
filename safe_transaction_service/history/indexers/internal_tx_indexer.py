@@ -15,9 +15,10 @@ from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
     get_safe_tx_decoder,
 )
-from safe_transaction_service.utils.utils import FixedSizeDict, chunks
+from safe_transaction_service.utils.utils import chunks
 
 from ..models import InternalTx, InternalTxDecoded, MonitoredAddress, SafeMasterCopy
+from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -57,38 +58,7 @@ class InternalTxIndexer(EthereumIndexer):
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
-        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
-
-    def mark_as_processed(
-        self, tx_hash: HexBytes, block_hash: Optional[HexBytes]
-    ) -> bool:
-        """
-        Mark a `tx_hash` as processed by the indexer
-
-        :param tx_hash:
-        :param block_hash:
-        :return: `True` if `tx_hash` was marked as processed, `False` if it was already processed
-        """
-
-        tx_hash = HexBytes(tx_hash)
-        block_hash = HexBytes(block_hash or 0)
-        tx_id = tx_hash + block_hash
-
-        if tx_id in self._processed_element_cache:
-            logger.debug(
-                "Tx with tx-hash=%s on block=%s was already processed",
-                tx_hash.hex(),
-                block_hash.hex(),
-            )
-            return False
-        else:
-            logger.debug(
-                "Marking tx with tx-hash=%s on block=%s as processed",
-                tx_hash.hex(),
-                block_hash.hex(),
-            )
-            self._processed_element_cache[tx_id] = None
-            return True
+        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
 
     @property
     def database_field(self):
@@ -315,7 +285,9 @@ class InternalTxIndexer(EthereumIndexer):
                 if tx_hash_with_traces[tx_hash]
                 else None
             )
-            if self.mark_as_processed(tx_hash, block_hash):
+            if not self.element_already_processed_checker.is_processed(
+                tx_hash, block_hash
+            ):
                 tx_hashes.append(tx_hash)
                 # Traces can be already populated if using `trace_block`, but with `trace_filter`
                 # some traces will be missing and `trace_transaction` needs to be called
@@ -367,7 +339,18 @@ class InternalTxIndexer(EthereumIndexer):
             logger.debug(
                 "End decoding and storing of %d decoded traces", internal_txs_decoded
             )
-            return tx_hashes
+
+        # Mark traces as processed
+        for tx_hash in list(tx_hash_with_traces.keys()):
+            block_hash = (
+                tx_hash_with_traces[tx_hash][0]["blockHash"]
+                if tx_hash_with_traces[tx_hash]
+                else None
+            )
+            self.element_already_processed_checker.mark_as_processed(
+                tx_hash, block_hash
+            )
+        return tx_hashes
 
 
 class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
