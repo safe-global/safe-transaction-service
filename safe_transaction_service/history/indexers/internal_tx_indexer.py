@@ -294,7 +294,7 @@ class InternalTxIndexer(EthereumIndexer):
                 if not tx_hash_with_traces[tx_hash]:
                     tx_hashes_missing_traces.append(tx_hash)
             else:
-                # Trace was already processed
+                # Traces were already processed
                 del tx_hash_with_traces[tx_hash]
 
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)

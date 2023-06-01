@@ -280,7 +280,7 @@ class EventsIndexer(EthereumIndexer):
         logger.debug("End processing %d decoded events", len(decoded_elements))
 
         logger.debug("Marking events as processed")
-        for log_receipt in log_receipts:
+        for log_receipt in not_processed_log_receipts:
             self.element_already_processed_checker.mark_as_processed(
                 log_receipt["transactionHash"],
                 log_receipt["blockHash"],

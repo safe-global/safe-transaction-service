@@ -9,6 +9,10 @@ logger = getLogger(__name__)
 
 
 class ElementAlreadyProcessedChecker:
+    """
+    Keeps a cache of already processed transactions and events
+    """
+
     def __init__(self):
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
 
@@ -24,12 +28,26 @@ class ElementAlreadyProcessedChecker:
     def is_processed(
         self, tx_hash: HexBytes, block_hash: Optional[HexBytes], index: int = 0
     ) -> bool:
+        """
+        :param tx_hash:
+        :param block_hash:
+        :param index: Only for events
+        :return: ``True`` if element was processed, ``False`` otherwise
+        """
         tx_id = self.get_key(tx_hash, block_hash, index)
         return tx_id in self._processed_element_cache
 
     def mark_as_processed(
         self, tx_hash: HexBytes, block_hash: Optional[HexBytes], index: int = 0
     ) -> bool:
+        """
+        Mark element as processed if it is not already marked
+
+        :param tx_hash:
+        :param block_hash:
+        :param index: Only for events
+        :return: ``True`` if element was marked as processed, ``False`` if it was marked already
+        """
         tx_id = self.get_key(tx_hash, block_hash, index)
 
         if tx_id in self._processed_element_cache:
