@@ -14,8 +14,9 @@ from web3.contract.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
 
-from safe_transaction_service.utils.utils import FixedSizeDict, chunks
+from safe_transaction_service.utils.utils import chunks
 
+from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -51,42 +52,9 @@ class EventsIndexer(EthereumIndexer):
 
         # Number of concurrent requests to `getLogs`
         self.get_logs_concurrency = settings.ETH_EVENTS_GET_LOGS_CONCURRENCY
-        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
+        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
 
         super().__init__(*args, **kwargs)
-
-    def mark_as_processed(self, log_receipt: LogReceipt) -> bool:
-        """
-        Mark event as processed by the indexer
-
-        :param log_receipt:
-        :return: `True` if `event` was marked as processed, `False` if it was already processed
-        """
-
-        # Calculate id, collision should be almost impossible
-        # Add blockHash to prevent reorg issues
-        block_hash = HexBytes(log_receipt["blockHash"])
-        tx_hash = HexBytes(log_receipt["transactionHash"])
-        log_index = log_receipt["logIndex"]
-        event_id = block_hash + tx_hash + HexBytes(log_index)
-
-        if event_id in self._processed_element_cache:
-            logger.debug(
-                "Event with tx-hash=%s log-index=%d on block=%s was already processed",
-                tx_hash.hex(),
-                log_index,
-                block_hash.hex(),
-            )
-            return False
-        else:
-            logger.debug(
-                "Marking event with tx-hash=%s log-index=%d on block=%s as processed",
-                tx_hash.hex(),
-                log_index,
-                block_hash.hex(),
-            )
-            self._processed_element_cache[event_id] = None
-            return True
 
     @property
     @abstractmethod
@@ -289,7 +257,11 @@ class EventsIndexer(EthereumIndexer):
         not_processed_log_receipts = [
             log_receipt
             for log_receipt in log_receipts
-            if self.mark_as_processed(log_receipt)
+            if not self.element_already_processed_checker.is_processed(
+                log_receipt["transactionHash"],
+                log_receipt["blockHash"],
+                log_receipt["logIndex"],
+            )
         ]
         decoded_elements: List[EventData] = self.decode_elements(
             not_processed_log_receipts
@@ -306,4 +278,14 @@ class EventsIndexer(EthereumIndexer):
             if processed_element := self._process_decoded_element(decoded_element):
                 processed_elements.append(processed_element)
         logger.debug("End processing %d decoded events", len(decoded_elements))
+
+        logger.debug("Marking events as processed")
+        for log_receipt in not_processed_log_receipts:
+            self.element_already_processed_checker.mark_as_processed(
+                log_receipt["transactionHash"],
+                log_receipt["blockHash"],
+                log_receipt["logIndex"],
+            )
+        logger.debug("Marked events as processed")
+
         return processed_elements

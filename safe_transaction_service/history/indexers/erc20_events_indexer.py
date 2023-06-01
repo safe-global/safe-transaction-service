@@ -170,7 +170,11 @@ class Erc20EventsIndexer(EventsIndexer):
             not_processed_log_receipts = [
                 log_receipt
                 for log_receipt in log_receipts
-                if self.mark_as_processed(log_receipt)
+                if not self.element_already_processed_checker.is_processed(
+                    log_receipt["transactionHash"],
+                    log_receipt["blockHash"],
+                    log_receipt["logIndex"],
+                )
             ]
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
                 self.events_to_erc20_transfer(not_processed_log_receipts),
@@ -181,6 +185,14 @@ class Erc20EventsIndexer(EventsIndexer):
                 ignore_conflicts=True,
             )
             logger.debug("Stored TokenTransfer objects")
+            logger.debug("Marking events as processed")
+            for log_receipt in not_processed_log_receipts:
+                self.element_already_processed_checker.mark_as_processed(
+                    log_receipt["transactionHash"],
+                    log_receipt["blockHash"],
+                    log_receipt["logIndex"],
+                )
+            logger.debug("Marked events as processed")
             return range(
                 result_erc20 + result_erc721
             )  # TODO Hack to prevent returning `TokenTransfer` and using too much RAM
