@@ -448,10 +448,10 @@ class EthereumIndexer(ABC):
                 )
                 number_processed_elements = len(processed_elements)
                 logger.debug(
-                    "%s: Processed %d elements for almost updated addresses. From-block-number=%d to-block-number=%d",
+                    "%s: Processed %d elements for almost updated addresses. From-block-number=%s to-block-number=%d",
                     self.__class__.__name__,
                     number_processed_elements,
-                    from_block_number,
+                    from_block_number,  # Can be None
                     to_block_number,
                 )
                 total_number_processed_elements += number_processed_elements
@@ -504,10 +504,10 @@ class EthereumIndexer(ABC):
 
                 number_processed_elements = len(processed_elements)
                 logger.debug(
-                    "%s: Processed %d elements for not updated addresses. From-block-number=%d to-block-number=%d",
+                    "%s: Processed %d elements for not updated addresses. From-block-number=%s to-block-number=%d",
                     self.__class__.__name__,
                     number_processed_elements,
-                    from_block_number,
+                    from_block_number,  # Can be None
                     to_block_number,
                 )
                 total_number_processed_elements += number_processed_elements
