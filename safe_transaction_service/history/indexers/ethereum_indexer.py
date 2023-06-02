@@ -451,7 +451,7 @@ class EthereumIndexer(ABC):
                     "%s: Processed %d elements for almost updated addresses. From-block-number=%d to-block-number=%d",
                     self.__class__.__name__,
                     number_processed_elements,
-                    from_block_number,
+                    from_block_number or 0,
                     to_block_number,
                 )
                 total_number_processed_elements += number_processed_elements
