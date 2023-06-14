@@ -24,6 +24,8 @@ services:
 
   rabbitmq:
     image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
 
   db:
     image: postgres:13-alpine

@@ -99,6 +99,7 @@ LOCAL_APPS = [
     "safe_transaction_service.notifications.apps.NotificationsConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
+    "safe_transaction_service.events.apps.EventsConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -240,6 +241,10 @@ CELERY_ROUTES = (
         ),
         (
             "safe_transaction_service.history.tasks.send_webhook_task",
+            {"queue": "webhooks", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.events.tasks.send_event_to_queue_task",
             {"queue": "webhooks", "delivery_mode": "transient"},
         ),
         (
@@ -489,6 +494,11 @@ ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
     "ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD", default=0.1
 )  # Percentage of Safes allowed to be out of sync without alerting. By default 10%
 
+# Events
+# ------------------------------------------------------------------------------
+EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
+EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
+EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
 
 # AWS S3 https://github.com/etianen/django-s3-storage
 # ------------------------------------------------------------------------------

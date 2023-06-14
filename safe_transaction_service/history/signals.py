@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
+from safe_transaction_service.events.tasks import send_event_to_queue_task
 from safe_transaction_service.notifications.tasks import send_notification_task
 
 from .models import (
@@ -167,6 +168,7 @@ def process_webhook(
                     countdown=5,
                     priority=2,  # Almost lowest priority
                 )
+                send_event_to_queue_task.delay(payload)
             else:
                 logger.debug(
                     "Notification will not be sent for created=%s object=%s",
