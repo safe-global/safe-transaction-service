@@ -140,7 +140,7 @@ class AsyncQueueService(QueueService):
             self._connection_parameters.host,
             err,
         )
-        self._connection.ioloop.call_later(5, self.connect)
+        connection.ioloop.call_later(5, self.connect)
 
     def on_connection_closed(self, connection: GeventConnection, reason: Exception):
         """
@@ -158,7 +158,7 @@ class AsyncQueueService(QueueService):
             self._connection_parameters.host,
             reason,
         )
-        self._connection.ioloop.call_later(5, self.connect)
+        connection.ioloop.call_later(5, self.connect)
 
     def open_channel(self):
         """
