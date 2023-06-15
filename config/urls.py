@@ -14,7 +14,6 @@ schema_view = get_schema_view(
         title="Safe Transaction Service API",
         default_version="v1",
         description="API to keep track of transactions sent via Gnosis Safe smart contracts",
-        contact=openapi.Contact(email="safe@gnosis.io"),
         license=openapi.License(name="MIT License"),
     ),
     validators=["flex", "ssv"],
