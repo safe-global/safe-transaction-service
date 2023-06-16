@@ -161,6 +161,9 @@ class PriceService:
     def get_algorand_usd_price(self) -> float:
         return self.kraken_client.get_algo_usd_price()
 
+    def get_kava_usd_price(self) -> float:
+        return self.kraken_client.get_kava_usd_price()
+
     def get_binance_usd_price(self) -> float:
         try:
             return self.kucoin_client.get_bnb_usd_price()
@@ -298,6 +301,11 @@ class PriceService:
             EthereumNetwork.FLARE_MAINNET,
         ):
             return self.get_kraken_sgb_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.KAVA_EVM_TESTNET,
+            EthereumNetwork.KAVA_EVM,
+        ):
+            return self.get_kava_usd_price()
         else:
             return self.get_ether_usd_price()
 
