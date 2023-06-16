@@ -263,6 +263,7 @@ class AllTransactionsListView(ListAPIView):
             _schema_trusted_param,
         ],
     )
+    @method_decorator(cache_page(10))  # 10 seconds
     def get(self, request, *args, **kwargs):
         """
         Returns a paginated list of transactions for a Safe. The list has different structures depending on the
