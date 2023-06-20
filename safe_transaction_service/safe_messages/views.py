@@ -43,6 +43,9 @@ class SafeMessageSignatureView(CreateAPIView):
         )
         return context
 
+    @swagger_auto_schema(
+        responses={201: "Created"},
+    )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -89,7 +92,7 @@ class SafeMessagesView(ListCreateAPIView):
 
     @swagger_auto_schema(
         request_body=serializers.SafeMessageSerializer,
-        responses={201: serializers.SafeMessageResponseSerializer},
+        responses={201: "Created"},
     )
     def post(self, request, address, *args, **kwargs):
         if not fast_is_checksum_address(address):
