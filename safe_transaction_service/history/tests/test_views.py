@@ -1771,7 +1771,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "label": another_label,
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "safe": None,
             "signature": delegator.signHash(
                 DelegateSignatureHelper.calculate_hash(delegate.address, eth_sign=True)
             )["signature"].hex(),

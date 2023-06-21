@@ -369,7 +369,7 @@ class DelegateSignatureCheckerMixin:
 
 
 class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
-    safe = EthereumAddressField(allow_null=True, required=False)
+    safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65)
