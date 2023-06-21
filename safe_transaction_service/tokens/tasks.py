@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -22,6 +23,9 @@ from .models import Token, TokenList
 
 logger = get_task_logger(__name__)
 
+TASK_SOFT_TIME_LIMIT = 30  # 30 seconds
+TASK_TIME_LIMIT = 60  # 1 minute
+
 
 @dataclass
 class EthValueWithTimestamp:
@@ -42,7 +46,7 @@ class EthValueWithTimestamp:
         return f"{self.eth_value}:{self.timestamp.timestamp()}"
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
 @close_gevent_db_connection_decorator
 def calculate_token_eth_price_task(
     token_address: ChecksumAddress, redis_key: str, force_recalculation: bool = False
@@ -57,13 +61,13 @@ def calculate_token_eth_price_task(
     """
     from .services.price_service import PriceServiceProvider
 
-    redis_expiration_time = 60 * 30  # Expire in 30 minutes
     redis = get_redis()
     now = timezone.now()
     current_timestamp = int(now.timestamp())
     key_was_set = redis.set(
         redis_key, f"0:{current_timestamp}", ex=60 * 15, nx=True
     )  # Expire in 15 minutes
+    # Only calculate the price if key was not set previously or if `force_recalculation` is `True`
     if key_was_set or force_recalculation:
         price_service = PriceServiceProvider()
         eth_price = price_service.get_token_eth_price_from_oracles(token_address)
@@ -89,13 +93,16 @@ def calculate_token_eth_price_task(
                 return EthValueWithTimestamp(eth_price, now)
 
         eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
-        redis.setex(redis_key, redis_expiration_time, str(eth_value_with_timestamp))
+        redis.setex(
+            redis_key, settings.TOKEN_ETH_PRICE_TTL, str(eth_value_with_timestamp)
+        )
         if not getattr(settings, "CELERY_ALWAYS_EAGER", False):
             # Recalculate price before cache expires and prevents recursion checking Celery Eager property
+            # Use randint to prevent triggering all the tasks at the same time
             calculate_token_eth_price_task.apply_async(
                 (token_address, redis_key),
                 {"force_recalculation": True},
-                countdown=redis_expiration_time - 300,
+                countdown=settings.TOKEN_ETH_PRICE_TTL - random.randint(60, 300),
             )
 
         return EthValueWithTimestamp(eth_price, now)
@@ -103,7 +110,7 @@ def calculate_token_eth_price_task(
         return EthValueWithTimestamp.from_string(redis.get(redis_key).decode())
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
 @close_gevent_db_connection_decorator
 def fix_pool_tokens_task() -> Optional[int]:
     """
