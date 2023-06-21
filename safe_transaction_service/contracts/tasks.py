@@ -23,6 +23,9 @@ from .models import Contract
 
 logger = get_task_logger(__name__)
 
+TASK_SOFT_TIME_LIMIT = 30  # 30 seconds
+TASK_TIME_LIMIT = 60  # 1 minute
+
 
 class ContractAction(Enum):
     CREATED = 0
@@ -30,7 +33,7 @@ class ContractAction(Enum):
     NOT_MODIFIED = 2
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
 @close_gevent_db_connection_decorator
 def create_missing_contracts_with_metadata_task() -> int:
     """
@@ -53,7 +56,7 @@ def create_missing_contracts_with_metadata_task() -> int:
     return i
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
 @close_gevent_db_connection_decorator
 def create_missing_multisend_contracts_with_metadata_task() -> int:
     """
@@ -85,7 +88,7 @@ def create_missing_multisend_contracts_with_metadata_task() -> int:
     return len(addresses)
 
 
-@app.shared_task()
+@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
 @close_gevent_db_connection_decorator
 def reindex_contracts_without_metadata_task() -> int:
     """
@@ -106,6 +109,8 @@ def reindex_contracts_without_metadata_task() -> int:
 
 
 @app.shared_task(
+    soft_time_limit=TASK_SOFT_TIME_LIMIT,
+    time_limit=TASK_TIME_LIMIT,
     autoretry_for=(EtherscanRateLimitError,),
     retry_backoff=10,
     retry_kwargs={"max_retries": 5},
