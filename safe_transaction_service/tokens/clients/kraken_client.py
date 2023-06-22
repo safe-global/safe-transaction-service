@@ -1,20 +1,16 @@
 import logging
 
-import requests
-
+from .base_client import BaseHTTPClient
 from .exceptions import CannotGetPrice
 
 logger = logging.getLogger(__name__)
 
 
-class KrakenClient:
-    def __init__(self):
-        self.http_session = requests.Session()
-
+class KrakenClient(BaseHTTPClient):
     def _get_price(self, symbol: str) -> float:
         url = f"https://api.kraken.com/0/public/Ticker?pair={symbol}"
         try:
-            response = self.http_session.get(url, timeout=10)
+            response = self.http_session.get(url, timeout=self.request_timeout)
             api_json = response.json()
             error = api_json.get("error")
             if not response.ok or error:
