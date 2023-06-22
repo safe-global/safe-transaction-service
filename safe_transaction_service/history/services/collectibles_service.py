@@ -209,7 +209,7 @@ class CollectiblesService:
 
         try:
             logger.debug("Getting metadata for uri=%s", uri)
-            with requests.get(uri, timeout=15, stream=True) as response:
+            with requests.get(uri, timeout=10, stream=True) as response:
                 if not response.ok:
                     logger.debug("Cannot get metadata for uri=%s", uri)
                     raise MetadataRetrievalException(uri)
