@@ -28,7 +28,7 @@ services:
       - "5672:5672"
 
   db:
-    image: postgres:13-alpine
+    image: postgres:14-alpine
     ports:
       - "5432:5432"
     environment:
