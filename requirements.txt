@@ -19,7 +19,7 @@ django-timezone-field==5.1
 djangorestframework==3.14.0
 djangorestframework-camel-case==1.4.2
 docutils==0.20.1
-drf-yasg[validation]==1.21.5
+drf-yasg[validation]==1.21.6
 firebase-admin==6.2.0
 flower==1.2.0
 gunicorn[gevent]==20.1.0
