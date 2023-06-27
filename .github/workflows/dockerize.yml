@@ -1,0 +1,46 @@
+name: Dockerize Web
+
+on:
+  push:
+    branches:
+      - development
+
+  pull_request:
+    branches:
+      - master
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_REPOSITORY: axieinfinity/safe-transaction-service
+  DOCKER_FILE: docker/web/Dockerfile
+
+jobs:
+  push_to_docker_registry:
+    name: Push Docker image to GHCR.IO
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 'Checkout Repo'
+        uses: 'actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c' #v3.1.0
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Enable Registry Cache
+      - name: "Set up Docker Buildx"
+        uses: "docker/setup-buildx-action@8c0edbc76e98fa90f69d9a2c020dcb50019dc325" #v2.2.1
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@37abcedcc1da61a57767b7588cb9d03eb57e28b3 #v3.3.0
+        with:
+          context: .
+          file: ${{ env.DOCKER_FILE }}
+          push: true
+          tags: "${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:nightly"
+
