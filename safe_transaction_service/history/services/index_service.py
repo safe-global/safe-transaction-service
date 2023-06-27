@@ -67,7 +67,6 @@ class IndexServiceProvider:
                 EthereumClientProvider(),
                 settings.ETH_REORG_BLOCKS,
                 settings.ETH_L2_NETWORK,
-                settings.ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD,
             )
         return cls.instance
 
@@ -84,12 +83,10 @@ class IndexService:
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
         eth_l2_network: bool,
-        alert_out_of_sync_events_threshold: float,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_l2_network = eth_l2_network
-        self.alert_out_of_sync_events_threshold = alert_out_of_sync_events_threshold
 
     def block_get_or_create_from_block_hash(self, block_hash: int):
         try:
@@ -405,7 +402,11 @@ class IndexService:
         if not addresses:
             logger.warning("No addresses to process")
         else:
-            logger.info("Start reindexing addresses %s", addresses)
+            # Don't log all the addresses
+            addresses_str = (
+                str(addresses) if len(addresses) < 10 else f"{addresses[:10]}..."
+            )
+            logger.info("Start reindexing addresses %s", addresses_str)
             current_block_number = self.ethereum_client.current_block_number
             stop_block_number = (
                 min(current_block_number, to_block_number)

@@ -415,7 +415,7 @@ ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env.int(
     "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT", default=10_000
 )
 ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN = env.int(
-    "ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN", default=6
+    "ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN", default=10
 )
 ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS = env.int(
     "ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS", default=10
@@ -442,7 +442,7 @@ ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX", default=0
 )  # Maximum number of blocks to process together when searching for events. 0 == no limit.
 ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN = env.int(
-    "ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN", default=10
+    "ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN", default=20
 )  # Blocks to reindex again every indexer run when service is synced. Useful for RPCs not reliable
 ETH_EVENTS_GET_LOGS_CONCURRENCY = env.int(
     "ETH_EVENTS_GET_LOGS_CONCURRENCY", default=20
@@ -454,7 +454,7 @@ ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
 ETH_REORG_BLOCKS = env.int(
-    "ETH_REORG_BLOCKS", default=100 if ETH_L2_NETWORK else 10
+    "ETH_REORG_BLOCKS", default=150 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable
 
 # Tokens
@@ -495,10 +495,6 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
             "firebase-credentials.json"
         )
     )
-
-ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
-    "ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD", default=0.1
-)  # Percentage of Safes allowed to be out of sync without alerting. By default 10%
 
 # Events
 # ------------------------------------------------------------------------------
