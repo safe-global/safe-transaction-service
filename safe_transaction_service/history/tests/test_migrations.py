@@ -7,6 +7,8 @@ from django_test_migrations.migrator import Migrator
 from eth_account import Account
 from web3 import Web3
 
+from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
+
 
 class TestMigrations(TestCase):
     def setUp(self) -> None:
@@ -241,3 +243,88 @@ class TestMigrations(TestCase):
         )
         SafeContract = old_state.apps.get_model("history", "SafeContract")
         self.assertEqual(SafeContract.objects.filter(erc20_block_number=0).count(), 3)
+
+    def test_migration_forward_0073_safe_apps_links(self):
+        """
+        Migrate safe apps links from 'apps.gnosis-safe.io' -> 'apps-portal.safe.global'
+        """
+
+        new_state = self.migrator.apply_initial_migration(
+            ("history", "0072_safecontract_banned_and_more"),
+        )
+
+        # Factories can be used as there are no database definition changes
+        # Make sure there are no issues with empty `origin` or `origin` lacking `url`
+        MultisigTransactionFactory(origin={"not_url": "random"})
+
+        # Make sure other urls are not affected
+        MultisigTransactionFactory(
+            origin={"url": "https://app.zerion.io", "name": "Zerion"}
+        )
+
+        # This origin must be replaced
+        MultisigTransactionFactory(
+            origin={
+                "url": "https://apps.gnosis-safe.io/tx-builder/",
+                "name": "Transaction Builder",
+            }
+        )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0073_safe_apps_links"),
+        )
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        self.assertCountEqual(
+            MultisigTransaction.objects.values_list("origin", flat=True),
+            [
+                {"not_url": "random"},
+                {"url": "https://app.zerion.io", "name": "Zerion"},
+                {
+                    "url": "https://apps-portal.safe.global/tx-builder/",
+                    "name": "Transaction Builder",
+                },
+            ],
+        )
+
+    def test_migration_backward_0073_safe_apps_links(self):
+        """
+        Migrate safe apps links from 'apps.gnosis-safe.io' -> 'apps-portal.safe.global'
+        """
+
+        new_state = self.migrator.apply_initial_migration(
+            ("history", "0073_safe_apps_links"),
+        )
+
+        # Factories can be used as there are no database definition changes
+        # Make sure there are no issues with empty `origin` or `origin` lacking `url`
+        MultisigTransactionFactory(origin={"not_url": "random"})
+
+        # Make sure other urls are not affected
+        MultisigTransactionFactory(
+            origin={"url": "https://app.zerion.io", "name": "Zerion"}
+        )
+
+        # This origin must be replaced
+        MultisigTransactionFactory(
+            origin={
+                "url": "https://apps-portal.safe.global/tx-builder/",
+                "name": "Transaction Builder",
+            }
+        )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0072_safecontract_banned_and_more"),
+        )
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        self.assertCountEqual(
+            MultisigTransaction.objects.values_list("origin", flat=True),
+            [
+                {"not_url": "random"},
+                {"url": "https://app.zerion.io", "name": "Zerion"},
+                {
+                    "url": "https://apps.gnosis-safe.io/tx-builder/",
+                    "name": "Transaction Builder",
+                },
+            ],
+        )
