@@ -13,22 +13,22 @@ from gnosis.eth import EthereumNetwork
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
 
 
-# Extend Keys for Master Copies and Proxy Factories
-MASTER_COPIES[EthereumNetwork.RONIN] = [
+# Overwrite Keys for Master Copies and Proxy Factories for Ronin Testnet and Mainnet.
+MASTER_COPIES[EthereumNetwork.PUBLICMINT_MAINNET] = [
     ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 7938928, "1.3.0+L2"),
     ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 7938928, "1.3.0"),
 ]
 
-MASTER_COPIES[EthereumNetwork.RONIN_TESTNET] = [
+MASTER_COPIES[EthereumNetwork.EDGEWARE_MAINNET] = [
     ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 807_225, "1.3.0+L2"),
     ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 807_225, "1.3.0"),
 ]
 
-PROXY_FACTORIES[EthereumNetwork.RONIN] = [
+PROXY_FACTORIES[EthereumNetwork.PUBLICMINT_MAINNET] = [
     ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 7938928)
 ]
 
-PROXY_FACTORIES[EthereumNetwork.RONIN_TESTNET] = [
+PROXY_FACTORIES[EthereumNetwork.EDGEWARE_MAINNET] = [
     ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 807_225)
 ]
 

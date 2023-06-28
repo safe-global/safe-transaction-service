@@ -339,8 +339,8 @@ class EthereumNetwork(Enum):
     MAINNETZ_MAINNET = 2016
     PUBLICMINT_DEVNET = 2018
     PUBLICMINT_TESTNET = 2019
-    RONIN = 2020  # Ronin Mainnet
-    RONIN_TESTNET = 2021  # Ronin Testnet
+    PUBLICMINT_MAINNET = 2020  # Ronin Mainnet
+    EDGEWARE_MAINNET = 2021  # Ronin Testnet
     BERESHEET_TESTNET = 2022  # Ronin Devnet
     TAYCAN_TESTNET = 2023
     RANGERS_PROTOCOL_MAINNET = 2025
