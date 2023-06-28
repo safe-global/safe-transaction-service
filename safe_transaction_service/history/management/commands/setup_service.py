@@ -9,8 +9,28 @@ from django_celery_beat.models import CrontabSchedule, IntervalSchedule, Periodi
 
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe.addresses import MASTER_COPIES, PROXY_FACTORIES
-
+from gnosis.eth import EthereumNetwork
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
+
+
+# Extend Keys for Master Copies and Proxy Factories
+MASTER_COPIES[EthereumNetwork.RONIN] = [
+    ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 7938928, "1.3.0+L2"),
+    ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 7938928, "1.3.0"),
+]
+
+MASTER_COPIES[EthereumNetwork.EDG] = [
+    ("0x3E5c63644E683549055b9Be8653de26E0B4CD36E", 807_225, "1.3.0+L2"),
+    ("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552", 807_225, "1.3.0"),
+]
+
+PROXY_FACTORIES[EthereumNetwork.RONIN] = [
+    ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 7938928)
+]
+
+PROXY_FACTORIES[EthereumNetwork.EDG] = [
+    ("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2", 807_225)
+]
 
 
 @dataclass
