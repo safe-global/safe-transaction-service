@@ -163,7 +163,7 @@ database data with blockchain data for every Safe.
 it's faster if you trigger a manual reindex. `--addresses` argument is optional, but if you know the problematic Safes providing
 them will make reindexing **way** faster, as if not all the Safes are reindexed.
 
-If you see ERC20/ERC721 missing:
+If you see ERC20/ERC721 transfers missing:
 - `python manage.py reindex_erc20 --from-block-number X --addresses 0x111 0x222`: same logic as with `reindex_master_copies`.
 
 ## FAQ
