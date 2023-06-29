@@ -49,7 +49,7 @@ class ReorgService:
         :param eth_reorg_rewind_blocks: Number of blocks to rewind indexing when a reorg is found
         """
         self.ethereum_client = ethereum_client
-        self.eth_reorg_blocks = eth_reorg_blocks  #
+        self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
 
         # List with functions for database models to recover from reorgs
