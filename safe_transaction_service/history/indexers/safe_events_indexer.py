@@ -31,10 +31,14 @@ logger = getLogger(__name__)
 class SafeEventsIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            from django.conf import settings
-
-            cls.instance = SafeEventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
+            cls.instance = cls.get_new_instance()
         return cls.instance
+
+    @classmethod
+    def get_new_instance(cls) -> "SafeEventsIndexer":
+        from django.conf import settings
+
+        return SafeEventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
     @classmethod
     def del_singleton(cls):
