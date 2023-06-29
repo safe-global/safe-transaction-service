@@ -214,8 +214,7 @@ class TestTasks(TestCase):
                     reprocess_mock.assert_called_with([safe_address])
                     reindex_mock.assert_called_with(
                         safe_status_0.block_number,
-                        # to_block_number=safe_status_5.block_number,
-                        to_block_number=None,
+                        to_block_number=safe_status_5.block_number,
                         addresses=[safe_address],
                     )
                     self.assertIn(
@@ -235,7 +234,7 @@ class TestTasks(TestCase):
                     )
                     self.assertIn(
                         f"Reindexing master copies from-block={safe_status_0.internal_tx.ethereum_tx.block_id} "
-                        f"to-block=None addresses={[safe_address]}",
+                        f"to-block={safe_status_5.block_number} addresses={[safe_address]}",
                         cm.output[4],
                     )
                     self.assertIn(
