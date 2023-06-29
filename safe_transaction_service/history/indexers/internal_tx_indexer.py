@@ -27,17 +27,21 @@ logger = getLogger(__name__)
 class InternalTxIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            from django.conf import settings
-
-            if settings.ETH_INTERNAL_NO_FILTER:
-                instance_class = InternalTxIndexerWithTraceBlock
-            else:
-                instance_class = InternalTxIndexer
-
-            cls.instance = instance_class(
-                EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-            )
+            cls.instance = cls.get_new_instance()
         return cls.instance
+
+    @classmethod
+    def get_new_instance(cls) -> "InternalTxIndexer":
+        from django.conf import settings
+
+        if settings.ETH_INTERNAL_NO_FILTER:
+            instance_class = InternalTxIndexerWithTraceBlock
+        else:
+            instance_class = InternalTxIndexer
+
+        return instance_class(
+            EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+        )
 
     @classmethod
     def del_singleton(cls):

@@ -27,12 +27,14 @@ logger = getLogger(__name__)
 class Erc20EventsIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            from django.conf import settings
-
-            cls.instance = Erc20EventsIndexer(
-                EthereumClient(settings.ETHEREUM_NODE_URL)
-            )
+            cls.instance = cls.get_new_instance()
         return cls.instance
+
+    @classmethod
+    def get_new_instance(cls) -> "Erc20EventsIndexer":
+        from django.conf import settings
+
+        return Erc20EventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
     @classmethod
     def del_singleton(cls):

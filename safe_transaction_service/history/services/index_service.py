@@ -375,7 +375,7 @@ class IndexService:
         addresses: Optional[ChecksumAddress] = None,
     ) -> int:
         """
-        :param provider:
+        :param indexer: A new instance must be provider, providing the singleton one can break indexing
         :param from_block_number:
         :param to_block_number:
         :param block_process_limit:
@@ -384,14 +384,9 @@ class IndexService:
         """
         assert (not to_block_number) or to_block_number > from_block_number
 
-        ignore_addresses_on_log_filter = (
-            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER
-            if hasattr(indexer, "IGNORE_ADDRESSES_ON_LOG_FILTER")
-            else None
-        )
-
         if addresses:
             # Just process addresses provided
+            # No issues on modifying the indexer as we should be provided with a new instance
             indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False
         else:
             addresses = list(
@@ -431,8 +426,6 @@ class IndexService:
 
             logger.info("End reindexing addresses %s", addresses)
 
-        # We changed attributes on the indexer, so better restore it
-        indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = ignore_addresses_on_log_filter
         return element_number
 
     def reindex_master_copies(
@@ -457,10 +450,10 @@ class IndexService:
         from ..indexers import InternalTxIndexerProvider, SafeEventsIndexerProvider
 
         indexer = (
-            SafeEventsIndexerProvider
+            SafeEventsIndexerProvider.get_new_instance()
             if self.eth_l2_network
-            else InternalTxIndexerProvider
-        )()
+            else InternalTxIndexerProvider.get_new_instance()
+        )
 
         return self._reindex(
             indexer,
@@ -490,7 +483,7 @@ class IndexService:
 
         from ..indexers import Erc20EventsIndexerProvider
 
-        indexer = Erc20EventsIndexerProvider()
+        indexer = Erc20EventsIndexerProvider.get_new_instance()
         return self._reindex(
             indexer,
             from_block_number,
