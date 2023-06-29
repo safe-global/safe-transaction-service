@@ -161,7 +161,7 @@ Tokens related transactions (ERC20/721) will not be fixed with this method. This
 database data with blockchain data for every Safe.
 - `python manage.py reindex_master_copies --from-block-number X --addresses 0x111 0x222`: if you know the first problematic block,
 it's faster if you trigger a manual reindex. `--addresses` argument is optional, but if you know the problematic Safes providing
-them will make reindexing **way** faster, as if not all the Safes are reindexed.
+them will make reindexing **way** faster, as only those Safes will be reindexed (instead of the entire collection).
 
 If you see ERC20/ERC721 transfers missing:
 - `python manage.py reindex_erc20 --from-block-number X --addresses 0x111 0x222`: same logic as with `reindex_master_copies`.
