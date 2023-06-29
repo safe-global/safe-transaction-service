@@ -24,12 +24,13 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas
 
 from safe_transaction_service import __version__
+from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
@@ -116,11 +117,12 @@ class AboutEthereumRPCView(APIView):
         except (IOError, ValueError):
             syncing = "Error getting syncing status"
 
-        ethereum_network = ethereum_client.get_network()
+        ethereum_chain_id = get_chain_id()
+        ethereum_network = EthereumNetwork(ethereum_chain_id)
         return {
             "version": client_version,
             "block_number": ethereum_client.current_block_number,
-            "chain_id": ethereum_network.value,
+            "chain_id": ethereum_chain_id,
             "chain": ethereum_network.name,
             "syncing": syncing,
         }
