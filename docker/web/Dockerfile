@@ -29,4 +29,3 @@ RUN set -ex \
 
 COPY . .
 RUN DJANGO_SETTINGS_MODULE=config.settings.local DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput
-COPY ethereum_network.py /usr/local/lib/python3.10/site-packages/gnosis/eth/ethereum_network.py
