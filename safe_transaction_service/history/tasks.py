@@ -334,7 +334,9 @@ def reindex_master_copies_task(
     Reindexes master copies
     """
     with contextlib.suppress(LockError):
-        with only_one_running_task(self):
+        with only_one_running_task(
+            self, lock_name_suffix=str(addresses) if addresses else None
+        ):
             index_service = IndexServiceProvider()
             logger.info(
                 "Reindexing master copies from-block=%d to-block=%s addresses=%s",
@@ -358,7 +360,9 @@ def reindex_erc20_events_task(
     Reindexes master copies
     """
     with contextlib.suppress(LockError):
-        with only_one_running_task(self):
+        with only_one_running_task(
+            self, lock_name_suffix=str(addresses) if addresses else None
+        ):
             index_service = IndexServiceProvider()
             logger.info(
                 "Reindexing erc20/721 events from-block=%d to-block=%s addresses=%s",
@@ -433,8 +437,7 @@ def process_decoded_internal_txs_for_safe_task(
                                 # Setting the safe address reindexing should be very fast
                                 reindex_master_copies_task.delay(
                                     block_number,
-                                    # Reindex until current block
-                                    #  to_block_number=to_block_number,
+                                    to_block_number=to_block_number,
                                     addresses=[safe_address],
                                 )
                             logger.info(

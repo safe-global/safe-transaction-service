@@ -77,7 +77,7 @@ def only_one_running_task(
     if WORKER_STOPPED:
         raise LockError("Worker is stopping")
     redis = get_redis()
-    lock_name = f"tasks:{task.name}"
+    lock_name = f"locks:tasks:{task.name}"
     if lock_name_suffix:
         lock_name += f":{lock_name_suffix}"
     with redis.lock(
