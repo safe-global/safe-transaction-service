@@ -152,7 +152,7 @@ You can tell there are indexing issues if:
 use the **web UI** please make sure by checking **Transaction Service API**, as sometimes it can be a cache delay in
 the **Safe Client Gateway** which is between web UI and **Safe Transaction Service**.
 - Asset transfers (ERC20/721) are missing from `all-transactions` or `transfers` endpoints.
-- You see in the logs errors about an owner cannot be removed or similar inconsistent errors when `worker-indexer` is processing decoded data.
+- You see error logs such as "Cannot remove owner" or similar inconsistent errors when `worker-indexer` is processing decoded data.
 
 There are multiple options for this. Connect to either `web` or `worker` instances. Running commands inside of `tmux` is recommended
 (installed by default):
