@@ -148,9 +148,7 @@ Service can run into some issues when running in production:
 
 ### Indexing issues
 You can tell there are indexing issues if:
-- Executed transactions are missing from the API (`all-transactions`, `multisig-transactions`, `module-transactions`... endpoints). If you
-use the **web UI** please make sure by checking **Transaction Service API**, as sometimes it can be a cache delay in
-the **Safe Client Gateway** which is between web UI and **Safe Transaction Service**.
+- Executed transactions are missing from the API (`all-transactions`, `multisig-transactions`, `module-transactions`... endpoints). If you use the [Safe{Wallet} Web client](https://github.com/safe-global/safe-wallet-web) you should check what is the current state of the Safe Client Gateway cache as it might have outdated data.
 - Asset transfers (ERC20/721) are missing from `all-transactions` or `transfers` endpoints.
 - You see error logs such as "Cannot remove owner" or similar inconsistent errors when `worker-indexer` is processing decoded data.
 
