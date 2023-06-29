@@ -230,6 +230,16 @@ class Erc20EventsIndexer(EventsIndexer):
     def update_monitored_address(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
     ) -> int:
-        return int(
-            IndexingStatus.objects.set_erc20_721_indexing_status(to_block_number + 1)
+        # Keep indexing going on the next block
+        new_to_block_number = to_block_number + 1
+        result = IndexingStatus.objects.set_erc20_721_indexing_status(
+            new_to_block_number, from_block_number=from_block_number
         )
+        if not result:
+            logger.warning(
+                "%s: Possible reorg - Cannot update erc20_721 indexing status from-block-number=%d to-block-number=%d",
+                self.__class__.__name__,
+                from_block_number,
+                to_block_number,
+            )
+        return int(result)

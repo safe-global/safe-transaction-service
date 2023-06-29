@@ -278,8 +278,7 @@ class EthereumIndexer(ABC):
             **{
                 "address__in": addresses,
                 self.database_field
-                + "__gte": from_block_number
-                - 1,  # Protect in case of reorg
+                + "__gte": from_block_number,  # Protect in case of reorg
                 self.database_field
                 + "__lt": new_to_block_number,  # Don't update to a lower block number
             }
