@@ -539,8 +539,10 @@ class DbTxDecoder(TxDecoder):
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
         """
-        abis = ContractAbi.objects.filter(contracts__address=address).values_list(
-            "abi", flat=True
+        abis = (
+            ContractAbi.objects.filter(contracts__address=address)
+            .order_by("relevance")
+            .values_list("abi", flat=True)
         )
         if abis:
             return self._generate_selectors_with_abis_from_abi(abis[0])
@@ -564,7 +566,7 @@ class DbTxDecoder(TxDecoder):
                     and selector in contract_selectors_with_abis
                 ):
                     # If the selector is available in the abi specific for the address we will use that one
-                    # Otherwise we fallback to the general abi that matches the selector
+                    # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
 
