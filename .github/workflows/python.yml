@@ -5,6 +5,9 @@ on:
       - master
       - develop
   pull_request:
+    branches:
+      - develop
+
   release:
     types: [ released ]
 
