@@ -2559,16 +2559,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # test internal_tx transfer_id empty trace_address
-        transfer_id = (
-            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
-        )
-        response = self.client.get(
-            reverse("v1:history:transfer", args=(transfer_id,)),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
         # test invalid erc20 transfer_id empty log_index
         transfer_id = (
             "e27e15ba8dea473d98c80a6b45d372c0f3c6f8c184177044c935c37eb419d7216"
@@ -2629,6 +2619,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "tokenId": None,
             "tokenAddress": None,
             "from": internal_tx._from,
+            "tokenInfo": None,
+        }
+        self.assertEqual(response.json(), expected_result)
+
+        # test internal_tx transfer_id empty trace_address
+        ethereum_tx_hash = (
+            "0x12bafc5ee165d825201a24418e00bef6039bb06f6d09420ab1c5f7b4098c0809"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx_empty_trace_address = InternalTxFactory(
+            ethereum_tx=ethereum_tx, to=safe_address, trace_address=""
+        )
+        transfer_id_empty_trace_address = (
+            "i12bafc5ee165d825201a24418e00bef6039bb06f6d09420ab1c5f7b4098c0809"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id_empty_trace_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_result = {
+            "type": TransferType.ETHER_TRANSFER.name,
+            "executionDate": internal_tx_empty_trace_address.ethereum_tx.block.timestamp.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "blockNumber": internal_tx_empty_trace_address.ethereum_tx.block_id,
+            "transferId": transfer_id_empty_trace_address,
+            "transactionHash": internal_tx_empty_trace_address.ethereum_tx_id,
+            "to": safe_address,
+            "value": str(internal_tx_empty_trace_address.value),
+            "tokenId": None,
+            "tokenAddress": None,
+            "from": internal_tx_empty_trace_address._from,
             "tokenInfo": None,
         }
         self.assertEqual(response.json(), expected_result)
