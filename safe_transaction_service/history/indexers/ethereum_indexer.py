@@ -7,6 +7,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
+from requests import Timeout
 
 from gnosis.eth import EthereumClient
 
@@ -393,7 +394,12 @@ class EthereumIndexer(ABC):
                 to_block_number,
                 current_block_number=current_block_number,
             )
-        except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
+            processed_elements = self.process_elements(elements)
+        except (
+            FindRelevantElementsException,
+            SoftTimeLimitExceeded,
+            Timeout,
+        ) as e:
             self.block_process_limit = 1  # Set back to the very minimum
             logger.info(
                 "%s: block_process_limit set back to %d",
@@ -401,8 +407,6 @@ class EthereumIndexer(ABC):
                 self.block_process_limit,
             )
             raise e
-
-        processed_elements = self.process_elements(elements)
 
         if not self.update_monitored_addresses(
             addresses, from_block_number, to_block_number
