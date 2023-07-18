@@ -424,7 +424,7 @@ class IndexService:
                 )
                 element_number += len(elements)
 
-            logger.info("End reindexing addresses %s", addresses)
+            logger.info("End reindexing addresses %s", addresses_str)
 
         return element_number
 

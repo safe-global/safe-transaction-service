@@ -231,7 +231,7 @@ class SafeEventsIndexer(EventsIndexer):
             trace_address=trace_address,
             error=None,
         )
-        child_internal_tx = None  # For Ether transfers
+        child_internal_tx: Optional[InternalTx] = None  # For Ether transfers
         internal_tx_decoded = InternalTxDecoded(
             internal_tx=internal_tx,
             function_name="",
