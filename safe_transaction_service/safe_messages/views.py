@@ -95,6 +95,14 @@ class SafeMessagesView(ListCreateAPIView):
         responses={201: "Created"},
     )
     def post(self, request, address, *args, **kwargs):
+        """
+        Create a new signed message for a Safe. Message can be:
+        - A ``string``, so ``EIP191`` will be used to get the hash.
+        - An ``EIP712`` ``object``.
+
+        Hash will be calculated from the provided ``message``. Sending a raw ``hash`` will not be accepted,
+        service needs to derive it itself.
+        """
         if not fast_is_checksum_address(address):
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
