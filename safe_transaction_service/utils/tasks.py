@@ -57,7 +57,7 @@ def only_one_running_task(
     task: CeleryTask,
     lock_name_suffix: Optional[str] = None,
     lock_timeout: Optional[int] = LOCK_TIMEOUT,
-    gevent: bool = True,
+    gevent_enabled: bool = True,
 ):
     """
     Ensures one running task at the same, using `task` name as a unique key
@@ -67,7 +67,7 @@ def only_one_running_task(
     when it has different arguments
     :param lock_timeout: How long the lock will be stored, in case worker is halted so key is not stored forever
     in Redis
-    :param gevent: If `True`, `close_gevent_db_connection` will be called at the end
+    :param gevent_enabled: If `True`, `close_gevent_db_connection` will be called at the end
     :return: Instance of redis `Lock`
     :raises: LockError if lock cannot be acquired
     """
@@ -83,6 +83,6 @@ def only_one_running_task(
             yield lock
             ACTIVE_LOCKS.remove(lock_name)
         finally:
-            if gevent:
+            if gevent_enabled:
                 # Needed for django-db-geventpool
                 close_gevent_db_connection()
