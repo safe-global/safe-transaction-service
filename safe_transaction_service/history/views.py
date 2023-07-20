@@ -235,12 +235,28 @@ class AllTransactionsListView(ListAPIView):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
+        logger.debug(
+            "%s: Getting all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         queryset = self.filter_queryset(
             transaction_service.get_all_tx_identifiers(
                 safe, executed=executed, queued=queued, trusted=trusted
             )
         )
         page = self.paginate_queryset(queryset)
+        logger.debug(
+            "%s: Got all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
 
         if not page:
             return self.get_paginated_response([])
@@ -251,7 +267,23 @@ class AllTransactionsListView(ListAPIView):
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe, all_tx_identifiers
         )
+        logger.debug(
+            "%s: Got all txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s were serialized",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         return self.get_paginated_response(all_txs_serialized)
 
     @swagger_auto_schema(

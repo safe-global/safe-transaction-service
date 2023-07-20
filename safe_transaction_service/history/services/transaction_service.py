@@ -36,6 +36,9 @@ from ..serializers import (
 logger = logging.getLogger(__name__)
 
 
+AnySafeTransaction = EthereumTx | MultisigTransaction | ModuleTransaction
+
+
 class TransactionServiceException(Exception):
     pass
 
@@ -65,7 +68,7 @@ class TransactionService:
 
     def get_txs_from_cache(
         self, safe_address: str, ids_to_search: Sequence[str]
-    ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
+    ) -> List[AnySafeTransaction]:
         keys_to_search = [
             self.get_cache_key(safe_address, id_to_search)
             for id_to_search in ids_to_search
@@ -78,13 +81,11 @@ class TransactionService:
     def store_txs_in_cache(
         self,
         safe_address: str,
-        ids_with_txs: Tuple[
-            str, List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]
-        ],
+        ids_with_txs: Tuple[str, List[AnySafeTransaction]],
     ):
         """
         Store executed transactions older than 10 minutes, using `ethereum_tx_hash` as key (for
-        MultisigTransaction it will be `SafeTxHash`) and expire then in one hour
+        MultisigTransaction it will be `SafeTxHash`) and expire them in one hour
 
         :param safe_address:
         :param ids_with_txs:
@@ -119,7 +120,7 @@ class TransactionService:
         Build a queryset with identifiers (`safeTxHash` or `txHash`) for every tx for a Safe for paginated filtering.
         In the case of Multisig Transactions, as some of them are not mined, we use the `safeTxHash`.
         Criteria for building this list:
-          - Return only multisig txs with `nonce < current Safe Nonce`
+          - Return ``SafeTxHash`` for every MultisigTx (even not executed)
           - The endpoint should only show incoming transactions that have been mined
           - The transactions should be sorted by execution date. If an outgoing transaction doesn't have an execution
           date the execution date of the transaction with the same nonce that has been executed should be taken.
@@ -134,7 +135,13 @@ class TransactionService:
         sent by a delegate or indexed). With `False` all txs are returned
         :return: List with tx hashes sorted by date (newest first)
         """
-
+        logger.debug(
+            "Safe=%s Getting all tx identifiers executed=%s queued=%s trusted=%s",
+            safe_address,
+            executed,
+            queued,
+            trusted,
+        )
         # If tx is not mined, get the execution date of a tx mined with the same nonce
         case = Case(
             When(
@@ -197,7 +204,6 @@ class TransactionService:
                 "block",
                 "safe_nonce",
             )
-            .distinct()
             .order_by("-execution_date")
         )
 
@@ -282,7 +288,7 @@ class TransactionService:
 
     def get_all_txs_from_identifiers(
         self, safe_address: str, ids_to_search: Sequence[str]
-    ) -> List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]:
+    ) -> List[AnySafeTransaction]:
         """
         Now that we know how to paginate, we retrieve the real transactions
 
@@ -290,49 +296,79 @@ class TransactionService:
         :param ids_to_search: `SafeTxHash` for MultisigTransactions, `txHash` for other transactions
         :return:
         """
-        cached_txs = {
-            id_to_search: cached_tx
-            for id_to_search, cached_tx in zip(
+
+        logger.debug(
+            "Safe=%s Getting %d txs from identifiers", safe_address, len(ids_to_search)
+        )
+        ids_with_cached_txs = {
+            id_to_search: cached_txs
+            for id_to_search, cached_txs in zip(
                 ids_to_search,
                 self.get_txs_from_cache(safe_address, ids_to_search),
             )
-            if cached_tx
+            if cached_txs
         }
-        id_not_cached = [
+        logger.debug(
+            "Safe=%s Got %d cached txs from identifiers",
+            safe_address,
+            len(ids_with_cached_txs),
+        )
+        ids_not_cached = [
             hash_to_search
             for hash_to_search in ids_to_search
-            if hash_to_search not in cached_txs
+            if hash_to_search not in ids_with_cached_txs
         ]
-        id_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {
+        logger.debug(
+            "Safe=%s %d not cached txs from identifiers",
+            safe_address,
+            len(ids_not_cached),
+        )
+        ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {
             multisig_tx.safe_tx_hash: [multisig_tx]
             for multisig_tx in MultisigTransaction.objects.filter(
-                safe=safe_address, safe_tx_hash__in=id_not_cached
+                safe=safe_address, safe_tx_hash__in=ids_not_cached
             )
             .with_confirmations_required()
             .prefetch_related("confirmations")
             .select_related("ethereum_tx__block")
             .order_by("-nonce", "-created")
         }
+        logger.debug(
+            "Safe=%s Got %d Multisig txs from identifiers",
+            safe_address,
+            len(ids_with_multisig_txs),
+        )
 
-        id_with_module_txs: Dict[HexStr, List[ModuleTransaction]] = {}
+        ids_with_module_txs: Dict[HexStr, List[ModuleTransaction]] = {}
         for module_tx in ModuleTransaction.objects.filter(
-            safe=safe_address, internal_tx__ethereum_tx__in=id_not_cached
+            safe=safe_address, internal_tx__ethereum_tx__in=ids_not_cached
         ).select_related("internal_tx"):
-            id_with_module_txs.setdefault(
+            ids_with_module_txs.setdefault(
                 module_tx.internal_tx.ethereum_tx_id, []
             ).append(module_tx)
+        logger.debug(
+            "Safe=%s Got %d Module txs from identifiers",
+            safe_address,
+            len(ids_with_module_txs),
+        )
 
-        id_with_plain_ethereum_txs: Dict[HexStr, List[EthereumTx]] = {
+        ids_with_plain_ethereum_txs: Dict[HexStr, List[EthereumTx]] = {
             ethereum_tx.tx_hash: [ethereum_tx]
             for ethereum_tx in EthereumTx.objects.filter(
-                tx_hash__in=id_not_cached
+                tx_hash__in=ids_not_cached
             ).select_related("block")
         }
+        logger.debug(
+            "Safe=%s Got %d Plain Ethereum txs from identifiers",
+            safe_address,
+            len(ids_with_plain_ethereum_txs),
+        )
 
-        # We also need the in/out transfers for the MultisigTxs
-        all_ids = id_not_cached + [
+        # We also need the in/out transfers for the MultisigTxs, we add the MultisigTx Ethereum Tx hashes
+        # to not cached ids
+        all_ids = ids_not_cached + [
             multisig_tx.ethereum_tx_id
-            for multisig_txs in id_with_multisig_txs.values()
+            for multisig_txs in ids_with_multisig_txs.values()
             for multisig_tx in multisig_txs
         ]
 
@@ -358,6 +394,10 @@ class TransactionService:
         for transfer in transfers:
             transfer_dict[transfer["transaction_hash"]].append(transfer)
 
+        logger.debug(
+            "Safe=%s Got %d Transfers from identifiers", safe_address, len(transfers)
+        )
+
         # Add available information about the token on database for the transfers
         tokens = {
             token.address: token
@@ -369,28 +409,34 @@ class TransactionService:
                 }
             )
         }
+        logger.debug(
+            "Safe=%s Got %d tokens for transfers from database",
+            safe_address,
+            len(tokens),
+        )
+
         for transfer in transfers:
             transfer["token"] = tokens.get(transfer["token_address"])
 
         # Build the list
         def get_the_transactions(
             transaction_id: str,
-        ) -> List[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]:
+        ) -> List[MultisigTransaction | ModuleTransaction | EthereumTx]:
             """
-            :param transaction_id:
-            :return: Transactions for the transaction id
+            :param transaction_id: SafeTxHash (in case of a ``MultisigTransaction``) or Ethereum ``TxHash`` for the rest
+            :return: Transactions for the transaction id, with transfers appended
             """
-            if result := cached_txs.get(transaction_id):
+            if result := ids_with_cached_txs.get(transaction_id):
                 return result
 
             result: Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]
-            if result := id_with_multisig_txs.get(transaction_id):
+            if result := ids_with_multisig_txs.get(transaction_id):
                 for multisig_tx in result:
                     # Populate transfers
                     multisig_tx.transfers = transfer_dict[multisig_tx.ethereum_tx_id]
                 return result
 
-            if result := id_with_module_txs.get(transaction_id):
+            if result := ids_with_module_txs.get(transaction_id):
                 for module_tx in result:
                     # Populate transfers
                     module_tx.transfers = transfer_dict[
@@ -398,7 +444,7 @@ class TransactionService:
                     ]
                 return result
 
-            if result := id_with_plain_ethereum_txs.get(transaction_id):
+            if result := ids_with_plain_ethereum_txs.get(transaction_id):
                 # If no Multisig or Module tx found, fallback to simple tx
                 for ethereum_tx in result:
                     # Populate transfers
@@ -411,18 +457,27 @@ class TransactionService:
                     "Tx not found, problem merging all transactions together"
                 )
 
+        logger.debug(
+            "Safe=%s Got all transactions from tx identifiers. Storing in cache",
+            safe_address,
+        )
         ids_with_txs = [
             (id_to_search, get_the_transactions(id_to_search))
             for id_to_search in ids_to_search
         ]
         self.store_txs_in_cache(safe_address, ids_with_txs)
+        logger.debug(
+            "Safe=%s Got all transactions from tx identifiers. Stored in cache",
+            safe_address,
+        )
         return list(
             dict.fromkeys(tx for (_, txs) in ids_with_txs for tx in txs)
         )  # Sorted already by execution_date
 
     def serialize_all_txs(
-        self, models: List[Union[EthereumTx, MultisigTransaction, ModuleTransaction]]
+        self, models: List[AnySafeTransaction]
     ) -> List[Dict[str, Any]]:
+        logger.debug("Serializing all transactions")
         results = []
         for model in models:
             model_type = type(model)
@@ -437,4 +492,6 @@ class TransactionService:
             serialized = serializer(model)
             # serialized.is_valid(raise_exception=True)
             results.append(serialized.data)
+
+        logger.debug("Serialized all transactions")
         return results
