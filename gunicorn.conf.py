@@ -13,7 +13,7 @@ log_level = "info"
 logger_class = "safe_transaction_service.utils.loggers.CustomGunicornLogger"
 preload_app = False  # Load application code before the worker processes are forked (problems with gevent patching)
 # For timeout to work with gevent, a custom GeventWorker needs to be used
-timeout = os.environ("WEB_WORKER_TIMEOUT", 60)
+timeout = os.environ.get("WEB_WORKER_TIMEOUT", 60)
 
 worker_class = "gunicorn_custom_workers.MyGeventWorker"  # "gevent"
 worker_connections = os.environ.get("WEB_WORKER_CONNECTIONS", 1000)
