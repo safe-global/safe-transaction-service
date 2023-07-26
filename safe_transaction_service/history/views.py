@@ -1,6 +1,7 @@
 import hashlib
 import logging
-from typing import Any, Dict, Tuple
+import pickle
+from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -33,6 +34,7 @@ from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
+from ..utils.redis import get_redis
 from . import filters, pagination, serializers
 from .helpers import add_tokens_to_transfers, is_valid_unique_transfer_id
 from .models import (
@@ -48,6 +50,7 @@ from .models import (
     SafeMasterCopy,
     TransferDict,
 )
+from .pagination import ListPagination
 from .serializers import get_data_decoded_from_data
 from .services import (
     BalanceServiceProvider,
@@ -173,10 +176,7 @@ class MasterCopiesView(ListAPIView):
 
 
 class AllTransactionsListView(ListAPIView):
-    filter_backends = (
-        django_filters.rest_framework.DjangoFilterBackend,
-        OrderingFilter,
-    )
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     ordering_fields = ["execution_date", "safe_nonce", "block", "created"]
     pagination_class = pagination.SmallPagination
     serializer_class = (
@@ -231,10 +231,19 @@ class AllTransactionsListView(ListAPIView):
         )
         return executed, queued, trusted
 
-    def list(self, request, *args, **kwargs):
+    def get_tx_identifiers(self, request, *args, **kwargs) -> Optional[Response]:
+        """
+        Get tx identifiers. This query will merge txs and events
+        and will return the important identifiers (safeTxHash or txHash) filtered
+        :param request:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
+
         logger.debug(
             "%s: Getting all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s",
             self.__class__.__name__,
@@ -258,12 +267,61 @@ class AllTransactionsListView(ListAPIView):
             trusted,
         )
 
-        if not page:
+        return page
+
+    def get_cached_tx_identifiers(self, request, *args, **kwargs) -> Optional[Response]:
+        transaction_service = TransactionServiceProvider()
+        safe = self.kwargs["address"]
+        executed, queued, trusted = self.get_parameters()
+        cache_timeout = settings.CACHE_ALL_TXS_VIEW
+        redis = get_redis()
+
+        # Get all relevant elements for a Safe to be cached
+        relevant_elements = transaction_service.get_count_relevant_txs_for_safe(safe)
+        # Trick to get limit and offset
+        list_pagination = ListPagination(request)
+        limit, offset = list_pagination.limit, list_pagination.offset
+        cache_key = f"all-txs:{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{safe}:{relevant_elements}"
+        lock_key = f"locks:{cache_key}"
+
+        if not cache_timeout:
+            # Cache disabled
+            return self.get_tx_identifiers(request, *args, **kwargs)
+
+        with redis.lock(
+            lock_key,
+            timeout=60,  # This prevents a service restart to leave a lock forever
+        ):
+            if result := redis.get(cache_key):
+                # Count needs to be retrieved to set it up the paginator
+                page, count = pickle.loads(result)
+                # Setting the paginator like this is not very elegant and needs to be tested really well
+                self.paginator.count = count
+                self.paginator.limit = limit
+                self.paginator.offset = offset
+                self.paginator.request = request
+                return page
+            page = self.get_tx_identifiers(request, *args, **kwargs)
+            redis.set(
+                cache_key, pickle.dumps((page, self.paginator.count)), ex=cache_timeout
+            )
+
+            return page
+
+    def list(self, request, *args, **kwargs):
+        transaction_service = TransactionServiceProvider()
+        safe = self.kwargs["address"]
+        executed, queued, trusted = self.get_parameters()
+
+        tx_identifiers_page = self.get_cached_tx_identifiers(request, *args, **kwargs)
+        if not tx_identifiers_page:
             return self.get_paginated_response([])
 
         # Tx identifiers are retrieved using `safe_tx_hash` attribute name due to how Django
         # handles `UNION` of all the Transaction models using the first model attribute name
-        all_tx_identifiers = [element["safe_tx_hash"] for element in page]
+        all_tx_identifiers = [
+            element["safe_tx_hash"] for element in tx_identifiers_page
+        ]
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe, all_tx_identifiers
         )

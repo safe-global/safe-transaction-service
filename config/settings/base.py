@@ -524,6 +524,11 @@ EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
 EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
 EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
 
+# Cache
+CACHE_ALL_TXS_VIEW = env.int(
+    "CACHE_ALL_TXS_VIEW", default=10 * 60
+)  # 10 minutes. 0 is disabled
+
 # AWS S3 https://github.com/etianen/django-s3-storage
 # ------------------------------------------------------------------------------
 # AWS_QUERYSTRING_AUTH = False  # Remove query parameter authentication from generated URLs
