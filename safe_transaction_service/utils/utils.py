@@ -5,7 +5,7 @@ from typing import Any, Iterable, List, Union
 from django.core.signals import request_finished
 from django.db import connection
 
-from gevent.monkey import saved
+import gevent.monkey
 
 
 class FixedSizeDict(dict):
@@ -53,7 +53,7 @@ def chunks_iterable(iterable: Iterable[Any], n: int) -> Iterable[Iterable[Any]]:
 
 
 def running_on_gevent() -> bool:
-    return "sys" in saved
+    return "sys" in gevent.monkey.saved
 
 
 def close_gevent_db_connection() -> None:

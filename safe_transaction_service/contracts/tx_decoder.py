@@ -119,6 +119,14 @@ class MultisendDecoded(TypedDict):
 
 @cache
 def get_db_tx_decoder() -> "DbTxDecoder":
+    """
+    :return: Tx decoder with every ABI in the database loaded and indexed by function opcode
+    .. note::
+        Be careful when calling this function in a concurrent way, as if cache is not generated it will compute
+        the ``DbTxDecoder`` multiple times, and depending on the number of Contracts in the database it could
+        take a lot.
+    """
+
     def _get_db_tx_decoder() -> "DbTxDecoder":
         return DbTxDecoder()
 
