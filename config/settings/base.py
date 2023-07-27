@@ -212,8 +212,18 @@ INSTALLED_APPS += [
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="django://")
 # https://docs.celeryproject.org/en/stable/userguide/optimizing.html#broker-connection-pools
 # https://docs.celeryq.dev/en/latest/userguide/optimizing.html#broker-connection-pools
-CELERY_BROKER_POOL_LIMIT = env(
-    "CELERY_BROKER_POOL_LIMIT", default=env("CELERYD_CONCURRENCY", default=1000)
+# Configured to 0 due to connection issues https://github.com/celery/celery/issues/4355
+CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
+CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=0)
+
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
+CELERY_BROKER_CONNECTION_MAX_RETRIES = env.int(
+    "CELERY_BROKER_CONNECTION_MAX_RETRIES", default=0
+)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-channel-error-retry
+CELERY_BROKER_CHANNEL_ERROR_RETRY = env.bool(
+    "CELERY_BROKER_CHANNEL_ERROR_RETRY", default=True
 )
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://")
@@ -234,6 +244,7 @@ CELERY_TASK_DEFAULT_PRIORITY = 5
 CELERY_TASK_QUEUE_MAX_PRIORITY = 10
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
 CELERY_BROKER_TRANSPORT_OPTIONS = {}
+
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_routes
 CELERY_ROUTES = (
     [
