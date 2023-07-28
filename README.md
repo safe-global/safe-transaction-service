@@ -182,7 +182,7 @@ and [have a proper RPC](https://docs.safe.global/safe-core-api/rpc-requirements)
 
 ### How can I interact with service?
 Aside from using standard HTTP requests:
-- [Safe API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/api-kit)
+- [Safe{Core} API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/api-kit)
 - [Safe-eth-py](https://github.com/safe-global/safe-eth-py)
 - [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
 
