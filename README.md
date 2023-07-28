@@ -20,7 +20,7 @@ a transaction that is pending to be sent to the blockchain.
 
 ## Index of contents
 
-- [Docs](https://docs.gnosis-safe.io/backend/service-architecture)
+- [Docs](https://docs.safe.global/safe-core-api/service-architecture)
 - [Deploying the service](https://github.com/safe-global/safe-infrastructure)
 
 ## Setup for development
@@ -178,16 +178,16 @@ are deleted and indexing is restarted to the last `confirmed` block.
 
 ### If I add my chain to [safe-eth-py](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) will you support it?
 No, for a chain to be supported we need to set up a dedicated infra for that network
-and [have a proper RPC](https://docs.safe.global/learn/infrastructure/rpc-requirements)
+and [have a proper RPC](https://docs.safe.global/safe-core-api/rpc-requirements)
 
 ### How can I interact with service?
 Aside from using standard HTTP requests:
-- [Safe API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/safe-service-client)
+- [Safe{Core} API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/api-kit)
 - [Safe-eth-py](https://github.com/safe-global/safe-eth-py)
 - [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
 
 ### What chains do you officially support?
-https://docs.safe.global/learn/safe-core/safe-core-api/available-services
+https://docs.safe.global/safe-core-api/available-services
 
 ### What means banned field in SafeContract model?
 The `banned` field in the `SafeContract` model is used to prevent indexing of certain Safes that have an unsupported `MasterCopy` or unverified proxies that have issues during indexing. This field does not remove the banned Safe and indexing can be resumed once the issue has been resolved.
