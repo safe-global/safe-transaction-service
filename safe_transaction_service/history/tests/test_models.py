@@ -1391,7 +1391,9 @@ class TestMultisigTransactions(TestCase):
         )
 
         # SafeStatus not matching the EthereumTx
-        safe_status = SafeStatusFactory(nonce=1, threshold=8)
+        safe_status = SafeStatusFactory(
+            address=multisig_transaction.safe, nonce=1, threshold=8
+        )
         self.assertIsNone(
             MultisigTransaction.objects.with_confirmations_required()
             .first()

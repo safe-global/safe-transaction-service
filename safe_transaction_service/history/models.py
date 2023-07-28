@@ -1306,7 +1306,10 @@ class MultisigTransactionQuerySet(models.QuerySet):
         :return: queryset with `confirmations_required: int` field
         """
         threshold_safe_status_query = (
-            SafeStatus.objects.filter(internal_tx__ethereum_tx=OuterRef("ethereum_tx"))
+            SafeStatus.objects.filter(
+                address=OuterRef("safe"),
+                internal_tx__ethereum_tx=OuterRef("ethereum_tx"),
+            )
             .sorted_reverse_by_mined()
             .values("threshold")
         )
