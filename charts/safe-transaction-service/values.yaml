@@ -8,8 +8,6 @@ nameOverride: ""
 ##
 fullnameOverride: ""
 
-
-
 ## @section Installation Parameters
 ##
 
@@ -121,8 +119,7 @@ config:
   ethL2Network: 1
 
   ## @param config.ethereumRpcUrl
-  ethereumRpcUrl: https://primary.gnosis-chain.rpc.hoprtech.net
-
+  ethereumRpcUrl: https://rpc.gnosis.gateway.fm
 
   ## @param config.extraEnvVars Add additional extra environment vairables to the configMap
   ##
@@ -173,5 +170,3 @@ config:
     virtualHost: /
     ## @param config.rabbitmq.host RabbitMQ server host
     host: ""
-
-

@@ -1,11 +1,6 @@
 # Safe Transaction Service Chart
 
 This chart packages the Safe transaction service resources. The chart assumes that there is already an existing Postgres, Redis and RabbitMQ instance available and connection attribute should be passed in the values of the Helm Chart
-This chart packages the Safe transaction service resources. The chart assumes that exists already the following external resources:
-- Postgres instance
-- Redis instance
-- RabbitMQ instance
-This chart needs to know the connection attributes that should be passed as values of the Helm Chart or as a reference to an exiting secret
 
 ## Parameters
 
@@ -48,7 +43,7 @@ This chart needs to know the connection attributes that should be passed as valu
 | `config.secretReferenceKey`          | Reference to an existing secret containing the following entries: DJANGO_SECRET_KEY                           | `""`                                            |
 | `config.debug`                       | Enable debug                                                                                                  | `true`                                          |
 | `config.ethL2Network`                | Log Level                                                                                                     | `1`                                             |
-| `config.ethereumRpcUrl`              |                                                                                                               | `https://primary.gnosis-chain.rpc.hoprtech.net` |
+| `config.ethereumRpcUrl`              |                                                                                                               | `https://rpc.gnosis.gateway.fm` |
 | `config.extraEnvVars`                | Add additional extra environment vairables to the configMap                                                   | `{}`                                            |
 | `config.django.allowedHosts`         | Allowed hosts                                                                                                 | `*`                                             |
 | `config.postgres.secretReferenceKey` | Reference to an existing secret containing the following entry: DATABASE_URL                                  | `""`                                            |
