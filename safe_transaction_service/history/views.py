@@ -24,12 +24,13 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas
 
 from safe_transaction_service import __version__
+from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
@@ -116,11 +117,12 @@ class AboutEthereumRPCView(APIView):
         except (IOError, ValueError):
             syncing = "Error getting syncing status"
 
-        ethereum_network = ethereum_client.get_network()
+        ethereum_chain_id = get_chain_id()
+        ethereum_network = EthereumNetwork(ethereum_chain_id)
         return {
             "version": client_version,
             "block_number": ethereum_client.current_block_number,
-            "chain_id": ethereum_network.value,
+            "chain_id": ethereum_chain_id,
             "chain": ethereum_network.name,
             "syncing": syncing,
         }
@@ -233,12 +235,28 @@ class AllTransactionsListView(ListAPIView):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
+        logger.debug(
+            "%s: Getting all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         queryset = self.filter_queryset(
             transaction_service.get_all_tx_identifiers(
                 safe, executed=executed, queued=queued, trusted=trusted
             )
         )
         page = self.paginate_queryset(queryset)
+        logger.debug(
+            "%s: Got all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
 
         if not page:
             return self.get_paginated_response([])
@@ -249,7 +267,23 @@ class AllTransactionsListView(ListAPIView):
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe, all_tx_identifiers
         )
+        logger.debug(
+            "%s: Got all txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s were serialized",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+        )
         return self.get_paginated_response(all_txs_serialized)
 
     @swagger_auto_schema(
@@ -624,111 +658,6 @@ class SafeBalanceUsdView(SafeBalanceView):
         Get balance for Ether and ERC20 tokens with USD fiat conversion
         """
         return super().get(*args, **kwargs)
-
-
-class SafeDelegateListView(ListCreateAPIView):
-    pagination_class = pagination.DefaultPagination
-
-    def get_queryset(self):
-        return SafeContractDelegate.objects.filter(
-            safe_contract_id=self.kwargs["address"]
-        )
-
-    def get_serializer_class(self):
-        if self.request.method == "GET":
-            return serializers.SafeDelegateResponseSerializer
-        elif self.request.method == "POST":
-            return serializers.SafeDelegateSerializer
-        elif self.request.method == "DELETE":
-            return serializers.SafeDelegateDeleteSerializer
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use /delegates endpoint",
-        responses={400: "Invalid data", 422: "Invalid Ethereum address"},
-    )
-    def get(self, request, address, **kwargs):
-        """
-        Get the list of delegates for a Safe address
-        """
-        if not fast_is_checksum_address(address):
-            return Response(
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                data={
-                    "code": 1,
-                    "message": "Checksum address validation failed",
-                    "arguments": [address],
-                },
-            )
-
-        return super().get(request, address, **kwargs)
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use /delegates endpoint",
-        responses={
-            202: "Accepted",
-            400: "Malformed data",
-            422: "Invalid Ethereum address/Error processing data",
-        },
-    )
-    def post(self, request, address, **kwargs):
-        """
-        Create a delegate for a Safe address with a custom label. Calls with same delegate but different label or
-        signer will update the label or delegator if different.
-        For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
-        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
-        For signature this hash need to be signed: keccak(checksummed address + str(int(current_epoch // 3600)))
-        For example:
-             - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
-             - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
-             - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
-        """
-        if not fast_is_checksum_address(address):
-            return Response(
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                data={
-                    "code": 1,
-                    "message": "Checksum address validation failed",
-                    "arguments": [address],
-                },
-            )
-
-        request.data["safe"] = address
-        return super().post(request, address, **kwargs)
-
-    @swagger_auto_schema(
-        operation_id="safes_delegates_delete_all",
-        deprecated=True,
-        operation_description="Use /delegates endpoint",
-        responses={
-            204: "Deleted",
-            400: "Malformed data",
-            422: "Invalid Ethereum address/Error processing data",
-        },
-    )
-    def delete(self, request, address, *args, **kwargs):
-        """
-        Delete all delegates for a Safe. Signature is built the same way that for adding a delegate using the Safe
-        address as the delegate.
-
-        Check `POST /delegates/`
-        """
-        if not fast_is_checksum_address(address):
-            return Response(
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                data={
-                    "code": 1,
-                    "message": "Checksum address validation failed",
-                    "arguments": [address],
-                },
-            )
-        request.data["safe"] = address
-        request.data["delegate"] = address
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        SafeContractDelegate.objects.filter(safe_contract_id=address).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SafeDelegateDestroyView(DestroyAPIView):

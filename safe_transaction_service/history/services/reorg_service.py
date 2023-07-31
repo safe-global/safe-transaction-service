@@ -40,7 +40,7 @@ class ReorgService:
         self,
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
-        eth_reorg_rewind_blocks: Optional[int] = 250,
+        eth_reorg_rewind_blocks: Optional[int] = 10,
     ):
         """
         :param ethereum_client:
@@ -49,7 +49,7 @@ class ReorgService:
         :param eth_reorg_rewind_blocks: Number of blocks to rewind indexing when a reorg is found
         """
         self.ethereum_client = ethereum_client
-        self.eth_reorg_blocks = eth_reorg_blocks  #
+        self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
 
         # List with functions for database models to recover from reorgs
@@ -83,6 +83,7 @@ class ReorgService:
             EthereumBlock.objects.not_confirmed(to_block_number=to_block)
             .only("number", "block_hash", "confirmed")
             .order_by("number")
+            .iterator()
         ):
             blockchain_block, blockchain_next_block = self.ethereum_client.get_blocks(
                 [database_block.number, database_block.number + 1],
@@ -93,8 +94,19 @@ class ReorgService:
                 == HexBytes(blockchain_next_block["parentHash"])
                 == HexBytes(database_block.block_hash)
             ):
+                logger.debug(
+                    "Block with number=%d and hash=%s is matching blockchain one, setting as confirmed",
+                    database_block.number,
+                    HexBytes(blockchain_block["hash"]).hex(),
+                )
                 database_block.set_confirmed()
             else:
+                logger.warning(
+                    "Block with number=%d and hash=%s is not matching blockchain hash=%s, reorg found",
+                    database_block.number,
+                    HexBytes(database_block.block_hash).hex(),
+                    HexBytes(blockchain_block["hash"]).hex(),
+                )
                 return database_block.number
 
     @transaction.atomic
@@ -129,10 +141,14 @@ class ReorgService:
         )
 
         updated = self.reset_all_to_block(safe_reorg_block_number)
-        EthereumBlock.objects.filter(number__gte=reorg_block_number).delete()
+        number_deleted_blocks, _ = EthereumBlock.objects.filter(
+            number__gte=reorg_block_number
+        ).delete()
         logger.warning(
-            "Reorg of block-number=%d fixed, %d elements updated",
+            "Reorg of block-number=%d fixed, indexing was reset to safe block=%d, %d elements updated and %d blocks deleted",
             reorg_block_number,
+            safe_reorg_block_number,
             updated,
+            number_deleted_blocks,
         )
         return updated

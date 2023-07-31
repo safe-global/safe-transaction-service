@@ -119,6 +119,14 @@ class MultisendDecoded(TypedDict):
 
 @cache
 def get_db_tx_decoder() -> "DbTxDecoder":
+    """
+    :return: Tx decoder with every ABI in the database loaded and indexed by function opcode
+    .. note::
+        Be careful when calling this function in a concurrent way, as if cache is not generated it will compute
+        the ``DbTxDecoder`` multiple times, and depending on the number of Contracts in the database it could
+        take a lot.
+    """
+
     def _get_db_tx_decoder() -> "DbTxDecoder":
         return DbTxDecoder()
 
@@ -539,8 +547,10 @@ class DbTxDecoder(TxDecoder):
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
         """
-        abis = ContractAbi.objects.filter(contracts__address=address).values_list(
-            "abi", flat=True
+        abis = (
+            ContractAbi.objects.filter(contracts__address=address)
+            .order_by("relevance")
+            .values_list("abi", flat=True)
         )
         if abis:
             return self._generate_selectors_with_abis_from_abi(abis[0])
@@ -564,7 +574,7 @@ class DbTxDecoder(TxDecoder):
                     and selector in contract_selectors_with_abis
                 ):
                     # If the selector is available in the abi specific for the address we will use that one
-                    # Otherwise we fallback to the general abi that matches the selector
+                    # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
 

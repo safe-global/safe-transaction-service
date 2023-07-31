@@ -18,7 +18,7 @@ from safe_transaction_service.history.models import (
     TokenTransfer,
     WebHookType,
 )
-from safe_transaction_service.utils.ethereum import get_ethereum_network
+from safe_transaction_service.utils.ethereum import get_chain_id
 
 
 def build_webhook_payload(
@@ -107,7 +107,7 @@ def build_webhook_payload(
 
     # Add chainId to every payload
     for payload in payloads:
-        payload["chainId"] = str(get_ethereum_network().value)
+        payload["chainId"] = str(get_chain_id())
 
     return payloads
 

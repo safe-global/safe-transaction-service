@@ -1,4 +1,3 @@
-import pickle
 from typing import Any, Dict, Optional, Tuple
 
 from celery import app
@@ -11,38 +10,14 @@ from safe_transaction_service.history.models import (
     SafeLastStatus,
     WebHookType,
 )
-from safe_transaction_service.utils.ethereum import get_ethereum_network
-from safe_transaction_service.utils.redis import get_redis
+from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .clients.firebase_client import FirebaseClientPool
 from .models import FirebaseDevice, FirebaseDeviceOwner
+from .utils import mark_notification_as_processed
 
 logger = get_task_logger(__name__)
-
-
-class DuplicateNotification:
-    def __init__(self, address: Optional[str], payload: Dict[str, Any]):
-        self.redis = get_redis()
-        self.address = address
-        self.payload = payload
-        self.redis_payload = self._get_redis_payload(address, payload)
-
-    def _get_redis_payload(self, address: Optional[str], payload: Dict[str, Any]):
-        return f"notifications:{address}:".encode() + pickle.dumps(payload)
-
-    def is_duplicated(self) -> bool:
-        """
-        :return: True if payload was already notified, False otherwise
-        """
-        return bool(self.redis.get(self.redis_payload))
-
-    def set_duplicated(self) -> bool:
-        """
-        Stores notification with an expiration time of 5 minutes
-        :return:
-        """
-        return self.redis.set(self.redis_payload, 1, ex=5 * 60)
 
 
 def filter_notification(payload: Dict[str, Any]) -> bool:
@@ -102,6 +77,16 @@ def send_notification_task(
     if not (address and payload):  # Both must be present
         return 0, 0
 
+    # Make sure notification has not been sent before
+    if not mark_notification_as_processed(address, payload):
+        # Notification was processed already
+        logger.info(
+            "Duplicated notification about Safe=%s with payload=%s",
+            address,
+            payload,
+        )
+        return 0, 0
+
     tokens = list(
         FirebaseDevice.objects.filter(safes__address=address)
         .exclude(cloud_messaging_token=None)
@@ -113,19 +98,6 @@ def send_notification_task(
 
     if not (tokens and filter_notification(payload)):
         return 0, 0
-
-    # Make sure notification has not been sent before
-    duplicate_notification = DuplicateNotification(address, payload)
-    if duplicate_notification.is_duplicated():
-        logger.info(
-            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
-            address,
-            payload,
-            tokens,
-        )
-        return 0, 0
-
-    duplicate_notification.set_duplicated()
 
     with FirebaseClientPool() as firebase_client:
         logger.info(
@@ -217,20 +189,18 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
         "type": WebHookType.CONFIRMATION_REQUEST.name,
         "address": address,
         "safeTxHash": safe_tx_hash,
-        "chainId": str(get_ethereum_network().value),
+        "chainId": str(get_chain_id()),
     }
+
     # Make sure notification has not been sent before
-    duplicate_notification = DuplicateNotification(address, payload)
-    if duplicate_notification.is_duplicated():
+    if not mark_notification_as_processed(address, payload):
+        # Notification was processed already
         logger.info(
-            "Duplicated notification about Safe=%s with payload=%s to tokens=%s",
+            "Duplicated notification about Safe=%s with payload=%s",
             address,
             payload,
-            tokens,
         )
         return 0, 0
-
-    duplicate_notification.set_duplicated()
 
     with FirebaseClientPool() as firebase_client:
         logger.info(

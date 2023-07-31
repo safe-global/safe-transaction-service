@@ -152,6 +152,35 @@ class TestIndexingStatus(TestCase):
             # IndexingStatus should be inserted with a migration and `indexing_type` is unique
             IndexingStatusFactory(indexing_type=0)
 
+    def test_set_erc20_721_indexing_status(self):
+        self.assertTrue(IndexingStatus.objects.set_erc20_721_indexing_status(5))
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 5
+        )
+
+        self.assertTrue(IndexingStatus.objects.set_erc20_721_indexing_status(2))
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 2
+        )
+
+        self.assertTrue(
+            IndexingStatus.objects.set_erc20_721_indexing_status(
+                10, from_block_number=2
+            )
+        )
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 10
+        )
+
+        self.assertFalse(
+            IndexingStatus.objects.set_erc20_721_indexing_status(
+                20, from_block_number=11
+            )
+        )
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 10
+        )
+
 
 class TestMultisigTransaction(TestCase):
     def test_data_should_be_decoded(self):
@@ -1362,7 +1391,9 @@ class TestMultisigTransactions(TestCase):
         )
 
         # SafeStatus not matching the EthereumTx
-        safe_status = SafeStatusFactory(nonce=1, threshold=8)
+        safe_status = SafeStatusFactory(
+            address=multisig_transaction.safe, nonce=1, threshold=8
+        )
         self.assertIsNone(
             MultisigTransaction.objects.with_confirmations_required()
             .first()

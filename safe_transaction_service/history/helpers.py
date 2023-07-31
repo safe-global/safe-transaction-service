@@ -62,7 +62,7 @@ def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:
     :return: ``True`` for a valid ``unique_transfer_id``, ``False`` otherwise
     """
     token_transfer_id_pattern = r"^(e)([a-fA-F0-9]{64})(\d+)"
-    internal_transfer_id_pattern = r"^(i)([a-fA-F0-9]{64})(\d+)(,\d+)*"
+    internal_transfer_id_pattern = r"^(i)([a-fA-F0-9]{64})(\d*)(,\d+)*"
 
     return bool(
         re.fullmatch(token_transfer_id_pattern, unique_transfer_id)

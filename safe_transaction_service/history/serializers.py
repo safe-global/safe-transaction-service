@@ -369,7 +369,7 @@ class DelegateSignatureCheckerMixin:
 
 
 class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
-    safe = EthereumAddressField(allow_null=True, required=False)
+    safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65)
@@ -981,40 +981,3 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
 
         attrs["delegator"] = delegator
         return attrs
-
-
-class SafeDelegateSerializer(SafeDelegateDeleteSerializer):
-    """
-    Deprecated in favour of DelegateSerializer
-    """
-
-    label = serializers.CharField(max_length=50)
-
-    def get_valid_delegators(
-        self,
-        ethereum_client: EthereumClient,
-        safe_address: ChecksumAddress,
-        delegate: ChecksumAddress,
-    ) -> List[ChecksumAddress]:
-        """
-        :param ethereum_client:
-        :param safe_address:
-        :param delegate:
-        :return: Valid delegators for a Safe. A delegate shouldn't be able to add itself
-        """
-        return get_safe_owners(safe_address)
-
-    def save(self, **kwargs):
-        safe_address = self.validated_data["safe"]
-        delegate = self.validated_data["delegate"]
-        delegator = self.validated_data["delegator"]
-        label = self.validated_data["label"]
-        obj, _ = SafeContractDelegate.objects.update_or_create(
-            safe_contract_id=safe_address,
-            delegate=delegate,
-            defaults={
-                "label": label,
-                "delegator": delegator,
-            },
-        )
-        return obj

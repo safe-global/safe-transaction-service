@@ -50,6 +50,7 @@ ENABLE_ANALYTICS = env("ENABLE_ANALYTICS", default=False)
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
+DB_STATEMENT_TIMEOUT = env.int("DB_STATEMENT_TIMEOUT", 60_000)
 DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
@@ -61,6 +62,7 @@ DATABASES["default"]["OPTIONS"] = {
     # https://github.com/jneight/django-db-geventpool#settings
     "MAX_CONNS": DB_MAX_CONNS,
     "REUSE_CONNS": env.int("DB_REUSE_CONNS", default=DB_MAX_CONNS),
+    "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -99,6 +101,7 @@ LOCAL_APPS = [
     "safe_transaction_service.notifications.apps.NotificationsConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
+    "safe_transaction_service.events.apps.EventsConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -209,8 +212,18 @@ INSTALLED_APPS += [
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="django://")
 # https://docs.celeryproject.org/en/stable/userguide/optimizing.html#broker-connection-pools
 # https://docs.celeryq.dev/en/latest/userguide/optimizing.html#broker-connection-pools
-CELERY_BROKER_POOL_LIMIT = env(
-    "CELERY_BROKER_POOL_LIMIT", default=env("CELERYD_CONCURRENCY", default=1000)
+# Configured to 0 due to connection issues https://github.com/celery/celery/issues/4355
+CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
+CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=0)
+
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
+CELERY_BROKER_CONNECTION_MAX_RETRIES = env.int(
+    "CELERY_BROKER_CONNECTION_MAX_RETRIES", default=0
+)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-channel-error-retry
+CELERY_BROKER_CHANNEL_ERROR_RETRY = env.bool(
+    "CELERY_BROKER_CHANNEL_ERROR_RETRY", default=True
 )
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://")
@@ -231,6 +244,7 @@ CELERY_TASK_DEFAULT_PRIORITY = 5
 CELERY_TASK_QUEUE_MAX_PRIORITY = 10
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
 CELERY_BROKER_TRANSPORT_OPTIONS = {}
+
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_routes
 CELERY_ROUTES = (
     [
@@ -240,7 +254,11 @@ CELERY_ROUTES = (
         ),
         (
             "safe_transaction_service.history.tasks.send_webhook_task",
-            {"queue": "webhooks, 'delivery_mode': 'transient'"},
+            {"queue": "webhooks", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.events.tasks.send_event_to_queue_task",
+            {"queue": "webhooks", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task",
@@ -408,7 +426,7 @@ ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env.int(
     "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT", default=10_000
 )
 ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN = env.int(
-    "ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN", default=6
+    "ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN", default=10
 )
 ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS = env.int(
     "ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS", default=10
@@ -435,7 +453,7 @@ ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX", default=0
 )  # Maximum number of blocks to process together when searching for events. 0 == no limit.
 ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN = env.int(
-    "ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN", default=10
+    "ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN", default=20
 )  # Blocks to reindex again every indexer run when service is synced. Useful for RPCs not reliable
 ETH_EVENTS_GET_LOGS_CONCURRENCY = env.int(
     "ETH_EVENTS_GET_LOGS_CONCURRENCY", default=20
@@ -447,7 +465,7 @@ ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
 ETH_REORG_BLOCKS = env.int(
-    "ETH_REORG_BLOCKS", default=100 if ETH_L2_NETWORK else 10
+    "ETH_REORG_BLOCKS", default=200 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable
 
 # Tokens
@@ -464,6 +482,10 @@ TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
     "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
 )  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
 
+TOKEN_ETH_PRICE_TTL = env.int(
+    "TOKEN_ETH_PRICE_TTL", default=60 * 30  # 30 minutes
+)  # Expiration time for token eth price
+
 # Notifications
 # ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
@@ -472,6 +494,10 @@ SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
 NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH = env(
     "NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH", default=None
 )
+NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS = env.int(
+    "NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS", default=60 * 60 * 2  # 2 hours
+)  # Don't allow the same notification to be sent during the expiration time due to reorgs and reindexing
+
 if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
     import json
 
@@ -481,10 +507,11 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
         )
     )
 
-ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD = env.float(
-    "ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD", default=0.1
-)  # Percentage of Safes allowed to be out of sync without alerting. By default 10%
-
+# Events
+# ------------------------------------------------------------------------------
+EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
+EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
+EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
 
 # AWS S3 https://github.com/etianen/django-s3-storage
 # ------------------------------------------------------------------------------

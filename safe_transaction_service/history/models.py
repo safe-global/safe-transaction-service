@@ -166,12 +166,20 @@ class IndexingStatusManager(models.Manager):
     def get_erc20_721_indexing_status(self) -> "IndexingStatus":
         return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
 
-    def set_erc20_721_indexing_status(self, block_number: int) -> bool:
-        return bool(
-            self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value).update(
-                block_number=block_number
-            )
-        )
+    def set_erc20_721_indexing_status(
+        self, block_number: int, from_block_number: Optional[int] = None
+    ) -> bool:
+        """
+
+        :param block_number:
+        :param from_block_number: If provided, only update the field if bigger than `from_block_number`, to protect
+                                  from reorgs
+        :return:
+        """
+        queryset = self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
+        if from_block_number is not None:
+            queryset = queryset.filter(block_number__gte=from_block_number)
+        return bool(queryset.update(block_number=block_number))
 
 
 class IndexingStatus(models.Model):
@@ -1298,7 +1306,10 @@ class MultisigTransactionQuerySet(models.QuerySet):
         :return: queryset with `confirmations_required: int` field
         """
         threshold_safe_status_query = (
-            SafeStatus.objects.filter(internal_tx__ethereum_tx=OuterRef("ethereum_tx"))
+            SafeStatus.objects.filter(
+                address=OuterRef("safe"),
+                internal_tx__ethereum_tx=OuterRef("ethereum_tx"),
+            )
             .sorted_reverse_by_mined()
             .values("threshold")
         )

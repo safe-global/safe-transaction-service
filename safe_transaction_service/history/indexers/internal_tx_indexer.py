@@ -15,9 +15,10 @@ from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
     get_safe_tx_decoder,
 )
-from safe_transaction_service.utils.utils import FixedSizeDict, chunks
+from safe_transaction_service.utils.utils import chunks
 
 from ..models import InternalTx, InternalTxDecoded, MonitoredAddress, SafeMasterCopy
+from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -26,17 +27,21 @@ logger = getLogger(__name__)
 class InternalTxIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            from django.conf import settings
-
-            if settings.ETH_INTERNAL_NO_FILTER:
-                instance_class = InternalTxIndexerWithTraceBlock
-            else:
-                instance_class = InternalTxIndexer
-
-            cls.instance = instance_class(
-                EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
-            )
+            cls.instance = cls.get_new_instance()
         return cls.instance
+
+    @classmethod
+    def get_new_instance(cls) -> "InternalTxIndexer":
+        from django.conf import settings
+
+        if settings.ETH_INTERNAL_NO_FILTER:
+            instance_class = InternalTxIndexerWithTraceBlock
+        else:
+            instance_class = InternalTxIndexer
+
+        return instance_class(
+            EthereumClient(settings.ETHEREUM_TRACING_NODE_URL),
+        )
 
     @classmethod
     def del_singleton(cls):
@@ -57,38 +62,7 @@ class InternalTxIndexer(EthereumIndexer):
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
-        self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
-
-    def mark_as_processed(
-        self, tx_hash: HexBytes, block_hash: Optional[HexBytes]
-    ) -> bool:
-        """
-        Mark a `tx_hash` as processed by the indexer
-
-        :param tx_hash:
-        :param block_hash:
-        :return: `True` if `tx_hash` was marked as processed, `False` if it was already processed
-        """
-
-        tx_hash = HexBytes(tx_hash)
-        block_hash = HexBytes(block_hash or 0)
-        tx_id = tx_hash + block_hash
-
-        if tx_id in self._processed_element_cache:
-            logger.debug(
-                "Tx with tx-hash=%s on block=%s was already processed",
-                tx_hash.hex(),
-                block_hash.hex(),
-            )
-            return False
-        else:
-            logger.debug(
-                "Marking tx with tx-hash=%s on block=%s as processed",
-                tx_hash.hex(),
-                block_hash.hex(),
-            )
-            self._processed_element_cache[tx_id] = None
-            return True
+        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
 
     @property
     def database_field(self):
@@ -209,6 +183,20 @@ class InternalTxIndexer(EthereumIndexer):
             raise FindRelevantElementsException(
                 "Request error calling `trace_filter`"
             ) from e
+        except ValueError as e:
+            # For example, Infura returns:
+            #   ValueError: {'code': -32005, 'data': {'from': '0x6BBCE1', 'limit': 10000, 'to': '0x7072DB'}, 'message': 'query returned more than 10000 results. Try with this block range [0x6BBCE1, 0x7072DB].'}
+            logger.warning(
+                "%s: Value error retrieving trace_filter results from-block=%d to-block=%d : %s",
+                self.__class__.__name__,
+                from_block_number,
+                to_block_number,
+                e,
+            )
+            raise FindRelevantElementsException(
+                f"Request error retrieving trace_filter results "
+                f"from-block={from_block_number} to-block={to_block_number}"
+            ) from e
 
         # Log INFO if traces found, DEBUG if not
         traces: OrderedDict[HexBytes, None] = OrderedDict()
@@ -301,14 +289,16 @@ class InternalTxIndexer(EthereumIndexer):
                 if tx_hash_with_traces[tx_hash]
                 else None
             )
-            if self.mark_as_processed(tx_hash, block_hash):
+            if not self.element_already_processed_checker.is_processed(
+                tx_hash, block_hash
+            ):
                 tx_hashes.append(tx_hash)
                 # Traces can be already populated if using `trace_block`, but with `trace_filter`
                 # some traces will be missing and `trace_transaction` needs to be called
                 if not tx_hash_with_traces[tx_hash]:
                     tx_hashes_missing_traces.append(tx_hash)
             else:
-                # Trace was already processed
+                # Traces were already processed
                 del tx_hash_with_traces[tx_hash]
 
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
@@ -353,7 +343,18 @@ class InternalTxIndexer(EthereumIndexer):
             logger.debug(
                 "End decoding and storing of %d decoded traces", internal_txs_decoded
             )
-            return tx_hashes
+
+        # Mark traces as processed
+        for tx_hash in list(tx_hash_with_traces.keys()):
+            block_hash = (
+                tx_hash_with_traces[tx_hash][0]["blockHash"]
+                if tx_hash_with_traces[tx_hash]
+                else None
+            )
+            self.element_already_processed_checker.mark_as_processed(
+                tx_hash, block_hash
+            )
+        return tx_hashes
 
 
 class InternalTxIndexerWithTraceBlock(InternalTxIndexer):

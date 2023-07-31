@@ -322,7 +322,7 @@ class TestInternalTxIndexer(TestCase):
         results = tx_processor.process_decoded_transactions(internal_txs_decoded)
         self.assertEqual(results, [True, True])
 
-    def test_mark_as_processed(self):
+    def test_element_already_processed_checker(self):
         """
         Test not reprocessing of processed events
         """
@@ -336,11 +336,14 @@ class TestInternalTxIndexer(TestCase):
             EthereumTxFactory(tx_hash=tx_hash)
 
         # After the first processing transactions will be cached to prevent reprocessing
-        self.assertEqual(len(self.internal_tx_indexer._processed_element_cache), 0)
+        processed_element_cache = (
+            self.internal_tx_indexer.element_already_processed_checker._processed_element_cache
+        )
+        self.assertEqual(len(processed_element_cache), 0)
         self.assertEqual(
             len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 2
         )
-        self.assertEqual(len(self.internal_tx_indexer._processed_element_cache), 2)
+        self.assertEqual(len(processed_element_cache), 2)
 
         # Transactions are cached and will not be reprocessed
         self.assertEqual(
@@ -351,7 +354,7 @@ class TestInternalTxIndexer(TestCase):
         )
 
         # Cleaning the cache will reprocess the transactions again
-        self.internal_tx_indexer._processed_element_cache.clear()
+        self.internal_tx_indexer.element_already_processed_checker.clear()
         self.assertEqual(
             len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 2
         )
