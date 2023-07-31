@@ -25,4 +25,5 @@ repos:
       - id: end-of-file-fixer
         types: [python]
       - id: check-yaml
+        exclude: ^charts/safe-transaction-service/templates/
       - id: check-added-large-files

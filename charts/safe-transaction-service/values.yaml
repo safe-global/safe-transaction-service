@@ -67,7 +67,7 @@ image:
   ##
   tag: ""
 
-  ## @param image.pullPolicy Pull policy to deployment as deinfed in 
+  ## @param image.pullPolicy Pull policy to deployment as deinfed in
   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
   ##
   pullPolicy: IfNotPresent
@@ -78,7 +78,7 @@ service:
   type: ClusterIP
   ports:
     ## @param service.ports.number service port number
-    ##  
+    ##
     number: 80
     ## @param service.ports.name service port name
     ##

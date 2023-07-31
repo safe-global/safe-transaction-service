@@ -37,7 +37,7 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-          seccompProfile: 
+          seccompProfile:
             type: RuntimeDefault
           capabilities:
             drop:
@@ -89,5 +89,5 @@ spec:
       {{- end }}
       volumes:
         - name: tmp-volume
-          emptyDir: {} 
+          emptyDir: {}
 

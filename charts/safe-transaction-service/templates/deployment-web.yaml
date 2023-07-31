@@ -38,7 +38,7 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-          seccompProfile: 
+          seccompProfile:
             type: RuntimeDefault
           capabilities:
             drop:
@@ -126,10 +126,10 @@ spec:
         - name: content-volume
           emptyDir: {}
         - name: tmp-volume
-          emptyDir: {} 
+          emptyDir: {}
         - name: nginx-volume
           configMap:
             name: {{ include "safe-transaction.fullname" . }}-nginx
         - name: cache-volume
-          emptyDir: {} 
+          emptyDir: {}
 
