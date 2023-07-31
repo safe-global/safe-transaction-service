@@ -1627,21 +1627,21 @@ class SafeContractManager(models.Manager):
         """
 
         query = """
-                SELECT COUNT(*)
+                SELECT SUM(count_all)
                 FROM (
                     -- Get multisig transactions
-                    SELECT 1
+                    SELECT COUNT(*) AS count_all
                     FROM "history_multisigtransaction"
                     WHERE "history_multisigtransaction"."safe" = %s
                     UNION ALL
                     -- Get confirmations
-                    SELECT 1
+                    SELECT COUNT(*)
                     FROM "history_multisigtransaction"
                        JOIN "history_multisigconfirmation" ON "history_multisigtransaction"."safe_tx_hash" = "history_multisigconfirmation"."multisig_transaction_id"
                     WHERE "history_multisigtransaction"."safe" = %s
                     UNION ALL
                     -- Get ERC20 Transfers
-                    SELECT 1
+                    SELECT COUNT(*)
                     FROM "history_erc20transfer"
                     WHERE (
                             "history_erc20transfer"."to" = %s
@@ -1649,7 +1649,7 @@ class SafeContractManager(models.Manager):
                         )
                     UNION ALL
                     -- Get ERC721 Transfers
-                    SELECT 1
+                    SELECT COUNT(*)
                     FROM "history_erc721transfer"
                     WHERE (
                             "history_erc721transfer"."to" = %s
@@ -1657,7 +1657,7 @@ class SafeContractManager(models.Manager):
                         )
                     UNION ALL
                     -- Get Ether Transfers
-                    SELECT 1
+                    SELECT COUNT(*)
                     FROM "history_internaltx"
                     WHERE (
                             "history_internaltx"."call_type" = 0
@@ -1666,7 +1666,7 @@ class SafeContractManager(models.Manager):
                         )
                     UNION ALL
                     -- Get Module Transactions
-                    SELECT 1
+                    SELECT COUNT(*)
                     FROM "history_moduletransaction"
                     WHERE "history_moduletransaction"."safe" = %s
                 ) subquery
