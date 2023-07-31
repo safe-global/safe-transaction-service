@@ -231,7 +231,7 @@ class AllTransactionsListView(ListAPIView):
         )
         return executed, queued, trusted
 
-    def get_tx_identifiers(self, request, *args, **kwargs) -> Optional[Response]:
+    def get_page_tx_identifiers(self, request, *args, **kwargs) -> Optional[Response]:
         """
         Get tx identifiers. This query will merge txs and events
         and will return the important identifiers (safeTxHash or txHash) filtered
@@ -269,7 +269,9 @@ class AllTransactionsListView(ListAPIView):
 
         return page
 
-    def get_cached_tx_identifiers(self, request, *args, **kwargs) -> Optional[Response]:
+    def get_cached_page_tx_identifiers(
+        self, request, *args, **kwargs
+    ) -> Optional[Response]:
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
@@ -286,7 +288,7 @@ class AllTransactionsListView(ListAPIView):
 
         if not cache_timeout:
             # Cache disabled
-            return self.get_tx_identifiers(request, *args, **kwargs)
+            return self.get_page_tx_identifiers(request, *args, **kwargs)
 
         with redis.lock(
             lock_key,
@@ -301,7 +303,7 @@ class AllTransactionsListView(ListAPIView):
                 self.paginator.offset = offset
                 self.paginator.request = request
                 return page
-            page = self.get_tx_identifiers(request, *args, **kwargs)
+            page = self.get_page_tx_identifiers(request, *args, **kwargs)
             redis.set(
                 cache_key, pickle.dumps((page, self.paginator.count)), ex=cache_timeout
             )
@@ -313,7 +315,9 @@ class AllTransactionsListView(ListAPIView):
         safe = self.kwargs["address"]
         executed, queued, trusted = self.get_parameters()
 
-        tx_identifiers_page = self.get_cached_tx_identifiers(request, *args, **kwargs)
+        tx_identifiers_page = self.get_cached_page_tx_identifiers(
+            request, *args, **kwargs
+        )
         if not tx_identifiers_page:
             return self.get_paginated_response([])
 
