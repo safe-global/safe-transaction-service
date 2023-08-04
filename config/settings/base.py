@@ -475,6 +475,9 @@ ETH_EVENTS_QUERY_CHUNK_SIZE = env.int(
 ETH_EVENTS_UPDATED_BLOCK_BEHIND = env.int(
     "ETH_EVENTS_UPDATED_BLOCK_BEHIND", default=24 * 60 * 60 // 15
 )  # Number of blocks to consider an address 'almost updated'.
+ETH_REORG_BLOCKS_BATCH = env.int(
+    "ETH_REORG_BLOCKS_BATCH", default=250
+)  # Number of blocks to be checked in the same batch for reorgs
 ETH_REORG_BLOCKS = env.int(
     "ETH_REORG_BLOCKS", default=200 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable

@@ -1,6 +1,7 @@
 import logging
 from typing import Callable, List, Optional
 
+from django.core.paginator import Paginator
 from django.db import transaction
 
 from hexbytes import HexBytes
@@ -24,7 +25,9 @@ class ReorgServiceProvider:
             from django.conf import settings
 
             cls.instance = ReorgService(
-                EthereumClientProvider(), settings.ETH_REORG_BLOCKS
+                EthereumClientProvider(),
+                settings.ETH_REORG_BLOCKS,
+                settings.ETH_REORG_BLOCKS_BATCH,
             )
         return cls.instance
 
@@ -40,6 +43,7 @@ class ReorgService:
         self,
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
+        eth_reorg_blocks_batch: int,
         eth_reorg_rewind_blocks: Optional[int] = 10,
     ):
         """
@@ -50,6 +54,7 @@ class ReorgService:
         """
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
+        self.eth_reorg_blocks_batch = eth_reorg_blocks_batch
         self.eth_reorg_rewind_blocks = eth_reorg_rewind_blocks
 
         # List with functions for database models to recover from reorgs
@@ -77,37 +82,52 @@ class ReorgService:
         """
         :return: Number of the oldest block with reorg detected. `None` if not reorg found
         """
+        first_not_confirmed_block = (
+            EthereumBlock.objects.not_confirmed().order_by("number").first()
+        )
+        if not first_not_confirmed_block:
+            return None
         current_block_number = self.ethereum_client.current_block_number
-        to_block = current_block_number - self.eth_reorg_blocks
-        for database_block in (
-            EthereumBlock.objects.not_confirmed(to_block_number=to_block)
+        confirmation_block = current_block_number - self.eth_reorg_blocks
+        queryset = (
+            EthereumBlock.objects.since_block(first_not_confirmed_block.number)
             .only("number", "block_hash", "confirmed")
             .order_by("number")
-            .iterator()
-        ):
-            blockchain_block, blockchain_next_block = self.ethereum_client.get_blocks(
-                [database_block.number, database_block.number + 1],
-                full_transactions=False,
+        )
+        paginator = Paginator(queryset, per_page=self.eth_reorg_blocks_batch)
+        for page_number in paginator.page_range:
+            current_page = paginator.get_page(page_number)
+            database_blocks = []
+            block_numbers = []
+            for block in current_page.object_list:
+                database_blocks.append(block)
+                block_numbers.append(block.number)
+            blockchain_blocks = self.ethereum_client.get_blocks(
+                block_numbers, full_transactions=False
             )
-            if (
-                HexBytes(blockchain_block["hash"])
-                == HexBytes(blockchain_next_block["parentHash"])
-                == HexBytes(database_block.block_hash)
+
+            for database_block, blockchain_block in zip(
+                database_blocks, blockchain_blocks
             ):
-                logger.debug(
-                    "Block with number=%d and hash=%s is matching blockchain one, setting as confirmed",
-                    database_block.number,
-                    HexBytes(blockchain_block["hash"]).hex(),
-                )
-                database_block.set_confirmed()
-            else:
-                logger.warning(
-                    "Block with number=%d and hash=%s is not matching blockchain hash=%s, reorg found",
-                    database_block.number,
-                    HexBytes(database_block.block_hash).hex(),
-                    HexBytes(blockchain_block["hash"]).hex(),
-                )
-                return database_block.number
+                if HexBytes(blockchain_block["hash"]) == HexBytes(
+                    database_block.block_hash
+                ):
+                    # Check all the blocks but only mark safe ones as confirmed
+                    if database_block.number <= confirmation_block:
+                        logger.debug(
+                            "Block with number=%d and hash=%s is matching blockchain one, setting as confirmed",
+                            database_block.number,
+                            HexBytes(blockchain_block["hash"]).hex(),
+                        )
+                        database_block.set_confirmed()
+                else:
+                    logger.warning(
+                        "Block with number=%d and hash=%s is not matching blockchain hash=%s, reorg found",
+                        database_block.number,
+                        HexBytes(database_block.block_hash).hex(),
+                        HexBytes(blockchain_block["hash"]).hex(),
+                    )
+                    return database_block.number
 
     @transaction.atomic
     def reset_all_to_block(self, block_number: int) -> int:
