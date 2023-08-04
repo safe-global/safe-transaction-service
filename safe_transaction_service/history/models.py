@@ -272,15 +272,19 @@ class EthereumBlockQuerySet(models.QuerySet):
             timestamp__lte=timezone.now() - datetime.timedelta(seconds=seconds)
         ).order_by("-timestamp")
 
-    def not_confirmed(self, to_block_number: Optional[int] = None):
+    def not_confirmed(self):
         """
         :param to_block_number:
         :return: Block not confirmed until ``to_block_number``, if provided
         """
         queryset = self.filter(confirmed=False)
-        if to_block_number is not None:
-            queryset = queryset.filter(number__lte=to_block_number)
         return queryset
+
+    def since_block(self, block_number: int):
+        return self.filter(number__gte=block_number)
+
+    def until_block(self, block_number: int):
+        return self.filter(number__lte=block_number)
 
 
 class EthereumBlock(models.Model):
