@@ -7,6 +7,12 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers as default_cors_headers
 
+from ..gunicorn import (
+    gunicorn_request_timeout,
+    gunicorn_worker_connections,
+    gunicorn_workers,
+)
+
 ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 APPS_DIR = ROOT_DIR / "safe_transaction_service"
 
@@ -46,6 +52,11 @@ SSO_ENABLED = False
 
 # Enable analytics endpoints
 ENABLE_ANALYTICS = env("ENABLE_ANALYTICS", default=False)
+
+# GUNICORN
+GUNICORN_REQUEST_TIMEOUT = gunicorn_request_timeout
+GUNICORN_WORKER_CONNECTIONS = gunicorn_worker_connections
+GUNICORN_WORKERS = gunicorn_workers
 
 # DATABASES
 # ------------------------------------------------------------------------------
