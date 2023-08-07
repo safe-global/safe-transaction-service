@@ -1,7 +1,7 @@
 boto3==1.28.15
 cachetools==5.3.1
 celery==5.2.7
-django==4.2.3
+django==4.2.4
 django-cache-memoize==0.1.10
 django-celery-beat==2.5.0
 django-cors-headers==4.2.0
