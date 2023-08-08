@@ -962,6 +962,13 @@ class InternalTx(models.Model):
             ),
             Index(fields=["_from", "timestamp"]),
             Index(fields=["to", "timestamp"]),
+            # Speed up getting ether transfers in all-transactions and ether transfer count
+            Index(
+                name="history_internal_transfer_idx",
+                fields=["to", "timestamp"],
+                include=["ethereum_tx_id", "block_number"],
+                condition=Q(call_type=0) & Q(value__gt=0),
+            ),
         ]
 
     def __str__(self):
