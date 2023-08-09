@@ -333,7 +333,7 @@ class AllTransactionsListView(ListAPIView):
 
         with redis.lock(
             lock_key,
-            timeout=60,  # This prevents a service restart to leave a lock forever
+            timeout=settings.GUNICORN_REQUEST_TIMEOUT,  # This prevents a service restart to leave a lock forever
         ):
             if result := redis.get(cache_key):
                 # Count needs to be retrieved to set it up the paginator
