@@ -289,6 +289,11 @@ class PriceService:
             EthereumNetwork.XDC_APOTHEM_NETWORK,
         ):
             return self.get_xdc_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.METER_MAINNET,
+            EthereumNetwork.METER_TESTNET,
+        ):
+            return self.coingecko_client.get_mtr_usd_price()
         else:
             return self.get_ether_usd_price()
 
