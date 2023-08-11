@@ -454,7 +454,7 @@ class PriceService:
         """
         return (
             self.get_token_eth_value(token_address)
-            or self.get_token_usd_price(token_address) / self.get_ether_usd_price()
+            or self.get_token_usd_price(token_address) / self.get_native_coin_usd_price()
         )
 
     def get_token_eth_price_from_composed_oracles(
