@@ -350,7 +350,7 @@ class PriceService:
     def get_token_usd_price(self, token_address: ChecksumAddress) -> float:
         """
         :param token_address:
-        :return: usd value for a given `token_address` using Curve, if not use Coingecko as last resource
+        :return: usd value for a given `token_address` using Coingecko
         """
         if self.coingecko_client.supports_network(self.ethereum_network):
             try:
@@ -449,7 +449,8 @@ class PriceService:
         """
         return (
             self.get_token_eth_value(token_address)
-            or self.get_token_usd_price(token_address) / self.get_ether_usd_price()
+            or self.get_token_usd_price(token_address)
+            / self.get_native_coin_usd_price()
         )
 
     def get_token_eth_price_from_composed_oracles(
