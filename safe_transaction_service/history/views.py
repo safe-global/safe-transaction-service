@@ -180,7 +180,8 @@ class AllTransactionsListView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     )
-    ordering_fields = ["execution_date", "safe_nonce", "block", "created"]
+    ordering_fields = ["execution_date"]
+    allowed_ordering_fields = ["execution_date", "-execution_date"]
     pagination_class = pagination.SmallPagination
     serializer_class = (
         serializers.AllTransactionsSchemaSerializer
@@ -416,7 +417,7 @@ class AllTransactionsListView(ListAPIView):
         by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
-        Ordering_fields: ["execution_date", "safe_nonce", "block", "created"] eg: `created` or `-created`
+        Ordering_fields: ["execution_date"] eg: `execution_date` or `-execution_date`
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
@@ -426,6 +427,16 @@ class AllTransactionsListView(ListAPIView):
                     "code": 1,
                     "message": "Checksum address validation failed",
                     "arguments": [address],
+                },
+            )
+        ordering = self.get_ordering_parameter()
+        if ordering and ordering not in self.allowed_ordering_fields:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={
+                    "code": 1,
+                    "message": "Ordering field is not valid, execution_date is only allowed",
+                    "arguments": [ordering],
                 },
             )
 

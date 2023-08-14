@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from dataclasses import asdict
@@ -47,6 +48,7 @@ from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
+    EthereumBlockFactory,
     EthereumTxFactory,
     InternalTxFactory,
     ModuleTransactionFactory,
@@ -337,6 +339,46 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+    def test_all_transactions_ordering(self):
+        safe_address = Account.create().address
+        block_2_days_ago = EthereumBlockFactory(
+            timestamp=timezone.now() - datetime.timedelta(days=2)
+        )
+        ethereum_tx_2_days_ago = EthereumTxFactory(block=block_2_days_ago)
+        # Older transaction
+        MultisigTransactionFactory(
+            safe=safe_address, ethereum_tx=ethereum_tx_2_days_ago
+        )
+        # Earlier transactions
+        MultisigTransactionFactory(safe=safe_address)
+        MultisigTransactionFactory(safe=safe_address)
+
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?ordering=nonce"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        first_result = response.data["results"][0]
+        self.assertEqual(
+            first_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
+        )
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?trusted=False&ordering=-execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        last_result = response.data["results"][2]
+        self.assertEqual(
+            last_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
+        )
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
