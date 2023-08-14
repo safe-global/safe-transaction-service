@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import pickle
 from dataclasses import asdict
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
@@ -33,6 +34,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
+from ...utils.redis import get_redis
 from ..helpers import DelegateSignatureHelper
 from ..models import (
     IndexingStatus,
@@ -379,6 +381,50 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             last_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
         )
+
+    def test_all_transactions_cache(self):
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        # Older transaction
+        MultisigTransactionFactory(safe=safe_address)
+        # Earlier transactions
+        MultisigTransactionFactory(safe=safe_address)
+        MultisigTransactionFactory(safe=safe_address)
+
+        cache_key = "all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:10:0:execution_date:3"
+        redis = get_redis()
+        redis.delete(cache_key)
+        cache_result = redis.mget(cache_key)
+        # Should be stored in redis cache
+        self.assertIsNone(cache_result[0])
+
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+
+        cache_result = redis.mget(cache_key)
+        # Should be stored in redis cache
+        self.assertIsNotNone(cache_result[0])
+
+        # Modify cache to value
+        redis.set(cache_key, pickle.dumps(([], 0)), ex=60 * 10)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        # Response returned from cache
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        # Cache should be invalidated because there is new transaction
+        MultisigTransactionFactory(safe=safe_address)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.data["count"], 4)
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
