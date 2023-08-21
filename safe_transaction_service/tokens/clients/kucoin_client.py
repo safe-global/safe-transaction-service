@@ -80,3 +80,10 @@ class KucoinClient(BaseHTTPClient):
         :raises: CannotGetPrice
         """
         return self._get_price("XDC-USDT")
+
+    def get_ftm_usd_price(self) -> float:
+        """
+        :return: current USD price for FTM Token
+        :raises: CannotGetPrice
+        """
+        return self._get_price("FTM-USDT")
