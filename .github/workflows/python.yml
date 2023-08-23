@@ -76,7 +76,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install wheel
-        pip install -r requirements-test.txt coveralls
+        pip install -r requirements-test.txt
       env:
         PIP_USE_MIRRORS: true
     - name: Run tests and coverage
@@ -96,11 +96,8 @@ jobs:
         ETH_HASH_BACKEND: pysha3
         REDIS_URL: redis://localhost:6379/0
         EVENTS_QUEUE_URL: amqp://guest:guest@localhost:5672/
-    - name: Send results to coveralls
-      continue-on-error: true  # Ignore coveralls problems
-      run: coveralls --service=github
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Required for coveralls
+    - name: Coveralls
+      uses: coverallsapp/github-action@v2
   docker-deploy:
     runs-on: ubuntu-latest
     needs:

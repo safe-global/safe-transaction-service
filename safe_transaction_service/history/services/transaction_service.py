@@ -1,4 +1,3 @@
-import copyreg
 import logging
 import pickle
 from collections import defaultdict
@@ -8,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from django.db.models import Case, Exists, F, OuterRef, QuerySet, Subquery, Value, When
 from django.utils import timezone
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
@@ -25,6 +24,7 @@ from ..models import (
     InternalTx,
     ModuleTransaction,
     MultisigTransaction,
+    SafeContract,
     TransferDict,
 )
 from ..serializers import (
@@ -59,8 +59,6 @@ class TransactionService:
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
         self.redis = redis
-        # Encode memoryview for redis
-        copyreg.pickle(memoryview, lambda val: (memoryview, (bytes(val),)))
 
     #  Cache methods ---------------------------------
     def get_cache_key(self, safe_address: str, tx_id: str):
@@ -108,6 +106,21 @@ class TransactionService:
             pipe.execute()
 
     # End of cache methods ----------------------------
+
+    def get_count_relevant_txs_for_safe(self, safe_address: ChecksumAddress) -> int:
+        """
+        This method searches multiple tables and count every tx or event for a Safe.
+        It will return the same or higher value if compared to counting ``get_all_tx_identifiers``
+        as that method will group some transactions (for example, 3 ERC20 can be grouped in a ``MultisigTransaction``,
+        so it will be ``1`` element for ``get_all_tx_identifiers`` but ``4`` for this function.
+
+        This query should be pretty fast, and it's meant to be used for invalidating caches.
+
+        :param safe_address:
+        :return: number of relevant txs for a Safe
+        """
+
+        return SafeContract.objects.get_count_relevant_txs_for_safe(safe_address)
 
     def get_all_tx_identifiers(
         self,

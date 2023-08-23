@@ -18,6 +18,10 @@ from safe_transaction_service.history.models import (
     TokenTransfer,
     WebHookType,
 )
+from safe_transaction_service.safe_messages.models import (
+    SafeMessage,
+    SafeMessageConfirmation,
+)
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 
@@ -102,6 +106,22 @@ def build_webhook_payload(
                 "type": WebHookType.MODULE_TRANSACTION.name,
                 "module": instance.module,
                 "txHash": HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
+            }
+        ]
+    elif sender == SafeMessage:
+        payloads = [
+            {
+                "address": instance.safe,
+                "type": WebHookType.MESSAGE_CREATED.name,
+                "messageHash": instance.message_hash,
+            }
+        ]
+    elif sender == SafeMessageConfirmation:
+        payloads = [
+            {
+                "address": instance.safe_message.safe,  # This could make a db call
+                "type": WebHookType.MESSAGE_CONFIRMATION.name,
+                "messageHash": instance.safe_message.message_hash,
             }
         ]
 

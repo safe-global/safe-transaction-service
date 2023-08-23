@@ -962,6 +962,13 @@ class InternalTx(models.Model):
             ),
             Index(fields=["_from", "timestamp"]),
             Index(fields=["to", "timestamp"]),
+            # Speed up getting ether transfers in all-transactions and ether transfer count
+            Index(
+                name="history_internal_transfer_idx",
+                fields=["to", "timestamp"],
+                include=["ethereum_tx_id", "block_number"],
+                condition=Q(call_type=0) & Q(value__gt=0),
+            ),
         ]
 
     def __str__(self):
@@ -1606,6 +1613,70 @@ class SafeContractManager(models.Manager):
     def get_banned_safes(self) -> QuerySet[ChecksumAddress]:
         return self.filter(banned=True).values_list("address", flat=True)
 
+    def get_count_relevant_txs_for_safe(self, address: ChecksumAddress) -> int:
+        """
+        This method searches multiple tables and count every tx or event for a Safe.
+        It will return the same or higher value if compared to counting ``get_all_tx_identifiers``
+        as that method will group some transactions (for example, 3 ERC20 can be grouped in a ``MultisigTransaction``,
+        so it will be ``1`` element for ``get_all_tx_identifiers`` but ``4`` for this function.
+
+        This query should be pretty fast, and it's meant to be used for invalidating caches.
+
+        :param address:
+        :return: number of relevant txs for a Safe
+        """
+
+        query = """
+                SELECT SUM(count_all)
+                FROM (
+                    -- Get multisig transactions
+                    SELECT COUNT(*) AS count_all
+                    FROM "history_multisigtransaction"
+                    WHERE "history_multisigtransaction"."safe" = %s
+                    UNION ALL
+                    -- Get confirmations
+                    SELECT COUNT(*)
+                    FROM "history_multisigtransaction"
+                       JOIN "history_multisigconfirmation" ON "history_multisigtransaction"."safe_tx_hash" = "history_multisigconfirmation"."multisig_transaction_id"
+                    WHERE "history_multisigtransaction"."safe" = %s
+                    UNION ALL
+                    -- Get ERC20 Transfers
+                    SELECT COUNT(*)
+                    FROM "history_erc20transfer"
+                    WHERE (
+                            "history_erc20transfer"."to" = %s
+                            OR "history_erc20transfer"."_from" = %s
+                        )
+                    UNION ALL
+                    -- Get ERC721 Transfers
+                    SELECT COUNT(*)
+                    FROM "history_erc721transfer"
+                    WHERE (
+                            "history_erc721transfer"."to" = %s
+                            OR "history_erc721transfer"."_from" = %s
+                        )
+                    UNION ALL
+                    -- Get Ether Transfers
+                    SELECT COUNT(*)
+                    FROM "history_internaltx"
+                    WHERE (
+                            "history_internaltx"."call_type" = 0
+                            AND "history_internaltx"."to" = %s
+                            AND "history_internaltx"."value" > 0
+                        )
+                    UNION ALL
+                    -- Get Module Transactions
+                    SELECT COUNT(*)
+                    FROM "history_moduletransaction"
+                    WHERE "history_moduletransaction"."safe" = %s
+                ) subquery
+                """
+
+        with connection.cursor() as cursor:
+            hex_address = HexBytes(address)
+            cursor.execute(query, [hex_address] * 8)
+            return cursor.fetchone()[0]
+
 
 class SafeContract(models.Model):
     objects = SafeContractManager()
@@ -1930,6 +2001,8 @@ class WebHookType(Enum):
     MODULE_TRANSACTION = 7
     OUTGOING_ETHER = 8
     OUTGOING_TOKEN = 9
+    MESSAGE_CREATED = 10
+    MESSAGE_CONFIRMATION = 11
 
 
 class WebHookQuerySet(models.QuerySet):
