@@ -113,7 +113,7 @@ def build_webhook_payload(
             {
                 "address": instance.safe,
                 "type": WebHookType.MESSAGE_CREATED.name,
-                "messageHash": instance.message_hash,
+                "messageHash": HexBytes(instance.message_hash).hex(),
             }
         ]
     elif sender == SafeMessageConfirmation:
@@ -121,7 +121,7 @@ def build_webhook_payload(
             {
                 "address": instance.safe_message.safe,  # This could make a db call
                 "type": WebHookType.MESSAGE_CONFIRMATION.name,
-                "messageHash": instance.safe_message.message_hash,
+                "messageHash": HexBytes(instance.safe_message.message_hash).hex(),
             }
         ]
 
