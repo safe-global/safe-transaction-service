@@ -33,11 +33,7 @@ class SafeMessage(TimeStampedModel):
         message = message_str[:message_size]
         if len(message_str) > message_size:
             message += "..."
-        message_hash = (
-            self.message_hash.hex()
-            if isinstance(self.message_hash, bytes)
-            else self.message_hash
-        )
+        message_hash = HexBytes(self.message_hash).hex()
         return f"Safe Message {message_hash} - {message}"
 
     def build_signature(self) -> bytes:
