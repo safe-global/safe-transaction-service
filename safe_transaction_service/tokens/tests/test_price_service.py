@@ -172,7 +172,6 @@ class TestPriceService(TestCase):
             price_service.cache_native_coin_usd_price.clear()
             self.assertEqual(price_service.get_mtr_usd_price(), 8.0)
 
-
     @mock.patch.object(CoingeckoClient, "get_bnb_usd_price", return_value=3.0)
     @mock.patch.object(KucoinClient, "get_bnb_usd_price", return_value=5.0)
     def test_get_binance_usd_price(
