@@ -399,6 +399,7 @@ class EthereumIndexer(ABC):
             FindRelevantElementsException,
             SoftTimeLimitExceeded,
             Timeout,
+            ValueError,
         ) as e:
             self.block_process_limit = 1  # Set back to the very minimum
             logger.info(
