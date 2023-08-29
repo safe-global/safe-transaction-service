@@ -191,6 +191,9 @@ class PriceService:
     def get_xdc_usd_price(self) -> float:
         return self.kucoin_client.get_xdc_usd_price()
 
+    def get_ftm_usd_price(self) -> float:
+        return self.kucoin_client.get_ftm_usd_price()
+
     def get_kcs_usd_price(self) -> float:
         try:
             return self.kucoin_client.get_kcs_usd_price()
@@ -297,6 +300,11 @@ class PriceService:
             EthereumNetwork.METER_TESTNET,
         ):
             return self.coingecko_client.get_mtr_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.FANTOM_OPERA,
+            EthereumNetwork.FANTOM_TESTNET,
+        ):
+            return self.get_ftm_usd_price()
         else:
             return self.get_ether_usd_price()
 
