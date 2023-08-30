@@ -181,7 +181,9 @@ class AllTransactionsListView(ListAPIView):
         OrderingFilter,
     )
     ordering_fields = ["execution_date"]
-    allowed_ordering_fields = ["execution_date", "-execution_date"]
+    allowed_ordering_fields = ordering_fields + [
+        f"-{ordering_field}" for ordering_field in ordering_fields
+    ]
     pagination_class = pagination.SmallPagination
     serializer_class = (
         serializers.AllTransactionsSchemaSerializer
@@ -435,7 +437,7 @@ class AllTransactionsListView(ListAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
                 data={
                     "code": 1,
-                    "message": "Ordering field is not valid, execution_date is only allowed",
+                    "message": "Ordering field is not valid, only `execution_date` is allowed",
                     "arguments": [ordering],
                 },
             )

@@ -355,7 +355,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Earlier transactions
         MultisigTransactionFactory(safe=safe_address)
         MultisigTransactionFactory(safe=safe_address)
-
+        # Nonce is not allowed as a sorting parameter
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?ordering=nonce"
@@ -385,36 +385,50 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_all_transactions_cache(self):
         safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
         # Older transaction
-        MultisigTransactionFactory(safe=safe_address)
-        # Earlier transactions
-        MultisigTransactionFactory(safe=safe_address)
-        MultisigTransactionFactory(safe=safe_address)
-
-        cache_key = "all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:10:0:execution_date:3"
+        factory_transactions = [
+            MultisigTransactionFactory(safe=safe_address),
+            MultisigTransactionFactory(safe=safe_address),
+        ]
+        # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
+        cache_key = "all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:10:0:execution_date:2"
         redis = get_redis()
         redis.delete(cache_key)
-        cache_result = redis.mget(cache_key)
-        # Should be stored in redis cache
-        self.assertIsNone(cache_result[0])
+        cache_result = redis.get(cache_key)
+        # Should be empty at the beginning
+        self.assertIsNone(cache_result)
 
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(response.data["count"], 2)
 
-        cache_result = redis.mget(cache_key)
+        cache_result = redis.get(cache_key)
         # Should be stored in redis cache
-        self.assertIsNotNone(cache_result[0])
-
-        # Modify cache to value
+        self.assertIsNotNone(cache_result)
+        # Cache should content the expected values
+        cache_values, cache_count = pickle.loads(cache_result)
+        self.assertEqual(cache_count, 2)
+        for cache_value, factory_transaction in zip(cache_values, factory_transactions):
+            self.assertEqual(
+                cache_value["safe_tx_hash"], factory_transaction.safe_tx_hash
+            )
+            self.assertEqual(cache_value["created"], factory_transaction.created)
+            self.assertEqual(
+                cache_value["execution_date"], factory_transaction.execution_date
+            )
+            self.assertEqual(
+                cache_value["block"], factory_transaction.ethereum_tx.block_id
+            )
+            self.assertEqual(cache_value["safe_nonce"], factory_transaction.nonce)
+        # Modify cache to empty list
         redis.set(cache_key, pickle.dumps(([], 0)), ex=60 * 10)
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
         )
-        # Response returned from cache
+        # Response should be returned from cache
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
 
@@ -424,7 +438,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
         )
-        self.assertEqual(response.data["count"], 4)
+        self.assertEqual(response.data["count"], 3)
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
