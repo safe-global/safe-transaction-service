@@ -200,6 +200,9 @@ class PriceService:
         except CannotGetPrice:
             return self.coingecko_client.get_kcs_usd_price()
 
+    def get_mtr_usd_price(self) -> float:
+        return self.coingecko_client.get_mtr_usd_price()
+
     @cachedmethod(cache=operator.attrgetter("cache_ether_usd_price"))
     @cache_memoize(60 * 30, prefix="balances-get_ether_usd_price")  # 30 minutes
     def get_ether_usd_price(self) -> float:
@@ -292,6 +295,11 @@ class PriceService:
             EthereumNetwork.XDC_APOTHEM_NETWORK,
         ):
             return self.get_xdc_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.METER_MAINNET,
+            EthereumNetwork.METER_TESTNET,
+        ):
+            return self.coingecko_client.get_mtr_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.FANTOM_OPERA,
             EthereumNetwork.FANTOM_TESTNET,
