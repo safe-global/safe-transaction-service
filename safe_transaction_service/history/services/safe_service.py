@@ -81,7 +81,12 @@ class SafeService:
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
+        """
+        :param safe_address:
+        :return: SafeCreation info for the provided ``safe_address``
+        """
         try:
+            # Get first the actual creation transaction for the safe
             creation_internal_tx = (
                 InternalTx.objects.filter(
                     ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
@@ -93,6 +98,8 @@ class SafeService:
 
             created_time = creation_ethereum_tx.block.timestamp
 
+            # Get the parent trace for the creation
+            # For L2s, `ProxyCreation` event is used to emulate the trace
             parent_internal_tx = self._get_parent_internal_tx(creation_internal_tx)
 
             creator = (parent_internal_tx or creation_ethereum_tx)._from
@@ -100,16 +107,17 @@ class SafeService:
 
             master_copy: Optional[str] = None
             setup_data: Optional[bytes] = None
-            data = (
-                bytes(parent_internal_tx.data)
-                if parent_internal_tx
-                else bytes(creation_ethereum_tx.data)
-            )
-            result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(
-                data
-            )
-            if result:
-                master_copy, setup_data = result
+            data_tx = parent_internal_tx if parent_internal_tx else creation_internal_tx
+
+            # A regular ether transfer could trigger a Safe deployment, so it's not guaranteed that there will be
+            # ``data`` for the transaction
+            if data_tx.data:
+                data = bytes(data_tx.data)
+                result = self._decode_proxy_factory(
+                    data
+                ) or self._decode_cpk_proxy_factory(data)
+                if result:
+                    master_copy, setup_data = result
             if not (master_copy and setup_data):
                 if setup_internal_tx := self._get_next_internal_tx(
                     creation_internal_tx
@@ -177,6 +185,14 @@ class SafeService:
     def _decode_proxy_factory(
         self, data: Union[bytes, str]
     ) -> Optional[Tuple[str, bytes]]:
+        """
+        Decode contract creation function for Safe ProxyFactory deployments
+
+        :param data:
+        :return: Tuple with the `master_copy` and `setup_data`, `None` if it cannot be decoded
+        """
+        if not data:
+            return None
         try:
             _, data_decoded = self.proxy_factory_contract.decode_function_input(data)
             master_copy = (
@@ -199,6 +215,17 @@ class SafeService:
     def _decode_cpk_proxy_factory(
         self, data: Union[bytes, str]
     ) -> Optional[Tuple[str, bytes]]:
+        """
+        Decode contract creation function for Safe Contract Proxy Kit Safe deployments (function is different
+        from the regular ProxyFactory)
+
+        More info: https://github.com/5afe/contract-proxy-kit
+
+        :param data:
+        :return: Tuple with the `master_copy` and `setup_data`, `None` if it cannot be decoded
+        """
+        if not data:
+            return None
         try:
             _, data_decoded = self.cpk_proxy_factory_contract.decode_function_input(
                 data
