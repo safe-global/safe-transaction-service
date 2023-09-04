@@ -107,7 +107,7 @@ class SafeService:
 
             master_copy: Optional[str] = None
             setup_data: Optional[bytes] = None
-            data_tx = parent_internal_tx if parent_internal_tx else creation_internal_tx
+            data_tx = parent_internal_tx if parent_internal_tx else creation_ethereum_tx
 
             # A regular ether transfer could trigger a Safe deployment, so it's not guaranteed that there will be
             # ``data`` for the transaction
