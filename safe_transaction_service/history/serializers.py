@@ -474,7 +474,10 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
     transaction_hash = serializers.SerializerMethodField()
     block_number = serializers.SerializerMethodField()
     is_successful = serializers.SerializerMethodField()
-    module_transaction_id = serializers.SerializerMethodField()
+    module_transaction_id = serializers.SerializerMethodField(
+        help_text="Internally calculated parameter to uniquely identify a moduleTransaction \n"
+        "`ModuleTransactionId = i+tx_hash+trace_address`"
+    )
 
     class Meta:
         model = ModuleTransaction
@@ -736,7 +739,11 @@ class TransferResponseSerializer(serializers.Serializer):
     value = serializers.CharField(allow_null=True, source="_value")
     token_id = serializers.CharField(allow_null=True, source="_token_id")
     token_address = EthereumAddressField(allow_null=True, default=None)
-    transfer_id = serializers.SerializerMethodField()
+    transfer_id = serializers.SerializerMethodField(
+        help_text="Internally calculated parameter to uniquely identify a transfer \n"
+        "Token transfers are calculated as `transferId = e+tx_hash+log_index` \n"
+        "Ether transfers are calculated as `transferId = i+tx_hash+trace_address`"
+    )
 
     def get_fields(self):
         result = super().get_fields()
