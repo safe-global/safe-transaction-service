@@ -23,6 +23,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import EthereumClient, TracingManager
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
+from gnosis.safe.safe import SafeBase
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -3310,7 +3311,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    @mock.patch.object(Safe, "estimate_tx_gas", return_value=52000, autospec=True)
+    @mock.patch.object(SafeBase, "estimate_tx_gas", return_value=52000, autospec=True)
     def test_estimate_multisig_tx_view(self, estimate_tx_gas_mock: MagicMock):
         safe_address = Account.create().address
         to = Account.create().address
