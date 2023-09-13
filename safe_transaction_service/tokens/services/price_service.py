@@ -190,6 +190,9 @@ class PriceService:
 
     def get_xdc_usd_price(self) -> float:
         return self.kucoin_client.get_xdc_usd_price()
+    
+    def get_peel_usd_price(self) -> float:
+        return self.kucoin_client.get_peel_usd_price()
 
     def get_ftm_usd_price(self) -> float:
         return self.kucoin_client.get_ftm_usd_price()
@@ -295,6 +298,11 @@ class PriceService:
             EthereumNetwork.XDC_APOTHEM_NETWORK,
         ):
             return self.get_xdc_usd_price()
+        elif self.ethereum_network in (
+            EthereumNetwork.APE_MAINNET,
+            EthereumNetwork.APE_TESTNET,
+        ):
+            return self.get_peel_usd_price()
         elif self.ethereum_network in (
             EthereumNetwork.METER_MAINNET,
             EthereumNetwork.METER_TESTNET,

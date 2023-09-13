@@ -33,5 +33,5 @@ exec celery -C -A config.celery_app worker \
      --concurrency=${TASK_CONCURRENCY} \
      --max-memory-per-child=${MAX_MEMORY_PER_CHILD} \
      --max-tasks-per-child=${MAX_TASKS_PER_CHILD} \
-     --without-heartbeat --without-gossip \
+     --without-heartbeat -E --without-gossip \
      --without-mingle -Q "$WORKER_QUEUES"
