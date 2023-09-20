@@ -167,12 +167,22 @@ class IndexingView(GenericAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class MasterCopiesView(ListAPIView):
+class SingletonsView(ListAPIView):
     serializer_class = serializers.MasterCopyResponseSerializer
     pagination_class = None
 
     def get_queryset(self):
         return SafeMasterCopy.objects.relevant()
+
+
+class MasterCopiesView(SingletonsView):
+    @swagger_auto_schema(
+        deprecated=True,
+        operation_description="Use `singletons` instead of `master-copies`",
+        responses={200: "Ok"},
+    )
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
 
 
 class AllTransactionsListView(ListAPIView):

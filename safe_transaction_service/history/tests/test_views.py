@@ -3169,8 +3169,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         """
         SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
-    def test_master_copies_view(self):
-        response = self.client.get(reverse("v1:history:master-copies"))
+    def _test_singletons_view(self, url: str):
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
@@ -3180,7 +3180,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             initial_block_number=deployed_block_number,
             tx_block_number=last_indexed_block_number,
         )
-        response = self.client.get(reverse("v1:history:master-copies"))
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_master_copy = [
             {
@@ -3195,7 +3195,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.data, expected_master_copy)
 
         safe_master_copy = SafeMasterCopyFactory(l2=True)
-        response = self.client.get(reverse("v1:history:master-copies"))
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_l2_master_copy = [
             {
@@ -3213,9 +3213,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         with self.settings(ETH_L2_NETWORK=True):
-            response = self.client.get(reverse("v1:history:master-copies"))
+            response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertCountEqual(response.data, expected_l2_master_copy)
+
+    def test_singletons_view(self):
+        url = reverse("v1:history:singletons")
+        return self._test_singletons_view(url)
+
+    def test_master_copies_view(self):
+        url = reverse("v1:history:master-copies")
+        return self._test_singletons_view(url)
 
     def test_modules_view(self):
         invalid_address = "0x2A"
