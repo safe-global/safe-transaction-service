@@ -220,6 +220,7 @@ class EventsIndexer(EthereumIndexer):
         """
         for event_to_listen in self.events_to_listen[log_receipt["topics"][0].hex()]:
             # Try to decode using all the existing ABIs
+            # One topic can have multiple matching ABIs due to `indexed` elements changing how to decode it
             try:
                 return event_to_listen.process_log(log_receipt)
             except LogTopicError:

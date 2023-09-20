@@ -2988,34 +2988,79 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             }
             data_decoded_cpk = None
 
+            # Using `createProxyWithNonce` for v1.4.1, example taken from Goerli
+            create_v1_4_1_test_data = {
+                "master_copy": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+                "setup_data": "0xb63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000160000000000000000000000000fd0732dc9e303f09fcef3a7388ad10a83459ec990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c7d289db6238596b5a5dbe2f1df9d29c930f959c00000000000000000000000068bbf2084546ccba3cf2f604736e77b3b2a671600000000000000000000000000000000000000000000000000000000000000000",
+                "data": "0x1688f0b900000000000000000000000029fcb43b46531bca003ddc8fcb67ffe91900c76200000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000018a765221620000000000000000000000000000000000000000000000000000000000000184b63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000160000000000000000000000000fd0732dc9e303f09fcef3a7388ad10a83459ec990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c7d289db6238596b5a5dbe2f1df9d29c930f959c00000000000000000000000068bbf2084546ccba3cf2f604736e77b3b2a67160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            }
+            data_decoded_v1_4_1 = {
+                "method": "setup",
+                "parameters": [
+                    {
+                        "name": "_owners",
+                        "type": "address[]",
+                        "value": [
+                            "0xC7D289DB6238596B5A5DBE2f1dF9D29C930F959c",
+                            "0x68bbF2084546ccBA3Cf2F604736e77b3b2a67160",
+                        ],
+                    },
+                    {"name": "_threshold", "type": "uint256", "value": "2"},
+                    {
+                        "name": "to",
+                        "type": "address",
+                        "value": "0x0000000000000000000000000000000000000000",
+                    },
+                    {"name": "data", "type": "bytes", "value": "0x"},
+                    {
+                        "name": "fallbackHandler",
+                        "type": "address",
+                        "value": "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
+                    },
+                    {
+                        "name": "paymentToken",
+                        "type": "address",
+                        "value": "0x0000000000000000000000000000000000000000",
+                    },
+                    {"name": "payment", "type": "uint256", "value": "0"},
+                    {
+                        "name": "paymentReceiver",
+                        "type": "address",
+                        "value": "0x0000000000000000000000000000000000000000",
+                    },
+                ],
+            }
+
             for test_data, data_decoded in [
                 (create_test_data, data_decoded_1),
                 (create_test_data_2, data_decoded_2),
                 (create_cpk_test_data, data_decoded_cpk),
+                (create_v1_4_1_test_data, data_decoded_v1_4_1),
             ]:
-                another_trace_2["action"]["input"] = HexBytes(test_data["data"])
-                response = self.client.get(
-                    reverse("v1:history:safe-creation", args=(owner_address,)),
-                    format="json",
-                )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                created_iso = (
-                    internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                with self.subTest(test_data=test_data, data_decoded=data_decoded):
+                    another_trace_2["action"]["input"] = HexBytes(test_data["data"])
+                    response = self.client.get(
+                        reverse("v1:history:safe-creation", args=(owner_address,)),
+                        format="json",
                     )
-                )
-                self.assertEqual(
-                    response.data,
-                    {
-                        "created": created_iso,
-                        "creator": another_trace_2["action"]["from"],
-                        "transaction_hash": internal_tx.ethereum_tx_id,
-                        "factory_address": internal_tx._from,
-                        "master_copy": test_data["master_copy"],
-                        "setup_data": test_data["setup_data"],
-                        "data_decoded": data_decoded,
-                    },
-                )
+                    self.assertEqual(response.status_code, status.HTTP_200_OK)
+                    created_iso = (
+                        internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
+                            "+00:00", "Z"
+                        )
+                    )
+                    self.assertEqual(
+                        response.data,
+                        {
+                            "created": created_iso,
+                            "creator": another_trace_2["action"]["from"],
+                            "transaction_hash": internal_tx.ethereum_tx_id,
+                            "factory_address": internal_tx._from,
+                            "master_copy": test_data["master_copy"],
+                            "setup_data": test_data["setup_data"],
+                            "data_decoded": data_decoded,
+                        },
+                    )
 
     def test_safe_info_view(self):
         invalid_address = "0x2A"
