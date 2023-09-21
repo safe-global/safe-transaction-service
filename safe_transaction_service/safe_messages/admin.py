@@ -11,7 +11,7 @@ class SafeMessageAdmin(BinarySearchAdmin):
     list_display = ("safe", "message_hash", "proposed_by", "message")
     ordering = ["-created"]
     readonly_fields = ("message_hash",)
-    search_fields = ["safe", "message_hash", "proposed_by", "message"]
+    search_fields = ["=safe", "=message_hash", "=proposed_by", "message"]
 
 
 @admin.register(SafeMessageConfirmation)
@@ -26,7 +26,7 @@ class SafeMessageConfirmationAdmin(BinarySearchAdmin):
     list_select_related = ("safe_message",)
     ordering = ["-created"]
     search_fields = [
-        "safe_message__safe",
-        "owner",
+        "=safe_message__safe",
+        "=owner",
         "safe_message__description",
     ]
