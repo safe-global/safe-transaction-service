@@ -5,6 +5,7 @@ from uuid import UUID
 
 from django.conf import settings
 
+from eth_account.messages import defunct_hash_message
 from hexbytes import HexBytes
 
 from gnosis.eth.utils import fast_keccak
@@ -67,9 +68,13 @@ def calculate_device_registration_hash(
     cloud_messaging_token: str,
     safes: Sequence[str],
     prefix: str = "gnosis-safe",
+    eip191: bool = False,
 ) -> HexBytes:
     safes_to_str = "".join(sorted(safes))
     str_to_sign = (
         f"{prefix}{timestamp}{identifier}{cloud_messaging_token}{safes_to_str}"
     )
-    return fast_keccak(str_to_sign.encode())
+    raw_hash = fast_keccak(str_to_sign.encode())
+    if eip191:
+        return defunct_hash_message(raw_hash)
+    return raw_hash
