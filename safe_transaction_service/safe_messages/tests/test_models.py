@@ -35,7 +35,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         ]:
             with self.subTest(input=input):
                 with mock.patch(
-                    "gnosis.safe.Safe.domain_separator",
+                    "gnosis.safe.safe.Safe.domain_separator",
                     return_value=mock_domain_separator,
                     new_callable=PropertyMock,
                 ):

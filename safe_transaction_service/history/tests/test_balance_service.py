@@ -67,7 +67,14 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(balances[0].balance, value)
 
         tokens_value = int(12 * 1e18)
-        erc20 = deploy_erc20(self.w3, "Eurodollar", "EUD", safe_address, tokens_value)
+        erc20 = deploy_erc20(
+            self.w3,
+            self.ethereum_test_account,
+            "Eurodollar",
+            "EUD",
+            safe_address,
+            tokens_value,
+        )
         balances = balance_service.get_usd_balances(safe_address)
         self.assertEqual(len(balances), 1)
 
@@ -123,10 +130,22 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         )
 
         # Test sorting
-        erc20_2 = deploy_erc20(self.w3, "Peseta", "PTA", safe_address, tokens_value)
+        erc20_2 = deploy_erc20(
+            self.w3,
+            self.ethereum_test_account,
+            "Peseta",
+            "PTA",
+            safe_address,
+            tokens_value,
+        )
         token_info_2 = balance_service.get_token_info(erc20_2.address)
         erc20_3 = deploy_erc20(
-            self.w3, "Double Dollars", "DD", safe_address, tokens_value
+            self.w3,
+            self.ethereum_test_account,
+            "Double Dollars",
+            "DD",
+            safe_address,
+            tokens_value,
         )
         token_info_3 = balance_service.get_token_info(erc20_3.address)
 
@@ -207,7 +226,12 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
 
         tokens_value = int(12 * 1e18)
         erc20 = deploy_erc20(
-            self.w3, "Galactic Credit Standard", "GCS", safe_address, tokens_value
+            self.w3,
+            self.ethereum_test_account,
+            "Galactic Credit Standard",
+            "GCS",
+            safe_address,
+            tokens_value,
         )
         ERC20TransferFactory(address=erc20.address, to=safe_address)
 

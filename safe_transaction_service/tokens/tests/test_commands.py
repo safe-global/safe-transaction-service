@@ -7,9 +7,9 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from gnosis.eth import EthereumClientProvider
 from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
-from gnosis.eth.tests.utils import deploy_example_erc20
+from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from gnosis.eth.tests.utils import deploy_erc20
 
 from ..clients import CoinMarketCapClient, CoinMarketCapToken
 from ..models import Token
@@ -51,7 +51,7 @@ relay_token_client_mock = [
 ]
 
 
-class TestCommands(TestCase):
+class TestCommands(EthereumTestCaseMixin, TestCase):
     def test_add_token(self):
         command = "add_token"
         buf = StringIO()
@@ -63,8 +63,14 @@ class TestCommands(TestCase):
         token.refresh_from_db()
         self.assertTrue(token.trusted)
 
-        ethereum_client = EthereumClientProvider()
-        erc20 = deploy_example_erc20(ethereum_client.w3, 10, Account.create().address)
+        erc20 = deploy_erc20(
+            self.ethereum_client.w3,
+            self.ethereum_test_account,
+            "Uxio",
+            "UXI",
+            Account.create().address,
+            10,
+        )
         call_command(command, erc20.address, "--no-prompt", stdout=buf)
         self.assertIn("Created token", buf.getvalue())
         self.assertTrue(Token.objects.get(address=erc20.address).trusted)

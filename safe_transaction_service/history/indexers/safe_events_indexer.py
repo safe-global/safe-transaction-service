@@ -12,7 +12,13 @@ from web3.types import EventData
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_safe_V1_1_1_contract
+from gnosis.eth.contracts import (
+    get_proxy_factory_V1_3_0_contract,
+    get_proxy_factory_V1_4_1_contract,
+    get_safe_V1_1_1_contract,
+    get_safe_V1_3_0_contract,
+    get_safe_V1_4_1_contract,
+)
 
 from ..models import (
     EthereumBlock,
@@ -22,7 +28,6 @@ from ..models import (
     InternalTxType,
     SafeMasterCopy,
 )
-from .abis.gnosis import gnosis_safe_l2_v1_3_0_abi, proxy_factory_v1_3_0_abi
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -102,10 +107,12 @@ class SafeEventsIndexer(EventsIndexer):
         );
 
         event ExecutionFailure(
-            bytes32 txHash, uint256 payment
+            bytes32 txHash,
+            uint256 payment
         );
         event ExecutionSuccess(
-            bytes32 txHash, uint256 payment
+            bytes32 txHash,
+            uint256 payment
         );
 
         event EnabledModule(address module);
@@ -129,46 +136,127 @@ class SafeEventsIndexer(EventsIndexer):
         # ProxyFactory
         event ProxyCreation(GnosisSafeProxy proxy, address singleton);
 
-        Safe v1.4.0 L2 Events
+        Safe v1.4.1 L2 Events
         ------------------
-        TODO: Add them on on deployment
+        event SafeMultiSigTransaction(
+            address to,
+            uint256 value,
+            bytes data,
+            Enum.Operation operation,
+            uint256 safeTxGas,
+            uint256 baseGas,
+            uint256 gasPrice,
+            address gasToken,
+            address payable refundReceiver,
+            bytes signatures,
+            // We combine nonce, sender and threshold into one to avoid stack too deep
+            // Dev note: additionalInfo should not contain `bytes`, as this complicates decoding
+            bytes additionalInfo
+        );
+
+        event SafeModuleTransaction(
+            address module,
+            address to,
+            uint256 value,
+            bytes data,
+            Enum.Operation operation,
+        );
+
+        event SafeSetup(
+            address indexed initiator,
+            address[] owners,
+            uint256 threshold,
+            address initializer,
+            address fallbackHandler
+        );
+
+        event ApproveHash(
+            bytes32 indexed approvedHash,
+            address indexed owner
+        );
+
+        event SignMsg(
+            bytes32 indexed msgHash
+        );
+
+        event ExecutionFailure(
+            bytes32 indexed txHash,
+            uint256 payment
+        );
+
+        event ExecutionSuccess(
+            bytes32 indexed txHash,
+            uint256 payment
+        );
+
+        event EnabledModule(address indexed module);
+        event DisabledModule(address indexed module);
+        event ExecutionFromModuleSuccess(address indexed module);
+        event ExecutionFromModuleFailure(address indexed module);
+
+        event AddedOwner(address indexed owner);
+        event RemovedOwner(address indexed owner);
+        event ChangedThreshold(uint256 threshold);
+
+        # Incoming Ether
+        event SafeReceived(
+            address indexed sender,
+            uint256 value
+        );
+
+        event ChangedFallbackHandler(address indexed handler);
+        event ChangedGuard(address indexed guard);
+
+        # ProxyFactory
+        event ProxyCreation(GnosisSafeProxy indexed proxy, address singleton);
 
         :return: List of supported `ContractEvent`
         """
-        l2_contract = self.ethereum_client.w3.eth.contract(
-            abi=gnosis_safe_l2_v1_3_0_abi
+        proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(
+            self.ethereum_client.w3
         )
-        proxy_factory_contract = self.ethereum_client.w3.eth.contract(
-            abi=proxy_factory_v1_3_0_abi
+        proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(
+            self.ethereum_client.w3
         )
-        old_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
+        safe_l2_v1_4_1_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
+        safe_l2_v1_3_0_contract = get_safe_V1_3_0_contract(self.ethereum_client.w3)
+        safe_v1_1_1_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
         return [
-            l2_contract.events.SafeMultiSigTransaction(),
-            l2_contract.events.SafeModuleTransaction(),
-            l2_contract.events.SafeSetup(),
-            l2_contract.events.ApproveHash(),
-            l2_contract.events.SignMsg(),
-            l2_contract.events.ExecutionFailure(),
-            l2_contract.events.ExecutionSuccess(),
+            safe_l2_v1_3_0_contract.events.SafeMultiSigTransaction(),
+            safe_l2_v1_3_0_contract.events.SafeModuleTransaction(),
+            safe_l2_v1_3_0_contract.events.SafeSetup(),
+            safe_l2_v1_3_0_contract.events.ApproveHash(),
+            safe_l2_v1_3_0_contract.events.SignMsg(),
+            safe_l2_v1_4_1_contract.events.ExecutionFailure(),
+            safe_l2_v1_3_0_contract.events.ExecutionFailure(),
+            safe_l2_v1_4_1_contract.events.ExecutionSuccess(),
+            safe_l2_v1_3_0_contract.events.ExecutionSuccess(),
             # Modules
-            l2_contract.events.EnabledModule(),
-            l2_contract.events.DisabledModule(),
-            l2_contract.events.ExecutionFromModuleSuccess(),
-            l2_contract.events.ExecutionFromModuleFailure(),
+            safe_l2_v1_4_1_contract.events.EnabledModule(),
+            safe_l2_v1_3_0_contract.events.EnabledModule(),
+            safe_l2_v1_4_1_contract.events.DisabledModule(),
+            safe_l2_v1_3_0_contract.events.DisabledModule(),
+            safe_l2_v1_3_0_contract.events.ExecutionFromModuleSuccess(),
+            safe_l2_v1_3_0_contract.events.ExecutionFromModuleFailure(),
             # Owners
-            l2_contract.events.AddedOwner(),
-            l2_contract.events.RemovedOwner(),
-            l2_contract.events.ChangedThreshold(),
+            safe_l2_v1_4_1_contract.events.AddedOwner(),
+            safe_l2_v1_3_0_contract.events.AddedOwner(),
+            safe_l2_v1_4_1_contract.events.RemovedOwner(),
+            safe_l2_v1_3_0_contract.events.RemovedOwner(),
+            safe_l2_v1_3_0_contract.events.ChangedThreshold(),
             # Incoming Ether
-            l2_contract.events.SafeReceived(),
+            safe_l2_v1_3_0_contract.events.SafeReceived(),
             # Changed FallbackHandler
-            l2_contract.events.ChangedFallbackHandler(),
+            safe_l2_v1_4_1_contract.events.ChangedFallbackHandler(),
+            safe_l2_v1_3_0_contract.events.ChangedFallbackHandler(),
             # Changed Guard
-            l2_contract.events.ChangedGuard(),
+            safe_l2_v1_4_1_contract.events.ChangedGuard(),
+            safe_l2_v1_3_0_contract.events.ChangedGuard(),
             # Change Master Copy
-            old_contract.events.ChangedMasterCopy(),
+            safe_v1_1_1_contract.events.ChangedMasterCopy(),
             # Proxy creation
-            proxy_factory_contract.events.ProxyCreation(),
+            proxy_factory_v1_4_1_contract.events.ProxyCreation(),
+            proxy_factory_v1_3_0_contract.events.ProxyCreation(),
         ]
 
     @property

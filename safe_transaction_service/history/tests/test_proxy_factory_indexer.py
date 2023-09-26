@@ -13,8 +13,8 @@ class TestProxyFactoryIndexer(SafeTestCaseMixin, TestCase):
         proxy_factory_indexer.confirmations = 0
         self.assertEqual(proxy_factory_indexer.start(), (0, 0))
         ProxyFactoryFactory(address=self.proxy_factory.address)
-        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
-            self.ethereum_test_account, self.safe_contract_address
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account, self.safe_contract.address
         )
         safe_contract_address = ethereum_tx_sent.contract_address
         self.w3.eth.wait_for_transaction_receipt(ethereum_tx_sent.tx_hash)

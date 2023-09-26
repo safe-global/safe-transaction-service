@@ -163,7 +163,6 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             attrs["gas_token"],
             attrs["refund_receiver"],
             safe_nonce=attrs["nonce"],
-            safe_version=safe_version,
         )
         contract_transaction_hash = safe_tx.safe_tx_hash
 
