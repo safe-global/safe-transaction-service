@@ -616,9 +616,17 @@ class SafeMultisigTransactionListView(ListAPIView):
         )
 
     def get_unique_nonce(self, address: str):
-        return (
-            MultisigTransaction.objects.filter(safe=address).distinct("nonce").count()
+        """
+        :param address:
+        :return: Number of Multisig Transactions with different nonce
+        """
+        only_trusted = parse_boolean_query_param(
+            self.request.query_params.get("trusted", False)
         )
+        queryset = MultisigTransaction.objects.filter(safe=address)
+        if only_trusted:
+            queryset = queryset.filter(trusted=True)
+        return queryset.distinct("nonce").count()
 
     def get_serializer_class(self):
         """
