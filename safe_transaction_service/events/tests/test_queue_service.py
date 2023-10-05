@@ -18,6 +18,8 @@ class TestQueueService(TestCase):
         self.queue_service._channel.queue_bind(
             self.queue, self.queue_service.exchange_name
         )
+        # Clean queue to avoid old messages
+        self.queue_service._channel.queue_purge(self.queue)
 
     def test_send_unsent_messages(self):
         queue_service = QueueServiceProvider()
