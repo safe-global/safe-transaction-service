@@ -151,10 +151,14 @@ class IndexService:
         :return: `True` if master copies and ERC20/721 are synced, `False` otherwise
         """
 
+        try:
+            current_block_number = self.ethereum_client.current_block_number
+        except IOError:
+            # If there's an error connecting to the node we consider the service as out of sync
+            return False
+
         # Use number of reorg blocks to consider as not synced
-        reference_block_number = (
-            self.ethereum_client.current_block_number - self.eth_reorg_blocks
-        )
+        reference_block_number = current_block_number - self.eth_reorg_blocks
         synced: bool = True
         for safe_master_copy in SafeMasterCopy.objects.relevant().filter(
             tx_block_number__lt=reference_block_number
