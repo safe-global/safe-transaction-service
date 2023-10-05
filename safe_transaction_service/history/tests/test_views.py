@@ -798,6 +798,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "b1b3b164cf000000000000000000000000000000000000000000000000000000"
             "0000000001"
         )
+
         multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
         safe_tx_hash = multisig_tx.safe_tx_hash
         response = self.client.get(
@@ -814,6 +815,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertFalse(response.data["trusted"])
         self.assertIsNone(response.data["max_fee_per_gas"])
         self.assertIsNone(response.data["max_priority_fee_per_gas"])
+        self.assertIsNone(response.data["proposer"])
         self.assertEqual(
             response.data["data_decoded"],
             {
@@ -828,6 +830,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 ],
             },
         )
+
         # Test camelCase
         self.assertEqual(
             response.json()["transactionHash"], multisig_tx.ethereum_tx.tx_hash
@@ -855,8 +858,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["origin"], json.dumps(origin))
         self.assertEqual(json.loads(response.data["origin"]), origin)
 
+        # Test proposer
+        proposer = Account.create().address
+        multisig_tx.proposer = proposer
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.data["proposer"], proposer)
+
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address
+        proposer = Account.create().address
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -865,7 +879,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        multisig_tx = MultisigTransactionFactory(safe=safe_address)
+        multisig_tx = MultisigTransactionFactory(safe=safe_address, proposer=proposer)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -889,7 +903,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         # Check Etag header
         self.assertTrue(response["Etag"])
-
         MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
@@ -898,6 +911,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 1)
+        self.assertEqual(response.data["results"][0]["proposer"], proposer)
 
         MultisigTransactionFactory(safe=safe_address, nonce=multisig_tx.nonce)
         response = self.client.get(
@@ -1182,6 +1196,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertIsNone(response.data["results"][0]["executor"])
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
+        self.assertEqual(response.data["results"][0]["proposer"], data["sender"])
 
         # Test confirmation with signature
         data["signature"] = safe_owner_1.signHash(safe_tx.safe_tx_hash)[
@@ -1676,7 +1691,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigTransaction.objects.count(), 1)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
-        self.assertTrue(MultisigTransaction.objects.first().trusted)
+        multisig_transaction = MultisigTransaction.objects.first()
+        self.assertTrue(multisig_transaction.trusted)
+        # Proposer should be the owner address not the delegate
+        self.assertNotEqual(multisig_transaction.proposer, safe_delegate.address)
+        self.assertEqual(multisig_transaction.proposer, safe_owners[0].address)
 
         data["signature"] = data["signature"] + data["signature"][2:]
         response = self.client.post(

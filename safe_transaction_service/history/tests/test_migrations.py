@@ -7,8 +7,6 @@ from django_test_migrations.migrator import Migrator
 from eth_account import Account
 from web3 import Web3
 
-from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
-
 
 class TestMigrations(TestCase):
     def setUp(self) -> None:
@@ -252,23 +250,28 @@ class TestMigrations(TestCase):
         new_state = self.migrator.apply_initial_migration(
             ("history", "0072_safecontract_banned_and_more"),
         )
-
-        # Factories can be used as there are no database definition changes
-        # Make sure there are no issues with empty `origin` or `origin` lacking `url`
-        MultisigTransactionFactory(origin={"not_url": "random"})
-
-        # Make sure other urls are not affected
-        MultisigTransactionFactory(
-            origin={"url": "https://app.zerion.io", "name": "Zerion"}
-        )
-
-        # This origin must be replaced
-        MultisigTransactionFactory(
-            origin={
+        origins = [
+            {"not_url": "random"},
+            {"url": "https://app.zerion.io", "name": "Zerion"},
+            {
                 "url": "https://apps.gnosis-safe.io/tx-builder/",
                 "name": "Transaction Builder",
-            }
-        )
+            },
+        ]
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        for origin in origins:
+            MultisigTransaction.objects.create(
+                safe_tx_hash=Web3.keccak(text=f"multisig-tx-{origin}").hex(),
+                safe=Account.create().address,
+                value=0,
+                operation=0,
+                safe_tx_gas=0,
+                base_gas=0,
+                gas_price=0,
+                nonce=0,
+                origin=origin,
+            )
 
         new_state = self.migrator.apply_tested_migration(
             ("history", "0073_safe_apps_links"),
@@ -295,22 +298,28 @@ class TestMigrations(TestCase):
             ("history", "0073_safe_apps_links"),
         )
 
-        # Factories can be used as there are no database definition changes
-        # Make sure there are no issues with empty `origin` or `origin` lacking `url`
-        MultisigTransactionFactory(origin={"not_url": "random"})
-
-        # Make sure other urls are not affected
-        MultisigTransactionFactory(
-            origin={"url": "https://app.zerion.io", "name": "Zerion"}
-        )
-
-        # This origin must be replaced
-        MultisigTransactionFactory(
-            origin={
-                "url": "https://apps-portal.safe.global/tx-builder/",
+        origins = [
+            {"not_url": "random"},
+            {"url": "https://app.zerion.io", "name": "Zerion"},
+            {
+                "url": "https://apps.gnosis-safe.io/tx-builder/",
                 "name": "Transaction Builder",
-            }
-        )
+            },
+        ]
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        for origin in origins:
+            MultisigTransaction.objects.create(
+                safe_tx_hash=Web3.keccak(text=f"multisig-tx-{origin}").hex(),
+                safe=Account.create().address,
+                value=0,
+                operation=0,
+                safe_tx_gas=0,
+                base_gas=0,
+                gas_price=0,
+                nonce=0,
+                origin=origin,
+            )
 
         new_state = self.migrator.apply_tested_migration(
             ("history", "0072_safecontract_banned_and_more"),
