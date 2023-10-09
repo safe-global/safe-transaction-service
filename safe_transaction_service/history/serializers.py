@@ -256,12 +256,13 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 and (user := request.user)
             ):
                 trusted = user.has_perm("history.create_trusted")
-        try:
+
+        if self.validated_data["sender"] in self.validated_data["safe_owners"]:
+            proposer = self.validated_data["sender"]
+        else:
             proposer = SafeContractDelegate.objects.get(
                 delegate=self.validated_data["sender"]
             ).delegator
-        except SafeContractDelegate.DoesNotExist:
-            proposer = self.validated_data["sender"]
 
         multisig_transaction, created = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,
