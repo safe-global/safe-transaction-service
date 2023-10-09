@@ -1606,7 +1606,7 @@ class SafeMasterCopyQueryset(models.QuerySet):
 class SafeMasterCopy(MonitoredAddress):
     objects = SafeMasterCopyManager.from_queryset(SafeMasterCopyQueryset)()
     version = models.CharField(max_length=20, validators=[validate_version])
-    deployer = models.CharField(max_length=50, default="Gnosis")
+    deployer = models.CharField(max_length=50, default="Safe")
     l2 = models.BooleanField(default=False)
 
     class Meta:
