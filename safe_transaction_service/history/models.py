@@ -1366,6 +1366,7 @@ class MultisigTransaction(TimeStampedModel):
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Keccak256Field(primary_key=True)
     safe = EthereumAddressV2Field(db_index=True)
+    proposer = EthereumAddressV2Field(null=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx,
         null=True,
