@@ -5,12 +5,8 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from gnosis.eth import EthereumClient
-from gnosis.safe.safe_deployments import safe_deployments
 
 from config.settings.base import STATICFILES_DIRS
-from safe_transaction_service.contracts.management.commands.update_safe_contracts_logo import (
-    get_deployment_addresses,
-)
 from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 
@@ -33,42 +29,50 @@ class TestCommands(TestCase):
         )
         self.assertIn("Processing finished", buf.getvalue())
 
-    @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=5)
+    @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=1)
     def test_update_safe_contracts_logo(self, mock_chain_id):
         command = "update_safe_contracts_logo"
         buf = StringIO()
         multisend_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
         random_contract = ContractFactory()
         previous_random_contract_logo = random_contract.logo.read()
-        previous_multisend_logo: bytes = ContractFactory(
-            address=multisend_address
-        ).logo.read()
+        multisend_contract: bytes = ContractFactory(
+            address=multisend_address, name="Custom multisend"
+        )
+
         call_command(
             command, f"--logo-path={STATICFILES_DIRS[0]}/safe/logo.png", stdout=buf
         )
-        current_multisend_logo: bytes = Contract.objects.get(
+        current_multisend_contract: bytes = Contract.objects.get(
             address=multisend_address
-        ).logo.read()
-        self.assertNotEqual(current_multisend_logo, previous_multisend_logo)
+        )
+        # Previous created contracts logo should be updated
+        self.assertNotEqual(
+            current_multisend_contract.logo.read(), multisend_contract.logo.read()
+        )
+
+        # Previous created contracts name and display name should keep unchanged
+        self.assertEqual(multisend_contract.name, current_multisend_contract.name)
+        self.assertEqual(
+            multisend_contract.display_name, current_multisend_contract.display_name
+        )
+
         # No safe contract logos should keep unchanged
         current_no_safe_contract_logo: bytes = Contract.objects.get(
             address=random_contract.address
         ).logo.read()
         self.assertEqual(current_no_safe_contract_logo, previous_random_contract_logo)
 
-    def test_get_deployment_addresses(self):
-        expected_result = [
-            "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
-            "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526",
-            "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
-            "0x41675C099F32341bf84BFc5382aF534df5C7461a",
-            "0x3d4BA2E0884aa488718476ca2FB8Efc291A46199",
-            "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67",
-            "0x9b35Af71d77eaf8d7e40252370304687390A1A52",
-            "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
-            "0xd53cd0aB83D845Ac265BE939c57F53AD838012c9",
-        ]
+        # Missing safe addresses should be added
+        self.assertEqual(Contract.objects.count(), 28)
 
-        result = get_deployment_addresses(safe_deployments["1.4.1"], "1")
+        # Contract name and display name should be correctly generated
+        safe_l2_141_address = "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762"
+        contract = Contract.objects.get(address=safe_l2_141_address)
+        self.assertEqual(contract.name, "SafeL2")
+        self.assertEqual(contract.display_name, "SafeL2 1.4.1")
 
-        self.assertEqual(expected_result, result)
+        safe_multisend_141_address = "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
+        contract = Contract.objects.get(address=safe_multisend_141_address)
+        self.assertEqual(contract.name, "MultiSend")
+        self.assertEqual(contract.display_name, "Safe: MultiSend 1.4.1")

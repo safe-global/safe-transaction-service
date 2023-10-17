@@ -7,25 +7,23 @@ from gnosis.safe.safe_deployments import safe_deployments
 from safe_transaction_service.contracts.models import Contract
 
 
-def get_deployment_addresses(safe_deployments: dict, chain_id: str) -> list:
+def generate_safe_contract_display_name(contract_name: str, version: str) -> str:
     """
-    Return the deployment addresses of passed dict for a chain id.
-    :param safe_deployments:
-    :param chain_id:
-    :return:
+    Generates the display name for Safe contract.
+    Append Safe at the beginning if the contract name doesn't contain Safe word and append the contract version at the end.
+
+    :param contract_name:
+    :param version:
+    :return: display_name
     """
-    addresses = []
-    if isinstance(safe_deployments, dict):
-        for key, value in safe_deployments.items():
-            if isinstance(value, dict):
-                addresses.extend(get_deployment_addresses(value, chain_id))
-            elif key == chain_id:
-                addresses.append(value)
-    return addresses
+    if "safe" not in contract_name.lower():
+        return f"Safe: {contract_name} {version}"
+    else:
+        return f"{contract_name} {version}"
 
 
 class Command(BaseCommand):
-    help = "Update safe contract logos by new one"
+    help = "Update or create Safe contracts with provided logo"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -37,45 +35,37 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """
-        Command to add or update safe contract logos if exist.
+        Command to create or update Safe contracts with provided logo.
+
         :param args:
-        :param options: safe version and logo path
+        :param options: Safe version and logo path
         :return:
         """
         safe_version = options["safe_version"]
         logo_path = options["logo_path"]
         ethereum_client = EthereumClientProvider()
-        chain_id = str(ethereum_client.get_chain_id())
-
+        chain_id = ethereum_client.get_chain_id()
+        logo_file = File(open(logo_path, "rb"))
         if not safe_version:
-            addresses = get_deployment_addresses(safe_deployments, chain_id)
+            versions = list(safe_deployments.keys())
         elif safe_version in safe_deployments:
-            addresses = get_deployment_addresses(
-                safe_deployments[safe_version], chain_id
-            )
+            versions = [safe_version]
         else:
             raise CommandError(
                 f"Wrong Safe version {safe_version}, supported versions {safe_deployments.keys()}"
             )
 
-        for contract_address in addresses:
-            try:
-                contract = Contract.objects.get(address=contract_address)
-                # Remove previous one if exist
-                contract.logo.delete(save=True)
-                contract.logo.save(
-                    f"{contract.address}.png", File(open(logo_path, "rb"))
+        for version in versions:
+            for contract_name, addresses in safe_deployments[version].items():
+                contract, created = Contract.objects.get_or_create(
+                    address=addresses[str(chain_id)],
+                    defaults={
+                        "name": contract_name,
+                        "display_name": generate_safe_contract_display_name(
+                            contract_name, version
+                        ),
+                    },
                 )
+
+                contract.logo.save(f"{contract.address}.png", logo_file)
                 contract.save()
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Contract {contract_address} successfully updated"
-                    )
-                )
-            except Contract.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Contract {contract_address} does not exist on database"
-                    )
-                )
-                continue
