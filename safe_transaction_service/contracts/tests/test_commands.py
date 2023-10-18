@@ -33,22 +33,21 @@ class TestCommands(TestCase):
     def test_update_safe_contracts_logo(self, mock_chain_id):
         command = "update_safe_contracts_logo"
         buf = StringIO()
-        multisend_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
         random_contract = ContractFactory()
         previous_random_contract_logo = random_contract.logo.read()
-        multisend_contract: bytes = ContractFactory(
+        multisend_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
+        multisend_contract = ContractFactory(
             address=multisend_address, name="Custom multisend"
         )
+        multisend_contract_logo = multisend_contract.logo.read()
 
         call_command(
             command, f"--logo-path={STATICFILES_DIRS[0]}/safe/logo.png", stdout=buf
         )
-        current_multisend_contract: bytes = Contract.objects.get(
-            address=multisend_address
-        )
+        current_multisend_contract = Contract.objects.get(address=multisend_address)
         # Previous created contracts logo should be updated
         self.assertNotEqual(
-            current_multisend_contract.logo.read(), multisend_contract.logo.read()
+            current_multisend_contract.logo.read(), multisend_contract_logo
         )
 
         # Previous created contracts name and display name should keep unchanged
@@ -76,3 +75,14 @@ class TestCommands(TestCase):
         contract = Contract.objects.get(address=safe_multisend_141_address)
         self.assertEqual(contract.name, "MultiSend")
         self.assertEqual(contract.display_name, "Safe: MultiSend 1.4.1")
+
+        # Force to update contract names should update the name and display name of the contract
+        call_command(
+            command,
+            "--force-update-contract-names",
+            f"--logo-path={STATICFILES_DIRS[0]}/safe/logo.png",
+            stdout=buf,
+        )
+        contract = Contract.objects.get(address=multisend_address)
+        self.assertEqual(contract.name, "MultiSend")
+        self.assertEqual(contract.display_name, "Safe: MultiSend 1.3.0")

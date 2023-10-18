@@ -30,6 +30,12 @@ class Command(BaseCommand):
             "--safe-version", type=str, help="Contract version", required=False
         )
         parser.add_argument(
+            "--force-update-contract-names",
+            help="Update all the safe contract names and display names",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
             "--logo-path", type=str, help="Path of new logo", required=True
         )
 
@@ -45,6 +51,7 @@ class Command(BaseCommand):
         logo_path = options["logo_path"]
         ethereum_client = EthereumClientProvider()
         chain_id = ethereum_client.get_chain_id()
+        force_update_contract_names = options["force_update_contract_names"]
         logo_file = File(open(logo_path, "rb"))
         if not safe_version:
             versions = list(safe_deployments.keys())
@@ -55,17 +62,33 @@ class Command(BaseCommand):
                 f"Wrong Safe version {safe_version}, supported versions {safe_deployments.keys()}"
             )
 
+        if force_update_contract_names:
+            # update all safe contract names
+            queryset = Contract.objects.update_or_create
+        else:
+            # only update the contracts with empty values
+            queryset = Contract.objects.get_or_create
+
         for version in versions:
             for contract_name, addresses in safe_deployments[version].items():
-                contract, created = Contract.objects.get_or_create(
+                display_name = generate_safe_contract_display_name(
+                    contract_name, version
+                )
+                contract, created = queryset(
                     address=addresses[str(chain_id)],
                     defaults={
                         "name": contract_name,
-                        "display_name": generate_safe_contract_display_name(
-                            contract_name, version
-                        ),
+                        "display_name": display_name,
                     },
                 )
+
+                if not created:
+                    # Remove previous logo file
+                    contract.logo.delete(save=True)
+                    # update name only for contracts with empty names
+                    if not force_update_contract_names and contract.name == "":
+                        contract.display_name = display_name
+                        contract.name = contract_name
 
                 contract.logo.save(f"{contract.address}.png", logo_file)
                 contract.save()
