@@ -34,5 +34,3 @@ redis==5.0.1
 requests==2.31.0
 safe-eth-py[django]==6.0.0b3
 web3==6.11.1
-
-

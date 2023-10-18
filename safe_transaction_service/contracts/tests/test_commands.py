@@ -6,7 +6,6 @@ from django.test import TestCase
 
 from gnosis.eth import EthereumClient
 
-from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 
@@ -37,13 +36,11 @@ class TestCommands(TestCase):
         previous_random_contract_logo = random_contract.logo.read()
         multisend_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
         multisend_contract = ContractFactory(
-            address=multisend_address, name="Custom multisend"
+            address=multisend_address, name="GnosisMultisend"
         )
         multisend_contract_logo = multisend_contract.logo.read()
 
-        call_command(
-            command, f"--logo-path={STATICFILES_DIRS[0]}/safe/logo.png", stdout=buf
-        )
+        call_command(command, stdout=buf)
         current_multisend_contract = Contract.objects.get(address=multisend_address)
         # Previous created contracts logo should be updated
         self.assertNotEqual(
@@ -80,7 +77,6 @@ class TestCommands(TestCase):
         call_command(
             command,
             "--force-update-contract-names",
-            f"--logo-path={STATICFILES_DIRS[0]}/safe/logo.png",
             stdout=buf,
         )
         contract = Contract.objects.get(address=multisend_address)

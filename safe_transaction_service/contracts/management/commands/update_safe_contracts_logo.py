@@ -4,6 +4,7 @@ from django.core.management import BaseCommand, CommandError
 from gnosis.eth import EthereumClientProvider
 from gnosis.safe.safe_deployments import safe_deployments
 
+from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
 
 
@@ -16,6 +17,8 @@ def generate_safe_contract_display_name(contract_name: str, version: str) -> str
     :param version:
     :return: display_name
     """
+    # Remove gnosis word
+    contract_name = contract_name.replace("Gnosis", "")
     if "safe" not in contract_name.lower():
         return f"Safe: {contract_name} {version}"
     else:
@@ -36,7 +39,11 @@ class Command(BaseCommand):
             default=False,
         )
         parser.add_argument(
-            "--logo-path", type=str, help="Path of new logo", required=True
+            "--logo-path",
+            type=str,
+            help="Path of new logo",
+            required=False,
+            default=f"{STATICFILES_DIRS[0]}/safe/safe_contract_logo.png",
         )
 
     def handle(self, *args, **options):
@@ -48,10 +55,10 @@ class Command(BaseCommand):
         :return:
         """
         safe_version = options["safe_version"]
+        force_update_contract_names = options["force_update_contract_names"]
         logo_path = options["logo_path"]
         ethereum_client = EthereumClientProvider()
         chain_id = ethereum_client.get_chain_id()
-        force_update_contract_names = options["force_update_contract_names"]
         logo_file = File(open(logo_path, "rb"))
         if not safe_version:
             versions = list(safe_deployments.keys())
