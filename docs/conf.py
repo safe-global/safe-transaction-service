@@ -40,7 +40,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Safe Transaction Service"
-copyright = """2018, Gnosis"""
+copyright = """2018, Safe"""
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -183,8 +183,8 @@ latex_documents = [
     (
         "index",
         "safe_transaction_service.tex",
-        "Gnosis Transaction Service Documentation",
-        """Gnosis""",
+        "Safe Transaction Service Documentation",
+        """Safe""",
         "manual",
     )
 ]
@@ -219,7 +219,7 @@ man_pages = [
         "index",
         "safe_transaction_service",
         "Safe Transaction Service Documentation",
-        ["""Gnosis"""],
+        ["""Safe"""],
         1,
     )
 ]
@@ -238,9 +238,9 @@ texinfo_documents = [
         "index",
         "safe_transaction_service",
         "Safe Transaction Service Documentation",
-        """Gnosis""",
+        """Safe""",
         "Safe Transaction Service",
-        """Project to manage transactions for Gnosis Safe""",
+        """Project to manage transactions for Safe wallet""",
         "Miscellaneous",
     )
 ]

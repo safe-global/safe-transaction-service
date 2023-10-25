@@ -136,7 +136,7 @@ class EventsIndexer(EthereumIndexer):
         to_block_number: int,
     ) -> List[LogReceipt]:
         """
-        It will get Safe events using all the Gnosis Safe topics for filtering.
+        It will get Safe events using all the Safe topics for filtering.
 
         :param addresses:
         :param from_block_number:
