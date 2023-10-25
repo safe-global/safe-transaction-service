@@ -216,7 +216,7 @@ class InternalTxAdmin(BinarySearchAdmin):
 
 
 class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
-    title = "Gnosis official Safes"
+    title = "Official Safes"
     parameter_name = "official_safes"
 
     def lookups(self, request, model_admin):
