@@ -359,8 +359,8 @@ class TestCommands(TestCase):
             last_proxy_factory.tx_block_number, last_proxy_factory_initial_block
         )
 
-        # At May 2023 we support 9 Master Copies, 2 L2 Master Copies and 5 Proxy Factories
-        self.assertEqual(SafeMasterCopy.objects.count(), 9)
+        # At May 2023 we support 10 Master Copies, 2 L2 Master Copies and 5 Proxy Factories
+        self.assertEqual(SafeMasterCopy.objects.count(), 10)
         self.assertEqual(SafeMasterCopy.objects.l2().count(), 2)
         self.assertEqual(ProxyFactory.objects.count(), 5)
 
