@@ -3321,6 +3321,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.data, {"safe_tx_gas": str(estimate_tx_gas_mock.return_value)}
         )
+        with mock.patch(
+            "safe_transaction_service.history.views.settings.ETH_L2_NETWORK",
+            return_value=True,
+        ):
+            response = self.client.post(
+                reverse(
+                    "v1:history:multisig-transaction-estimate", args=(safe_address,)
+                ),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data, {"safe_tx_gas": "0"})
 
         estimate_tx_gas_mock.side_effect = CannotEstimateGas
         response = self.client.post(
