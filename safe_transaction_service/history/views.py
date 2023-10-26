@@ -1321,6 +1321,12 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
         if not SafeContract.objects.filter(address=address).exists():
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        # This endpoint is only needed for Safes < 1.3.0, so it should be disabled for L2 chains as they
+        # don't support Safes below that version
+        if settings.ETH_L2_NETWORK:
+            response_serializer = self.response_serializer(data={"safe_tx_gas": 0})
+            return Response(status=status.HTTP_200_OK, data=response_serializer.data)
+
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             try:
