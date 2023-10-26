@@ -1325,6 +1325,7 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
         # don't support Safes below that version
         if settings.ETH_L2_NETWORK:
             response_serializer = self.response_serializer(data={"safe_tx_gas": 0})
+            response_serializer.is_valid()
             return Response(status=status.HTTP_200_OK, data=response_serializer.data)
 
         serializer = self.get_serializer(data=request.data)
