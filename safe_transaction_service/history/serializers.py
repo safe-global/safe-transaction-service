@@ -260,9 +260,15 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         if self.validated_data["sender"] in self.validated_data["safe_owners"]:
             proposer = self.validated_data["sender"]
         else:
-            proposer = SafeContractDelegate.objects.get(
-                delegate=self.validated_data["sender"]
-            ).delegator
+            proposer = (
+                SafeContractDelegate.objects.get_for_safe_and_delegate(
+                    self.validated_data["safe"],
+                    self.validated_data["safe_owners"],
+                    self.validated_data["sender"],
+                )
+                .first()
+                .delegator
+            )
 
         multisig_transaction, created = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,

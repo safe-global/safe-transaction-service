@@ -1677,11 +1677,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
 
-        # Add delegate
-        SafeContractDelegateFactory(
+        # Add delegates (to check there's no issue with delegating twice to the same account)
+        safe_contract_delegate = SafeContractDelegateFactory(
             safe_contract__address=safe_address,
             delegate=safe_delegate.address,
             delegator=safe_owners[0].address,
+        )
+        SafeContractDelegateFactory(
+            safe_contract=safe_contract_delegate.safe_contract,
+            delegate=safe_delegate.address,
+            delegator=safe_owners[1].address,
         )
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
@@ -1967,9 +1972,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
+        queryset = SafeContractDelegate.objects.get_for_safe(
+            safe_address, [delegator.address]
+        )
+        self.assertEqual(len(queryset), 2)
         self.assertCountEqual(
-            SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
-            [delegate.address],
+            set(safe_contract_delegate.delegate for safe_contract_delegate in queryset),
+            {delegate.address},
         )
 
     def test_delegates_get(self):
