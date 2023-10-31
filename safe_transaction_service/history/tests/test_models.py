@@ -1000,11 +1000,11 @@ class TestSafeStatus(TestCase):
         self.assertEqual(safe_status_5.previous(), safe_status_2)
 
 
-class TestSafeContract(TestCase):
-    def test_get_delegates_for_safe(self):
+class TestSafeContractDelegate(TestCase):
+    def test_get_for_safe(self):
         random_safe = Account.create().address
-        self.assertEqual(
-            SafeContractDelegate.objects.get_delegates_for_safe(random_safe), set()
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(random_safe, []), []
         )
 
         safe_contract_delegate = SafeContractDelegateFactory()
@@ -1013,15 +1013,58 @@ class TestSafeContract(TestCase):
         )
         safe_contract_delegate_another_safe = SafeContractDelegateFactory()
         safe_address = safe_contract_delegate.safe_contract.address
+
         self.assertCountEqual(
-            SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
-            [safe_contract_delegate.delegate, safe_contract_delegate_2.delegate],
+            SafeContractDelegate.objects.get_for_safe(
+                safe_address,
+                [safe_contract_delegate.delegator, safe_contract_delegate_2.delegator],
+            ),
+            [safe_contract_delegate, safe_contract_delegate_2],
         )
 
         another_safe_address = safe_contract_delegate_another_safe.safe_contract.address
+        # Use a Safe with an owner not matching
         self.assertCountEqual(
-            SafeContractDelegate.objects.get_delegates_for_safe(another_safe_address),
-            [safe_contract_delegate_another_safe.delegate],
+            SafeContractDelegate.objects.get_for_safe(
+                another_safe_address, [safe_contract_delegate.delegator]
+            ),
+            [],
+        )
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(
+                another_safe_address, [safe_contract_delegate_another_safe.delegator]
+            ),
+            [safe_contract_delegate_another_safe],
+        )
+
+        # Create delegate without Safe
+        safe_contract_delegate_without_safe = SafeContractDelegateFactory(
+            safe_contract=None
+        )
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(
+                safe_address,
+                [
+                    safe_contract_delegate.delegator,
+                    safe_contract_delegate_2.delegator,
+                    safe_contract_delegate_without_safe.delegator,
+                ],
+            ),
+            [
+                safe_contract_delegate,
+                safe_contract_delegate_2,
+                safe_contract_delegate_without_safe,
+            ],
+        )
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(
+                another_safe_address,
+                [
+                    safe_contract_delegate_another_safe.delegator,
+                    safe_contract_delegate_without_safe.delegator,
+                ],
+            ),
+            [safe_contract_delegate_another_safe, safe_contract_delegate_without_safe],
         )
 
     def test_get_delegates_for_safe_and_owners(self):
