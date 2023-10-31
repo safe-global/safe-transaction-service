@@ -40,6 +40,12 @@ class Command(BaseCommand):
             help="Number of blocks to query each time if reindexing",
             default=100,
         )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            help="Size of batch requests",
+            default=1000,
+        )
 
     def get_nonce_fn(self, ethereum_client: EthereumClient):
         return get_safe_V1_3_0_contract(
@@ -51,23 +57,23 @@ class Command(BaseCommand):
         reindex = not options["dont_reindex"]
         force_batch_call = options["force_batch_call"]
         block_process_limit = options["block_process_limit"]
-
+        batch_size = options["batch_size"]
         queryset = SafeLastStatus.objects.all()
         if settings.ETH_L2_NETWORK:
             # Filter nonce=0 to exclude not initialized or non L2 Safes in a L2 network
             queryset = queryset.exclude(nonce=0)
 
         count = queryset.count()
-        batch = 1000
+
         index_service = IndexServiceProvider()
         ethereum_client = index_service.ethereum_client
         nonce_fn = self.get_nonce_fn(ethereum_client)
         first_issue_block_number = ethereum_client.current_block_number
         all_problematic_addresses = set()
 
-        for i in range(0, count, batch):
+        for i in range(0, count, batch_size):
             self.stdout.write(self.style.SUCCESS(f"Processed {i}/{count}"))
-            safe_statuses = queryset[i : i + batch]
+            safe_statuses = queryset[i : i + batch_size]
             safe_statuses_list = list(safe_statuses)  # Force retrieve queryset from DB
 
             blockchain_nonces = ethereum_client.batch_call_same_function(
