@@ -413,7 +413,7 @@ class IndexService:
                 else current_block_number
             )
             for block_number in range(
-                from_block_number, stop_block_number, block_process_limit
+                from_block_number, stop_block_number + 1, block_process_limit
             ):
                 elements = indexer.find_relevant_elements(
                     addresses,
