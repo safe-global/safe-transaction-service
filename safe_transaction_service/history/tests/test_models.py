@@ -1110,7 +1110,7 @@ class TestSafeContractDelegate(TestCase):
             [],
         )
 
-        # If Safe is not set, delegate is valid for any Safe
+        # If Safe is not set, delegate is valid for any Safe which delegator is an owner
         safe_contract_delegate_2.safe_contract = None
         safe_contract_delegate_2.save()
         self.assertCountEqual(
