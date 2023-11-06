@@ -1761,8 +1761,8 @@ class SafeContractDelegate(models.Model):
         null=True,
         default=None,
     )  # If safe_contract is not defined, delegate is valid for every Safe which delegator is an owner
-    delegate = EthereumAddressV2Field()
-    delegator = EthereumAddressV2Field()  # Owner who created the delegate
+    delegate = EthereumAddressV2Field(db_index=True)
+    delegator = EthereumAddressV2Field(db_index=True)  # Owner who created the delegate
     label = models.CharField(max_length=50)
     read = models.BooleanField(default=True)  # For permissions in the future
     write = models.BooleanField(default=True)
