@@ -25,6 +25,7 @@ class HasLogoFilterAdmin(admin.SimpleListFilter):
             return queryset
 
 
+# TODO Use the class in safe-eth-py
 class AdvancedAdminSearchMixin:
     """
     Use database indexes when using exact search instead
@@ -39,9 +40,6 @@ class AdvancedAdminSearchMixin:
         This function was modified from Django original get_search_results
         to allow `exact` search that uses database indexes
         """
-
-        # Apply keyword searches.
-        print("HOLA")
 
         def construct_search(field_name):
             if field_name.startswith("^"):
