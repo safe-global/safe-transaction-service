@@ -3,6 +3,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters.rest_framework
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -61,6 +62,10 @@ class TokenPriceView(RetrieveAPIView):
     lookup_field = "address"
     queryset = Token.objects.all()
 
+    @swagger_auto_schema(
+        deprecated=True,
+        operation_description="Price service will be removed at 30/11/2024",
+    )
     @method_decorator(cache_page(60 * 10))  # Cache 10 minutes
     def get(self, request, *args, **kwargs):
         address = self.kwargs["address"]
