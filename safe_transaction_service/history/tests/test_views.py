@@ -31,7 +31,6 @@ from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
 from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ...utils.redis import get_redis
@@ -1796,23 +1795,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
     @mock.patch.object(BalanceService, "get_token_info", autospec=True)
-    @mock.patch.object(
-        PriceService, "get_token_eth_value", return_value=0.4, autospec=True
-    )
-    @mock.patch.object(
-        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
-    )
     @mock.patch.object(timezone, "now", return_value=timezone.now())
     def test_safe_balances_usd_view(
         self,
         timezone_now_mock: MagicMock,
-        get_native_coin_usd_price_mock: MagicMock,
-        get_token_eth_value_mock: MagicMock,
         get_token_info_mock: MagicMock,
     ):
-        timestamp_str = timezone_now_mock.return_value.isoformat().replace(
-            "+00:00", "Z"
-        )
+        timestamp_str = "1970-01-01T00:00:00Z"
         safe_address = Account.create().address
         response = self.client.get(
             reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
@@ -1829,7 +1818,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertIsNone(response.data[0]["token_address"])
         self.assertEqual(response.data[0]["balance"], str(value))
-        self.assertEqual(response.data[0]["eth_value"], "1.0")
+        self.assertEqual(response.data[0]["eth_value"], "0.0")
 
         tokens_value = int(12 * 1e18)
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
@@ -1859,20 +1848,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "token_address": None,
                     "token": None,
                     "balance": str(value),
-                    "eth_value": "1.0",
+                    "eth_value": "0.0",
                     "timestamp": timestamp_str,
                     "fiat_balance": "0.0",
-                    "fiat_conversion": "123.4",
+                    "fiat_conversion": "0.0",
                     "fiat_code": "USD",
                 },  # 7 wei is rounded to 0.0
                 {
                     "token_address": erc20.address,
                     "token": token_dict,
                     "balance": str(tokens_value),
-                    "eth_value": "0.4",
+                    "eth_value": "0.0",
                     "timestamp": timestamp_str,
-                    "fiat_balance": str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
-                    "fiat_conversion": str(round(123.4 * 0.4, 4)),
+                    "fiat_balance": "0.0",
+                    "fiat_conversion": "0.0",
                     "fiat_code": "USD",
                 },
             ],
