@@ -64,7 +64,7 @@ class TokenPriceView(RetrieveAPIView):
 
     @swagger_auto_schema(
         deprecated=True,
-        operation_description="Price service will be removed at 30/11/2024",
+        operation_description="Eth/token pricing features will be removed at 30/11/2024",
     )
     @method_decorator(cache_page(60 * 10))  # Cache 10 minutes
     def get(self, request, *args, **kwargs):
