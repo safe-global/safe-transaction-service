@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, OrderedDict, Sequence
 from django.conf import settings
 
 import gevent
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from gevent import pool
@@ -223,7 +224,7 @@ class EventsIndexer(EthereumIndexer):
             # One topic can have multiple matching ABIs due to `indexed` elements changing how to decode it
             try:
                 return event_to_listen.process_log(log_receipt)
-            except LogTopicError:
+            except (LogTopicError, DecodingError):
                 continue
 
         logger.error(
