@@ -98,10 +98,3 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                 }
             ],
         )
-
-    def test_token_price_view(self):
-        random_address = Account.create().address
-        response = self.client.get(
-            reverse("v1:tokens:price-usd", args=(random_address,))
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

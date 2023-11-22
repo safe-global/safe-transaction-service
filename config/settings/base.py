@@ -496,10 +496,6 @@ TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
     "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
 )  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
 
-TOKEN_ETH_PRICE_TTL = env.int(
-    "TOKEN_ETH_PRICE_TTL", default=60 * 30  # 30 minutes
-)  # Expiration time for token eth price
-
 # Notifications
 # ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
