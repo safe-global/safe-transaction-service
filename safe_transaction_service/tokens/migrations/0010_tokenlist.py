@@ -38,7 +38,6 @@ def add_default_token_lists(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tokens", "0009_token_token_spam_idx"),
     ]

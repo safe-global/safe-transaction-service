@@ -19,7 +19,6 @@ def add_trusted_contracts(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0006_contractabi_abi_hash"),
     ]

@@ -7,7 +7,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0049_block_number_internaltx_20211129_1111"),
     ]

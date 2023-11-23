@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0042_safestatus_history_saf_address_1c362b_idx"),
     ]

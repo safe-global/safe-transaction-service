@@ -42,7 +42,6 @@ def migrate_back_l2_master_copies(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0040_auto_20210607_1007"),
     ]

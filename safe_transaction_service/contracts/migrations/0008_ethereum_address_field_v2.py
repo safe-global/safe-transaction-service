@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0007_contract_trusted_for_delegate_call"),
     ]

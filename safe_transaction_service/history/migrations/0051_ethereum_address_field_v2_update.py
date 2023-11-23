@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0050_ethereum_address_field_v2_20211201_1507"),
     ]

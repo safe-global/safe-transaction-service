@@ -196,7 +196,6 @@ class IndexService:
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
     ) -> List["EthereumTx"]:
-
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(

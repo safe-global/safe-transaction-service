@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0052_keccak256_field_20211209_1628"),
     ]

@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0074_internaltx_history_internal_transfer_idx"),
     ]

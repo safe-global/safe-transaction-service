@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0004_alter_firebasedeviceowner_id"),
     ]

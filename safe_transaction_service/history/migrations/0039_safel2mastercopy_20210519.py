@@ -9,7 +9,6 @@ import safe_transaction_service.history.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0038_safestatus_guard"),
     ]

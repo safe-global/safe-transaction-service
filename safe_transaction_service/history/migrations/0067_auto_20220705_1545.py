@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0066_auto_20220628_1125"),
     ]

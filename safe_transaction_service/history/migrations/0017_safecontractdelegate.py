@@ -7,7 +7,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0016_multisigconfirmation_signature_type"),
     ]

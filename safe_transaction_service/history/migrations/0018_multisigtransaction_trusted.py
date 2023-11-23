@@ -9,7 +9,6 @@ def set_confirmed_txs_trusted(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0017_safecontractdelegate"),
     ]

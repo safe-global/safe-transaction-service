@@ -9,7 +9,6 @@ import safe_transaction_service.contracts.models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []
