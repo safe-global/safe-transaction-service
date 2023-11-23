@@ -24,7 +24,6 @@ def fix_token_decimals(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tokens", "0001_initial"),
     ]

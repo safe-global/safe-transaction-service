@@ -8,7 +8,6 @@ import safe_transaction_service.contracts.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0009_alter_contractabi_abi_hash"),
     ]

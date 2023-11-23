@@ -7,7 +7,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0002_auto_20200806_1534"),
     ]

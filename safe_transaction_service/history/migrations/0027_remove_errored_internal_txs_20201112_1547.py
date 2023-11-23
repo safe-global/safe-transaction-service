@@ -35,7 +35,6 @@ def delete_errored_internal_txs(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0026_auto_20201030_1355"),
     ]

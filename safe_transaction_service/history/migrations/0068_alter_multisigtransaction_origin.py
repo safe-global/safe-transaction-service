@@ -30,13 +30,12 @@ def repair_backward_migration(apps, schema_editor):
     transactions = MultisigTransaction.objects.filter(origin__isnull=False).iterator()
     for transaction in transactions:
         value = json.loads(transaction.origin)
-        if type(value) == str:
+        if isinstance(value, str):
             transaction.origin = value
             transaction.save()
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0067_auto_20220705_1545"),
     ]

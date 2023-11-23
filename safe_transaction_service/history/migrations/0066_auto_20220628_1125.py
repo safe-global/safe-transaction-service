@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0065_safelaststatus_history_saf_enabled_020fea_gin"),
     ]

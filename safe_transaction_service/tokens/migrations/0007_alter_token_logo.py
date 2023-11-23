@@ -8,7 +8,6 @@ import safe_transaction_service.tokens.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tokens", "0006_auto_20220214_1629"),
     ]

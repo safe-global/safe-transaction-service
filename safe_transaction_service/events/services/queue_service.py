@@ -93,7 +93,6 @@ class QueueService:
 
 
 class AsyncQueueService(QueueService):
-
     # Singleton class definition
     def __init__(self):
         super().__init__()
