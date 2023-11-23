@@ -11,7 +11,6 @@ from safe_transaction_service.history.services import (
 )
 
 from .models import Token
-from .services import PriceServiceProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +33,3 @@ def clear_cache(sender: Type[Model], instance: Token, created: bool, **kwargs) -
 
         collectibles_service = CollectiblesServiceProvider()
         collectibles_service.cache_token_info.clear()
-
-        price_service = PriceServiceProvider()
-        price_service.cache_token_eth_value.clear()
-        price_service.cache_token_info.clear()
-        price_service.cache_token_usd_value.clear()
-        price_service.cache_underlying_token.clear()

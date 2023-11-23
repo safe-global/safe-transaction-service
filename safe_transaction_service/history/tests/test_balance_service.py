@@ -1,18 +1,13 @@
-from typing import Optional
-from unittest import mock
-from unittest.mock import MagicMock
+import datetime
 
 from django.test import TestCase
-from django.utils import timezone
 
 from eth_account import Account
-from eth_typing import ChecksumAddress
 
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.utils import deploy_erc20
 
 from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ..services import BalanceServiceProvider
@@ -41,18 +36,8 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(token_info.symbol, token_db.symbol)
         self.assertEqual(token_info.decimals, token_db.decimals)
 
-    @mock.patch.object(
-        PriceService, "get_token_eth_value", return_value=0.4, autospec=True
-    )
-    @mock.patch.object(
-        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
-    )
-    @mock.patch.object(timezone, "now", return_value=timezone.now())
     def test_get_usd_balances(
         self,
-        timezone_now_mock: MagicMock,
-        get_native_coin_usd_price_mock: MagicMock,
-        get_token_eth_value_mock: MagicMock,
     ):
         balance_service = self.balance_service
 
@@ -85,16 +70,22 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
             balances,
             [
                 BalanceWithFiat(
-                    None, None, value, 1.0, timezone_now_mock.return_value, 0.0, 123.4
+                    None,
+                    None,
+                    value,
+                    0.0,
+                    datetime.datetime.utcfromtimestamp(0),
+                    0.0,
+                    0.0,
                 ),
                 BalanceWithFiat(
                     erc20.address,
                     token_info,
                     tokens_value,
-                    0.4,
-                    timezone_now_mock.return_value,
-                    round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                    round(123.4 * 0.4, 4),
+                    0.0,
+                    datetime.datetime.utcfromtimestamp(0),
+                    0.0,
+                    0.0,
                 ),
             ],
         )
@@ -104,7 +95,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
             balances,
             [
                 BalanceWithFiat(
-                    None, None, value, 1.0, timezone_now_mock.return_value, 0.0, 123.4
+                    None, None, value, 0.0, datetime.datetime.utcfromtimestamp(0), 0, 0
                 ),
             ],
         )
@@ -115,16 +106,16 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
             balances,
             [
                 BalanceWithFiat(
-                    None, None, value, 1.0, timezone_now_mock.return_value, 0.0, 123.4
+                    None, None, value, 0.0, datetime.datetime.utcfromtimestamp(0), 0, 0
                 ),
                 BalanceWithFiat(
                     erc20.address,
                     token_info,
                     tokens_value,
-                    0.4,
-                    timezone_now_mock.return_value,
-                    round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                    round(123.4 * 0.4, 4),
+                    0,
+                    datetime.datetime.utcfromtimestamp(0),
+                    0,
+                    0,
                 ),
             ],
         )
@@ -167,57 +158,46 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
                                 None,
                                 None,
                                 value,
-                                1.0,
-                                timezone_now_mock.return_value,
                                 0.0,
-                                123.4,
+                                datetime.datetime.utcfromtimestamp(0),
+                                0.0,
+                                0.0,
                             ),
                             BalanceWithFiat(
                                 erc20_3.address,
                                 token_info_3,
                                 tokens_value,
-                                0.4,
-                                timezone_now_mock.return_value,
-                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                                round(123.4 * 0.4, 4),
+                                0.0,
+                                datetime.datetime.utcfromtimestamp(0),
+                                0.0,
+                                0.0,
                             ),
                             BalanceWithFiat(
                                 erc20.address,
                                 token_info,
                                 tokens_value,
-                                0.4,
-                                timezone_now_mock.return_value,
-                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                                round(123.4 * 0.4, 4),
+                                0.0,
+                                datetime.datetime.utcfromtimestamp(0),
+                                0.0,
+                                0.0,
                             ),
                             BalanceWithFiat(
                                 erc20_2.address,
                                 token_info_2,
                                 tokens_value,
-                                0.4,
-                                timezone_now_mock.return_value,
-                                round(123.4 * 0.4 * (tokens_value / 1e18), 4),
-                                round(123.4 * 0.4, 4),
+                                0.0,
+                                datetime.datetime.utcfromtimestamp(0),
+                                0.0,
+                                0.0,
                             ),
                         ],
                     )
 
-    @mock.patch.object(
-        PriceService, "get_token_eth_value", return_value=0.4, autospec=True
-    )
-    @mock.patch.object(
-        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
-    )
-    @mock.patch.object(timezone, "now", return_value=timezone.now())
-    def test_get_usd_balances_copy_price(
-        self,
-        timezone_now_mock: MagicMock,
-        get_native_coin_usd_price_mock: MagicMock,
-        get_token_eth_value_mock: MagicMock,
-    ):
+    def test_get_usd_balances_copy_price(self):
         balance_service = self.balance_service
         safe_address = SafeContractFactory().address
         random_address = Account.create().address
+        timestamp_str = "1970-01-01T00:00:00Z"
 
         balances = balance_service.get_usd_balances(safe_address)
         self.assertEqual(len(balances), 1)
@@ -235,16 +215,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         )
         ERC20TransferFactory(address=erc20.address, to=safe_address)
 
-        def get_token_eth_value(
-            self, token_address: ChecksumAddress
-        ) -> Optional[float]:
-            if token_address == erc20.address:
-                return 0.4
-            elif token_address == random_address:
-                return 0.1
-
-        get_token_eth_value_mock.side_effect = get_token_eth_value
-        for expected_token_eth_value in (0.4, 0.1):
+        for expected_token_eth_value in (0, 0):
             with self.subTest(expected_token_eth_value=expected_token_eth_value):
                 balances = balance_service.get_usd_balances(safe_address)
                 self.assertEqual(len(balances), 2)
@@ -255,24 +226,19 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
                             None,
                             None,
                             0,
-                            1.0,
-                            timezone_now_mock.return_value,
+                            expected_token_eth_value,
+                            datetime.datetime.utcfromtimestamp(0),
                             0.0,
-                            123.4,
+                            0.0,
                         ),
                         BalanceWithFiat(
                             erc20.address,
                             balance_service.get_token_info(erc20.address),
                             tokens_value,
                             expected_token_eth_value,
-                            timezone_now_mock.return_value,
-                            round(
-                                123.4
-                                * expected_token_eth_value
-                                * (tokens_value / 1e18),
-                                4,
-                            ),
-                            round(123.4 * expected_token_eth_value, 4),
+                            datetime.datetime.utcfromtimestamp(0),
+                            0.0,
+                            0.0,
                         ),
                     ],
                 )
