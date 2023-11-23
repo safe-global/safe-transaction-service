@@ -27,9 +27,6 @@ fi
 echo "==> $(date +%H:%M:%S) ==> Check RPC connected matches previously used RPC... "
 python manage.py check_chainid_matches
 
-# Run Celery as root
-export C_FORCE_ROOT=true
-
 echo "==> $(date +%H:%M:%S) ==> Running Celery worker with a max_memory_per_child of ${MAX_MEMORY_PER_CHILD} <=="
 exec celery -C -A config.celery_app worker \
      --loglevel $log_level --pool=gevent \

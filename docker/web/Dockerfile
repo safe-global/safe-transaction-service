@@ -27,5 +27,13 @@ RUN set -ex \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
         -exec rm -rf '{}' +
 
-COPY . .
+# /nginx mount point must be created before so it doesn't have root permissions
+# ${APP_HOME} root folder will not be updated by COPY --chown, so permissions need to be adjusted
+RUN groupadd python && \
+    useradd -r -g python python && \
+    mkdir -p /nginx && \
+    chown -R python:python /nginx ${APP_HOME}
+COPY --chown=python:python . .
+USER python
+
 RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput
