@@ -20,11 +20,13 @@ RUN set -ex && \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
         -exec rm -rf '{}' +
 
-RUN addgroup -S python && \
-    adduser -S python python && \
+RUN addgroup -g 999 -S python && \
+    adduser -u 999 -S python python && \
     mkdir -p /nginx && \
     chown -R python:python /nginx ${APP_HOME}
 COPY --chown=python:python . .
-USER python
+
+# Use numeric ids so kubernetes identifies the user correctly
+USER 999:999
 
 RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput
