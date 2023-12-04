@@ -313,6 +313,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "symbol": token.symbol,
                 "decimals": token.decimals,
                 "logo_uri": token.get_full_logo_uri(),
+                "trusted": token.trusted,
             },
         )
         transfers_not_empty = [
@@ -2325,6 +2326,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         "symbol": token.symbol,
                         "decimals": token.decimals,
                         "logoUri": token.get_full_logo_uri(),
+                        "trusted": token.trusted,
                     },
                 },
                 {
@@ -2400,6 +2402,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         "symbol": token.symbol,
                         "decimals": token.decimals,
                         "logoUri": token.get_full_logo_uri(),
+                        "trusted": token.trusted,
                     },
                 },
                 {
@@ -2569,6 +2572,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "symbol": token.symbol,
                     "decimals": token.decimals,
                     "logoUri": token.get_full_logo_uri(),
+                    "trusted": token.trusted,
                 },
             },
             {
@@ -2856,6 +2860,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "symbol": token.symbol,
                 "decimals": token.decimals,
                 "logoUri": token.get_full_logo_uri(),
+                "trusted": token.trusted,
             },
         }
         self.assertEqual(response.json(), expected_result)

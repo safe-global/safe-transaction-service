@@ -44,6 +44,7 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                 "name": token.name,
                 "symbol": token.symbol,
                 "decimals": token.decimals,
+                "trusted": token.trusted,
             },
         )
 
@@ -59,6 +60,7 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                 "name": token.name,
                 "symbol": token.symbol,
                 "decimals": token.decimals,
+                "trusted": token.trusted,
             },
         )
 
@@ -95,6 +97,7 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
                     "name": token.name,
                     "symbol": token.symbol,
                     "decimals": token.decimals,
+                    "trusted": token.trusted,
                 }
             ],
         )
