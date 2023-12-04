@@ -20,6 +20,7 @@ class TokenInfoResponseSerializer(serializers.Serializer):
     symbol = serializers.CharField()
     decimals = serializers.IntegerField()
     logo_uri = serializers.SerializerMethodField()
+    trusted = serializers.BooleanField()
 
     def get_type(self, obj: Token) -> str:
         if obj.is_erc20():
