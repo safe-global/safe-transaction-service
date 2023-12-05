@@ -2,7 +2,6 @@ import datetime
 from enum import Enum
 from itertools import chain
 
-from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from celery import app
@@ -128,17 +127,16 @@ def create_or_update_contract_with_metadata_task(
     logger.info("Searching metadata for contract %s", address)
     ethereum_network = get_ethereum_network()
     try:
-        with transaction.atomic():
-            contract = Contract.objects.create_from_address(
-                address, network=ethereum_network
-            )
-            action = ContractAction.CREATED
-    except IntegrityError:
         contract = Contract.objects.get(address=address)
         if contract.sync_abi_from_api():
             action = ContractAction.UPDATED
         else:
             action = ContractAction.NOT_MODIFIED
+    except Contract.DoesNotExist:
+        contract = Contract.objects.create_from_address(
+            address, network=ethereum_network
+        )
+        action = ContractAction.CREATED
 
     logger.info(
         "%s contract with address=%s name=%s abi-found=%s",
