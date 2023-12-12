@@ -14,15 +14,16 @@ from gnosis.eth.clients import (
     BlockscoutClient,
     ContractMetadata,
     EtherscanClient,
-    Sourcify,
+    SourcifyClient,
 )
-from gnosis.eth.ethereum_client import EthereumNetwork
+from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
 from gnosis.eth.tests.clients.mocks import (
     etherscan_source_code_mock,
     sourcify_safe_metadata,
 )
 
 from ..models import Contract, ContractAbi, validate_abi
+from ..services.contract_metadata_service import get_contract_metadata_service
 from .factories import ContractAbiFactory, ContractFactory
 
 
@@ -57,7 +58,13 @@ class TestContractAbi(TestCase):
 
 class TestContract(TestCase):
     @mock.patch.object(
-        Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
+        SourcifyClient, "is_chain_supported", autospec=True, return_value=True
+    )
+    @mock.patch.object(
+        SourcifyClient,
+        "_do_request",
+        autospec=True,
+        return_value=sourcify_safe_metadata,
     )
     @mock.patch.object(
         EtherscanClient,
@@ -65,13 +72,26 @@ class TestContract(TestCase):
         autospec=True,
         return_value=etherscan_source_code_mock,
     )
-    def test_contract_create_from_address(
-        self, etherscan_request_mock: MagicMock, sourcify_request_mock: MagicMock
+    def test_contract_create_from_metadata(
+        self,
+        etherscan_request_mock: MagicMock,
+        sourcify_request_mock: MagicMock,
+        sourcify_is_chain_supported: MagicMock,
     ):
+        get_contract_metadata_service.cache_clear()
+        with mock.patch.object(
+            EthereumClient, "get_network", return_value=EthereumNetwork.MAINNET
+        ):
+            contract_metadata_service = get_contract_metadata_service()
+        get_contract_metadata_service.cache_clear()
+
         safe_contract_address = "0x6851D6fDFAfD08c0295C392436245E5bc78B0185"
+        contract_metadata = contract_metadata_service.get_contract_metadata(
+            safe_contract_address
+        )
         network = EthereumNetwork.MAINNET
-        contract = Contract.objects.create_from_address(
-            safe_contract_address, network=network
+        contract = Contract.objects.create_from_metadata(
+            safe_contract_address, contract_metadata
         )
         self.assertEqual(contract.name, "GnosisSafe")
         self.assertTrue(contract.contract_abi.abi)
@@ -79,31 +99,38 @@ class TestContract(TestCase):
 
         with self.assertRaises(IntegrityError):
             with atomic():
-                Contract.objects.create_from_address(
-                    safe_contract_address, network=network
+                Contract.objects.create_from_metadata(
+                    safe_contract_address, contract_metadata
                 )
 
-        sourcify_request_mock.return_value = None
-
         # Use etherscan API
+        sourcify_request_mock.return_value = None
+        contract_metadata = contract_metadata_service.get_contract_metadata(
+            safe_contract_address
+        )
+
         with self.assertRaises(IntegrityError):
             with atomic():
-                Contract.objects.create_from_address(
-                    safe_contract_address, network=network
+                Contract.objects.create_from_metadata(
+                    safe_contract_address, contract_metadata
                 )
 
         contract.delete()
-        contract = Contract.objects.create_from_address(
-            safe_contract_address, network=network
+        contract = Contract.objects.create_from_metadata(
+            safe_contract_address, contract_metadata
         )
         self.assertEqual(contract.name, "GnosisSafe")
         self.assertTrue(contract.contract_abi.abi)
         self.assertEqual(len(contract.contract_abi.abi_functions()), 31)
 
         etherscan_request_mock.return_value = None
+        contract_metadata = contract_metadata_service.get_contract_metadata(
+            safe_contract_address
+        )
+        self.assertIsNone(contract_metadata)
         new_safe_contract_address = Account.create().address
-        contract_without_metadata = Contract.objects.create_from_address(
-            new_safe_contract_address, network=network
+        contract_without_metadata = Contract.objects.create_from_metadata(
+            new_safe_contract_address, contract_metadata
         )
         self.assertEqual(contract_without_metadata.name, "")
         self.assertIsNone(contract_without_metadata.contract_abi)
@@ -133,10 +160,14 @@ class TestContract(TestCase):
     @mock.patch.object(
         BlockscoutClient, "get_contract_metadata", autospec=True, side_effect=IOError
     )
-    @mock.patch.object(Sourcify, "get_contract_metadata", autospec=True)
-    def test_sync_abi_from_api(
+    @mock.patch.object(
+        SourcifyClient, "is_chain_supported", autospec=True, return_value=True
+    )
+    @mock.patch.object(SourcifyClient, "get_contract_metadata", autospec=True)
+    def test_update_from_metadata(
         self,
         sourcify_get_contract_metadata_mock: MagicMock,
+        sourcify_is_chain_supported: MagicMock,
         blockscout_client_mock: MagicMock,
         etherscan_get_contract_abi_mock: MagicMock,
     ):
@@ -187,11 +218,11 @@ class TestContract(TestCase):
         network = EthereumNetwork.MAINNET
         self.assertIsNone(contract.contract_abi)
         self.assertEqual(ContractAbi.objects.count(), 0)
-        self.assertTrue(contract.sync_abi_from_api(network=network))
+        self.assertTrue(contract.update_from_metadata(network=network))
         # Remove contract_abi description and sync again to check that's filled
         contract.contract_abi.description = ""
         contract.contract_abi.save()
-        self.assertTrue(contract.sync_abi_from_api(network=network))
+        self.assertTrue(contract.update_from_metadata(network=network))
         self.assertIsNotNone(contract.contract_abi)
         self.assertEqual(contract.name, contract_name)
         contract_abi = contract.contract_abi
@@ -205,7 +236,7 @@ class TestContract(TestCase):
         sourcify_get_contract_metadata_mock.side_effect = (
             IOError  # Now etherscan should be used
         )
-        self.assertTrue(contract.sync_abi_from_api(network=network))
+        self.assertTrue(contract.update_from_metadata(network=network))
         self.assertEqual(ContractAbi.objects.count(), 2)  # A new ABI was inserted
         self.assertNotEqual(
             contract.contract_abi, contract_abi
@@ -217,7 +248,7 @@ class TestContract(TestCase):
         )  # Description should not change
 
         etherscan_get_contract_abi_mock.side_effect = IOError
-        self.assertFalse(contract.sync_abi_from_api(network=network))
+        self.assertFalse(contract.update_from_metadata(network=network))
 
     def test_without_metadata(self):
         ContractFactory(name="aloha", contract_abi=None)

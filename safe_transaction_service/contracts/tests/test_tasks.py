@@ -7,7 +7,7 @@ from django.utils import timezone
 from eth_account import Account
 from hexbytes import HexBytes
 
-from gnosis.eth.clients import Sourcify
+from gnosis.eth.clients import SourcifyClient
 from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
 
 from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
@@ -39,12 +39,15 @@ class TestTasks(TestCase):
         self.assertEqual(create_missing_contracts_with_metadata_task.delay().result, 0)
 
         with mock.patch.object(
-            Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
+            SourcifyClient,
+            "_do_request",
+            autospec=True,
+            return_value=sourcify_safe_metadata,
         ):
             multisig_tx = MultisigTransactionFactory(
                 to=Account.create().address, data=b"12", trusted=True
             )
-            contract_metadata = Sourcify().get_contract_metadata(multisig_tx.to)
+            contract_metadata = SourcifyClient().get_contract_metadata(multisig_tx.to)
             self.assertEqual(
                 create_missing_contracts_with_metadata_task.delay().result, 1
             )
@@ -126,7 +129,10 @@ class TestTasks(TestCase):
 
     def test_create_or_update_contract_with_metadata_task(self):
         with mock.patch.object(
-            Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
+            SourcifyClient,
+            "_do_request",
+            autospec=True,
+            return_value=sourcify_safe_metadata,
         ) as sourcify_mock:
             random_address = Account.create().address
 
