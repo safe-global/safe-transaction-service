@@ -186,6 +186,8 @@ class Contract(models.Model):  # Known contract addresses by the service
         :param contract_metadata: Contract Metadata
         :return: True if updated, False otherwise
         """
+        if not contract_metadata:
+            return False
 
         name = contract_metadata.name or ""
         contract_abi, _ = ContractAbi.objects.get_or_create(
