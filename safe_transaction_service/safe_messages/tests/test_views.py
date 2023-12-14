@@ -269,13 +269,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertDictEqual(
             response.data,
             {
-                "non_field_errors": [
+                "signature": [
                     ErrorDetail(
-                        string="1 owner signature was expected, 0 received",
-                        code="invalid",
+                        string="Ensure this field has at least 1 hexadecimal chars (not counting 0x).",
+                        code="min_length",
                     )
                 ]
             },
