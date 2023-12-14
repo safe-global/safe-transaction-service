@@ -17,15 +17,8 @@ from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
 from web3._utils.normalizers import normalize_abi
 
-from gnosis.eth.clients import (
-    BlockscoutClient,
-    BlockScoutConfigurationProblem,
-    EtherscanClient,
-    EtherscanClientConfigurationProblem,
-    Sourcify,
-)
+from gnosis.eth.clients import ContractMetadata
 from gnosis.eth.django.models import EthereumAddressV2Field, Keccak256Field
-from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 from gnosis.eth.utils import fast_keccak
 
 logger = getLogger(__name__)
@@ -97,18 +90,19 @@ class ContractAbi(models.Model):
 
 
 class ContractManager(models.Manager):
-    def create_from_address(
-        self, address: str, network: Optional[EthereumNetwork] = None
+    def create_from_metadata(
+        self, address: str, metadata: Optional[ContractMetadata]
     ) -> "Contract":
         """
-        Create contract and try to fetch information from APIs
+        Create contract from provided ``metadata``
 
         :param address:
-        :param network:
-        :return: Contract instance populated with all the information found
+        :param metadata:
+        :return: Contract instance populated with all the information provided by ``metadata``
         """
         contract = super().create(address=address)
-        contract.sync_abi_from_api(network=network)
+        if metadata:
+            contract.update_from_metadata(metadata)
         return contract
 
     def fix_missing_logos(self) -> int:
@@ -185,56 +179,27 @@ class Contract(models.Model):  # Known contract addresses by the service
         logo = " with logo" if self.logo else " without logo"
         return f"Contract {self.address} - {self.name} - with abi {has_abi}{logo}"
 
-    def sync_abi_from_api(self, network: Optional[EthereumNetwork] = None) -> bool:
+    def update_from_metadata(self, contract_metadata: ContractMetadata) -> bool:
         """
-        Sync ABI from Sourcify, then from Etherscan and Blockscout if available
+        Update contract metadata
 
-        :param network: Can be provided to save requests to the node
+        :param contract_metadata: Contract Metadata
         :return: True if updated, False otherwise
         """
-        ethereum_client = EthereumClientProvider()
-        network = network or ethereum_client.get_network()
-        sourcify = Sourcify(network)
+        if not contract_metadata:
+            return False
 
-        try:
-            etherscan_client = EtherscanClient(
-                network, api_key=settings.ETHERSCAN_API_KEY
-            )
-        except EtherscanClientConfigurationProblem:
-            logger.info(
-                "Etherscan client is not available for current network %s", network
-            )
-            etherscan_client = None
-
-        try:
-            blockscout_client = BlockscoutClient(network)
-        except BlockScoutConfigurationProblem:
-            logger.info(
-                "Blockscout client is not available for current network %s", network
-            )
-            blockscout_client = None
-
-        contract_abi: Optional[ContractAbi] = None
-        for client in (sourcify, etherscan_client, blockscout_client):
-            if not client:
-                continue
-            try:
-                contract_metadata = client.get_contract_metadata(self.address)
-                if contract_metadata:
-                    name = contract_metadata.name or ""
-                    contract_abi, _ = ContractAbi.objects.get_or_create(
-                        abi=contract_metadata.abi, defaults={"description": name}
-                    )
-                    if name:
-                        if not contract_abi.description:
-                            contract_abi.description = name
-                            contract_abi.save(update_fields=["description"])
-                        if not self.name:
-                            self.name = name
-                    self.contract_abi = contract_abi
-                    self.save(update_fields=["name", "contract_abi"])
-                    break
-            except IOError:
-                pass
+        name = contract_metadata.name or ""
+        contract_abi, _ = ContractAbi.objects.get_or_create(
+            abi=contract_metadata.abi, defaults={"description": name}
+        )
+        if name:
+            if not contract_abi.description:
+                contract_abi.description = name
+                contract_abi.save(update_fields=["description"])
+            if not self.name:
+                self.name = name
+        self.contract_abi = contract_abi
+        self.save(update_fields=["name", "contract_abi"])
 
         return bool(contract_abi)
