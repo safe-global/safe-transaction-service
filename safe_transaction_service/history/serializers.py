@@ -2,12 +2,15 @@ import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from django.http import Http404
+
 from drf_yasg.utils import swagger_serializer_method
 from eth_typing import ChecksumAddress, HexStr
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.django.models import EthereumAddressV2Field as EthereumAddressDbField
 from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
 from gnosis.eth.django.serializers import (
@@ -27,7 +30,7 @@ from safe_transaction_service.tokens.serializers import TokenInfoResponseSeriali
 from safe_transaction_service.utils.serializers import get_safe_owners, get_safe_version
 
 from .exceptions import NodeConnectionException
-from .helpers import DelegateSignatureHelper
+from .helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from .models import (
     EthereumTx,
     ModuleTransaction,
@@ -352,7 +355,7 @@ class DelegateSignatureCheckerMixin:
         delegator: ChecksumAddress,
     ) -> bool:
         """
-        Checks signature and returns a valid owner if found, None otherwise
+        Verifies signature to check if it matches the delegator
 
         :param ethereum_client:
         :param signature:
@@ -470,6 +473,51 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
         raise ValidationError(
             f"Signature does not match provided delegate={delegate} or delegator={delegator}"
         )
+
+
+class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
+    safe_tx_hash = Sha3HashField()
+    signature = HexadecimalField(min_length=65)
+
+    def validate(self, attrs):
+        super().validate(attrs)
+        safe_tx_hash = attrs["safe_tx_hash"]
+        signature = attrs["signature"]
+
+        try:
+            multisig_tx = MultisigTransaction.objects.select_related("ethereum_tx").get(
+                safe_tx_hash=safe_tx_hash
+            )
+        except MultisigTransaction.DoesNotExist:
+            raise Http404("Multisig transaction not found")
+
+        if multisig_tx.executed:
+            raise ValidationError("Executed transactions cannot be deleted")
+
+        proposer = multisig_tx.proposer
+        if not proposer or proposer == NULL_ADDRESS:
+            raise ValidationError("Old transactions without proposer cannot be deleted")
+
+        ethereum_client = EthereumClientProvider()
+        chain_id = ethereum_client.get_chain_id()
+        safe_address = multisig_tx.safe
+        # Accept a message with the current topt and the previous totp (to prevent replay attacks)
+        for previous_totp in (True, False):
+            message_hash = DeleteMultisigTxSignatureHelper.calculate_hash(
+                safe_address, safe_tx_hash, chain_id, previous_totp=previous_totp
+            )
+            safe_signatures = SafeSignature.parse_signature(signature, message_hash)
+            if len(safe_signatures) != 1:
+                raise ValidationError(
+                    f"1 owner signature was expected, {len(safe_signatures)} received"
+                )
+            safe_signature = safe_signatures[0]
+            if safe_signature.signature_type != SafeSignatureType.EOA:
+                raise ValidationError("Only EOA signatures are supported")
+            if safe_signature.owner == proposer:
+                return attrs
+
+        raise ValidationError("Provided owner is not the proposer of the transaction")
 
 
 class DataDecoderSerializer(serializers.Serializer):
