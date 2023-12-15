@@ -83,12 +83,12 @@ class TestCommands(TestCase):
         contract = Contract.objects.get(address=multisend_address)
         self.assertEqual(contract.name, "MultiSendCallOnly")
         self.assertEqual(contract.display_name, "Safe: MultiSendCallOnly 1.3.0")
-        # MultiSendCallOnly should be trusted for delegates calls
+        # MultiSendCallOnly should be trusted for delegate calls
         self.assertTrue(contract.trusted_for_delegate_call)
 
         multisend_141_address = "0x9641d764fc13c8B624c04430C7356C1C7C8102e2"
         contract = Contract.objects.get(address=multisend_141_address)
         self.assertEqual(contract.name, "MultiSendCallOnly")
         self.assertEqual(contract.display_name, "Safe: MultiSendCallOnly 1.4.1")
-        # MultiSendCallOnly should be trusted for delegates calls
+        # MultiSendCallOnly should be trusted for delegate calls
         self.assertTrue(contract.trusted_for_delegate_call)

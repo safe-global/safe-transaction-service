@@ -7,7 +7,7 @@ from gnosis.safe.safe_deployments import safe_deployments
 from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
 
-TRUSTED_FOR_DELEGATES = ["MultiSendCallOnly"]
+TRUSTED_FOR_DELEGATE_CALL = ["MultiSendCallOnly"]
 
 
 def generate_safe_contract_display_name(contract_name: str, version: str) -> str:
@@ -90,7 +90,7 @@ class Command(BaseCommand):
                             "name": contract_name,
                             "display_name": display_name,
                             "trusted_for_delegate_call": contract_name
-                            in TRUSTED_FOR_DELEGATES,
+                            in TRUSTED_FOR_DELEGATE_CALL,
                         },
                     )
 
