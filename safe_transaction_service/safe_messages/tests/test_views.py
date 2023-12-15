@@ -274,7 +274,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             {
                 "signature": [
                     ErrorDetail(
-                        string="Ensure this field has at least 1 hexadecimal chars (not counting 0x).",
+                        string="Ensure this field has at least 65 hexadecimal chars (not counting 0x).",
                         code="min_length",
                     )
                 ]
