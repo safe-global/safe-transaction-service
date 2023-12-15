@@ -32,6 +32,7 @@ from safe_transaction_service.utils.serializers import get_safe_owners, get_safe
 from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from .models import (
+    MAX_SIGNATURE_LENGTH,
     EthereumTx,
     ModuleTransaction,
     MultisigConfirmation,
@@ -63,7 +64,7 @@ class GnosisBaseModelSerializer(serializers.ModelSerializer):
 #            Request Serializers
 # ================================================ #
 class SafeMultisigConfirmationSerializer(serializers.Serializer):
-    signature = HexadecimalField(min_length=65)  # Signatures must be at least 65 bytes
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def validate_signature(self, signature: bytes):
         safe_tx_hash = self.context["safe_tx_hash"]
@@ -388,7 +389,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
     label = serializers.CharField(max_length=50)
 
     def validate(self, attrs):
@@ -450,7 +451,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
 class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -477,7 +478,7 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
 
 class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
     safe_tx_hash = Sha3HashField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -512,8 +513,14 @@ class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
                     f"1 owner signature was expected, {len(safe_signatures)} received"
                 )
             safe_signature = safe_signatures[0]
-            if safe_signature.signature_type != SafeSignatureType.EOA:
-                raise ValidationError("Only EOA signatures are supported")
+            # Currently almost all the transactions are proposed using EOAs. Adding support for EIP1271, for example,
+            # would require to use the EIP712 domain of the Safe and a blockchain check. For starting
+            # with this feature we will try to keep it simple and only support EOA signatures.
+            if safe_signature.signature_type not in (
+                SafeSignatureType.EOA,
+                SafeSignatureType.ETH_SIGN,
+            ):
+                raise ValidationError("Only EOA and ETH_SIGN signatures are supported")
             if safe_signature.owner == proposer:
                 return attrs
 
@@ -961,7 +968,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
 
     safe = EthereumAddressField()
     delegate = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def get_valid_delegators(
         self,

@@ -939,7 +939,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string="Only EOA signatures are supported", code="invalid"
+                        string="Only EOA and ETH_SIGN signatures are supported",
+                        code="invalid",
                     )
                 ]
             },

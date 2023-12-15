@@ -55,6 +55,8 @@ from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
 
+MAX_SIGNATURE_LENGTH = 5_000
+
 
 class ConfirmationType(Enum):
     CONFIRMATION = 0
@@ -1522,7 +1524,7 @@ class MultisigConfirmation(TimeStampedModel):
     )  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressV2Field()
 
-    signature = HexField(null=True, default=None, max_length=5000)
+    signature = HexField(null=True, default=None, max_length=MAX_SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )
