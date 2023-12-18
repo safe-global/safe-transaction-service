@@ -3,7 +3,7 @@ from eth_account import Account
 from factory.django import DjangoModelFactory
 
 from ..models import SafeMessage, SafeMessageConfirmation
-from ..utils import get_safe_message_hash_for_message
+from ..utils import get_hash_for_message, get_safe_message_hash_for_message
 
 
 class SafeMessageFactory(DjangoModelFactory):
@@ -17,7 +17,9 @@ class SafeMessageFactory(DjangoModelFactory):
 
     @factory.lazy_attribute
     def message_hash(self):
-        return get_safe_message_hash_for_message(self.safe, self.message).hex()
+        return get_safe_message_hash_for_message(
+            self.safe, get_hash_for_message(self.message)
+        ).hex()
 
 
 class SafeMessageConfirmationFactory(DjangoModelFactory):
