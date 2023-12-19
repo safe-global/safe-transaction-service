@@ -11,6 +11,7 @@ from django.contrib.auth.models import Permission
 from django.urls import reverse
 from django.utils import timezone
 
+import eth_abi
 from eth_account import Account
 from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
@@ -1257,6 +1258,77 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_post_multisig_transaction_with_1271_signature(self):
+        account = Account.create()
+        safe_owner = self.deploy_test_safe(owners=[account.address])
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+
+        data = {
+            "to": account.address,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            "sender": safe_owner.address,
+        }
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        safe_tx_hash = safe_tx.safe_tx_hash
+        safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
+
+        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        safe_owner_signature = account.signHash(safe_owner_message_hash)["signature"]
+        signature_1271 = (
+            signature_to_bytes(
+                0, int.from_bytes(HexBytes(safe_owner.address), byteorder="big"), 65
+            )
+            + eth_abi.encode(["bytes"], [safe_owner_signature])[32:]
+        )
+
+        data["contractTransactionHash"] = safe_tx_hash.hex()
+        data["signature"] = signature_1271.hex()
+
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe.address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.get(
+            safe_tx_hash=safe_tx_hash
+        )
+        self.assertTrue(multisig_transaction_db.trusted)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+
+        # Test MultisigConfirmation endpoint
+        confirmation_data = {"signature": data["signature"]}
+        MultisigConfirmation.objects.all().delete()
+        response = self.client.post(
+            reverse(
+                "v1:history:multisig-transaction-confirmations",
+                args=(safe_tx_hash.hex(),),
+            ),
+            format="json",
+            data=confirmation_data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
 
     def test_post_multisig_transaction_with_trusted_user(self):
         safe_owner_1 = Account.create()
