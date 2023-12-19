@@ -24,7 +24,7 @@ from safe_transaction_service.contracts.tx_decoder import (
     get_db_tx_decoder,
 )
 from safe_transaction_service.tokens.serializers import TokenInfoResponseSerializer
-from safe_transaction_service.utils.serializers import get_safe_owners, get_safe_version
+from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .exceptions import NodeConnectionException
 from .helpers import DelegateSignatureHelper
@@ -65,22 +65,41 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
     def validate_signature(self, signature: bytes):
         safe_tx_hash = self.context["safe_tx_hash"]
         try:
-            multisig_transaction = MultisigTransaction.objects.select_related(
-                "ethereum_tx"
-            ).get(safe_tx_hash=safe_tx_hash)
+            multisig_transaction: MultisigTransaction = (
+                MultisigTransaction.objects.select_related("ethereum_tx").get(
+                    safe_tx_hash=safe_tx_hash
+                )
+            )
         except MultisigTransaction.DoesNotExist as exc:
             raise NotFound(
                 f"Multisig transaction with safe-tx-hash={safe_tx_hash} was not found"
             ) from exc
 
-        safe_address = multisig_transaction.safe
         if multisig_transaction.executed:
             raise ValidationError(
                 f"Transaction with safe-tx-hash={safe_tx_hash} was already executed"
             )
 
+        safe_address = multisig_transaction.safe
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(safe_address, ethereum_client)
+        safe_tx = safe.build_multisig_tx(
+            multisig_transaction.to,
+            multisig_transaction.value,
+            multisig_transaction.data,
+            multisig_transaction.operation,
+            multisig_transaction.safe_tx_gas,
+            multisig_transaction.base_gas,
+            multisig_transaction.gas_price,
+            multisig_transaction.gas_token,
+            multisig_transaction.refund_receiver,
+            safe_nonce=multisig_transaction.nonce,
+        )
+
         safe_owners = get_safe_owners(safe_address)
-        parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
+        parsed_signatures = SafeSignature.parse_signature(
+            signature, safe_tx_hash, safe_tx.safe_tx_hash_preimage
+        )
         signature_owners = []
         ethereum_client = EthereumClientProvider()
         for safe_signature in parsed_signatures:
@@ -149,9 +168,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
         ethereum_client = EthereumClientProvider()
         safe_address = attrs["safe"]
-        safe_version = get_safe_version(safe_address)
 
-        safe = Safe(safe_address, EthereumClientProvider())
+        safe = Safe(safe_address, ethereum_client)
         safe_tx = safe.build_multisig_tx(
             attrs["to"],
             attrs["value"],
@@ -164,12 +182,12 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             attrs["refund_receiver"],
             safe_nonce=attrs["nonce"],
         )
-        contract_transaction_hash = safe_tx.safe_tx_hash
+        safe_tx_hash = safe_tx.safe_tx_hash
 
         # Check safe tx hash matches
-        if contract_transaction_hash != attrs["contract_transaction_hash"]:
+        if safe_tx_hash != attrs["contract_transaction_hash"]:
             raise ValidationError(
-                f"Contract-transaction-hash={contract_transaction_hash.hex()} "
+                f"Contract-transaction-hash={safe_tx_hash.hex()} "
                 f'does not match provided contract-tx-hash={attrs["contract_transaction_hash"].hex()}'
             )
 
@@ -180,9 +198,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         ).executed()
         if multisig_transactions:
             for multisig_transaction in multisig_transactions:
-                if multisig_transaction.safe_tx_hash == contract_transaction_hash.hex():
+                if multisig_transaction.safe_tx_hash == safe_tx_hash.hex():
                     raise ValidationError(
-                        f"Tx with safe-tx-hash={contract_transaction_hash.hex()} "
+                        f"Tx with safe-tx-hash={safe_tx_hash.hex()} "
                         f"for safe={safe_address} was already executed in "
                         f"tx-hash={multisig_transaction.ethereum_tx_id}"
                     )
@@ -209,7 +227,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
         parsed_signatures = SafeSignature.parse_signature(
-            signature, contract_transaction_hash
+            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
         )
         attrs["parsed_signatures"] = parsed_signatures
         # If there's at least one signature, transaction is trusted (until signatures are mandatory)

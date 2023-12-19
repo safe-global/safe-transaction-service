@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from eth_typing import ChecksumAddress, Hash32, HexStr
+from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -22,7 +22,6 @@ class SafeMessageSignatureParserMixin:
         self,
         safe_signatures: Sequence[SafeSignature],
         safe_address: ChecksumAddress,
-        message_hash: Hash32,
         safe_message: Optional[SafeMessage],
     ) -> Tuple[ChecksumAddress, SafeSignatureType]:
         """
@@ -40,9 +39,6 @@ class SafeMessageSignatureParserMixin:
 
         ethereum_client = EthereumClientProvider()
         for safe_signature in safe_signatures:
-            if safe_signature.signature_type == SafeSignatureType.CONTRACT_SIGNATURE:
-                # For contract signatures it needs the preimage, not the SafeMessageHash
-                safe_signature.safe_tx_hash = message_hash
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
                     f"Signature={safe_signature.signature.hex()} for owner={safe_signature.owner} is not valid"
@@ -103,9 +99,11 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
                 f"Message with hash {safe_message_hash.hex()} for safe {safe_address} already exists in DB"
             )
 
-        safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
+        safe_signatures = SafeSignature.parse_signature(
+            signature, safe_message_hash, message_hash
+        )
         owner, signature_type = self.get_valid_owner_from_signatures(
-            safe_signatures, safe_address, message_hash, None
+            safe_signatures, safe_address, None
         )
 
         attrs["proposed_by"] = owner
@@ -143,9 +141,11 @@ class SafeMessageSignatureSerializer(
         message_hash = get_hash_for_message(safe_message.message)
         safe_message_hash = safe_message.message_hash
 
-        safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
+        safe_signatures = SafeSignature.parse_signature(
+            signature, safe_message_hash, message_hash
+        )
         owner, signature_type = self.get_valid_owner_from_signatures(
-            safe_signatures, safe_address, message_hash, safe_message
+            safe_signatures, safe_address, safe_message
         )
 
         attrs["owner"] = owner
