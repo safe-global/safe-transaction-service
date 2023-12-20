@@ -195,7 +195,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "safeTxHash": multisig_tx.safe_tx_hash,
             "type": WebHookType.EXECUTED_MULTISIG_TRANSACTION.name,
             "failed": "false",
-            "txHash": "0xc8ed8af6e9e19d7e882493f3b79885585110ef406c415e0f9fdcb89ffd46422a",
+            "txHash": multisig_tx.ethereum_tx_id,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         webhook_task_mock.assert_called_with(
