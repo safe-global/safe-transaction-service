@@ -54,7 +54,7 @@ def build_webhook_payload(
         payloads = [
             {
                 "address": instance.safe,
-                "type": WebHookType.DELETED_MULTISIG_TRANSACTION,
+                "type": WebHookType.DELETED_MULTISIG_TRANSACTION.name,
                 "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
             }
         ]
