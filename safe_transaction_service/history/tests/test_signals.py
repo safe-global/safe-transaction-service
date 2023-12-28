@@ -1,5 +1,6 @@
 from datetime import timedelta
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.db.models.signals import post_save
 from django.test import TestCase
@@ -9,9 +10,9 @@ import factory
 from gnosis.eth import EthereumNetwork
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from safe_transaction_service.events.tasks import send_event_to_queue_task
 from safe_transaction_service.notifications.tasks import send_notification_task
 
+from ...events.services.queue_service import QueueService
 from ...safe_messages.models import SafeMessage, SafeMessageConfirmation
 from ...safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
@@ -103,12 +104,12 @@ class TestSignals(SafeTestCaseMixin, TestCase):
     @factory.django.mute_signals(post_save)
     @mock.patch.object(send_webhook_task, "apply_async")
     @mock.patch.object(send_notification_task, "apply_async")
-    @mock.patch.object(send_event_to_queue_task, "delay")
+    @mock.patch.object(QueueService, "send_event")
     def test_process_webhook(
         self,
-        webhook_task_mock,
-        send_notification_task_mock,
-        send_event_to_queue_task_mock,
+        send_event_to_queue_task_mock: MagicMock,
+        webhook_task_mock: MagicMock,
+        send_notification_task_mock: MagicMock,
     ):
         multisig_confirmation = MultisigConfirmationFactory()
         process_webhook(MultisigConfirmation, multisig_confirmation, True)
@@ -123,8 +124,8 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         multisig_confirmation.created -= timedelta(minutes=75)
         process_webhook(MultisigConfirmation, multisig_confirmation, True)
         webhook_task_mock.assert_not_called()
-        send_notification_task_mock.assert_not_called()
         send_event_to_queue_task_mock.assert_not_called()
+        send_notification_task_mock.assert_not_called()
 
     @factory.django.mute_signals(post_save)
     def test_is_relevant_notification_multisig_confirmation(self):

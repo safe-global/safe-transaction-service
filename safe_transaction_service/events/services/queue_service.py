@@ -1,5 +1,6 @@
 import json
 import logging
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
@@ -13,24 +14,17 @@ from pika.exchange_type import ExchangeType
 logger = logging.getLogger(__name__)
 
 
-class QueueServiceProvider:
-    def __new__(cls):
-        if not hasattr(cls, "instance"):
-            if settings.EVENTS_QUEUE_URL:
-                if settings.EVENTS_QUEUE_ASYNC_CONNECTION:
-                    cls.instance = AsyncQueueService()
-                else:
-                    cls.instance = SyncQueueService()
-            else:
-                # Mock send_event to not configured host us is not mandatory configure a queue for events
-                cls.instance = MockedQueueService()
-                logger.warning("MockedQueueService is used")
-        return cls.instance
-
-    @classmethod
-    def del_singleton(cls):
-        if hasattr(cls, "instance"):
-            del cls.instance
+@lru_cache()
+def getQueueService():
+    if settings.EVENTS_QUEUE_URL:
+        if settings.EVENTS_QUEUE_ASYNC_CONNECTION:
+            return AsyncQueueService()
+        else:
+            return SyncQueueService()
+    else:
+        # Mock send_event to not configured host us is not mandatory configure a queue for events
+        return MockedQueueService()
+        logger.warning("MockedQueueService is used")
 
 
 class QueueService:
@@ -55,7 +49,11 @@ class QueueService:
         if self._channel is None or not self._channel.is_open:
             logger.warning("Connection is still not initialized")
             if fail_retry:
+                logger.info("Adding %s to unsent messages", payload)
                 self.unsent_events.append(payload)
+            if not self.is_async():
+                # Try to reconnect
+                self.connect()
             return False
 
         try:
@@ -67,6 +65,7 @@ class QueueService:
         except pika.exceptions.ConnectionClosedByBroker:
             logger.warning("Event can not be sent due to there is no channel opened")
             if fail_retry:
+                logger.info("Adding %s to unsent messages", payload)
                 self.unsent_events.append(payload)
             return False
 
@@ -97,6 +96,10 @@ class AsyncQueueService(QueueService):
     def __init__(self):
         super().__init__()
         self.connect()
+
+    @property
+    def is_async(self):
+        return True
 
     def connect(self) -> GeventConnection:
         """
@@ -151,6 +154,7 @@ class AsyncQueueService(QueueService):
         :param Exception reason: exception representing reason for loss of
             connection.
         """
+        self._connection = connection
         self._channel = None
         logger.error(
             "Connection closed with %s, reopening in 5 seconds: %s",
@@ -238,6 +242,10 @@ class SyncQueueService(QueueService):
         super().__init__()
         self.connect()
 
+    @property
+    def is_async(self):
+        return False
+
     def connect(self) -> BlockingConnection:
         """
         This method connects to RabbitMq using Blockingconnection.
@@ -248,7 +256,10 @@ class SyncQueueService(QueueService):
         try:
             self._connection = BlockingConnection(self._connection_parameters)
             self._channel = self.open_channel()
+            self._channel.confirm_delivery()
             self.setup_exchange()
+            # Send messages if there was any missing
+            self.send_unsent_events()
             return self._connection
         except pika.exceptions.AMQPConnectionError:
             logger.error("Cannot open connection, retrying")

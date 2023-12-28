@@ -6,12 +6,14 @@ from django.test import TestCase
 from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
-from safe_transaction_service.events.services.queue_service import QueueServiceProvider
+from safe_transaction_service.events.services.queue_service import getQueueService
 
 
 class TestQueueService(TestCase):
     def setUp(self):
-        self.queue_service = QueueServiceProvider()
+        self.queue_service = getQueueService()
+        # Ensure that is singleton
+        self.assertEqual(self.queue_service, getQueueService())
         # Create queue for test
         self.queue = "test_queue"
         self.queue_service._channel.queue_declare(self.queue)
@@ -22,7 +24,7 @@ class TestQueueService(TestCase):
         self.queue_service._channel.queue_purge(self.queue)
 
     def test_send_unsent_messages(self):
-        queue_service = QueueServiceProvider()
+        queue_service = getQueueService()
         messages_to_send = 10
         queue_service.remove_unsent_events()
         with mock.patch.object(
