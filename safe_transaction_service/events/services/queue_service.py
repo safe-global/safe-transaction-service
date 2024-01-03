@@ -1,6 +1,5 @@
 import json
 import logging
-from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
@@ -14,7 +13,6 @@ from pika.exchange_type import ExchangeType
 logger = logging.getLogger(__name__)
 
 
-@lru_cache()
 def getQueueService():
     if settings.EVENTS_QUEUE_URL:
         return SyncQueueService()
@@ -22,6 +20,36 @@ def getQueueService():
         # Mock send_event to not configured host us is not mandatory configure a queue for events
         return MockedQueueService()
         logger.warning("MockedQueueService is used")
+
+
+class QueueServicePool:
+    """
+    Context manager to get a QueueService connection from the pool or create a new one and append it to the pool if all the
+    instances are taken. Very useful for gevent, as it is not safe to share one Pika connection across threads.
+    https://pika.readthedocs.io/en/stable/faq.html
+    Use:
+    ```
+    with QueueServicePool() as queue_service:
+        queue_service...
+    ```
+    """
+
+    queue_service_pool = []
+
+    def __init__(self):
+        self.instance: QueueService
+
+    def __enter__(self):
+        if self.queue_service_pool:
+            # If there are elements on the pool, take them
+            self.instance = self.queue_service_pool.pop()
+        else:
+            # If not, get a new client
+            self.instance = getQueueService()
+        return self.instance
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.queue_service_pool.append(self.instance)
 
 
 class QueueService:

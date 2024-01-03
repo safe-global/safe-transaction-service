@@ -1,19 +1,21 @@
 import json
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
 from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
-from safe_transaction_service.events.services.queue_service import getQueueService
+from safe_transaction_service.events.services.queue_service import (
+    QueueServicePool,
+    getQueueService,
+)
 
 
 class TestQueueService(TestCase):
     def setUp(self):
         self.queue_service = getQueueService()
-        # Ensure that is singleton
-        self.assertEqual(self.queue_service, getQueueService())
         # Create queue for test
         self.queue = "test_queue"
         self.queue_service._channel.queue_declare(self.queue)
@@ -57,3 +59,19 @@ class TestQueueService(TestCase):
         # Check if message was written to the queue
         _, _, body = self.queue_service._channel.basic_get(self.queue, auto_ack=True)
         self.assertEquals(json.loads(body), payload)
+
+    @mock.patch(
+        "safe_transaction_service.events.services.queue_service.getQueueService"
+    )
+    def test_queue_service_pool(self, mock_get_queue_service: MagicMock):
+        queue_service = getQueueService()
+        QueueServicePool.queue_service_pool = [queue_service]
+        with QueueServicePool() as queue_service:
+            self.assertEqual(queue_service, queue_service)
+        mock_get_queue_service.assert_not_called()
+
+        QueueServicePool.queue_service_pool = []
+        mock_get_queue_service.return_value = queue_service
+        with QueueServicePool() as queue_service:
+            self.assertEqual(queue_service, queue_service)
+        mock_get_queue_service.assert_called_once()
