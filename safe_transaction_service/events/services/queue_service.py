@@ -27,6 +27,7 @@ class QueueServicePool:
     Context manager to get a QueueService connection from the pool or create a new one and append it to the pool if all the
     instances are taken. Very useful for gevent, as it is not safe to share one Pika connection across threads.
     https://pika.readthedocs.io/en/stable/faq.html
+    # To avoid leave unsent messages in QueueService instances the queue service pool is rotating every QueueService in the list.
     Use:
     ```
     with QueueServicePool() as queue_service:
@@ -49,7 +50,7 @@ class QueueServicePool:
         return self.instance
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.queue_service_pool.append(self.instance)
+        self.queue_service_pool.insert(0, self.instance)
 
 
 class QueueService:
