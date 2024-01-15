@@ -126,7 +126,7 @@ def _process_webhook(
 ):
     assert not (
         created and deleted
-    ), "A instance cannot be created and deleted at the same time"
+    ), "An instance cannot be created and deleted at the same time"
 
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_webhook_payload(sender, instance, deleted=deleted)
