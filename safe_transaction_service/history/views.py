@@ -586,6 +586,60 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
             .select_related("ethereum_tx__block")
         )
 
+    @swagger_auto_schema(
+        request_body=serializers.SafeMultisigTransactionDeleteSerializer(),
+        responses={
+            204: "Deleted",
+            404: "Transaction not found",
+            400: "Error processing data",
+        },
+    )
+    def delete(self, request, safe_tx_hash: HexStr):
+        """
+        Delete a queued but not executed multisig transaction. Only the proposer can delete the transaction.
+        Delegates are not valid, if the transaction was proposed by a delegator the owner who delegated to
+        the delegate must be used.
+        An EOA is required to sign the following EIP712 data:
+
+        ```python
+         {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"},
+                ],
+                "DeleteRequest": [
+                    {"name": "safeTxHash", "type": "bytes32"},
+                    {"name": "totp", "type": "uint256"},
+                ],
+            },
+            "primaryType": "DeleteRequest",
+            "domain": {
+                "name": "Safe Transaction Service",
+                "version": "1.0",
+                "chainId": chain_id,
+                "verifyingContract": safe_address,
+            },
+            "message": {
+                "safeTxHash": safe_tx_hash,
+                "totp": totp,
+            },
+        }
+        ```
+
+        `totp` parameter is calculated with `T0=0` and `Tx=3600`. `totp` is calculated by taking the
+        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        """
+        request.data["safe_tx_hash"] = safe_tx_hash
+        serializer = serializers.SafeMultisigTransactionDeleteSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailView):
     @swagger_auto_schema(
