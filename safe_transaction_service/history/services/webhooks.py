@@ -30,10 +30,12 @@ def build_webhook_payload(
     instance: Union[
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
+    deleted: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     :param sender: Sender type
     :param instance: Sender instance
+    :param deleted: If the instance has been deleted
     :return: A list of webhooks generated from the instance provided
     """
     payloads: List[Dict[str, Any]] = []
@@ -46,6 +48,14 @@ def build_webhook_payload(
                 "safeTxHash": HexBytes(
                     instance.multisig_transaction.safe_tx_hash
                 ).hex(),
+            }
+        ]
+    elif sender == MultisigTransaction and deleted:
+        payloads = [
+            {
+                "address": instance.safe,
+                "type": WebHookType.DELETED_MULTISIG_TRANSACTION.name,
+                "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
             }
         ]
     elif sender == MultisigTransaction:

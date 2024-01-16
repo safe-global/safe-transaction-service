@@ -2019,6 +2019,7 @@ class WebHookType(Enum):
     OUTGOING_TOKEN = 9
     MESSAGE_CREATED = 10
     MESSAGE_CONFIRMATION = 11
+    DELETED_MULTISIG_TRANSACTION = 12
 
 
 class WebHookQuerySet(models.QuerySet):
