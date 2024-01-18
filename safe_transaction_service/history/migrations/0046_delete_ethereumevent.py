@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0045_erc20transfer_erc721transfer"),
     ]

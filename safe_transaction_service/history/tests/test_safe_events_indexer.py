@@ -1,12 +1,14 @@
 from django.test import TestCase
 
 from eth_account import Account
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
+from web3 import Web3
 from web3.datastructures import AttributeDict
 from web3.types import LogReceipt
 
 from gnosis.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
-from gnosis.eth.contracts import get_safe_V1_3_0_contract
+from gnosis.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
 from gnosis.safe import Safe
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -27,7 +29,7 @@ from .factories import EthereumTxFactory, SafeMasterCopyFactory
 from .mocks.mocks_safe_events_indexer import safe_events_mock
 
 
-class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
+class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
     def setUp(self) -> None:
         self.safe_events_indexer = SafeEventsIndexer(
             self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
@@ -36,6 +38,23 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
     def tearDown(self) -> None:
         SafeEventsIndexerProvider.del_singleton()
+
+    @property
+    def safe_contract_version(self) -> str:
+        return "1.4.1"
+
+    @property
+    def safe_contract(self):
+        """
+        :return: Last Safe Contract available
+        """
+        return self.safe_contract_V1_4_1
+
+    def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
+        """
+        :return: Last Safe Contract available
+        """
+        return get_safe_V1_4_1_contract(w3, address=address)
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
@@ -47,54 +66,69 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
 
     def test_invalid_event(self):
         """
-        AddedOwner event broke indexer on BSC. Same signature, but different number of indexed attributes
+        Events with same name and types, but different indexed elements can break the indexer
+        We will test the expected:
+
+        event ExecutionSuccess(
+            bytes32 txHash,
+            uint256 payment
+        );
+
+        With the made out:
+        event ExecutionSuccess(
+            bytes32 indexed txHash,
+            uint256 indexed payment
+        );
         """
 
         valid_event: LogReceipt = AttributeDict(
             {
-                "address": "0x384f55D8BD4046461433A56bb87fe4aA615C0cc8",
-                "blockHash": HexBytes(
-                    "0x551a6e5ca972c453873898be696980d7ff65d27a6f80ddffab17591144c99e01"
-                ),
-                "blockNumber": 9205844,
-                "data": "0x000000000000000000000000a1350318b2907ee0f6c8918eddc778a0b633e774",
-                "logIndex": 0,
-                "removed": False,
+                "address": "0xE618d8147210d45ffCBd2E3b33DD44252a43fF76",
                 "topics": [
                     HexBytes(
-                        "0x9465fa0c962cc76958e6373a993326400c1c94f8be2fe3a952adfa7f60b2ea26"
+                        "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e"
                     )
                 ],
-                "transactionHash": HexBytes(
-                    "0x7e4b2bb0ac5129552908e9c8433ea1746f76616188e8c3597a6bdce88d0b474c"
+                "data": HexBytes(
+                    "0x55e61223bfe56101c8243067945cf90da23f0e0a3409eac65dc6e8852833cf440000000000000000000000000000000000000000000000000000000000000000"
                 ),
-                "transactionIndex": 0,
-                "transactionLogIndex": "0x0",
-                "type": "mined",
+                "blockNumber": 9727973,
+                "transactionHash": HexBytes(
+                    "0x9afccb1cf5498ae564b5589bf4bbf0b29b486f52952d1270dd51702ed2e29ff9"
+                ),
+                "transactionIndex": 50,
+                "blockHash": HexBytes(
+                    "0x3b2a9816f9b4280dc0190f1aafb910c99efbbf836e1865ab068ecbf6c0402fa7"
+                ),
+                "logIndex": 129,
+                "removed": False,
             }
         )
 
         dangling_event: LogReceipt = AttributeDict(
             {
-                "address": "0x1E44C806f1AfD4f420C10c8088f4e0388F066E7A",
+                "address": "0xE618d8147210d45ffCBd2E3b33DD44252a43fF76",
                 "topics": [
                     HexBytes(
-                        "0x9465fa0c962cc76958e6373a993326400c1c94f8be2fe3a952adfa7f60b2ea26"
+                        "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e"
                     ),
                     HexBytes(
-                        "0x00000000000000000000000020212521370dd2dde0b0e3ac25b65eb3e859d303"
+                        "0x55e61223bfe56101c8243067945cf90da23f0e0a3409eac65dc6e8852833cf44"
+                    ),
+                    HexBytes(
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
                     ),
                 ],
-                "data": "0x",
-                "blockNumber": 10129293,
+                "data": HexBytes("0x"),
+                "blockNumber": 9727973,
                 "transactionHash": HexBytes(
-                    "0xc19ef099702fb9f7d7962925428683eff534e009210ef2cf23135f43962c192a"
+                    "0x9afccb1cf5498ae564b5589bf4bbf0b29b486f52952d1270dd51702ed2e29ff9"
                 ),
-                "transactionIndex": 89,
+                "transactionIndex": 50,
                 "blockHash": HexBytes(
-                    "0x6b41eac9177a1606e1a853adf3f3da018fcf476f7d217acb69b7d130bdfaf2c9"
+                    "0x3b2a9816f9b4280dc0190f1aafb910c99efbbf836e1865ab068ecbf6c0402fa7"
                 ),
-                "logIndex": 290,
+                "logIndex": 129,
                 "removed": False,
             }
         )
@@ -112,23 +146,26 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
             valid_event["topics"][0].hex(), self.safe_events_indexer.events_to_listen
         )
 
-        # Dangling event cannot be decoded
+        # Dangling event cannot be decoded, but valid event is
         expected_event = AttributeDict(
             {
                 "args": AttributeDict(
-                    {"owner": "0xa1350318b2907ee0f6c8918edDC778A0b633e774"}
+                    {
+                        "txHash": b"U\xe6\x12#\xbf\xe5a\x01\xc8$0g\x94\\\xf9\r\xa2?\x0e\n4\t\xea\xc6]\xc6\xe8\x85(3\xcfD",
+                        "payment": 0,
+                    }
                 ),
-                "event": "AddedOwner",
-                "logIndex": 0,
-                "transactionIndex": 0,
+                "event": "ExecutionSuccess",
+                "logIndex": 129,
+                "transactionIndex": 50,
                 "transactionHash": HexBytes(
-                    "0x7e4b2bb0ac5129552908e9c8433ea1746f76616188e8c3597a6bdce88d0b474c"
+                    "0x9afccb1cf5498ae564b5589bf4bbf0b29b486f52952d1270dd51702ed2e29ff9"
                 ),
-                "address": "0x384f55D8BD4046461433A56bb87fe4aA615C0cc8",
+                "address": "0xE618d8147210d45ffCBd2E3b33DD44252a43fF76",
                 "blockHash": HexBytes(
-                    "0x551a6e5ca972c453873898be696980d7ff65d27a6f80ddffab17591144c99e01"
+                    "0x3b2a9816f9b4280dc0190f1aafb910c99efbbf836e1865ab068ecbf6c0402fa7"
                 ),
-                "blockNumber": 9205844,
+                "blockNumber": 9727973,
             }
         )
         self.assertEqual(
@@ -162,18 +199,20 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
             address=self.safe_contract.address,
             initial_block_number=initial_block_number,
             tx_block_number=initial_block_number,
-            version="1.3.0",
+            version=self.safe_contract_version,
             l2=True,
         )
-        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract(
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
             self.ethereum_test_account,
             self.safe_contract.address,
             initializer=initializer,
         )
         safe_address = ethereum_tx_sent.contract_address
         safe = Safe(safe_address, self.ethereum_client)
-        safe_contract = get_safe_V1_3_0_contract(self.w3, safe_address)
-        self.assertEqual(safe_contract.functions.VERSION().call(), "1.3.0")
+        safe_contract = self.get_safe_contract(self.w3, safe_address)
+        self.assertEqual(
+            safe_contract.functions.VERSION().call(), self.safe_contract_version
+        )
 
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
@@ -520,8 +559,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 9)
 
-        # Set guard (nonce: 7) INVALIDATES SAFE, as no more transactions can be done ---------------------------------
-        guard_address = Account.create().address
+        # Set guard (nonce: 7) ---------------------------------
+        guard_address = self.deploy_example_guard()
         data = HexBytes(
             self.safe_contract.functions.setGuard(guard_address).build_transaction(
                 {"gas": 1, "gasPrice": 1}
@@ -532,7 +571,8 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
-        self.assertEqual(self.safe_events_indexer.start(), (3, 1))
+        # 2 blocks will be processed due to the guard deployment
+        self.assertEqual(self.safe_events_indexer.start(), (3, 2))
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
         # Add one SafeStatus increasing the nonce and another one changing the guard
         self.assertEqual(SafeStatus.objects.count(), 17)
@@ -666,3 +706,22 @@ class TestSafeEventsIndexer(SafeTestCaseMixin, TestCase):
         with self.safe_events_indexer.auto_adjust_block_limit(100, 104):
             pass
         self.assertEqual(self.safe_events_indexer.block_process_limit, 5)
+
+
+class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
+    @property
+    def safe_contract_version(self) -> str:
+        return "1.3.0"
+
+    @property
+    def safe_contract(self):
+        """
+        :return: Last Safe Contract available
+        """
+        return self.safe_contract_V1_3_0
+
+    def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
+        """
+        :return: Last Safe Contract available
+        """
+        return get_safe_V1_3_0_contract(w3, address=address)

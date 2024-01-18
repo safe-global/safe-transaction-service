@@ -8,7 +8,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0032_webhook_new_module_transaction"),
     ]

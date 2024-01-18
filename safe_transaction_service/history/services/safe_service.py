@@ -7,7 +7,11 @@ from eth_typing import ChecksumAddress
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.contracts import get_cpk_factory_contract, get_proxy_factory_contract
+from gnosis.eth.contracts import (
+    get_cpk_factory_contract,
+    get_proxy_factory_V1_3_0_contract,
+    get_proxy_factory_V1_4_1_contract,
+)
 from gnosis.safe import Safe
 from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.safe import SafeInfo
@@ -77,7 +81,8 @@ class SafeService:
         self.ethereum_client = ethereum_client
         self.ethereum_tracing_client = ethereum_tracing_client
         dummy_w3 = Web3()  # Not needed, just used to decode contracts
-        self.proxy_factory_contract = get_proxy_factory_contract(dummy_w3)
+        self.proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(dummy_w3)
+        self.proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(dummy_w3)
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
@@ -194,23 +199,29 @@ class SafeService:
         if not data:
             return None
         try:
-            _, data_decoded = self.proxy_factory_contract.decode_function_input(data)
-            master_copy = (
-                data_decoded.get("masterCopy")
-                or data_decoded.get("_mastercopy")
-                or data_decoded.get("_singleton")
-                or data_decoded.get("singleton")
+            _, data_decoded = self.proxy_factory_v1_3_0_contract.decode_function_input(
+                data
             )
-            setup_data = data_decoded.get("data") or data_decoded.get("initializer")
-            if master_copy and setup_data is not None:
-                return master_copy, setup_data
-
-            logger.error(
-                "Problem decoding proxy factory, data_decoded=%s", data_decoded
-            )
-            return None
         except ValueError:
-            return None
+            try:
+                (
+                    _,
+                    data_decoded,
+                ) = self.proxy_factory_v1_4_1_contract.decode_function_input(data)
+            except ValueError:
+                return None
+        master_copy = (
+            data_decoded.get("masterCopy")
+            or data_decoded.get("_mastercopy")
+            or data_decoded.get("_singleton")
+            or data_decoded.get("singleton")
+        )
+        setup_data = data_decoded.get("data") or data_decoded.get("initializer")
+        if master_copy and setup_data is not None:
+            return master_copy, setup_data
+
+        logger.error("Problem decoding proxy factory, data_decoded=%s", data_decoded)
+        return None
 
     def _decode_cpk_proxy_factory(
         self, data: Union[bytes, str]

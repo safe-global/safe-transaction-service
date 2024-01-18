@@ -1,14 +1,15 @@
 from django.contrib import admin
 
-from gnosis.eth.django.admin import BinarySearchAdmin
-
-from safe_transaction_service.utils.admin import HasLogoFilterAdmin
+from safe_transaction_service.utils.admin import (
+    AdvancedAdminSearchMixin,
+    HasLogoFilterAdmin,
+)
 
 from .models import Token, TokenList
 
 
 @admin.register(Token)
-class TokenAdmin(BinarySearchAdmin):
+class TokenAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     list_display = (
         "address",
         "trusted",
@@ -21,7 +22,7 @@ class TokenAdmin(BinarySearchAdmin):
     )
     list_filter = ("trusted", "spam", "events_bugged", "decimals", HasLogoFilterAdmin)
     ordering = ("address",)
-    search_fields = ["=address", "symbol", "name", "=copy_price"]
+    search_fields = ["==address", "symbol", "name", "==copy_price"]
 
 
 @admin.register(TokenList)
@@ -32,4 +33,4 @@ class TokenListAdmin(admin.ModelAdmin):
         "description",
     )
     ordering = ("pk",)
-    search_fields = ["description"]
+    search_fields = ["url", "description"]

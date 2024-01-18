@@ -1,6 +1,6 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -12,15 +12,60 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.utils.serializers import get_safe_owners
 
-from .models import SafeMessage, SafeMessageConfirmation
-from .utils import get_safe_message_hash_for_message
+from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
+from .utils import get_hash_for_message, get_safe_message_hash_for_message
 
 
 # Request serializers
-class SafeMessageSerializer(serializers.Serializer):
+class SafeMessageSignatureParserMixin:
+    def get_valid_owner_from_signatures(
+        self,
+        safe_signatures: Sequence[SafeSignature],
+        safe_address: ChecksumAddress,
+        safe_message: Optional[SafeMessage],
+    ) -> Tuple[ChecksumAddress, SafeSignatureType]:
+        """
+        :param safe_signatures:
+        :param safe_address:
+        :param message_hash: Original hash of the message (not the one tied to the Safe)
+        :param safe_message: Safe message database object (if already created)
+        :return:
+        :raises ValidationError:
+        """
+        if len(safe_signatures) != 1:
+            raise ValidationError(
+                f"1 owner signature was expected, {len(safe_signatures)} received"
+            )
+
+        ethereum_client = EthereumClientProvider()
+        for safe_signature in safe_signatures:
+            if not safe_signature.is_valid(ethereum_client, safe_address):
+                raise ValidationError(
+                    f"Signature={safe_signature.signature.hex()} for owner={safe_signature.owner} is not valid"
+                )
+
+        owner = safe_signatures[0].owner
+        signature_type = safe_signatures[0].signature_type
+        if safe_message:
+            # Check signature is not already in database
+            if SafeMessageConfirmation.objects.filter(
+                safe_message=safe_message, owner=owner
+            ).exists():
+                raise ValidationError(f"Signature for owner {owner} already exists")
+
+        owners = get_safe_owners(safe_address)
+        if owner not in owners:
+            raise ValidationError(f"{owner} is not an owner of the Safe")
+
+        return owner, signature_type
+
+
+class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Serializer):
     message = serializers.JSONField()
     safe_app_id = serializers.IntegerField(allow_null=True, default=None)
-    signature = eth_serializers.HexadecimalField(max_length=65)
+    signature = eth_serializers.HexadecimalField(
+        min_length=65, max_length=SIGNATURE_LENGTH
+    )
 
     def validate_message(self, value: Union[str, Dict[str, Any]]):
         if isinstance(value, str):
@@ -39,11 +84,14 @@ class SafeMessageSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        message = attrs["message"]
         safe_address = self.context["safe_address"]
+        message = attrs["message"]
         signature = attrs["signature"]
         attrs["safe"] = safe_address
-        safe_message_hash = get_safe_message_hash_for_message(safe_address, message)
+        message_hash = get_hash_for_message(message)
+        safe_message_hash = get_safe_message_hash_for_message(
+            safe_address, message_hash
+        )
         attrs["message_hash"] = safe_message_hash
 
         if SafeMessage.objects.filter(message_hash=safe_message_hash).exists():
@@ -51,26 +99,15 @@ class SafeMessageSerializer(serializers.Serializer):
                 f"Message with hash {safe_message_hash.hex()} for safe {safe_address} already exists in DB"
             )
 
-        safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
-        if len(safe_signatures) != 1:
-            raise ValidationError(
-                f"1 owner signature was expected, {len(safe_signatures)} received"
-            )
+        safe_signatures = SafeSignature.parse_signature(
+            signature, safe_message_hash, message_hash
+        )
+        owner, signature_type = self.get_valid_owner_from_signatures(
+            safe_signatures, safe_address, None
+        )
 
-        ethereum_client = EthereumClientProvider()
-        for safe_signature in safe_signatures:
-            if not safe_signature.is_valid(ethereum_client, safe_address):
-                raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={safe_signature.owner} is not valid"
-                )
-
-        owners = get_safe_owners(safe_address)
-        proposed_by = safe_signatures[0].owner
-        if proposed_by not in owners:
-            raise ValidationError(f"{proposed_by} is not an owner of the Safe")
-
-        attrs["proposed_by"] = proposed_by
-        attrs["signature_type"] = safe_signatures[0].signature_type.value
+        attrs["proposed_by"] = owner
+        attrs["signature_type"] = signature_type.value
         return attrs
 
     def create(self, validated_data):
@@ -87,8 +124,12 @@ class SafeMessageSerializer(serializers.Serializer):
         return safe_message
 
 
-class SafeMessageSignatureSerializer(serializers.Serializer):
-    signature = eth_serializers.HexadecimalField(max_length=65)
+class SafeMessageSignatureSerializer(
+    SafeMessageSignatureParserMixin, serializers.Serializer
+):
+    signature = eth_serializers.HexadecimalField(
+        min_length=65, max_length=SIGNATURE_LENGTH
+    )
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -97,33 +138,18 @@ class SafeMessageSignatureSerializer(serializers.Serializer):
         attrs["safe_message"] = safe_message
         signature: HexStr = attrs["signature"]
         safe_address = safe_message.safe
+        message_hash = get_hash_for_message(safe_message.message)
         safe_message_hash = safe_message.message_hash
 
-        safe_signatures = SafeSignature.parse_signature(signature, safe_message_hash)
-        if len(safe_signatures) != 1:
-            raise ValidationError(
-                f"1 owner signature was expected, {len(safe_signatures)} received"
-            )
-
-        ethereum_client = EthereumClientProvider()
-        for safe_signature in safe_signatures:
-            if not safe_signature.is_valid(ethereum_client, safe_address):
-                raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={safe_signature.owner} is not valid"
-                )
-
-        owner = safe_signatures[0].owner
-        if SafeMessageConfirmation.objects.filter(
-            safe_message=safe_message, owner=owner
-        ).exists():
-            raise ValidationError(f"Signature for owner {owner} already exists")
-
-        owners = get_safe_owners(safe_address)
-        if owner not in owners:
-            raise ValidationError(f"{owner} is not an owner of the Safe")
+        safe_signatures = SafeSignature.parse_signature(
+            signature, safe_message_hash, message_hash
+        )
+        owner, signature_type = self.get_valid_owner_from_signatures(
+            safe_signatures, safe_address, safe_message
+        )
 
         attrs["owner"] = owner
-        attrs["signature_type"] = safe_signatures[0].signature_type.value
+        attrs["signature_type"] = signature_type.value
         return attrs
 
     def create(self, validated_data):

@@ -27,7 +27,6 @@ def remove_duplicated(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0046_delete_ethereumevent"),
     ]

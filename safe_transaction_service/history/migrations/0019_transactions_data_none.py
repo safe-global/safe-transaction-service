@@ -10,7 +10,6 @@ def set_data_none(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0018_multisigtransaction_trusted"),
     ]

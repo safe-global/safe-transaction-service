@@ -5,14 +5,17 @@ from unittest.mock import MagicMock
 
 from django.urls import reverse
 
+import eth_abi
 from eth_account import Account
 from eth_account.messages import defunct_hash_message
+from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 
 from gnosis.eth.eip712 import eip712_encode_hash
 from gnosis.safe.safe_signature import SafeSignatureEOA
+from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.safe_messages.models import (
@@ -241,6 +244,40 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                     },
                 )
 
+    def test_safe_messages_create_using_1271_signature_view(self):
+        account = Account.create()
+        safe_owner = self.deploy_test_safe(owners=[account.address])
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+
+        safe_address = safe.address
+        message = get_eip712_payload_mock()
+        description = "Testing EIP712 message signing"
+        message_hash = eip712_encode_hash(message)
+        safe_owner_message_hash = safe_owner.get_message_hash(message_hash)
+        safe_owner_signature = account.signHash(safe_owner_message_hash)["signature"]
+
+        # Build EIP1271 signature v=0 r=safe v=dynamic_part dynamic_part=size+owner_signature
+        signature_1271 = (
+            signature_to_bytes(
+                0, int.from_bytes(HexBytes(safe_owner.address), byteorder="big"), 65
+            )
+            + eth_abi.encode(["bytes"], [safe_owner_signature])[32:]
+        )
+
+        data = {
+            "message": message,
+            "description": description,
+            "signature": HexBytes(signature_1271).hex(),
+        }
+        response = self.client.post(
+            reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeMessage.objects.count(), 1)
+        self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
+
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
         return_value=[],
@@ -269,13 +306,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertDictEqual(
             response.data,
             {
-                "non_field_errors": [
+                "signature": [
                     ErrorDetail(
-                        string="1 owner signature was expected, 0 received",
-                        code="invalid",
+                        string="Ensure this field has at least 65 hexadecimal chars (not counting 0x).",
+                        code="min_length",
                     )
                 ]
             },

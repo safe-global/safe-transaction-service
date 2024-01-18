@@ -19,7 +19,6 @@ def fix_failed_module_transactions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0036_fix_exec_from_module"),
     ]

@@ -6,7 +6,6 @@ import safe_transaction_service.history.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0057_alter_webhook_authorization"),
     ]

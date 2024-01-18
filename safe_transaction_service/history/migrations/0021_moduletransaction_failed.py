@@ -20,7 +20,6 @@ def set_failed_for_module_txs(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0020_safemastercopy_version"),
     ]

@@ -50,7 +50,6 @@ def remove_indexing_status(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0068_alter_multisigtransaction_origin"),
     ]

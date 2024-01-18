@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.db.models.signals import post_save
 from django.test import TestCase
@@ -28,8 +29,8 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(send_event_to_queue_task, "delay")
     def test_process_webhook(
         self,
-        send_event_to_queue_task_mock,
-        webhook_task_mock,
+        send_event_to_queue_task_mock: MagicMock,
+        webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
@@ -64,8 +65,8 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(send_event_to_queue_task, "delay")
     def test_signals_are_correctly_fired(
         self,
-        send_event_to_queue_task_mock,
-        webhook_task_mock,
+        send_event_to_queue_task_mock: MagicMock,
+        webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         # Create a confirmation should fire a signal and webhooks should be sended

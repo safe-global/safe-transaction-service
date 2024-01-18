@@ -1,5 +1,6 @@
 from datetime import timedelta
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.db.models.signals import post_save
 from django.test import TestCase
@@ -81,6 +82,14 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             MultisigTransaction, MultisigTransactionFactory(ethereum_tx=None)
         )[0]
         self.assertEqual(payload["type"], WebHookType.PENDING_MULTISIG_TRANSACTION.name)
+        self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+
+        payload = build_webhook_payload(
+            MultisigTransaction,
+            MultisigTransactionFactory(ethereum_tx=None),
+            deleted=True,
+        )[0]
+        self.assertEqual(payload["type"], WebHookType.DELETED_MULTISIG_TRANSACTION.name)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
         safe_address = self.deploy_test_safe().address
@@ -165,4 +174,53 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         multisig_tx.modified -= timedelta(minutes=75)
         self.assertFalse(
             is_relevant_notification(multisig_tx.__class__, multisig_tx, created=False)
+        )
+
+    @mock.patch.object(send_webhook_task, "apply_async")
+    @mock.patch.object(send_event_to_queue_task, "delay")
+    def test_signals_are_correctly_fired(
+        self,
+        send_event_to_queue_task_mock: MagicMock,
+        webhook_task_mock: MagicMock,
+    ):
+        # Not trusted txs should not fire any event
+        MultisigTransactionFactory(trusted=False)
+        webhook_task_mock.assert_not_called()
+        send_event_to_queue_task_mock.assert_not_called()
+
+        # Trusted txs should fire an event
+        multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
+        pending_multisig_transaction_payload = {
+            "address": multisig_tx.safe,
+            "safeTxHash": multisig_tx.safe_tx_hash,
+            "type": WebHookType.EXECUTED_MULTISIG_TRANSACTION.name,
+            "failed": "false",
+            "txHash": multisig_tx.ethereum_tx_id,
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        webhook_task_mock.assert_called_with(
+            args=(multisig_tx.safe, pending_multisig_transaction_payload), priority=2
+        )
+        send_event_to_queue_task_mock.assert_called_with(
+            pending_multisig_transaction_payload
+        )
+
+        # Deleting a tx should fire an event
+        webhook_task_mock.reset_mock()
+        send_event_to_queue_task_mock.reset_mock()
+        safe_tx_hash = multisig_tx.safe_tx_hash
+        multisig_tx.delete()
+
+        deleted_multisig_transaction_payload = {
+            "address": multisig_tx.safe,
+            "safeTxHash": safe_tx_hash,
+            "type": WebHookType.DELETED_MULTISIG_TRANSACTION.name,
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+
+        webhook_task_mock.assert_called_with(
+            args=(multisig_tx.safe, deleted_multisig_transaction_payload), priority=2
+        )
+        send_event_to_queue_task_mock.assert_called_with(
+            deleted_multisig_transaction_payload
         )

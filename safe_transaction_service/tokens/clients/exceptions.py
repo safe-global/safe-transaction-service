@@ -15,7 +15,3 @@ class CoingeckoRateLimitError(CoingeckoRequestError):
         }
     }
     """
-
-
-class CannotGetPrice(CoingeckoRequestError):
-    pass

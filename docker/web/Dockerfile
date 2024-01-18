@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
@@ -27,5 +27,15 @@ RUN set -ex \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
         -exec rm -rf '{}' +
 
-COPY . .
+# /nginx mount point must be created before so it doesn't have root permissions
+# ${APP_HOME} root folder will not be updated by COPY --chown, so permissions need to be adjusted
+RUN groupadd -g 999 python && \
+    useradd -u 999 -r -g python python && \
+    mkdir -p /nginx && \
+    chown -R python:python /nginx ${APP_HOME}
+COPY --chown=python:python . .
+
+# Use numeric ids so kubernetes identifies the user correctly
+USER 999:999
+
 RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput

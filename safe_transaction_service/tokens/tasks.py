@@ -1,21 +1,17 @@
-import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from celery import app
 from celery.utils.log import get_task_logger
-from eth_typing import ChecksumAddress
 
 from gnosis.eth.ethereum_client import EthereumNetwork
 from gnosis.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
-from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .exceptions import TokenListRetrievalException
@@ -44,70 +40,6 @@ class EthValueWithTimestamp:
 
     def __str__(self):
         return f"{self.eth_value}:{self.timestamp.timestamp()}"
-
-
-@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
-@close_gevent_db_connection_decorator
-def calculate_token_eth_price_task(
-    token_address: ChecksumAddress, redis_key: str, force_recalculation: bool = False
-) -> Optional[EthValueWithTimestamp]:
-    """
-    Do price calculation for token in an async way and store it with its timestamp on redis
-
-    :param token_address: Token address
-    :param redis_key: Redis key for token price
-    :param force_recalculation: Force a new calculation even if an old one is on cache
-    :return: token price (in ether) when calculated
-    """
-    from .services.price_service import PriceServiceProvider
-
-    redis = get_redis()
-    now = timezone.now()
-    current_timestamp = int(now.timestamp())
-    key_was_set = redis.set(
-        redis_key, f"0:{current_timestamp}", ex=60 * 15, nx=True
-    )  # Expire in 15 minutes
-    # Only calculate the price if key was not set previously or if `force_recalculation` is `True`
-    if key_was_set or force_recalculation:
-        price_service = PriceServiceProvider()
-        eth_price = price_service.get_token_eth_price_from_oracles(token_address)
-        if not eth_price:
-            eth_price = price_service.get_token_eth_price_from_composed_oracles(
-                token_address
-            )
-
-        logger.debug("Calculated eth-price=%f for token=%s", eth_price, token_address)
-        if not eth_price:
-            logger.warning(
-                "Cannot calculate eth price for token=%s - Trying to use previous price",
-                token_address,
-            )
-            last_redis_value = redis.get(redis_key)
-            if last_redis_value:
-                logger.warning("Using previous eth price for token=%s", token_address)
-                eth_price = EthValueWithTimestamp.from_string(
-                    last_redis_value.decode()
-                ).eth_value
-            else:
-                logger.warning("Cannot calculate eth price for token=%s", token_address)
-                return EthValueWithTimestamp(eth_price, now)
-
-        eth_value_with_timestamp = EthValueWithTimestamp(eth_price, now)
-        redis.setex(
-            redis_key, settings.TOKEN_ETH_PRICE_TTL, str(eth_value_with_timestamp)
-        )
-        if not getattr(settings, "CELERY_ALWAYS_EAGER", False):
-            # Recalculate price before cache expires and prevents recursion checking Celery Eager property
-            # Use randint to prevent triggering all the tasks at the same time
-            calculate_token_eth_price_task.apply_async(
-                (token_address, redis_key),
-                {"force_recalculation": True},
-                countdown=settings.TOKEN_ETH_PRICE_TTL - random.randint(60, 300),
-            )
-
-        return EthValueWithTimestamp(eth_price, now)
-    else:
-        return EthValueWithTimestamp.from_string(redis.get(redis_key).decode())
 
 
 @app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
@@ -150,7 +82,7 @@ def update_token_info_from_token_list_task() -> int:
     token_addresses = [
         fast_to_checksum_address(token["address"])
         for token in tokens
-        if token["chainId"] == ethereum_network.value
+        if token.get("chainId") == ethereum_network.value
     ]
 
     with transaction.atomic():

@@ -151,10 +151,14 @@ class IndexService:
         :return: `True` if master copies and ERC20/721 are synced, `False` otherwise
         """
 
+        try:
+            current_block_number = self.ethereum_client.current_block_number
+        except IOError:
+            # If there's an error connecting to the node we consider the service as out of sync
+            return False
+
         # Use number of reorg blocks to consider as not synced
-        reference_block_number = (
-            self.ethereum_client.current_block_number - self.eth_reorg_blocks
-        )
+        reference_block_number = current_block_number - self.eth_reorg_blocks
         synced: bool = True
         for safe_master_copy in SafeMasterCopy.objects.relevant().filter(
             tx_block_number__lt=reference_block_number
@@ -192,7 +196,6 @@ class IndexService:
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
     ) -> List["EthereumTx"]:
-
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
@@ -409,7 +412,7 @@ class IndexService:
                 else current_block_number
             )
             for block_number in range(
-                from_block_number, stop_block_number, block_process_limit
+                from_block_number, stop_block_number + 1, block_process_limit
             ):
                 elements = indexer.find_relevant_elements(
                     addresses,

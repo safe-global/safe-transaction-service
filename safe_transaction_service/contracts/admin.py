@@ -1,15 +1,16 @@
 from django.contrib import admin
 
-from gnosis.eth.django.admin import BinarySearchAdmin
-
-from safe_transaction_service.utils.admin import HasLogoFilterAdmin
+from safe_transaction_service.utils.admin import (
+    AdvancedAdminSearchMixin,
+    HasLogoFilterAdmin,
+)
 
 from .models import Contract, ContractAbi
 from .tasks import create_or_update_contract_with_metadata_task
 
 
 @admin.register(ContractAbi)
-class ContractAbiAdmin(BinarySearchAdmin):
+class ContractAbiAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     list_display = ("pk", "relevance", "description", "abi_functions")
     list_filter = ("relevance",)
     ordering = ["relevance"]
@@ -40,7 +41,7 @@ class HasAbiFilter(admin.SimpleListFilter):
 
 
 @admin.register(Contract)
-class ContractAdmin(BinarySearchAdmin):
+class ContractAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     actions = ["find_abi"]
     list_display = (
         "address",
@@ -57,7 +58,7 @@ class ContractAdmin(BinarySearchAdmin):
     ordering = ["address"]
     raw_id_fields = ("contract_abi",)
     search_fields = [
-        "=address",
+        "==address",
         "name",
         "contract_abi__abi",
         "contract_abi__description",
