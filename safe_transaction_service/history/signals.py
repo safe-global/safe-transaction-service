@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from safe_transaction_service.notifications.tasks import send_notification_task
 
-from ..events.services.queue_service import QueueServicePool
+from ..events.services.queue_service import getQueueService
 from .models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -168,8 +168,8 @@ def process_webhook(
                     countdown=5,
                     priority=2,  # Almost lowest priority
                 )
-                with QueueServicePool() as queue_service:
-                    queue_service.send_event(payload)
+                queue_service = getQueueService()
+                queue_service.send_event(payload)
             else:
                 logger.debug(
                     "Notification will not be sent for created=%s object=%s",

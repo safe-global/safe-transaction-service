@@ -1,6 +1,5 @@
 import json
 from unittest import mock
-from unittest.mock import MagicMock
 
 from django.test import TestCase
 
@@ -8,27 +7,31 @@ from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
 from safe_transaction_service.events.services.queue_service import (
-    QueueServicePool,
+    BrokerConnection,
     getQueueService,
 )
 
 
 class TestQueueService(TestCase):
     def setUp(self):
-        self.queue_service = getQueueService()
+        broker_connection = BrokerConnection()
         # Create queue for test
         self.queue = "test_queue"
-        self.queue_service._channel.queue_declare(self.queue)
-        self.queue_service._channel.queue_bind(
-            self.queue, self.queue_service.exchange_name
+
+        broker_connection.channel.queue_declare(self.queue)
+        broker_connection.channel.queue_bind(
+            self.queue, broker_connection.exchange_name
         )
         # Clean queue to avoid old messages
-        self.queue_service._channel.queue_purge(self.queue)
+        broker_connection.channel.queue_purge(self.queue)
 
     def test_send_unsent_messages(self):
         queue_service = getQueueService()
+        # Clean previous pool connections
+        queue_service._connections_pool = []
         messages_to_send = 10
         queue_service.remove_unsent_events()
+        self.assertEquals(len(queue_service._connections_pool), 0)
         with mock.patch.object(
             Channel,
             "basic_publish",
@@ -36,42 +39,51 @@ class TestQueueService(TestCase):
         ):
             for i in range(messages_to_send):
                 payload = f"not sent {i}"
-                self.assertFalse(queue_service.send_event(payload))
-            # Shouldn't add this message to unsent_messages list
-            self.assertFalse(queue_service.send_event(payload, fail_retry=False))
+                queue_service.send_event(payload)
 
             self.assertEquals(len(queue_service.unsent_events), messages_to_send)
             self.assertEquals(queue_service.send_unsent_events(), 0)
 
-        # After reconnection should send messages
-        self.assertEquals(queue_service.send_unsent_events(), messages_to_send)
+        # After reconnection should send event and previous messages (10+1)
+        self.assertEquals(queue_service.send_event("not sent 11"), messages_to_send + 1)
+        # Everything should be sent by send_event
+        self.assertEquals(queue_service.send_unsent_events(), 0)
         self.assertEquals(len(queue_service.unsent_events), 0)
+        # Just one connection should be requested
+        self.assertEquals(len(queue_service._connections_pool), 1)
+        broker_connection = queue_service.get_connection()
+        # First event published should be the last 1
+        _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
+        self.assertEquals(json.loads(body), "not sent 11")
+        # Check if all unsent_events were sent
         for i in range(messages_to_send):
             payload = f"not sent {i}"
-            _, _, body = queue_service._channel.basic_get(self.queue, auto_ack=True)
+            _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
             self.assertEquals(json.loads(body), payload)
 
     def test_send_event_to_queue(self):
         payload = {"event": "test_event", "type": "event type"}
-
-        self.assertTrue(self.queue_service.send_event(payload))
-
+        queue_service = getQueueService()
+        # Clean previous pool connections
+        queue_service._connections_pool = []
+        self.assertEquals(len(queue_service._connections_pool), 0)
+        queue_service.send_event(payload)
+        self.assertEquals(len(queue_service._connections_pool), 1)
+        broker_connection = queue_service.get_connection()
         # Check if message was written to the queue
-        _, _, body = self.queue_service._channel.basic_get(self.queue, auto_ack=True)
+        _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
         self.assertEquals(json.loads(body), payload)
 
-    @mock.patch(
-        "safe_transaction_service.events.services.queue_service.getQueueService"
-    )
-    def test_queue_service_pool(self, mock_get_queue_service: MagicMock):
+    def test_get_connection(self):
         queue_service = getQueueService()
-        QueueServicePool.queue_service_pool = [queue_service]
-        with QueueServicePool() as queue_service:
-            self.assertEqual(queue_service, queue_service)
-        mock_get_queue_service.assert_not_called()
-
-        QueueServicePool.queue_service_pool = []
-        mock_get_queue_service.return_value = queue_service
-        with QueueServicePool() as queue_service:
-            self.assertEqual(queue_service, queue_service)
-        mock_get_queue_service.assert_called_once()
+        # Clean previous pool connections
+        queue_service._connections_pool = []
+        self.assertEquals(len(queue_service._connections_pool), 0)
+        connection_1 = queue_service.get_connection()
+        self.assertEquals(len(queue_service._connections_pool), 0)
+        connection_2 = queue_service.get_connection()
+        self.assertEquals(len(queue_service._connections_pool), 0)
+        queue_service.release_connection(connection_1)
+        self.assertEquals(len(queue_service._connections_pool), 1)
+        queue_service.release_connection(connection_2)
+        self.assertEquals(len(queue_service._connections_pool), 2)
