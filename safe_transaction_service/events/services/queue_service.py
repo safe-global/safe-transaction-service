@@ -22,8 +22,7 @@ class BrokerConnection:
 
     def connect(self) -> Optional[BlockingConnection]:
         """
-        This method connects to RabbitMq using Blockingconnection.
-        Store in _connection the BlocingConnection object and creates a new channel
+        This method connects to RabbitMq using BlockingConnection.
 
         :return: BlockingConnection
         """
@@ -44,11 +43,20 @@ class BrokerConnection:
             logger.error("Cannot open connection with RabbitMQ")
 
     def is_connected(self) -> bool:
+        """
+
+        :return: True if is connected False in other case
+        """
         if not self.connection or not self.connection.is_open:
             return False
         return True
 
     def publish(self, message: str) -> bool:
+        """
+
+        :param message:
+        :return: True if message was published False in other case
+        """
         # Check if is still connected if not try to reconnect
         if not self.is_connected() and not self.connect():
             return False
@@ -77,12 +85,22 @@ class QueueService:
         self.unsent_events: List = []
 
     def get_connection(self) -> BrokerConnection:
+        """
+
+        :return: A BrokerConnection from _connections_pool if there is one available or returns a new BrokerConnection
+        """
         if self._connections_pool:
             return self._connections_pool.pop()
         else:
             return BrokerConnection()
 
     def release_connection(self, broker_connection: BrokerConnection):
+        """
+        Append the connection to _connections_pool
+
+        :param broker_connection:
+        :return:
+        """
         self._connections_pool.insert(0, broker_connection)
 
     def send_event(self, payload: Dict[str, Any]) -> int:
@@ -107,7 +125,7 @@ class QueueService:
 
     def send_unsent_events(self) -> int:
         """
-        If connection is ready send the unsent messages list due connection broken
+        If connection is ready send the unsent messages list
 
         :return: number of messages sent
         """
@@ -122,6 +140,7 @@ class QueueService:
                 else:
                     break
             self.release_connection(broker_connection)
+            logger.info("Sent %i not sent messages", len(self.unsent_events))
             return sent_events
         return 0
 
