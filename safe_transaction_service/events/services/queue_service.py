@@ -1,6 +1,6 @@
 import json
 import logging
-from functools import lru_cache
+from functools import cache
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
@@ -69,19 +69,20 @@ class BrokerConnection:
             return False
 
 
-@lru_cache
+@cache
 def getQueueService():
     if settings.EVENTS_QUEUE_URL:
         return QueueService()
     else:
         # Mock send_event to not configured host us is not mandatory configure a queue for events
-        return MockedQueueService()
         logger.warning("MockedQueueService is used")
+        return MockedQueueService()
+
 
 
 class QueueService:
     def __init__(self):
-        self._connections_pool: List[BrokerConnection] = []
+        self._connection_pool: List[BrokerConnection] = []
         self.unsent_events: List = []
 
     def get_connection(self) -> BrokerConnection:
@@ -89,8 +90,8 @@ class QueueService:
 
         :return: A BrokerConnection from _connections_pool if there is one available or returns a new BrokerConnection
         """
-        if self._connections_pool:
-            return self._connections_pool.pop()
+        if self._connection_pool:
+            return self._connection_pool.pop()
         else:
             return BrokerConnection()
 
@@ -101,11 +102,11 @@ class QueueService:
         :param broker_connection:
         :return:
         """
-        self._connections_pool.insert(0, broker_connection)
+        self._connection_pool.insert(0, broker_connection)
 
     def send_event(self, payload: Dict[str, Any]) -> int:
         """
-        Send an event to rabbitMq exchange
+        Send an event to RabbitMQ exchange
 
         :param payload: Dict with the payload of the event
         """
@@ -129,19 +130,24 @@ class QueueService:
 
         :return: number of messages sent
         """
-        if len(self.unsent_events):
+        if self.unsent_events:
+            # Avoid race conditions
+            unsent_events = self.unsent_events
+            self.unsent_events = []
             broker_connection = self.get_connection()
-            sent_events = 0
-            logger.info("Sending %i not sent messages", len(self.unsent_events))
-            for unsent_message in list(self.unsent_events):
+            total_sent_events = 0
+            logger.info("Sending %i not sent messages", len(unsent_events))
+
+            for unsent_message in unsent_events:
                 if broker_connection.publish(unsent_message):
-                    self.unsent_events.remove(unsent_message)
-                    sent_events += 1
+                    total_sent_events += 1
                 else:
-                    break
+                    self.unsent_events.append(unsent_message)
+
             self.release_connection(broker_connection)
-            logger.info("Sent %i not sent messages", len(self.unsent_events))
-            return sent_events
+            logger.info("Sent %i not sent messages", total_sent_events)
+            return total_sent_events
+
         return 0
 
     def remove_unsent_events(self):

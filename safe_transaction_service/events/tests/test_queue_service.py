@@ -28,10 +28,10 @@ class TestQueueService(TestCase):
     def test_send_unsent_messages(self):
         queue_service = getQueueService()
         # Clean previous pool connections
-        queue_service._connections_pool = []
+        queue_service._connection_pool = []
         messages_to_send = 10
         queue_service.remove_unsent_events()
-        self.assertEquals(len(queue_service._connections_pool), 0)
+        self.assertEquals(len(queue_service._connection_pool), 0)
         with mock.patch.object(
             Channel,
             "basic_publish",
@@ -50,7 +50,7 @@ class TestQueueService(TestCase):
         self.assertEquals(queue_service.send_unsent_events(), 0)
         self.assertEquals(len(queue_service.unsent_events), 0)
         # Just one connection should be requested
-        self.assertEquals(len(queue_service._connections_pool), 1)
+        self.assertEquals(len(queue_service._connection_pool), 1)
         broker_connection = queue_service.get_connection()
         # First event published should be the last 1
         _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
@@ -65,10 +65,10 @@ class TestQueueService(TestCase):
         payload = {"event": "test_event", "type": "event type"}
         queue_service = getQueueService()
         # Clean previous pool connections
-        queue_service._connections_pool = []
-        self.assertEquals(len(queue_service._connections_pool), 0)
+        queue_service._connection_pool = []
+        self.assertEquals(len(queue_service._connection_pool), 0)
         queue_service.send_event(payload)
-        self.assertEquals(len(queue_service._connections_pool), 1)
+        self.assertEquals(len(queue_service._connection_pool), 1)
         broker_connection = queue_service.get_connection()
         # Check if message was written to the queue
         _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
@@ -77,13 +77,13 @@ class TestQueueService(TestCase):
     def test_get_connection(self):
         queue_service = getQueueService()
         # Clean previous pool connections
-        queue_service._connections_pool = []
-        self.assertEquals(len(queue_service._connections_pool), 0)
+        queue_service._connection_pool = []
+        self.assertEquals(len(queue_service._connection_pool), 0)
         connection_1 = queue_service.get_connection()
-        self.assertEquals(len(queue_service._connections_pool), 0)
+        self.assertEquals(len(queue_service._connection_pool), 0)
         connection_2 = queue_service.get_connection()
-        self.assertEquals(len(queue_service._connections_pool), 0)
+        self.assertEquals(len(queue_service._connection_pool), 0)
         queue_service.release_connection(connection_1)
-        self.assertEquals(len(queue_service._connections_pool), 1)
+        self.assertEquals(len(queue_service._connection_pool), 1)
         queue_service.release_connection(connection_2)
-        self.assertEquals(len(queue_service._connections_pool), 2)
+        self.assertEquals(len(queue_service._connection_pool), 2)
