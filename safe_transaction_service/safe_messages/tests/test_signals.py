@@ -64,7 +64,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(
         self,
-        send_event_to_queue_task_mock: MagicMock,
+        send_event_mock: MagicMock,
         webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
@@ -79,7 +79,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(safe_address, message_created_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(message_created_payload)
+        send_event_mock.assert_called_with(message_created_payload)
         message_confirmation_payload = {
             "address": safe_address,
             "type": WebHookType.MESSAGE_CONFIRMATION.name,
@@ -91,4 +91,4 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(safe_address, message_confirmation_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(message_confirmation_payload)
+        send_event_mock.assert_called_with(message_confirmation_payload)

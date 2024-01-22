@@ -79,7 +79,6 @@ def get_queue_service():
         return MockedQueueService()
 
 
-
 class QueueService:
     def __init__(self):
         self._connection_pool: List[BrokerConnection] = []
