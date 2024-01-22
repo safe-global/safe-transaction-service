@@ -5,7 +5,7 @@ django==4.2.7
 django-cache-memoize==0.2.0
 django-celery-beat==2.5.0
 django-cors-headers==4.3.1
-django-db-geventpool==4.0.1
+django-db-geventpool==4.0.2
 django-debug-toolbar
 django-debug-toolbar-force
 django-environ==0.11.2
@@ -32,5 +32,5 @@ psycogreen==1.0.2
 psycopg2==2.9.9
 redis==5.0.1
 requests==2.31.0
-safe-eth-py[django]==6.0.0b13
-web3==6.11.4
+safe-eth-py[django]==6.0.0b14
+web3==6.14.0

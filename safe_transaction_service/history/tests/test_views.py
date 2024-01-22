@@ -17,6 +17,7 @@ from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
 from requests import ReadTimeout
 from rest_framework import status
+from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 from web3 import Web3
 
@@ -35,7 +36,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
 from ...utils.redis import get_redis
-from ..helpers import DelegateSignatureHelper
+from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
     MultisigConfirmation,
@@ -868,6 +869,132 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             format="json",
         )
         self.assertEqual(response.data["proposer"], proposer)
+
+    def test_delete_multisig_transaction(self):
+        owner_account = Account.create()
+        safe_tx_hash = Web3.keccak(text="random-tx").hex()
+        url = reverse("v1:history:multisig-transaction", args=(safe_tx_hash,))
+        data = {"signature": "0x" + "1" * (130 * 2)}  # 2 signatures of 65 bytes
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Add our test MultisigTransaction to the database
+        multisig_transaction = MultisigTransactionFactory(safe_tx_hash=safe_tx_hash)
+
+        # Add other MultisigTransactions to the database to make sure they are not deleted
+        MultisigTransactionFactory()
+        MultisigTransactionFactory()
+
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Executed transactions cannot be deleted", code="invalid"
+                    )
+                ]
+            },
+        )
+
+        multisig_transaction.ethereum_tx = None
+        multisig_transaction.save(update_fields=["ethereum_tx"])
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Old transactions without proposer cannot be deleted",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Set a random proposer for the transaction
+        multisig_transaction.proposer = Account.create().address
+        multisig_transaction.save(update_fields=["proposer"])
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="1 owner signature was expected, 2 received",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a contract signature
+        data = {"signature": "0x" + "0" * 130}  # 1 signature of 65 bytes
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Only EOA and ETH_SIGN signatures are supported",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a real not valid signature and set the right proposer
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.save(update_fields=["proposer"])
+        data = {
+            "signature": owner_account.signHash(safe_tx_hash)[
+                "signature"
+            ].hex()  # Random signature
+        }
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Provided owner is not the proposer of the transaction",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a proper signature
+        message_hash = DeleteMultisigTxSignatureHelper.calculate_hash(
+            multisig_transaction.safe,
+            safe_tx_hash,
+            self.ethereum_client.get_chain_id(),
+            previous_totp=False,
+        )
+        data = {
+            "signature": owner_account.signHash(message_hash)[
+                "signature"
+            ].hex()  # Random signature
+        }
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertTrue(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertFalse(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+
+        # Trying to do the query again should raise a 404
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address

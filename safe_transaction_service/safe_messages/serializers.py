@@ -62,7 +62,7 @@ class SafeMessageSignatureParserMixin:
 
 class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Serializer):
     message = serializers.JSONField()
-    safe_app_id = serializers.IntegerField(allow_null=True, default=None)
+    safe_app_id = serializers.IntegerField(allow_null=True, default=None, min_value=0)
     signature = eth_serializers.HexadecimalField(
         min_length=65, max_length=SIGNATURE_LENGTH
     )

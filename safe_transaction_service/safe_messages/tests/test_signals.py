@@ -65,7 +65,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     def test_signals_are_correctly_fired(
         self,
         send_event_to_queue_task_mock: MagicMock,
-        webhook_task_mock,
+        webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         # Create a confirmation should fire a signal and webhooks should be sended
