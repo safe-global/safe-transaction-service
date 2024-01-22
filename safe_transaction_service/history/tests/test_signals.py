@@ -10,9 +10,9 @@ import factory
 from gnosis.eth import EthereumNetwork
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from safe_transaction_service.events.tasks import send_event_to_queue_task
 from safe_transaction_service.notifications.tasks import send_notification_task
 
+from ...events.services.queue_service import QueueService
 from ...safe_messages.models import SafeMessage, SafeMessageConfirmation
 from ...safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
@@ -112,28 +112,28 @@ class TestSignals(SafeTestCaseMixin, TestCase):
     @factory.django.mute_signals(post_save)
     @mock.patch.object(send_webhook_task, "apply_async")
     @mock.patch.object(send_notification_task, "apply_async")
-    @mock.patch.object(send_event_to_queue_task, "delay")
+    @mock.patch.object(QueueService, "send_event")
     def test_process_webhook(
         self,
-        webhook_task_mock,
-        send_notification_task_mock,
-        send_event_to_queue_task_mock,
+        send_event_mock: MagicMock,
+        webhook_task_mock: MagicMock,
+        send_notification_task_mock: MagicMock,
     ):
         multisig_confirmation = MultisigConfirmationFactory()
         process_webhook(MultisigConfirmation, multisig_confirmation, True)
         webhook_task_mock.assert_called()
         send_notification_task_mock.assert_called()
-        send_event_to_queue_task_mock.assert_called()
+        send_event_mock.assert_called()
         # reset calls
         webhook_task_mock.reset_mock()
         send_notification_task_mock.reset_mock()
-        send_event_to_queue_task_mock.reset_mock()
+        send_event_mock.reset_mock()
 
         multisig_confirmation.created -= timedelta(minutes=75)
         process_webhook(MultisigConfirmation, multisig_confirmation, True)
         webhook_task_mock.assert_not_called()
+        send_event_mock.assert_not_called()
         send_notification_task_mock.assert_not_called()
-        send_event_to_queue_task_mock.assert_not_called()
 
     @factory.django.mute_signals(post_save)
     def test_is_relevant_notification_multisig_confirmation(self):
@@ -177,16 +177,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         )
 
     @mock.patch.object(send_webhook_task, "apply_async")
-    @mock.patch.object(send_event_to_queue_task, "delay")
+    @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(
         self,
-        send_event_to_queue_task_mock: MagicMock,
+        send_event_mock: MagicMock,
         webhook_task_mock: MagicMock,
     ):
         # Not trusted txs should not fire any event
         MultisigTransactionFactory(trusted=False)
         webhook_task_mock.assert_not_called()
-        send_event_to_queue_task_mock.assert_not_called()
+        send_event_mock.assert_not_called()
 
         # Trusted txs should fire an event
         multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
@@ -201,13 +201,11 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(multisig_tx.safe, pending_multisig_transaction_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(
-            pending_multisig_transaction_payload
-        )
+        send_event_mock.assert_called_with(pending_multisig_transaction_payload)
 
         # Deleting a tx should fire an event
         webhook_task_mock.reset_mock()
-        send_event_to_queue_task_mock.reset_mock()
+        send_event_mock.reset_mock()
         safe_tx_hash = multisig_tx.safe_tx_hash
         multisig_tx.delete()
 
@@ -221,6 +219,4 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(multisig_tx.safe, deleted_multisig_transaction_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(
-            deleted_multisig_transaction_payload
-        )
+        send_event_mock.assert_called_with(deleted_multisig_transaction_payload)
