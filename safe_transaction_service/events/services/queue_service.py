@@ -70,7 +70,7 @@ class BrokerConnection:
 
 
 @cache
-def getQueueService():
+def get_queue_service():
     if settings.EVENTS_QUEUE_URL:
         return QueueService()
     else:
@@ -131,10 +131,10 @@ class QueueService:
         :return: number of messages sent
         """
         if self.unsent_events:
+            broker_connection = self.get_connection()
             # Avoid race conditions
             unsent_events = self.unsent_events
             self.unsent_events = []
-            broker_connection = self.get_connection()
             total_sent_events = 0
             logger.info("Sending %i not sent messages", len(unsent_events))
 

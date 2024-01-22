@@ -8,7 +8,7 @@ from pika.exceptions import ConnectionClosedByBroker
 
 from safe_transaction_service.events.services.queue_service import (
     BrokerConnection,
-    getQueueService,
+    get_queue_service,
 )
 
 
@@ -26,7 +26,7 @@ class TestQueueService(TestCase):
         broker_connection.channel.queue_purge(self.queue)
 
     def test_send_unsent_messages(self):
-        queue_service = getQueueService()
+        queue_service = get_queue_service()
         # Clean previous pool connections
         queue_service._connection_pool = []
         messages_to_send = 10
@@ -63,7 +63,7 @@ class TestQueueService(TestCase):
 
     def test_send_event_to_queue(self):
         payload = {"event": "test_event", "type": "event type"}
-        queue_service = getQueueService()
+        queue_service = get_queue_service()
         # Clean previous pool connections
         queue_service._connection_pool = []
         self.assertEquals(len(queue_service._connection_pool), 0)
@@ -75,7 +75,7 @@ class TestQueueService(TestCase):
         self.assertEquals(json.loads(body), payload)
 
     def test_get_connection(self):
-        queue_service = getQueueService()
+        queue_service = get_queue_service()
         # Clean previous pool connections
         queue_service._connection_pool = []
         self.assertEquals(len(queue_service._connection_pool), 0)
