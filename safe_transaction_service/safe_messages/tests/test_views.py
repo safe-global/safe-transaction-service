@@ -175,7 +175,27 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                     "message": message,
                     "description": description,
                     "signature": signature,
+                    "safeAppId": -1,
                 }
+                response = self.client.post(
+                    reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(
+                    response.data,
+                    {
+                        "safe_app_id": [
+                            ErrorDetail(
+                                string="Ensure this value is greater than or equal to 0.",
+                                code="min_value",
+                            )
+                        ]
+                    },
+                )
+
+                data.pop("safeAppId")
                 response = self.client.post(
                     reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
                     format="json",
