@@ -5,19 +5,18 @@ import requests
 from cache_memoize import cache_memoize
 from hexbytes import HexBytes
 
+from gnosis.eth import EthereumNetwork
+
 
 class EnsClient:
     def __init__(self, network_id: int):
-        base_url = "https://api.thegraph.com/subgraphs/name/ensdomains/"
-        if network_id == 3:  # Ropsten
-            url = base_url + "ensropsten"
-        elif network_id == 4:  # Rinkeby
-            url = base_url + "ensrinkeby"
-        elif network_id == 5:  # Goerli
-            url = base_url + "ensgoerli"
+        self.base_url = "https://api.thegraph.com/subgraphs/name/ensdomains/"
+        self.ethereum_network = EthereumNetwork(network_id)
+        if network_id == self.ethereum_network.ROPSTEN:  # Ropsten
+            url = self.base_url + "ensropsten"
         else:  # Fallback to mainnet
-            url = base_url + "ens"
-        self.url: str = url
+            url = self.base_url + "ens"
+        self.url = url
         self.request_timeout = 5  # Seconds
         self.request_session = requests.Session()
 

@@ -16,7 +16,7 @@ Transactions can also be sent to the service to allow offchain collecting of sig
 a transaction that is pending to be sent to the blockchain.
 
 [Swagger (Mainnet version)](https://safe-transaction-mainnet.safe.global/)
-[Swagger (Göerli version)](https://safe-transaction-goerli.safe.global/)
+[More networks](https://docs.safe.global/safe-core-api/supported-networks)
 
 ## Index of contents
 

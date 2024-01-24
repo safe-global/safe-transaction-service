@@ -35,7 +35,7 @@ from .factories import (
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
-from .mocks.traces import call_trace, module_traces, rinkeby_traces
+from .mocks.traces import call_trace, module_traces, testnet_traces
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             TracingManager,
             "trace_transaction",
             autospec=True,
-            return_value=rinkeby_traces,
+            return_value=testnet_traces,
         ):
             # call_trace has [] as a trace address and module txs need to get the grandfather tx, so [0,0] must
             # be used
