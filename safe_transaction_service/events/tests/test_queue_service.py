@@ -30,7 +30,7 @@ class TestQueueService(TestCase):
         # Clean previous pool connections
         queue_service._connection_pool = []
         messages_to_send = 10
-        queue_service.remove_unsent_events()
+        queue_service.clear_unsent_events()
         self.assertEquals(len(queue_service._connection_pool), 0)
         with mock.patch.object(
             Channel,
