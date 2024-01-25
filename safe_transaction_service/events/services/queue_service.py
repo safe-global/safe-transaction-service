@@ -112,6 +112,7 @@ class QueueService:
 
         event = json.dumps(payload)
         if broker_connection.publish(event):
+            logger.debug("Event correctly sent: %s", event)
             self.release_connection(broker_connection)
             return self.send_unsent_events() + 1
 
