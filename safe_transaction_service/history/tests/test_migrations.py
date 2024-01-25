@@ -241,3 +241,99 @@ class TestMigrations(TestCase):
         )
         SafeContract = old_state.apps.get_model("history", "SafeContract")
         self.assertEqual(SafeContract.objects.filter(erc20_block_number=0).count(), 3)
+
+    def test_migration_forward_0073_safe_apps_links(self):
+        """
+        Migrate safe apps links from 'apps.gnosis-safe.io' -> 'apps-portal.safe.global'
+        """
+
+        new_state = self.migrator.apply_initial_migration(
+            ("history", "0072_safecontract_banned_and_more"),
+        )
+        origins = [
+            {"not_url": "random"},
+            {"url": "https://app.zerion.io", "name": "Zerion"},
+            {
+                "url": "https://apps.gnosis-safe.io/tx-builder/",
+                "name": "Transaction Builder",
+            },
+        ]
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        for origin in origins:
+            MultisigTransaction.objects.create(
+                safe_tx_hash=Web3.keccak(text=f"multisig-tx-{origin}").hex(),
+                safe=Account.create().address,
+                value=0,
+                operation=0,
+                safe_tx_gas=0,
+                base_gas=0,
+                gas_price=0,
+                nonce=0,
+                origin=origin,
+            )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0073_safe_apps_links"),
+        )
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        self.assertCountEqual(
+            MultisigTransaction.objects.values_list("origin", flat=True),
+            [
+                {"not_url": "random"},
+                {"url": "https://app.zerion.io", "name": "Zerion"},
+                {
+                    "url": "https://apps-portal.safe.global/tx-builder/",
+                    "name": "Transaction Builder",
+                },
+            ],
+        )
+
+    def test_migration_backward_0073_safe_apps_links(self):
+        """
+        Migrate safe apps links from 'apps.gnosis-safe.io' -> 'apps-portal.safe.global'
+        """
+
+        new_state = self.migrator.apply_initial_migration(
+            ("history", "0073_safe_apps_links"),
+        )
+
+        origins = [
+            {"not_url": "random"},
+            {"url": "https://app.zerion.io", "name": "Zerion"},
+            {
+                "url": "https://apps.gnosis-safe.io/tx-builder/",
+                "name": "Transaction Builder",
+            },
+        ]
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        for origin in origins:
+            MultisigTransaction.objects.create(
+                safe_tx_hash=Web3.keccak(text=f"multisig-tx-{origin}").hex(),
+                safe=Account.create().address,
+                value=0,
+                operation=0,
+                safe_tx_gas=0,
+                base_gas=0,
+                gas_price=0,
+                nonce=0,
+                origin=origin,
+            )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0072_safecontract_banned_and_more"),
+        )
+
+        MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
+        self.assertCountEqual(
+            MultisigTransaction.objects.values_list("origin", flat=True),
+            [
+                {"not_url": "random"},
+                {"url": "https://app.zerion.io", "name": "Zerion"},
+                {
+                    "url": "https://apps.gnosis-safe.io/tx-builder/",
+                    "name": "Transaction Builder",
+                },
+            ],
+        )

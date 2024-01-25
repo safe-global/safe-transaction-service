@@ -11,6 +11,8 @@ from gnosis.safe.safe_signature import SafeSignatureType
 
 logger = getLogger(__name__)
 
+SIGNATURE_LENGTH = 5_000
+
 
 class SafeMessage(TimeStampedModel):
     """
@@ -33,11 +35,7 @@ class SafeMessage(TimeStampedModel):
         message = message_str[:message_size]
         if len(message_str) > message_size:
             message += "..."
-        message_hash = (
-            self.message_hash.hex()
-            if isinstance(self.message_hash, bytes)
-            else self.message_hash
-        )
+        message_hash = HexBytes(self.message_hash).hex()
         return f"Safe Message {message_hash} - {message}"
 
     def build_signature(self) -> bytes:
@@ -65,7 +63,7 @@ class SafeMessageConfirmation(TimeStampedModel):
         related_name="confirmations",
     )
     owner = EthereumAddressV2Field(db_index=True)
-    signature = HexField(max_length=5000)
+    signature = HexField(max_length=SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )

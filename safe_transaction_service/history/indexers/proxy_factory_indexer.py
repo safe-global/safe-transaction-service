@@ -8,8 +8,9 @@ from web3.types import EventData, LogReceipt
 from gnosis.eth import EthereumClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import (
-    get_proxy_factory_contract,
     get_proxy_factory_V1_1_1_contract,
+    get_proxy_factory_V1_3_0_contract,
+    get_proxy_factory_V1_4_1_contract,
 )
 
 from ..models import ProxyFactory, SafeContract
@@ -21,13 +22,15 @@ logger = getLogger(__name__)
 class ProxyFactoryIndexerProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            from django.conf import settings
-
-            cls.instance = ProxyFactoryIndexer(
-                EthereumClient(settings.ETHEREUM_NODE_URL)
-            )
+            cls.instance = cls.get_new_instance()
 
         return cls.instance
+
+    @classmethod
+    def get_new_instance(cls) -> "ProxyFactoryIndexer":
+        from django.conf import settings
+
+        return ProxyFactoryIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
     @classmethod
     def del_singleton(cls):
@@ -38,13 +41,22 @@ class ProxyFactoryIndexerProvider:
 class ProxyFactoryIndexer(EventsIndexer):
     @cached_property
     def contract_events(self) -> List[ContractEvent]:
-        old_proxy_factory_contract = get_proxy_factory_V1_1_1_contract(
+        proxy_factory_v1_1_1_contract = get_proxy_factory_V1_1_1_contract(
             self.ethereum_client.w3
         )
-        proxy_factory_contract = get_proxy_factory_contract(self.ethereum_client.w3)
+        proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(
+            self.ethereum_client.w3
+        )
+        proxy_factory_v_1_4_1_contract = get_proxy_factory_V1_4_1_contract(
+            self.ethereum_client.w3
+        )
         return [
-            old_proxy_factory_contract.events.ProxyCreation(),
-            proxy_factory_contract.events.ProxyCreation(),
+            # event ProxyCreation(Proxy proxy)
+            proxy_factory_v1_1_1_contract.events.ProxyCreation(),
+            # event ProxyCreation(GnosisSafeProxy proxy, address singleton)
+            proxy_factory_v1_3_0_contract.events.ProxyCreation(),
+            # event ProxyCreation(SafeProxy indexed proxy, address singleton)
+            proxy_factory_v_1_4_1_contract.events.ProxyCreation(),
         ]
 
     @property

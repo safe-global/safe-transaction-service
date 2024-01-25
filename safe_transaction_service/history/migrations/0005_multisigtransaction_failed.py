@@ -22,7 +22,6 @@ def set_failed_for_multisig_txs(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0004_auto_20191118_1001"),
     ]

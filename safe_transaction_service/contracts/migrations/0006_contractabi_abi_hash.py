@@ -22,7 +22,6 @@ def add_hash_for_contract_abis(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0005_alter_contractabi_id"),
     ]

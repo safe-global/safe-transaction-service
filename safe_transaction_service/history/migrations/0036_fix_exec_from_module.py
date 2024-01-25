@@ -49,7 +49,6 @@ def fix_ethereum_logs(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0035_safemastercopy_deployer"),
     ]

@@ -5,15 +5,22 @@ from django.utils import timezone
 
 from eth_account import Account
 
-from ..models import EthereumTx, ModuleTransaction, MultisigTransaction
+from ..models import (
+    EthereumTx,
+    EthereumTxCallType,
+    ModuleTransaction,
+    MultisigTransaction,
+)
 from ..services.transaction_service import (
     TransactionService,
     TransactionServiceProvider,
 )
 from .factories import (
     ERC20TransferFactory,
+    ERC721TransferFactory,
     InternalTxFactory,
     ModuleTransactionFactory,
+    MultisigConfirmationFactory,
     MultisigTransactionFactory,
 )
 
@@ -28,6 +35,57 @@ class TestTransactionService(TestCase):
     def tearDown(self):
         super().tearDown()
         self.transaction_service.redis.flushall()
+
+    def test_get_count_relevant_txs_for_safe(self):
+        transaction_service: TransactionService = self.transaction_service
+        safe_address = Account.create().address
+
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 0
+        )
+
+        MultisigTransactionFactory(safe=safe_address)
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 1
+        )
+
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        # Not related MultisigConfirmation should not show
+        MultisigConfirmationFactory()
+        ERC20TransferFactory(to=safe_address)
+        ERC20TransferFactory(_from=safe_address)
+        ERC721TransferFactory(to=safe_address)
+        ERC721TransferFactory(_from=safe_address)
+        ModuleTransactionFactory(safe=safe_address)
+        InternalTxFactory(
+            value=5, call_type=EthereumTxCallType.CALL.value, to=safe_address
+        )
+
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 10
+        )
+
+        # InternalTxs without value are not returned
+        InternalTxFactory(
+            value=0, call_type=EthereumTxCallType.CALL.value, to=safe_address
+        )
+
+        # InternalTxs without proper type are not returned
+        InternalTxFactory(
+            value=5, call_type=EthereumTxCallType.DELEGATE_CALL.value, to=safe_address
+        )
+
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 10
+        )
+
+        # A different Safe must be empty
+        safe_address_2 = Account.create().address
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address_2), 0
+        )
 
     def test_get_all_tx_identifiers(self):
         transaction_service: TransactionService = self.transaction_service

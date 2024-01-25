@@ -1,5 +1,7 @@
+import datetime
 import json
 import logging
+import pickle
 from dataclasses import asdict
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
@@ -9,11 +11,13 @@ from django.contrib.auth.models import Permission
 from django.urls import reverse
 from django.utils import timezone
 
+import eth_abi
 from eth_account import Account
 from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
 from requests import ReadTimeout
 from rest_framework import status
+from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 from web3 import Web3
 
@@ -29,10 +33,10 @@ from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
 from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import PriceService
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 
-from ..helpers import DelegateSignatureHelper
+from ...utils.redis import get_redis
+from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
     MultisigConfirmation,
@@ -47,6 +51,7 @@ from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
+    EthereumBlockFactory,
     EthereumTxFactory,
     InternalTxFactory,
     ModuleTransactionFactory,
@@ -58,6 +63,16 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
+from .mocks.mocks_safe_creation import (
+    create_cpk_test_data,
+    create_test_data_v1_0_0,
+    create_test_data_v1_1_1,
+    create_v1_4_1_test_data,
+    data_decoded_cpk,
+    data_decoded_v1_0_0,
+    data_decoded_v1_1_1,
+    data_decoded_v1_4_1,
+)
 from .mocks.traces import call_trace
 
 logger = logging.getLogger(__name__)
@@ -66,6 +81,16 @@ logger = logging.getLogger(__name__)
 class TestViews(SafeTestCaseMixin, APITestCase):
     def test_about_view(self):
         url = reverse("v1:history:about")
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_swagger_json_schema(self):
+        url = reverse("schema-json", args=(".json",))
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_swagger_ui(self):
+        url = reverse("schema-swagger-ui")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -290,6 +315,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "symbol": token.symbol,
                 "decimals": token.decimals,
                 "logo_uri": token.get_full_logo_uri(),
+                "trusted": token.trusted,
             },
         )
         transfers_not_empty = [
@@ -327,6 +353,104 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+    def test_all_transactions_ordering(self):
+        safe_address = Account.create().address
+        block_2_days_ago = EthereumBlockFactory(
+            timestamp=timezone.now() - datetime.timedelta(days=2)
+        )
+        ethereum_tx_2_days_ago = EthereumTxFactory(block=block_2_days_ago)
+        # Older transaction
+        MultisigTransactionFactory(
+            safe=safe_address, ethereum_tx=ethereum_tx_2_days_ago
+        )
+        # Earlier transactions
+        MultisigTransactionFactory(safe=safe_address)
+        MultisigTransactionFactory(safe=safe_address)
+        # Nonce is not allowed as a sorting parameter
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?ordering=nonce"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        first_result = response.data["results"][0]
+        self.assertEqual(
+            first_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
+        )
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?trusted=False&ordering=-execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        last_result = response.data["results"][2]
+        self.assertEqual(
+            last_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
+        )
+
+    def test_all_transactions_cache(self):
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        # Older transaction
+        factory_transactions = [
+            MultisigTransactionFactory(safe=safe_address),
+            MultisigTransactionFactory(safe=safe_address),
+        ]
+        # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
+        cache_key = "all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:10:0:execution_date:2"
+        redis = get_redis()
+        redis.delete(cache_key)
+        cache_result = redis.get(cache_key)
+        # Should be empty at the beginning
+        self.assertIsNone(cache_result)
+
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+        cache_result = redis.get(cache_key)
+        # Should be stored in redis cache
+        self.assertIsNotNone(cache_result)
+        # Cache should content the expected values
+        cache_values, cache_count = pickle.loads(cache_result)
+        self.assertEqual(cache_count, 2)
+        for cache_value, factory_transaction in zip(cache_values, factory_transactions):
+            self.assertEqual(
+                cache_value["safe_tx_hash"], factory_transaction.safe_tx_hash
+            )
+            self.assertEqual(cache_value["created"], factory_transaction.created)
+            self.assertEqual(
+                cache_value["execution_date"], factory_transaction.execution_date
+            )
+            self.assertEqual(
+                cache_value["block"], factory_transaction.ethereum_tx.block_id
+            )
+            self.assertEqual(cache_value["safe_nonce"], factory_transaction.nonce)
+        # Modify cache to empty list
+        redis.set(cache_key, pickle.dumps(([], 0)), ex=60 * 10)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        # Response should be returned from cache
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        # Cache should be invalidated because there is new transaction
+        MultisigTransactionFactory(safe=safe_address)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?executed=True&queued=False&trusted=False&ordering=execution_date"
+        )
+        self.assertEqual(response.data["count"], 3)
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
@@ -676,6 +800,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "b1b3b164cf000000000000000000000000000000000000000000000000000000"
             "0000000001"
         )
+
         multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
         safe_tx_hash = multisig_tx.safe_tx_hash
         response = self.client.get(
@@ -692,6 +817,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertFalse(response.data["trusted"])
         self.assertIsNone(response.data["max_fee_per_gas"])
         self.assertIsNone(response.data["max_priority_fee_per_gas"])
+        self.assertIsNone(response.data["proposer"])
         self.assertEqual(
             response.data["data_decoded"],
             {
@@ -706,6 +832,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 ],
             },
         )
+
         # Test camelCase
         self.assertEqual(
             response.json()["transactionHash"], multisig_tx.ethereum_tx.tx_hash
@@ -733,16 +860,154 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["origin"], json.dumps(origin))
         self.assertEqual(json.loads(response.data["origin"]), origin)
 
+        # Test proposer
+        proposer = Account.create().address
+        multisig_tx.proposer = proposer
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.data["proposer"], proposer)
+
+    def test_delete_multisig_transaction(self):
+        owner_account = Account.create()
+        safe_tx_hash = Web3.keccak(text="random-tx").hex()
+        url = reverse("v1:history:multisig-transaction", args=(safe_tx_hash,))
+        data = {"signature": "0x" + "1" * (130 * 2)}  # 2 signatures of 65 bytes
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Add our test MultisigTransaction to the database
+        multisig_transaction = MultisigTransactionFactory(safe_tx_hash=safe_tx_hash)
+
+        # Add other MultisigTransactions to the database to make sure they are not deleted
+        MultisigTransactionFactory()
+        MultisigTransactionFactory()
+
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Executed transactions cannot be deleted", code="invalid"
+                    )
+                ]
+            },
+        )
+
+        multisig_transaction.ethereum_tx = None
+        multisig_transaction.save(update_fields=["ethereum_tx"])
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Old transactions without proposer cannot be deleted",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Set a random proposer for the transaction
+        multisig_transaction.proposer = Account.create().address
+        multisig_transaction.save(update_fields=["proposer"])
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="1 owner signature was expected, 2 received",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a contract signature
+        data = {"signature": "0x" + "0" * 130}  # 1 signature of 65 bytes
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Only EOA and ETH_SIGN signatures are supported",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a real not valid signature and set the right proposer
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.save(update_fields=["proposer"])
+        data = {
+            "signature": owner_account.signHash(safe_tx_hash)[
+                "signature"
+            ].hex()  # Random signature
+        }
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Provided owner is not the proposer of the transaction",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a proper signature
+        message_hash = DeleteMultisigTxSignatureHelper.calculate_hash(
+            multisig_transaction.safe,
+            safe_tx_hash,
+            self.ethereum_client.get_chain_id(),
+            previous_totp=False,
+        )
+        data = {
+            "signature": owner_account.signHash(message_hash)[
+                "signature"
+            ].hex()  # Random signature
+        }
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertTrue(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertFalse(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+
+        # Trying to do the query again should raise a 404
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_get_multisig_transactions(self):
         safe_address = Account.create().address
+        proposer = Account.create().address
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        multisig_tx = MultisigTransactionFactory(safe=safe_address)
+        multisig_tx = MultisigTransactionFactory(safe=safe_address, proposer=proposer)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -766,7 +1031,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         # Check Etag header
         self.assertTrue(response["Etag"])
-
         MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
@@ -775,6 +1039,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 1)
+        self.assertEqual(response.data["results"][0]["proposer"], proposer)
 
         MultisigTransactionFactory(safe=safe_address, nonce=multisig_tx.nonce)
         response = self.client.get(
@@ -783,6 +1048,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["count_unique_nonce"], 1)
+
+    def test_get_multisig_transactions_unique_nonce(self):
+        """
+        Unique nonce should follow the trusted filter
+        """
+
+        safe_address = Account.create().address
+        url = reverse("v1:history:multisig-transactions", args=(safe_address,))
+        response = self.client.get(
+            url,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["count_unique_nonce"], 0)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
+        MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
+        response = self.client.get(
+            url,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["count_unique_nonce"], 2)
+
+        response = self.client.get(
+            url + "?trusted=True",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["count_unique_nonce"], 1)
 
     @mock.patch.object(
@@ -1026,6 +1324,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertIsNone(response.data["results"][0]["executor"])
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
+        self.assertEqual(response.data["results"][0]["proposer"], data["sender"])
 
         # Test confirmation with signature
         data["signature"] = safe_owner_1.signHash(safe_tx.safe_tx_hash)[
@@ -1086,6 +1385,77 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_post_multisig_transaction_with_1271_signature(self):
+        account = Account.create()
+        safe_owner = self.deploy_test_safe(owners=[account.address])
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+
+        data = {
+            "to": account.address,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            "sender": safe_owner.address,
+        }
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        safe_tx_hash = safe_tx.safe_tx_hash
+        safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
+
+        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        safe_owner_signature = account.signHash(safe_owner_message_hash)["signature"]
+        signature_1271 = (
+            signature_to_bytes(
+                0, int.from_bytes(HexBytes(safe_owner.address), byteorder="big"), 65
+            )
+            + eth_abi.encode(["bytes"], [safe_owner_signature])[32:]
+        )
+
+        data["contractTransactionHash"] = safe_tx_hash.hex()
+        data["signature"] = signature_1271.hex()
+
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe.address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.get(
+            safe_tx_hash=safe_tx_hash
+        )
+        self.assertTrue(multisig_transaction_db.trusted)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+
+        # Test MultisigConfirmation endpoint
+        confirmation_data = {"signature": data["signature"]}
+        MultisigConfirmation.objects.all().delete()
+        response = self.client.post(
+            reverse(
+                "v1:history:multisig-transaction-confirmations",
+                args=(safe_tx_hash.hex(),),
+            ),
+            format="json",
+            data=confirmation_data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
 
     def test_post_multisig_transaction_with_trusted_user(self):
         safe_owner_1 = Account.create()
@@ -1506,11 +1876,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
 
-        # Add delegate
-        SafeContractDelegateFactory(
+        # Add delegates (to check there's no issue with delegating twice to the same account)
+        safe_contract_delegate = SafeContractDelegateFactory(
             safe_contract__address=safe_address,
             delegate=safe_delegate.address,
             delegator=safe_owners[0].address,
+        )
+        SafeContractDelegateFactory(
+            safe_contract=safe_contract_delegate.safe_contract,
+            delegate=safe_delegate.address,
+            delegator=safe_owners[1].address,
         )
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
@@ -1520,7 +1895,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigTransaction.objects.count(), 1)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
-        self.assertTrue(MultisigTransaction.objects.first().trusted)
+        multisig_transaction = MultisigTransaction.objects.first()
+        self.assertTrue(multisig_transaction.trusted)
+        # Proposer should be the owner address not the delegate
+        self.assertNotEqual(multisig_transaction.proposer, safe_delegate.address)
+        self.assertEqual(multisig_transaction.proposer, safe_owners[0].address)
 
         data["signature"] = data["signature"] + data["signature"][2:]
         response = self.client.post(
@@ -1616,23 +1995,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
     @mock.patch.object(BalanceService, "get_token_info", autospec=True)
-    @mock.patch.object(
-        PriceService, "get_token_eth_value", return_value=0.4, autospec=True
-    )
-    @mock.patch.object(
-        PriceService, "get_native_coin_usd_price", return_value=123.4, autospec=True
-    )
     @mock.patch.object(timezone, "now", return_value=timezone.now())
     def test_safe_balances_usd_view(
         self,
         timezone_now_mock: MagicMock,
-        get_native_coin_usd_price_mock: MagicMock,
-        get_token_eth_value_mock: MagicMock,
         get_token_info_mock: MagicMock,
     ):
-        timestamp_str = timezone_now_mock.return_value.isoformat().replace(
-            "+00:00", "Z"
-        )
+        timestamp_str = "1970-01-01T00:00:00Z"
         safe_address = Account.create().address
         response = self.client.get(
             reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
@@ -1649,7 +2018,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertIsNone(response.data[0]["token_address"])
         self.assertEqual(response.data[0]["balance"], str(value))
-        self.assertEqual(response.data[0]["eth_value"], "1.0")
+        self.assertEqual(response.data[0]["eth_value"], "0.0")
 
         tokens_value = int(12 * 1e18)
         erc20 = self.deploy_example_erc20(tokens_value, safe_address)
@@ -1679,20 +2048,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "token_address": None,
                     "token": None,
                     "balance": str(value),
-                    "eth_value": "1.0",
+                    "eth_value": "0.0",
                     "timestamp": timestamp_str,
                     "fiat_balance": "0.0",
-                    "fiat_conversion": "123.4",
+                    "fiat_conversion": "0.0",
                     "fiat_code": "USD",
                 },  # 7 wei is rounded to 0.0
                 {
                     "token_address": erc20.address,
                     "token": token_dict,
                     "balance": str(tokens_value),
-                    "eth_value": "0.4",
+                    "eth_value": "0.0",
                     "timestamp": timestamp_str,
-                    "fiat_balance": str(round(123.4 * 0.4 * (tokens_value / 1e18), 4)),
-                    "fiat_conversion": str(round(123.4 * 0.4, 4)),
+                    "fiat_balance": "0.0",
+                    "fiat_conversion": "0.0",
                     "fiat_code": "USD",
                 },
             ],
@@ -1771,7 +2140,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "label": another_label,
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "safe": None,
             "signature": delegator.signHash(
                 DelegateSignatureHelper.calculate_hash(delegate.address, eth_sign=True)
             )["signature"].hex(),
@@ -1793,9 +2161,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
+        queryset = SafeContractDelegate.objects.get_for_safe(
+            safe_address, [delegator.address]
+        )
+        self.assertEqual(len(queryset), 2)
         self.assertCountEqual(
-            SafeContractDelegate.objects.get_delegates_for_safe(safe_address),
-            [delegate.address],
+            set(safe_contract_delegate.delegate for safe_contract_delegate in queryset),
+            {delegate.address},
         )
 
     def test_delegates_get(self):
@@ -2153,6 +2525,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         "symbol": token.symbol,
                         "decimals": token.decimals,
                         "logoUri": token.get_full_logo_uri(),
+                        "trusted": token.trusted,
                     },
                 },
                 {
@@ -2228,6 +2601,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         "symbol": token.symbol,
                         "decimals": token.decimals,
                         "logoUri": token.get_full_logo_uri(),
+                        "trusted": token.trusted,
                     },
                 },
                 {
@@ -2397,6 +2771,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     "symbol": token.symbol,
                     "decimals": token.decimals,
                     "logoUri": token.get_full_logo_uri(),
+                    "trusted": token.trusted,
                 },
             },
             {
@@ -2550,16 +2925,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # test internal_tx transfer_id empty trace_address
-        transfer_id = (
-            "ief060441f0101ab83d62066b962f97e3a582686e0720157407c965c5946c2f7a"
-        )
-        response = self.client.get(
-            reverse("v1:history:transfer", args=(transfer_id,)),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
         # test invalid erc20 transfer_id empty log_index
         transfer_id = (
             "e27e15ba8dea473d98c80a6b45d372c0f3c6f8c184177044c935c37eb419d7216"
@@ -2624,6 +2989,39 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         }
         self.assertEqual(response.json(), expected_result)
 
+        # test internal_tx transfer_id empty trace_address
+        ethereum_tx_hash = (
+            "0x12bafc5ee165d825201a24418e00bef6039bb06f6d09420ab1c5f7b4098c0809"
+        )
+        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+        internal_tx_empty_trace_address = InternalTxFactory(
+            ethereum_tx=ethereum_tx, to=safe_address, trace_address=""
+        )
+        transfer_id_empty_trace_address = (
+            "i12bafc5ee165d825201a24418e00bef6039bb06f6d09420ab1c5f7b4098c0809"
+        )
+        response = self.client.get(
+            reverse("v1:history:transfer", args=(transfer_id_empty_trace_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_result = {
+            "type": TransferType.ETHER_TRANSFER.name,
+            "executionDate": internal_tx_empty_trace_address.ethereum_tx.block.timestamp.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "blockNumber": internal_tx_empty_trace_address.ethereum_tx.block_id,
+            "transferId": transfer_id_empty_trace_address,
+            "transactionHash": internal_tx_empty_trace_address.ethereum_tx_id,
+            "to": safe_address,
+            "value": str(internal_tx_empty_trace_address.value),
+            "tokenId": None,
+            "tokenAddress": None,
+            "from": internal_tx_empty_trace_address._from,
+            "tokenInfo": None,
+        }
+        self.assertEqual(response.json(), expected_result)
+
         # Test filtering ERC20 transfer by transfer_id
         erc20_tx_hash = (
             "0x406754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
@@ -2661,6 +3059,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "symbol": token.symbol,
                 "decimals": token.decimals,
                 "logoUri": token.get_full_logo_uri(),
+                "trusted": token.trusted,
             },
         }
         self.assertEqual(response.json(), expected_result)
@@ -2765,123 +3164,37 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             return_value=[another_trace, another_trace_2],
         ):
             # `another_trace_2` should change the `creator` and `master_copy` and `setup_data` should appear
-            # Taken from rinkeby
-            create_test_data = {
-                "master_copy": "0xb6029EA3B2c51D09a50B53CA8012FeEB05bDa35A",
-                "setup_data": "0xa97ab18a00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030000000000000000000000006e45d69a383ceca3d54688e833bd0e1388747e6b00000000000000000000000061a0c717d18232711bc788f19c9cd56a43cc88720000000000000000000000007724b234c9099c205f03b458944942bceba134080000000000000000000000000000000000000000000000000000000000000000",
-                "data": "0x61b69abd000000000000000000000000b6029ea3b2c51d09a50b53ca8012feeb05bda35a00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000184a97ab18a00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030000000000000000000000006e45d69a383ceca3d54688e833bd0e1388747e6b00000000000000000000000061a0c717d18232711bc788f19c9cd56a43cc88720000000000000000000000007724b234c9099c205f03b458944942bceba13408000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-            }
-            data_decoded_1 = {
-                "method": "setup",
-                "parameters": [
-                    {
-                        "name": "_owners",
-                        "type": "address[]",
-                        "value": [
-                            "0x6E45d69a383CECa3d54688e833Bd0e1388747e6B",
-                            "0x61a0c717d18232711bC788F19C9Cd56a43cc8872",
-                            "0x7724b234c9099C205F03b458944942bcEBA13408",
-                        ],
-                    },
-                    {"name": "_threshold", "type": "uint256", "value": "1"},
-                    {
-                        "name": "to",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                    {"name": "data", "type": "bytes", "value": "0x"},
-                    {
-                        "name": "paymentToken",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                    {"name": "payment", "type": "uint256", "value": "0"},
-                    {
-                        "name": "paymentReceiver",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                ],
-            }
-
-            create_test_data_2 = {
-                "master_copy": "0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
-                "setup_data": "0xb63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac9b6dd409ff10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000085c26101f353f38e45c72d414b44972831f07be3000000000000000000000000235518798770d7336c5c4908dd1019457fea43a10000000000000000000000007f63c25665ea7e85500eaeb806e552e651b07b9d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-                "data": "0x1688f0b900000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000002cecc9e861200000000000000000000000000000000000000000000000000000000000001c4b63e800d0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac9b6dd409ff10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000085c26101f353f38e45c72d414b44972831f07be3000000000000000000000000235518798770d7336c5c4908dd1019457fea43a10000000000000000000000007f63c25665ea7e85500eaeb806e552e651b07b9d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-            }
-            data_decoded_2 = {
-                "method": "setup",
-                "parameters": [
-                    {
-                        "name": "_owners",
-                        "type": "address[]",
-                        "value": [
-                            "0x85C26101f353f38E45c72d414b44972831f07BE3",
-                            "0x235518798770D7336c5c4908dd1019457FEa43a1",
-                            "0x7F63c25665EA7e85500eAEB806E552e651B07b9d",
-                        ],
-                    },
-                    {"name": "_threshold", "type": "uint256", "value": "1"},
-                    {
-                        "name": "to",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                    {"name": "data", "type": "bytes", "value": "0x"},
-                    {
-                        "name": "fallbackHandler",
-                        "type": "address",
-                        "value": "0xd5D82B6aDDc9027B22dCA772Aa68D5d74cdBdF44",
-                    },
-                    {
-                        "name": "paymentToken",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                    {"name": "payment", "type": "uint256", "value": "3036537000337393"},
-                    {
-                        "name": "paymentReceiver",
-                        "type": "address",
-                        "value": "0x0000000000000000000000000000000000000000",
-                    },
-                ],
-            }
-
-            create_cpk_test_data = {
-                "master_copy": "0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
-                "setup_data": "0x5714713d000000000000000000000000ff54516a7bc1c1ea952a688e72d5b93a80620074",
-                "data": "0x460868ca00000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5fcfe33a586323e7325be6aa6ecd8b4600d232a9037e83c8ece69413b777dabe6500000000000000000000000040a930851bd2e590bd5a5c981b436de25742e9800000000000000000000000005ef44de4b98f2bce0e29c344e7b2fb8f0282a0cf000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000245714713d000000000000000000000000ff54516a7bc1c1ea952a688e72d5b93a8062007400000000000000000000000000000000000000000000000000000000",
-            }
-            data_decoded_cpk = None
 
             for test_data, data_decoded in [
-                (create_test_data, data_decoded_1),
-                (create_test_data_2, data_decoded_2),
+                (create_test_data_v1_0_0, data_decoded_v1_0_0),
+                (create_test_data_v1_1_1, data_decoded_v1_1_1),
                 (create_cpk_test_data, data_decoded_cpk),
+                (create_v1_4_1_test_data, data_decoded_v1_4_1),
             ]:
-                another_trace_2["action"]["input"] = HexBytes(test_data["data"])
-                response = self.client.get(
-                    reverse("v1:history:safe-creation", args=(owner_address,)),
-                    format="json",
-                )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                created_iso = (
-                    internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                with self.subTest(test_data=test_data, data_decoded=data_decoded):
+                    another_trace_2["action"]["input"] = HexBytes(test_data["data"])
+                    response = self.client.get(
+                        reverse("v1:history:safe-creation", args=(owner_address,)),
+                        format="json",
                     )
-                )
-                self.assertEqual(
-                    response.data,
-                    {
-                        "created": created_iso,
-                        "creator": another_trace_2["action"]["from"],
-                        "transaction_hash": internal_tx.ethereum_tx_id,
-                        "factory_address": internal_tx._from,
-                        "master_copy": test_data["master_copy"],
-                        "setup_data": test_data["setup_data"],
-                        "data_decoded": data_decoded,
-                    },
-                )
+                    self.assertEqual(response.status_code, status.HTTP_200_OK)
+                    created_iso = (
+                        internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
+                            "+00:00", "Z"
+                        )
+                    )
+                    self.assertEqual(
+                        response.data,
+                        {
+                            "created": created_iso,
+                            "creator": another_trace_2["action"]["from"],
+                            "transaction_hash": internal_tx.ethereum_tx_id,
+                            "factory_address": internal_tx._from,
+                            "master_copy": test_data["master_copy"],
+                            "setup_data": test_data["setup_data"],
+                            "data_decoded": data_decoded,
+                        },
+                    )
 
     def test_safe_info_view(self):
         invalid_address = "0x2A"
@@ -3035,8 +3348,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         """
         SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
-    def test_master_copies_view(self):
-        response = self.client.get(reverse("v1:history:master-copies"))
+    def _test_singletons_view(self, url: str):
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
@@ -3046,7 +3359,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             initial_block_number=deployed_block_number,
             tx_block_number=last_indexed_block_number,
         )
-        response = self.client.get(reverse("v1:history:master-copies"))
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_master_copy = [
             {
@@ -3061,7 +3374,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.data, expected_master_copy)
 
         safe_master_copy = SafeMasterCopyFactory(l2=True)
-        response = self.client.get(reverse("v1:history:master-copies"))
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_l2_master_copy = [
             {
@@ -3079,9 +3392,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         with self.settings(ETH_L2_NETWORK=True):
-            response = self.client.get(reverse("v1:history:master-copies"))
+            response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertCountEqual(response.data, expected_l2_master_copy)
+
+    def test_singletons_view(self):
+        url = reverse("v1:history:singletons")
+        return self._test_singletons_view(url)
+
+    def test_master_copies_view(self):
+        url = reverse("v1:history:master-copies")
+        return self._test_singletons_view(url)
 
     def test_modules_view(self):
         invalid_address = "0x2A"
@@ -3202,6 +3523,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.data, {"safe_tx_gas": str(estimate_tx_gas_mock.return_value)}
         )
+        with mock.patch(
+            "safe_transaction_service.history.views.settings.ETH_L2_NETWORK",
+            return_value=True,
+        ):
+            response = self.client.post(
+                reverse(
+                    "v1:history:multisig-transaction-estimate", args=(safe_address,)
+                ),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data, {"safe_tx_gas": "0"})
 
         estimate_tx_gas_mock.side_effect = CannotEstimateGas
         response = self.client.post(

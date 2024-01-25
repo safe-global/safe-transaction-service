@@ -27,25 +27,3 @@ def get_safe_owners(safe_address: ChecksumAddress) -> List[ChecksumAddress]:
         raise ValidationError(
             "Problem connecting to the ethereum node, please try again later"
         )
-
-
-def get_safe_version(safe_address: ChecksumAddress) -> str:
-    """
-
-    :param safe_address:
-    :return: Current version for a Safe
-    :raises: ValidationError
-    """
-    ethereum_client = EthereumClientProvider()
-    safe = Safe(safe_address, ethereum_client)
-    try:
-        return safe.retrieve_version()
-    except Web3Exception as e:
-        raise ValidationError(
-            f"Could not get Safe {safe_address} version from blockchain, check contract exists on network "
-            f"{ethereum_client.get_network().name}"
-        ) from e
-    except IOError:
-        raise ValidationError(
-            "Problem connecting to the ethereum node, please try again later"
-        )

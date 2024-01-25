@@ -67,7 +67,6 @@ class IndexServiceProvider:
                 EthereumClientProvider(),
                 settings.ETH_REORG_BLOCKS,
                 settings.ETH_L2_NETWORK,
-                settings.ALERT_OUT_OF_SYNC_EVENTS_THRESHOLD,
             )
         return cls.instance
 
@@ -84,12 +83,10 @@ class IndexService:
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
         eth_l2_network: bool,
-        alert_out_of_sync_events_threshold: float,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
         self.eth_l2_network = eth_l2_network
-        self.alert_out_of_sync_events_threshold = alert_out_of_sync_events_threshold
 
     def block_get_or_create_from_block_hash(self, block_hash: int):
         try:
@@ -154,10 +151,14 @@ class IndexService:
         :return: `True` if master copies and ERC20/721 are synced, `False` otherwise
         """
 
+        try:
+            current_block_number = self.ethereum_client.current_block_number
+        except IOError:
+            # If there's an error connecting to the node we consider the service as out of sync
+            return False
+
         # Use number of reorg blocks to consider as not synced
-        reference_block_number = (
-            self.ethereum_client.current_block_number - self.eth_reorg_blocks
-        )
+        reference_block_number = current_block_number - self.eth_reorg_blocks
         synced: bool = True
         for safe_master_copy in SafeMasterCopy.objects.relevant().filter(
             tx_block_number__lt=reference_block_number
@@ -195,7 +196,6 @@ class IndexService:
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
     ) -> List["EthereumTx"]:
-
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
@@ -378,7 +378,7 @@ class IndexService:
         addresses: Optional[ChecksumAddress] = None,
     ) -> int:
         """
-        :param provider:
+        :param indexer: A new instance must be provider, providing the singleton one can break indexing
         :param from_block_number:
         :param to_block_number:
         :param block_process_limit:
@@ -387,14 +387,9 @@ class IndexService:
         """
         assert (not to_block_number) or to_block_number > from_block_number
 
-        ignore_addresses_on_log_filter = (
-            indexer.IGNORE_ADDRESSES_ON_LOG_FILTER
-            if hasattr(indexer, "IGNORE_ADDRESSES_ON_LOG_FILTER")
-            else None
-        )
-
         if addresses:
             # Just process addresses provided
+            # No issues on modifying the indexer as we should be provided with a new instance
             indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False
         else:
             addresses = list(
@@ -405,7 +400,11 @@ class IndexService:
         if not addresses:
             logger.warning("No addresses to process")
         else:
-            logger.info("Start reindexing addresses %s", addresses)
+            # Don't log all the addresses
+            addresses_str = (
+                str(addresses) if len(addresses) < 10 else f"{addresses[:10]}..."
+            )
+            logger.info("Start reindexing addresses %s", addresses_str)
             current_block_number = self.ethereum_client.current_block_number
             stop_block_number = (
                 min(current_block_number, to_block_number)
@@ -413,7 +412,7 @@ class IndexService:
                 else current_block_number
             )
             for block_number in range(
-                from_block_number, stop_block_number, block_process_limit
+                from_block_number, stop_block_number + 1, block_process_limit
             ):
                 elements = indexer.find_relevant_elements(
                     addresses,
@@ -428,10 +427,8 @@ class IndexService:
                 )
                 element_number += len(elements)
 
-            logger.info("End reindexing addresses %s", addresses)
+            logger.info("End reindexing addresses %s", addresses_str)
 
-        # We changed attributes on the indexer, so better restore it
-        indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = ignore_addresses_on_log_filter
         return element_number
 
     def reindex_master_copies(
@@ -456,10 +453,10 @@ class IndexService:
         from ..indexers import InternalTxIndexerProvider, SafeEventsIndexerProvider
 
         indexer = (
-            SafeEventsIndexerProvider
+            SafeEventsIndexerProvider.get_new_instance()
             if self.eth_l2_network
-            else InternalTxIndexerProvider
-        )()
+            else InternalTxIndexerProvider.get_new_instance()
+        )
 
         return self._reindex(
             indexer,
@@ -489,7 +486,7 @@ class IndexService:
 
         from ..indexers import Erc20EventsIndexerProvider
 
-        indexer = Erc20EventsIndexerProvider()
+        indexer = Erc20EventsIndexerProvider.get_new_instance()
         return self._reindex(
             indexer,
             from_block_number,

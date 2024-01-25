@@ -8,21 +8,30 @@ from django.core.management import CommandError, call_command
 from django.test import TestCase
 
 from django_celery_beat.models import PeriodicTask
+from eth_account import Account
 
 from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
-from ..models import IndexingStatus, ProxyFactory, SafeMasterCopy
+from ..models import (
+    IndexingStatus,
+    InternalTxDecoded,
+    ProxyFactory,
+    SafeLastStatus,
+    SafeMasterCopy,
+)
 from ..services import IndexServiceProvider
 from ..tasks import logger as task_logger
 from .factories import (
     MultisigTransactionFactory,
     SafeContractFactory,
+    SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
 
 
-class TestCommands(TestCase):
+class TestCommands(SafeTestCaseMixin, TestCase):
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def _test_setup_service(
         self,
@@ -359,10 +368,10 @@ class TestCommands(TestCase):
             last_proxy_factory.tx_block_number, last_proxy_factory_initial_block
         )
 
-        # At May 2023 we support 9 Master Copies, 2 L2 Master Copies and 5 Proxy Factories
-        self.assertEqual(SafeMasterCopy.objects.count(), 9)
-        self.assertEqual(SafeMasterCopy.objects.l2().count(), 2)
-        self.assertEqual(ProxyFactory.objects.count(), 5)
+        # At Nov 2023 we support 12 Master Copies, 3 L2 Master Copies and 6 Proxy Factories
+        self.assertEqual(SafeMasterCopy.objects.count(), 12)
+        self.assertEqual(SafeMasterCopy.objects.l2().count(), 3)
+        self.assertEqual(ProxyFactory.objects.count(), 6)
 
     def test_setup_service_mainnet_erc20_indexing_setup(self):
         # Test IndexingStatus ERC20 is not modified if higher than the oldest master copy
@@ -443,3 +452,71 @@ class TestCommands(TestCase):
         buf = StringIO()
         call_command(command, stdout=buf)
         self.assertIn("EthereumRPC chainId 1 looks good", buf.getvalue())
+
+    @mock.patch(
+        "safe_transaction_service.history.management.commands.check_index_problems.settings.ETH_L2_NETWORK",
+        return_value=True,
+    )  # Testing L2 chain as ganache haven't tracing methods
+    def test_check_index_problems(self, mock_eth_l2_network: MagicMock):
+        command = "check_index_problems"
+        buf = StringIO()
+        # Test empty with empty SafeContract model
+        call_command(command, stdout=buf)
+        self.assertIn("Database haven't any address to be checked", buf.getvalue())
+
+        # Should ignore Safe with nonce 0
+        owner = Account.create()
+        safe = self.deploy_test_safe(
+            number_owners=1,
+            threshold=1,
+            owners=[owner.address],
+            initial_funding_wei=1000,
+        )
+        SafeContractFactory(address=safe.address)
+        SafeLastStatusFactory(nonce=0, address=safe.address)
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Database haven't any address to be checked", buf.getvalue())
+
+        # Should detect missing transactions
+        data = b""
+        value = 122
+        to = Account.create().address
+        multisig_tx = safe.build_multisig_tx(to, value, data)
+        multisig_tx.sign(owner.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        SafeLastStatus.objects.filter(address=safe.address).update(nonce=1)
+        self.assertEqual(InternalTxDecoded.objects.count(), 0)
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn(
+            f"Safe={safe.address} is corrupted, has some old transactions missing",
+            buf.getvalue(),
+        )
+        self.assertEqual(InternalTxDecoded.objects.count(), 1)
+        with self.assertRaises(SafeLastStatus.DoesNotExist):
+            SafeLastStatus.objects.get(address=safe.address)
+
+        # Should works with batch_size option
+        SafeLastStatusFactory(nonce=1, address=safe.address)
+        buf = StringIO()
+        call_command(command, "--batch-size=1", stdout=buf)
+        self.assertIn(
+            f"Safe={safe.address} is corrupted, has some old transactions missing",
+            buf.getvalue(),
+        )
+        self.assertEqual(InternalTxDecoded.objects.count(), 1)
+        with self.assertRaises(SafeLastStatus.DoesNotExist):
+            SafeLastStatus.objects.get(address=safe.address)
+
+        # Should detect incorrect nonce
+        with mock.patch.object(SafeLastStatus, "is_corrupted", return_value=False):
+            SafeLastStatusFactory(nonce=2, address=safe.address)
+            buf = StringIO()
+            call_command(command, stdout=buf)
+            self.assertIn(
+                f"Safe={safe.address} stored nonce=2 is different from blockchain-nonce=1",
+                buf.getvalue(),
+            )
+            with self.assertRaises(SafeLastStatus.DoesNotExist):
+                SafeLastStatus.objects.get(address=safe.address)

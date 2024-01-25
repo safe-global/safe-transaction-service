@@ -7,6 +7,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
+from requests import Timeout
 
 from gnosis.eth import EthereumClient
 
@@ -256,9 +257,9 @@ class EthereumIndexer(ABC):
         )
         return not_updated_addresses
 
-    def update_monitored_address(
+    def update_monitored_addresses(
         self, addresses: Sequence[str], from_block_number: int, to_block_number: int
-    ) -> int:
+    ) -> bool:
         """
         :param addresses: Addresses to have the block number updated
         :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
@@ -278,14 +279,14 @@ class EthereumIndexer(ABC):
             **{
                 "address__in": addresses,
                 self.database_field
-                + "__gte": from_block_number
-                - 1,  # Protect in case of reorg
+                + "__gte": from_block_number,  # Protect in case of reorg
                 self.database_field
                 + "__lt": new_to_block_number,  # Don't update to a lower block number
             }
         ).update(**{self.database_field: new_to_block_number})
 
-        if updated_addresses != len(addresses):
+        all_updated = updated_addresses == len(addresses)
+        if not all_updated:
             logger.warning(
                 "%s: Possible reorg - Cannot update all indexed addresses... Updated %d/%d addresses "
                 "from-block-number=%d to-block-number=%d",
@@ -393,7 +394,13 @@ class EthereumIndexer(ABC):
                 to_block_number,
                 current_block_number=current_block_number,
             )
-        except (FindRelevantElementsException, SoftTimeLimitExceeded) as e:
+            processed_elements = self.process_elements(elements)
+        except (
+            FindRelevantElementsException,
+            SoftTimeLimitExceeded,
+            Timeout,
+            ValueError,
+        ) as e:
             self.block_process_limit = 1  # Set back to the very minimum
             logger.info(
                 "%s: block_process_limit set back to %d",
@@ -402,9 +409,13 @@ class EthereumIndexer(ABC):
             )
             raise e
 
-        processed_elements = self.process_elements(elements)
+        if not self.update_monitored_addresses(
+            addresses, from_block_number, to_block_number
+        ):
+            raise ValueError(
+                "Possible reorg, indexed addresses were updated while indexer was running"
+            )
 
-        self.update_monitored_address(addresses, from_block_number, to_block_number)
         return processed_elements, from_block_number, to_block_number, updated
 
     def start(self) -> Tuple[int, int]:

@@ -51,9 +51,11 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             )
             self.assertIsInstance(safe_creation_info, SafeCreationInfo)
 
-    def test_get_safe_creation_info_without_tracing(self):
+    def test_get_safe_creation_info_without_tracing_but_with_proxy_factory(self):
         """
         Tracing is not used, so traces must be fetched from DB if possible. L2 indexer "emulates" creation traces
+        if ``ProxyCreation`` event is detected (ProxyFactory used)
+
         :return:
         """
         random_address = Account.create().address
@@ -79,6 +81,29 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_creation.factory_address, creation_trace._from)
         self.assertEqual(safe_creation.master_copy, setup_trace.to)
         self.assertEqual(bytes(safe_creation.setup_data), b"1234")
+
+    def test_get_safe_creation_info_without_tracing_nor_proxy_factory(self):
+        """
+        Tracing is not used, so traces must be fetched from DB if possible. L2 indexer cannot "emulate" creation traces
+        as ProxyFactory was not used
+
+        :return:
+        """
+
+        random_address = Account.create().address
+        creation_trace = InternalTxFactory(
+            contract_address=random_address,
+            ethereum_tx__status=1,
+            trace_address="0",
+            ethereum_tx__data=None,
+        )
+
+        # Setup can be done by a transfer to a contract, no need to have data
+        safe_creation = self.safe_service.get_safe_creation_info(random_address)
+        self.assertEqual(safe_creation.creator, creation_trace.ethereum_tx._from)
+        self.assertEqual(safe_creation.factory_address, creation_trace._from)
+        self.assertIsNone(safe_creation.master_copy)
+        self.assertIsNone(safe_creation.setup_data)
 
     @mock.patch.object(
         TracingManager, "trace_transaction", return_value=creation_internal_txs

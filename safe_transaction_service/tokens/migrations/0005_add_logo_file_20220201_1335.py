@@ -6,7 +6,6 @@ import safe_transaction_service.tokens.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tokens", "0004_ethereum_address_field_v2_20211201_1512"),
     ]

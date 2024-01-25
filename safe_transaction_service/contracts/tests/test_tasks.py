@@ -1,5 +1,6 @@
 import datetime
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 from django.utils import timezone
@@ -7,12 +8,10 @@ from django.utils import timezone
 from eth_account import Account
 from hexbytes import HexBytes
 
-from gnosis.eth.clients import Sourcify
-from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
-
 from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
 
 from ..models import Contract
+from ..services.contract_metadata_service import ContractMetadataService
 from ..tasks import (
     ContractAction,
     create_missing_contracts_with_metadata_task,
@@ -20,10 +19,14 @@ from ..tasks import (
     create_or_update_contract_with_metadata_task,
     reindex_contracts_without_metadata_task,
 )
+from .mocks.contract_metadata_mocks import sourcify_metadata_mock
 
 
 class TestTasks(TestCase):
-    def test_contract_tasks(self):
+    @mock.patch.object(
+        ContractMetadataService, "get_contract_metadata", return_value=None
+    )
+    def test_contract_tasks(self, contract_metadata_service_mock: MagicMock):
         self.assertEqual(create_missing_contracts_with_metadata_task.delay().result, 0)
         [
             MultisigTransactionFactory(
@@ -38,31 +41,26 @@ class TestTasks(TestCase):
         )  # Contract ABIs were not found
         self.assertEqual(create_missing_contracts_with_metadata_task.delay().result, 0)
 
-        with mock.patch.object(
-            Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
-        ):
-            multisig_tx = MultisigTransactionFactory(
-                to=Account.create().address, data=b"12", trusted=True
-            )
-            contract_metadata = Sourcify().get_contract_metadata(multisig_tx.to)
-            self.assertEqual(
-                create_missing_contracts_with_metadata_task.delay().result, 1
-            )
-            self.assertEqual(
-                Contract.objects.without_metadata().count(), 2
-            )  # Previously inserted contracts were not processed
-            contract = Contract.objects.select_related("contract_abi").get(
-                address=multisig_tx.to
-            )
-            self.assertEqual(contract.name, contract_metadata.name)
-            self.assertEqual(contract.contract_abi.abi, contract_metadata.abi)
-            contract_abi_id = contract.contract_abi_id
+        contract_metadata_service_mock.return_value = sourcify_metadata_mock
+        multisig_tx = MultisigTransactionFactory(
+            to=Account.create().address, data=b"12", trusted=True
+        )
+        self.assertEqual(create_missing_contracts_with_metadata_task.delay().result, 1)
+        self.assertEqual(
+            Contract.objects.without_metadata().count(), 2
+        )  # Previously inserted contracts were not processed
+        contract = Contract.objects.select_related("contract_abi").get(
+            address=multisig_tx.to
+        )
+        self.assertEqual(contract.name, sourcify_metadata_mock.name)
+        self.assertEqual(contract.contract_abi.abi, sourcify_metadata_mock.abi)
+        contract_abi_id = contract.contract_abi_id
 
-            # Reindex all the contracts, they should have the same abi
-            self.assertEqual(reindex_contracts_without_metadata_task.delay().result, 2)
-            self.assertEqual(
-                Contract.objects.filter(contract_abi_id=contract_abi_id).count(), 3
-            )
+        # Reindex all the contracts, they should have the same abi
+        self.assertEqual(reindex_contracts_without_metadata_task.delay().result, 2)
+        self.assertEqual(
+            Contract.objects.filter(contract_abi_id=contract_abi_id).count(), 3
+        )
 
     def test_create_missing_multisend_contracts_with_metadata_task(self):
         self.assertEqual(
@@ -124,28 +122,26 @@ class TestTasks(TestCase):
             create_missing_multisend_contracts_with_metadata_task.delay().result, 0
         )
 
-    def test_create_or_update_contract_with_metadata_task(self):
-        with mock.patch.object(
-            Sourcify, "_do_request", autospec=True, return_value=sourcify_safe_metadata
-        ) as sourcify_mock:
-            random_address = Account.create().address
+    @mock.patch.object(
+        ContractMetadataService,
+        "get_contract_metadata",
+        return_value=sourcify_metadata_mock,
+    )
+    def test_create_or_update_contract_with_metadata_task(
+        self, contract_metadata_service_mock: MagicMock
+    ):
+        random_address = Account.create().address
 
-            self.assertFalse(Contract.objects.filter(address=random_address).exists())
-            contract_action = create_or_update_contract_with_metadata_task(
-                random_address
-            )
-            self.assertEqual(contract_action, ContractAction.CREATED)
-            self.assertTrue(Contract.objects.filter(address=random_address).exists())
+        self.assertFalse(Contract.objects.filter(address=random_address).exists())
+        contract_action = create_or_update_contract_with_metadata_task(random_address)
+        self.assertEqual(contract_action, ContractAction.CREATED)
+        self.assertTrue(Contract.objects.filter(address=random_address).exists())
 
-            # Try with a contract already created
-            contract_action = create_or_update_contract_with_metadata_task(
-                random_address
-            )
-            self.assertEqual(contract_action, ContractAction.UPDATED)
-            self.assertTrue(Contract.objects.filter(address=random_address).exists())
+        # Try with a contract already created
+        contract_action = create_or_update_contract_with_metadata_task(random_address)
+        self.assertEqual(contract_action, ContractAction.UPDATED)
+        self.assertTrue(Contract.objects.filter(address=random_address).exists())
 
-            sourcify_mock.side_effect = IOError
-            contract_action = create_or_update_contract_with_metadata_task(
-                random_address
-            )
-            self.assertEqual(contract_action, ContractAction.NOT_MODIFIED)
+        contract_metadata_service_mock.return_value = None
+        contract_action = create_or_update_contract_with_metadata_task(random_address)
+        self.assertEqual(contract_action, ContractAction.NOT_MODIFIED)

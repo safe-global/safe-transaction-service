@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, Sequence, Set
+from typing import Any, Dict, List, Sequence, Set, Tuple
 from uuid import uuid4
 
 from django.db import IntegrityError, transaction
@@ -88,53 +88,83 @@ class FirebaseDeviceSerializer(serializers.Serializer):
 
         return valid_owners
 
+    def process_parsed_signatures(
+        self,
+        safe_owners: Sequence[ChecksumAddress],
+        signatures: Sequence[bytes],
+        hash_to_sign: bytes,
+    ) -> Tuple[List[ChecksumAddress], List[ChecksumAddress]]:
+        """
+        :param safe_owners: Current owners of the Safe
+        :param signatures: List of signatures for registration
+        :param hash_to_sign: Raw hash or EIP191 encoded registration authorization hash is accepted
+        :return: A tuple with ``accepted owners to register`` and ``not accepted owners``
+        """
+        owners_to_register = []  # Owners to register for notifications
+        owners_to_not_register = []  # Owners of the Safe not present in the signature
+        for signature in signatures:
+            parsed_signatures = SafeSignature.parse_signature(signature, hash_to_sign)
+            if not parsed_signatures:
+                raise ValidationError("Signature cannot be parsed")
+            for safe_signature in parsed_signatures:
+                if (
+                    safe_signature.signature_type != SafeSignatureType.EOA
+                    or not safe_signature.is_valid()
+                ):
+                    raise ValidationError(
+                        "An externally owned account signature was expected"
+                    )
+                owner = safe_signature.owner
+                if owner in (owners_to_register + owners_to_not_register):
+                    raise ValidationError(f"Signature for owner={owner} is duplicated")
+
+                if owner in safe_owners:
+                    owners_to_register.append(owner)
+                else:
+                    owners_to_not_register.append(owner)
+                    # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
+                    #                       f'Expected hash to sign {hash_to_sign.hex()}')
+        return owners_to_register, owners_to_not_register
+
     def validate(self, attrs: Dict[str, Any]):
         attrs = super().validate(attrs)
-        signature_owners = []
-        owners_without_safe = []
         signatures = attrs.get("signatures") or []
         safe_addresses = attrs["safes"]
+        owners_to_register, owners_to_not_register = [], []
         if signatures:
-            valid_owners = self.get_valid_owners(safe_addresses)
-            for signature in signatures:
-                hash_to_sign = calculate_device_registration_hash(
-                    attrs["timestamp"],
-                    attrs["uuid"],
-                    attrs["cloud_messaging_token"],
-                    attrs["safes"],
+            safe_owners = self.get_valid_owners(safe_addresses)
+            # Allow 2 valid hashes, raw hash and EIP191 one
+            hash_raw_to_sign = calculate_device_registration_hash(
+                attrs["timestamp"],
+                attrs["uuid"],
+                attrs["cloud_messaging_token"],
+                attrs["safes"],
+            )
+            hash_eip191_to_sign = calculate_device_registration_hash(
+                attrs["timestamp"],
+                attrs["uuid"],
+                attrs["cloud_messaging_token"],
+                attrs["safes"],
+                eip191=True,
+            )
+            for hash_to_sign in (hash_raw_to_sign, hash_eip191_to_sign):
+                # We will check the 2 accepted hashes, EIP191 and raw one. If we find valid owners, stop
+                (
+                    owners_to_register,
+                    owners_to_not_register,
+                ) = self.process_parsed_signatures(
+                    safe_owners, signatures, hash_to_sign
                 )
-                parsed_signatures = SafeSignature.parse_signature(
-                    signature, hash_to_sign
-                )
-                if not parsed_signatures:
-                    raise ValidationError("Signature cannot be parsed")
-                for safe_signature in parsed_signatures:
-                    if (
-                        safe_signature.signature_type != SafeSignatureType.EOA
-                        or not safe_signature.is_valid()
-                    ):
-                        raise ValidationError(
-                            "An externally owned account signature was expected"
-                        )
-                    owner = safe_signature.owner
-                    if owner in (signature_owners + owners_without_safe):
-                        raise ValidationError(
-                            f"Signature for owner={owner} is duplicated"
-                        )
+                if owners_to_register:
+                    break
 
-                    if owner not in valid_owners:
-                        owners_without_safe.append(owner)
-                        # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
-                        #                       f'Expected hash to sign {hash_to_sign.hex()}')
-                    else:
-                        signature_owners.append(owner)
-            if len(signatures) > len(signature_owners + owners_without_safe):
+            if len(signatures) > len(owners_to_register + owners_to_not_register):
                 raise ValidationError(
                     "Number of signatures is less than the number of owners detected"
                 )
 
-        attrs["owners_registered"] = signature_owners
-        attrs["owners_not_registered"] = owners_without_safe
+        attrs["owners_registered"] = owners_to_register
+        attrs["owners_not_registered"] = owners_to_not_register
         return attrs
 
     @transaction.atomic

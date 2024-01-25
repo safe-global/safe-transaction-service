@@ -5,6 +5,7 @@ from unittest import mock
 from django.urls import reverse
 
 from eth_account import Account
+from eth_account.messages import encode_defunct
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -134,7 +135,7 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         signatures = [owner_account.signHash(hash_to_sign)["signature"].hex()]
         data = {
             "uuid": unique_id,
-            "safes": [safe_address],
+            "safes": safes,
             "cloudMessagingToken": cloud_messaging_token,
             "buildNumber": 0,
             "bundle": "company.package.app",
@@ -146,7 +147,6 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(
             reverse("v1:notifications:devices"), format="json", data=data
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn(
             f"Could not get Safe {safe_address} owners from blockchain, check contract exists on network",
@@ -199,6 +199,49 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
             self.assertCountEqual(
                 FirebaseDeviceOwner.objects.values_list("owner", flat=True),
                 [owner_account.address, owner_account_2.address],
+            )
+
+    def test_notifications_devices_create_with_signatures_eip191_view(self):
+        safe_address = Account.create().address
+        safe_contract = SafeContractFactory(address=safe_address)
+        owner_account = Account.create()
+        owner_account_2 = Account.create()
+
+        self.assertEqual(FirebaseDevice.objects.count(), 0)
+        unique_id = uuid.uuid4()
+        timestamp = int(time.time())
+        cloud_messaging_token = "A" * 163
+        safes = [safe_address]
+        hash_to_sign = calculate_device_registration_hash(
+            timestamp, unique_id, cloud_messaging_token, safes
+        )
+        message_to_sign = encode_defunct(hash_to_sign)
+        signatures = [owner_account.sign_message(message_to_sign)["signature"].hex()]
+        data = {
+            "uuid": unique_id,
+            "safes": safes,
+            "cloudMessagingToken": cloud_messaging_token,
+            "buildNumber": 0,
+            "bundle": "company.package.app",
+            "deviceType": "WEB",
+            "version": "2.0.1",
+            "timestamp": timestamp,
+            "signatures": signatures,
+        }
+
+        with mock.patch(
+            "safe_transaction_service.notifications.serializers.get_safe_owners",
+            return_value=[owner_account.address],
+        ):
+            response = self.client.post(
+                reverse("v1:notifications:devices"), format="json", data=data
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data["uuid"], str(unique_id))
+            self.assertEqual(FirebaseDevice.objects.count(), 1)
+            self.assertEqual(FirebaseDeviceOwner.objects.count(), 1)
+            self.assertEqual(
+                FirebaseDeviceOwner.objects.first().owner, owner_account.address
             )
 
     def test_notifications_devices_create_with_delegates_signatures_view(self):

@@ -38,7 +38,6 @@ def init_safe_last_status(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("history", "0061_alter_internaltx_block_number"),
     ]

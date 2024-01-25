@@ -104,8 +104,9 @@ class TestTasks(TestCase):
 
         reindex_mastercopies_last_hours_task()
         reindex_master_copies_mock.assert_called_once_with(
-            from_block_number=ethereum_block_1.number,
+            ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
+            addresses=None,
         )
 
     @patch.object(IndexService, "reindex_erc20_events")
@@ -127,8 +128,9 @@ class TestTasks(TestCase):
 
         reindex_erc20_erc721_last_hours_task()
         reindex_erc20_events.assert_called_once_with(
-            from_block_number=ethereum_block_1.number,
+            ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
+            addresses=None,
         )
 
     @patch.object(EthereumClient, "get_network", return_value=EthereumNetwork.GANACHE)
@@ -211,8 +213,9 @@ class TestTasks(TestCase):
                     process_decoded_internal_txs_for_safe_task.delay(safe_address)
                     reprocess_mock.assert_called_with([safe_address])
                     reindex_mock.assert_called_with(
-                        from_block_number=safe_status_0.block_number,
+                        safe_status_0.block_number,
                         to_block_number=safe_status_5.block_number,
+                        addresses=[safe_address],
                     )
                     self.assertIn(
                         f"Safe-address={safe_address} A problem was found in SafeStatus "
@@ -231,7 +234,7 @@ class TestTasks(TestCase):
                     )
                     self.assertIn(
                         f"Reindexing master copies from-block={safe_status_0.internal_tx.ethereum_tx.block_id} "
-                        f"to-block={safe_status_5.block_number}",
+                        f"to-block={safe_status_5.block_number} addresses={[safe_address]}",
                         cm.output[4],
                     )
                     self.assertIn(

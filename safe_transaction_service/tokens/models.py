@@ -311,7 +311,7 @@ class TokenList(models.Model):
 
     def get_tokens(self) -> List[Dict[str, Any]]:
         try:
-            response = requests.get(self.url)
+            response = requests.get(self.url, timeout=5)
             if response.ok:
                 tokens = response.json().get("tokens", [])
                 if not tokens:

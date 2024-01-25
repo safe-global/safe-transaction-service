@@ -6,7 +6,6 @@ import gnosis.eth.django.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tokens", "0005_add_logo_file_20220201_1335"),
     ]

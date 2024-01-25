@@ -18,7 +18,8 @@ urlpatterns = [
     ),
     path(
         "about/master-copies/", views.MasterCopiesView.as_view(), name="master-copies"
-    ),
+    ),  # Deprecated
+    path("about/singletons/", views.SingletonsView.as_view(), name="singletons"),
     path(
         "about/indexing/",
         views.IndexingView.as_view(),

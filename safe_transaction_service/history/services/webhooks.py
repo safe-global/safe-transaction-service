@@ -18,6 +18,10 @@ from safe_transaction_service.history.models import (
     TokenTransfer,
     WebHookType,
 )
+from safe_transaction_service.safe_messages.models import (
+    SafeMessage,
+    SafeMessageConfirmation,
+)
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 
@@ -26,10 +30,12 @@ def build_webhook_payload(
     instance: Union[
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
     ],
+    deleted: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     :param sender: Sender type
     :param instance: Sender instance
+    :param deleted: If the instance has been deleted
     :return: A list of webhooks generated from the instance provided
     """
     payloads: List[Dict[str, Any]] = []
@@ -42,6 +48,14 @@ def build_webhook_payload(
                 "safeTxHash": HexBytes(
                     instance.multisig_transaction.safe_tx_hash
                 ).hex(),
+            }
+        ]
+    elif sender == MultisigTransaction and deleted:
+        payloads = [
+            {
+                "address": instance.safe,
+                "type": WebHookType.DELETED_MULTISIG_TRANSACTION.name,
+                "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
             }
         ]
     elif sender == MultisigTransaction:
@@ -102,6 +116,22 @@ def build_webhook_payload(
                 "type": WebHookType.MODULE_TRANSACTION.name,
                 "module": instance.module,
                 "txHash": HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
+            }
+        ]
+    elif sender == SafeMessage:
+        payloads = [
+            {
+                "address": instance.safe,
+                "type": WebHookType.MESSAGE_CREATED.name,
+                "messageHash": HexBytes(instance.message_hash).hex(),
+            }
+        ]
+    elif sender == SafeMessageConfirmation:
+        payloads = [
+            {
+                "address": instance.safe_message.safe,  # This could make a db call
+                "type": WebHookType.MESSAGE_CONFIRMATION.name,
+                "messageHash": HexBytes(instance.safe_message.message_hash).hex(),
             }
         ]
 

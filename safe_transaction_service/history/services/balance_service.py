@@ -2,6 +2,7 @@ import logging
 import operator
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional, Sequence
 
 from django.conf import settings
@@ -16,13 +17,7 @@ from redis import Redis
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.utils import fast_is_checksum_address
 
-from safe_transaction_service.tokens.clients import CannotGetPrice
 from safe_transaction_service.tokens.models import Token
-from safe_transaction_service.tokens.services.price_service import (
-    FiatCode,
-    PriceService,
-    PriceServiceProvider,
-)
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import chunks
 
@@ -72,6 +67,11 @@ class Balance:
         return self.token_address
 
 
+class FiatCode(Enum):
+    USD = 1
+    EUR = 2
+
+
 @dataclass
 class BalanceWithFiat(Balance):
     eth_value: float  # Value in ether
@@ -84,9 +84,7 @@ class BalanceWithFiat(Balance):
 class BalanceServiceProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            cls.instance = BalanceService(
-                EthereumClientProvider(), PriceServiceProvider(), get_redis()
-            )
+            cls.instance = BalanceService(EthereumClientProvider(), get_redis())
         return cls.instance
 
     @classmethod
@@ -96,12 +94,9 @@ class BalanceServiceProvider:
 
 
 class BalanceService:
-    def __init__(
-        self, ethereum_client: EthereumClient, price_service: PriceService, redis: Redis
-    ):
+    def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
         self.ethereum_network = self.ethereum_client.get_network()
-        self.price_service = price_service
         self.redis = redis
         self.cache_token_info = TTLCache(
             maxsize=4096, ttl=60 * 30
@@ -268,50 +263,28 @@ class BalanceService:
         exclude_spam: bool = False,
     ) -> List[BalanceWithFiat]:
         """
-        All this could be more optimal (e.g. batching requests), but as everything is cached
-        I think we should be alright
+        NOTE: PriceService was removed, this function return balances with price 0.
 
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
         :param exclude_spam: If True, exclude spam tokens
         :return: List of BalanceWithFiat
         """
-        # TODO Use price service get_token_cached_usd_values
         balances: List[Balance] = self.get_balances(
             safe_address, only_trusted, exclude_spam
         )
-        try:
-            eth_price = self.price_service.get_native_coin_usd_price()
-        except CannotGetPrice:
-            logger.warning("Cannot get network ether price", exc_info=True)
-            eth_price = 0
         balances_with_usd = []
-        price_token_addresses = [balance.get_price_address() for balance in balances]
-        token_eth_values_with_timestamp = (
-            self.price_service.get_token_cached_eth_values(price_token_addresses)
-        )
-        for balance, token_eth_value_with_timestamp in zip(
-            balances, token_eth_values_with_timestamp
-        ):
-            token_eth_value = token_eth_value_with_timestamp.eth_value
-            token_address = balance.token_address
-            if not token_address:  # Ether
-                fiat_conversion = eth_price
-                fiat_balance = fiat_conversion * (balance.balance / 10**18)
-            else:
-                fiat_conversion = eth_price * token_eth_value
-                balance_with_decimals = balance.balance / 10**balance.token.decimals
-                fiat_balance = fiat_conversion * balance_with_decimals
 
+        for balance in balances:
             balances_with_usd.append(
                 BalanceWithFiat(
                     balance.token_address,
                     balance.token,
                     balance.balance,
-                    token_eth_value,
-                    token_eth_value_with_timestamp.timestamp,
-                    round(fiat_balance, 4),
-                    round(fiat_conversion, 4),
+                    0.0,
+                    datetime.utcfromtimestamp(0),
+                    0.0,
+                    0.0,
                     FiatCode.USD.name,
                 )
             )

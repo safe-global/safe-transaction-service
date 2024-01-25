@@ -1,13 +1,17 @@
-# Less size than Debian, slowest to build
-FROM python:3.10-alpine
+# Less size than Debian
+FROM python:3.11-alpine
 
-ENV PYTHONUNBUFFERED 1
-WORKDIR /app
+ARG APP_HOME=/app
+WORKDIR ${APP_HOME}
+ENV PYTHONUNBUFFERED=1
+
+# https://eth-hash.readthedocs.io/en/latest/quickstart.html#specify-backend-by-environment-variable
+# `pysha3` is way faster than `pycryptodome` for CPython
+ENV ETH_HASH_BACKEND=pysha3
 
 COPY requirements.txt ./
-
-# Signal handling for PID1 https://github.com/krallin/tini
-RUN apk add --update --no-cache tini libpq && \
+RUN set -ex && \
+    apk add --update --no-cache postgresql-client tmux && \
     apk add --no-cache --virtual .build-dependencies postgresql-dev alpine-sdk libffi-dev && \
     pip install --no-cache-dir -r requirements.txt && \
     apk del .build-dependencies && \
@@ -16,7 +20,13 @@ RUN apk add --update --no-cache tini libpq && \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
         -exec rm -rf '{}' +
 
-COPY . .
-RUN DJANGO_SETTINGS_MODULE=config.settings.local DJANGO_DOT_ENV_FILE=.env.local python manage.py collectstatic --noinput
+RUN addgroup -g 999 -S python && \
+    adduser -u 999 -S python python && \
+    mkdir -p /nginx && \
+    chown -R python:python /nginx ${APP_HOME}
+COPY --chown=python:python . .
 
-ENTRYPOINT ["/sbin/tini", "--"]
+# Use numeric ids so kubernetes identifies the user correctly
+USER 999:999
+
+RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput

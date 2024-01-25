@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 from urllib.parse import urljoin
 
-import requests
-
 from gnosis.eth.utils import fast_to_checksum_address
+
+from .base_client import BaseHTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -20,22 +20,24 @@ class CoinMarketCapToken:
     logo_uri: str
 
 
-class CoinMarketCapClient:
+class CoinMarketCapClient(BaseHTTPClient):
     base_url = "https://pro-api.coinmarketcap.com/"
     base_logo_uri = "https://s2.coinmarketcap.com/static/img/coins/200x200/"
 
-    def __init__(self, api_token: str):
+    def __init__(self, api_token: str, request_timeout: int = 10):
+        super().__init__(request_timeout=request_timeout)
         self.api_token = api_token
         self.headers = {
             "Accepts": "application/json",
             "X-CMC_PRO_API_KEY": api_token,
         }
-        self.http_session = requests.Session()
 
     def download_file(self, url: str, taget_folder: str, local_filename: str) -> str:
         if not os.path.exists(taget_folder):
             os.makedirs(taget_folder)
-        with self.http_session.get(url, stream=True) as response:
+        with self.http_session.get(
+            url, stream=True, timeout=self.request_timeout
+        ) as response:
             if not response.ok:
                 logger.warning("Image not found for url %s", url)
                 return None
@@ -75,7 +77,12 @@ class CoinMarketCapClient:
 
         try:
             return (
-                self.http_session.get(url, headers=self.headers, params=parameters)
+                self.http_session.get(
+                    url,
+                    headers=self.headers,
+                    params=parameters,
+                    timeout=self.request_timeout,
+                )
                 .json()
                 .get("data", [])
             )

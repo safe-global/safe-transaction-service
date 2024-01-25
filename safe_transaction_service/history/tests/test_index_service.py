@@ -4,6 +4,7 @@ from unittest.mock import PropertyMock
 from django.test import TestCase
 
 from eth_account import Account
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from web3 import Web3
 
 from gnosis.eth import EthereumClient
@@ -120,6 +121,10 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
             current_block_number_mock.return_value - reorg_blocks
         )
         self.assertTrue(self.index_service.is_service_synced())
+
+        # Test connection error to the node
+        current_block_number_mock.side_effect = RequestsConnectionError
+        self.assertFalse(self.index_service.is_service_synced())
 
     def test_reprocess_addresses(self):
         index_service: IndexService = self.index_service

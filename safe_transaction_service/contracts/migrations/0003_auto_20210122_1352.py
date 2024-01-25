@@ -6,7 +6,6 @@ import safe_transaction_service.contracts.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0002_auto_20210119_1136"),
     ]
