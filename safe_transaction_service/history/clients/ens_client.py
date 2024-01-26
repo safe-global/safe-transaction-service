@@ -8,14 +8,16 @@ from hexbytes import HexBytes
 from gnosis.eth import EthereumNetwork
 
 
+# TODO Move this class to safe-eth-py
 class EnsClient:
     def __init__(self, network_id: int):
-        self.base_url = "https://api.thegraph.com/subgraphs/name/ensdomains/"
         self.ethereum_network = EthereumNetwork(network_id)
-        if network_id == self.ethereum_network.ROPSTEN:  # Ropsten
-            url = self.base_url + "ensropsten"
+        if network_id == self.ethereum_network.SEPOLIA:
+            url = (
+                "https://api.studio.thegraph.com/proxy/49574/enssepolia/version/latest/"
+            )
         else:  # Fallback to mainnet
-            url = self.base_url + "ens"
+            url = "https://api.thegraph.com/subgraphs/name/ensdomains/ens/"
         self.url = url
         self.request_timeout = 5  # Seconds
         self.request_session = requests.Session()
@@ -52,13 +54,10 @@ class EnsClient:
             "domain_hash", domain_hash_str
         )
         try:
-            r = self.request_session.post(
+            response = self.request_session.post(
                 self.url, json={"query": query}, timeout=self.request_timeout
             )
         except IOError:
-            return None
-
-        if not r.ok:
             return None
 
         """
@@ -73,11 +72,13 @@ class EnsClient:
             }
         }
         """
-        data = r.json()
-        if data:
-            domains = data.get("data", {}).get("domains")
-            if domains:
-                return domains[0].get("labelName")
+        if response.ok:
+            data = response.json()
+            if data:
+                domains = data.get("data", {}).get("domains")
+                if domains:
+                    return domains[0].get("labelName")
+        return None
 
     def query_by_domain_hash(
         self, domain_hash: Union[str, bytes, int]
@@ -133,15 +134,14 @@ class EnsClient:
             "account_id", account.lower()
         )
         try:
-            r = self.request_session.post(
+            response = self.request_session.post(
                 self.url, json={"query": query}, timeout=self.request_timeout
             )
         except IOError:
             return None
 
-        if not r.ok:
-            return None
-        else:
-            data = r.json()
+        if response.ok:
+            data = response.json()
             if data:
                 return data.get("data", {}).get("account")
+        return None
