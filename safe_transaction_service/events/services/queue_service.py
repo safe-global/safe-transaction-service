@@ -56,10 +56,10 @@ class BrokerConnection:
             return True
         except pika.exceptions.AMQPError:
             if retry:
-                logger.info("The connection has been terminated. trying again.")
+                logger.info("The connection has been terminated, trying again.")
                 # One more chance
                 self.connect()
-                self.publish(message, retry=False)
+                return self.publish(message, retry=False)
             return False
 
 
@@ -140,7 +140,7 @@ class QueueService:
                 self.unsent_events.append(unsent_message)
 
         self.release_connection(broker_connection)
-        logger.info("Correctly sent previously unsent messages: %i", total_sent_events)
+        logger.info("Correctly sent messages: %i", total_sent_events)
         return total_sent_events
 
     def clear_unsent_events(self):
