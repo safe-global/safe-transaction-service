@@ -48,7 +48,7 @@ call_trace = {
     "type": "call",
 }
 
-rinkeby_traces = [
+testnet_traces = [
     {
         "action": {
             "from": "0x5aC255889882aCd3da2aA939679E3f3d4cea221e",
@@ -138,7 +138,7 @@ rinkeby_traces = [
         "transactionPosition": 0,
         "type": "call",
     },
-]
+]  # Taken from Rinkeby
 
 module_traces = [
     {
