@@ -60,13 +60,13 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         self.assertGreater(PeriodicTask.objects.count(), 0)
 
         # Check last master copy was created
-        last_master_copy_address = "0x6851D6fDFAfD08c0295C392436245E5bc78B0185"
+        last_master_copy_address = "0x41675C099F32341bf84BFc5382aF534df5C7461a"
         last_master_copy = SafeMasterCopy.objects.get(address=last_master_copy_address)
         self.assertGreater(last_master_copy.initial_block_number, 0)
         self.assertGreater(last_master_copy.tx_block_number, 0)
 
         # Check last proxy factory was created
-        last_proxy_factory_address = "0x76E2cFc1F5Fa8F6a5b3fC4c8F4788F0116861F9B"
+        last_proxy_factory_address = "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
         last_proxy_factory = ProxyFactory.objects.get(
             address=last_proxy_factory_address
         )
@@ -390,14 +390,8 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             first_safe_block_deployed + 20,
         )
 
-    def test_setup_service_rinkeby(self):
-        self._test_setup_service(EthereumNetwork.RINKEBY)
-
-    def test_setup_service_goerli(self):
-        self._test_setup_service(EthereumNetwork.GOERLI)
-
-    def test_setup_service_kovan(self):
-        self._test_setup_service(EthereumNetwork.KOVAN)
+    def test_setup_service_sepolia(self):
+        self._test_setup_service(EthereumNetwork.SEPOLIA)
 
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def test_setup_service_not_valid_network(

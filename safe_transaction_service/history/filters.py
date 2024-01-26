@@ -103,20 +103,30 @@ class MultisigTransactionFilter(filters.FilterSet):
     )
     transaction_hash = Keccak256Filter(field_name="ethereum_tx_id")
 
-    def filter_confirmations(self, queryset, name: str, value: bool):
+    def __init__(self, data=None, *args, **kwargs):
+        if data is not None:
+            data = data.copy()
+            data.setdefault("trusted", True)
+
+        super().__init__(data, *args, **kwargs)
+
+    def filter_confirmations(self, queryset, _name: str, value: bool):
         if value:
             return queryset.with_confirmations()
         else:
             return queryset.without_confirmations()
 
-    def filter_executed(self, queryset, name: str, value: bool):
+    def filter_executed(self, queryset, _name: str, value: bool):
         if value:
             return queryset.executed()
         else:
             return queryset.not_executed()
 
-    def filter_trusted(self, queryset, name: str, value: bool):
-        return queryset.filter(trusted=value)
+    def filter_trusted(self, queryset, _name: str, value: bool):
+        if value:
+            return queryset.trusted()
+        else:
+            return queryset
 
     class Meta:
         model = MultisigTransaction

@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 class BrokerConnection:
     def __init__(self):
         self.exchange_name: str = settings.EVENTS_QUEUE_EXCHANGE_NAME
-        self.channel: Channel = None
-        self._connection_parameters = URLParameters(settings.EVENTS_QUEUE_URL)
-        self.connection: BlockingConnection = self.connect()
+        self.channel: Optional[Channel] = None
+        self.connection_parameters = URLParameters(settings.EVENTS_QUEUE_URL)
+        self.connection: Optional[BlockingConnection] = self.connect()
 
     def connect(self) -> Optional[BlockingConnection]:
         """
@@ -27,7 +27,8 @@ class BrokerConnection:
         :return: BlockingConnection
         """
         try:
-            self.connection = BlockingConnection(self._connection_parameters)
+            logger.debug("Opening connection to RabbitMQ")
+            self.connection = BlockingConnection(self.connection_parameters)
             self.channel = self.connection.channel()
             self.channel.confirm_delivery()
             # Declare exchange
@@ -36,36 +37,29 @@ class BrokerConnection:
                 exchange_type=ExchangeType.fanout,
                 durable=True,
             )
-            # Send messages if there was any missing
-            # self.send_unsent_events()
+            logger.debug("Opened connection to RabbitMQ")
             return self.connection
-        except pika.exceptions.AMQPConnectionError:
-            logger.error("Cannot open connection with RabbitMQ")
+        except pika.exceptions.AMQPError:
+            logger.error("Cannot open connection to RabbitMQ")
+            return None
 
-    def is_connected(self) -> bool:
+    def publish(self, message: str, retry: Optional[bool] = True) -> bool:
         """
-
-        :return: True if is connected False in other case
-        """
-        if not self.connection or not self.connection.is_open:
-            return False
-        return True
-
-    def publish(self, message: str) -> bool:
-        """
-
         :param message:
-        :return: True if message was published False in other case
+        :param retry:
+        :return: `True` if message was published, `False` otherwise
         """
-        # Check if is still connected if not try to reconnect
-        if not self.is_connected() and not self.connect():
-            return False
         try:
             self.channel.basic_publish(
                 exchange=self.exchange_name, routing_key="", body=message
             )
             return True
-        except pika.exceptions.AMQPConnectionError:
+        except pika.exceptions.AMQPError:
+            if retry:
+                logger.info("The connection has been terminated, trying again.")
+                # One more chance
+                self.connect()
+                return self.publish(message, retry=False)
             return False
 
 
@@ -86,41 +80,40 @@ class QueueService:
 
     def get_connection(self) -> BrokerConnection:
         """
-
-        :return: A BrokerConnection from _connections_pool if there is one available or returns a new BrokerConnection
+        :return: A `BrokerConnection` from the connection pool if there is one available, othwerwise
+            returns a new BrokerConnection
         """
         if self._connection_pool:
             return self._connection_pool.pop()
         else:
             return BrokerConnection()
 
-    def release_connection(self, broker_connection: BrokerConnection):
+    def release_connection(self, broker_connection: BrokerConnection) -> None:
         """
-        Append the connection to _connections_pool
+        Return the `BrokerConnection` to the pool
 
         :param broker_connection:
         :return:
         """
-        self._connection_pool.insert(0, broker_connection)
+        return self._connection_pool.insert(0, broker_connection)
 
     def send_event(self, payload: Dict[str, Any]) -> int:
         """
-        Send an event to RabbitMQ exchange
+        Publish event using the `BrokerConnection`
 
-        :param payload: Dict with the payload of the event
+        :param payload: Number of events published
         """
         broker_connection = self.get_connection()
 
         event = json.dumps(payload)
         if broker_connection.publish(event):
+            logger.debug("Event correctly sent: %s", event)
             self.release_connection(broker_connection)
             return self.send_unsent_events() + 1
-        else:
-            logger.warning("Event can not be sent due any connection error")
-            logger.debug("Adding %s to unsent messages", payload)
-            self.unsent_events.append(event)
 
-        self.release_connection(broker_connection)
+        logger.warning("Unable to send the event due to a connection error")
+        logger.debug("Adding %s to unsent messages", payload)
+        self.unsent_events.append(event)
         return 0
 
     def send_unsent_events(self) -> int:
@@ -129,28 +122,29 @@ class QueueService:
 
         :return: number of messages sent
         """
-        if self.unsent_events:
-            broker_connection = self.get_connection()
-            # Avoid race conditions
-            unsent_events = self.unsent_events
-            self.unsent_events = []
-            total_sent_events = 0
-            logger.info("Sending %i not sent messages", len(unsent_events))
+        if not self.unsent_events:
+            return 0
 
-            for unsent_message in unsent_events:
-                if broker_connection.publish(unsent_message):
-                    total_sent_events += 1
-                else:
-                    self.unsent_events.append(unsent_message)
+        broker_connection = self.get_connection()
 
-            self.release_connection(broker_connection)
-            logger.info("Sent %i not sent messages", total_sent_events)
-            return total_sent_events
-
-        return 0
-
-    def remove_unsent_events(self):
+        # Avoid race conditions
+        unsent_events = self.unsent_events
         self.unsent_events = []
+
+        total_sent_events = 0
+        logger.info("Sending previously unsent messages: %i", len(unsent_events))
+        for unsent_message in unsent_events:
+            if broker_connection.publish(unsent_message):
+                total_sent_events += 1
+            else:
+                self.unsent_events.append(unsent_message)
+
+        self.release_connection(broker_connection)
+        logger.info("Correctly sent messages: %i", total_sent_events)
+        return total_sent_events
+
+    def clear_unsent_events(self):
+        self.unsent_events.clear()
 
 
 class MockedQueueService:

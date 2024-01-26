@@ -1007,7 +1007,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        multisig_tx = MultisigTransactionFactory(safe=safe_address, proposer=proposer)
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, proposer=proposer, trusted=True
+        )
+        # Not trusted multisig transaction should not be returned by default
+        MultisigTransactionFactory(safe=safe_address, proposer=proposer, trusted=False)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1041,7 +1045,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 1)
         self.assertEqual(response.data["results"][0]["proposer"], proposer)
 
-        MultisigTransactionFactory(safe=safe_address, nonce=multisig_tx.nonce)
+        # Check not trusted
+        response = self.client.get(
+            reverse("v1:history:multisig-transactions", args=(safe_address,))
+            + "?trusted=False",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+        MultisigTransactionFactory(
+            safe=safe_address, nonce=multisig_tx.nonce, trusted=True
+        )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1067,21 +1082,23 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
         MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
+
+        # Unique nonce ignores not trusted transactions by default
         response = self.client.get(
             url,
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
-        self.assertEqual(response.data["count_unique_nonce"], 2)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["count_unique_nonce"], 1)
 
         response = self.client.get(
-            url + "?trusted=True",
+            url + "?trusted=False",
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["count_unique_nonce"], 1)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["count_unique_nonce"], 2)
 
     @mock.patch.object(
         DbTxDecoder, "get_data_decoded", return_value={"param1": "value"}
@@ -1092,7 +1109,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         try:
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             multisig_transaction = MultisigTransactionFactory(
-                operation=SafeOperation.CALL.value, data=b"abcd"
+                operation=SafeOperation.CALL.value, data=b"abcd", trusted=True
             )
             safe_address = multisig_transaction.safe
             response = self.client.get(
@@ -1138,7 +1155,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
 
         multisig_transaction = MultisigTransactionFactory(
-            safe=safe_address, nonce=0, ethereum_tx=None
+            safe=safe_address, nonce=0, ethereum_tx=None, trusted=True
         )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
@@ -1259,13 +1276,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertFalse(multisig_transaction_db.trusted)
 
         response = self.client.get(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            reverse(
+                "v1:history:multisig-transaction",
+                args=(data["contractTransactionHash"],),
+            ),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
-        self.assertIsNone(response.data["results"][0]["executor"])
-        self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
+        self.assertIsNone(response.data["executor"])
+        self.assertEqual(len(response.data["confirmations"]), 0)
 
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
@@ -1317,14 +1336,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertFalse(multisig_transaction_db.trusted)
 
         response = self.client.get(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            reverse(
+                "v1:history:multisig-transaction",
+                args=(data["contractTransactionHash"],),
+            ),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
-        self.assertIsNone(response.data["results"][0]["executor"])
-        self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
-        self.assertEqual(response.data["results"][0]["proposer"], data["sender"])
+        self.assertIsNone(response.data["executor"])
+        self.assertEqual(len(response.data["confirmations"]), 0)
+        self.assertEqual(response.data["proposer"], data["sender"])
 
         # Test confirmation with signature
         data["signature"] = safe_owner_1.signHash(safe_tx.safe_tx_hash)[

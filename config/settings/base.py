@@ -419,6 +419,9 @@ LOGGING = {
             "handlers": ["console", "mail_admins"],
             "propagate": True,
         },
+        "pika": {
+            "propagate": True if DEBUG else False,
+        },
     },
 }
 
@@ -518,7 +521,6 @@ if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
 # Events
 # ------------------------------------------------------------------------------
 EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
-EVENTS_QUEUE_ASYNC_CONNECTION = env("EVENTS_QUEUE_ASYNC_CONNECTION", default=False)
 EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
 
 # Cache
