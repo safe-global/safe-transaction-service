@@ -29,7 +29,7 @@ class TestTasks(TestCase):
     def test_fix_pool_tokens_task(self, get_network_mock: MagicMock):
         self.assertEqual(fix_pool_tokens_task.delay().result, 0)
 
-        get_network_mock.return_value = EthereumNetwork.RINKEBY
+        get_network_mock.return_value = EthereumNetwork.SEPOLIA
         self.assertIsNone(fix_pool_tokens_task.delay().result)
 
     @mock.patch(

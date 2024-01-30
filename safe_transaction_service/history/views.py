@@ -675,7 +675,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         :return: Number of Multisig Transactions with different nonce
         """
         only_trusted = parse_boolean_query_param(
-            self.request.query_params.get("trusted", False)
+            self.request.query_params.get("trusted", True)
         )
         queryset = MultisigTransaction.objects.filter(safe=address)
         if only_trusted:
@@ -696,7 +696,8 @@ class SafeMultisigTransactionListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         """
-        Returns the history of a multisig tx (safe)
+        Returns a paginated list of Multisig Transactions for a Safe.
+        By default only ``trusted`` multisig transactions are returned.
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
