@@ -22,7 +22,7 @@ class CoingeckoClient(BaseHTTPClient):
         EthereumNetwork.ARBITRUM_ONE: "arbitrum-one",
         EthereumNetwork.AURORA_MAINNET: "aurora",
         EthereumNetwork.AVALANCHE_C_CHAIN: "avalanche",
-        EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET: "binance-smart-chain",
+        EthereumNetwork.BNB_SMART_CHAIN_MAINNET: "binance-smart-chain",
         EthereumNetwork.FUSE_MAINNET: "fuse",
         EthereumNetwork.GNOSIS: "xdai",
         EthereumNetwork.KCC_MAINNET: "kucoin-community-chain",
