@@ -19,7 +19,7 @@ TOKEN_LIST_BY_NETWORK = {
         "Official",
     ),
     EthereumNetwork.GNOSIS: ("https://tokens.honeyswap.org/", "HoneySwap"),
-    EthereumNetwork.BINANCE_SMART_CHAIN_MAINNET: (
+    EthereumNetwork.BNB_SMART_CHAIN_MAINNET: (
         "https://tokens.pancakeswap.finance/pancakeswap-extended.json",
         "PancakeSwap",
     ),
