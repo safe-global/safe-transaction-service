@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -21,10 +22,12 @@ class TestProxyFactoryIndexer(SafeTestCaseMixin, TestCase):
         )
         safe_contract_address = ethereum_tx_sent.contract_address
         self.w3.eth.wait_for_transaction_receipt(ethereum_tx_sent.tx_hash)
-        # We expect 1 event and 21 blocks 20 by reindexing and 1 from safe creation
+
+        blocks_to_reindex_again = settings.ETH_EVENTS_BLOCKS_TO_REINDEX_AGAIN
+        # We expect 1 event (Safe Creation) and `1 + blocks_to_reindex_again` blocks
         self.assertEqual(
             proxy_factory_indexer.start(),
-            (1, 21),
+            (1, 1 + blocks_to_reindex_again),
         )
         # Test if only 1 Safe was created
         self.assertEqual(SafeContract.objects.count(), 1 + safe_contracts_count)
