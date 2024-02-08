@@ -50,7 +50,7 @@ from .models import (
     SafeMasterCopy,
     TransferDict,
 )
-from .pagination import ListPagination
+from .pagination import DummyPagination
 from .serializers import get_data_decoded_from_data
 from .services import (
     BalanceServiceProvider,
@@ -357,6 +357,7 @@ class AllTransactionsListView(ListAPIView):
                 self.paginator.offset = offset
                 self.paginator.request = self.request
                 return page
+
             page = self.get_page_tx_identifiers(
                 safe, executed, queued, trusted, ordering, limit, offset
             )
@@ -372,7 +373,7 @@ class AllTransactionsListView(ListAPIView):
         executed, queued, trusted = self.get_parameters()
         ordering = self.get_ordering_parameter()
         # Trick to get limit and offset
-        list_pagination = ListPagination(self.request)
+        list_pagination = DummyPagination(self.request)
         limit, offset = list_pagination.limit, list_pagination.offset
 
         tx_identifiers_page = self.get_cached_page_tx_identifiers(
