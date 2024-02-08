@@ -79,6 +79,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def setUp(self):
+        get_redis().flushall()
+
+    def tearDown(self):
+        get_redis().flushall()
+
     def test_about_view(self):
         url = reverse("v1:history:about")
         response = self.client.get(url, format="json")
@@ -394,7 +400,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             last_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
         )
 
-    def test_all_transactions_cache(self):
+    def test_all_transactions_cache_view(self):
         safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
         # Older transaction
         factory_transactions = [
@@ -451,6 +457,31 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
         )
         self.assertEqual(response.data["count"], 3)
+
+    def test_all_transactions_cache_limit_offset_view(self):
+        """
+        Test limit and offset
+        """
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        number_transactions = 100
+
+        for _ in range(number_transactions):
+            MultisigTransactionFactory(safe=safe_address)
+
+        for limit, offset in ((57, 12), (13, 24)):
+            with self.subTest(limit=limit, offset=offset):
+                # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
+                cache_key = f"all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:{limit}:{offset}:execution_date:{number_transactions}"
+                redis = get_redis()
+                self.assertFalse(redis.exists(cache_key))
+
+                response = self.client.get(
+                    reverse("v1:history:all-transactions", args=(safe_address,))
+                    + f"?executed=True&queued=False&trusted=False&ordering=execution_date&limit={limit}&offset={offset}"
+                )
+                self.assertEqual(response.data["count"], number_transactions)
+                self.assertEqual(len(response.data["results"]), limit)
+                self.assertTrue(redis.exists(cache_key))
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
