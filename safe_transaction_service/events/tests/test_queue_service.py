@@ -6,10 +6,7 @@ from django.test import TestCase
 from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
-from safe_transaction_service.events.services.queue_service import (
-    BrokerConnection,
-    get_queue_service,
-)
+from ..services.queue_service import BrokerConnection, get_queue_service
 
 
 class TestQueueService(TestCase):
