@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
     services:
       redis:
         image: redis
@@ -75,7 +75,7 @@ jobs:
         cache-dependency-path: 'requirements*.txt'
     - name: Install dependencies
       run: |
-        pip install wheel
+        pip install wheel setuptools
         pip install -r requirements-test.txt
       env:
         PIP_USE_MIRRORS: true
