@@ -1321,9 +1321,9 @@ class MultisigTransactionQuerySet(models.QuerySet):
         threshold_safe_status_query = (
             SafeStatus.objects.filter(
                 address=OuterRef("safe"),
-                internal_tx__ethereum_tx=OuterRef("ethereum_tx"),
+                nonce=OuterRef("nonce"),
             )
-            .sorted_reverse_by_mined()
+            .order_by("internal_tx_id")
             .values("threshold")
         )
 
@@ -1399,6 +1399,12 @@ class MultisigTransaction(TimeStampedModel):
     class Meta:
         permissions = [
             ("create_trusted", "Can create trusted transactions"),
+        ]
+        indexes = [
+            Index(
+                name="history_multisigtx_safe_sorted",
+                fields=["safe", "-nonce", "-created"],
+            ),
         ]
 
     def __str__(self):
@@ -1983,7 +1989,6 @@ class SafeStatus(SafeStatusBase):
     class Meta:
         indexes = [
             Index(fields=["address", "-nonce"]),  # Index on address and nonce DESC
-            Index(fields=["address", "-nonce", "-internal_tx"]),  # For Window search
         ]
         unique_together = (("internal_tx", "address"),)
         verbose_name_plural = "Safe statuses"
