@@ -1482,17 +1482,17 @@ class TestMultisigTransactions(TestCase):
         )
 
     def test_with_confirmations_required(self):
-        # This should never be picked
+        # This should never be picked, Safe not matching
         SafeStatusFactory(nonce=0, threshold=4)
 
-        multisig_transaction = MultisigTransactionFactory()
+        multisig_transaction = MultisigTransactionFactory(nonce=0)
         self.assertIsNone(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
             .confirmations_required
         )
 
-        # SafeStatus not matching the EthereumTx
+        # SafeStatus not matching the nonce (looking for threshold in nonce=0)
         safe_status = SafeStatusFactory(
             address=multisig_transaction.safe, nonce=1, threshold=8
         )
@@ -1502,8 +1502,8 @@ class TestMultisigTransactions(TestCase):
             .confirmations_required
         )
 
-        safe_status.internal_tx.ethereum_tx = multisig_transaction.ethereum_tx
-        safe_status.internal_tx.save(update_fields=["ethereum_tx"])
+        safe_status.nonce = 0
+        safe_status.save(update_fields=["nonce"])
 
         self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
@@ -1512,8 +1512,8 @@ class TestMultisigTransactions(TestCase):
             8,
         )
 
-        # It will not be picked, as EthereumTx is not matching
-        SafeStatusFactory(nonce=2, threshold=15)
+        # It will not be picked, as nonce is still matching the previous SafeStatus
+        SafeStatusFactory(address=multisig_transaction.safe, nonce=1, threshold=15)
         self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
@@ -1521,7 +1521,16 @@ class TestMultisigTransactions(TestCase):
             8,
         )
 
-        # As EthereumTx is empty, the latest safe status will be used if available
+        multisig_transaction.nonce = 1
+        multisig_transaction.save(update_fields=["nonce"])
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            15,
+        )
+
+        # As EthereumTx is empty, the latest Safe Status will be used if available
         multisig_transaction.ethereum_tx = None
         multisig_transaction.save(update_fields=["ethereum_tx"])
         self.assertIsNone(

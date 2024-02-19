@@ -1318,12 +1318,26 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
         :return: queryset with `confirmations_required: int` field
         """
+
+        """
+        SafeStatus works the following way:
+            - First entry of any Multisig Transactions is `execTransaction`, that increments the nonce.
+            - Next entries are configuration changes on the Safe.
+        For example, for a Multisig Transaction with nonce 1 changing the threshold the `SafeStatus` table
+        will look like:
+            - setup with nonce 0
+            - execTransaction with nonce already increased to 1 for a previous Multisig Transaction.
+            - execTransaction with nonce already increased to 2, old threshold and internal_tx_id=7 (auto increased id).
+            - changeThreshold with nonce already increased to 2, new threshold and internal_tx_id=8 (any number
+              higher than 7).
+        We need to get the previous entry to get the proper threshold at that point before it's changed.
+        """
         threshold_safe_status_query = (
             SafeStatus.objects.filter(
                 address=OuterRef("safe"),
-                internal_tx__ethereum_tx=OuterRef("ethereum_tx"),
+                nonce=OuterRef("nonce"),
             )
-            .sorted_reverse_by_mined()
+            .order_by("-internal_tx_id")
             .values("threshold")
         )
 
@@ -1399,6 +1413,12 @@ class MultisigTransaction(TimeStampedModel):
     class Meta:
         permissions = [
             ("create_trusted", "Can create trusted transactions"),
+        ]
+        indexes = [
+            Index(
+                name="history_multisigtx_safe_sorted",
+                fields=["safe", "-nonce", "-created"],
+            ),
         ]
 
     def __str__(self):
@@ -1983,7 +2003,6 @@ class SafeStatus(SafeStatusBase):
     class Meta:
         indexes = [
             Index(fields=["address", "-nonce"]),  # Index on address and nonce DESC
-            Index(fields=["address", "-nonce", "-internal_tx"]),  # For Window search
         ]
         unique_together = (("internal_tx", "address"),)
         verbose_name_plural = "Safe statuses"
