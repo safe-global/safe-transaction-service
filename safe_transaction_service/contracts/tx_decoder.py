@@ -164,9 +164,9 @@ class SafeTxDecoder:
 
     def __init__(self):
         logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
-        self.fn_selectors_with_abis: Dict[
-            bytes, ABIFunction
-        ] = self._generate_selectors_with_abis_from_abis(self.get_supported_abis())
+        self.fn_selectors_with_abis: Dict[bytes, ABIFunction] = (
+            self._generate_selectors_with_abis_from_abis(self.get_supported_abis())
+        )
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
