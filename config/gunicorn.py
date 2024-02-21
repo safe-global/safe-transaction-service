@@ -1,6 +1,7 @@
 """
 Store gunicorn variables in this file, so they can be read by Django
 """
+
 import os
 
 gunicorn_request_timeout = os.environ.get("WEB_WORKER_TIMEOUT", 60)
