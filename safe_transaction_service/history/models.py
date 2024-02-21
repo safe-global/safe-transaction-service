@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
-from functools import cache, lru_cache
+from functools import cache, cached_property, lru_cache
 from itertools import islice
 from logging import getLogger
 from typing import (
@@ -2167,3 +2167,34 @@ class WebHook(models.Model):
             return False
         else:
             return True
+
+
+class UserOperation(models.Model):
+    """
+    EIP 4337 UserOperation
+
+    https://www.erc4337.io/docs/understanding-ERC-4337/user-operation
+    """
+
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    sender = EthereumAddressV2Field(db_index=True)
+    nonce = Uint256Field()
+    init_code = models.BinaryField(null=True, blank=True, editable=True)
+    call_data = models.BinaryField(null=True, blank=True, editable=True)
+    call_data_gas_limit = Uint256Field()
+    verification_gas_limit = Uint256Field()
+    pre_verification_gas = Uint256Field()
+    max_fee_per_gas = Uint256Field()
+    max_priority_fee_per_gas = Uint256Field()
+    paymaster = EthereumAddressV2Field(
+        db_index=True, null=True, blank=True, editable=True
+    )
+    paymaster_data = models.BinaryField(null=True, blank=True, editable=True)
+
+    class Meta:
+        unique_together = (("sender", "nonce"),)
+
+    @cached_property
+    def paymaster_and_data(self) -> Optional[bytes]:
+        if self.paymaster and self.paymaster_data:
+            return HexBytes(self.paymaster) + HexBytes(self.paymaster_data)

@@ -1,8 +1,11 @@
+"""
+Contains classes for processing indexed data and store Safe related models in database
+"""
 from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
@@ -11,6 +14,7 @@ from packaging.version import Version
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.account_abstraction import BundlerClient
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import (
     get_safe_V1_0_0_contract,
@@ -34,8 +38,27 @@ from ..models import (
     SafeMasterCopy,
     SafeStatus,
 )
+from ..models import UserOperation as UserOperationModel
 
 logger = getLogger(__name__)
+
+
+# EntryPoint v0.6.0
+# 0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f
+# UserOperationEvent (
+#                    index_topic_1 bytes32 userOpHash, index_topic_2 address sender,
+#                    index_topic_3 address paymaster, uint256 nonce, bool success,
+#                    uint256 actualGasCost, uint256 actualGasUsed
+#                    )
+# Entrypoint v0.7.0
+# TBD
+USER_OPERATION_EVENT_TOPICS = {
+    HexBytes("0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f")
+}
+
+USER_OPERATION_SUPPORTED_ENTRY_POINTS = {
+    ChecksumAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
+}
 
 
 class TxProcessorException(Exception):
@@ -57,7 +80,18 @@ class SafeTxProcessorProvider:
                 if settings.ETHEREUM_TRACING_NODE_URL
                 else None
             )
-            cls.instance = SafeTxProcessor(ethereum_client, ethereum_tracing_client)
+            bundler_client = (
+                BundlerClient(settings.ETHEREUM_4337_BUNDLER_URL)
+                if settings.ETHEREUM_4337_BUNDLER_URL
+                else None
+            )
+            if not ethereum_tracing_client:
+                logger.warning("Ethereum tracing client was not configured")
+            if not bundler_client:
+                logger.warning("Ethereum 4337 bundler client was not configured")
+            cls.instance = SafeTxProcessor(
+                ethereum_client, ethereum_tracing_client, bundler_client
+            )
         return cls.instance
 
     @classmethod
@@ -91,6 +125,7 @@ class SafeTxProcessor(TxProcessor):
         self,
         ethereum_client: EthereumClient,
         ethereum_tracing_client: Optional[EthereumClient],
+        bundler_client: Optional[BundlerClient],
     ):
         """
         :param ethereum_client: Used for regular RPC calls
@@ -101,6 +136,7 @@ class SafeTxProcessor(TxProcessor):
         # This safe_tx_failure events allow us to detect a failed safe transaction
         self.ethereum_client = ethereum_client
         self.ethereum_tracing_client = ethereum_tracing_client
+        self.bundler_client = bundler_client
         dummy_w3 = Web3()
         self.safe_tx_failure_events = [
             get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
@@ -318,6 +354,56 @@ class SafeTxProcessor(TxProcessor):
         self.clear_cache()
         return results
 
+    def process_4337_transaction(self, ethereum_tx: EthereumTx) -> bool:
+        """
+        Check if transaction contains any 4337 UserOperation
+
+        :return: `True` if transaction contains any 4337 UserOperation
+        """
+        detected_user_operation = False
+        for log in ethereum_tx.logs:
+            if (
+                log["topics"]
+                and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
+                and log["address"]
+                in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
+            ):
+                # Detected a 4337 UserOperation
+                detected_user_operation = True
+                if self.bundler_client:
+                    # If bundler client is not configured we cannot more information
+                    user_operation_hash = log["topics"][1]
+                    try:
+                        user_operation = self.bundler_client.get_user_operation_by_hash(
+                            user_operation_hash
+                        )
+                        with transaction.atomic():  # Needed for handling IntegrityError
+                            UserOperationModel.objects.create(
+                                ethereum_tx=ethereum_tx,
+                                sender=user_operation.sender,
+                                nonce=user_operation.nonce,
+                                init_code=user_operation.init_code,
+                                call_data=user_operation.call_data,
+                                call_data_gas_limit=user_operation.call_gas_limit,
+                                verification_gas_limit=user_operation.verification_gas_limit,
+                                pre_verification_gas=user_operation.pre_verification_gas,
+                                max_fee_per_gas=user_operation.max_fee_per_gas,
+                                max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
+                                paymaster=user_operation.paymaster,
+                                paymaster_data=user_operation.paymaster_data,
+                            )
+                    except IOError:
+                        logger.error(
+                            "Error retrieving user-operation-hash=%s from bundler API",
+                            user_operation_hash,
+                        )
+                    except IntegrityError:
+                        logger.warning(
+                            "user-operation-hash=%s was already indexed",
+                            user_operation_hash,
+                        )
+        return detected_user_operation
+
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
     ) -> bool:
@@ -346,6 +432,8 @@ class SafeTxProcessor(TxProcessor):
         contract_address = internal_tx._from
         master_copy = internal_tx.to
         processed_successfully = True
+
+        # Check 4337
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -592,6 +680,10 @@ class SafeTxProcessor(TxProcessor):
                 ethereum_tx = internal_tx.ethereum_tx
 
                 failed = self.is_failed(ethereum_tx, safe_tx_hash)
+
+                # Detect Account Abstraction in this transaction
+                self.process_4337_transaction(ethereum_tx)
+
                 multisig_tx, _ = MultisigTransaction.objects.get_or_create(
                     safe_tx_hash=safe_tx_hash,
                     defaults={
