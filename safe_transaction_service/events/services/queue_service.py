@@ -89,7 +89,7 @@ class QueueService:
             and self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
         ):
             logger.warning(
-                "No available pool connections, currently using: %i",
+                "Number of active connections reached the pool limit: %d",
                 self._total_connections,
             )
             return None
@@ -110,7 +110,7 @@ class QueueService:
         :return:
         """
         self._total_connections -= 1
-        # We don't add to the pool broken connections
+        # Don't add broken connections to the pool
         if broker_connection:
             self._connection_pool.insert(0, broker_connection)
 
@@ -122,7 +122,7 @@ class QueueService:
         """
         event = json.dumps(payload)
         if not (broker_connection := self.get_connection()):
-            # No available pool connection then store to send later
+            # No available connections in the pool, store event to send it later
             self.unsent_events.append(event)
             return 0
 
@@ -134,6 +134,7 @@ class QueueService:
         logger.warning("Unable to send the event due to a connection error")
         logger.debug("Adding %s to unsent messages", payload)
         self.unsent_events.append(event)
+        # As the message cannot be sent, we don't want to send the problematic connection back to the pool, only reduce the number of total connections
         self.release_connection(None)
         return 0
 
@@ -147,7 +148,7 @@ class QueueService:
             return 0
 
         if not (broker_connection := self.get_connection()):
-            # No available pool connection
+            # Connection not available in the pool
             return 0
 
         # Avoid race conditions

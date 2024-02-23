@@ -78,7 +78,7 @@ class TestQueueService(TestCase):
     def test_send_event_to_queue(self):
         payload = {"event": "test_event", "type": "event type"}
         queue_service = QueueService()
-        # Clean previous pool connections
+        # Clean previous connection pool
         queue_service._connection_pool = []
         self.assertEqual(len(queue_service._connection_pool), 0)
         queue_service.send_event(payload)
@@ -90,7 +90,7 @@ class TestQueueService(TestCase):
 
     def test_get_connection(self):
         queue_service = QueueService()
-        # Clean previous pool connections
+        # Clean previous connection pool
         queue_service._connection_pool = []
         self.assertEqual(len(queue_service._connection_pool), 0)
         self.assertEqual(queue_service._total_connections, 0)
@@ -110,7 +110,7 @@ class TestQueueService(TestCase):
             connection_1 = queue_service.get_connection()
             self.assertEqual(len(queue_service._connection_pool), 1)
             self.assertEqual(queue_service._total_connections, 1)
-            # We should reach the limit connections
+            # We should reach the connection limit of the pool
             connection_1 = queue_service.get_connection()
             self.assertEqual(len(queue_service._connection_pool), 1)
             self.assertEqual(queue_service._total_connections, 1)
