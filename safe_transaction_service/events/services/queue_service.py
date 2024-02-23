@@ -76,26 +76,43 @@ def get_queue_service():
 class QueueService:
     def __init__(self):
         self._connection_pool: List[BrokerConnection] = []
+        self._total_connections: int = 0
         self.unsent_events: List = []
 
-    def get_connection(self) -> BrokerConnection:
+    def get_connection(self) -> Optional[BrokerConnection]:
         """
         :return: A `BrokerConnection` from the connection pool if there is one available, othwerwise
             returns a new BrokerConnection
         """
-        if self._connection_pool:
-            return self._connection_pool.pop()
-        else:
-            return BrokerConnection()
+        if (
+            settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+            and self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+        ):
+            logger.warning(
+                "Number of active connections reached the pool limit: %d",
+                self._total_connections,
+            )
+            return None
 
-    def release_connection(self, broker_connection: BrokerConnection) -> None:
+        if self._connection_pool:
+            broker_connection = self._connection_pool.pop()
+        else:
+            broker_connection = BrokerConnection()
+
+        self._total_connections += 1
+        return broker_connection
+
+    def release_connection(self, broker_connection: Optional[BrokerConnection]):
         """
         Return the `BrokerConnection` to the pool
 
         :param broker_connection:
         :return:
         """
-        return self._connection_pool.insert(0, broker_connection)
+        self._total_connections -= 1
+        # Don't add broken connections to the pool
+        if broker_connection:
+            self._connection_pool.insert(0, broker_connection)
 
     def send_event(self, payload: Dict[str, Any]) -> int:
         """
@@ -103,9 +120,12 @@ class QueueService:
 
         :param payload: Number of events published
         """
-        broker_connection = self.get_connection()
-
         event = json.dumps(payload)
+        if not (broker_connection := self.get_connection()):
+            # No available connections in the pool, store event to send it later
+            self.unsent_events.append(event)
+            return 0
+
         if broker_connection.publish(event):
             logger.debug("Event correctly sent: %s", event)
             self.release_connection(broker_connection)
@@ -114,6 +134,8 @@ class QueueService:
         logger.warning("Unable to send the event due to a connection error")
         logger.debug("Adding %s to unsent messages", payload)
         self.unsent_events.append(event)
+        # As the message cannot be sent, we don't want to send the problematic connection back to the pool, only reduce the number of total connections
+        self.release_connection(None)
         return 0
 
     def send_unsent_events(self) -> int:
@@ -125,7 +147,9 @@ class QueueService:
         if not self.unsent_events:
             return 0
 
-        broker_connection = self.get_connection()
+        if not (broker_connection := self.get_connection()):
+            # Connection not available in the pool
+            return 0
 
         # Avoid race conditions
         unsent_events = self.unsent_events
