@@ -6,7 +6,7 @@ from django.test import TestCase
 from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
-from ..services.queue_service import BrokerConnection, get_queue_service
+from ..services.queue_service import BrokerConnection, QueueService, get_queue_service
 
 
 class TestQueueService(TestCase):
@@ -57,21 +57,27 @@ class TestQueueService(TestCase):
             payload = f"not sent {i}"
             _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
             self.assertEqual(json.loads(body), payload)
-        # Test unsent messages when pool limit is reached
+
+    def test_send_with_pool_limit(self):
+        queue_service = QueueService()
+        payload = "Pool limit test"
+        # Unused connection, just to reach the limit
+        connection_1 = queue_service.get_connection()
+        self.assertEqual(len(queue_service.unsent_events), 0)
+        self.assertEqual(queue_service.send_event(payload), 1)
         with self.settings(EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT=1):
-            # Unused connection, just to reach the limit
-            connection_1 = queue_service.get_connection()
+            self.assertEqual(queue_service._total_connections, 1)
             self.assertEqual(len(queue_service.unsent_events), 0)
-            queue_service.send_event(payload)
+            self.assertEqual(queue_service.send_event(payload), 0)
             self.assertEqual(len(queue_service.unsent_events), 1)
             queue_service.release_connection(connection_1)
             self.assertEqual(len(queue_service.unsent_events), 1)
-            queue_service.send_event(payload)
+            self.assertEqual(queue_service.send_event(payload), 2)
             self.assertEqual(len(queue_service.unsent_events), 0)
 
     def test_send_event_to_queue(self):
         payload = {"event": "test_event", "type": "event type"}
-        queue_service = get_queue_service()
+        queue_service = QueueService()
         # Clean previous pool connections
         queue_service._connection_pool = []
         self.assertEqual(len(queue_service._connection_pool), 0)
@@ -83,7 +89,7 @@ class TestQueueService(TestCase):
         self.assertEqual(json.loads(body), payload)
 
     def test_get_connection(self):
-        queue_service = get_queue_service()
+        queue_service = QueueService()
         # Clean previous pool connections
         queue_service._connection_pool = []
         self.assertEqual(len(queue_service._connection_pool), 0)

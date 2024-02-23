@@ -84,7 +84,14 @@ class QueueService:
         :return: A `BrokerConnection` from the connection pool if there is one available, othwerwise
             returns a new BrokerConnection
         """
-        if self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT:
+        if (
+            settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+            and self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+        ):
+            logger.warning(
+                "No available pool connections, currently using: %i",
+                self._total_connections,
+            )
             return None
 
         if self._connection_pool:
@@ -95,7 +102,7 @@ class QueueService:
         self._total_connections += 1
         return broker_connection
 
-    def release_connection(self, broker_connection: Optional[BrokerConnection] = None):
+    def release_connection(self, broker_connection: Optional[BrokerConnection]):
         """
         Return the `BrokerConnection` to the pool
 
@@ -103,6 +110,7 @@ class QueueService:
         :return:
         """
         self._total_connections -= 1
+        # We don't add to the pool broken connections
         if broker_connection:
             self._connection_pool.insert(0, broker_connection)
 
@@ -113,7 +121,7 @@ class QueueService:
         :param payload: Number of events published
         """
         event = json.dumps(payload)
-        if (broker_connection := self.get_connection()) is None:
+        if not (broker_connection := self.get_connection()):
             # No available pool connection then store to send later
             self.unsent_events.append(event)
             return 0
@@ -126,7 +134,7 @@ class QueueService:
         logger.warning("Unable to send the event due to a connection error")
         logger.debug("Adding %s to unsent messages", payload)
         self.unsent_events.append(event)
-        self.release_connection()
+        self.release_connection(None)
         return 0
 
     def send_unsent_events(self) -> int:
@@ -138,7 +146,7 @@ class QueueService:
         if not self.unsent_events:
             return 0
 
-        if (broker_connection := self.get_connection()) is None:
+        if not (broker_connection := self.get_connection()):
             # No available pool connection
             return 0
 
