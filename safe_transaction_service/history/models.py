@@ -2085,6 +2085,9 @@ class UserOperation(models.Model):
 
     class Meta:
         unique_together = (("sender", "nonce"),)
+        indexes = [
+            Index(fields=["sender", "-nonce"]),
+        ]
 
     @cached_property
     def paymaster_and_data(self) -> Optional[bytes]:

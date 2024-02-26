@@ -380,6 +380,7 @@ class SafeTxProcessor(TxProcessor):
                         with transaction.atomic():  # Needed for handling IntegrityError
                             UserOperationModel.objects.create(
                                 ethereum_tx=ethereum_tx,
+                                user_operation_hash=user_operation_hash,
                                 sender=user_operation.sender,
                                 nonce=user_operation.nonce,
                                 init_code=user_operation.init_code,
@@ -391,6 +392,8 @@ class SafeTxProcessor(TxProcessor):
                                 max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
                                 paymaster=user_operation.paymaster,
                                 paymaster_data=user_operation.paymaster_data,
+                                signature=user_operation.signature,
+                                entry_point=user_operation.entry_point,
                             )
                     except IOError:
                         logger.error(
