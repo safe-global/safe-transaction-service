@@ -37,6 +37,8 @@ from model_utils.models import TimeStampedModel
 from packaging.version import Version
 from web3.types import EventData
 
+from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
+from gnosis.eth.account_abstraction import UserOperationMetadata
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
@@ -2064,6 +2066,7 @@ class UserOperation(models.Model):
     """
 
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    user_operation_hash = Keccak256Field(unique=True)
     sender = EthereumAddressV2Field(db_index=True)
     nonce = Uint256Field()
     init_code = models.BinaryField(null=True, blank=True, editable=True)
@@ -2077,6 +2080,8 @@ class UserOperation(models.Model):
         db_index=True, null=True, blank=True, editable=True
     )
     paymaster_data = models.BinaryField(null=True, blank=True, editable=True)
+    signature = models.BinaryField()
+    entry_point = EthereumAddressV2Field(db_index=True)
 
     class Meta:
         unique_together = (("sender", "nonce"),)
@@ -2085,6 +2090,42 @@ class UserOperation(models.Model):
     def paymaster_and_data(self) -> Optional[bytes]:
         if self.paymaster and self.paymaster_data:
             return HexBytes(self.paymaster) + HexBytes(self.paymaster_data)
+
+    @cached_property
+    def to_user_operation(self, add_tx_metadata: bool = False) -> UserOperationClass:
+        """
+        Returns a safe-eth-py UserOperation object
+
+        :param add_tx_metadata: If `True` more database queries will be performed to get the transaction metadata
+        :return: safe-eth-py `UserOperation`
+        """
+        user_operation_metadata = (
+            UserOperationMetadata(
+                # More DB queries
+                transaction_hash=HexBytes(self.ethereum_tx_id),
+                block_hash=HexBytes(self.ethereum_tx.block.block_hash),
+                block_number=self.ethereum_tx.block.number,  # TODO Maybe tx information is not needed
+            )
+            if add_tx_metadata
+            else None
+        )
+
+        return UserOperationClass(
+            self.user_operation_hash,
+            self.sender,
+            self.nonce,
+            bytes(self.init_code) if self.init_code else None,
+            bytes(self.call_data) if self.call_data else None,
+            self.call_data_gas_limit,
+            self.verification_gas_limit,
+            self.pre_verification_gas,
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            self.paymaster_and_data,
+            self.signature,
+            self.entry_point,
+            user_operation_metadata,
+        )
 
 
 class WebHookType(Enum):
