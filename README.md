@@ -187,7 +187,7 @@ Aside from using standard HTTP requests:
 - [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
 
 ### What chains do you officially support?
-https://docs.safe.global/safe-core-api/available-services
+https://docs.safe.global/api-supported-networks
 
 ### What means banned field in SafeContract model?
 The `banned` field in the `SafeContract` model is used to prevent indexing of certain Safes that have an unsupported `MasterCopy` or unverified proxies that have issues during indexing. This field does not remove the banned Safe and indexing can be resumed once the issue has been resolved.
