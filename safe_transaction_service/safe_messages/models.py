@@ -69,7 +69,12 @@ class SafeMessageConfirmation(TimeStampedModel):
     )
 
     class Meta:
-        unique_together = (("safe_message", "owner"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["safe_message", "owner"],
+                name="unique_safe_message_confirmation_owner",
+            )
+        ]
         ordering = ["created"]
 
     def __str__(self):

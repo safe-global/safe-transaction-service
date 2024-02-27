@@ -497,7 +497,11 @@ class TokenTransfer(models.Model):
             Index(fields=["_from", "timestamp"]),
             Index(fields=["to", "timestamp"]),
         ]
-        unique_together = (("ethereum_tx", "log_index"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ethereum_tx", "log_index"], name="unique_token_transfer_index"
+            )
+        ]
 
     def __str__(self):
         return f"Token Transfer from={self._from} to={self.to}"
@@ -562,7 +566,11 @@ class ERC20Transfer(TokenTransfer):
         abstract = False
         verbose_name = "ERC20 Transfer"
         verbose_name_plural = "ERC20 Transfers"
-        unique_together = (("ethereum_tx", "log_index"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ethereum_tx", "log_index"], name="unique_erc20_transfer_index"
+            )
+        ]
 
     def __str__(self):
         return f"ERC20 Transfer from={self._from} to={self.to} value={self.value}"
@@ -674,7 +682,11 @@ class ERC721Transfer(TokenTransfer):
         abstract = False
         verbose_name = "ERC721 Transfer"
         verbose_name_plural = "ERC721 Transfers"
-        unique_together = (("ethereum_tx", "log_index"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ethereum_tx", "log_index"], name="unique_erc721_transfer_index"
+            )
+        ]
 
     def __str__(self):
         return (
@@ -959,7 +971,12 @@ class InternalTx(models.Model):
     error = models.CharField(max_length=200, null=True)
 
     class Meta:
-        unique_together = (("ethereum_tx", "trace_address"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ethereum_tx", "trace_address"],
+                name="unique_internal_tx_trace_address",
+            )
+        ]
         indexes = [
             models.Index(
                 name="history_internaltx_value_idx",
@@ -1550,7 +1567,12 @@ class MultisigConfirmation(TimeStampedModel):
     )
 
     class Meta:
-        unique_together = (("multisig_transaction_hash", "owner"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["multisig_transaction_hash", "owner"],
+                name="unique_multisig_transaction_owner_confirmation",
+            )
+        ]
         ordering = ["created"]
 
     def __str__(self):
@@ -1790,7 +1812,12 @@ class SafeContractDelegate(models.Model):
     write = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = (("safe_contract", "delegate", "delegator"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["safe_contract", "delegate", "delegator"],
+                name="unique_safe_contract_delegate_delegator",
+            )
+        ]
 
     def __str__(self):
         return (
@@ -2004,7 +2031,11 @@ class SafeStatus(SafeStatusBase):
         indexes = [
             Index(fields=["address", "-nonce"]),  # Index on address and nonce DESC
         ]
-        unique_together = (("internal_tx", "address"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["internal_tx", "address"], name="unique_safe_tx_address_status"
+            )
+        ]
         verbose_name_plural = "Safe statuses"
 
     def __str__(self):
@@ -2092,7 +2123,11 @@ class WebHook(models.Model):
     )
 
     class Meta:
-        unique_together = (("address", "url"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["address", "url"], name="unique_webhook_address_url"
+            )
+        ]
 
     def __str__(self):
         if self.address:

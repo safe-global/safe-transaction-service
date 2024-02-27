@@ -70,7 +70,11 @@ class FirebaseDeviceOwner(models.Model):
     class Meta:
         verbose_name = "Firebase Device Owner"
         verbose_name_plural = "Firebase Device Owners"
-        unique_together = (("firebase_device", "owner"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["firebase_device", "owner"], name="unique_firebase_device_owner"
+            )
+        ]
 
     def __str__(self):
         return f"{self.owner} for device {self.firebase_device_id}"
