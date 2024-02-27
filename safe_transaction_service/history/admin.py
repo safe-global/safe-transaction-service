@@ -644,6 +644,7 @@ class SafeStatusAdmin(SafeLastStatusAdmin):
 @admin.register(UserOperation)
 class UserOperationAdmin(admin.ModelAdmin):
     list_display = (
+        "ethereum_tx_id",
         "sender",
         "nonce",
     )

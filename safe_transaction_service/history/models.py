@@ -1145,7 +1145,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         return (
             self.pending_for_safes()
             .filter(internal_tx___from=safe_address)
-            .select_related("internal_tx")
+            .select_related("internal_tx", "internal_tx__ethereum_tx")
         )
 
     def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:
@@ -2088,6 +2088,9 @@ class UserOperation(models.Model):
         indexes = [
             Index(fields=["sender", "-nonce"]),
         ]
+
+    def __str__(self):
+        return f"UserOperation for {self.sender} with nonce {self.nonce}"
 
     @cached_property
     def paymaster_and_data(self) -> Optional[bytes]:
