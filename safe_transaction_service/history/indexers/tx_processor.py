@@ -1,6 +1,7 @@
 """
 Contains classes for processing indexed data and store Safe related models in database
 """
+
 from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union

@@ -23,8 +23,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: pip install pre-commit
-      - name: Force pre-commit to update
-        run: pre-commit clean
       - name: Run pre-commit
         run: pre-commit run --all-files
 

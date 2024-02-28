@@ -13,6 +13,7 @@ Entrypoint v0.7.0
 -----------------
     TBD
 """
+
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 from hexbytes import HexBytes
 
