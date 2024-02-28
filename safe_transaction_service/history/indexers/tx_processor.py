@@ -24,8 +24,15 @@ from gnosis.eth.contracts import (
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
+from safe_transaction_service.account_abstraction.models import (
+    UserOperation as UserOperationModel,
+)
 from safe_transaction_service.safe_messages import models as safe_message_models
 
+from ...account_abstraction.constants import (
+    USER_OPERATION_EVENT_TOPICS,
+    USER_OPERATION_SUPPORTED_ENTRY_POINTS,
+)
 from ..models import (
     EthereumTx,
     InternalTx,
@@ -38,27 +45,8 @@ from ..models import (
     SafeMasterCopy,
     SafeStatus,
 )
-from ..models import UserOperation as UserOperationModel
 
 logger = getLogger(__name__)
-
-
-# EntryPoint v0.6.0
-# 0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f
-# UserOperationEvent (
-#                    index_topic_1 bytes32 userOpHash, index_topic_2 address sender,
-#                    index_topic_3 address paymaster, uint256 nonce, bool success,
-#                    uint256 actualGasCost, uint256 actualGasUsed
-#                    )
-# Entrypoint v0.7.0
-# TBD
-USER_OPERATION_EVENT_TOPICS = {
-    HexBytes("0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f")
-}
-
-USER_OPERATION_SUPPORTED_ENTRY_POINTS = {
-    ChecksumAddress("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789")
-}
 
 
 class TxProcessorException(Exception):

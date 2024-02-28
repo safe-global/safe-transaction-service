@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
-from functools import cache, cached_property, lru_cache
+from functools import cache, lru_cache
 from itertools import islice
 from logging import getLogger
 from typing import (
@@ -37,8 +37,6 @@ from model_utils.models import TimeStampedModel
 from packaging.version import Version
 from web3.types import EventData
 
-from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.account_abstraction import UserOperationMetadata
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
@@ -48,7 +46,6 @@ from gnosis.eth.django.models import (
 )
 from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe import SafeOperationEnum
-from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
@@ -256,7 +253,7 @@ class EthereumBlockManager(models.Manager):
                     f"Marking block as not confirmed"
                 )
 
-    @lru_cache(maxsize=10000)
+    @lru_cache(maxsize=10_000)
     def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:
         try:
             return self.values("timestamp").get(block_hash=block_hash)["timestamp"]
@@ -2057,85 +2054,6 @@ class SafeStatus(SafeStatusBase):
             .sorted_by_mined()
             .first()
         )
-
-
-class UserOperation(models.Model):
-    """
-    EIP 4337 UserOperation
-
-    https://www.erc4337.io/docs/understanding-ERC-4337/user-operation
-    """
-
-    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
-    user_operation_hash = Keccak256Field(unique=True)
-    sender = EthereumAddressV2Field(db_index=True)
-    nonce = Uint256Field()
-    init_code = models.BinaryField(null=True, blank=True, editable=True)
-    call_data = models.BinaryField(null=True, blank=True, editable=True)
-    call_data_gas_limit = Uint256Field()
-    verification_gas_limit = Uint256Field()
-    pre_verification_gas = Uint256Field()
-    max_fee_per_gas = Uint256Field()
-    max_priority_fee_per_gas = Uint256Field()
-    paymaster = EthereumAddressV2Field(
-        db_index=True, null=True, blank=True, editable=True
-    )
-    paymaster_data = models.BinaryField(null=True, blank=True, editable=True)
-    signature = models.BinaryField()
-    entry_point = EthereumAddressV2Field(db_index=True)
-
-    class Meta:
-        unique_together = (("sender", "nonce"),)
-        indexes = [
-            Index(fields=["sender", "-nonce"]),
-        ]
-
-    def __str__(self):
-        return f"UserOperation for {self.sender} with nonce {self.nonce}"
-
-    @cached_property
-    def paymaster_and_data(self) -> Optional[bytes]:
-        if self.paymaster and self.paymaster_data:
-            return HexBytes(self.paymaster) + HexBytes(self.paymaster_data)
-
-    @cached_property
-    def to_user_operation(self, add_tx_metadata: bool = False) -> UserOperationClass:
-        """
-        Returns a safe-eth-py UserOperation object
-
-        :param add_tx_metadata: If `True` more database queries will be performed to get the transaction metadata
-        :return: safe-eth-py `UserOperation`
-        """
-        user_operation_metadata = (
-            UserOperationMetadata(
-                # More DB queries
-                transaction_hash=HexBytes(self.ethereum_tx_id),
-                block_hash=HexBytes(self.ethereum_tx.block.block_hash),
-                block_number=self.ethereum_tx.block.number,
-            )
-            if add_tx_metadata
-            else None
-        )
-
-        return UserOperationClass(
-            self.user_operation_hash,
-            self.sender,
-            self.nonce,
-            bytes(self.init_code) if self.init_code else None,
-            bytes(self.call_data) if self.call_data else None,
-            self.call_data_gas_limit,
-            self.verification_gas_limit,
-            self.pre_verification_gas,
-            self.max_fee_per_gas,
-            self.max_priority_fee_per_gas,
-            self.paymaster_and_data,
-            self.signature,
-            self.entry_point,
-            user_operation_metadata,
-        )
-
-    def to_safe_operation(self):
-        return SafeOperation.from_user_operation(self.to_user_operation())
 
 
 class WebHookType(Enum):

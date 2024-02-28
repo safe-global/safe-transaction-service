@@ -33,7 +33,6 @@ from .models import (
     SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
-    UserOperation,
     WebHook,
 )
 from .services import IndexServiceProvider
@@ -639,19 +638,6 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
 @admin.register(SafeStatus)
 class SafeStatusAdmin(SafeLastStatusAdmin):
     pass
-
-
-@admin.register(UserOperation)
-class UserOperationAdmin(admin.ModelAdmin):
-    list_display = (
-        "ethereum_tx_id",
-        "sender",
-        "nonce",
-    )
-    search_fields = [
-        "==sender",
-    ]
-    ordering = ["-nonce"]
 
 
 @admin.register(WebHook)
