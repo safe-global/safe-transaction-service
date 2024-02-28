@@ -48,6 +48,7 @@ from gnosis.eth.django.models import (
 )
 from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe import SafeOperationEnum
+from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
@@ -2110,7 +2111,7 @@ class UserOperation(models.Model):
                 # More DB queries
                 transaction_hash=HexBytes(self.ethereum_tx_id),
                 block_hash=HexBytes(self.ethereum_tx.block.block_hash),
-                block_number=self.ethereum_tx.block.number,  # TODO Maybe tx information is not needed
+                block_number=self.ethereum_tx.block.number,
             )
             if add_tx_metadata
             else None
@@ -2132,6 +2133,9 @@ class UserOperation(models.Model):
             self.entry_point,
             user_operation_metadata,
         )
+
+    def to_safe_operation(self):
+        return SafeOperation.from_user_operation(self.to_user_operation())
 
 
 class WebHookType(Enum):
