@@ -373,39 +373,74 @@ class SafeTxProcessor(TxProcessor):
                 # If bundler client is not configured we cannot get the required information
                 if self.bundler_client:
                     user_operation_hash = log["topics"][1]
-                    if UserOperationModel.objects.filter(
-                        user_operation_hash=user_operation_hash
-                    ).exists():
-                        logger.warning(
-                            "[%s] user-operation-hash=%s was already indexed",
-                            safe_address,
-                            user_operation_hash,
-                        )
-                    else:
-                        logger.debug(
-                            "[%s] Retrieving UserOperation and receipt with user-operation-hash=%s on tx-hash=%s",
-                            safe_address,
-                            user_operation_hash,
-                            ethereum_tx.tx_hash,
-                        )
-                        try:
-                            user_operation = (
-                                self.bundler_client.get_user_operation_by_hash(
-                                    user_operation_hash
+                    try:
+                        if UserOperationReceiptModel.objects.filter(
+                            user_operation__user_operation_hash=user_operation_hash
+                        ).exists():
+                            logger.warning(
+                                "[%s] user-operation-hash=%s receipt was already indexed",
+                                safe_address,
+                                user_operation_hash,
+                            )
+                        else:
+                            try:
+                                user_operation_db = UserOperationModel.objects.only(
+                                    "id"
+                                ).get(
+                                    user_operation__user_operation_hash=user_operation_hash
                                 )
+                                logger.warning(
+                                    "[%s] user-operation-hash=%s was already indexed",
+                                    safe_address,
+                                    user_operation_hash,
+                                )
+                            except UserOperationModel.DoesNotExist:
+                                logger.debug(
+                                    "[%s] Retrieving UserOperation with user-operation-hash=%s on tx-hash=%s",
+                                    safe_address,
+                                    user_operation_hash,
+                                    ethereum_tx.tx_hash,
+                                )
+                                user_operation = (
+                                    self.bundler_client.get_user_operation_by_hash(
+                                        user_operation_hash
+                                    )
+                                )
+                                logger.debug(
+                                    "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
+                                    safe_address,
+                                    user_operation_hash,
+                                    ethereum_tx.tx_hash,
+                                )
+                                user_operation_db = UserOperationModel.objects.create(
+                                    ethereum_tx=ethereum_tx,
+                                    user_operation_hash=user_operation_hash,
+                                    sender=user_operation.sender,
+                                    nonce=user_operation.nonce,
+                                    init_code=user_operation.init_code,
+                                    call_data=user_operation.call_data,
+                                    call_data_gas_limit=user_operation.call_gas_limit,
+                                    verification_gas_limit=user_operation.verification_gas_limit,
+                                    pre_verification_gas=user_operation.pre_verification_gas,
+                                    max_fee_per_gas=user_operation.max_fee_per_gas,
+                                    max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
+                                    paymaster=user_operation.paymaster,
+                                    paymaster_data=user_operation.paymaster_data,
+                                    signature=user_operation.signature,
+                                    entry_point=user_operation.entry_point,
+                                )
+
+                            logger.debug(
+                                "[%s] Retrieving UserOperation Receipt with user-operation-hash=%s on tx-hash=%s",
+                                safe_address,
+                                user_operation_hash,
+                                ethereum_tx.tx_hash,
                             )
                             user_operation_receipt = (
                                 self.bundler_client.get_user_operation_receipt(
                                     user_operation_hash
                                 )
                             )
-                            logger.debug(
-                                "[%s] Storing UserOperation and receipt with user-operation=%s on tx-hash=%s",
-                                safe_address,
-                                user_operation_hash,
-                                ethereum_tx.tx_hash,
-                            )
-
                             # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
                             # to get deposited funds
                             deposited = 0
@@ -423,42 +458,27 @@ class SafeTxProcessor(TxProcessor):
                                 ):
                                     deposited += int(user_operation_log["data"], 16)
 
-                            with transaction.atomic():  # Needed for handling IntegrityError
-                                user_operation = UserOperationModel.objects.create(
-                                    ethereum_tx=ethereum_tx,
-                                    user_operation_hash=user_operation_hash,
-                                    sender=user_operation.sender,
-                                    nonce=user_operation.nonce,
-                                    init_code=user_operation.init_code,
-                                    call_data=user_operation.call_data,
-                                    call_data_gas_limit=user_operation.call_gas_limit,
-                                    verification_gas_limit=user_operation.verification_gas_limit,
-                                    pre_verification_gas=user_operation.pre_verification_gas,
-                                    max_fee_per_gas=user_operation.max_fee_per_gas,
-                                    max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
-                                    paymaster=user_operation.paymaster,
-                                    paymaster_data=user_operation.paymaster_data,
-                                    signature=user_operation.signature,
-                                    entry_point=user_operation.entry_point,
-                                )
-                                UserOperationReceiptModel.objects.create(
-                                    user_operation=user_operation,
-                                    actual_gas_cost=user_operation_receipt[
-                                        "actualGasCost"
-                                    ],
-                                    actual_gas_used=user_operation_receipt[
-                                        "actualGasUsed"
-                                    ],
-                                    success=user_operation_receipt["success"],
-                                    reason=user_operation_receipt["reason"],
-                                    deposited=deposited,
-                                )
-                        except BundlerClientException:
-                            logger.error(
-                                "[%s] Error retrieving user-operation-hash=%s from bundler API",
+                            logger.debug(
+                                "[%s] Storing UserOperation Receipt with user-operation=%s on tx-hash=%s",
                                 safe_address,
                                 user_operation_hash,
+                                ethereum_tx.tx_hash,
                             )
+
+                            UserOperationReceiptModel.objects.create(
+                                user_operation=user_operation_db,
+                                actual_gas_cost=user_operation_receipt["actualGasCost"],
+                                actual_gas_used=user_operation_receipt["actualGasUsed"],
+                                success=user_operation_receipt["success"],
+                                reason=user_operation_receipt["reason"],
+                                deposited=deposited,
+                            )
+                    except BundlerClientException:
+                        logger.error(
+                            "[%s] Error retrieving user-operation-hash=%s from bundler API",
+                            safe_address,
+                            user_operation_hash,
+                        )
         return detected_user_operation
 
     def __process_decoded_transaction(
