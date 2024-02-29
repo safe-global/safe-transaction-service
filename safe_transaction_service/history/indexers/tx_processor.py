@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
-from django.db import IntegrityError, transaction
+from django.db import transaction
 
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
@@ -15,7 +15,7 @@ from packaging.version import Version
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.account_abstraction import BundlerClient
+from gnosis.eth.account_abstraction import BundlerClient, BundlerClientException
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import (
     get_safe_V1_0_0_contract,
@@ -28,9 +28,13 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 from safe_transaction_service.account_abstraction.models import (
     UserOperation as UserOperationModel,
 )
+from safe_transaction_service.account_abstraction.models import (
+    UserOperationReceipt as UserOperationReceiptModel,
+)
 from safe_transaction_service.safe_messages import models as safe_message_models
 
 from ...account_abstraction.constants import (
+    DEPOSIT_EVENT_TOPIC,
     USER_OPERATION_EVENT_TOPICS,
     USER_OPERATION_SUPPORTED_ENTRY_POINTS,
 )
@@ -358,61 +362,103 @@ class SafeTxProcessor(TxProcessor):
             if (
                 len(log["topics"]) == 4
                 and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
-                and log["address"]
+                and Web3.to_checksum_address(log["address"])
                 in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
-                and Web3.to_checksum_address(log["topics"][2][-40:]) == safe_address
+                and Web3.to_checksum_address(log["topics"][2][-40:])
+                == safe_address  # Check sender
             ):
                 # Detected a 4337 UserOperation
                 detected_user_operation = True
+
+                # If bundler client is not configured we cannot get the required information
                 if self.bundler_client:
-                    # If bundler client is not configured we cannot more information
                     user_operation_hash = log["topics"][1]
-                    logger.debug(
-                        "[%s] Retrieving UserOperation with user-operation-hash=%s on tx-hash=%s",
-                        safe_address,
-                        user_operation_hash,
-                        ethereum_tx.tx_hash,
-                    )
-                    try:
-                        user_operation = self.bundler_client.get_user_operation_by_hash(
-                            user_operation_hash
-                        )
-                        logger.debug(
-                            "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
-                            safe_address,
-                            user_operation_hash,
-                            ethereum_tx.tx_hash,
-                        )
-                        with transaction.atomic():  # Needed for handling IntegrityError
-                            UserOperationModel.objects.create(
-                                ethereum_tx=ethereum_tx,
-                                user_operation_hash=user_operation_hash,
-                                sender=user_operation.sender,
-                                nonce=user_operation.nonce,
-                                init_code=user_operation.init_code,
-                                call_data=user_operation.call_data,
-                                call_data_gas_limit=user_operation.call_gas_limit,
-                                verification_gas_limit=user_operation.verification_gas_limit,
-                                pre_verification_gas=user_operation.pre_verification_gas,
-                                max_fee_per_gas=user_operation.max_fee_per_gas,
-                                max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
-                                paymaster=user_operation.paymaster,
-                                paymaster_data=user_operation.paymaster_data,
-                                signature=user_operation.signature,
-                                entry_point=user_operation.entry_point,
-                            )
-                    except IOError:
-                        logger.error(
-                            "[%s] Error retrieving user-operation-hash=%s from bundler API",
-                            safe_address,
-                            user_operation_hash,
-                        )
-                    except IntegrityError:
+                    if UserOperationModel.objects.filter(
+                        user_operation_hash=user_operation_hash
+                    ).exists():
                         logger.warning(
                             "[%s] user-operation-hash=%s was already indexed",
                             safe_address,
                             user_operation_hash,
                         )
+                    else:
+                        logger.debug(
+                            "[%s] Retrieving UserOperation and receipt with user-operation-hash=%s on tx-hash=%s",
+                            safe_address,
+                            user_operation_hash,
+                            ethereum_tx.tx_hash,
+                        )
+                        try:
+                            user_operation = (
+                                self.bundler_client.get_user_operation_by_hash(
+                                    user_operation_hash
+                                )
+                            )
+                            user_operation_receipt = (
+                                self.bundler_client.get_user_operation_receipt(
+                                    user_operation_hash
+                                )
+                            )
+                            logger.debug(
+                                "[%s] Storing UserOperation and receipt with user-operation=%s on tx-hash=%s",
+                                safe_address,
+                                user_operation_hash,
+                                ethereum_tx.tx_hash,
+                            )
+
+                            # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
+                            # to get deposited funds
+                            deposited = 0
+                            for user_operation_log in user_operation_receipt["logs"]:
+                                if (
+                                    len(user_operation_log["topics"]) == 2
+                                    and HexBytes(user_operation_log["topics"][0])
+                                    == DEPOSIT_EVENT_TOPIC
+                                    and Web3.to_checksum_address(
+                                        user_operation_log["address"]
+                                    )
+                                    in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
+                                    and Web3.to_checksum_address(log["topics"][1][-40:])
+                                    == safe_address
+                                ):
+                                    deposited += int(user_operation_log["data"], 16)
+
+                            with transaction.atomic():  # Needed for handling IntegrityError
+                                user_operation = UserOperationModel.objects.create(
+                                    ethereum_tx=ethereum_tx,
+                                    user_operation_hash=user_operation_hash,
+                                    sender=user_operation.sender,
+                                    nonce=user_operation.nonce,
+                                    init_code=user_operation.init_code,
+                                    call_data=user_operation.call_data,
+                                    call_data_gas_limit=user_operation.call_gas_limit,
+                                    verification_gas_limit=user_operation.verification_gas_limit,
+                                    pre_verification_gas=user_operation.pre_verification_gas,
+                                    max_fee_per_gas=user_operation.max_fee_per_gas,
+                                    max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
+                                    paymaster=user_operation.paymaster,
+                                    paymaster_data=user_operation.paymaster_data,
+                                    signature=user_operation.signature,
+                                    entry_point=user_operation.entry_point,
+                                )
+                                UserOperationReceiptModel.objects.create(
+                                    user_operation=user_operation,
+                                    actual_gas_cost=user_operation_receipt[
+                                        "actualGasCost"
+                                    ],
+                                    actual_gas_used=user_operation_receipt[
+                                        "actualGasUsed"
+                                    ],
+                                    success=user_operation_receipt["success"],
+                                    reason=user_operation_receipt["reason"],
+                                    deposited=deposited,
+                                )
+                        except BundlerClientException:
+                            logger.error(
+                                "[%s] Error retrieving user-operation-hash=%s from bundler API",
+                                safe_address,
+                                user_operation_hash,
+                            )
         return detected_user_operation
 
     def __process_decoded_transaction(
