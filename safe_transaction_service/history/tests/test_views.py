@@ -79,6 +79,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestViews(SafeTestCaseMixin, APITestCase):
+    def setUp(self):
+        get_redis().flushall()
+
+    def tearDown(self):
+        get_redis().flushall()
+
     def test_about_view(self):
         url = reverse("v1:history:about")
         response = self.client.get(url, format="json")
@@ -394,7 +400,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             last_result["transaction_hash"], ethereum_tx_2_days_ago.tx_hash
         )
 
-    def test_all_transactions_cache(self):
+    def test_all_transactions_cache_view(self):
         safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
         # Older transaction
         factory_transactions = [
@@ -451,6 +457,31 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
         )
         self.assertEqual(response.data["count"], 3)
+
+    def test_all_transactions_cache_limit_offset_view(self):
+        """
+        Test limit and offset
+        """
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        number_transactions = 100
+
+        for _ in range(number_transactions):
+            MultisigTransactionFactory(safe=safe_address)
+
+        for limit, offset in ((57, 12), (13, 24)):
+            with self.subTest(limit=limit, offset=offset):
+                # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
+                cache_key = f"all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:{limit}:{offset}:execution_date:{number_transactions}"
+                redis = get_redis()
+                self.assertFalse(redis.exists(cache_key))
+
+                response = self.client.get(
+                    reverse("v1:history:all-transactions", args=(safe_address,))
+                    + f"?executed=True&queued=False&trusted=False&ordering=execution_date&limit={limit}&offset={offset}"
+                )
+                self.assertEqual(response.data["count"], number_transactions)
+                self.assertEqual(len(response.data["results"]), limit)
+                self.assertTrue(redis.exists(cache_key))
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
@@ -1406,6 +1437,54 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_post_multisig_transaction_with_zero_to(self):
+        safe_owner_1 = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
+
+        response = self.client.get(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        data = {
+            "to": NULL_ADDRESS,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+            "sender": safe_owner_1.address,
+        }
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction_db = MultisigTransaction.objects.first()
+        self.assertFalse(multisig_transaction_db.trusted)
 
     def test_post_multisig_transaction_with_1271_signature(self):
         account = Account.create()

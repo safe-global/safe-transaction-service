@@ -147,6 +147,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
 
 
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
+    to = EthereumAddressField(allow_zero_address=True, allow_sentinel_address=True)
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     # TODO Make signature mandatory
@@ -298,9 +299,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 "safe": self.validated_data["safe"],
                 "to": self.validated_data["to"],
                 "value": self.validated_data["value"],
-                "data": self.validated_data["data"]
-                if self.validated_data["data"]
-                else None,
+                "data": (
+                    self.validated_data["data"] if self.validated_data["data"] else None
+                ),
                 "operation": self.validated_data["operation"],
                 "safe_tx_gas": self.validated_data["safe_tx_gas"],
                 "base_gas": self.validated_data["base_gas"],

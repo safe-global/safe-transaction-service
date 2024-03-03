@@ -60,9 +60,13 @@ class Command(BaseCommand):
                                 m.to,
                                 str(m.failed),
                                 m.origin,
-                                json.dumps(decoder.get_data_decoded(m.data.tobytes()))
-                                if m.data
-                                else "",
+                                (
+                                    json.dumps(
+                                        decoder.get_data_decoded(m.data.tobytes())
+                                    )
+                                    if m.data
+                                    else ""
+                                ),
                             ]
                         )
                         + "\n"

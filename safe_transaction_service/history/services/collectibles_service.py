@@ -489,9 +489,9 @@ class CollectiblesService:
         # Creates a collectibles metadata keeping the initial order
         for collectible_metadata_cached_index in range(len(collectibles_with_metadata)):
             if collectibles_with_metadata[collectible_metadata_cached_index] is None:
-                collectibles_with_metadata[
-                    collectible_metadata_cached_index
-                ] = collectibles_with_metadata_not_cached.pop(0)
+                collectibles_with_metadata[collectible_metadata_cached_index] = (
+                    collectibles_with_metadata_not_cached.pop(0)
+                )
 
         return collectibles_with_metadata, count
 
@@ -607,9 +607,9 @@ class CollectiblesService:
         if blockchain_token_uris:
             pipe = self.redis.pipeline()
             redis_map_to_store = {
-                get_redis_key(address_with_token_id): token_uri
-                if token_uri is not None
-                else ""
+                get_redis_key(address_with_token_id): (
+                    token_uri if token_uri is not None else ""
+                )
                 for address_with_token_id, token_uri in blockchain_token_uris.items()
             }
             pipe.mset(redis_map_to_store)
