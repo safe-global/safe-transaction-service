@@ -14,7 +14,7 @@ from gnosis.eth.django.models import (
     Keccak256Field,
     Uint256Field,
 )
-from gnosis.safe.account_abstraction import SafeOperation
+from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 
 from safe_transaction_service.history import models as history_models
 
@@ -28,7 +28,7 @@ class UserOperation(models.Model):
     https://www.erc4337.io/docs/understanding-ERC-4337/user-operation
     """
 
-    user_operation_hash = Keccak256Field(primary_key=True)
+    hash = Keccak256Field(primary_key=True)
     ethereum_tx = models.ForeignKey(history_models.EthereumTx, on_delete=models.CASCADE)
     sender = EthereumAddressV2Field(db_index=True)
     nonce = Uint256Field()
@@ -97,7 +97,7 @@ class UserOperation(models.Model):
         )
 
     def to_safe_operation(self):
-        return SafeOperation.from_user_operation(self.to_user_operation())
+        return SafeOperationClass.from_user_operation(self.to_user_operation())
 
 
 class UserOperationReceipt(models.Model):
@@ -107,3 +107,22 @@ class UserOperationReceipt(models.Model):
     success = models.BooleanField()
     reason = models.CharField(max_length=256)
     deposited = Uint256Field()
+
+
+class SafeOperation(models.Model):
+    hash = Keccak256Field(primary_key=True)  # safeOperationHash
+    user_operation = models.ForeignKey(
+        UserOperation, on_delete=models.CASCADE, null=True, blank=True
+    )
+    safe = EthereumAddressV2Field(db_index=True)
+    nonce = Uint256Field()
+    init_code_hash = Keccak256Field()
+    call_data_hash = Keccak256Field()
+    call_gas_limit = Uint256Field()
+    verification_gas_limit = Uint256Field()
+    pre_verification_gas = Uint256Field()
+    max_fee_per_gas = Uint256Field()
+    max_priority_fee_per_gas = Uint256Field()
+    paymaster_and_data_hash = Keccak256Field()
+    valid_after = models.DateTimeField()  # Epoch uint48
+    valid_until = models.DateTimeField()  # Epoch uint48

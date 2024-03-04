@@ -372,10 +372,10 @@ class SafeTxProcessor(TxProcessor):
 
                 # If bundler client is not configured we cannot get the required information
                 if self.bundler_client:
-                    user_operation_hash = log["topics"][1]
+                    user_operation_hash = HexBytes(log["topics"][1]).hex()
                     try:
                         if UserOperationReceiptModel.objects.filter(
-                            user_operation__user_operation_hash=user_operation_hash
+                            user_operation__hash=user_operation_hash
                         ).exists():
                             logger.warning(
                                 "[%s] user-operation-hash=%s receipt was already indexed",
@@ -386,9 +386,7 @@ class SafeTxProcessor(TxProcessor):
                             try:
                                 user_operation_db = UserOperationModel.objects.only(
                                     "id"
-                                ).get(
-                                    user_operation__user_operation_hash=user_operation_hash
-                                )
+                                ).get(user_operation__hash=user_operation_hash)
                                 logger.warning(
                                     "[%s] user-operation-hash=%s was already indexed",
                                     safe_address,
@@ -406,6 +404,13 @@ class SafeTxProcessor(TxProcessor):
                                         user_operation_hash
                                     )
                                 )
+                                if not user_operation:
+                                    self.bundler_client.get_user_operation_by_hash.cache_clear()
+                                    raise BundlerClientException(
+                                        "user-operation=%s returned `null`",
+                                        user_operation_hash,
+                                    )
+
                                 logger.debug(
                                     "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
                                     safe_address,
@@ -414,7 +419,7 @@ class SafeTxProcessor(TxProcessor):
                                 )
                                 user_operation_db = UserOperationModel.objects.create(
                                     ethereum_tx=ethereum_tx,
-                                    user_operation_hash=user_operation_hash,
+                                    hash=user_operation_hash,
                                     sender=user_operation.sender,
                                     nonce=user_operation.nonce,
                                     init_code=user_operation.init_code,
@@ -473,11 +478,16 @@ class SafeTxProcessor(TxProcessor):
                                 reason=user_operation_receipt["reason"],
                                 deposited=deposited,
                             )
-                    except BundlerClientException:
+
+                            # Build SafeOperation from UserOperation
+                            # safe_operation = SafeOperation.from_user_operation(user_operation)
+                            # safe_operation_hash = safe_operation.get_safe_operation_hash(self.ethereum_client.get_chain_id(), )
+                    except BundlerClientException as exc:
                         logger.error(
-                            "[%s] Error retrieving user-operation-hash=%s from bundler API",
+                            "[%s] Error retrieving user-operation-hash=%s from bundler API: %s",
                             safe_address,
                             user_operation_hash,
+                            exc,
                         )
         return detected_user_operation
 
