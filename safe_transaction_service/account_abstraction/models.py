@@ -14,6 +14,7 @@ from gnosis.eth.django.models import (
     Keccak256Field,
     Uint256Field,
 )
+from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 
 from safe_transaction_service.history import models as history_models
@@ -29,7 +30,9 @@ class UserOperation(models.Model):
     """
 
     hash = Keccak256Field(primary_key=True)
-    ethereum_tx = models.ForeignKey(history_models.EthereumTx, on_delete=models.CASCADE)
+    ethereum_tx = models.ForeignKey(
+        history_models.EthereumTx, on_delete=models.CASCADE, null=True, blank=True
+    )
     sender = EthereumAddressV2Field(db_index=True)
     nonce = Uint256Field()
     init_code = models.BinaryField(null=True, blank=True, editable=True)
@@ -43,8 +46,15 @@ class UserOperation(models.Model):
         db_index=True, null=True, blank=True, editable=True
     )
     paymaster_data = models.BinaryField(null=True, blank=True, editable=True)
-    signature = models.BinaryField()
+    signature = models.BinaryField(null=True, blank=True, editable=True)
     entry_point = EthereumAddressV2Field(db_index=True)
+
+    # Receipt
+    actual_gas_cost = Uint256Field()
+    actual_gas_used = Uint256Field()
+    success = models.BooleanField()
+    reason = models.CharField(max_length=256)
+    deposited = Uint256Field()
 
     class Meta:
         unique_together = (("sender", "nonce"),)
@@ -96,8 +106,14 @@ class UserOperation(models.Model):
             user_operation_metadata,
         )
 
-    def to_safe_operation(self):
-        return SafeOperationClass.from_user_operation(self.to_user_operation())
+    def to_safe_operation(self) -> SafeOperation:
+        """
+        :return: SafeOperation built from UserOperation
+        :raises: ValueError
+        """
+        if self.signature and bytes(self.signature):
+            return SafeOperationClass.from_user_operation(self.to_user_operation())
+        raise ValueError("Not enough information to build SafeOperation")
 
 
 class UserOperationReceipt(models.Model):
@@ -114,15 +130,5 @@ class SafeOperation(models.Model):
     user_operation = models.ForeignKey(
         UserOperation, on_delete=models.CASCADE, null=True, blank=True
     )
-    safe = EthereumAddressV2Field(db_index=True)
-    nonce = Uint256Field()
-    init_code_hash = Keccak256Field()
-    call_data_hash = Keccak256Field()
-    call_gas_limit = Uint256Field()
-    verification_gas_limit = Uint256Field()
-    pre_verification_gas = Uint256Field()
-    max_fee_per_gas = Uint256Field()
-    max_priority_fee_per_gas = Uint256Field()
-    paymaster_and_data_hash = Keccak256Field()
     valid_after = models.DateTimeField()  # Epoch uint48
     valid_until = models.DateTimeField()  # Epoch uint48
