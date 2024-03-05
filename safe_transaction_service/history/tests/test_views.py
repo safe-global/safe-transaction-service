@@ -24,7 +24,7 @@ from web3 import Web3
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import EthereumClient, TracingManager
 from gnosis.eth.utils import fast_is_checksum_address
-from gnosis.safe import CannotEstimateGas, Safe, SafeOperation
+from gnosis.safe import CannotEstimateGas, Safe, SafeOperationEnum
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -1140,7 +1140,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         try:
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             multisig_transaction = MultisigTransactionFactory(
-                operation=SafeOperation.CALL.value, data=b"abcd", trusted=True
+                operation=SafeOperationEnum.CALL.value, data=b"abcd", trusted=True
             )
             safe_address = multisig_transaction.safe
             response = self.client.get(
@@ -1152,7 +1152,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 response.data["results"][0]["data_decoded"], {"param1": "value"}
             )
 
-            multisig_transaction.operation = SafeOperation.DELEGATE_CALL.value
+            multisig_transaction.operation = SafeOperationEnum.DELEGATE_CALL.value
             multisig_transaction.save()
             response = self.client.get(
                 reverse("v1:history:multisig-transactions", args=(safe_address,)),
