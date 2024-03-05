@@ -184,7 +184,7 @@ and [have a proper RPC](https://docs.safe.global/safe-core-api/rpc-requirements)
 Aside from using standard HTTP requests:
 - [Safe{Core} API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/api-kit)
 - [Safe-eth-py](https://github.com/safe-global/safe-eth-py)
-- [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
+- [Safe CLI](https://github.com/safe-global/safe-cli): It has a `tx-service` mode to gather offchain signatures.
 
 ### What chains do you officially support?
 https://docs.safe.global/api-supported-networks
