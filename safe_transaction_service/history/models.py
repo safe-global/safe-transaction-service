@@ -45,7 +45,7 @@ from gnosis.eth.django.models import (
     Uint256Field,
 )
 from gnosis.eth.utils import fast_to_checksum_address
-from gnosis.safe import SafeOperation
+from gnosis.safe import SafeOperationEnum
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
@@ -1412,7 +1412,7 @@ class MultisigTransaction(TimeStampedModel):
     value = Uint256Field()
     data = models.BinaryField(null=True, blank=True, editable=True)
     operation = models.PositiveSmallIntegerField(
-        choices=[(tag.value, tag.name) for tag in SafeOperation]
+        choices=[(tag.value, tag.name) for tag in SafeOperationEnum]
     )
     safe_tx_gas = Uint256Field()
     base_gas = Uint256Field()
@@ -1469,7 +1469,7 @@ class MultisigTransaction(TimeStampedModel):
         :return: `True` if data should be decoded, `False` otherwise
         """
         return not (
-            self.operation == SafeOperation.DELEGATE_CALL.value
+            self.operation == SafeOperationEnum.DELEGATE_CALL.value
             and self.to not in Contract.objects.trusted_addresses_for_delegate_call()
         )
 
@@ -1502,7 +1502,7 @@ class ModuleTransaction(TimeStampedModel):
     value = Uint256Field()
     data = models.BinaryField(null=True)
     operation = models.PositiveSmallIntegerField(
-        choices=[(tag.value, tag.name) for tag in SafeOperation]
+        choices=[(tag.value, tag.name) for tag in SafeOperationEnum]
     )
     failed = models.BooleanField(default=False)
 

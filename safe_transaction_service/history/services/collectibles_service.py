@@ -18,6 +18,7 @@ from eth_typing import ChecksumAddress
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.clients import EnsClient
 
 from safe_transaction_service.tokens.constants import (
     CRYPTO_KITTIES_CONTRACT_ADDRESSES,
@@ -27,7 +28,6 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import chunks
 
-from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
 from ..models import ERC721Transfer
 
