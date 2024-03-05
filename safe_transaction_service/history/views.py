@@ -50,7 +50,7 @@ from .models import (
     SafeMasterCopy,
     TransferDict,
 )
-from .pagination import ListPagination
+from .pagination import DummyPagination
 from .serializers import get_data_decoded_from_data
 from .services import (
     BalanceServiceProvider,
@@ -357,6 +357,7 @@ class AllTransactionsListView(ListAPIView):
                 self.paginator.offset = offset
                 self.paginator.request = self.request
                 return page
+
             page = self.get_page_tx_identifiers(
                 safe, executed, queued, trusted, ordering, limit, offset
             )
@@ -372,7 +373,7 @@ class AllTransactionsListView(ListAPIView):
         executed, queued, trusted = self.get_parameters()
         ordering = self.get_ordering_parameter()
         # Trick to get limit and offset
-        list_pagination = ListPagination(self.request)
+        list_pagination = DummyPagination(self.request)
         limit, offset = list_pagination.limit, list_pagination.offset
 
         tx_identifiers_page = self.get_cached_page_tx_identifiers(
@@ -586,6 +587,60 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
             .select_related("ethereum_tx__block")
         )
 
+    @swagger_auto_schema(
+        request_body=serializers.SafeMultisigTransactionDeleteSerializer(),
+        responses={
+            204: "Deleted",
+            404: "Transaction not found",
+            400: "Error processing data",
+        },
+    )
+    def delete(self, request, safe_tx_hash: HexStr):
+        """
+        Delete a queued but not executed multisig transaction. Only the proposer can delete the transaction.
+        Delegates are not valid, if the transaction was proposed by a delegator the owner who delegated to
+        the delegate must be used.
+        An EOA is required to sign the following EIP712 data:
+
+        ```python
+         {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"},
+                ],
+                "DeleteRequest": [
+                    {"name": "safeTxHash", "type": "bytes32"},
+                    {"name": "totp", "type": "uint256"},
+                ],
+            },
+            "primaryType": "DeleteRequest",
+            "domain": {
+                "name": "Safe Transaction Service",
+                "version": "1.0",
+                "chainId": chain_id,
+                "verifyingContract": safe_address,
+            },
+            "message": {
+                "safeTxHash": safe_tx_hash,
+                "totp": totp,
+            },
+        }
+        ```
+
+        `totp` parameter is calculated with `T0=0` and `Tx=3600`. `totp` is calculated by taking the
+        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        """
+        request.data["safe_tx_hash"] = safe_tx_hash
+        serializer = serializers.SafeMultisigTransactionDeleteSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailView):
     @swagger_auto_schema(
@@ -621,7 +676,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         :return: Number of Multisig Transactions with different nonce
         """
         only_trusted = parse_boolean_query_param(
-            self.request.query_params.get("trusted", False)
+            self.request.query_params.get("trusted", True)
         )
         queryset = MultisigTransaction.objects.filter(safe=address)
         if only_trusted:
@@ -642,7 +697,8 @@ class SafeMultisigTransactionListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         """
-        Returns the history of a multisig tx (safe)
+        Returns a paginated list of Multisig Transactions for a Safe.
+        By default only ``trusted`` multisig transactions are returned.
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):

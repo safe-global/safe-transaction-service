@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.db.models.signals import post_save
 from django.test import TestCase
@@ -8,7 +9,7 @@ import factory
 from gnosis.eth import EthereumNetwork
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from safe_transaction_service.events.tasks import send_event_to_queue_task
+from safe_transaction_service.events.services.queue_service import QueueService
 from safe_transaction_service.history.models import WebHookType
 from safe_transaction_service.history.tasks import send_webhook_task
 from safe_transaction_service.safe_messages.models import (
@@ -25,11 +26,11 @@ from safe_transaction_service.safe_messages.tests.factories import (
 class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     @factory.django.mute_signals(post_save)
     @mock.patch.object(send_webhook_task, "apply_async")
-    @mock.patch.object(send_event_to_queue_task, "delay")
+    @mock.patch.object(QueueService, "send_event")
     def test_process_webhook(
         self,
-        send_event_to_queue_task_mock,
-        webhook_task_mock,
+        send_event_to_queue_task_mock: MagicMock,
+        webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
@@ -58,14 +59,13 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(safe_address, message_confirmation_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(message_confirmation_payload)
 
     @mock.patch.object(send_webhook_task, "apply_async")
-    @mock.patch.object(send_event_to_queue_task, "delay")
+    @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(
         self,
-        send_event_to_queue_task_mock,
-        webhook_task_mock,
+        send_event_mock: MagicMock,
+        webhook_task_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         # Create a confirmation should fire a signal and webhooks should be sended
@@ -79,8 +79,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(safe_address, message_created_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(message_created_payload)
-
+        send_event_mock.assert_called_with(message_created_payload)
         message_confirmation_payload = {
             "address": safe_address,
             "type": WebHookType.MESSAGE_CONFIRMATION.name,
@@ -92,4 +91,4 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         webhook_task_mock.assert_called_with(
             args=(safe_address, message_confirmation_payload), priority=2
         )
-        send_event_to_queue_task_mock.assert_called_with(message_confirmation_payload)
+        send_event_mock.assert_called_with(message_confirmation_payload)

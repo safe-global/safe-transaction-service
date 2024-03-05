@@ -1,276 +1,174 @@
 import json
 import logging
+from functools import cache
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 
 import pika.exceptions
 from pika import BlockingConnection, URLParameters
-from pika.adapters.gevent_connection import GeventConnection
 from pika.channel import Channel
 from pika.exchange_type import ExchangeType
 
 logger = logging.getLogger(__name__)
 
 
-class QueueServiceProvider:
-    def __new__(cls):
-        if not hasattr(cls, "instance"):
-            if settings.EVENTS_QUEUE_URL:
-                if settings.EVENTS_QUEUE_ASYNC_CONNECTION:
-                    cls.instance = AsyncQueueService()
-                else:
-                    cls.instance = SyncQueueService()
-            else:
-                # Mock send_event to not configured host us is not mandatory configure a queue for events
-                cls.instance = MockedQueueService()
-                logger.warning("MockedQueueService is used")
-        return cls.instance
-
-    @classmethod
-    def del_singleton(cls):
-        if hasattr(cls, "instance"):
-            del cls.instance
-
-
-class QueueService:
+class BrokerConnection:
     def __init__(self):
         self.exchange_name: str = settings.EVENTS_QUEUE_EXCHANGE_NAME
-        self._channel: Channel = None
-        self._connection: GeventConnection = None
-        self.unsent_events: List = []
-        self._connection_parameters: URLParameters = URLParameters(
-            settings.EVENTS_QUEUE_URL
-        )
+        self.channel: Optional[Channel] = None
+        self.connection_parameters = URLParameters(settings.EVENTS_QUEUE_URL)
+        self.connection: Optional[BlockingConnection] = self.connect()
 
-    def send_event(
-        self, payload: Dict[str, Any], fail_retry: Optional[bool] = True
-    ) -> bool:
+    def connect(self) -> Optional[BlockingConnection]:
         """
-        Send an event to rabbitMq exchange
-
-        :param payload: Dict with the payload of the event
-        :param fail_retry: if True the unsent event because any error will be retried.
-        """
-        if self._channel is None or not self._channel.is_open:
-            logger.warning("Connection is still not initialized")
-            if fail_retry:
-                self.unsent_events.append(payload)
-            return False
-
-        try:
-            event = json.dumps(payload)
-            self._channel.basic_publish(
-                exchange=self.exchange_name, routing_key="", body=event
-            )
-            return True
-        except pika.exceptions.ConnectionClosedByBroker:
-            logger.warning("Event can not be sent due to there is no channel opened")
-            if fail_retry:
-                self.unsent_events.append(payload)
-            return False
-
-    def send_unsent_events(self) -> int:
-        """
-        If connection is ready send the unsent messages list due connection broken
-
-        :return: number of messages sent
-        """
-        sent_events = 0
-        if self._channel.is_open and len(self.unsent_events) > 0:
-            logger.info("Sending %i not sent messages", len(self.unsent_events))
-            for unsent_message in list(self.unsent_events):
-                if self.send_event(unsent_message, fail_retry=False):
-                    self.unsent_events.remove(unsent_message)
-                    sent_events += 1
-                else:
-                    break
-
-        return sent_events
-
-    def remove_unsent_events(self):
-        self.unsent_events = []
-
-
-class AsyncQueueService(QueueService):
-    # Singleton class definition
-    def __init__(self):
-        super().__init__()
-        self.connect()
-
-    def connect(self) -> GeventConnection:
-        """
-        This method connects to RabbitMq.
-        When the connection is established, the on_connection_open method
-        will be invoked by pika.
-
-        :return: GeventConnection
-        """
-        return GeventConnection(
-            self._connection_parameters,
-            on_open_callback=self.on_connection_open,
-            on_open_error_callback=self.on_connection_open_error,
-            on_close_callback=self.on_connection_closed,
-        )
-
-    def on_connection_open(self, connection: GeventConnection):
-        """
-        This method is called by pika once the connection to RabbitMQ has
-        been established. It passes the handle to the connection object.
-
-        :param GeventConnection connection: The connection
-        """
-
-        logger.info("Connection opened with %s", self._connection_parameters.host)
-        self._connection = connection
-        self.open_channel()
-
-    def on_connection_open_error(self, connection: GeventConnection, err: Exception):
-        """
-        This method is called by pika if the connection to RabbitMQ
-        can't be established. Connection object is paased if were necessary
-        Always retry the reconnection every 5 seconds.
-
-        :param GeventConnection: The connection
-        :param Exception err: The error
-        """
-        logger.error(
-            "Connection open failed with %s, retrying in 5 seconds: %s",
-            self._connection_parameters.host,
-            err,
-        )
-        connection.ioloop.call_later(5, self.connect)
-
-    def on_connection_closed(self, connection: GeventConnection, reason: Exception):
-        """
-        This method is invoked by pika when the connection to RabbitMQ is
-        closed unexpectedly. Since it is unexpected, we will reconnect to
-        RabbitMQ if it disconnects.
-
-        :param GeventConnection: The closed connection obj
-        :param Exception reason: exception representing reason for loss of
-            connection.
-        """
-        self._channel = None
-        logger.error(
-            "Connection closed with %s, reopening in 5 seconds: %s",
-            self._connection_parameters.host,
-            reason,
-        )
-        connection.ioloop.call_later(5, self.connect)
-
-    def open_channel(self):
-        """
-        This method will open a new channel with RabbitMQ by issuing the
-        Channel.Open RPC command. When RabbitMQ confirms the channel is open
-        by sending the Channel.OpenOK RPC reply, the on_channel_open method
-        will be invoked.
-        """
-        logger.info("Opening a new channel")
-        self._connection.channel(on_open_callback=self.on_channel_open)
-
-    def on_channel_open(self, channel: Channel):
-        """
-        This method is invoked by pika when the channel has been opened.
-        The channel object is passed in so we can make use of it.
-
-        :param pika.channel.Channel channel: The channel object
-        """
-        logger.info("Channel with number %i opened", channel.channel_number)
-        self._channel = channel
-        self._channel.add_on_close_callback(self.on_channel_closed)
-        self.setup_exchange()
-
-    def on_channel_closed(self, channel: Channel, reason: Exception):
-        """
-        Invoked by pika when RabbitMQ unexpectedly closes the channel.
-        Channels are usually closed if you attempt to do something that
-        violates the protocol.
-        In this method we retry to open a new channel with rabbitMQ if the connection is still open.
-
-        :param Channel channel: The closed channel
-        :param Exception reason: why the channel was closed
-        """
-        logger.warning("Channel %i was closed: %s", channel.channel_number, reason)
-        self._channel = None
-        if self._connection and self._connection.is_open:
-            # If channel was closed and connection is still active we try to reopen the channel
-            logger.error(
-                "Connection is opened retry to open channel in 5 seconds: %s",
-                self._connection_parameters.host,
-                reason,
-            )
-            self._connection.ioloop.call_later(5, self.open_channel())
-
-    def setup_exchange(self):
-        """
-        Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
-        command. When it is complete, the on_exchange_declareok method will
-        be invoked by pika.
-        """
-        logger.info("Declaring exchange %s", self.exchange_name)
-
-        self._channel.exchange_declare(
-            exchange=self.exchange_name,
-            exchange_type=ExchangeType.fanout,
-            durable=True,
-            callback=self.on_exchange_declareok,
-        )
-
-    def on_exchange_declareok(self, _unused_frame):
-        """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
-        command.
-        Send unsent messages that cannot be sent as due connection errors.
-
-        :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
-        """
-
-        logger.info("Exchange declared: %s", self.exchange_name)
-        self.send_unsent_events()
-
-
-class SyncQueueService(QueueService):
-    """
-    Synchronous connection with test purpose as we cannot test using gevent connection
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.connect()
-
-    def connect(self) -> BlockingConnection:
-        """
-        This method connects to RabbitMq using Blockingconnection.
-        Store in _connection the BlocingConnection object and creates a new channel
+        This method connects to RabbitMq using BlockingConnection.
 
         :return: BlockingConnection
         """
         try:
-            self._connection = BlockingConnection(self._connection_parameters)
-            self._channel = self.open_channel()
-            self.setup_exchange()
-            return self._connection
-        except pika.exceptions.AMQPConnectionError:
-            logger.error("Cannot open connection, retrying")
+            logger.debug("Opening connection to RabbitMQ")
+            self.connection = BlockingConnection(self.connection_parameters)
+            self.channel = self.connection.channel()
+            self.channel.confirm_delivery()
+            # Declare exchange
+            self.channel.exchange_declare(
+                exchange=self.exchange_name,
+                exchange_type=ExchangeType.fanout,
+                durable=True,
+            )
+            logger.debug("Opened connection to RabbitMQ")
+            return self.connection
+        except pika.exceptions.AMQPError:
+            logger.error("Cannot open connection to RabbitMQ")
+            return None
 
-    def open_channel(self) -> Channel:
+    def publish(self, message: str, retry: Optional[bool] = True) -> bool:
         """
-        Open a new channel
+        :param message:
+        :param retry:
+        :return: `True` if message was published, `False` otherwise
+        """
+        try:
+            self.channel.basic_publish(
+                exchange=self.exchange_name, routing_key="", body=message
+            )
+            return True
+        except pika.exceptions.AMQPError:
+            if retry:
+                logger.info("The connection has been terminated, trying again.")
+                # One more chance
+                self.connect()
+                return self.publish(message, retry=False)
+            return False
 
-        :return: channel opened
-        """
-        return self._connection.channel()
 
-    def setup_exchange(self):
-        """
-        Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
-        command.
-        """
-        logger.info("Declaring exchange %s", self.exchange_name)
+@cache
+def get_queue_service():
+    if settings.EVENTS_QUEUE_URL:
+        return QueueService()
+    else:
+        # Mock send_event to not configured host us is not mandatory configure a queue for events
+        logger.warning("MockedQueueService is used")
+        return MockedQueueService()
 
-        self._channel.exchange_declare(
-            exchange=self.exchange_name, exchange_type=ExchangeType.fanout, durable=True
-        )
+
+class QueueService:
+    def __init__(self):
+        self._connection_pool: List[BrokerConnection] = []
+        self._total_connections: int = 0
+        self.unsent_events: List = []
+
+    def get_connection(self) -> Optional[BrokerConnection]:
+        """
+        :return: A `BrokerConnection` from the connection pool if there is one available, othwerwise
+            returns a new BrokerConnection
+        """
+        if (
+            settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+            and self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+        ):
+            logger.warning(
+                "Number of active connections reached the pool limit: %d",
+                self._total_connections,
+            )
+            return None
+
+        if self._connection_pool:
+            broker_connection = self._connection_pool.pop()
+        else:
+            broker_connection = BrokerConnection()
+
+        self._total_connections += 1
+        return broker_connection
+
+    def release_connection(self, broker_connection: Optional[BrokerConnection]):
+        """
+        Return the `BrokerConnection` to the pool
+
+        :param broker_connection:
+        :return:
+        """
+        self._total_connections -= 1
+        # Don't add broken connections to the pool
+        if broker_connection:
+            self._connection_pool.insert(0, broker_connection)
+
+    def send_event(self, payload: Dict[str, Any]) -> int:
+        """
+        Publish event using the `BrokerConnection`
+
+        :param payload: Number of events published
+        """
+        event = json.dumps(payload)
+        if not (broker_connection := self.get_connection()):
+            # No available connections in the pool, store event to send it later
+            self.unsent_events.append(event)
+            return 0
+
+        if broker_connection.publish(event):
+            logger.debug("Event correctly sent: %s", event)
+            self.release_connection(broker_connection)
+            return self.send_unsent_events() + 1
+
+        logger.warning("Unable to send the event due to a connection error")
+        logger.debug("Adding %s to unsent messages", payload)
+        self.unsent_events.append(event)
+        # As the message cannot be sent, we don't want to send the problematic connection back to the pool, only reduce the number of total connections
+        self.release_connection(None)
+        return 0
+
+    def send_unsent_events(self) -> int:
+        """
+        If connection is ready send the unsent messages list
+
+        :return: number of messages sent
+        """
+        if not self.unsent_events:
+            return 0
+
+        if not (broker_connection := self.get_connection()):
+            # Connection not available in the pool
+            return 0
+
+        # Avoid race conditions
+        unsent_events = self.unsent_events
+        self.unsent_events = []
+
+        total_sent_events = 0
+        logger.info("Sending previously unsent messages: %i", len(unsent_events))
+        for unsent_message in unsent_events:
+            if broker_connection.publish(unsent_message):
+                total_sent_events += 1
+            else:
+                self.unsent_events.append(unsent_message)
+
+        self.release_connection(broker_connection)
+        logger.info("Correctly sent messages: %i", total_sent_events)
+        return total_sent_events
+
+    def clear_unsent_events(self):
+        self.unsent_events.clear()
 
 
 class MockedQueueService:

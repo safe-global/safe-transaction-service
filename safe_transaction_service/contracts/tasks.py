@@ -2,7 +2,6 @@ import datetime
 from enum import Enum
 from itertools import chain
 
-from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from celery import app
@@ -16,10 +15,10 @@ from safe_transaction_service.history.models import (
     ModuleTransaction,
     MultisigTransaction,
 )
-from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .models import Contract
+from .services.contract_metadata_service import get_contract_metadata_service
 
 logger = get_task_logger(__name__)
 
@@ -120,25 +119,24 @@ def create_or_update_contract_with_metadata_task(
     address: ChecksumAddress,
 ) -> ContractAction:
     """
-    Creates or updates a contract using 3rd party information (contract name, ABI...)
+    Creates or updates a contract using 3rd party metadata (contract name, ABI...)
 
     :param address: Contract address
     :return: ContractAction
     """
     logger.info("Searching metadata for contract %s", address)
-    ethereum_network = get_ethereum_network()
+    contract_metadata_service = get_contract_metadata_service()
+    contract_metadata = contract_metadata_service.get_contract_metadata(address)
+
     try:
-        with transaction.atomic():
-            contract = Contract.objects.create_from_address(
-                address, network=ethereum_network
-            )
-            action = ContractAction.CREATED
-    except IntegrityError:
         contract = Contract.objects.get(address=address)
-        if contract.sync_abi_from_api():
+        if contract_metadata and contract.update_from_metadata(contract_metadata):
             action = ContractAction.UPDATED
         else:
             action = ContractAction.NOT_MODIFIED
+    except Contract.DoesNotExist:
+        contract = Contract.objects.create_from_metadata(address, contract_metadata)
+        action = ContractAction.CREATED
 
     logger.info(
         "%s contract with address=%s name=%s abi-found=%s",

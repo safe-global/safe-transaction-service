@@ -60,13 +60,14 @@ class TestCommands(TestCase):
         self.assertEqual(current_no_safe_contract_logo, previous_random_contract_logo)
 
         # Missing safe addresses should be added
-        self.assertEqual(Contract.objects.count(), 10)
+        self.assertEqual(Contract.objects.count(), 19)
 
         # Contract name and display name should be correctly generated
         safe_l2_130_address = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E"
         contract = Contract.objects.get(address=safe_l2_130_address)
         self.assertEqual(contract.name, "GnosisSafeL2")
         self.assertEqual(contract.display_name, "SafeL2 1.3.0")
+        self.assertFalse(contract.trusted_for_delegate_call)
 
         safe_multisend_130_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
         contract = Contract.objects.get(address=safe_multisend_130_address)
@@ -82,3 +83,12 @@ class TestCommands(TestCase):
         contract = Contract.objects.get(address=multisend_address)
         self.assertEqual(contract.name, "MultiSendCallOnly")
         self.assertEqual(contract.display_name, "Safe: MultiSendCallOnly 1.3.0")
+        # MultiSendCallOnly should be trusted for delegate calls
+        self.assertTrue(contract.trusted_for_delegate_call)
+
+        multisend_141_address = "0x9641d764fc13c8B624c04430C7356C1C7C8102e2"
+        contract = Contract.objects.get(address=multisend_141_address)
+        self.assertEqual(contract.name, "MultiSendCallOnly")
+        self.assertEqual(contract.display_name, "Safe: MultiSendCallOnly 1.4.1")
+        # MultiSendCallOnly should be trusted for delegate calls
+        self.assertTrue(contract.trusted_for_delegate_call)

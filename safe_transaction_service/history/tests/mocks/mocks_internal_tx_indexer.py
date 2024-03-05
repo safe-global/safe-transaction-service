@@ -78,7 +78,7 @@ trace_filter_result = [
     },
 ]
 
-# trace_blocks 6067026 on Rinkeby
+# trace_blocks([6067026]) on Rinkeby
 trace_blocks_result = [
     [
         {

@@ -18,6 +18,7 @@ from eth_typing import ChecksumAddress
 from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.clients import EnsClient
 
 from safe_transaction_service.tokens.constants import (
     CRYPTO_KITTIES_CONTRACT_ADDRESSES,
@@ -27,7 +28,6 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import chunks
 
-from ..clients import EnsClient
 from ..exceptions import NodeConnectionException
 from ..models import ERC721Transfer
 
@@ -489,9 +489,9 @@ class CollectiblesService:
         # Creates a collectibles metadata keeping the initial order
         for collectible_metadata_cached_index in range(len(collectibles_with_metadata)):
             if collectibles_with_metadata[collectible_metadata_cached_index] is None:
-                collectibles_with_metadata[
-                    collectible_metadata_cached_index
-                ] = collectibles_with_metadata_not_cached.pop(0)
+                collectibles_with_metadata[collectible_metadata_cached_index] = (
+                    collectibles_with_metadata_not_cached.pop(0)
+                )
 
         return collectibles_with_metadata, count
 
@@ -607,9 +607,9 @@ class CollectiblesService:
         if blockchain_token_uris:
             pipe = self.redis.pipeline()
             redis_map_to_store = {
-                get_redis_key(address_with_token_id): token_uri
-                if token_uri is not None
-                else ""
+                get_redis_key(address_with_token_id): (
+                    token_uri if token_uri is not None else ""
+                )
                 for address_with_token_id, token_uri in blockchain_token_uris.items()
             }
             pipe.mset(redis_map_to_store)

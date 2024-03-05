@@ -82,7 +82,7 @@ def update_token_info_from_token_list_task() -> int:
     token_addresses = [
         fast_to_checksum_address(token["address"])
         for token in tokens
-        if token["chainId"] == ethereum_network.value
+        if token.get("chainId") == ethereum_network.value
     ]
 
     with transaction.atomic():

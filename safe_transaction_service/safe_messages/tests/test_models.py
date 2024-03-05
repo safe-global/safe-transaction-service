@@ -8,7 +8,7 @@ from hexbytes import HexBytes
 
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..utils import get_safe_message_hash_for_message
+from ..utils import get_hash_for_message, get_safe_message_hash_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
 from .mocks import get_eip712_payload_mock
 
@@ -60,7 +60,9 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         message_hash = safe_message.message_hash
         self.assertEqual(
             message_hash,
-            get_safe_message_hash_for_message(safe_message.safe, message).hex(),
+            get_safe_message_hash_for_message(
+                safe_message.safe, get_hash_for_message(message)
+            ).hex(),
         )
         recovered_owner = Account._recover_hash(
             safe_message.message_hash,

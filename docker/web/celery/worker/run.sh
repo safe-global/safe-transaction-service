@@ -15,7 +15,7 @@ fi
 
 if [ ${RUN_MIGRATIONS:-0} = 1 ]; then
   echo "==> $(date +%H:%M:%S) ==> Migrating Django models... "
-  python manage.py migrate --noinput
+  DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput
 
   echo "==> $(date +%H:%M:%S) ==> Setting up service... "
   python manage.py setup_service

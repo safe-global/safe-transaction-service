@@ -2,12 +2,15 @@ import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from django.http import Http404
+
 from drf_yasg.utils import swagger_serializer_method
 from eth_typing import ChecksumAddress, HexStr
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.django.models import EthereumAddressV2Field as EthereumAddressDbField
 from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
 from gnosis.eth.django.serializers import (
@@ -24,11 +27,12 @@ from safe_transaction_service.contracts.tx_decoder import (
     get_db_tx_decoder,
 )
 from safe_transaction_service.tokens.serializers import TokenInfoResponseSerializer
-from safe_transaction_service.utils.serializers import get_safe_owners, get_safe_version
+from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .exceptions import NodeConnectionException
-from .helpers import DelegateSignatureHelper
+from .helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from .models import (
+    MAX_SIGNATURE_LENGTH,
     EthereumTx,
     ModuleTransaction,
     MultisigConfirmation,
@@ -60,27 +64,46 @@ class GnosisBaseModelSerializer(serializers.ModelSerializer):
 #            Request Serializers
 # ================================================ #
 class SafeMultisigConfirmationSerializer(serializers.Serializer):
-    signature = HexadecimalField(min_length=65)  # Signatures must be at least 65 bytes
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def validate_signature(self, signature: bytes):
         safe_tx_hash = self.context["safe_tx_hash"]
         try:
-            multisig_transaction = MultisigTransaction.objects.select_related(
-                "ethereum_tx"
-            ).get(safe_tx_hash=safe_tx_hash)
+            multisig_transaction: MultisigTransaction = (
+                MultisigTransaction.objects.select_related("ethereum_tx").get(
+                    safe_tx_hash=safe_tx_hash
+                )
+            )
         except MultisigTransaction.DoesNotExist as exc:
             raise NotFound(
                 f"Multisig transaction with safe-tx-hash={safe_tx_hash} was not found"
             ) from exc
 
-        safe_address = multisig_transaction.safe
         if multisig_transaction.executed:
             raise ValidationError(
                 f"Transaction with safe-tx-hash={safe_tx_hash} was already executed"
             )
 
+        safe_address = multisig_transaction.safe
+        ethereum_client = EthereumClientProvider()
+        safe = Safe(safe_address, ethereum_client)
+        safe_tx = safe.build_multisig_tx(
+            multisig_transaction.to,
+            multisig_transaction.value,
+            multisig_transaction.data,
+            multisig_transaction.operation,
+            multisig_transaction.safe_tx_gas,
+            multisig_transaction.base_gas,
+            multisig_transaction.gas_price,
+            multisig_transaction.gas_token,
+            multisig_transaction.refund_receiver,
+            safe_nonce=multisig_transaction.nonce,
+        )
+
         safe_owners = get_safe_owners(safe_address)
-        parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
+        parsed_signatures = SafeSignature.parse_signature(
+            signature, safe_tx_hash, safe_tx.safe_tx_hash_preimage
+        )
         signature_owners = []
         ethereum_client = EthereumClientProvider()
         for safe_signature in parsed_signatures:
@@ -124,6 +147,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
 
 
 class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
+    to = EthereumAddressField(allow_zero_address=True, allow_sentinel_address=True)
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
     # TODO Make signature mandatory
@@ -149,9 +173,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
 
         ethereum_client = EthereumClientProvider()
         safe_address = attrs["safe"]
-        safe_version = get_safe_version(safe_address)
 
-        safe = Safe(safe_address, EthereumClientProvider())
+        safe = Safe(safe_address, ethereum_client)
         safe_tx = safe.build_multisig_tx(
             attrs["to"],
             attrs["value"],
@@ -164,12 +187,12 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
             attrs["refund_receiver"],
             safe_nonce=attrs["nonce"],
         )
-        contract_transaction_hash = safe_tx.safe_tx_hash
+        safe_tx_hash = safe_tx.safe_tx_hash
 
         # Check safe tx hash matches
-        if contract_transaction_hash != attrs["contract_transaction_hash"]:
+        if safe_tx_hash != attrs["contract_transaction_hash"]:
             raise ValidationError(
-                f"Contract-transaction-hash={contract_transaction_hash.hex()} "
+                f"Contract-transaction-hash={safe_tx_hash.hex()} "
                 f'does not match provided contract-tx-hash={attrs["contract_transaction_hash"].hex()}'
             )
 
@@ -180,9 +203,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         ).executed()
         if multisig_transactions:
             for multisig_transaction in multisig_transactions:
-                if multisig_transaction.safe_tx_hash == contract_transaction_hash.hex():
+                if multisig_transaction.safe_tx_hash == safe_tx_hash.hex():
                     raise ValidationError(
-                        f"Tx with safe-tx-hash={contract_transaction_hash.hex()} "
+                        f"Tx with safe-tx-hash={safe_tx_hash.hex()} "
                         f"for safe={safe_address} was already executed in "
                         f"tx-hash={multisig_transaction.ethereum_tx_id}"
                     )
@@ -209,7 +232,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
         parsed_signatures = SafeSignature.parse_signature(
-            signature, contract_transaction_hash
+            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
         )
         attrs["parsed_signatures"] = parsed_signatures
         # If there's at least one signature, transaction is trusted (until signatures are mandatory)
@@ -276,9 +299,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
                 "safe": self.validated_data["safe"],
                 "to": self.validated_data["to"],
                 "value": self.validated_data["value"],
-                "data": self.validated_data["data"]
-                if self.validated_data["data"]
-                else None,
+                "data": (
+                    self.validated_data["data"] if self.validated_data["data"] else None
+                ),
                 "operation": self.validated_data["operation"],
                 "safe_tx_gas": self.validated_data["safe_tx_gas"],
                 "base_gas": self.validated_data["base_gas"],
@@ -352,7 +375,7 @@ class DelegateSignatureCheckerMixin:
         delegator: ChecksumAddress,
     ) -> bool:
         """
-        Checks signature and returns a valid owner if found, None otherwise
+        Verifies signature to check if it matches the delegator
 
         :param ethereum_client:
         :param signature:
@@ -385,7 +408,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
     label = serializers.CharField(max_length=50)
 
     def validate(self, attrs):
@@ -447,7 +470,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
 class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -470,6 +493,57 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
         raise ValidationError(
             f"Signature does not match provided delegate={delegate} or delegator={delegator}"
         )
+
+
+class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
+    safe_tx_hash = Sha3HashField()
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
+
+    def validate(self, attrs):
+        super().validate(attrs)
+        safe_tx_hash = attrs["safe_tx_hash"]
+        signature = attrs["signature"]
+
+        try:
+            multisig_tx = MultisigTransaction.objects.select_related("ethereum_tx").get(
+                safe_tx_hash=safe_tx_hash
+            )
+        except MultisigTransaction.DoesNotExist:
+            raise Http404("Multisig transaction not found")
+
+        if multisig_tx.executed:
+            raise ValidationError("Executed transactions cannot be deleted")
+
+        proposer = multisig_tx.proposer
+        if not proposer or proposer == NULL_ADDRESS:
+            raise ValidationError("Old transactions without proposer cannot be deleted")
+
+        ethereum_client = EthereumClientProvider()
+        chain_id = ethereum_client.get_chain_id()
+        safe_address = multisig_tx.safe
+        # Accept a message with the current topt and the previous totp (to prevent replay attacks)
+        for previous_totp in (True, False):
+            message_hash = DeleteMultisigTxSignatureHelper.calculate_hash(
+                safe_address, safe_tx_hash, chain_id, previous_totp=previous_totp
+            )
+            safe_signatures = SafeSignature.parse_signature(signature, message_hash)
+            if len(safe_signatures) != 1:
+                raise ValidationError(
+                    f"1 owner signature was expected, {len(safe_signatures)} received"
+                )
+            safe_signature = safe_signatures[0]
+            # Currently almost all the transactions are proposed using EOAs. Adding support for EIP1271, for example,
+            # would require to use the EIP712 domain of the Safe and a blockchain check. For starting
+            # with this feature we will try to keep it simple and only support EOA signatures.
+            if safe_signature.signature_type not in (
+                SafeSignatureType.EOA,
+                SafeSignatureType.ETH_SIGN,
+            ):
+                raise ValidationError("Only EOA and ETH_SIGN signatures are supported")
+            if safe_signature.owner == proposer:
+                return attrs
+
+        raise ValidationError("Provided owner is not the proposer of the transaction")
 
 
 class DataDecoderSerializer(serializers.Serializer):
@@ -913,7 +987,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
 
     safe = EthereumAddressField()
     delegate = EthereumAddressField()
-    signature = HexadecimalField(min_length=65)
+    signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
 
     def get_valid_delegators(
         self,

@@ -5,7 +5,7 @@ from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from safe_transaction_service.events.tasks import send_event_to_queue_task
+from safe_transaction_service.events.services.queue_service import get_queue_service
 from safe_transaction_service.history.services.webhooks import build_webhook_payload
 from safe_transaction_service.history.tasks import send_webhook_task
 from safe_transaction_service.safe_messages.models import (
@@ -46,7 +46,8 @@ def process_webhook(
             send_webhook_task.apply_async(
                 args=(address, payload), priority=2  # Almost lowest priority
             )  # Almost the lowest priority
-            send_event_to_queue_task.delay(payload)
+            queue_service = get_queue_service()
+            queue_service.send_event(payload)
         else:
             logger.debug(
                 "Notification will not be sent for created=%s object=%s",
