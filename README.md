@@ -2,7 +2,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-transaction-service/badge.svg?branch=main)](https://coveralls.io/github/safe-global/safe-transaction-service?branch=main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)
-![Django 4](https://img.shields.io/badge/Django-4-blue.svg)
+![Django 5](https://img.shields.io/badge/Django-5-blue.svg)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/safeglobal/safe-transaction-service?label=Docker&sort=semver)](https://hub.docker.com/r/safeglobal/safe-transaction-service)
 
 # Safe Transaction Service
@@ -16,7 +16,7 @@ Transactions can also be sent to the service to allow offchain collecting of sig
 a transaction that is pending to be sent to the blockchain.
 
 [Swagger (Mainnet version)](https://safe-transaction-mainnet.safe.global/)
-[More networks](https://docs.safe.global/safe-core-api/supported-networks)
+[More networks](https://docs.safe.global/api-supported-networks)
 
 ## Index of contents
 
@@ -184,10 +184,10 @@ and [have a proper RPC](https://docs.safe.global/safe-core-api/rpc-requirements)
 Aside from using standard HTTP requests:
 - [Safe{Core} API Kit](https://github.com/safe-global/safe-core-sdk/tree/main/packages/api-kit)
 - [Safe-eth-py](https://github.com/safe-global/safe-eth-py)
-- [Safe CLI](https://github.com/5afe/safe-cli): It has a `tx-service` mode to gather offchain signatures.
+- [Safe CLI](https://github.com/safe-global/safe-cli): It has a `tx-service` mode to gather offchain signatures.
 
 ### What chains do you officially support?
-https://docs.safe.global/safe-core-api/available-services
+https://docs.safe.global/api-supported-networks
 
 ### What means banned field in SafeContract model?
 The `banned` field in the `SafeContract` model is used to prevent indexing of certain Safes that have an unsupported `MasterCopy` or unverified proxies that have issues during indexing. This field does not remove the banned Safe and indexing can be resumed once the issue has been resolved.
