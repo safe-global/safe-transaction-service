@@ -2,7 +2,7 @@ name: Python CI
 on:
   push:
     branches:
-      - master
+      - main
       - develop
   pull_request:
   release:
@@ -103,7 +103,7 @@ jobs:
     needs:
       - linting
       - test-app
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || (github.event_name == 'release' && github.event.action == 'released')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.event_name == 'release' && github.event.action == 'released')
     steps:
     - uses: actions/checkout@v4
     - uses: docker/setup-qemu-action@v3
@@ -116,7 +116,7 @@ jobs:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     - name: Deploy Master
-      if: github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/main'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -159,11 +159,11 @@ jobs:
   autodeploy:
     runs-on: ubuntu-latest
     needs: [docker-deploy]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     steps:
     - uses: actions/checkout@v4
     - name: Deploy Staging
-      if: github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/main'
       run: bash scripts/autodeploy.sh
       env:
         AUTODEPLOY_URL: ${{ secrets.AUTODEPLOY_URL }}

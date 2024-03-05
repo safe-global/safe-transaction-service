@@ -1,5 +1,5 @@
-![Build Status](https://github.com/safe-global/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-transaction-service/badge.svg?branch=master)](https://coveralls.io/github/safe-global/safe-transaction-service?branch=master)
+![Build Status](https://github.com/safe-global/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=main)
+[![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-transaction-service/badge.svg?branch=main)](https://coveralls.io/github/safe-global/safe-transaction-service?branch=main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)
 ![Django 4](https://img.shields.io/badge/Django-4-blue.svg)
@@ -70,7 +70,7 @@ For more parameters check [base.py](config/settings/base.py) file.
 
 - If the network is not supported yet [contracts can be deployed using the deployment instructions
 ](https://github.com/safe-global/safe-contracts/tree/v1.3.0/contracts)
-and then a PR should be provided [adding the deployment block number and the address](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) (address will be the same for every network).
+and then a PR should be provided [adding the deployment block number and the address](https://github.com/safe-global/safe-eth-py/blob/main/gnosis/safe/addresses.py) (address will be the same for every network).
 - Only `ProxyFactory` and `GnosisSafeL2` must be configured. `+L2` must be added to the `Safe L2` contract versions, so the service knows the contract can be indexed using events. For us to accept the PR network must be on https://github.com/ethereum-lists/chains .
 - You can always set this up later using the **admin panel** if your network is not supported, going to the **Master Copies** and **Proxy Factories**.
 - **We recommend** using event indexing for every network where transaction fees are not relevant, so a tracing node is not required and everything can be indexed using events with the `Safe L2` version.
