@@ -6,20 +6,25 @@ from django.db import models
 from django.db.models import Index
 
 from hexbytes import HexBytes
+from model_utils.models import TimeStampedModel
 
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
 from gnosis.eth.account_abstraction import UserOperationMetadata
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
+    HexField,
     Keccak256Field,
     Uint256Field,
 )
 from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
+from gnosis.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.history import models as history_models
 
 logger = logging.getLogger(__name__)
+
+SIGNATURE_LENGTH = 5_000
 
 
 class UserOperation(models.Model):
@@ -48,13 +53,6 @@ class UserOperation(models.Model):
     paymaster_data = models.BinaryField(null=True, blank=True, editable=True)
     signature = models.BinaryField(null=True, blank=True, editable=True)
     entry_point = EthereumAddressV2Field(db_index=True)
-
-    # Receipt
-    actual_gas_cost = Uint256Field()
-    actual_gas_used = Uint256Field()
-    success = models.BooleanField()
-    reason = models.CharField(max_length=256)
-    deposited = Uint256Field()
 
     class Meta:
         unique_together = (("sender", "nonce"),)
@@ -117,7 +115,9 @@ class UserOperation(models.Model):
 
 
 class UserOperationReceipt(models.Model):
-    user_operation = models.OneToOneField(UserOperation, on_delete=models.CASCADE)
+    user_operation = models.OneToOneField(
+        UserOperation, on_delete=models.CASCADE, related_name="receipt"
+    )
     actual_gas_cost = Uint256Field()
     actual_gas_used = Uint256Field()
     success = models.BooleanField()
@@ -125,10 +125,47 @@ class UserOperationReceipt(models.Model):
     deposited = Uint256Field()
 
 
-class SafeOperation(models.Model):
+class SafeOperation(TimeStampedModel):
     hash = Keccak256Field(primary_key=True)  # safeOperationHash
-    user_operation = models.ForeignKey(
-        UserOperation, on_delete=models.CASCADE, null=True, blank=True
+    user_operation = models.OneToOneField(
+        UserOperation, on_delete=models.CASCADE, related_name="safe_operation"
     )
     valid_after = models.DateTimeField()  # Epoch uint48
     valid_until = models.DateTimeField()  # Epoch uint48
+    module_address = EthereumAddressV2Field(db_index=True)
+
+    def build_signature(self) -> bytes:
+        return b"".join(
+            [
+                HexBytes(signature)
+                for _, signature in sorted(
+                    self.confirmations.values_list("owner", "signature"),
+                    key=lambda tup: tup[0].lower(),
+                )
+            ]
+        )
+
+
+class SafeOperationConfirmation(TimeStampedModel):
+    safe_operation = models.ForeignKey(
+        SafeOperation,
+        on_delete=models.CASCADE,
+        related_name="confirmations",
+    )
+    owner = EthereumAddressV2Field()
+    signature = HexField(null=True, default=None, max_length=SIGNATURE_LENGTH)
+    signature_type = models.PositiveSmallIntegerField(
+        choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["safe_operation", "owner"],
+                name="unique_safe_operation_owner_confirmation",
+            )
+        ]
+        ordering = ["created"]
+
+    def __str__(self):
+        return f"Safe Operation Confirmation for owner={self.owner}"
