@@ -42,7 +42,7 @@ def datetime_to_str(value: datetime.datetime) -> str:
     return value
 
 
-class TestMessageViews(SafeTestCaseMixin, APITestCase):
+class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
     def test_safe_operation_view(self):
         random_safe_operation_hash = (
             "0x8aca9664752dbae36135fd0956c956fc4a370feeac67485b49bcd4b99608ae41"
