@@ -234,6 +234,10 @@ CELERY_BROKER_CONNECTION_MAX_RETRIES = env.int(
 CELERY_BROKER_CHANNEL_ERROR_RETRY = env.bool(
     "CELERY_BROKER_CHANNEL_ERROR_RETRY", default=True
 )
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-connection-retry-on-startup
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = env.bool(
+    "CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP", default=True
+)
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://")
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-accept_content

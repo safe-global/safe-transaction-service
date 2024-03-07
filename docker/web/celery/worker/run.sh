@@ -4,7 +4,7 @@ set -euo pipefail
 
 MAX_MEMORY_PER_CHILD="${WORKER_MAX_MEMORY_PER_CHILD:-2097152}"
 MAX_TASKS_PER_CHILD="${MAX_TASKS_PER_CHILD:-1000000}"
-TASK_CONCURRENCY="${CELERYD_CONCURRENCY:-1000}"
+TASK_CONCURRENCY="${CELERYD_CONCURRENCY:-50000}"
 
 # DEBUG set in .env_docker_compose
 if [ ${DEBUG:-0} = 1 ]; then
@@ -34,4 +34,4 @@ exec celery -C -A config.celery_app worker \
      --max-memory-per-child=${MAX_MEMORY_PER_CHILD} \
      --max-tasks-per-child=${MAX_TASKS_PER_CHILD} \
      --without-heartbeat --without-gossip \
-     --without-mingle -Q "$WORKER_QUEUES"
+     --without-mingle -E -Q "$WORKER_QUEUES"
