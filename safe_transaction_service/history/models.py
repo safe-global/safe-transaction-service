@@ -1101,7 +1101,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         :return: Transactions ordered to be processed. First `setup` and then older transactions
         """
-        return self.annotate(
+        return self.alias(
             is_setup=Case(
                 When(function_name="setup", then=Value(0)),
                 default=Value(1),
@@ -1369,7 +1369,7 @@ class MultisigTransactionQuerySet(models.QuerySet):
         )
         return (
             self.not_executed()
-            .annotate(
+            .alias(
                 max_executed_nonce=Coalesce(
                     Subquery(subquery), Value(-1), output_field=Uint256Field()
                 )
