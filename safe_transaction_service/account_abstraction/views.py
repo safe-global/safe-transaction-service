@@ -23,8 +23,8 @@ class SafeOperationsView(ListCreateAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
-    ordering = ["-created"]
-    ordering_fields = ["created", "modified"]
+    ordering = ["-nonce"]
+    ordering_fields = ["nonce"]
     pagination_class = pagination.DefaultPagination
 
     def get_serializer_context(self):

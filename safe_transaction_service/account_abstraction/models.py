@@ -130,8 +130,8 @@ class SafeOperation(TimeStampedModel):
     user_operation = models.OneToOneField(
         UserOperation, on_delete=models.CASCADE, related_name="safe_operation"
     )
-    valid_after = models.DateTimeField()  # Epoch uint48
-    valid_until = models.DateTimeField()  # Epoch uint48
+    valid_after = models.DateTimeField(null=True)  # Epoch uint48
+    valid_until = models.DateTimeField(null=True)  # Epoch uint48
     module_address = EthereumAddressV2Field(db_index=True)
 
     def build_signature(self) -> bytes:

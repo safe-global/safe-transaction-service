@@ -45,8 +45,8 @@ class SafeOperationSerializer(serializers.Serializer):
     )
     entry_point = eth_serializers.EthereumAddressField()
     # Safe Operation fields
-    valid_after = serializers.IntegerField(min_value=0)  # Epoch uint48
-    valid_until = serializers.IntegerField(min_value=0)  # Epoch uint48
+    valid_after = serializers.DateTimeField(allow_null=True)  # Epoch uint48
+    valid_until = serializers.DateTimeField(allow_null=True)  # Epoch uint48
     module_address = eth_serializers.EthereumAddressField()
 
     def _validate_signature(
@@ -60,14 +60,15 @@ class SafeOperationSerializer(serializers.Serializer):
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_operation_hash, safe_operation_hash_preimage
         )
-        signature_owners = {}
+        signature_owners = set()
         safe_signatures = []
         ethereum_client = EthereumClientProvider()
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
             if owner not in safe_owners:
                 raise ValidationError(
-                    f"Signer={owner} is not an owner. Current owners={safe_owners}"
+                    f"Signer={owner} is not an owner. Current owners={safe_owners}. "
+                    f"Safe-operation-hash=0x{safe_operation_hash.hex()}"
                 )
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
@@ -76,7 +77,7 @@ class SafeOperationSerializer(serializers.Serializer):
             if owner in signature_owners:
                 raise ValidationError(f"Signature for owner={owner} is duplicated")
 
-            signature_owners.append(owner)
+            signature_owners.add(owner)
             safe_signatures.append(safe_signature)
         return safe_signatures
 
@@ -85,14 +86,16 @@ class SafeOperationSerializer(serializers.Serializer):
 
         module_address = attrs["module_address"]
         # TODO Check module_address is whitelisted
+        # FIXME Check nonce higher than last executed nonce
         if module_address not in SAFE_OPERATION_MODULE_ADDRESSES:
             raise ValidationError(
                 f"Module-address={module_address} not supported, valid values are {SAFE_OPERATION_MODULE_ADDRESSES}"
             )
 
-        valid_after = attrs["valid_after"]
-        valid_until = attrs["valid_until"]
+        valid_after = attrs["valid_after"] or 0
+        valid_until = attrs["valid_until"] or 0
 
+        # FIXME Check types
         if valid_after > valid_until:
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
@@ -107,28 +110,23 @@ class SafeOperationSerializer(serializers.Serializer):
                 f"UserOperation with nonce={nonce} for safe={safe_address} was already executed"
             )
 
-        paymaster = attrs["paymaster"]
-        paymaster_data = attrs["paymaster_data"]
-        paymaster_and_data = (
-            (HexBytes(paymaster) + HexBytes(paymaster_data))
-            if paymaster and paymaster_data
-            else b""
-        )
-        attrs["paymaster_and_data"] = paymaster_and_data
-        attrs["init_code"] = attrs["init_code"] or b""
-        attrs["call_data"] = attrs["call_data"] or b""
+        # FIXME Check all these `None`
+
+        paymaster = attrs["paymaster"] or b""
+        paymaster_data = attrs["paymaster_data"] or b""
+        attrs["paymaster_and_data"] = bytes(paymaster) + bytes(paymaster_data)
 
         safe_operation = SafeOperationClass(
-            attrs["safe"],
+            safe_address,
             nonce,
-            fast_keccak(attrs["init_code"]),
-            fast_keccak(attrs["call_data"]),
+            fast_keccak(attrs["init_code"] or b""),
+            fast_keccak(attrs["call_data"] or b""),
             attrs["call_data_gas_limit"],
             attrs["verification_gas_limit"],
             attrs["pre_verification_gas"],
             attrs["max_fee_per_gas"],
             attrs["max_priority_fee_per_gas"],
-            fast_keccak(paymaster_and_data),
+            fast_keccak(attrs["paymaster_and_data"]),
             valid_after,
             valid_until,
             attrs["entry_point"],
