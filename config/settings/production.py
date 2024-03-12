@@ -65,10 +65,6 @@ if SSO_ENABLED:
 # Django Admin URL regex.
 ADMIN_URL = env("DJANGO_ADMIN_URL", default="admin/")
 
-# CELERY
-# ------------------------------------------------------------------------------
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=REDIS_URL)
-
 # Gunicorn
 # ------------------------------------------------------------------------------
 INSTALLED_APPS += ["gunicorn"]  # noqa F405
