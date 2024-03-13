@@ -4,6 +4,7 @@ Contains classes for processing indexed data and store Safe related models in da
 
 from abc import ABC, abstractmethod
 from datetime import datetime
+from functools import lru_cache
 from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
@@ -38,7 +39,6 @@ from safe_transaction_service.account_abstraction.models import (
 from safe_transaction_service.safe_messages import models as safe_message_models
 
 from ...account_abstraction.constants import (
-    DEPOSIT_EVENT_TOPIC,
     USER_OPERATION_EVENT_TOPICS,
     USER_OPERATION_SUPPORTED_ENTRY_POINTS,
 )
@@ -351,11 +351,13 @@ class SafeTxProcessor(TxProcessor):
         self.clear_cache()
         return results
 
+    @lru_cache(maxsize=2048)
     def process_4337_transaction(
         self, safe_address: ChecksumAddress, ethereum_tx: EthereumTx
     ) -> bool:
         """
-        Check if transaction contains any 4337 UserOperation for the provided `safe_address`
+        Check if transaction contains any 4337 UserOperation for the provided `safe_address`.
+        Function is cached to prevent reprocessing the same transaction.
 
         :param safe_address: Sender to check in UserOperation
         :param ethereum_tx: EthereumTx to check for UserOperations
@@ -378,9 +380,10 @@ class SafeTxProcessor(TxProcessor):
                 if not self.bundler_client:
                     continue
 
-                with transaction.atomic():
-                    user_operation_hash = HexBytes(log["topics"][1]).hex()
-                    try:
+                user_operation_hash = HexBytes(log["topics"][1]).hex()
+                try:
+                    # Rollbacks if there's a problem, as we need to work on multiple database models
+                    with transaction.atomic():
                         # If the UserOperationReceipt is present, UserOperation was already processed and mined
                         if UserOperationReceiptModel.objects.filter(
                             user_operation__hash=user_operation_hash
@@ -470,20 +473,7 @@ class SafeTxProcessor(TxProcessor):
                             )
                             # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
                             # to get deposited funds
-                            deposited = 0
-                            for user_operation_log in user_operation_receipt["logs"]:
-                                if (
-                                    len(user_operation_log["topics"]) == 2
-                                    and HexBytes(user_operation_log["topics"][0])
-                                    == DEPOSIT_EVENT_TOPIC
-                                    and Web3.to_checksum_address(
-                                        user_operation_log["address"]
-                                    )
-                                    in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
-                                    and Web3.to_checksum_address(log["topics"][1][-40:])
-                                    == safe_address
-                                ):
-                                    deposited += int(user_operation_log["data"], 16)
+                            deposited = user_operation_receipt.get_deposit()
 
                             logger.debug(
                                 "[%s] Storing UserOperation Receipt with user-operation=%s on tx-hash=%s",
@@ -507,23 +497,9 @@ class SafeTxProcessor(TxProcessor):
                             )
 
                             # Find module address using event `ExecutionFromModuleSuccess (index_topic_1 address module)`
-                            module_address: Optional[ChecksumAddress] = None
-                            for log in reversed(user_operation_receipt["logs"]):
-                                if (
-                                    len(log["topics"]) == 2
-                                    and HexBytes(log["topics"][0])
-                                    == HexBytes(
-                                        "0x6895c13664aa4f67288b25d7a21d7aaa34916e355fb9b6fae0a139a9085becb8"
-                                    )  #
-                                    # Only index this Safe's events
-                                    and Web3.to_checksum_address(log["address"])
-                                    == safe_address
-                                ):
-                                    module_address = Web3.to_checksum_address(
-                                        log["topics"][1][-40:]
-                                    )
-                                    break
-                            if not module_address:
+                            if not (
+                                module_address := user_operation_receipt.get_module_address()
+                            ):
                                 raise ValueError(
                                     "Cannot find ExecutionFromModuleSuccess for the Operation"
                                 )
@@ -557,20 +533,20 @@ class SafeTxProcessor(TxProcessor):
                                     user_operation_hash,
                                 )
 
-                    except BundlerClientException as exc:
-                        logger.error(
-                            "[%s] Error retrieving user-operation-hash=%s from bundler API: %s",
-                            safe_address,
-                            user_operation_hash,
-                            exc,
-                        )
-                    except ValueError as exc:
-                        logger.error(
-                            "[%s] Error processing user-operation-hash=%s: %s",
-                            safe_address,
-                            user_operation_hash,
-                            exc,
-                        )
+                except BundlerClientException as exc:
+                    logger.error(
+                        "[%s] Error retrieving user-operation-hash=%s from bundler API: %s",
+                        safe_address,
+                        user_operation_hash,
+                        exc,
+                    )
+                except ValueError as exc:
+                    logger.error(
+                        "[%s] Error processing user-operation-hash=%s: %s",
+                        safe_address,
+                        user_operation_hash,
+                        exc,
+                    )
 
         return detected_user_operation
 

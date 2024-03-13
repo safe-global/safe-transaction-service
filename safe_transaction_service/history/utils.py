@@ -5,6 +5,7 @@ from django.core import exceptions
 from django.utils.translation import gettext as _
 
 from hexbytes import HexBytes
+from web3.types import LogReceipt
 
 
 class HexField(forms.CharField):
@@ -36,7 +37,7 @@ class HexField(forms.CharField):
         return "0x" + bytes(value).hex() if value else ""
 
 
-def clean_receipt_log(receipt_log: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def clean_receipt_log(receipt_log: LogReceipt) -> Optional[Dict[str, Any]]:
     """
     Clean receipt log and make them JSON compliant
 
