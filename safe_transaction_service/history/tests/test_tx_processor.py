@@ -5,9 +5,9 @@ from django.test import TestCase
 
 from eth_account import Account
 from eth_utils import keccak
-from web3 import Web3
 
 from gnosis.eth.ethereum_client import TracingManager
+from gnosis.eth.utils import fast_keccak_text
 from gnosis.safe.safe_signature import SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -340,7 +340,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertTrue(tx_processor.is_failed(ethereum_tx, logs[0]["data"]))
         self.assertFalse(
-            tx_processor.is_failed(ethereum_tx, Web3.keccak(text="hola").hex())
+            tx_processor.is_failed(ethereum_tx, fast_keccak_text("hola").hex())
         )
 
         # Event for Safes >= 1.1.1
@@ -359,7 +359,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertTrue(tx_processor.is_failed(ethereum_tx, safe_tx_hash))
         self.assertFalse(
-            tx_processor.is_failed(ethereum_tx, Web3.keccak(text="hola").hex())
+            tx_processor.is_failed(ethereum_tx, fast_keccak_text("hola").hex())
         )
 
         # Event for Safes >= 1.4.1
@@ -378,7 +378,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertTrue(tx_processor.is_failed(ethereum_tx, safe_tx_hash))
         self.assertFalse(
-            tx_processor.is_failed(ethereum_tx, Web3.keccak(text="hola").hex())
+            tx_processor.is_failed(ethereum_tx, fast_keccak_text("hola").hex())
         )
 
     def test_tx_is_version_breaking_signatures(self):

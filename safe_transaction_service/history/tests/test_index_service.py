@@ -5,10 +5,10 @@ from django.test import TestCase
 
 from eth_account import Account
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from web3 import Web3
 
 from gnosis.eth import EthereumClient
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from gnosis.eth.utils import fast_keccak_text
 
 from ..models import (
     EthereumTx,
@@ -88,7 +88,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
 
         # Test block hash changes
         ethereum_tx = ethereum_txs[0]
-        ethereum_tx.block.block_hash = Web3.keccak(text="aloha")
+        ethereum_tx.block.block_hash = fast_keccak_text("aloha")
         ethereum_tx.block.save(update_fields=["block_hash"])
         tx_hash = ethereum_tx.tx_hash
 

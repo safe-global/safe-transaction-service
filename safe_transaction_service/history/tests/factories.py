@@ -7,9 +7,9 @@ from eth_account import Account
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
 from hexbytes import HexBytes
-from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
+from gnosis.eth.utils import fast_keccak_text
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from ..models import (
@@ -53,8 +53,8 @@ class EthereumBlockFactory(DjangoModelFactory):
     gas_limit = factory.fuzzy.FuzzyInteger(100000000, 200000000)
     gas_used = factory.fuzzy.FuzzyInteger(100000, 500000)
     timestamp = factory.LazyFunction(timezone.now)
-    block_hash = factory.Sequence(lambda n: Web3.keccak(text=f"block-{n}").hex())
-    parent_hash = factory.Sequence(lambda n: Web3.keccak(text=f"block{n - 1}").hex())
+    block_hash = factory.Sequence(lambda n: fast_keccak_text(f"block-{n}").hex())
+    parent_hash = factory.Sequence(lambda n: fast_keccak_text(f"block{n - 1}").hex())
 
 
 class EthereumTxFactory(DjangoModelFactory):
@@ -63,7 +63,7 @@ class EthereumTxFactory(DjangoModelFactory):
 
     block = factory.SubFactory(EthereumBlockFactory)
     tx_hash = factory.Sequence(
-        lambda n: Web3.keccak(text=f"ethereum_tx_hash-{n}").hex()
+        lambda n: fast_keccak_text(f"ethereum_tx_hash-{n}").hex()
     )
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
@@ -226,7 +226,7 @@ class ModuleTransactionFactory(DjangoModelFactory):
     module = factory.LazyFunction(lambda: Account.create().address)
     to = factory.LazyFunction(lambda: Account.create().address)
     value = FuzzyInteger(low=0, high=10)
-    data = factory.Sequence(lambda n: Web3.keccak(text=f"module-tx-{n}"))
+    data = factory.Sequence(lambda n: fast_keccak_text(f"module-tx-{n}"))
     operation = FuzzyInteger(low=0, high=1)
     failed = False
 
@@ -236,7 +236,7 @@ class MultisigTransactionFactory(DjangoModelFactory):
         model = MultisigTransaction
 
     safe_tx_hash = factory.Sequence(
-        lambda n: Web3.keccak(text=f"multisig-tx-{n}").hex()
+        lambda n: fast_keccak_text(f"multisig-tx-{n}").hex()
     )
     safe = factory.LazyFunction(lambda: Account.create().address)
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
@@ -263,7 +263,7 @@ class MultisigConfirmationFactory(DjangoModelFactory):
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     multisig_transaction = factory.SubFactory(MultisigTransactionFactory)
     multisig_transaction_hash = factory.Sequence(
-        lambda n: Web3.keccak(text=f"multisig-confirmation-tx-{n}").hex()
+        lambda n: fast_keccak_text(f"multisig-confirmation-tx-{n}").hex()
     )
     owner = factory.LazyFunction(lambda: Account.create().address)
     signature = None

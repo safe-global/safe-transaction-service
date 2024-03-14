@@ -9,8 +9,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from eth_account import Account
-from web3 import Web3
 
+from gnosis.eth.utils import fast_keccak_text
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.contracts.models import ContractQuerySet
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 class TestModelSignals(TestCase):
     def test_bind_confirmations(self):
-        safe_tx_hash = Web3.keccak(text="prueba")
+        safe_tx_hash = fast_keccak_text("prueba")
         ethereum_tx = EthereumTxFactory()
         MultisigConfirmation.objects.create(
             ethereum_tx=ethereum_tx,
@@ -87,7 +87,7 @@ class TestModelSignals(TestCase):
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
     def test_bind_confirmations_reverse(self):
-        safe_tx_hash = Web3.keccak(text="prueba")
+        safe_tx_hash = fast_keccak_text("prueba")
         ethereum_tx = EthereumTxFactory()
         multisig_tx, _ = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,
@@ -1257,7 +1257,7 @@ class TestEthereumBlock(TestCase):
 
         # Test block with different block-hash but same block number
         mock_block_2 = dict(mock_block)
-        mock_block_2["hash"] = Web3.keccak(text="another-hash")
+        mock_block_2["hash"] = fast_keccak_text("another-hash")
         self.assertNotEqual(mock_block["hash"], mock_block_2["hash"])
         with self.assertRaises(IntegrityError):
             EthereumBlock.objects.get_or_create_from_block(mock_block_2)
