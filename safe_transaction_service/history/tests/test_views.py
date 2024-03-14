@@ -19,11 +19,10 @@ from requests import ReadTimeout
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
-from web3 import Web3
 
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.ethereum_client import EthereumClient, TracingManager
-from gnosis.eth.utils import fast_is_checksum_address
+from gnosis.eth.utils import fast_is_checksum_address, fast_keccak_text
 from gnosis.safe import CannotEstimateGas, Safe, SafeOperationEnum
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
@@ -684,7 +683,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
     def test_get_multisig_confirmation(self):
-        random_safe_tx_hash = Web3.keccak(text="enxebre").hex()
+        random_safe_tx_hash = fast_keccak_text("enxebre").hex()
         response = self.client.get(
             reverse(
                 "v1:history:multisig-transaction-confirmations",
@@ -710,7 +709,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 2)
 
     def test_post_multisig_confirmation(self):
-        random_safe_tx_hash = Web3.keccak(text="enxebre").hex()
+        random_safe_tx_hash = fast_keccak_text("enxebre").hex()
         data = {
             "signature": Account.create()
             .signHash(random_safe_tx_hash)["signature"]
@@ -819,7 +818,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
     def test_get_multisig_transaction(self):
-        safe_tx_hash = Web3.keccak(text="gnosis").hex()
+        safe_tx_hash = fast_keccak_text("gnosis").hex()
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
             format="json",
@@ -903,7 +902,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_delete_multisig_transaction(self):
         owner_account = Account.create()
-        safe_tx_hash = Web3.keccak(text="random-tx").hex()
+        safe_tx_hash = fast_keccak_text("random-tx").hex()
         url = reverse("v1:history:multisig-transaction", args=(safe_tx_hash,))
         data = {"signature": "0x" + "1" * (130 * 2)}  # 2 signatures of 65 bytes
         response = self.client.delete(url, format="json", data=data)
