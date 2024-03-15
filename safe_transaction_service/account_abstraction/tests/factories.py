@@ -5,7 +5,7 @@ from eth_account import Account
 from factory.django import DjangoModelFactory
 
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.utils import fast_keccak
+from gnosis.eth.utils import fast_keccak_text
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.history.tests import factories as history_factories
@@ -18,9 +18,7 @@ class UserOperationFactory(DjangoModelFactory):
     class Meta:
         model = models.UserOperation
 
-    hash = factory.Sequence(
-        lambda n: "0x" + fast_keccak(f"user-operation-{n}".encode()).hex()
-    )
+    hash = factory.Sequence(lambda n: fast_keccak_text(f"user-operation-{n}").hex())
     ethereum_tx = factory.SubFactory(history_factories.EthereumTxFactory)
     sender = factory.LazyFunction(lambda: Account.create().address)
     nonce = factory.Sequence(lambda n: n)
@@ -48,9 +46,7 @@ class SafeOperationFactory(DjangoModelFactory):
     class Meta:
         model = models.SafeOperation
 
-    hash = factory.Sequence(
-        lambda n: "0x" + fast_keccak(f"safe-operation-{n}".encode()).hex()
-    )
+    hash = factory.Sequence(lambda n: fast_keccak_text(f"safe-operation-{n}").hex())
     user_operation = factory.SubFactory(UserOperationFactory)
     valid_after = factory.LazyFunction(timezone.now)
     valid_until = factory.LazyFunction(timezone.now)

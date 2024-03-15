@@ -68,7 +68,7 @@ class SafeOperationSerializer(serializers.Serializer):
             if owner not in safe_owners:
                 raise ValidationError(
                     f"Signer={owner} is not an owner. Current owners={safe_owners}. "
-                    f"Safe-operation-hash=0x{safe_operation_hash.hex()}"
+                    f"Safe-operation-hash={safe_operation_hash.hex()}"
                 )
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(

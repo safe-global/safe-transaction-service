@@ -245,7 +245,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertDictEqual(
             response.data,
             {
                 "non_field_errors": [
