@@ -24,6 +24,7 @@ from gnosis.eth.contracts import (
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
 )
+from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
@@ -368,9 +369,9 @@ class SafeTxProcessor(TxProcessor):
             if (
                 len(log["topics"]) == 4
                 and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
-                and Web3.to_checksum_address(log["address"])
+                and fast_to_checksum_address(log["address"])
                 in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
-                and Web3.to_checksum_address(log["topics"][2][-40:])
+                and fast_to_checksum_address(log["topics"][2][-40:])
                 == safe_address  # Check sender
             ):
                 # Detected a 4337 UserOperation
