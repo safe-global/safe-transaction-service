@@ -398,7 +398,7 @@ class SafeTxProcessor(TxProcessor):
                             try:
                                 user_operation_model = UserOperationModel.objects.only(
                                     "id", "ethereum_tx_id"
-                                ).get(user_operation__hash=user_operation_hash)
+                                ).get(hash=user_operation_hash)
                             except UserOperationModel.DoesNotExist:
                                 user_operation_model = None
 
