@@ -26,6 +26,7 @@ from gnosis.eth.contracts import (
 )
 from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe import SafeTx
+from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
 from safe_transaction_service.account_abstraction.models import (
@@ -493,7 +494,7 @@ class SafeTxProcessor(TxProcessor):
                             )
 
                             # Build SafeOperation from UserOperation
-                            safe_operation = SafeOperationModel.from_user_operation(
+                            safe_operation = SafeOperation.from_user_operation(
                                 user_operation
                             )
 
