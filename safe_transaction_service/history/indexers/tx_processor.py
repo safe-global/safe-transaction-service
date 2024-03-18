@@ -485,10 +485,10 @@ class SafeTxProcessor(TxProcessor):
 
                             UserOperationReceiptModel.objects.create(
                                 user_operation=user_operation_model,
-                                actual_gas_cost=user_operation_receipt["actualGasCost"],
-                                actual_gas_used=user_operation_receipt["actualGasUsed"],
-                                success=user_operation_receipt["success"],
-                                reason=user_operation_receipt["reason"],
+                                actual_gas_cost=user_operation_receipt.actual_gas_cost,
+                                actual_gas_used=user_operation_receipt.actual_gas_used,
+                                success=user_operation_receipt.success,
+                                reason=user_operation_receipt.reason,
                                 deposited=deposited,
                             )
 
