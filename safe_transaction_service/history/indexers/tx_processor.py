@@ -68,6 +68,10 @@ class OwnerCannotBeRemoved(TxProcessorException):
     pass
 
 
+class UserOperationFailed(TxProcessorException):
+    pass
+
+
 class SafeTxProcessorProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
@@ -473,6 +477,11 @@ class SafeTxProcessor(TxProcessor):
                                     user_operation_hash
                                 )
                             )
+                            if not user_operation_receipt.success:
+                                raise UserOperationFailed(
+                                    f"UserOperation with user-operation-hash={user_operation_hash} failed"
+                                )
+
                             # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
                             # to get deposited funds
                             deposited = user_operation_receipt.get_deposit()
