@@ -20,7 +20,7 @@ djangorestframework==3.14.0
 djangorestframework-camel-case==1.4.2
 docutils==0.20.1
 drf-yasg[validation]==1.21.7
-firebase-admin==6.4.0
+firebase-admin==6.5.0
 flower==2.0.1
 gunicorn[gevent]==21.2.0
 hexbytes==0.3.1
