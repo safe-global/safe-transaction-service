@@ -2,10 +2,8 @@
 Contains classes for processing indexed data and store Safe related models in database
 """
 
+import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
-from functools import lru_cache
-from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
 from django.db import transaction
@@ -17,33 +15,21 @@ from packaging.version import Version
 from web3 import Web3
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
-from gnosis.eth.account_abstraction import BundlerClient, BundlerClientException
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import (
     get_safe_V1_0_0_contract,
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
 )
-from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe import SafeTx
-from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
-from safe_transaction_service.account_abstraction.models import (
-    SafeOperation as SafeOperationModel,
-)
-from safe_transaction_service.account_abstraction.models import (
-    UserOperation as UserOperationModel,
-)
-from safe_transaction_service.account_abstraction.models import (
-    UserOperationReceipt as UserOperationReceiptModel,
+from safe_transaction_service.account_abstraction.services import (
+    AaProcessorService,
+    get_aa_processor_service,
 )
 from safe_transaction_service.safe_messages import models as safe_message_models
 
-from ...account_abstraction.constants import (
-    USER_OPERATION_EVENT_TOPICS,
-    USER_OPERATION_SUPPORTED_ENTRY_POINTS,
-)
 from ..models import (
     EthereumTx,
     InternalTx,
@@ -57,7 +43,7 @@ from ..models import (
     SafeStatus,
 )
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class TxProcessorException(Exception):
@@ -83,17 +69,11 @@ class SafeTxProcessorProvider:
                 if settings.ETHEREUM_TRACING_NODE_URL
                 else None
             )
-            bundler_client = (
-                BundlerClient(settings.ETHEREUM_4337_BUNDLER_URL)
-                if settings.ETHEREUM_4337_BUNDLER_URL
-                else None
-            )
+
             if not ethereum_tracing_client:
                 logger.warning("Ethereum tracing client was not configured")
-            if not bundler_client:
-                logger.warning("Ethereum 4337 bundler client was not configured")
             cls.instance = SafeTxProcessor(
-                ethereum_client, ethereum_tracing_client, bundler_client
+                ethereum_client, ethereum_tracing_client, get_aa_processor_service()
             )
         return cls.instance
 
@@ -128,18 +108,19 @@ class SafeTxProcessor(TxProcessor):
         self,
         ethereum_client: EthereumClient,
         ethereum_tracing_client: Optional[EthereumClient],
-        bundler_client: Optional[BundlerClient],
+        aa_processor_service: AaProcessorService,
     ):
         """
         :param ethereum_client: Used for regular RPC calls
         :param ethereum_tracing_client: Used for RPC calls requiring trace methods. It's required to get
            previous traces for a given `InternalTx` if not found on database
+        :param aa_processor_service: Used for detecting and processing 4337 transactions
         """
 
         # This safe_tx_failure events allow us to detect a failed safe transaction
         self.ethereum_client = ethereum_client
         self.ethereum_tracing_client = ethereum_tracing_client
-        self.bundler_client = bundler_client
+        self.aa_processor_service = aa_processor_service
         dummy_w3 = Web3()
         self.safe_tx_failure_events = [
             get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
@@ -357,210 +338,6 @@ class SafeTxProcessor(TxProcessor):
         self.clear_cache()
         return results
 
-    @lru_cache(maxsize=2048)
-    def process_4337_transaction(
-        self, safe_address: ChecksumAddress, ethereum_tx: EthereumTx
-    ) -> bool:
-        """
-        Check if transaction contains any 4337 UserOperation for the provided `safe_address`.
-        Function is cached to prevent reprocessing the same transaction.
-
-        :param safe_address: Sender to check in UserOperation
-        :param ethereum_tx: EthereumTx to check for UserOperations
-        :return: `True` if transaction contains any 4337 UserOperation
-        """
-        detected_user_operation = False
-        for log in ethereum_tx.logs:
-            if (
-                len(log["topics"]) == 4
-                and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
-                and fast_to_checksum_address(log["address"])
-                in USER_OPERATION_SUPPORTED_ENTRY_POINTS  # Only index supported entryPoints
-                and fast_to_checksum_address(log["topics"][2][-40:])
-                == safe_address  # Check sender
-            ):
-                # Detected a 4337 UserOperation
-                detected_user_operation = True
-
-                # If bundler client is not configured we cannot get the required information
-                if not self.bundler_client:
-                    continue
-
-                user_operation_hash = HexBytes(log["topics"][1]).hex()
-                try:
-                    # Rollbacks if there's a problem, as we need to work on multiple database models
-                    with transaction.atomic():
-                        # If the UserOperationReceipt is present, UserOperation was already processed and mined
-                        if UserOperationReceiptModel.objects.filter(
-                            user_operation__hash=user_operation_hash
-                        ).exists():
-                            logger.warning(
-                                "[%s] user-operation-hash=%s receipt was already indexed",
-                                safe_address,
-                                user_operation_hash,
-                            )
-                        else:
-                            try:
-                                user_operation_model = UserOperationModel.objects.only(
-                                    "hash", "ethereum_tx_id"
-                                ).get(hash=user_operation_hash)
-                            except UserOperationModel.DoesNotExist:
-                                user_operation_model = None
-
-                            logger.debug(
-                                "[%s] Retrieving UserOperation with user-operation-hash=%s on tx-hash=%s",
-                                safe_address,
-                                user_operation_hash,
-                                ethereum_tx.tx_hash,
-                            )
-                            user_operation = (
-                                self.bundler_client.get_user_operation_by_hash(
-                                    user_operation_hash
-                                )
-                            )
-                            if not user_operation:
-                                self.bundler_client.get_user_operation_by_hash.cache_clear()
-                                raise BundlerClientException(
-                                    "user-operation=%s returned `null`",
-                                    user_operation_hash,
-                                )
-
-                            if not user_operation_model:
-                                logger.debug(
-                                    "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
-                                    safe_address,
-                                    user_operation_hash,
-                                    ethereum_tx.tx_hash,
-                                )
-                                user_operation_model = UserOperationModel.objects.create(
-                                    ethereum_tx=ethereum_tx,
-                                    hash=user_operation_hash,
-                                    sender=user_operation.sender,
-                                    nonce=user_operation.nonce,
-                                    init_code=user_operation.init_code,
-                                    call_data=user_operation.call_data,
-                                    call_data_gas_limit=user_operation.call_gas_limit,
-                                    verification_gas_limit=user_operation.verification_gas_limit,
-                                    pre_verification_gas=user_operation.pre_verification_gas,
-                                    max_fee_per_gas=user_operation.max_fee_per_gas,
-                                    max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
-                                    paymaster=user_operation.paymaster,
-                                    paymaster_data=user_operation.paymaster_data,
-                                    signature=user_operation.signature,
-                                    entry_point=user_operation.entry_point,
-                                )
-                            else:
-                                # Only update, UserOperation was added using our endpoint and now it was executed
-                                logger.debug(
-                                    "[%s] Updating UserOperation with user-operation=%s on tx-hash=%s",
-                                    safe_address,
-                                    user_operation_hash,
-                                    ethereum_tx.tx_hash,
-                                )
-                                user_operation_model.signature = (
-                                    user_operation.signature
-                                )
-                                user_operation_model.ethereum_tx = ethereum_tx
-                                user_operation_model.save(
-                                    update_fields=["signature", "ethereum_tx"]
-                                )
-
-                            # UserOperationReceipt
-                            logger.debug(
-                                "[%s] Retrieving UserOperation Receipt with user-operation-hash=%s on tx-hash=%s",
-                                safe_address,
-                                user_operation_hash,
-                                ethereum_tx.tx_hash,
-                            )
-                            user_operation_receipt = (
-                                self.bundler_client.get_user_operation_receipt(
-                                    user_operation_hash
-                                )
-                            )
-                            if not user_operation_receipt.success:
-                                raise UserOperationFailed(
-                                    f"UserOperation with user-operation-hash={user_operation_hash} failed"
-                                )
-
-                            # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
-                            # to get deposited funds
-                            deposited = user_operation_receipt.get_deposit()
-
-                            logger.debug(
-                                "[%s] Storing UserOperation Receipt with user-operation=%s on tx-hash=%s",
-                                safe_address,
-                                user_operation_hash,
-                                ethereum_tx.tx_hash,
-                            )
-
-                            UserOperationReceiptModel.objects.create(
-                                user_operation=user_operation_model,
-                                actual_gas_cost=user_operation_receipt.actual_gas_cost,
-                                actual_gas_used=user_operation_receipt.actual_gas_used,
-                                success=user_operation_receipt.success,
-                                reason=user_operation_receipt.reason,
-                                deposited=deposited,
-                            )
-
-                            # Build SafeOperation from UserOperation
-                            safe_operation = SafeOperation.from_user_operation(
-                                user_operation
-                            )
-
-                            # Find module address using event `ExecutionFromModuleSuccess (index_topic_1 address module)`
-                            if not (
-                                module_address := user_operation_receipt.get_module_address()
-                            ):
-                                raise ValueError(
-                                    "Cannot find ExecutionFromModuleSuccess for the Operation"
-                                )
-
-                            safe_operation_hash = (
-                                safe_operation.get_safe_operation_hash(
-                                    self.ethereum_client.get_chain_id(), module_address
-                                )
-                            )
-
-                            # Store SafeOperation
-                            safe_operation_model, created = (
-                                SafeOperationModel.objects.get_or_create(
-                                    hash=safe_operation_hash,
-                                    defaults={
-                                        "user_operation": user_operation_model,
-                                        "valid_after": datetime.fromtimestamp(
-                                            safe_operation.valid_after
-                                        ),
-                                        "valid_until": datetime.fromtimestamp(
-                                            safe_operation.valid_until
-                                        ),
-                                    },
-                                )
-                            )
-                            if not created:
-                                logger.debug(
-                                    "[%s] safe-operation-hash=%s for user-operation-hash=%s was already indexed",
-                                    safe_address,
-                                    HexBytes(safe_operation_hash).hex(),
-                                    user_operation_hash,
-                                )
-
-                except BundlerClientException as exc:
-                    logger.error(
-                        "[%s] Error retrieving user-operation-hash=%s from bundler API: %s",
-                        safe_address,
-                        user_operation_hash,
-                        exc,
-                    )
-                except ValueError as exc:
-                    logger.error(
-                        "[%s] Error processing user-operation-hash=%s: %s",
-                        safe_address,
-                        user_operation_hash,
-                        exc,
-                    )
-
-        return detected_user_operation
-
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
     ) -> bool:
@@ -593,16 +370,6 @@ class SafeTxProcessor(TxProcessor):
         arguments = internal_tx_decoded.arguments
         master_copy = internal_tx.to
         processed_successfully = True
-
-        # Detect Account Abstraction in this transaction
-        detected_4337_transaction = self.process_4337_transaction(
-            contract_address, ethereum_tx
-        )
-        logger.debug(
-            "[%s] Detected 4337 transaction: %s",
-            contract_address,
-            detected_4337_transaction,
-        )
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -765,6 +532,17 @@ class SafeTxProcessor(TxProcessor):
                         "operation": arguments["operation"],
                         "failed": failed,
                     },
+                )
+                # Detect 4337 UserOperations in this transaction
+                number_detected_user_operations = (
+                    self.aa_processor_service.process_aa_transaction(
+                        contract_address, ethereum_tx
+                    )
+                )
+                logger.debug(
+                    "[%s] Detected %d 4337 transaction(s)",
+                    contract_address,
+                    number_detected_user_operations,
                 )
 
             elif function_name == "approveHash":

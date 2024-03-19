@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 
 import factory
@@ -11,7 +12,6 @@ from gnosis.safe.safe_signature import SafeSignatureType
 from safe_transaction_service.history.tests import factories as history_factories
 
 from .. import models
-from ..constants import USER_OPERATION_SUPPORTED_ENTRY_POINTS
 
 
 class UserOperationFactory(DjangoModelFactory):
@@ -32,7 +32,7 @@ class UserOperationFactory(DjangoModelFactory):
     paymaster = NULL_ADDRESS
     paymaster_data = b""
     signature = b""
-    entry_point = list(USER_OPERATION_SUPPORTED_ENTRY_POINTS)[0]
+    entry_point = settings.ETHEREUM_4337_SUPPORTED_ENTRY_POINTS[0]
 
 
 class UserOperationReceiptFactory(DjangoModelFactory):

@@ -442,6 +442,14 @@ ETHEREUM_NODE_URL = env("ETHEREUM_NODE_URL", default=None)
 # Ethereum 4337 Bundler RPC
 # ------------------------------------------------------------------------------
 ETHEREUM_4337_BUNDLER_URL = env("ETHEREUM_4337_BUNDLER_URL", default=None)
+ETHEREUM_4337_SUPPORTED_ENTRY_POINTS = env.list(
+    "ETHEREUM_4337_SUPPORTED_ENTRY_POINTS",
+    default=["0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
+)
+ETHEREUM_4337_SUPPORTED_SAFE_MODULES = env.list(
+    "ETHEREUM_4337_SUPPORTED_SAFE_MODULES",
+    default=["0xa581c4A4DB7175302464fF3C06380BC3270b4037"],
+)
 
 # Tracing indexing configuration (not useful for L2 indexing)
 # ------------------------------------------------------------------------------

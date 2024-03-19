@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
 from django.db import transaction
 
 from eth_typing import ChecksumAddress, HexStr
@@ -17,7 +18,6 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
-from .constants import SAFE_OPERATION_MODULE_ADDRESSES
 from .models import SafeOperation
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
@@ -87,9 +87,9 @@ class SafeOperationSerializer(serializers.Serializer):
         module_address = attrs["module_address"]
         # TODO Check module_address is whitelisted
         # FIXME Check nonce higher than last executed nonce
-        if module_address not in SAFE_OPERATION_MODULE_ADDRESSES:
+        if module_address not in settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES:
             raise ValidationError(
-                f"Module-address={module_address} not supported, valid values are {SAFE_OPERATION_MODULE_ADDRESSES}"
+                f"Module-address={module_address} not supported, valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
             )
 
         valid_after = attrs["valid_after"] or 0
