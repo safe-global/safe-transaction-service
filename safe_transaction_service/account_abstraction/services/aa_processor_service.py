@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from functools import cache
 from typing import List, Optional, Sequence, Tuple
 
@@ -176,8 +175,8 @@ class AaProcessorService:
             hash=safe_operation_hash,
             defaults={
                 "user_operation": user_operation_model,
-                "valid_after": datetime.fromtimestamp(safe_operation.valid_after),
-                "valid_until": datetime.fromtimestamp(safe_operation.valid_until),
+                "valid_after": safe_operation.valid_after_as_datetime,
+                "valid_until": safe_operation.valid_until_as_datetime,
                 "module_address": module_address,
             },
         )
