@@ -123,9 +123,7 @@ class AaProcessorService:
         parsed_signatures = SafeSignature.parse_signature(
             signature,
             safe_operation_model.hash,
-            safe_operation.get_safe_operation_hash_preimage(
-                self.ethereum_client.get_chain_id(), safe_operation_model.module_address
-            ),
+            safe_operation.safe_operation_hash_preimage,
         )
 
         safe_operation_confirmations = []

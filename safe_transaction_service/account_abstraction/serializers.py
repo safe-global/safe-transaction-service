@@ -147,7 +147,7 @@ class SafeOperationSerializer(serializers.Serializer):
         safe_signatures = self._validate_signature(
             safe_address,
             safe_operation_hash,
-            safe_operation.get_safe_operation_hash_preimage(chain_id, module_address),
+            safe_operation.safe_operation_hash_preimage,
             attrs["signature"],
         )
         if not safe_signatures:
