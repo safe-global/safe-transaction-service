@@ -407,7 +407,17 @@ class AllTransactionsListView(ListAPIView):
             queued,
             trusted,
         )
-        return self.get_paginated_response(all_txs_serialized)
+        paginated_response = self.get_paginated_response(all_txs_serialized)
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s: %s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+            paginated_response.data["results"],
+        )
+        return paginated_response
 
     @swagger_auto_schema(
         responses={
