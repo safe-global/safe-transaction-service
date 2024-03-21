@@ -431,7 +431,7 @@ class AllTransactionsListView(ListAPIView):
         ],
     )
     def get(self, request, *args, **kwargs):
-        """
+        f"""
         Returns a paginated list of transactions for a Safe. The list has different structures depending on the
         transaction type:
         - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`. If the query parameter `queued=False` is
@@ -440,6 +440,7 @@ class AllTransactionsListView(ListAPIView):
         by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
+          Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
         Ordering_fields: ["execution_date"] eg: `execution_date` or `-execution_date`
         """
         address = kwargs["address"]
@@ -1094,13 +1095,13 @@ class SafeTransferListView(ListAPIView):
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
             ERC20Transfer.objects.to_or_from(address).token_txs()
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
             ERC721Transfer.objects.to_or_from(address).token_txs()
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_txs_for_address(address)
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         return InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
         )
@@ -1129,8 +1130,9 @@ class SafeTransferListView(ListAPIView):
         }
     )
     def get(self, request, address, format=None):
-        """
-        Returns ether/tokens transfers for a Safe
+        f"""
+        Returns ether/tokens transfers for a Safe.
+        Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1153,21 +1155,23 @@ class SafeIncomingTransferListView(SafeTransferListView):
         }
     )
     def get(self, *args, **kwargs):
-        """
-        Returns incoming ether/tokens transfers for a Safe
+        f"""
+        Returns incoming ether/tokens transfers for a Safe.
+        Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
         """
         return super().get(*args, **kwargs)
 
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
             ERC20Transfer.objects.incoming(address).token_txs()
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
             ERC721Transfer.objects.incoming(address).token_txs()
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_incoming_txs_for_address(address)
-        )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
+
         return InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
         )

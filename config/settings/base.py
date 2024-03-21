@@ -562,3 +562,8 @@ SWAGGER_SETTINGS = {
 # Shell Plus
 # ------------------------------------------------------------------------------
 SHELL_PLUS_PRINT_SQL_TRUNCATE = env.int("SHELL_PLUS_PRINT_SQL_TRUNCATE", default=10_000)
+
+# Endpoints
+TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS = env.int(
+    "TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS", default=1_000
+)  # Don't return more than 1_000 transfers
