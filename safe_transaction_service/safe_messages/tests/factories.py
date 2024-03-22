@@ -32,8 +32,6 @@ class SafeMessageConfirmationFactory(DjangoModelFactory):
     safe_message = factory.SubFactory(SafeMessageFactory)
     owner = factory.LazyAttribute(lambda o: o.signing_owner.address)
     signature = factory.LazyAttribute(
-        lambda o: o.signing_owner.signHash(o.safe_message.message_hash)[
-            "signature"
-        ].hex()
+        lambda o: o.signing_owner.signHash(o.safe_message.message_hash)["signature"]
     )
     signature_type = 2

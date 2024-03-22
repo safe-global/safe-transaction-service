@@ -87,13 +87,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
-                "preparedSignature": safe_message_confirmation.signature,
+                "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
                         "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
-                        "signature": safe_message_confirmation.signature,
+                        "signature": safe_message_confirmation.signature.hex(),
                         "signatureType": "EOA",
                     }
                 ],
@@ -123,13 +123,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
-                "preparedSignature": safe_message_confirmation.signature,
+                "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
                         "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
-                        "signature": safe_message_confirmation.signature,
+                        "signature": safe_message_confirmation.signature.hex(),
                         "signatureType": "EOA",
                     }
                 ],
@@ -339,7 +339,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         )
 
         # Test same signature
-        data["signature"] = safe_message_confirmation.signature
+        data["signature"] = safe_message_confirmation.signature.hex()
         response = self.client.post(
             reverse("v1:safe_messages:signatures", args=(safe_message.message_hash,)),
             format="json",
@@ -470,7 +470,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
-                        "preparedSignature": safe_message_confirmation.signature,
+                        "preparedSignature": safe_message_confirmation.signature.hex(),
                         "confirmations": [
                             {
                                 "created": datetime_to_str(
@@ -480,7 +480,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                                     safe_message_confirmation.modified
                                 ),
                                 "owner": safe_message_confirmation.owner,
-                                "signature": safe_message_confirmation.signature,
+                                "signature": safe_message_confirmation.signature.hex(),
                                 "signatureType": "EOA",
                             }
                         ],
@@ -517,7 +517,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
-                        "preparedSignature": safe_message_confirmation.signature,
+                        "preparedSignature": safe_message_confirmation.signature.hex(),
                         "confirmations": [
                             {
                                 "created": datetime_to_str(
@@ -527,7 +527,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                                     safe_message_confirmation.modified
                                 ),
                                 "owner": safe_message_confirmation.owner,
-                                "signature": safe_message_confirmation.signature,
+                                "signature": safe_message_confirmation.signature.hex(),
                                 "signatureType": "EOA",
                             }
                         ],
@@ -583,13 +583,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
-                "preparedSignature": safe_message_confirmation.signature,
+                "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
                         "modified": datetime_to_str(safe_message_confirmation.modified),
                         "owner": safe_message_confirmation.owner,
-                        "signature": safe_message_confirmation.signature,
+                        "signature": safe_message_confirmation.signature.hex(),
                         "signatureType": "EOA",
                     }
                 ],
