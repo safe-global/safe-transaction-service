@@ -29,7 +29,11 @@ class TestTokenViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(
             response.data,
-            {"detail": ErrorDetail(string="Not found.", code="not_found")},
+            {
+                "detail": ErrorDetail(
+                    string="No Token matches the given query.", code="not_found"
+                )
+            },
         )
 
         token = TokenFactory(address=random_address, decimals=18)  # ERC20
