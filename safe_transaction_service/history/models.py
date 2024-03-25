@@ -40,7 +40,7 @@ from web3.types import EventData
 from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
-    HexField,
+    HexV2Field,
     Keccak256Field,
     Uint256Field,
 )
@@ -1561,7 +1561,7 @@ class MultisigConfirmation(TimeStampedModel):
     )  # Use this while we don't have a `multisig_transaction`
     owner = EthereumAddressV2Field()
 
-    signature = HexField(null=True, default=None, max_length=MAX_SIGNATURE_LENGTH)
+    signature = HexV2Field(null=True, default=None, max_length=MAX_SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )

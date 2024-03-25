@@ -6,7 +6,7 @@ from django.db.models import JSONField
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
-from gnosis.eth.django.models import EthereumAddressV2Field, HexField, Keccak256Field
+from gnosis.eth.django.models import EthereumAddressV2Field, HexV2Field, Keccak256Field
 from gnosis.safe.safe_signature import SafeSignatureType
 
 logger = getLogger(__name__)
@@ -63,7 +63,7 @@ class SafeMessageConfirmation(TimeStampedModel):
         related_name="confirmations",
     )
     owner = EthereumAddressV2Field(db_index=True)
-    signature = HexField(max_length=SIGNATURE_LENGTH)
+    signature = HexV2Field(max_length=SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )
