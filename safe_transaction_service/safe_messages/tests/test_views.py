@@ -1,4 +1,3 @@
-import datetime
 import logging
 from unittest import mock
 from unittest.mock import MagicMock
@@ -26,17 +25,11 @@ from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
     SafeMessageFactory,
 )
+from safe_transaction_service.utils.utils import datetime_to_str
 
 from .mocks import get_eip712_payload_mock
 
 logger = logging.getLogger(__name__)
-
-
-def datetime_to_str(value: datetime.datetime) -> str:
-    value = value.isoformat()
-    if value.endswith("+00:00"):
-        value = value[:-6] + "Z"
-    return value
 
 
 class TestMessageViews(SafeTestCaseMixin, APITestCase):

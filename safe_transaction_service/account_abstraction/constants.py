@@ -17,6 +17,7 @@ EntryPoint v0.6.0 and 0.7.0
 
 from hexbytes import HexBytes
 
+USER_OPERATION_NUMBER_TOPICS = 4
 USER_OPERATION_EVENT_TOPICS = {
     HexBytes("0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f")
 }

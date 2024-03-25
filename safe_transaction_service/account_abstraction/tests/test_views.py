@@ -1,4 +1,3 @@
-import datetime
 import logging
 from unittest import mock
 from unittest.mock import MagicMock
@@ -25,18 +24,12 @@ from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignatureEOA
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from safe_transaction_service.utils.utils import datetime_to_str
+
 from .. import models
 from . import factories
 
 logger = logging.getLogger(__name__)
-
-
-# FIXME Refactor datetime_to_str
-def datetime_to_str(value: datetime.datetime) -> str:
-    value = value.isoformat()
-    if value.endswith("+00:00"):
-        value = value[:-6] + "Z"
-    return value
 
 
 class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):

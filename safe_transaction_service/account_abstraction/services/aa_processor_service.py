@@ -22,7 +22,7 @@ from gnosis.safe.safe_signature import SafeSignature
 
 from safe_transaction_service.history import models as history_models
 
-from ..constants import USER_OPERATION_EVENT_TOPICS
+from ..constants import USER_OPERATION_EVENT_TOPICS, USER_OPERATION_NUMBER_TOPICS
 from ..models import SafeOperation as SafeOperationModel
 from ..models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ..models import UserOperation as UserOperationModel
@@ -86,7 +86,7 @@ class AaProcessorService:
             log
             for log in logs
             if (
-                len(log["topics"]) == 4
+                len(log["topics"]) == USER_OPERATION_NUMBER_TOPICS
                 and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
                 and fast_to_checksum_address(log["address"])
                 in self.supported_entry_points  # Only index supported entryPoints
