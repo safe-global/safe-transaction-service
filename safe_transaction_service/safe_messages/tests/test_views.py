@@ -48,7 +48,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:safe_messages:message", args=(random_safe_message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json(), {"detail": "Not found."})
+        self.assertEqual(
+            response.json(), {"detail": "No SafeMessage matches the given query."}
+        )
         safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
         response = self.client.get(
             reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
@@ -544,7 +546,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:safe_messages:message", args=(random_safe_message_hash,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json(), {"detail": "Not found."})
+        self.assertEqual(
+            response.json(), {"detail": "No SafeMessage matches the given query."}
+        )
         safe_message = SafeMessageFactory(safe=self.deploy_test_safe_v1_1_1().address)
         response = self.client.get(
             reverse("v1:safe_messages:message", args=(safe_message.message_hash,))
