@@ -12,7 +12,7 @@ from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
 from gnosis.eth.account_abstraction import UserOperationMetadata
 from gnosis.eth.django.models import (
     EthereumAddressV2Field,
-    HexField,
+    HexV2Field,
     Keccak256Field,
     Uint256Field,
 )
