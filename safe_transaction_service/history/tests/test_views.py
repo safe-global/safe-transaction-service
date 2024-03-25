@@ -2465,7 +2465,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertIn("Not found", response.data["detail"])
+        self.assertEqual(
+            "No SafeContractDelegate matches the given query.", response.data["detail"]
+        )
 
         # Test previous otp
         hash_to_sign = DelegateSignatureHelper.calculate_hash(
@@ -2478,7 +2480,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertIn("Not found", response.data["detail"])
+        self.assertEqual(
+            "No SafeContractDelegate matches the given query.", response.data["detail"]
+        )
 
         hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address)
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
@@ -2488,7 +2492,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertIn("Not found", response.data["detail"])
+        self.assertEqual(
+            "No SafeContractDelegate matches the given query.", response.data["detail"]
+        )
 
         SafeContractDelegateFactory(
             safe_contract=safe_contract, delegate=delegate_address
