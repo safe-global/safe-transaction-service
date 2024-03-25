@@ -50,12 +50,13 @@ from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.contracts.models import Contract
+from safe_transaction_service.utils.constants import (
+    SIGNATURE_LENGTH as MAX_SIGNATURE_LENGTH,
+)
 
 from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
-
-MAX_SIGNATURE_LENGTH = 5_000
 
 
 class ConfirmationType(Enum):

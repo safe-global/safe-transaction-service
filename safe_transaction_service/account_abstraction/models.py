@@ -21,10 +21,9 @@ from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.history import models as history_models
+from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 
 logger = logging.getLogger(__name__)
-
-SIGNATURE_LENGTH = 5_000
 
 
 class UserOperation(models.Model):

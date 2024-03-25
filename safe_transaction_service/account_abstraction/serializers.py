@@ -15,6 +15,7 @@ from gnosis.eth.utils import fast_keccak
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
+from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
@@ -22,8 +23,6 @@ from .models import SafeOperation
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
 from .models import UserOperation as UserOperationModel
-
-SIGNATURE_LENGTH = 5_000
 
 
 # ================================================ #
