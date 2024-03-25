@@ -153,7 +153,7 @@ class SafeOperationConfirmation(TimeStampedModel):
         related_name="confirmations",
     )
     owner = EthereumAddressV2Field()
-    signature = HexField(null=True, default=None, max_length=SIGNATURE_LENGTH)
+    signature = HexV2Field(null=True, default=None, max_length=SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
         choices=[(tag.value, tag.name) for tag in SafeSignatureType], db_index=True
     )
