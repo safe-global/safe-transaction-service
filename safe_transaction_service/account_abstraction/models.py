@@ -16,7 +16,6 @@ from gnosis.eth.django.models import (
     Keccak256Field,
     Uint256Field,
 )
-from gnosis.safe.account_abstraction import SafeOperation
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignatureType
 
@@ -63,11 +62,10 @@ class UserOperation(models.Model):
         return f"UserOperation for {self.sender} with nonce {self.nonce}"
 
     @cached_property
-    def paymaster_and_data(self) -> Optional[bytes]:
+    def paymaster_and_data(self) -> Optional[HexBytes]:
         if self.paymaster and self.paymaster_data:
-            return HexBytes(self.paymaster) + HexBytes(self.paymaster_data)
+            return HexBytes(HexBytes(self.paymaster) + HexBytes(self.paymaster_data))
 
-    @cached_property
     def to_user_operation(self, add_tx_metadata: bool = False) -> UserOperationClass:
         """
         Returns a safe-eth-py UserOperation object
@@ -87,23 +85,23 @@ class UserOperation(models.Model):
         )
 
         return UserOperationClass(
-            self.user_operation_hash,
+            HexBytes(self.hash),
             self.sender,
             self.nonce,
-            bytes(self.init_code) if self.init_code else b"",
-            bytes(self.call_data) if self.call_data else b"",
+            HexBytes(self.init_code) if self.init_code else b"",
+            HexBytes(self.call_data) if self.call_data else b"",
             self.call_data_gas_limit,
             self.verification_gas_limit,
             self.pre_verification_gas,
             self.max_fee_per_gas,
             self.max_priority_fee_per_gas,
-            self.paymaster_and_data,
-            bytes(self.signature) if self.signature else b"",
+            self.paymaster_and_data if self.paymaster_and_data else b"",
+            HexBytes(self.signature) if self.signature else b"",
             self.entry_point,
             user_operation_metadata,
         )
 
-    def to_safe_operation(self) -> SafeOperation:
+    def to_safe_operation(self) -> SafeOperationClass:
         """
         :return: SafeOperation built from UserOperation
         :raises: ValueError
