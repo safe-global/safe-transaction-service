@@ -13,6 +13,7 @@ from gnosis.eth import EthereumClient
 
 from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,
+    UnexpectedProblemDecoding,
     get_safe_tx_decoder,
 )
 from safe_transaction_service.utils.utils import chunks
@@ -231,17 +232,18 @@ class InternalTxIndexer(EthereumIndexer):
             .iterator()
         ):
             try:
-                function_name, arguments = self.tx_decoder.decode_transaction(
-                    bytes(internal_tx.data)
-                )
+                data = bytes(internal_tx.data)
+                function_name, arguments = self.tx_decoder.decode_transaction(data)
                 yield InternalTxDecoded(
                     internal_tx=internal_tx,
                     function_name=function_name,
                     arguments=arguments,
                     processed=False,
                 )
-            except CannotDecode:
-                pass
+            except CannotDecode as exc:
+                logger.debug("Cannot decode %s: %s", data.hex(), exc)
+            except UnexpectedProblemDecoding as exc:
+                logger.warning("Unexpected problem decoding %s: %s", data.hex(), exc)
 
     def trace_transactions(
         self, tx_hashes: Sequence[HexStr], batch_size: int
