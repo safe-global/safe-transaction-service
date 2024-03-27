@@ -49,6 +49,9 @@ from gnosis.safe import SafeOperationEnum
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
+from safe_transaction_service.account_abstraction.constants import (
+    USER_OPERATION_EVENT_TOPICS,
+)
 from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.utils.constants import (
     SIGNATURE_LENGTH as MAX_SIGNATURE_LENGTH,
@@ -361,6 +364,17 @@ class EthereumTxManager(models.Manager):
             to=tx.get("to"),
             value=tx["value"],
             type=tx.get("type", 0),
+        )
+
+    def account_abstraction_txs(self) -> QuerySet["EthereumTx"]:
+        """
+        :return: Transactions containing ERC4337 `UserOperation` event
+        """
+        user_operation_event_topic = list(USER_OPERATION_EVENT_TOPICS)[0].hex()
+        query = '{"topics": ["' + user_operation_event_topic + '"]}'
+
+        return self.raw(
+            f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
         )
 
 
