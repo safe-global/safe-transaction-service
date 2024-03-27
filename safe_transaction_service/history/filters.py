@@ -6,7 +6,6 @@ from rest_framework.exceptions import ValidationError
 
 from gnosis.eth.django.filters import EthereumAddressFilter, Keccak256Filter
 from gnosis.eth.django.models import (
-    EthereumAddressField,
     EthereumAddressV2Field,
     Keccak256Field,
     Uint256Field,
@@ -17,7 +16,6 @@ from .models import ModuleTransaction, MultisigTransaction
 filter_overrides = {
     Uint256Field: {"filter_class": django_filters.NumberFilter},
     Keccak256Field: {"filter_class": Keccak256Filter},
-    EthereumAddressField: {"filter_class": EthereumAddressFilter},
     EthereumAddressV2Field: {"filter_class": EthereumAddressFilter},
 }
 
