@@ -44,6 +44,13 @@ swagger_urlpatterns = [
 urlpatterns_v1 = [
     path("", include("safe_transaction_service.history.urls", namespace="history")),
     path(
+        "",
+        include(
+            "safe_transaction_service.account_abstraction.urls",
+            namespace="account_abstraction",
+        ),
+    ),
+    path(
         "contracts/",
         include("safe_transaction_service.contracts.urls", namespace="contracts"),
     ),

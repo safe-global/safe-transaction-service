@@ -1,5 +1,9 @@
+"""
+Contains classes for processing indexed data and store Safe related models in database
+"""
+
+import logging
 from abc import ABC, abstractmethod
-from logging import getLogger
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
 from django.db import transaction
@@ -20,6 +24,10 @@ from gnosis.eth.contracts import (
 from gnosis.safe import SafeTx
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
 
+from safe_transaction_service.account_abstraction.services import (
+    AaProcessorService,
+    get_aa_processor_service,
+)
 from safe_transaction_service.safe_messages import models as safe_message_models
 
 from ..models import (
@@ -35,7 +43,7 @@ from ..models import (
     SafeStatus,
 )
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class TxProcessorException(Exception):
@@ -43,6 +51,10 @@ class TxProcessorException(Exception):
 
 
 class OwnerCannotBeRemoved(TxProcessorException):
+    pass
+
+
+class UserOperationFailed(TxProcessorException):
     pass
 
 
@@ -57,7 +69,12 @@ class SafeTxProcessorProvider:
                 if settings.ETHEREUM_TRACING_NODE_URL
                 else None
             )
-            cls.instance = SafeTxProcessor(ethereum_client, ethereum_tracing_client)
+
+            if not ethereum_tracing_client:
+                logger.warning("Ethereum tracing client was not configured")
+            cls.instance = SafeTxProcessor(
+                ethereum_client, ethereum_tracing_client, get_aa_processor_service()
+            )
         return cls.instance
 
     @classmethod
@@ -91,16 +108,19 @@ class SafeTxProcessor(TxProcessor):
         self,
         ethereum_client: EthereumClient,
         ethereum_tracing_client: Optional[EthereumClient],
+        aa_processor_service: AaProcessorService,
     ):
         """
         :param ethereum_client: Used for regular RPC calls
         :param ethereum_tracing_client: Used for RPC calls requiring trace methods. It's required to get
            previous traces for a given `InternalTx` if not found on database
+        :param aa_processor_service: Used for detecting and processing 4337 transactions
         """
 
         # This safe_tx_failure events allow us to detect a failed safe transaction
         self.ethereum_client = ethereum_client
         self.ethereum_tracing_client = ethereum_tracing_client
+        self.aa_processor_service = aa_processor_service
         dummy_w3 = Web3()
         self.safe_tx_failure_events = [
             get_safe_V1_0_0_contract(dummy_w3).events.ExecutionFailed(),
@@ -207,7 +227,7 @@ class SafeTxProcessor(TxProcessor):
             ) or SafeLastStatus.objects.get_or_generate(address)
             return safe_status
         except SafeLastStatus.DoesNotExist:
-            logger.error("SafeLastStatus not found for address=%s", address)
+            logger.error("[%s] SafeLastStatus not found", address)
 
     def is_version_breaking_signatures(
         self, old_safe_version: str, new_safe_version: str
@@ -246,10 +266,10 @@ class SafeTxProcessor(TxProcessor):
         contract_address = internal_tx._from
         if owner not in safe_status.owners:
             logger.error(
-                "Error processing trace=%s for contract=%s with tx-hash=%s. Cannot remove owner=%s . "
+                "[%s] Error processing trace=%s with tx-hash=%s. Cannot remove owner=%s . "
                 "Current owners=%s",
-                internal_tx.trace_address,
                 contract_address,
+                internal_tx.trace_address,
                 internal_tx.ethereum_tx_id,
                 owner,
                 safe_status.owners,
@@ -327,8 +347,12 @@ class SafeTxProcessor(TxProcessor):
         :return: True if tx could be processed, False otherwise
         """
         internal_tx = internal_tx_decoded.internal_tx
+        ethereum_tx = internal_tx.ethereum_tx
+        contract_address = internal_tx._from
+
         logger.debug(
-            "Start processing InternalTxDecoded in tx-hash=%s",
+            "[%s] Start processing InternalTxDecoded in tx-hash=%s",
+            contract_address,
             HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id).hex(),
         )
 
@@ -337,19 +361,19 @@ class SafeTxProcessor(TxProcessor):
             # this kind of functions due to little gas used. Some of this transactions get decoded as they were
             # valid in old versions of the proxies, like changes to `setup`
             logger.debug(
-                "Calling a non existing function, will not process it",
+                "[%s] Calling a non existing function, will not process it",
+                contract_address,
             )
             return False
 
         function_name = internal_tx_decoded.function_name
         arguments = internal_tx_decoded.arguments
-        contract_address = internal_tx._from
         master_copy = internal_tx.to
         processed_successfully = True
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
-            logger.debug("Processing Safe setup")
+            logger.debug("[%s] Processing Safe setup", contract_address)
             owners = arguments["_owners"]
             threshold = arguments["_threshold"]
             fallback_handler = arguments.get("fallbackHandler", NULL_ADDRESS)
@@ -386,7 +410,7 @@ class SafeTxProcessor(TxProcessor):
                 # Usually this happens from Safes coming from a not supported Master Copy
                 # TODO When archive node is available, build SafeStatus from blockchain status
                 logger.debug(
-                    "Cannot process trace as `SafeLastStatus` is not found for Safe=%s",
+                    "[%s] Cannot process trace as `SafeLastStatus` is not found",
                     contract_address,
                 )
                 processed_successfully = False
@@ -395,7 +419,9 @@ class SafeTxProcessor(TxProcessor):
                 "removeOwner",
                 "removeOwnerWithThreshold",
             ):
-                logger.debug("Processing owner/threshold modification")
+                logger.debug(
+                    "[%s] Processing owner/threshold modification", contract_address
+                )
                 safe_last_status.threshold = (
                     arguments["_threshold"] or safe_last_status.threshold
                 )  # Event doesn't have threshold
@@ -406,17 +432,17 @@ class SafeTxProcessor(TxProcessor):
                     self.swap_owner(internal_tx, safe_last_status, owner, None)
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "swapOwner":
-                logger.debug("Processing owner swap")
+                logger.debug("[%s] Processing owner swap", contract_address)
                 old_owner = arguments["oldOwner"]
                 new_owner = arguments["newOwner"]
                 self.swap_owner(internal_tx, safe_last_status, old_owner, new_owner)
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "changeThreshold":
-                logger.debug("Processing threshold change")
+                logger.debug("[%s] Processing threshold change", contract_address)
                 safe_last_status.threshold = arguments["_threshold"]
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "changeMasterCopy":
-                logger.debug("Processing master copy change")
+                logger.debug("[%s] Processing master copy change", contract_address)
                 # TODO Ban address if it doesn't have a valid master copy
                 old_safe_version = self.get_safe_version_from_master_copy(
                     safe_last_status.master_copy
@@ -436,7 +462,7 @@ class SafeTxProcessor(TxProcessor):
                     MultisigTransaction.objects.queued(contract_address).delete()
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "setFallbackHandler":
-                logger.debug("Setting FallbackHandler")
+                logger.debug("[%s] Setting FallbackHandler", contract_address)
                 safe_last_status.fallback_handler = arguments["handler"]
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "setGuard":
@@ -444,25 +470,24 @@ class SafeTxProcessor(TxProcessor):
                     arguments["guard"] if arguments["guard"] != NULL_ADDRESS else None
                 )
                 if safe_last_status.guard:
-                    logger.debug("Setting Guard")
+                    logger.debug("[%s] Setting Guard", contract_address)
                 else:
-                    logger.debug("Unsetting Guard")
+                    logger.debug("[%s] Unsetting Guard", contract_address)
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "enableModule":
-                logger.debug("Enabling Module")
+                logger.debug("[%s] Enabling Module", contract_address)
                 safe_last_status.enabled_modules.append(arguments["module"])
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "disableModule":
-                logger.debug("Disabling Module")
+                logger.debug("[%s] Disabling Module", contract_address)
                 safe_last_status.enabled_modules.remove(arguments["module"])
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name in {
                 "execTransactionFromModule",
                 "execTransactionFromModuleReturnData",
             }:
-                logger.debug("Executing Tx from Module")
+                logger.debug("[%s] Executing Tx from Module", contract_address)
                 # TODO Add test with previous traces for processing a module transaction
-                ethereum_tx = internal_tx.ethereum_tx
                 if "module" in arguments:
                     # L2 Safe with event SafeModuleTransaction indexed using events
                     module_address = arguments["module"]
@@ -479,7 +504,8 @@ class SafeTxProcessor(TxProcessor):
                     )
                     if not previous_trace:
                         message = (
-                            f"Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} "
+                            f"[{contract_address}] Cannot find previous trace for "
+                            f"tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} "
                             f"and trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)
@@ -507,11 +533,21 @@ class SafeTxProcessor(TxProcessor):
                         "failed": failed,
                     },
                 )
+                # Detect 4337 UserOperations in this transaction
+                number_detected_user_operations = (
+                    self.aa_processor_service.process_aa_transaction(
+                        contract_address, ethereum_tx
+                    )
+                )
+                logger.debug(
+                    "[%s] Detected %d 4337 transaction(s)",
+                    contract_address,
+                    number_detected_user_operations,
+                )
 
             elif function_name == "approveHash":
-                logger.debug("Processing hash approval")
+                logger.debug("[%s] Processing hash approval", contract_address)
                 multisig_transaction_hash = arguments["hashToApprove"]
-                ethereum_tx = internal_tx.ethereum_tx
                 if "owner" in arguments:  # Event approveHash
                     owner = arguments["owner"]
                 else:
@@ -524,7 +560,7 @@ class SafeTxProcessor(TxProcessor):
                     )
                     if not previous_trace:
                         message = (
-                            f"Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} and "
+                            f"[{contract_address}] Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} and "
                             f"trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)
@@ -550,7 +586,7 @@ class SafeTxProcessor(TxProcessor):
                     multisig_confirmation.ethereum_tx = ethereum_tx
                     multisig_confirmation.save(update_fields=["ethereum_tx"])
             elif function_name == "execTransaction":
-                logger.debug("Processing transaction execution")
+                logger.debug("[%s] Processing transaction execution", contract_address)
                 # Events for L2 Safes store information about nonce
                 nonce = (
                     arguments["nonce"]
@@ -588,8 +624,6 @@ class SafeTxProcessor(TxProcessor):
                     chain_id=self.ethereum_client.get_chain_id(),
                 )
                 safe_tx_hash = safe_tx.safe_tx_hash
-
-                ethereum_tx = internal_tx.ethereum_tx
 
                 failed = self.is_failed(ethereum_tx, safe_tx_hash)
                 multisig_tx, _ = MultisigTransaction.objects.get_or_create(
@@ -655,14 +689,17 @@ class SafeTxProcessor(TxProcessor):
                 safe_last_status.nonce = nonce + 1
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "execTransactionFromModule":
-                logger.debug("Not processing execTransactionFromModule")
+                logger.debug(
+                    "[%s] Not processing execTransactionFromModule", contract_address
+                )
                 # No side effects or nonce increasing, but trace will be set as processed
             else:
                 processed_successfully = False
                 logger.warning(
-                    "Cannot process InternalTxDecoded function_name=%s and arguments=%s",
+                    "[%s] Cannot process InternalTxDecoded function_name=%s and arguments=%s",
+                    contract_address,
                     function_name,
                     arguments,
                 )
-        logger.debug("End processing")
+        logger.debug("[%s] End processing", contract_address)
         return processed_successfully

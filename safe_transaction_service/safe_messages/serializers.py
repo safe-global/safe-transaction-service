@@ -27,7 +27,6 @@ class SafeMessageSignatureParserMixin:
         """
         :param safe_signatures:
         :param safe_address:
-        :param message_hash: Original hash of the message (not the one tied to the Safe)
         :param safe_message: Safe message database object (if already created)
         :return:
         :raises ValidationError:

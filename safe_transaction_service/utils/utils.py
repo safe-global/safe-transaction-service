@@ -1,3 +1,4 @@
+import datetime
 import socket
 from functools import wraps
 from itertools import islice
@@ -80,3 +81,14 @@ def close_gevent_db_connection_decorator(f):
 
 def parse_boolean_query_param(value: Union[bool, str, int]) -> bool:
     return value in (True, "True", "true", "1", 1)
+
+
+def datetime_to_str(value: datetime.datetime) -> str:
+    """
+    :param value: `datetime.datetime` value
+    :return: ``ISO 8601`` date with ``Z`` format
+    """
+    value = value.isoformat()
+    if value.endswith("+00:00"):
+        value = value[:-6] + "Z"
+    return value
