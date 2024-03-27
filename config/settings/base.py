@@ -401,9 +401,6 @@ LOGGING = {
         "safe_transaction_service.history.services.balance_service": {
             "level": "DEBUG" if DEBUG else "WARNING",
         },
-        "safe_transaction_service.history.indexers.tx_processor": {
-            "level": "DEBUG",
-        },
         "safe_transaction_service.history.services.collectibles_service": {
             "level": "DEBUG" if DEBUG else "WARNING",
         },
