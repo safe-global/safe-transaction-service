@@ -44,7 +44,9 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json(), {"detail": "No UserOperation matches the given query."})
+        self.assertEqual(
+            response.json(), {"detail": "No UserOperation matches the given query."}
+        )
         safe_address = Account.create().address
         safe_operation = factories.SafeOperationFactory(
             user_operation__sender=safe_address

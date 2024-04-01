@@ -1,4 +1,3 @@
-from typing import Self
 import datetime
 from decimal import Decimal
 from enum import Enum
@@ -11,6 +10,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Self,
     Sequence,
     Set,
     Tuple,
