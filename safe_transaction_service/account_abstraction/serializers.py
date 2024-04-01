@@ -59,7 +59,7 @@ class SafeOperationSerializer(serializers.Serializer):
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_operation_hash, safe_operation_hash_preimage
         )
-        signature_owners = set()
+        owners_processed = set()
         safe_signatures = []
         ethereum_client = EthereumClientProvider()
         for safe_signature in parsed_signatures:
@@ -73,10 +73,10 @@ class SafeOperationSerializer(serializers.Serializer):
                 raise ValidationError(
                     f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
                 )
-            if owner in signature_owners:
+            if owner in owners_processed:
                 raise ValidationError(f"Signature for owner={owner} is duplicated")
 
-            signature_owners.add(owner)
+            owners_processed.add(owner)
             safe_signatures.append(safe_signature)
         return safe_signatures
 

@@ -1,3 +1,4 @@
+from typing import Self
 import datetime
 from decimal import Decimal
 from enum import Enum
@@ -75,7 +76,7 @@ class EthereumTxCallType(Enum):
     STATIC_CALL = 3
 
     @staticmethod
-    def parse_call_type(call_type: Optional[str]):
+    def parse_call_type(call_type: Optional[str]) -> Optional[Self]:
         if not call_type:
             return None
 
