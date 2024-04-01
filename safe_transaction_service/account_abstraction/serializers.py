@@ -283,4 +283,4 @@ class SafeOperationResponseSerializer(serializers.Serializer):
         :return: Serialized queryset
         """
         signature = HexBytes(obj.safe_operation.build_signature())
-        return HexBytes(signature).hex() if signature else None
+        return signature.hex() if signature else None
