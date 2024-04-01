@@ -1806,6 +1806,15 @@ class SafeContractDelegateManager(models.Manager):
             .distinct()
         )
 
+    def remove_delegates_for_owner_in_safe(
+        self, safe_address: ChecksumAddress, owner_address: ChecksumAddress
+    ) -> int:
+        return (
+            self.filter(Q(safe_contract_id=safe_address))
+            .filter(delegator=owner_address)
+            .delete()[0]
+        )
+
 
 class SafeContractDelegate(models.Model):
     """

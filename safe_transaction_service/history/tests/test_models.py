@@ -1272,6 +1272,45 @@ class TestSafeContractDelegate(TestCase):
             set(),
         )
 
+    def test_remove_delegates_for_owner_in_safe(self):
+        safe_address = Account.create().address
+        owner = Account.create().address
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(None, [owner]), []
+        )
+
+        safe_contract_delegate = SafeContractDelegateFactory(
+            delegator=owner, safe_contract=None
+        )
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                Account.create().address, [owner]
+            ),
+            {safe_contract_delegate.delegate},
+        )
+
+        safe_specific_delegate = SafeContractDelegateFactory(
+            delegator=owner, safe_contract__address=safe_address
+        )
+
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [owner]
+            ),
+            {safe_contract_delegate.delegate, safe_specific_delegate.delegate},
+        )
+
+        SafeContractDelegate.objects.remove_delegates_for_owner_in_safe(
+            safe_address, owner
+        )
+
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [owner]
+            ),
+            {safe_contract_delegate.delegate},
+        )
+
 
 class TestMultisigConfirmations(TestCase):
     def test_remove_unused_confirmations(self):
