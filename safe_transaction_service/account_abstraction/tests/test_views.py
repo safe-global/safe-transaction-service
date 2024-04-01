@@ -44,7 +44,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json(), {"detail": "Not found."})
+        self.assertEqual(response.json(), {"detail": "No UserOperation matches the given query."})
         safe_address = Account.create().address
         safe_operation = factories.SafeOperationFactory(
             user_operation__sender=safe_address
@@ -94,16 +94,17 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = safe_operation_confirmation.signature
+        expected["preparedSignature"] = safe_operation_confirmation.signature.hex()
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
                 "modified": datetime_to_str(safe_operation_confirmation.modified),
                 "owner": safe_operation_confirmation.owner,
-                "signature": safe_operation_confirmation.signature,
+                "signature": safe_operation_confirmation.signature.hex(),
                 "signatureType": "EOA",
             }
         ]
+        self.maxDiff = None
         self.assertDictEqual(response.json(), expected)
 
     def test_safe_operations_view(self):
@@ -163,13 +164,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = safe_operation_confirmation.signature
+        expected["preparedSignature"] = safe_operation_confirmation.signature.hex()
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
                 "modified": datetime_to_str(safe_operation_confirmation.modified),
                 "owner": safe_operation_confirmation.owner,
-                "signature": safe_operation_confirmation.signature,
+                "signature": safe_operation_confirmation.signature.hex(),
                 "signatureType": "EOA",
             }
         ]
