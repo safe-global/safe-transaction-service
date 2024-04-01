@@ -104,13 +104,14 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
 ]
 LOCAL_APPS = [
+    "safe_transaction_service.account_abstraction.apps.AccountAbstractionConfig",
     "safe_transaction_service.analytics.apps.AnalyticsConfig",
     "safe_transaction_service.contracts.apps.ContractsConfig",
+    "safe_transaction_service.events.apps.EventsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
     "safe_transaction_service.notifications.apps.NotificationsConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
-    "safe_transaction_service.events.apps.EventsConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -434,6 +435,18 @@ REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 # Ethereum RPC
 # ------------------------------------------------------------------------------
 ETHEREUM_NODE_URL = env("ETHEREUM_NODE_URL", default=None)
+
+# Ethereum 4337 Bundler RPC
+# ------------------------------------------------------------------------------
+ETHEREUM_4337_BUNDLER_URL = env("ETHEREUM_4337_BUNDLER_URL", default=None)
+ETHEREUM_4337_SUPPORTED_ENTRY_POINTS = env.list(
+    "ETHEREUM_4337_SUPPORTED_ENTRY_POINTS",
+    default=["0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
+)
+ETHEREUM_4337_SUPPORTED_SAFE_MODULES = env.list(
+    "ETHEREUM_4337_SUPPORTED_SAFE_MODULES",
+    default=["0xa581c4A4DB7175302464fF3C06380BC3270b4037"],
+)
 
 # Tracing indexing configuration (not useful for L2 indexing)
 # ------------------------------------------------------------------------------

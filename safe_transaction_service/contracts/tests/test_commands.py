@@ -1,5 +1,5 @@
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 from django.test import TestCase
@@ -29,7 +29,7 @@ class TestCommands(TestCase):
         self.assertIn("Processing finished", buf.getvalue())
 
     @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=137)
-    def test_update_safe_contracts_logo(self, mock_chain_id):
+    def test_update_safe_contracts_logo(self, mock_chain_id: MagicMock):
         command = "update_safe_contracts_logo"
         buf = StringIO()
         random_contract = ContractFactory()

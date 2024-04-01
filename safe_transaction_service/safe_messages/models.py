@@ -9,9 +9,9 @@ from model_utils.models import TimeStampedModel
 from gnosis.eth.django.models import EthereumAddressV2Field, HexV2Field, Keccak256Field
 from gnosis.safe.safe_signature import SafeSignatureType
 
-logger = getLogger(__name__)
+from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 
-SIGNATURE_LENGTH = 5_000
+logger = getLogger(__name__)
 
 
 class SafeMessage(TimeStampedModel):

@@ -10,6 +10,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Self,
     Sequence,
     Set,
     Tuple,
@@ -49,13 +50,17 @@ from gnosis.safe import SafeOperationEnum
 from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
+from safe_transaction_service.account_abstraction.constants import (
+    USER_OPERATION_EVENT_TOPICS,
+)
 from safe_transaction_service.contracts.models import Contract
+from safe_transaction_service.utils.constants import (
+    SIGNATURE_LENGTH as MAX_SIGNATURE_LENGTH,
+)
 
 from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
-
-MAX_SIGNATURE_LENGTH = 5_000
 
 
 class ConfirmationType(Enum):
@@ -71,7 +76,7 @@ class EthereumTxCallType(Enum):
     STATIC_CALL = 3
 
     @staticmethod
-    def parse_call_type(call_type: Optional[str]):
+    def parse_call_type(call_type: Optional[str]) -> Optional[Self]:
         if not call_type:
             return None
 
@@ -253,7 +258,7 @@ class EthereumBlockManager(models.Manager):
                     f"Marking block as not confirmed"
                 )
 
-    @lru_cache(maxsize=10000)
+    @lru_cache(maxsize=10_000)
     def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:
         try:
             return self.values("timestamp").get(block_hash=block_hash)["timestamp"]
@@ -360,6 +365,17 @@ class EthereumTxManager(models.Manager):
             to=tx.get("to"),
             value=tx["value"],
             type=tx.get("type", 0),
+        )
+
+    def account_abstraction_txs(self) -> QuerySet["EthereumTx"]:
+        """
+        :return: Transactions containing ERC4337 `UserOperation` event
+        """
+        user_operation_event_topic = list(USER_OPERATION_EVENT_TOPICS)[0].hex()
+        query = '{"topics": ["' + user_operation_event_topic + '"]}'
+
+        return self.raw(
+            f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
         )
 
 
@@ -1143,7 +1159,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         return (
             self.pending_for_safes()
             .filter(internal_tx___from=safe_address)
-            .select_related("internal_tx")
+            .select_related("internal_tx", "internal_tx__ethereum_tx")
         )
 
     def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:

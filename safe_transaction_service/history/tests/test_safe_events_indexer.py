@@ -34,7 +34,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.safe_events_indexer = SafeEventsIndexer(
             self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
         )
-        self.safe_tx_processor = SafeTxProcessor(self.ethereum_client, None)
+        self.safe_tx_processor = SafeTxProcessor(self.ethereum_client, None, None)
 
     def tearDown(self) -> None:
         SafeEventsIndexerProvider.del_singleton()

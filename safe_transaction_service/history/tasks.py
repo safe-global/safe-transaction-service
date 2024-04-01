@@ -389,9 +389,7 @@ def process_decoded_internal_txs_for_safe_task(
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(self, lock_name_suffix=safe_address):
-            logger.info(
-                "Start processing decoded internal txs for safe %s", safe_address
-            )
+            logger.info("[%s] Start processing decoded internal txs", safe_address)
 
             tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
             index_service: IndexService = IndexServiceProvider()
@@ -413,21 +411,21 @@ def process_decoded_internal_txs_for_safe_task(
                     ).sorted_reverse_by_mined():
                         if safe_status.is_corrupted():
                             message = (
-                                f"Safe-address={safe_address} A problem was found in SafeStatus "
+                                f"[{safe_address}] A problem was found in SafeStatus "
                                 f"with nonce={safe_status.nonce} "
                                 f"on internal-tx-id={safe_status.internal_tx_id} "
                                 f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
                             )
                             logger.error(message)
                             logger.info(
-                                "Safe-address=%s Processing traces again",
+                                "[%s] Processing traces again",
                                 safe_address,
                             )
                             if reindex_master_copies and previous_safe_status:
                                 block_number = previous_safe_status.block_number
                                 to_block_number = safe_last_status.block_number
                                 logger.info(
-                                    "Safe-address=%s Last known not corrupted SafeStatus with nonce=%d on block=%d , "
+                                    "[%s] Last known not corrupted SafeStatus with nonce=%d on block=%d , "
                                     "reindexing until block=%d",
                                     safe_address,
                                     previous_safe_status.nonce,
@@ -441,7 +439,7 @@ def process_decoded_internal_txs_for_safe_task(
                                     addresses=[safe_address],
                                 )
                             logger.info(
-                                "Safe-address=%s Processing traces again after reindexing",
+                                "[%s] Processing traces again after reindexing",
                                 safe_address,
                             )
                             raise ValueError(message)
@@ -452,9 +450,7 @@ def process_decoded_internal_txs_for_safe_task(
 
             # Check if a new decoded tx appeared before other already processed (due to a reindex)
             if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
-                logger.error(
-                    "Found out of order transactions for Safe=%s", safe_address
-                )
+                logger.error("[%s] Found out of order transactions", safe_address)
                 tx_processor.clear_cache(safe_address)
                 index_service.reprocess_addresses([safe_address])
 
@@ -474,12 +470,14 @@ def process_decoded_internal_txs_for_safe_task(
                     )
                 )
 
-            logger.info("Processed %d decoded transactions", number_processed)
+            logger.info(
+                "[%s] Processed %d decoded transactions", safe_address, number_processed
+            )
             if number_processed:
                 logger.info(
-                    "%d decoded internal txs successfully processed for safe %s",
-                    number_processed,
+                    "[%s] %d decoded internal txs successfully processed",
                     safe_address,
+                    number_processed,
                 )
                 return number_processed
 

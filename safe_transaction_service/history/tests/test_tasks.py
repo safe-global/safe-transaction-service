@@ -218,16 +218,16 @@ class TestTasks(TestCase):
                         addresses=[safe_address],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} A problem was found in SafeStatus "
+                        f"[{safe_address}] A problem was found in SafeStatus "
                         f"with nonce=2 on internal-tx-id={safe_status_2.internal_tx_id}",
                         cm.output[1],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Processing traces again",
+                        f"[{safe_address}] Processing traces again",
                         cm.output[2],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Last known not corrupted SafeStatus with nonce=0 on "
+                        f"[{safe_address}] Last known not corrupted SafeStatus with nonce=0 on "
                         f"block={safe_status_0.internal_tx.ethereum_tx.block_id} , "
                         f"reindexing until block={safe_status_5.block_number}",
                         cm.output[3],
@@ -238,7 +238,7 @@ class TestTasks(TestCase):
                         cm.output[4],
                     )
                     self.assertIn(
-                        f"Safe-address={safe_address} Processing traces again after reindexing",
+                        f"[{safe_address}] Processing traces again after reindexing",
                         cm.output[5],
                     )
 
