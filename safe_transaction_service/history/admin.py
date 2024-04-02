@@ -11,9 +11,8 @@ from hexbytes import HexBytes
 from rest_framework.authtoken.admin import TokenAdmin
 
 from gnosis.eth import EthereumClientProvider
+from gnosis.eth.django.admin import AdvancedAdminSearchMixin
 from gnosis.safe import SafeTx
-
-from safe_transaction_service.utils.admin import AdvancedAdminSearchMixin
 
 from .models import (
     Chain,

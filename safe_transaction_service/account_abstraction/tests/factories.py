@@ -40,6 +40,11 @@ class UserOperationReceiptFactory(DjangoModelFactory):
         model = models.UserOperationReceipt
 
     user_operation = factory.SubFactory(UserOperationFactory)
+    actual_gas_cost = factory.fuzzy.FuzzyInteger(20, 50)
+    actual_gas_used = factory.fuzzy.FuzzyInteger(100, 200)
+    success = True
+    reason = ""
+    deposited = factory.fuzzy.FuzzyInteger(500, 1_000)
 
 
 class SafeOperationFactory(DjangoModelFactory):
