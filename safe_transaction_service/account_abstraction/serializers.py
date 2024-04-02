@@ -242,6 +242,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
     sender = eth_serializers.EthereumAddressField()
     user_operation_hash = eth_serializers.HexadecimalField(source="hash")
     safe_operation_hash = eth_serializers.HexadecimalField(source="safe_operation.hash")
+    ethereum_tx_hash = eth_serializers.HexadecimalField(source="ethereum_tx_id")
     nonce = serializers.IntegerField(min_value=0)
     init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
