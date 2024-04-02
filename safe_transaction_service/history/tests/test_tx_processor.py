@@ -103,9 +103,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 1)
         self.assertEqual(safe_status.threshold, threshold)
 
-        safe_contract = SafeContract.objects.get(address=safe_address)
         safe_contract_delegate = SafeContractDelegateFactory(
-            delegator=owner, safe_contract=safe_contract
+            delegator=owner, safe_contract_id=safe_address
         )
         self.assertEqual(
             SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
@@ -163,7 +162,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
         number_confirmations = MultisigConfirmation.objects.count()
         safe_contract_delegate_another_owner = SafeContractDelegateFactory(
-            delegator=another_owner, safe_contract=safe_contract
+            delegator=another_owner, safe_contract_id=safe_address
         )
         self.assertEqual(
             SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
