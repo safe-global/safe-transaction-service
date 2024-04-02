@@ -64,6 +64,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "nonce": safe_operation.user_operation.nonce,
             "userOperationHash": safe_operation.user_operation.hash,
             "safeOperationHash": safe_operation.hash,
+            "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
             "initCode": "0x",  # FIXME Should be None
             "callData": "0x",  # FIXME Should be None
             "callDataGasLimit": safe_operation.user_operation.call_data_gas_limit,
@@ -136,6 +137,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "nonce": safe_operation.user_operation.nonce,
             "userOperationHash": safe_operation.user_operation.hash,
             "safeOperationHash": safe_operation.hash,
+            "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
             "initCode": "0x",  # FIXME Should be None
             "callData": "0x",  # FIXME Should be None
             "callDataGasLimit": safe_operation.user_operation.call_data_gas_limit,
