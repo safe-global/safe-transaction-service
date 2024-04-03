@@ -4,8 +4,11 @@ from unittest.mock import MagicMock, PropertyMock
 from django.test import TestCase
 
 from gnosis.eth import EthereumClient
+from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from ..indexers import Erc20EventsIndexerProvider
 from ..models import (
+    ERC20Transfer,
     EthereumBlock,
     EthereumTx,
     IndexingStatus,
@@ -17,12 +20,13 @@ from .factories import (
     EthereumBlockFactory,
     EthereumTxFactory,
     ProxyFactoryFactory,
+    SafeContractFactory,
     SafeMasterCopyFactory,
 )
 from .mocks.mocks_internal_tx_indexer import block_child, block_parent
 
 
-class TestReorgService(TestCase):
+class TestReorgService(EthereumTestCaseMixin, TestCase):
     @mock.patch.object(EthereumClient, "get_blocks")
     @mock.patch.object(
         EthereumClient, "current_block_number", new_callable=PropertyMock
@@ -114,3 +118,40 @@ class TestReorgService(TestCase):
         self.assertEqual(proxy_factory.tx_block_number, expected_rewind_block)
         self.assertEqual(indexing_status.block_number, expected_rewind_block)
         self.assertEqual(safe_master_copy.tx_block_number, expected_rewind_block)
+
+    def test_reorg_with_indexer(self):
+        reorg_service = ReorgServiceProvider()
+        erc20_events_indexer = Erc20EventsIndexerProvider()
+        erc20_events_indexer.confirmations = 0
+        self.assertEqual(erc20_events_indexer.start(), (0, 0))
+
+        account = self.ethereum_test_account
+        amount = 10
+        erc20_contract = self.deploy_example_erc20(amount, account.address)
+
+        safe_contract = SafeContractFactory()
+        IndexingStatus.objects.set_erc20_721_indexing_status(0)
+        tx_hash = self.ethereum_client.erc20.send_tokens(
+            safe_contract.address, amount, erc20_contract.address, account.key
+        )
+        self.assertEqual(
+            erc20_events_indexer.start(),
+            (1, self.ethereum_client.current_block_number + 1),
+        )
+        self.assertEqual(len(ERC20Transfer.objects.all()), 1)
+
+        # Erc20/721 last indexed block number is stored on IndexingStatus
+        self.assertGreater(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
+        )
+        block = EthereumBlock.objects.last()
+        reorg_service.recover_from_reorg(block.number)
+
+        self.assertEqual(len(ERC20Transfer.objects.all()), 0)
+        with self.assertRaises(EthereumBlock.DoesNotExist):
+            EthereumBlock.objects.get(number=block.number)
+
+        erc20_events_indexer.start()
+
+        self.assertIsNotNone(EthereumBlock.objects.get(number=block.number))
+        self.assertEqual(len(ERC20Transfer.objects.all()), 1)

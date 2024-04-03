@@ -159,8 +159,9 @@ class ReorgService:
         safe_reorg_block_number = max(
             reorg_block_number - self.eth_reorg_rewind_blocks, 0
         )
-
+        erc20_indexer = Erc20EventsIndexerProvider()
         updated = self.reset_all_to_block(safe_reorg_block_number)
+        erc20_indexer.element_already_processed_checker.clear()
         number_deleted_blocks, _ = EthereumBlock.objects.filter(
             number__gte=reorg_block_number
         ).delete()
