@@ -38,6 +38,7 @@ from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeContractDelegate,
     SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
@@ -280,12 +281,20 @@ class SafeTxProcessor(TxProcessor):
 
         if not new_owner:
             safe_status.owners.remove(owner)
+            SafeContractDelegate.objects.remove_delegates_for_owner_in_safe(
+                safe_status.address, owner
+            )
         else:
             # Replace owner by new_owner in the same place of the list
+            old_owners = list(safe_status.owners)
             safe_status.owners = [
                 new_owner if current_owner == owner else current_owner
                 for current_owner in safe_status.owners
             ]
+            if old_owners != safe_status.owners:
+                SafeContractDelegate.objects.remove_delegates_for_owner_in_safe(
+                    safe_status.address, owner
+                )
         MultisigConfirmation.objects.remove_unused_confirmations(
             contract_address, safe_status.nonce, owner
         )

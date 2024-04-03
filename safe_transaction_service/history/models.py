@@ -1807,6 +1807,19 @@ class SafeContractDelegateManager(models.Manager):
             .distinct()
         )
 
+    def remove_delegates_for_owner_in_safe(
+        self, safe_address: ChecksumAddress, owner_address: ChecksumAddress
+    ) -> int:
+        """
+        This method deletes delegated users only if the safe address and the owner address match.
+        Used when an owner is removed from the Safe.
+
+        :return: number of delegated users deleted
+        """
+        return self.filter(
+            safe_contract_id=safe_address, delegator=owner_address
+        ).delete()[0]
+
 
 class SafeContractDelegate(models.Model):
     """

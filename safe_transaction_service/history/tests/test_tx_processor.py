@@ -24,6 +24,7 @@ from ..models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeContractDelegate,
     SafeLastStatus,
     SafeStatus,
 )
@@ -32,6 +33,7 @@ from .factories import (
     InternalTxDecodedFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
+    SafeContractDelegateFactory,
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
@@ -101,6 +103,16 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.nonce, 1)
         self.assertEqual(safe_status.threshold, threshold)
 
+        safe_contract_delegate = SafeContractDelegateFactory(
+            delegator=owner, safe_contract_id=safe_address
+        )
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [owner]
+            ),
+            {safe_contract_delegate.delegate},
+        )
+
         another_owner = Account.create().address
         tx_processor.process_decoded_transactions(
             [
@@ -120,6 +132,12 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.owners, [new_owner, another_owner])
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [owner]
+            ),
+            set(),
+        )
         self.assertEqual(safe_status.nonce, 2)
         self.assertEqual(safe_status.threshold, threshold)
 
@@ -143,6 +161,15 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
         number_confirmations = MultisigConfirmation.objects.count()
+        safe_contract_delegate_another_owner = SafeContractDelegateFactory(
+            delegator=another_owner, safe_contract_id=safe_address
+        )
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [another_owner]
+            ),
+            {safe_contract_delegate_another_owner.delegate},
+        )
         tx_processor.process_decoded_transactions(
             [
                 InternalTxDecodedFactory(
@@ -172,6 +199,12 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.owners, [new_owner])
+        self.assertEqual(
+            SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
+                safe_address, [another_owner]
+            ),
+            set(),
+        )
         self.assertEqual(safe_status.nonce, 3)
         self.assertEqual(safe_status.threshold, threshold)
 
