@@ -186,7 +186,7 @@ class AaProcessorService:
                 user_operation.user_operation_hash.hex(),
             )
         self.index_safe_operation_confirmations(
-            HexBytes(user_operation.signature), safe_operation_model, safe_operation
+            HexBytes(safe_operation.signature), safe_operation_model, safe_operation
         )
         return safe_operation_model, safe_operation
 

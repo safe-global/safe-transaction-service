@@ -47,11 +47,19 @@ class TestAaProcessorService(TestCase):
         )
         self.aa_processor_service.process_aa_transaction(aa_safe_address, ethereum_tx)
 
+        user_operation_model = UserOperationModel.objects.get()
+        safe_operation_model = SafeOperationModel.objects.get()
+        user_operation_receipt_model = UserOperationReceiptModel.objects.get()
+        user_operation_confirmation_model = SafeOperationConfirmationModel.objects.get()
+
         self.assertEqual(
-            UserOperationModel.objects.get().hash, aa_expected_user_operation_hash.hex()
+            user_operation_model.hash, aa_expected_user_operation_hash.hex()
         )
         self.assertEqual(
-            SafeOperationModel.objects.get().hash, aa_expected_safe_operation_hash.hex()
+            safe_operation_model.hash, aa_expected_safe_operation_hash.hex()
         )
-        self.assertEqual(UserOperationReceiptModel.objects.count(), 1)
-        self.assertEqual(SafeOperationConfirmationModel.objects.count(), 1)
+        self.assertEqual(user_operation_receipt_model.deposited, 759940285250436)
+        self.assertEqual(
+            user_operation_confirmation_model.owner,
+            "0x5aC255889882aCd3da2aA939679E3f3d4cea221e",
+        )
