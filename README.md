@@ -194,9 +194,9 @@ The `banned` field in the `SafeContract` model is used to prevent indexing of ce
 
 ## Troubleshooting
 
-### Issues installing grpc on a Mac M1
+### Issues installing grpc on an Apple silicon system
 
-If you face issues installing the `grpc` dependency locally (required by this project) on a M1 chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
+If you face issues installing the `grpc` dependency locally (required by this project) on a Apple silicon chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
 
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-transaction-service/graphs/contributors)
