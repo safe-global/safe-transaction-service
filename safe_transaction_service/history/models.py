@@ -28,6 +28,7 @@ from django.db import IntegrityError, connection, models, transaction
 from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
 from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
 from django.db.models.functions import Coalesce
+from django.db.models.query import RawQuerySet
 from django.db.models.signals import post_save
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -367,7 +368,7 @@ class EthereumTxManager(models.Manager):
             type=tx.get("type", 0),
         )
 
-    def account_abstraction_txs(self) -> QuerySet["EthereumTx"]:
+    def account_abstraction_txs(self) -> RawQuerySet:
         """
         :return: Transactions containing ERC4337 `UserOperation` event
         """

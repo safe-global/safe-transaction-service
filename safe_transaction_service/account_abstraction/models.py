@@ -58,8 +58,8 @@ class UserOperation(models.Model):
             Index(fields=["sender", "-nonce"]),
         ]
 
-    def __str__(self):
-        return f"UserOperation for {self.sender} with nonce {self.nonce}"
+    def __str__(self) -> str:
+        return f"{HexBytes(self.hash).hex()} UserOperation for sender={self.sender} with nonce={self.nonce}"
 
     @cached_property
     def paymaster_and_data(self) -> Optional[HexBytes]:
@@ -121,6 +121,9 @@ class UserOperationReceipt(models.Model):
     reason = models.CharField(max_length=256)
     deposited = Uint256Field()
 
+    def __str__(self) -> str:
+        return f"{HexBytes(self.user_operation_id).hex()} UserOperationReceipt"
+
 
 class SafeOperation(TimeStampedModel):
     hash = Keccak256Field(primary_key=True)  # safeOperationHash
@@ -130,6 +133,9 @@ class SafeOperation(TimeStampedModel):
     valid_after = models.DateTimeField(null=True)  # Epoch uint48
     valid_until = models.DateTimeField(null=True)  # Epoch uint48
     module_address = EthereumAddressV2Field(db_index=True)
+
+    def __str__(self) -> str:
+        return f"{HexBytes(self.hash).hex()} SafeOperation for user-operation={HexBytes(self.user_operation_id).hex()}"
 
     def build_signature(self) -> bytes:
         return b"".join(
@@ -165,4 +171,7 @@ class SafeOperationConfirmation(TimeStampedModel):
         ordering = ["created"]
 
     def __str__(self):
-        return f"Safe Operation Confirmation for owner={self.owner}"
+        return (
+            f"Safe Operation Confirmation of owner={self.owner} for "
+            f"safe-operation={HexBytes(self.safe_operation_id).hex()}"
+        )
