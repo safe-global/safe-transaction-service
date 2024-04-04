@@ -1722,7 +1722,7 @@ class SafeContractManager(models.Manager):
                             OR "history_erc721transfer"."_from" = %s
                         )
                     UNION ALL
-                    -- Get Ether Transfers
+                    -- Get Incoming Ether Transfers
                     SELECT COUNT(*)
                     FROM "history_internaltx"
                     WHERE (
@@ -1730,6 +1730,15 @@ class SafeContractManager(models.Manager):
                             AND "history_internaltx"."to" = %s
                             AND "history_internaltx"."value" > 0
                         )
+                    UNION ALL
+                    -- Get Outgoing Ether Transfers
+                    SELECT COUNT(*)
+                    FROM "history_internaltx"
+                    WHERE (
+                        "history_internaltx"."call_type" = 0
+                        AND  "history_internaltx"."_from" = %s
+                        AND "history_internaltx"."value" > 0
+                    )
                     UNION ALL
                     -- Get Module Transactions
                     SELECT COUNT(*)
