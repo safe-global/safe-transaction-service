@@ -338,6 +338,15 @@ class AllTransactionsListView(ListAPIView):
         cache_key = f"all-txs:{safe}:{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{ordering}:{relevant_elements}"
         lock_key = f"locks:{cache_key}"
 
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s cache-key=%s",
+            self.__class__.__name__,
+            safe,
+            executed,
+            queued,
+            trusted,
+            cache_key,
+        )
         if not cache_timeout:
             # Cache disabled
             return self.get_page_tx_identifiers(
