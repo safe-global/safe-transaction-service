@@ -33,6 +33,7 @@ from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
+from safe_transaction_service.utils.utils import datetime_to_str
 
 from ...utils.redis import get_redis
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
@@ -662,11 +663,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.json(),
             {
-                "created": module_transaction.created.isoformat().replace(
-                    "+00:00", "Z"
-                ),
-                "executionDate": module_transaction.internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "created": datetime_to_str(module_transaction.created),
+                "executionDate": datetime_to_str(
+                    module_transaction.internal_tx.ethereum_tx.block.timestamp
                 ),
                 "blockNumber": module_transaction.internal_tx.ethereum_tx.block_id,
                 "isSuccessful": not module_transaction.failed,
@@ -2612,8 +2611,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             [
                 {
                     "type": TransferType.ERC20_TRANSFER.name,
-                    "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                    "executionDate": datetime_to_str(
+                        ethereum_erc_20_event.ethereum_tx.block.timestamp
                     ),
                     "transferId": erc20_transfer_id,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
@@ -2635,8 +2634,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 },
                 {
                     "type": TransferType.ETHER_TRANSFER.name,
-                    "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                    "executionDate": datetime_to_str(
+                        internal_tx.ethereum_tx.block.timestamp
                     ),
                     "transferId": internal_tx_transfer_id,
                     "transactionHash": internal_tx.ethereum_tx_id,
@@ -2673,8 +2672,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             [
                 {
                     "type": TransferType.ERC721_TRANSFER.name,
-                    "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                    "executionDate": datetime_to_str(
+                        ethereum_erc_721_event.ethereum_tx.block.timestamp
                     ),
                     "transferId": erc721_transfer_id,
                     "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
@@ -2688,8 +2687,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 },
                 {
                     "type": TransferType.ERC20_TRANSFER.name,
-                    "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                    "executionDate": datetime_to_str(
+                        ethereum_erc_20_event.ethereum_tx.block.timestamp
                     ),
                     "transferId": erc20_transfer_id,
                     "transactionHash": ethereum_erc_20_event.ethereum_tx_id,
@@ -2711,8 +2710,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 },
                 {
                     "type": TransferType.ETHER_TRANSFER.name,
-                    "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                        "+00:00", "Z"
+                    "executionDate": datetime_to_str(
+                        internal_tx.ethereum_tx.block.timestamp
                     ),
                     "transferId": internal_tx_transfer_id,
                     "transactionHash": internal_tx.ethereum_tx_id,
@@ -2843,8 +2842,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected_results = [
             {
                 "type": TransferType.ERC20_TRANSFER.name,
-                "executionDate": ethereum_erc_20_event_2.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    ethereum_erc_20_event_2.ethereum_tx.block.timestamp
                 ),
                 "blockNumber": ethereum_erc_20_event_2.ethereum_tx.block_id,
                 "transferId": erc20_transfer_id_2,
@@ -2858,8 +2857,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
             {
                 "type": TransferType.ERC20_TRANSFER.name,
-                "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    ethereum_erc_20_event.ethereum_tx.block.timestamp
                 ),
                 "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
                 "transferId": erc20_transfer_id,
@@ -2881,8 +2880,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
             {
                 "type": TransferType.ETHER_TRANSFER.name,
-                "executionDate": internal_tx_2.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    internal_tx_2.ethereum_tx.block.timestamp
                 ),
                 "blockNumber": internal_tx_2.ethereum_tx.block_id,
                 "transferId": internal_tx_2_transfer_id,
@@ -2896,8 +2895,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
             {
                 "type": TransferType.ETHER_TRANSFER.name,
-                "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    internal_tx.ethereum_tx.block.timestamp
                 ),
                 "blockNumber": internal_tx.ethereum_tx.block_id,
                 "transferId": internal_tx_transfer_id,
@@ -2941,8 +2940,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         expected_results = [
             {
                 "type": TransferType.ERC721_TRANSFER.name,
-                "executionDate": ethereum_erc_721_event_2.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    ethereum_erc_721_event_2.ethereum_tx.block.timestamp
                 ),
                 "transactionHash": ethereum_erc_721_event_2.ethereum_tx_id,
                 "transferId": erc721_transfer_id_2,
@@ -2956,8 +2955,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
             {
                 "type": TransferType.ERC721_TRANSFER.name,
-                "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
-                    "+00:00", "Z"
+                "executionDate": datetime_to_str(
+                    ethereum_erc_721_event.ethereum_tx.block.timestamp
                 ),
                 "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
                 "transferId": erc721_transfer_id,
@@ -3079,9 +3078,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_result = {
             "type": TransferType.ETHER_TRANSFER.name,
-            "executionDate": internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                "+00:00", "Z"
-            ),
+            "executionDate": datetime_to_str(internal_tx.ethereum_tx.block.timestamp),
             "blockNumber": internal_tx.ethereum_tx.block_id,
             "transferId": transfer_id,
             "transactionHash": internal_tx.ethereum_tx_id,
@@ -3112,8 +3109,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_result = {
             "type": TransferType.ETHER_TRANSFER.name,
-            "executionDate": internal_tx_empty_trace_address.ethereum_tx.block.timestamp.isoformat().replace(
-                "+00:00", "Z"
+            "executionDate": datetime_to_str(
+                internal_tx_empty_trace_address.ethereum_tx.block.timestamp
             ),
             "blockNumber": internal_tx_empty_trace_address.ethereum_tx.block_id,
             "transferId": transfer_id_empty_trace_address,
@@ -3146,8 +3143,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_result = {
             "type": TransferType.ERC20_TRANSFER.name,
-            "executionDate": ethereum_erc_20_event.ethereum_tx.block.timestamp.isoformat().replace(
-                "+00:00", "Z"
+            "executionDate": datetime_to_str(
+                ethereum_erc_20_event.ethereum_tx.block.timestamp
             ),
             "blockNumber": ethereum_erc_20_event.ethereum_tx.block_id,
             "transferId": transfer_id,
@@ -3188,8 +3185,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_result = {
             "type": TransferType.ERC721_TRANSFER.name,
-            "executionDate": ethereum_erc_721_event.ethereum_tx.block.timestamp.isoformat().replace(
-                "+00:00", "Z"
+            "executionDate": datetime_to_str(
+                ethereum_erc_721_event.ethereum_tx.block.timestamp
             ),
             "transactionHash": ethereum_erc_721_event.ethereum_tx_id,
             "transferId": transfer_id,
@@ -3230,9 +3227,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            created_iso = internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                "+00:00", "Z"
-            )
+            created_iso = datetime_to_str(internal_tx.ethereum_tx.block.timestamp)
             expected = {
                 "created": created_iso,
                 "creator": internal_tx.ethereum_tx._from,
@@ -3283,10 +3278,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         format="json",
                     )
                     self.assertEqual(response.status_code, status.HTTP_200_OK)
-                    created_iso = (
-                        internal_tx.ethereum_tx.block.timestamp.isoformat().replace(
-                            "+00:00", "Z"
-                        )
+                    created_iso = datetime_to_str(
+                        internal_tx.ethereum_tx.block.timestamp
                     )
                     self.assertEqual(
                         response.data,
