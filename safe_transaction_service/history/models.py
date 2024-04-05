@@ -992,6 +992,12 @@ class InternalTx(models.Model):
                 include=["ethereum_tx_id", "block_number"],
                 condition=Q(call_type=0) & Q(value__gt=0),
             ),
+            Index(
+                name="history_internal_transfer_from",
+                fields=["_from", "timestamp"],
+                include=["ethereum_tx_id", "block_number"],
+                condition=Q(call_type=0) & Q(value__gt=0),
+            ),
         ]
 
     def __str__(self):
@@ -1705,7 +1711,7 @@ class SafeContractManager(models.Manager):
                             OR "history_erc721transfer"."_from" = %s
                         )
                     UNION ALL
-                    -- Get Ether Transfers
+                    -- Get Incoming Ether Transfers
                     SELECT COUNT(*)
                     FROM "history_internaltx"
                     WHERE (
@@ -1713,6 +1719,15 @@ class SafeContractManager(models.Manager):
                             AND "history_internaltx"."to" = %s
                             AND "history_internaltx"."value" > 0
                         )
+                    UNION ALL
+                    -- Get Outgoing Ether Transfers
+                    SELECT COUNT(*)
+                    FROM "history_internaltx"
+                    WHERE (
+                        "history_internaltx"."call_type" = 0
+                        AND  "history_internaltx"."_from" = %s
+                        AND "history_internaltx"."value" > 0
+                    )
                     UNION ALL
                     -- Get Module Transactions
                     SELECT COUNT(*)
@@ -1723,7 +1738,7 @@ class SafeContractManager(models.Manager):
 
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
-            cursor.execute(query, [hex_address] * 8)
+            cursor.execute(query, [hex_address] * 9)
             return cursor.fetchone()[0]
 
 
