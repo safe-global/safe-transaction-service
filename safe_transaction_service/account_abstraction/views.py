@@ -8,13 +8,15 @@ from rest_framework.response import Response
 from gnosis.eth.utils import fast_is_checksum_address
 
 from . import pagination, serializers
-from .models import UserOperation
+from .models import SafeOperation
 
 
 class SafeOperationView(RetrieveAPIView):
-    lookup_field = "safe_operation__hash"
+    lookup_field = "hash"
     lookup_url_kwarg = "safe_operation_hash"
-    queryset = UserOperation.objects.prefetch_related("safe_operation__confirmations")
+    queryset = SafeOperation.objects.prefetch_related("confirmations").select_related(
+        "user_operation"
+    )
     serializer_class = serializers.SafeOperationResponseSerializer
 
 
@@ -23,9 +25,17 @@ class SafeOperationsView(ListCreateAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
-    ordering = ["-nonce"]
-    ordering_fields = ["nonce"]
+    ordering = ["-user_operation__nonce"]
+    ordering_fields = ["user_operation__nonce"]
     pagination_class = pagination.DefaultPagination
+
+    def get_queryset(self):
+        safe = self.kwargs["address"]
+        return (
+            SafeOperation.objects.filter(user_operation__sender=safe)
+            .prefetch_related("confirmations")
+            .select_related("user_operation")
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -81,9 +91,3 @@ class SafeOperationsView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(status=status.HTTP_201_CREATED)
-
-    def get_queryset(self):
-        safe = self.kwargs["address"]
-        return UserOperation.objects.filter(sender=safe).prefetch_related(
-            "safe_operation__confirmations"
-        )

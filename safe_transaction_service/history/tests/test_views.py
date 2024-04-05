@@ -28,11 +28,13 @@ from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from safe_transaction_service.account_abstraction.tests import factories as aa_factories
 from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
+from safe_transaction_service.utils.utils import datetime_to_str
 
 from ...utils.redis import get_redis
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
@@ -3241,8 +3243,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "setup_data": None,
                 "data_decoded": None,
                 "transaction_hash": internal_tx.ethereum_tx_id,
+                "safe_operation": None,
             }
-            self.assertEqual(response.data, expected)
+            self.assertDictEqual(response.data, expected)
 
         # Next children internal_tx should not alter the result
         another_trace = dict(call_trace)
@@ -3258,7 +3261,45 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(response.data, expected)
+            self.assertDictEqual(response.data, expected)
+
+        # Test 4337 SafeOperation showing in the creation
+        safe_operation = aa_factories.SafeOperationFactory(
+            user_operation__ethereum_tx_id=internal_tx.ethereum_tx_id
+        )
+        response = self.client.get(
+            reverse("v1:history:safe-creation", args=(owner_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected["safe_operation"] = {
+            "created": datetime_to_str(safe_operation.created),
+            "modified": datetime_to_str(safe_operation.created),
+            "ethereum_tx_hash": internal_tx.ethereum_tx_id,
+            "sender": safe_operation.user_operation.sender,
+            "user_operation_hash": safe_operation.user_operation.hash,
+            "safe_operation_hash": safe_operation.hash,
+            "nonce": safe_operation.user_operation.nonce,
+            "init_code": "0x",
+            "call_data": "0x",
+            "call_data_gas_limit": safe_operation.user_operation.call_data_gas_limit,
+            "verification_gas_limit": safe_operation.user_operation.verification_gas_limit,
+            "pre_verification_gas": safe_operation.user_operation.pre_verification_gas,
+            "max_fee_per_gas": safe_operation.user_operation.max_fee_per_gas,
+            "max_priority_fee_per_gas": safe_operation.user_operation.max_priority_fee_per_gas,
+            "paymaster": safe_operation.user_operation.paymaster,
+            "paymaster_data": "0x",
+            "signature": "0x",
+            "entry_point": safe_operation.user_operation.entry_point,
+            "valid_after": datetime_to_str(safe_operation.valid_after),
+            "valid_until": datetime_to_str(safe_operation.valid_until),
+            "module_address": safe_operation.module_address,
+            "confirmations": [],
+            "prepared_signature": None,
+        }
+
+        self.assertDictEqual(response.data, expected)
+        safe_operation.delete()
 
         another_trace_2 = dict(call_trace)
         another_trace_2["traceAddress"] = [0]
@@ -3288,7 +3329,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                             "+00:00", "Z"
                         )
                     )
-                    self.assertEqual(
+                    self.assertDictEqual(
                         response.data,
                         {
                             "created": created_iso,
@@ -3298,6 +3339,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                             "master_copy": test_data["master_copy"],
                             "setup_data": test_data["setup_data"],
                             "data_decoded": data_decoded,
+                            "safe_operation": None,
                         },
                     )
 

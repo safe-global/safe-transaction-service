@@ -45,7 +45,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(
-            response.json(), {"detail": "No UserOperation matches the given query."}
+            response.json(), {"detail": "No SafeOperation matches the given query."}
         )
         safe_address = Account.create().address
         safe_operation = factories.SafeOperationFactory(
@@ -107,7 +107,6 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "signatureType": "EOA",
             }
         ]
-        self.maxDiff = None
         self.assertDictEqual(response.json(), expected)
 
     def test_safe_operations_view(self):
