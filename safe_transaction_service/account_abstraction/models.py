@@ -53,7 +53,6 @@ class UserOperation(models.Model):
     entry_point = EthereumAddressV2Field(db_index=True)
 
     class Meta:
-        unique_together = (("sender", "nonce"),)
         indexes = [
             Index(fields=["sender", "-nonce"]),
         ]
