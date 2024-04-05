@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
@@ -80,6 +81,19 @@ class SafeOperationSerializer(serializers.Serializer):
             safe_signatures.append(safe_signature)
         return safe_signatures
 
+    def validate_valid_until(self, value: Optional[int]) -> Optional[int]:
+        """
+        Make sure ``valid_until`` is not newer than current timestamp, so it will be valid for some time
+
+        :param value:
+        :return:
+        """
+        if value and value <= timezone.now():
+            raise ValidationError(
+                "`valid_until` cannot be newer than the current timestamp"
+            )
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
@@ -88,14 +102,15 @@ class SafeOperationSerializer(serializers.Serializer):
         # FIXME Check nonce higher than last executed nonce
         if module_address not in settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES:
             raise ValidationError(
-                f"Module-address={module_address} not supported, valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
+                f"Module-address={module_address} not supported, "
+                f"valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
             )
 
         valid_after = attrs["valid_after"] or 0
         valid_until = attrs["valid_until"] or 0
 
         # FIXME Check types
-        if valid_after > valid_until:
+        if valid_after and valid_until and valid_after > valid_until:
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
         safe_address = self.context["safe_address"]
