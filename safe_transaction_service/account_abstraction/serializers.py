@@ -81,25 +81,39 @@ class SafeOperationSerializer(serializers.Serializer):
             safe_signatures.append(safe_signature)
         return safe_signatures
 
-    def validate_valid_until(self, value: Optional[int]) -> Optional[int]:
+    def validate_valid_until(self, valid_until: Optional[int]) -> Optional[int]:
         """
         Make sure ``valid_until`` is not newer than current timestamp, so it will be valid for some time
-
-        :param value:
+        :param valid_until:
         :return:
         """
-        if value and value <= timezone.now():
+        if valid_until and valid_until <= timezone.now():
             raise ValidationError(
                 "`valid_until` cannot be newer than the current timestamp"
             )
-        return value
+        return valid_until
+
+    def validate_nonce(self, nonce: int) -> int:
+        """
+        Check nonce is higher than the last executed SafeOperation
+
+        :param nonce:
+        :return:
+        """
+        safe_address = self.context["safe_address"]
+        if (
+            UserOperationModel.objects.filter(sender=safe_address, nonce__gte=nonce)
+            .exclude(ethereum_tx=None)
+            .exists()
+        ):
+            raise ValidationError(f"Nonce={nonce} too low for safe={safe_address}")
+        return nonce
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
         module_address = attrs["module_address"]
         # TODO Check module_address is whitelisted
-        # FIXME Check nonce higher than last executed nonce
         if module_address not in settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES:
             raise ValidationError(
                 f"Module-address={module_address} not supported, "
@@ -108,31 +122,18 @@ class SafeOperationSerializer(serializers.Serializer):
 
         valid_after = attrs["valid_after"] or 0
         valid_until = attrs["valid_until"] or 0
-
-        # FIXME Check types
         if valid_after and valid_until and valid_after > valid_until:
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
         safe_address = self.context["safe_address"]
-        nonce = attrs["nonce"]
-        if (
-            UserOperationModel.objects.filter(sender=safe_address, nonce=nonce)
-            .exclude(ethereum_tx=None)
-            .exists()
-        ):
-            raise ValidationError(
-                f"UserOperation with nonce={nonce} for safe={safe_address} was already executed"
-            )
-
         # FIXME Check all these `None`
-
         paymaster = attrs["paymaster"] or b""
         paymaster_data = attrs["paymaster_data"] or b""
         attrs["paymaster_and_data"] = bytes(paymaster) + bytes(paymaster_data)
 
         safe_operation = SafeOperationClass(
             safe_address,
-            nonce,
+            attrs["nonce"],
             fast_keccak(attrs["init_code"] or b""),
             fast_keccak(attrs["call_data"] or b""),
             attrs["call_data_gas_limit"],
@@ -155,7 +156,7 @@ class SafeOperationSerializer(serializers.Serializer):
 
         if SafeOperationModel.objects.filter(hash=safe_operation_hash).exists():
             raise ValidationError(
-                f"SafeOperation with hash={safe_operation_hash} already exists"
+                f"SafeOperation with hash={safe_operation_hash.hex()} already exists"
             )
 
         safe_signatures = self._validate_signature(
