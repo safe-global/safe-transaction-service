@@ -137,9 +137,14 @@ class SafeService:
         except IOError as exc:
             raise NodeConnectionException from exc
 
-        safe_operation = aa_models.SafeOperation.objects.filter(
-            user_operation__ethereum_tx=creation_ethereum_tx
-        ).first()
+        safe_operation = (
+            aa_models.SafeOperation.objects.filter(
+                user_operation__ethereum_tx=creation_ethereum_tx,
+                user_operation__sender=safe_address,
+            )
+            .exclude(user_operation__init_code=None)
+            .first()
+        )
         return SafeCreationInfo(
             created_time,
             creator,

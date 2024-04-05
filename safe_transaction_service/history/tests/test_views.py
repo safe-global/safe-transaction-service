@@ -3212,9 +3212,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        owner_address = Account.create().address
+        safe_address = Account.create().address
         response = self.client.get(
-            reverse("v1:history:safe-creation", args=(owner_address,))
+            reverse("v1:history:safe-creation", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -3223,12 +3223,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         ):
             # Insert create contract internal tx
             internal_tx = InternalTxFactory(
-                contract_address=owner_address,
+                contract_address=safe_address,
                 trace_address="0,0",
                 ethereum_tx__status=1,
             )
             response = self.client.get(
-                reverse("v1:history:safe-creation", args=(owner_address,)),
+                reverse("v1:history:safe-creation", args=(safe_address,)),
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -3257,7 +3257,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             return_value=[another_trace],
         ):
             response = self.client.get(
-                reverse("v1:history:safe-creation", args=(owner_address,)),
+                reverse("v1:history:safe-creation", args=(safe_address,)),
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -3265,10 +3265,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Test 4337 SafeOperation showing in the creation
         safe_operation = aa_factories.SafeOperationFactory(
-            user_operation__ethereum_tx_id=internal_tx.ethereum_tx_id
+            user_operation__ethereum_tx_id=internal_tx.ethereum_tx_id,
+            user_operation__sender=safe_address,
+            user_operation__init_code=HexBytes("0x1234"),
         )
         response = self.client.get(
-            reverse("v1:history:safe-creation", args=(owner_address,)),
+            reverse("v1:history:safe-creation", args=(safe_address,)),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -3280,7 +3282,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "user_operation_hash": safe_operation.user_operation.hash,
             "safe_operation_hash": safe_operation.hash,
             "nonce": safe_operation.user_operation.nonce,
-            "init_code": "0x",
+            "init_code": "0x1234",
             "call_data": "0x",
             "call_data_gas_limit": safe_operation.user_operation.call_data_gas_limit,
             "verification_gas_limit": safe_operation.user_operation.verification_gas_limit,
@@ -3298,6 +3300,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "prepared_signature": None,
         }
 
+        self.assertIsNotNone(response.data["safe_operation"])
         self.assertDictEqual(response.data, expected)
         safe_operation.delete()
 
@@ -3320,7 +3323,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 with self.subTest(test_data=test_data, data_decoded=data_decoded):
                     another_trace_2["action"]["input"] = HexBytes(test_data["data"])
                     response = self.client.get(
-                        reverse("v1:history:safe-creation", args=(owner_address,)),
+                        reverse("v1:history:safe-creation", args=(safe_address,)),
                         format="json",
                     )
                     self.assertEqual(response.status_code, status.HTTP_200_OK)
