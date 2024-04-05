@@ -16,6 +16,8 @@ from gnosis.safe import Safe
 from gnosis.safe.exceptions import CannotRetrieveSafeInfoException
 from gnosis.safe.safe import SafeInfo
 
+from safe_transaction_service.account_abstraction import models as aa_models
+
 from ..exceptions import NodeConnectionException
 from ..models import InternalTx, SafeLastStatus, SafeMasterCopy
 
@@ -45,6 +47,7 @@ class SafeCreationInfo:
     master_copy: Optional[EthereumAddress]
     setup_data: Optional[bytes]
     transaction_hash: str
+    safe_operation: Optional[aa_models.SafeOperation]
 
 
 class SafeServiceProvider:
@@ -134,6 +137,14 @@ class SafeService:
         except IOError as exc:
             raise NodeConnectionException from exc
 
+        safe_operation = (
+            aa_models.SafeOperation.objects.filter(
+                user_operation__ethereum_tx=creation_ethereum_tx,
+                user_operation__sender=safe_address,
+            )
+            .exclude(user_operation__init_code=None)
+            .first()
+        )
         return SafeCreationInfo(
             created_time,
             creator,
@@ -141,6 +152,7 @@ class SafeService:
             master_copy,
             setup_data,
             creation_internal_tx.ethereum_tx_id,
+            safe_operation,
         )
 
     def get_safe_info(self, safe_address: ChecksumAddress) -> SafeInfo:

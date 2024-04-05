@@ -22,6 +22,7 @@ from gnosis.safe import Safe
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 from gnosis.safe.serializers import SafeMultisigTxSerializerV1
 
+from safe_transaction_service.account_abstraction import serializers as aa_serializers
 from safe_transaction_service.contracts.tx_decoder import (
     TxDecoderException,
     get_db_tx_decoder,
@@ -776,6 +777,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     master_copy = EthereumAddressField(allow_null=True)
     setup_data = HexadecimalField(allow_null=True)
     data_decoded = serializers.SerializerMethodField()
+    safe_operation = aa_serializers.SafeOperationResponseSerializer(allow_null=True)
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
         return get_data_decoded_from_data(obj.setup_data or b"")

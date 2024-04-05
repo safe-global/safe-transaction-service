@@ -251,31 +251,53 @@ class SafeOperationConfirmationResponseSerializer(serializers.Serializer):
 
 
 class SafeOperationResponseSerializer(serializers.Serializer):
-    created = serializers.DateTimeField(source="safe_operation.created")
-    modified = serializers.DateTimeField(source="safe_operation.modified")
-
-    sender = eth_serializers.EthereumAddressField()
-    user_operation_hash = eth_serializers.HexadecimalField(source="hash")
-    safe_operation_hash = eth_serializers.HexadecimalField(source="safe_operation.hash")
-    ethereum_tx_hash = eth_serializers.HexadecimalField(source="ethereum_tx_id")
-    nonce = serializers.IntegerField(min_value=0)
-    init_code = eth_serializers.HexadecimalField(allow_null=True)
-    call_data = eth_serializers.HexadecimalField(allow_null=True)
-    call_data_gas_limit = serializers.IntegerField(min_value=0)
-    verification_gas_limit = serializers.IntegerField(min_value=0)
-    pre_verification_gas = serializers.IntegerField(min_value=0)
-    max_fee_per_gas = serializers.IntegerField(min_value=0)
-    max_priority_fee_per_gas = serializers.IntegerField(min_value=0)
-    paymaster = eth_serializers.EthereumAddressField(allow_null=True)
-    paymaster_data = eth_serializers.HexadecimalField(allow_null=True)
-    signature = eth_serializers.HexadecimalField()
-    entry_point = eth_serializers.EthereumAddressField()
-    # Safe Operation fields
-    valid_after = serializers.DateTimeField(source="safe_operation.valid_after")
-    valid_until = serializers.DateTimeField(source="safe_operation.valid_until")
-    module_address = eth_serializers.EthereumAddressField(
-        source="safe_operation.module_address"
+    created = serializers.DateTimeField()
+    modified = serializers.DateTimeField()
+    ethereum_tx_hash = eth_serializers.HexadecimalField(
+        source="user_operation.ethereum_tx_id"
     )
+
+    # User Operation fields
+    sender = eth_serializers.EthereumAddressField(source="user_operation.sender")
+    user_operation_hash = eth_serializers.HexadecimalField(source="user_operation.hash")
+    safe_operation_hash = eth_serializers.HexadecimalField(source="hash")
+    nonce = serializers.IntegerField(min_value=0, source="user_operation.nonce")
+    init_code = eth_serializers.HexadecimalField(
+        allow_null=True, source="user_operation.init_code"
+    )
+    call_data = eth_serializers.HexadecimalField(
+        allow_null=True, source="user_operation.call_data"
+    )
+    call_data_gas_limit = serializers.IntegerField(
+        min_value=0, source="user_operation.call_data_gas_limit"
+    )
+    verification_gas_limit = serializers.IntegerField(
+        min_value=0, source="user_operation.verification_gas_limit"
+    )
+    pre_verification_gas = serializers.IntegerField(
+        min_value=0, source="user_operation.pre_verification_gas"
+    )
+    max_fee_per_gas = serializers.IntegerField(
+        min_value=0, source="user_operation.max_fee_per_gas"
+    )
+    max_priority_fee_per_gas = serializers.IntegerField(
+        min_value=0, source="user_operation.max_priority_fee_per_gas"
+    )
+    paymaster = eth_serializers.EthereumAddressField(
+        allow_null=True, source="user_operation.paymaster"
+    )
+    paymaster_data = eth_serializers.HexadecimalField(
+        allow_null=True, source="user_operation.paymaster_data"
+    )
+    signature = eth_serializers.HexadecimalField(source="user_operation.signature")
+    entry_point = eth_serializers.EthereumAddressField(
+        source="user_operation.entry_point"
+    )
+
+    # Safe Operation fields
+    valid_after = serializers.DateTimeField()
+    valid_until = serializers.DateTimeField()
+    module_address = eth_serializers.EthereumAddressField()
 
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
@@ -288,7 +310,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
         :return: Serialized queryset
         """
         return SafeOperationConfirmationResponseSerializer(
-            obj.safe_operation.confirmations, many=True
+            obj.confirmations, many=True
         ).data
 
     def get_prepared_signature(self, obj: SafeOperation) -> Optional[HexStr]:
@@ -298,5 +320,5 @@ class SafeOperationResponseSerializer(serializers.Serializer):
         :param obj: SafeOperation instance
         :return: Serialized queryset
         """
-        signature = HexBytes(obj.safe_operation.build_signature())
+        signature = HexBytes(obj.build_signature())
         return signature.hex() if signature else None
