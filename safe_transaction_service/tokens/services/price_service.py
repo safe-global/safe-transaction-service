@@ -194,6 +194,9 @@ class PriceService:
     def get_kraken_sgb_price(self) -> float:
         return self.kraken_client.get_sgb_usd_price()
 
+    def get_kraken_flare_price(self) -> float:
+        return self.kraken_client.get_flr_usd_price()
+
     def get_xdc_usd_price(self) -> float:
         return self.kucoin_client.get_xdc_usd_price()
 
@@ -296,9 +299,12 @@ class PriceService:
         ):
             return self.get_xdc_usd_price()
         elif self.ethereum_network in (
+            EthereumNetwork.FLARE_MAINNET,
+        ):
+            return self.get_kraken_flare_price()
+        elif self.ethereum_network in (
             EthereumNetwork.FLARE_TESTNET_COSTON,
             EthereumNetwork.SONGBIRD_CANARY_NETWORK,
-            EthereumNetwork.FLARE_MAINNET,
         ):
             return self.get_kraken_sgb_price()
         elif self.ethereum_network in (
