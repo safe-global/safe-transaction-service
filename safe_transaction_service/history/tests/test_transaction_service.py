@@ -59,6 +59,7 @@ class TestTransactionService(TestCase):
         ERC721TransferFactory(to=safe_address)
         ERC721TransferFactory(_from=safe_address)
         ModuleTransactionFactory(safe=safe_address)
+        # Incoming ether transfer
         InternalTxFactory(
             value=5, call_type=EthereumTxCallType.CALL.value, to=safe_address
         )
@@ -79,6 +80,31 @@ class TestTransactionService(TestCase):
 
         self.assertEqual(
             transaction_service.get_count_relevant_txs_for_safe(safe_address), 10
+        )
+
+        # Outgoing ether transfer
+        InternalTxFactory(
+            value=5, call_type=EthereumTxCallType.CALL.value, _from=safe_address
+        )
+
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 11
+        )
+
+        # InternalTxs without value are not returned
+        InternalTxFactory(
+            value=0, call_type=EthereumTxCallType.CALL.value, _from=safe_address
+        )
+
+        # InternalTxs without proper type are not returned
+        InternalTxFactory(
+            value=5,
+            call_type=EthereumTxCallType.DELEGATE_CALL.value,
+            _from=safe_address,
+        )
+
+        self.assertEqual(
+            transaction_service.get_count_relevant_txs_for_safe(safe_address), 11
         )
 
         # A different Safe must be empty
