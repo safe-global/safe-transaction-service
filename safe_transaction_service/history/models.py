@@ -1009,6 +1009,12 @@ class InternalTx(models.Model):
                 include=["ethereum_tx_id", "block_number"],
                 condition=Q(call_type=0) & Q(value__gt=0),
             ),
+            Index(
+                name="history_internal_transfer_from",
+                fields=["_from", "timestamp"],
+                include=["ethereum_tx_id", "block_number"],
+                condition=Q(call_type=0) & Q(value__gt=0),
+            ),
         ]
 
     def __str__(self):
@@ -1749,7 +1755,7 @@ class SafeContractManager(models.Manager):
 
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
-            cursor.execute(query, [hex_address] * 8)
+            cursor.execute(query, [hex_address] * 9)
             return cursor.fetchone()[0]
 
 
