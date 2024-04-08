@@ -144,10 +144,9 @@ class SafeOperationSerializer(serializers.Serializer):
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
         safe_address = self.context["safe_address"]
-        # FIXME Check all these `None`
         paymaster = attrs["paymaster"] or b""
         paymaster_data = attrs["paymaster_data"] or b""
-        attrs["paymaster_and_data"] = bytes(paymaster) + bytes(paymaster_data)
+        attrs["paymaster_and_data"] = HexBytes(paymaster) + HexBytes(paymaster_data)
 
         safe_operation = SafeOperationClass(
             safe_address,
