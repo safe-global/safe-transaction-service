@@ -153,8 +153,8 @@ class IndexService:
 
         try:
             current_block_number = self.ethereum_client.current_block_number
-        except IOError:
-            # If there's an error connecting to the node we consider the service as out of sync
+        except (IOError, ValueError):
+            # If there's an error connecting to the node or invalid response we consider the service as out of sync
             return False
 
         # Use number of reorg blocks to consider as not synced
