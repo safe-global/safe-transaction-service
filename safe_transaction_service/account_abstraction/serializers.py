@@ -49,6 +49,10 @@ class SafeOperationSerializer(serializers.Serializer):
     valid_until = serializers.DateTimeField(allow_null=True)  # Epoch uint48
     module_address = eth_serializers.EthereumAddressField()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ethereum_client = EthereumClientProvider()
+
     def _validate_signature(
         self,
         safe_address: ChecksumAddress,
@@ -62,7 +66,6 @@ class SafeOperationSerializer(serializers.Serializer):
         )
         owners_processed = set()
         safe_signatures = []
-        ethereum_client = EthereumClientProvider()
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
             if owner not in safe_owners:
@@ -70,7 +73,7 @@ class SafeOperationSerializer(serializers.Serializer):
                     f"Signer={owner} is not an owner. Current owners={safe_owners}. "
                     f"Safe-operation-hash={safe_operation_hash.hex()}"
                 )
-            if not safe_signature.is_valid(ethereum_client, safe_address):
+            if not safe_signature.is_valid(self.ethereum_client, safe_address):
                 raise ValidationError(
                     f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
                 )
@@ -81,24 +84,27 @@ class SafeOperationSerializer(serializers.Serializer):
             safe_signatures.append(safe_signature)
         return safe_signatures
 
-    def validate_valid_until(self, valid_until: Optional[int]) -> Optional[int]:
+    def validate_init_code(self, init_code: Optional[HexBytes]) -> Optional[HexBytes]:
         """
-        Make sure ``valid_until`` is not newer than current timestamp, so it will be valid for some time
-        :param valid_until:
-        :return:
+        Check `init_code` is not provided for already initialized contracts
+
+        :param init_code:
+        :return: `init_code`
         """
-        if valid_until and valid_until <= timezone.now():
-            raise ValidationError(
-                "`valid_until` cannot be newer than the current timestamp"
-            )
-        return valid_until
+        if init_code:
+            safe_address = self.context["safe_address"]
+            if self.ethereum_client.is_contract(safe_address):
+                raise ValidationError(
+                    "`init_code` must be empty as the contract was already initialized"
+                )
+        return init_code
 
     def validate_nonce(self, nonce: int) -> int:
         """
         Check nonce is higher than the last executed SafeOperation
 
         :param nonce:
-        :return:
+        :return: `nonce`
         """
         safe_address = self.context["safe_address"]
         if (
@@ -108,6 +114,18 @@ class SafeOperationSerializer(serializers.Serializer):
         ):
             raise ValidationError(f"Nonce={nonce} too low for safe={safe_address}")
         return nonce
+
+    def validate_valid_until(self, valid_until: Optional[int]) -> Optional[int]:
+        """
+        Make sure ``valid_until`` is not previous to the current timestamp, so it will be valid for some time
+        :param valid_until:
+        :return: `valid_until`
+        """
+        if valid_until and valid_until <= timezone.now():
+            raise ValidationError(
+                "`valid_until` cannot be previous to the current timestamp"
+            )
+        return valid_until
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

@@ -281,6 +281,28 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 },
             )
 
+        # Fake that Safe contract was already deployed, so `init_code` should not be provided
+        with mock.patch.object(
+            EthereumClient, "is_contract", autospec=True, return_value=True
+        ):
+            response = self.client.post(
+                reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(
+                response.data,
+                {
+                    "init_code": [
+                        ErrorDetail(
+                            string="`init_code` must be empty as the contract was already initialized",
+                            code="invalid",
+                        )
+                    ]
+                },
+            )
+
         response = self.client.post(
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
             format="json",
@@ -354,7 +376,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         self, get_chain_id_mock: MagicMock, get_owners_mock: MagicMock
     ):
         """
-        Don't allow valid_until newer than current timestamp
+        Don't allow `valid_until` previous to the current timestamp
         """
 
         account = Account.create()
@@ -410,7 +432,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "valid_until": [
                     ErrorDetail(
-                        string="`valid_until` cannot be newer than the current timestamp",
+                        string="`valid_until` cannot be previous to the current timestamp",
                         code="invalid",
                     )
                 ]
