@@ -441,7 +441,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             },
         )
 
-        # Fix `valid_until`, set it in the future
+        # Set valid_until in the future
         valid_until = timezone.now() + datetime.timedelta(minutes=90)
         data["valid_until"] = datetime_to_str(valid_until)
         new_safe_operation = dataclasses.replace(
