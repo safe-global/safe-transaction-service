@@ -118,6 +118,7 @@ class SafeOperationSerializer(serializers.Serializer):
     def validate_valid_until(self, valid_until: Optional[int]) -> Optional[int]:
         """
         Make sure ``valid_until`` is not previous to the current timestamp, so it will be valid for some time
+
         :param valid_until:
         :return: `valid_until`
         """
@@ -138,8 +139,10 @@ class SafeOperationSerializer(serializers.Serializer):
                 f"valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
             )
 
-        valid_after = attrs["valid_after"] or 0
-        valid_until = attrs["valid_until"] or 0
+        valid_after, valid_until = [
+            int(attrs[key].timestamp()) if attrs[key] else 0
+            for key in ("valid_after", "valid_until")
+        ]
         if valid_after and valid_until and valid_after > valid_until:
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
