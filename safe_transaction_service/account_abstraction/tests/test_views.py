@@ -1,3 +1,5 @@
+import dataclasses
+import datetime
 import logging
 from unittest import mock
 from unittest.mock import MagicMock
@@ -376,10 +378,11 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         self, get_chain_id_mock: MagicMock, get_owners_mock: MagicMock
     ):
         """
-        Don't allow `valid_until` previous to the current timestamp
+        Make sure `valid_until` checks are working
         """
 
         account = Account.create()
+        get_owners_mock.return_value = [account.address]
         safe_address = safe_4337_address
         user_operation_hash = safe_4337_user_operation_hash_mock
 
@@ -398,7 +401,6 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         )
 
         signature = account.signHash(safe_operation_hash)["signature"].hex()
-        get_owners_mock.return_value = []
         data = {
             "nonce": safe_operation.nonce,
             "init_code": user_operation.init_code.hex(),
@@ -438,3 +440,20 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 ]
             },
         )
+
+        # Set valid_until in the future
+        valid_until = timezone.now() + datetime.timedelta(minutes=90)
+        data["valid_until"] = datetime_to_str(valid_until)
+        new_safe_operation = dataclasses.replace(
+            safe_operation, valid_until=int(valid_until.timestamp())
+        )
+        safe_operation_hash = new_safe_operation.get_safe_operation_hash(
+            safe_4337_chain_id_mock, safe_4337_module_address_mock
+        )
+        data["signature"] = account.signHash(safe_operation_hash)["signature"].hex()
+        response = self.client.post(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
