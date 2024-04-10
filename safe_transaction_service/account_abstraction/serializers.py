@@ -1,3 +1,4 @@
+import datetime
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
@@ -12,7 +13,7 @@ from rest_framework.exceptions import ValidationError
 import gnosis.eth.django.serializers as eth_serializers
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.utils import fast_keccak
+from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
@@ -38,8 +39,7 @@ class SafeOperationSerializer(serializers.Serializer):
     pre_verification_gas = serializers.IntegerField(min_value=0)
     max_fee_per_gas = serializers.IntegerField(min_value=0)
     max_priority_fee_per_gas = serializers.IntegerField(min_value=0)
-    paymaster = eth_serializers.EthereumAddressField(allow_null=True)
-    paymaster_data = eth_serializers.HexadecimalField(allow_null=True)
+    paymaster_and_data = eth_serializers.HexadecimalField(allow_null=True)
     signature = eth_serializers.HexadecimalField(
         min_length=65, max_length=SIGNATURE_LENGTH
     )
@@ -99,6 +99,16 @@ class SafeOperationSerializer(serializers.Serializer):
                 )
         return init_code
 
+    def validate_module_address(
+        self, module_address: ChecksumAddress
+    ) -> ChecksumAddress:
+        if module_address not in settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES:
+            raise ValidationError(
+                f"Module-address={module_address} not supported, "
+                f"valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
+            )
+        return module_address
+
     def validate_nonce(self, nonce: int) -> int:
         """
         Check nonce is higher than the last executed SafeOperation
@@ -115,7 +125,26 @@ class SafeOperationSerializer(serializers.Serializer):
             raise ValidationError(f"Nonce={nonce} too low for safe={safe_address}")
         return nonce
 
-    def validate_valid_until(self, valid_until: Optional[int]) -> Optional[int]:
+    def validate_paymaster_and_data(
+        self, paymaster_and_data: Optional[HexBytes]
+    ) -> Optional[HexBytes]:
+        if paymaster_and_data:
+            if len(paymaster_and_data) < 20:
+                raise ValidationError(
+                    "`paymaster_and_data` length should be at least 20 bytes"
+                )
+
+            paymaster_address = fast_to_checksum_address(paymaster_and_data[:20])
+            if not self.ethereum_client.is_contract(paymaster_address):
+                raise ValidationError(
+                    f"paymaster={paymaster_address} was not found in blockchain"
+                )
+
+        return paymaster_and_data
+
+    def validate_valid_until(
+        self, valid_until: Optional[datetime.datetime]
+    ) -> Optional[datetime.datetime]:
         """
         Make sure ``valid_until`` is not previous to the current timestamp, so it will be valid for some time
 
@@ -131,14 +160,6 @@ class SafeOperationSerializer(serializers.Serializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
-        module_address = attrs["module_address"]
-        # TODO Check module_address is whitelisted
-        if module_address not in settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES:
-            raise ValidationError(
-                f"Module-address={module_address} not supported, "
-                f"valid values are {settings.ETHEREUM_4337_SUPPORTED_SAFE_MODULES}"
-            )
-
         valid_after, valid_until = [
             int(attrs[key].timestamp()) if attrs[key] else 0
             for key in ("valid_after", "valid_until")
@@ -147,10 +168,6 @@ class SafeOperationSerializer(serializers.Serializer):
             raise ValidationError("`valid_after` cannot be higher than `valid_until`")
 
         safe_address = self.context["safe_address"]
-        paymaster = attrs["paymaster"] or b""
-        paymaster_data = attrs["paymaster_data"] or b""
-        attrs["paymaster_and_data"] = HexBytes(paymaster) + HexBytes(paymaster_data)
-
         safe_operation = SafeOperationClass(
             safe_address,
             attrs["nonce"],
@@ -161,15 +178,17 @@ class SafeOperationSerializer(serializers.Serializer):
             attrs["pre_verification_gas"],
             attrs["max_fee_per_gas"],
             attrs["max_priority_fee_per_gas"],
-            fast_keccak(attrs["paymaster_and_data"]),
+            fast_keccak(attrs["paymaster_and_data"] or b""),
             valid_after,
             valid_until,
             attrs["entry_point"],
             attrs["signature"],
         )
 
+        module_address = attrs["module_address"]
         chain_id = get_chain_id()
         attrs["chain_id"] = chain_id
+
         safe_operation_hash = safe_operation.get_safe_operation_hash(
             chain_id, module_address
         )
@@ -198,14 +217,14 @@ class SafeOperationSerializer(serializers.Serializer):
             b"",
             self.context["safe_address"],
             self.validated_data["nonce"],
-            self.validated_data["init_code"],
-            self.validated_data["call_data"],
+            self.validated_data["init_code"] or b"",
+            self.validated_data["call_data"] or b"",
             self.validated_data["call_data_gas_limit"],
             self.validated_data["verification_gas_limit"],
             self.validated_data["pre_verification_gas"],
             self.validated_data["max_fee_per_gas"],
             self.validated_data["max_priority_fee_per_gas"],
-            self.validated_data["paymaster_and_data"],
+            self.validated_data["paymaster_and_data"] or b"",
             self.validated_data["signature"],
             self.validated_data["entry_point"],
         )

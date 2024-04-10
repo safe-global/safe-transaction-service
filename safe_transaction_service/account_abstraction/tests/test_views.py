@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from eth_account import Account
+from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
@@ -68,8 +69,8 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "userOperationHash": safe_operation.user_operation.hash,
             "safeOperationHash": safe_operation.hash,
             "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
-            "initCode": "0x",  # FIXME Should be None
-            "callData": "0x",  # FIXME Should be None
+            "initCode": "0x",
+            "callData": "0x",
             "callDataGasLimit": safe_operation.user_operation.call_data_gas_limit,
             "verificationGasLimit": safe_operation.user_operation.verification_gas_limit,
             "preVerificationGas": safe_operation.user_operation.pre_verification_gas,
@@ -227,8 +228,11 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "pre_verification_gas": user_operation.pre_verification_gas,
             "max_fee_per_gas": user_operation.max_fee_per_gas,
             "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
-            "paymaster": user_operation.paymaster,
-            "paymaster_data": user_operation.paymaster_data,
+            "paymaster_and_data": (
+                user_operation.paymaster_and_data
+                if user_operation.paymaster_and_data
+                else None
+            ),
             "signature": signature,
             "entry_point": user_operation.entry_point,
             # Safe Operation fields,
@@ -410,8 +414,11 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "pre_verification_gas": user_operation.pre_verification_gas,
             "max_fee_per_gas": user_operation.max_fee_per_gas,
             "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
-            "paymaster": user_operation.paymaster,
-            "paymaster_data": user_operation.paymaster_data,
+            "paymaster_and_data": (
+                user_operation.paymaster_and_data
+                if user_operation.paymaster_and_data
+                else None
+            ),
             "signature": signature,
             "entry_point": user_operation.entry_point,
             # Safe Operation fields,
@@ -457,3 +464,115 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @mock.patch(
+        "safe_transaction_service.account_abstraction.serializers.get_safe_owners",
+    )
+    @mock.patch.object(
+        EthereumClient,
+        "get_chain_id",
+        autospec=True,
+        return_value=safe_4337_chain_id_mock,
+    )
+    def test_safe_operation_paymaster_and_data_create_view(
+        self, get_chain_id_mock: MagicMock, get_owners_mock: MagicMock
+    ):
+        """
+        Make sure `valid_until` checks are working
+        """
+
+        account = Account.create()
+        get_owners_mock.return_value = [account.address]
+        safe_address = safe_4337_address
+        user_operation_hash = safe_4337_user_operation_hash_mock
+
+        paymaster_address = Account.create().address
+        paymaster_and_data = HexBytes(paymaster_address)
+        user_operation = dataclasses.replace(
+            UserOperationClass.from_bundler_response(
+                user_operation_hash.hex(), user_operation_mock["result"]
+            ),
+            paymaster_and_data=paymaster_and_data,
+        )
+
+        safe_operation = SafeOperationClass.from_user_operation(user_operation)
+        safe_operation_hash = safe_operation.get_safe_operation_hash(
+            safe_4337_chain_id_mock, safe_4337_module_address_mock
+        )
+
+        signature = account.signHash(safe_operation_hash)["signature"].hex()
+        data = {
+            "nonce": safe_operation.nonce,
+            "init_code": user_operation.init_code.hex(),
+            "call_data": user_operation.call_data.hex(),
+            "call_data_gas_limit": user_operation.call_gas_limit,
+            "verification_gas_limit": user_operation.verification_gas_limit,
+            "pre_verification_gas": user_operation.pre_verification_gas,
+            "max_fee_per_gas": user_operation.max_fee_per_gas,
+            "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
+            "paymaster_and_data": "0x00",
+            "signature": signature,
+            "entry_point": user_operation.entry_point,
+            # Safe Operation fields,
+            "valid_after": (
+                datetime_to_str(safe_operation.valid_after_as_datetime)
+                if safe_operation.valid_after
+                else None
+            ),
+            "valid_until": (
+                datetime_to_str(safe_operation.valid_after_as_datetime)
+                if safe_operation.valid_after
+                else None
+            ),
+            "module_address": safe_4337_module_address_mock,
+        }
+        response = self.client.post(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "paymaster_and_data": [
+                    ErrorDetail(
+                        string="`paymaster_and_data` length should be at least 20 bytes",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Set valid paymaster_and_data
+        data["paymaster_and_data"] = paymaster_and_data.hex()
+        response = self.client.post(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "paymaster_and_data": [
+                    ErrorDetail(
+                        string=f"paymaster={paymaster_address} was not found in blockchain",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        with mock.patch.object(
+            EthereumClient,
+            "is_contract",
+            autospec=True,
+            side_effect=[False, True],
+        ):
+            response = self.client.post(
+                reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
