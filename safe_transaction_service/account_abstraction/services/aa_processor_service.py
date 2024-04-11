@@ -35,10 +35,6 @@ class AaProcessorServiceException(Exception):
     pass
 
 
-class UserOperationFailed(AaProcessorServiceException):
-    pass
-
-
 class ExecutionFromSafeModuleNotDetected(AaProcessorServiceException):
     pass
 
@@ -213,8 +209,11 @@ class AaProcessorService:
             user_operation_hash
         )
         if not user_operation_receipt.success:
-            raise UserOperationFailed(
-                f"UserOperation with user-operation-hash={user_operation_hash} failed"
+            logger.info(
+                "[%s] UserOperation user-operation-hash=%s on tx-hash=%s failed, indexing either way",
+                safe_address,
+                user_operation_hash,
+                tx_hash,
             )
 
         # Use event `Deposited (index_topic_1 address account, uint256 totalDeposit)`
