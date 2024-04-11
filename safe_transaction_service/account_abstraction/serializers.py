@@ -146,7 +146,7 @@ class SafeOperationSerializer(serializers.Serializer):
         self, valid_until: Optional[datetime.datetime]
     ) -> Optional[datetime.datetime]:
         """
-        Make sure ``valid_until`` is not previous to the current timestamp, so it will be valid for some time
+        Make sure ``valid_until`` is not previous to the current timestamp
 
         :param valid_until:
         :return: `valid_until`
