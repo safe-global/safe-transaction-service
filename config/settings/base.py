@@ -228,8 +228,10 @@ CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=0)
 
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
-CELERY_BROKER_CONNECTION_MAX_RETRIES = env.int(
-    "CELERY_BROKER_CONNECTION_MAX_RETRIES", default=0
+CELERY_BROKER_CONNECTION_MAX_RETRIES = (
+    value
+    if (value := env.int("CELERY_BROKER_CONNECTION_MAX_RETRIES", default=-1)) > 0
+    else None
 )
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-channel-error-retry
 CELERY_BROKER_CHANNEL_ERROR_RETRY = env.bool(
