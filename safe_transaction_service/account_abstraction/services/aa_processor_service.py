@@ -142,7 +142,7 @@ class AaProcessorService:
         user_operation_model: UserOperationModel,
         user_operation: UserOperation,
         user_operation_receipt: UserOperationReceipt,
-    ) -> Tuple[SafeOperationModel, SafeOperation]:
+    ) -> Optional[Tuple[SafeOperationModel, SafeOperation]]:
         """
         Creates or updates a Safe Operation
 
@@ -153,9 +153,20 @@ class AaProcessorService:
         """
 
         if not (module_address := user_operation_receipt.get_module_address()):
-            raise ExecutionFromSafeModuleNotDetected(
-                f"Cannot find ExecutionFromModuleSuccess for user-operation-hash={user_operation.user_operation_hash.hex()}"
-            )
+            if user_operation_receipt.get_deployed_account():
+                # UserOperation `initCode` was executed but `callData` failed, so account was deployed but no
+                # SafeOperation was executed
+                logger.info(
+                    "[%s] user-operation-hash=%s was reverted but contract was deployed",
+                    user_operation_model.sender,
+                    user_operation.user_operation_hash.hex(),
+                )
+                return None
+            else:
+                raise ExecutionFromSafeModuleNotDetected(
+                    f"Cannot find ExecutionFromModuleSuccess or ExecutionFromModuleFailure events for "
+                    f"user-operation-hash={user_operation.user_operation_hash.hex()}"
+                )
 
         # Build SafeOperation from UserOperation
         safe_operation = SafeOperation.from_user_operation(user_operation)
