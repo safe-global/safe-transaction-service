@@ -13,8 +13,10 @@ from rest_framework.exceptions import ValidationError
 import gnosis.eth.django.serializers as eth_serializers
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
+from gnosis.eth.contracts import get_safe_V1_4_1_contract
 from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
+from gnosis.safe.proxy_factory import ProxyFactoryV141
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
@@ -52,6 +54,14 @@ class SafeOperationSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ethereum_client = EthereumClientProvider()
+        self._deployment_owners: List[ChecksumAddress] = []
+
+    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+        """
+        :param safe_address:
+        :return: Current blockchain owners if Safe is deployed, otherwise `init_code` decoded owners
+        """
+        return self._deployment_owners or get_safe_owners(safe_address)
 
     def _validate_signature(
         self,
@@ -60,7 +70,7 @@ class SafeOperationSerializer(serializers.Serializer):
         safe_operation_hash_preimage: bytes,
         signature: bytes,
     ) -> List[SafeSignature]:
-        safe_owners = get_safe_owners(safe_address)
+        safe_owners = self._get_owners(safe_address)
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_operation_hash, safe_operation_hash_preimage
         )
@@ -91,12 +101,48 @@ class SafeOperationSerializer(serializers.Serializer):
         :param init_code:
         :return: `init_code`
         """
+        safe_address = self.context["safe_address"]
+        safe_is_deployed = self.ethereum_client.is_contract(safe_address)
         if init_code:
-            safe_address = self.context["safe_address"]
-            if self.ethereum_client.is_contract(safe_address):
+            if safe_is_deployed:
                 raise ValidationError(
                     "`init_code` must be empty as the contract was already initialized"
                 )
+            factory_address = fast_to_checksum_address(init_code[:20])
+            factory_data = init_code[20:]
+            if not self.ethereum_client.is_contract(factory_address):
+                raise ValidationError(
+                    f"`init_code` factory-address={factory_address} is not initialized"
+                )
+
+            # Decode data to check for a valid ProxyFactory Safe deployment
+            proxy_factory = ProxyFactoryV141(factory_address, self.ethereum_client)
+            safe_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
+            try:
+                _, data = proxy_factory.contract.decode_function_input(factory_data)
+                initializer = data.pop("initializer")
+                _, safe_deployment_data = safe_contract.decode_function_input(
+                    initializer
+                )
+            except ValueError:
+                raise ValidationError("Cannot decode data")
+
+            singleton = data.pop("_singleton")
+            salt_nonce = data.pop("saltNonce")
+            calculated_safe_address = proxy_factory.calculate_proxy_address(
+                singleton, initializer, salt_nonce, chain_specific=False
+            )
+            if calculated_safe_address != safe_address:
+                raise ValidationError(
+                    f"Provided safe-address={safe_address} does not match calculated-safe-address={calculated_safe_address}"
+                )
+            # Store owners used for deployment, to do checks afterward
+            self._deployment_owners = safe_deployment_data.pop("_owners")
+        elif not safe_is_deployed:
+            raise ValidationError(
+                "`init_code` was not provided and contract was not initialized"
+            )
+
         return init_code
 
     def validate_module_address(

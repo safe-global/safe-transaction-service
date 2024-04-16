@@ -24,6 +24,7 @@ from gnosis.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
 )
+from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.safe_signature import SafeSignatureEOA
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -31,6 +32,7 @@ from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from .. import models
+from ..serializers import SafeOperationSerializer
 from . import factories
 
 logger = logging.getLogger(__name__)
@@ -187,8 +189,10 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {"count": 1, "next": None, "previous": None, "results": [expected]},
         )
 
-    @mock.patch(
-        "safe_transaction_service.account_abstraction.serializers.get_safe_owners",
+    @mock.patch.object(
+        SafeOperationSerializer,
+        "_get_owners",
+        autospec=True,
     )
     @mock.patch.object(
         EthereumClient,
@@ -199,6 +203,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
     def test_safe_operation_create_view(
         self, get_chain_id_mock: MagicMock, get_owners_mock: MagicMock
     ):
+        self.maxDiff = None
         account = Account.create()
         safe_address = safe_4337_address
         user_operation_hash = safe_4337_user_operation_hash_mock
@@ -275,7 +280,8 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 data=data,
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(
+            self.maxDiff = None
+            self.assertDictEqual(
                 response.data,
                 {
                     "non_field_errors": [
@@ -369,8 +375,10 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             },
         )
 
-    @mock.patch(
-        "safe_transaction_service.account_abstraction.serializers.get_safe_owners",
+    @mock.patch.object(
+        SafeOperationSerializer,
+        "_get_owners",
+        autospec=True,
     )
     @mock.patch.object(
         EthereumClient,
@@ -465,8 +473,10 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    @mock.patch(
-        "safe_transaction_service.account_abstraction.serializers.get_safe_owners",
+    @mock.patch.object(
+        SafeOperationSerializer,
+        "_get_owners",
+        autospec=True,
     )
     @mock.patch.object(
         EthereumClient,
@@ -567,12 +577,19 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         with mock.patch.object(
             EthereumClient,
             "is_contract",
-            autospec=True,
-            side_effect=[False, True],
-        ):
+            side_effect=[False, True, True],
+        ) as is_contract_mock:
             response = self.client.post(
                 reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
                 format="json",
                 data=data,
             )
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertListEqual(
+                is_contract_mock.call_args_list,
+                [
+                    mock.call(safe_address),
+                    mock.call(fast_to_checksum_address(user_operation.init_code[:20])),
+                    mock.call(paymaster_address),
+                ],
+            )
