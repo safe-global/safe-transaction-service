@@ -2,13 +2,13 @@ from django.test import TestCase
 
 from hexbytes import HexBytes
 
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from gnosis.eth.tests.mocks.mock_bundler import user_operation_mock
+from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..helpers import DecodedInitCode, decode_init_code
 
 
-class TestAccountAbstractionHelpers(EthereumTestCaseMixin, TestCase):
+class TestAccountAbstractionHelpers(SafeTestCaseMixin, TestCase):
     def test_decode_init_code(self):
         with self.assertRaises(ValueError):
             decode_init_code(b"", self.ethereum_client)
