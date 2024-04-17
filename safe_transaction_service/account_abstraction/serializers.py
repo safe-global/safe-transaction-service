@@ -13,16 +13,15 @@ from rest_framework.exceptions import ValidationError
 import gnosis.eth.django.serializers as eth_serializers
 from gnosis.eth import EthereumClientProvider
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.contracts import get_safe_V1_4_1_contract
 from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
-from gnosis.safe.proxy_factory import ProxyFactoryV141
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
+from .helpers import decode_init_code
 from .models import SafeOperation
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
@@ -108,36 +107,23 @@ class SafeOperationSerializer(serializers.Serializer):
                 raise ValidationError(
                     "`init_code` must be empty as the contract was already initialized"
                 )
-            factory_address = fast_to_checksum_address(init_code[:20])
-            factory_data = init_code[20:]
-            if not self.ethereum_client.is_contract(factory_address):
-                raise ValidationError(
-                    f"`init_code` factory-address={factory_address} is not initialized"
-                )
 
-            # Decode data to check for a valid ProxyFactory Safe deployment
-            proxy_factory = ProxyFactoryV141(factory_address, self.ethereum_client)
-            safe_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
             try:
-                _, data = proxy_factory.contract.decode_function_input(factory_data)
-                initializer = data.pop("initializer")
-                _, safe_deployment_data = safe_contract.decode_function_input(
-                    initializer
-                )
+                decoded_init_code = decode_init_code(init_code, self.ethereum_client)
             except ValueError:
                 raise ValidationError("Cannot decode data")
-
-            singleton = data.pop("_singleton")
-            salt_nonce = data.pop("saltNonce")
-            calculated_safe_address = proxy_factory.calculate_proxy_address(
-                singleton, initializer, salt_nonce, chain_specific=False
-            )
-            if calculated_safe_address != safe_address:
+            if not self.ethereum_client.is_contract(decoded_init_code.factory_address):
                 raise ValidationError(
-                    f"Provided safe-address={safe_address} does not match calculated-safe-address={calculated_safe_address}"
+                    f"`init_code` factory-address={decoded_init_code.factory_address} is not initialized"
+                )
+
+            if decoded_init_code.expected_address != safe_address:
+                raise ValidationError(
+                    f"Provided safe-address={safe_address} does not match "
+                    f"calculated-safe-address={decoded_init_code.expected_address}"
                 )
             # Store owners used for deployment, to do checks afterward
-            self._deployment_owners = safe_deployment_data.pop("_owners")
+            self._deployment_owners = decoded_init_code.owners
         elif not safe_is_deployed:
             raise ValidationError(
                 "`init_code` was not provided and contract was not initialized"

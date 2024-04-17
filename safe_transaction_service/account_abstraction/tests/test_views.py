@@ -26,6 +26,7 @@ from gnosis.eth.tests.mocks.mock_bundler import (
 )
 from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
+from gnosis.safe.proxy_factory import ProxyFactoryV141
 from gnosis.safe.safe_signature import SafeSignatureEOA
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -294,16 +295,14 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
 
         # Fake that Safe contract was already deployed, so `init_code` should not be provided
-        with mock.patch.object(
-            EthereumClient, "is_contract", autospec=True, return_value=True
-        ):
+        with mock.patch.object(EthereumClient, "is_contract", return_value=True):
             response = self.client.post(
                 reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
                 format="json",
                 data=data,
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(
+            self.assertDictEqual(
                 response.data,
                 {
                     "init_code": [
@@ -314,6 +313,52 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                     ]
                 },
             )
+
+        with mock.patch.object(
+            ProxyFactoryV141, "calculate_proxy_address", return_value=NULL_ADDRESS
+        ):
+            response = self.client.post(
+                reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertDictEqual(
+                response.data,
+                {
+                    "init_code": [
+                        ErrorDetail(
+                            string=f"Provided safe-address={safe_address} does not match calculated-safe-address={NULL_ADDRESS}",
+                            code="invalid",
+                        )
+                    ]
+                },
+            )
+
+        # Fake that contract was not deployed and init_code was not provided
+        with mock.patch.object(
+            EthereumClient, "is_contract", return_value=False
+        ) as is_contract_mock:
+            data_without_init_code = dict(data)
+            data_without_init_code["init_code"] = None
+            response = self.client.post(
+                reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
+                format="json",
+                data=data_without_init_code,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertDictEqual(
+                response.data,
+                {
+                    "init_code": [
+                        ErrorDetail(
+                            string="`init_code` was not provided and contract was not initialized",
+                            code="invalid",
+                        )
+                    ]
+                },
+            )
+            is_contract_mock.assert_called_once_with(safe_address)
 
         response = self.client.post(
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
@@ -340,7 +385,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertDictEqual(
             response.data,
             {
                 "non_field_errors": [
@@ -363,7 +408,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertDictEqual(
             response.data,
             {
                 "nonce": [
