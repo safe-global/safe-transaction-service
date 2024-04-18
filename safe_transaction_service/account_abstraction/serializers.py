@@ -58,7 +58,7 @@ class SafeOperationSerializer(serializers.Serializer):
     def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
         """
         :param safe_address:
-        :return: Current blockchain owners if Safe is deployed, otherwise `init_code` decoded owners
+        :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
         """
         return self._deployment_owners or get_safe_owners(safe_address)
 
