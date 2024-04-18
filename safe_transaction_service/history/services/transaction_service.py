@@ -13,6 +13,7 @@ from redis import Redis
 
 from gnosis.eth import EthereumClient, EthereumClientProvider
 from gnosis.eth.django.models import Uint256Field
+from gnosis.eth.utils import fast_keccak_text
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
@@ -105,6 +106,13 @@ class TransactionService:
             for key in to_store.keys():
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
+
+    def get_all_txs_cache_dir(self, safe_address):
+        return fast_keccak_text(f"all-txs:{safe_address}")
+
+    def del_all_txs_cache_dir(self, safe_address):
+        redis = get_redis()
+        redis.unlink(self.get_all_txs_cache_dir(safe_address))
 
     # End of cache methods ----------------------------
 

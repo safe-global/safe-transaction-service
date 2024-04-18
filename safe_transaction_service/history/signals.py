@@ -1,10 +1,12 @@
 from logging import getLogger
-from typing import Type, Union
+from typing import Tuple, Type, Union
 
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+from eth_typing import ChecksumAddress
 
 from safe_transaction_service.notifications.tasks import send_notification_task
 
@@ -22,6 +24,7 @@ from .models import (
     SafeStatus,
     TokenTransfer,
 )
+from .services import TransactionServiceProvider
 from .services.webhooks import build_webhook_payload, is_relevant_notification
 from .tasks import send_webhook_task
 
@@ -112,6 +115,41 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
+def get_safe_addresses_from_instance(
+    instance: Union[
+        TokenTransfer,
+        InternalTx,
+        MultisigConfirmation,
+        MultisigTransaction,
+    ]
+) -> Tuple[ChecksumAddress, ChecksumAddress]:
+
+    if isinstance(instance, TokenTransfer):
+        from_safe_address = instance._from
+        to_safe_address = instance.to
+        return (to_safe_address, from_safe_address)
+    elif isinstance(instance, MultisigTransaction):
+        to_safe_address = instance.safe
+        return (to_safe_address, None)
+    elif isinstance(instance, MultisigConfirmation):
+        to_safe_address = instance.multisig_transaction.safe
+        return (to_safe_address, None)
+    elif isinstance(instance, InternalTx):
+        to_safe_address = instance.to
+        return (to_safe_address, None)
+
+    return (None, None)
+
+
+def _clean_all_txs_cache(instance):
+    transaction_service = TransactionServiceProvider()
+    to_address, from_address = get_safe_addresses_from_instance(instance)
+    if to_address:
+        transaction_service.del_all_txs_cache_dir(to_address)
+    if from_address:
+        transaction_service.del_all_txs_cache_dir(from_address)
+
+
 def _process_webhook(
     sender: Type[Model],
     instance: Union[
@@ -127,6 +165,9 @@ def _process_webhook(
     assert not (
         created and deleted
     ), "An instance cannot be created and deleted at the same time"
+
+    if sender != SafeContract:
+        _clean_all_txs_cache(instance)
 
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_webhook_payload(sender, instance, deleted=deleted)
