@@ -34,9 +34,13 @@ def decode_init_code(
     init_code: bytes, ethereum_client: EthereumClient
 ) -> DecodedInitCode:
     """
-    Decode data to check for a valid ProxyFactory Safe deployment
+    Decode data to check for a valid ProxyFactory Safe deployment.
 
-    :param init_code:
+    :param init_code: should be composed of:
+      - 20 first bytes with the address of the factory.
+      - Call data for the ``Factory``. In the case of the Safe:
+        - Call to the ``ProxyFactory``, with the ``initializer``, ``singleton`` and ``saltNonce``
+        - The ``ProxyFactory`` then deploys a ``Safe Proxy`` and calls ``setup`` with all the configuration parameters.
     :param ethereum_client:
     :return: Decoded Init Code dataclass
     :raises ValueError: Problem decoding
