@@ -21,6 +21,7 @@ from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
+from .helpers import decode_init_code
 from .models import SafeOperation
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
@@ -52,6 +53,14 @@ class SafeOperationSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ethereum_client = EthereumClientProvider()
+        self._deployment_owners: List[ChecksumAddress] = []
+
+    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+        """
+        :param safe_address:
+        :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
+        """
+        return self._deployment_owners or get_safe_owners(safe_address)
 
     def _validate_signature(
         self,
@@ -60,7 +69,7 @@ class SafeOperationSerializer(serializers.Serializer):
         safe_operation_hash_preimage: bytes,
         signature: bytes,
     ) -> List[SafeSignature]:
-        safe_owners = get_safe_owners(safe_address)
+        safe_owners = self._get_owners(safe_address)
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_operation_hash, safe_operation_hash_preimage
         )
@@ -91,12 +100,35 @@ class SafeOperationSerializer(serializers.Serializer):
         :param init_code:
         :return: `init_code`
         """
+        safe_address = self.context["safe_address"]
+        safe_is_deployed = self.ethereum_client.is_contract(safe_address)
         if init_code:
-            safe_address = self.context["safe_address"]
-            if self.ethereum_client.is_contract(safe_address):
+            if safe_is_deployed:
                 raise ValidationError(
                     "`init_code` must be empty as the contract was already initialized"
                 )
+
+            try:
+                decoded_init_code = decode_init_code(init_code, self.ethereum_client)
+            except ValueError:
+                raise ValidationError("Cannot decode data")
+            if not self.ethereum_client.is_contract(decoded_init_code.factory_address):
+                raise ValidationError(
+                    f"`init_code` factory-address={decoded_init_code.factory_address} is not initialized"
+                )
+
+            if decoded_init_code.expected_address != safe_address:
+                raise ValidationError(
+                    f"Provided safe-address={safe_address} does not match "
+                    f"calculated-safe-address={decoded_init_code.expected_address}"
+                )
+            # Store owners used for deployment, to do checks afterward
+            self._deployment_owners = decoded_init_code.owners
+        elif not safe_is_deployed:
+            raise ValidationError(
+                "`init_code` was not provided and contract was not initialized"
+            )
+
         return init_code
 
     def validate_module_address(
