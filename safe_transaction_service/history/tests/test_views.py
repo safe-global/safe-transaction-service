@@ -45,6 +45,8 @@ from ..models import (
     SafeMasterCopy,
 )
 from ..serializers import TransferType
+
+from ..services import TransactionServiceProvider
 from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
@@ -405,11 +407,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             MultisigTransactionFactory(safe=safe_address),
             MultisigTransactionFactory(safe=safe_address),
         ]
-        # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
-        cache_key = "all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:10:0:execution_date:2"
+        # all-txs:{safe_address}
+        cache_dir = f"all-txs:{safe_address}"
+        # {executed}{queued}{trusted}:{limit}:{offset}:{ordering}
+        cache_field = "100:10:0:execution_date"
         redis = get_redis()
-        redis.delete(cache_key)
-        cache_result = redis.get(cache_key)
+        redis.unlink(cache_dir)
+        cache_result = redis.hget(cache_dir, cache_field)
         # Should be empty at the beginning
         self.assertIsNone(cache_result)
 
@@ -420,7 +424,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
 
-        cache_result = redis.get(cache_key)
+        cache_result = redis.hget(cache_dir, cache_field)
         # Should be stored in redis cache
         self.assertIsNotNone(cache_result)
         # Cache should content the expected values
@@ -439,7 +443,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             )
             self.assertEqual(cache_value["safe_nonce"], factory_transaction.nonce)
         # Modify cache to empty list
-        redis.set(cache_key, pickle.dumps(([], 0)), ex=60 * 10)
+        redis.hset(cache_dir, cache_field, pickle.dumps(([], 0)))
+        redis.expire(cache_dir, 60 * 10)
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
@@ -462,16 +467,18 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         """
         safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
         number_transactions = 100
-
+        transaction_service = TransactionServiceProvider()
         for _ in range(number_transactions):
             MultisigTransactionFactory(safe=safe_address)
 
         for limit, offset in ((57, 12), (13, 24)):
             with self.subTest(limit=limit, offset=offset):
-                # all-txs:{safe}:{executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
-                cache_key = f"all-txs:0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9:100:{limit}:{offset}:execution_date:{number_transactions}"
+                # all-txs:{safe_address}
+                cache_dir = f"all-txs:{safe_address}"
+                # {executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
+                cache_field = f"100:{limit}:{offset}:execution_date"
                 redis = get_redis()
-                self.assertFalse(redis.exists(cache_key))
+                self.assertFalse(redis.hexists(cache_dir, cache_field))
 
                 response = self.client.get(
                     reverse("v1:history:all-transactions", args=(safe_address,))
@@ -479,7 +486,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 )
                 self.assertEqual(response.data["count"], number_transactions)
                 self.assertEqual(len(response.data["results"]), limit)
-                self.assertTrue(redis.exists(cache_key))
+                self.assertTrue(redis.hexists(cache_dir, cache_field))
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event

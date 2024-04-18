@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Tuple, Type, Union
+from typing import Optional, Tuple, Type, Union
 
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
@@ -122,21 +122,16 @@ def get_safe_addresses_from_instance(
         MultisigConfirmation,
         MultisigTransaction,
     ]
-) -> Tuple[ChecksumAddress, ChecksumAddress]:
+) -> Tuple[Optional[ChecksumAddress], Optional[ChecksumAddress]]:
 
     if isinstance(instance, TokenTransfer):
-        from_safe_address = instance._from
-        to_safe_address = instance.to
-        return (to_safe_address, from_safe_address)
+        return (instance.to, instance._from)
     elif isinstance(instance, MultisigTransaction):
-        to_safe_address = instance.safe
-        return (to_safe_address, None)
-    elif isinstance(instance, MultisigConfirmation):
-        to_safe_address = instance.multisig_transaction.safe
-        return (to_safe_address, None)
+        return (instance.safe, None)
+    elif isinstance(instance, MultisigConfirmation) and instance.multisig_transaction:
+        return (instance.multisig_transaction.safe, None)
     elif isinstance(instance, InternalTx):
-        to_safe_address = instance.to
-        return (to_safe_address, None)
+        return (instance.to, None)
 
     return (None, None)
 
