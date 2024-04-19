@@ -37,7 +37,7 @@ from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from ...utils.redis import get_redis
-from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
+from ..helpers import DelegateSignatureDeprecatedHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
     MultisigConfirmation,
@@ -2214,7 +2214,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
             # Create delegate
             self.assertEqual(SafeContractDelegate.objects.count(), 0)
-            hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate.address)
+            hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
+                delegate.address
+            )
             data["signature"] = delegator.signHash(hash_to_sign)["signature"].hex()
             response = self.client.post(url, format="json", data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -2240,7 +2242,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "delegate": delegate.address,
             "delegator": delegator.address,
             "signature": delegator.signHash(
-                DelegateSignatureHelper.calculate_hash(delegate.address, eth_sign=True)
+                DelegateSignatureDeprecatedHelper.calculate_hash(
+                    delegate.address, eth_sign=True
+                )
             )["signature"].hex(),
         }
         response = self.client.post(url, format="json", data=data)
@@ -2334,7 +2338,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         url_name = "v1:history:delegate"
         delegate = Account.create()
         delegator = Account.create()
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate.address)
+        hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
+            delegate.address
+        )
         # Test delete using delegate signature and then delegator signature
         for signer in (delegate, delegator):
             with self.subTest(signer=signer):
@@ -2455,7 +2461,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         # Test eth_sign first
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(
+        hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
             delegate_address, eth_sign=True
         )
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
@@ -2470,7 +2476,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         # Test previous otp
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(
+        hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
             delegate_address, previous_totp=True
         )
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
@@ -2484,7 +2490,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "No SafeContractDelegate matches the given query.", response.data["detail"]
         )
 
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address)
+        hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
+            delegate_address
+        )
         data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
         response = self.client.delete(
             reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
@@ -2517,7 +2525,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         SafeContractDelegateFactory(
             safe_contract=safe_contract, delegate=delegate_account.address
         )
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_account.address)
+        hash_to_sign = DelegateSignatureDeprecatedHelper.calculate_hash(
+            delegate_account.address
+        )
         data["signature"] = delegate_account.signHash(hash_to_sign)["signature"].hex()
         response = self.client.delete(
             reverse(
