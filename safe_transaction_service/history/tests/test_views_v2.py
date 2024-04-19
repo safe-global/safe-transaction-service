@@ -425,3 +425,47 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(SafeContractDelegate.objects.count(), 0)
+
+        # Try an invalid delegate_address
+        response = self.client.delete(
+            reverse(
+                url_name, args=("0x00000000000000000000000000000000000000000000000",)
+            ),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(
+            "Checksum address validation failed",
+            response.data["message"],
+        )
+
+        # Try an invalid signature
+        with mock.patch(
+            "gnosis.safe.safe_signature.SafeSignature.parse_signature",
+            return_value=[],
+        ) as parse_signature_mock:
+            # No signatures
+            response = self.client.delete(
+                reverse(url_name, args=(delegate.address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn(
+                "Signature is not valid",
+                response.data["non_field_errors"][0],
+            )
+
+            # More than 1 signature
+            parse_signature_mock.return_value = [None, None]
+            response = self.client.delete(
+                reverse(url_name, args=(delegate.address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn(
+                "More than one signatures detected, just one is expected",
+                response.data["non_field_errors"][0],
+            )
