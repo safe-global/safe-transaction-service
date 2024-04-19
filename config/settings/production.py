@@ -36,7 +36,7 @@ CACHES = {
 SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
     "DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True
 )
-# https://docs.djangoproject.com/en/3.2/ref/settings/#csrf-trusted-origins
+# https://docs.djangoproject.com/en/5.0/ref/settings/#csrf-trusted-origins
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # SSO (tested with https://github.com/buzzfeed/sso)
