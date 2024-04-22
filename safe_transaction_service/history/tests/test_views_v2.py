@@ -238,7 +238,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
 
-        # Test not internal server error on contract signature
+        # Test bad request with an invalid signature
         signature = signature_to_bytes(0, int(delegator.address, 16), 65) + HexBytes(
             "0" * 65
         )
@@ -311,6 +311,13 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertCountEqual(response.data["results"], expected)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+        # Test not found delegate address
+        response = self.client.get(
+            url + f"?delegate={Account.create().address}", format="json"
+        )
+        self.assertCountEqual(response.data["results"], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_delegate_delete(self):
         url_name = "v2:history:delegate"
         safe_address = Account.create().address
@@ -335,6 +342,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                     delegate=delegate.address,  # random delegator, should not be deleted
                 )
                 self.assertEqual(SafeContractDelegate.objects.count(), 3)
+
                 data = {
                     "signature": signer.signHash(hash_to_sign)["signature"].hex(),
                     "delegator": delegator.address,
