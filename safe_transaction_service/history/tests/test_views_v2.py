@@ -245,7 +245,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         data["signature"] = signature.hex()
         response = self.client.post(url, format="json", data=data)
         self.assertIn(
-            "Only EOA and ETH_SIGN signatures are supported",
+            f"Signature of type=CONTRACT_SIGNATURE for signer={delegator.address} is not valid",
             response.data["non_field_errors"][0],
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

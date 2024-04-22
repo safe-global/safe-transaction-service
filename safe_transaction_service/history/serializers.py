@@ -420,12 +420,13 @@ class DelegateSerializerMixin:
                     "More than one signatures detected, just one is expected"
                 )
             safe_signature = safe_signatures[0]
-            if safe_signature.signature_type not in (
-                SafeSignatureType.EOA,
-                SafeSignatureType.ETH_SIGN,
-            ):
-                raise ValidationError("Only EOA and ETH_SIGN signatures are supported")
-            if safe_signature.owner == signer:
+            owner = safe_signature.owner
+            if not safe_signature.is_valid(ethereum_client, owner):
+                raise ValidationError(
+                    f"Signature of type={safe_signature.signature_type.name} "
+                    f"for signer={signer} is not valid"
+                )
+            if owner == signer:
                 return True
         return False
 
@@ -971,7 +972,8 @@ class AllTransactionsSchemaSerializer(serializers.Serializer):
 
 class SafeDelegateDeleteDeprecatedSerializer(serializers.Serializer):
     """
-    Deprecated in favour of DelegateDeleteSerializer
+    .. deprecated:: 3.3.0
+       Deprecated in favour of DelegateDeleteSerializer
     """
 
     safe = EthereumAddressField()
