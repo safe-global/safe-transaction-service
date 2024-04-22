@@ -349,9 +349,7 @@ class AllTransactionsListView(ListAPIView):
             lock_key,
             timeout=settings.GUNICORN_REQUEST_TIMEOUT,  # This prevents a service restart to leave a lock forever
         ):
-            print(f"{cache_dir}:{cache_field}")
             if result := redis.hget(cache_dir, cache_field):
-                print("Getting from cache")
                 # Count needs to be retrieved to set it up the paginator
                 page, count = pickle.loads(result)
                 # Setting the paginator like this is not very elegant and needs to be tested really well
