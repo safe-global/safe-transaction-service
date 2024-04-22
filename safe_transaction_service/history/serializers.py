@@ -32,8 +32,8 @@ from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .exceptions import NodeConnectionException
 from .helpers import (
-    DelegateSignatureDeprecatedHelper,
     DelegateSignatureHelper,
+    DelegateSignatureHelperV2,
     DeleteMultisigTxSignatureHelper,
 )
 from .models import (
@@ -408,7 +408,7 @@ class DelegateSerializerMixin:
         chain_id = ethereum_client.get_chain_id()
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp in (True, False):
-            message_hash = DelegateSignatureHelper.calculate_hash(
+            message_hash = DelegateSignatureHelperV2.calculate_hash(
                 delegate, chain_id, previous_totp=previous_totp
             )
             safe_signatures = SafeSignature.parse_signature(signature, message_hash)
@@ -430,7 +430,7 @@ class DelegateSerializerMixin:
         return False
 
 
-class DelegateSerializer(DelegateSerializerMixin, serializers.Serializer):
+class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
@@ -468,7 +468,7 @@ class DelegateSerializer(DelegateSerializerMixin, serializers.Serializer):
         return obj
 
 
-class DelegateDeleteSerializer(DelegateSerializerMixin, serializers.Serializer):
+class DelegateDeleteSerializerV2(DelegateSerializerMixin, serializers.Serializer):
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
@@ -971,7 +971,7 @@ class AllTransactionsSchemaSerializer(serializers.Serializer):
 
 class SafeDelegateDeleteDeprecatedSerializer(serializers.Serializer):
     """
-    Deprecated in favour of DelegateDeleteDeprecatedSerializer
+    Deprecated in favour of DelegateDeleteSerializer
     """
 
     safe = EthereumAddressField()
@@ -1047,9 +1047,9 @@ class SafeDelegateDeleteDeprecatedSerializer(serializers.Serializer):
         )
 
         # Tries to find a valid delegator using multiple strategies
-        for (
-            operation_hash
-        ) in DelegateSignatureDeprecatedHelper.calculate_all_possible_hashes(delegate):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(
+            delegate
+        ):
             delegator = self.check_signature(
                 ethereum_client,
                 safe_address,
@@ -1067,9 +1067,11 @@ class SafeDelegateDeleteDeprecatedSerializer(serializers.Serializer):
         return attrs
 
 
-class DelegateSignatureDeprecatedCheckerMixin:
+class DelegateSignatureCheckerMixin:
     """
     Mixin to include delegate signature validation
+    .. deprecated:: 4.38.0
+       Deprecated in favour of DelegateSerializerMixin
     """
 
     def check_delegate_signature(
@@ -1109,11 +1111,10 @@ class DelegateSignatureDeprecatedCheckerMixin:
         return False
 
 
-class DelegateDeprecatedSerializer(
-    DelegateSignatureDeprecatedCheckerMixin, serializers.Serializer
-):
+class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     """
-    Deprecated in favour of DelegateSerializer
+    .. deprecated:: 4.38.0
+       Deprecated in favour of DelegateSerializerV2
     """
 
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
@@ -1150,9 +1151,9 @@ class DelegateDeprecatedSerializer(
                 )
 
         # Tries to find a valid delegator using multiple strategies
-        for (
-            operation_hash
-        ) in DelegateSignatureDeprecatedHelper.calculate_all_possible_hashes(delegate):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(
+            delegate
+        ):
             if self.check_delegate_signature(
                 ethereum_client, signature, operation_hash, delegator
             ):
@@ -1178,11 +1179,10 @@ class DelegateDeprecatedSerializer(
         return obj
 
 
-class DelegateDeleteDeprecatedSerializer(
-    DelegateSignatureDeprecatedCheckerMixin, serializers.Serializer
-):
+class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     """
-    Deprecated in favour of DelegateDeleteSerializer
+    .. deprecated:: 4.38.0
+       Deprecated in favour of DelegateDeleteSerializerV2
     """
 
     delegate = EthereumAddressField()
@@ -1198,9 +1198,9 @@ class DelegateDeleteDeprecatedSerializer(
 
         ethereum_client = EthereumClientProvider()
         # Tries to find a valid delegator using multiple strategies
-        for (
-            operation_hash
-        ) in DelegateSignatureDeprecatedHelper.calculate_all_possible_hashes(delegate):
+        for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(
+            delegate
+        ):
             for signer in (delegate, delegator):
                 if self.check_delegate_signature(
                     ethereum_client, signature, operation_hash, signer

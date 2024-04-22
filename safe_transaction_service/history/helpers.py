@@ -80,7 +80,7 @@ class DeleteMultisigTxSignatureHelper(TemporarySignatureHelper):
         return eip712_encode_hash(payload)
 
 
-class DelegateSignatureHelper(TemporarySignatureHelper):
+class DelegateSignatureHelperV2(TemporarySignatureHelper):
     @classmethod
     def calculate_hash(
         cls,
@@ -166,7 +166,12 @@ def add_tokens_to_transfers(transfers: TransferDict) -> TransferDict:
 # Deprecated ---------------------------------------------------------------
 
 
-class DelegateSignatureDeprecatedHelper(TemporarySignatureHelper):
+class DelegateSignatureHelper(TemporarySignatureHelper):
+    """
+    .. deprecated:: 4.38.0
+       Deprecated in favour of DelegateSignatureHelperV2
+    """
+
     @classmethod
     def calculate_hash(
         cls,

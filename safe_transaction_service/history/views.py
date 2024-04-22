@@ -1269,6 +1269,10 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
 
 
 class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailView):
+    """
+    .. deprecated:: 3.1.13
+    """
+
     @swagger_auto_schema(
         deprecated=True,
         operation_description="Use `multisig-transactions` instead of `transactions`",
@@ -1278,7 +1282,11 @@ class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailV
         return super().get(*args, **kwargs)
 
 
-class MasterCopiesDeprecatedView(SingletonsView):
+class MasterCopiesView(SingletonsView):
+    """
+    .. deprecated:: 4.26.0
+    """
+
     @swagger_auto_schema(
         deprecated=True,
         operation_description="Use `singletons` instead of `master-copies`",
@@ -1288,7 +1296,13 @@ class MasterCopiesDeprecatedView(SingletonsView):
         return super().get(*args, **kwargs)
 
 
-class DelegateListDeprecatedView(ListCreateAPIView):
+class DelegateListView(ListCreateAPIView):
+    """
+
+    .. deprecated:: 4.38.0
+       Deprecated in favor of V2 view supporting EIP712 signatures
+    """
+
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.DelegateListFilter
     pagination_class = pagination.DefaultPagination
@@ -1298,7 +1312,7 @@ class DelegateListDeprecatedView(ListCreateAPIView):
         if self.request.method == "GET":
             return serializers.SafeDelegateResponseSerializer
         elif self.request.method == "POST":
-            return serializers.DelegateDeprecatedSerializer
+            return serializers.DelegateSerializer
 
     @swagger_auto_schema(deprecated=True, responses={400: "Invalid data"})
     def get(self, request, **kwargs):
@@ -1325,8 +1339,14 @@ class DelegateListDeprecatedView(ListCreateAPIView):
         return super().post(request, **kwargs)
 
 
-class DelegateDeleteDeprecatedView(GenericAPIView):
-    serializer_class = serializers.DelegateDeleteDeprecatedSerializer
+class DelegateDeleteView(GenericAPIView):
+    """
+
+    .. deprecated:: 4.38.0
+       Deprecated in favor of V2 view supporting EIP712 signatures
+    """
+
+    serializer_class = serializers.DelegateDeleteSerializer
 
     @swagger_auto_schema(
         deprecated=True,
@@ -1368,6 +1388,10 @@ class DelegateDeleteDeprecatedView(GenericAPIView):
 
 
 class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView):
+    """
+    .. deprecated:: 3.1.13
+    """
+
     @swagger_auto_schema(
         deprecated=True,
         operation_description="Use `multisig-transactions` instead of `transactions`",
@@ -1383,7 +1407,13 @@ class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView)
         return super().post(*args, **kwargs)
 
 
-class SafeDelegateDestroyDeprecatedView(DestroyAPIView):
+class SafeDelegateDestroyView(DestroyAPIView):
+    """
+
+    .. deprecated:: 4.38.0
+       Deprecated in favor of V2 view supporting EIP712 signatures
+    """
+
     serializer_class = serializers.SafeDelegateDeleteDeprecatedSerializer
 
     def get_object(self):

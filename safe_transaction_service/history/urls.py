@@ -98,15 +98,15 @@ urlpatterns = [
     ),  # Deprecated
     path(
         "about/master-copies/",
-        views.MasterCopiesDeprecatedView.as_view(),
+        views.MasterCopiesView.as_view(),
         name="master-copies",
     ),  # Deprecated
     path(
-        "delegates/", views.DelegateListDeprecatedView.as_view(), name="delegates"
+        "delegates/", views.DelegateListView.as_view(), name="delegates"
     ),  # Deprecated
     path(
         "delegates/<str:delegate_address>/",
-        views.DelegateDeleteDeprecatedView.as_view(),
+        views.DelegateDeleteView.as_view(),
         name="delegate",
     ),  # Deprecated
     path(
@@ -116,7 +116,7 @@ urlpatterns = [
     ),  # Deprecated
     path(
         "safes/<str:address>/delegates/<str:delegate_address>/",
-        views.SafeDelegateDestroyDeprecatedView.as_view(),
+        views.SafeDelegateDestroyView.as_view(),
         name="safe-delegate",
     ),  # Deprecated
 ]

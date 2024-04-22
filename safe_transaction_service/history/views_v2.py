@@ -74,7 +74,7 @@ class DelegateListView(ListCreateAPIView):
         if self.request.method == "GET":
             return serializers.SafeDelegateResponseSerializer
         elif self.request.method == "POST":
-            return serializers.DelegateSerializer
+            return serializers.DelegateSerializerV2
 
     @swagger_auto_schema(responses={400: "Invalid data"})
     def get(self, request, **kwargs):
@@ -123,7 +123,7 @@ class DelegateListView(ListCreateAPIView):
 
 
 class DelegateDeleteView(GenericAPIView):
-    serializer_class = serializers.DelegateDeleteSerializer
+    serializer_class = serializers.DelegateDeleteSerializerV2
 
     @swagger_auto_schema(
         request_body=serializer_class(),

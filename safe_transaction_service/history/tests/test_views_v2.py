@@ -11,7 +11,7 @@ from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.safe.signatures import signature_to_bytes
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..helpers import DelegateSignatureHelper
+from ..helpers import DelegateSignatureHelperV2
 from ..models import SafeContractDelegate
 from .factories import (
     ERC721TransferFactory,
@@ -203,7 +203,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             # Create delegate
             self.assertEqual(SafeContractDelegate.objects.count(), 0)
             chain_id = self.ethereum_client.get_chain_id()
-            hash_to_sign = DelegateSignatureHelper.calculate_hash(
+            hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
                 delegate.address, chain_id, False
             )
             data["signature"] = delegator.signHash(hash_to_sign)["signature"].hex()
@@ -225,7 +225,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             self.assertEqual(safe_contract_delegate.label, label)
 
         # Create delegate without a Safe
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(
+        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
             delegate.address, chain_id, False
         )
         data = {
@@ -317,7 +317,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         delegate = Account.create()
         delegator = Account.create()
         chain_id = self.ethereum_client.get_chain_id()
-        hash_to_sign = DelegateSignatureHelper.calculate_hash(
+        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
             delegate.address, chain_id, False
         )
         # Test delete using delegate signature and then delegator signature
