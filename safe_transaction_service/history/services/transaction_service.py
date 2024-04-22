@@ -25,7 +25,6 @@ from ..models import (
     InternalTx,
     ModuleTransaction,
     MultisigTransaction,
-    SafeContract,
     TransferDict,
 )
 from ..serializers import (
@@ -114,21 +113,6 @@ class TransactionService:
         redis.unlink(self.get_all_txs_cache_dir(safe_address))
 
     # End of cache methods ----------------------------
-
-    def get_count_relevant_txs_for_safe(self, safe_address: ChecksumAddress) -> int:
-        """
-        This method searches multiple tables and count every tx or event for a Safe.
-        It will return the same or higher value if compared to counting ``get_all_tx_identifiers``
-        as that method will group some transactions (for example, 3 ERC20 can be grouped in a ``MultisigTransaction``,
-        so it will be ``1`` element for ``get_all_tx_identifiers`` but ``4`` for this function.
-
-        This query should be pretty fast, and it's meant to be used for invalidating caches.
-
-        :param safe_address:
-        :return: number of relevant txs for a Safe
-        """
-
-        return SafeContract.objects.get_count_relevant_txs_for_safe(safe_address)
 
     def get_all_tx_identifiers(
         self,
