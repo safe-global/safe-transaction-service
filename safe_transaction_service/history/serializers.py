@@ -970,7 +970,7 @@ class AllTransactionsSchemaSerializer(serializers.Serializer):
 # Deprecated ---------------------------------------------------------------
 
 
-class SafeDelegateDeleteDeprecatedSerializer(serializers.Serializer):
+class SafeDelegateDeleteSerializer(serializers.Serializer):
     """
     .. deprecated:: 3.3.0
        Deprecated in favour of DelegateDeleteSerializer

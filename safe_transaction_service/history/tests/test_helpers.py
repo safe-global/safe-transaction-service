@@ -20,7 +20,8 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
         delegate_address = "0x1234567890123456789012345678901234567890"
         chain_id = 1
 
-        expected_hash_previous_false = HexBytes(
+        # Hash calculated when totp previous is false
+        expected_hash_previous_totp_false = HexBytes(
             "0xc095ec37d1798b39b8cf9306a3d6788f6118f46a0d18fcfac037c8306bdbf397"
         )
 
@@ -29,9 +30,10 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
         )
 
         DelegateSignatureHelperV2.calculate_totp.assert_called_once_with(previous=False)
-        self.assertEqual(result_hash, expected_hash_previous_false)
+        self.assertEqual(result_hash, expected_hash_previous_totp_false)
 
-        expected_hash_previous_true = HexBytes(
+        # Hash calculated when totp previous is true
+        expected_hash_previous_totp_true = HexBytes(
             "0xbf910dbf371090157231e49e7530c44b5ecf6a24fd4322be85465c13dbcb1459"
         )
 
@@ -40,4 +42,4 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
         )
 
         DelegateSignatureHelperV2.calculate_totp.assert_called_with(previous=True)
-        self.assertEqual(result_hash, expected_hash_previous_true)
+        self.assertEqual(result_hash, expected_hash_previous_totp_true)

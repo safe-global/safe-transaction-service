@@ -1414,7 +1414,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
        Deprecated in favor of V2 view supporting EIP712 signatures
     """
 
-    serializer_class = serializers.SafeDelegateDeleteDeprecatedSerializer
+    serializer_class = serializers.SafeDelegateDeleteSerializer
 
     def get_object(self):
         return get_object_or_404(
