@@ -80,31 +80,49 @@ class DeleteMultisigTxSignatureHelper(TemporarySignatureHelper):
         return eip712_encode_hash(payload)
 
 
-class DelegateSignatureHelper(TemporarySignatureHelper):
+class DelegateSignatureHelperV2(TemporarySignatureHelper):
     @classmethod
     def calculate_hash(
         cls,
-        address: ChecksumAddress,
-        eth_sign: bool = False,
+        delegate_address: ChecksumAddress,
+        chain_id: int,
         previous_totp: bool = False,
-    ) -> bytes:
-        totp = cls.calculate_totp(previous=previous_totp)
-        message = address + str(totp)
-        if eth_sign:
-            return keccak(
-                text="\x19Ethereum Signed Message:\n" + str(len(message)) + message
-            )
-        else:
-            return keccak(text=message)
+    ) -> Hash32:
+        """
+        Builds a EIP712 object and calculates its hash
 
-    @classmethod
-    def calculate_all_possible_hashes(cls, delegate: ChecksumAddress) -> List[bytes]:
-        return [
-            cls.calculate_hash(delegate),
-            cls.calculate_hash(delegate, eth_sign=True),
-            cls.calculate_hash(delegate, previous_totp=True),
-            cls.calculate_hash(delegate, eth_sign=True, previous_totp=True),
-        ]
+        :param delegate_address:
+        :param chain_id:
+        :param previous_totp:
+        :return: Hash for the EIP712 generated object from the provided parameters
+        """
+        totp = cls.calculate_totp(previous=previous_totp)
+
+        payload = {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                ],
+                "Delegate": [
+                    {"name": "delegateAddress", "type": "bytes32"},
+                    {"name": "totp", "type": "uint256"},
+                ],
+            },
+            "primaryType": "Delegate",
+            "domain": {
+                "name": "Safe Transaction Service",
+                "version": "1.0",
+                "chainId": chain_id,
+            },
+            "message": {
+                "delegateAddress": delegate_address,
+                "totp": totp,
+            },
+        }
+
+        return eip712_encode_hash(payload)
 
 
 def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:
@@ -143,3 +161,38 @@ def add_tokens_to_transfers(transfers: TransferDict) -> TransferDict:
     for transfer in transfers:
         transfer["token"] = tokens.get(transfer["token_address"])
     return transfers
+
+
+# Deprecated ---------------------------------------------------------------
+
+
+class DelegateSignatureHelper(TemporarySignatureHelper):
+    """
+    .. deprecated:: 4.38.0
+       Deprecated in favour of DelegateSignatureHelperV2
+    """
+
+    @classmethod
+    def calculate_hash(
+        cls,
+        address: ChecksumAddress,
+        eth_sign: bool = False,
+        previous_totp: bool = False,
+    ) -> bytes:
+        totp = cls.calculate_totp(previous=previous_totp)
+        message = address + str(totp)
+        if eth_sign:
+            return keccak(
+                text="\x19Ethereum Signed Message:\n" + str(len(message)) + message
+            )
+        else:
+            return keccak(text=message)
+
+    @classmethod
+    def calculate_all_possible_hashes(cls, delegate: ChecksumAddress) -> List[bytes]:
+        return [
+            cls.calculate_hash(delegate),
+            cls.calculate_hash(delegate, eth_sign=True),
+            cls.calculate_hash(delegate, previous_totp=True),
+            cls.calculate_hash(delegate, eth_sign=True, previous_totp=True),
+        ]

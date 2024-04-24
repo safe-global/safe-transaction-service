@@ -16,9 +16,6 @@ urlpatterns = [
         views.AboutEthereumTracingRPCView.as_view(),
         name="about-ethereum-tracing-rpc",
     ),
-    path(
-        "about/master-copies/", views.MasterCopiesView.as_view(), name="master-copies"
-    ),  # Deprecated
     path("about/singletons/", views.SingletonsView.as_view(), name="singletons"),
     path(
         "about/indexing/",
@@ -26,18 +23,7 @@ urlpatterns = [
         name="indexing",
     ),
     path("data-decoder/", views.DataDecoderView.as_view(), name="data-decoder"),
-    path("delegates/", views.DelegateListView.as_view(), name="delegates"),
-    path(
-        "delegates/<str:delegate_address>/",
-        views.DelegateDeleteView.as_view(),
-        name="delegate",
-    ),
     path("safes/<str:address>/", views.SafeInfoView.as_view(), name="safe-info"),
-    path(
-        "safes/<str:address>/transactions/",
-        views.SafeMultisigTransactionDeprecatedListView.as_view(),
-        name="multisig-transactions-alias",
-    ),
     path(
         "safes/<str:address>/multisig-transactions/",
         views.SafeMultisigTransactionListView.as_view(),
@@ -94,11 +80,6 @@ urlpatterns = [
         name="safe-balances-usd",
     ),
     path(
-        "safes/<str:address>/delegates/<str:delegate_address>/",
-        views.SafeDelegateDestroyView.as_view(),
-        name="safe-delegate",
-    ),
-    path(
         "multisig-transactions/<str:safe_tx_hash>/",
         views.SafeMultisigTransactionDetailView.as_view(),
         name="multisig-transaction",
@@ -114,5 +95,28 @@ urlpatterns = [
         "transactions/<str:safe_tx_hash>/",
         views.SafeMultisigTransactionDeprecatedDetailView.as_view(),
         name="multisig-transaction-alias",
-    ),
+    ),  # Deprecated
+    path(
+        "about/master-copies/",
+        views.MasterCopiesView.as_view(),
+        name="master-copies",
+    ),  # Deprecated
+    path(
+        "delegates/", views.DelegateListView.as_view(), name="delegates"
+    ),  # Deprecated
+    path(
+        "delegates/<str:delegate_address>/",
+        views.DelegateDeleteView.as_view(),
+        name="delegate",
+    ),  # Deprecated
+    path(
+        "safes/<str:address>/transactions/",
+        views.SafeMultisigTransactionDeprecatedListView.as_view(),
+        name="multisig-transactions-alias",
+    ),  # Deprecated
+    path(
+        "safes/<str:address>/delegates/<str:delegate_address>/",
+        views.SafeDelegateDestroyView.as_view(),
+        name="safe-delegate",
+    ),  # Deprecated
 ]
