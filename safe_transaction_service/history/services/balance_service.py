@@ -1,8 +1,6 @@
 import logging
 import operator
 from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
 from typing import List, Optional, Sequence
 
 from django.conf import settings
@@ -65,20 +63,6 @@ class Balance:
         if self.token and self.token.copy_price:
             return self.token.copy_price
         return self.token_address
-
-
-class FiatCode(Enum):
-    USD = 1
-    EUR = 2
-
-
-@dataclass
-class BalanceWithFiat(Balance):
-    eth_value: float  # Value in ether
-    timestamp: datetime  # Calculated timestamp
-    fiat_balance: float
-    fiat_conversion: float
-    fiat_code: str = FiatCode.USD.name
 
 
 class BalanceServiceProvider:
@@ -255,38 +239,3 @@ class BalanceService:
                     "Cannot get erc20 token info for token-address=%s", token_address
                 )
                 return None
-
-    def get_usd_balances(
-        self,
-        safe_address: ChecksumAddress,
-        only_trusted: bool = False,
-        exclude_spam: bool = False,
-    ) -> List[BalanceWithFiat]:
-        """
-        NOTE: PriceService was removed, this function return balances with price 0.
-
-        :param safe_address:
-        :param only_trusted: If True, return balance only for trusted tokens
-        :param exclude_spam: If True, exclude spam tokens
-        :return: List of BalanceWithFiat
-        """
-        balances: List[Balance] = self.get_balances(
-            safe_address, only_trusted, exclude_spam
-        )
-        balances_with_usd = []
-
-        for balance in balances:
-            balances_with_usd.append(
-                BalanceWithFiat(
-                    balance.token_address,
-                    balance.token,
-                    balance.balance,
-                    0.0,
-                    datetime.utcfromtimestamp(0),
-                    0.0,
-                    0.0,
-                    FiatCode.USD.name,
-                )
-            )
-
-        return balances_with_usd

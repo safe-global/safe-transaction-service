@@ -732,14 +732,6 @@ class SafeBalanceResponseSerializer(serializers.Serializer):
     balance = serializers.CharField()
 
 
-class SafeBalanceUsdResponseSerializer(SafeBalanceResponseSerializer):
-    eth_value = serializers.CharField()
-    timestamp = serializers.DateTimeField()
-    fiat_balance = serializers.CharField()
-    fiat_conversion = serializers.CharField()
-    fiat_code = serializers.CharField()
-
-
 class SafeCollectibleResponseSerializer(serializers.Serializer):
     address = serializers.CharField()
     token_name = serializers.CharField()

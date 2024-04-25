@@ -826,20 +826,6 @@ class SafeBalanceView(GenericAPIView):
             return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeBalanceUsdView(SafeBalanceView):
-    serializer_class = serializers.SafeBalanceUsdResponseSerializer
-
-    def get_result(self, *args, **kwargs):
-        return BalanceServiceProvider().get_usd_balances(*args, **kwargs)
-
-    @swagger_safe_balance_schema(serializer_class)
-    def get(self, *args, **kwargs):
-        """
-        Get balance for Ether and ERC20 tokens with USD fiat conversion
-        """
-        return super().get(*args, **kwargs)
-
-
 class TransferView(RetrieveAPIView):
     serializer_class = serializers.TransferWithTokenInfoResponseSerializer
     pagination_class = None

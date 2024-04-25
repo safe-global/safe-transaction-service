@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import pickle
-from dataclasses import asdict
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
@@ -46,8 +45,6 @@ from ..models import (
     SafeMasterCopy,
 )
 from ..serializers import TransferType
-from ..services import BalanceService
-from ..services.balance_service import Erc20InfoWithLogo
 from ..views import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
@@ -2089,79 +2086,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                         "decimals": erc20.functions.decimals().call(),
                         "logoUri": Token.objects.first().get_full_logo_uri(),
                     },
-                },
-            ],
-        )
-
-    @mock.patch.object(BalanceService, "get_token_info", autospec=True)
-    @mock.patch.object(timezone, "now", return_value=timezone.now())
-    def test_safe_balances_usd_view(
-        self,
-        timezone_now_mock: MagicMock,
-        get_token_info_mock: MagicMock,
-    ):
-        timestamp_str = "1970-01-01T00:00:00Z"
-        safe_address = Account.create().address
-        response = self.client.get(
-            reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-        SafeContractFactory(address=safe_address)
-        value = 7
-        self.send_ether(safe_address, 7)
-        response = self.client.get(
-            reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertIsNone(response.data[0]["token_address"])
-        self.assertEqual(response.data[0]["balance"], str(value))
-        self.assertEqual(response.data[0]["eth_value"], "0.0")
-
-        tokens_value = int(12 * 1e18)
-        erc20 = self.deploy_example_erc20(tokens_value, safe_address)
-        response = self.client.get(
-            reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-
-        erc20_info = Erc20InfoWithLogo(
-            erc20.address, "UXIO", "UXI", 18, None, "http://logo_uri.es"
-        )
-        get_token_info_mock.return_value = erc20_info
-
-        ERC20TransferFactory(address=erc20.address, to=safe_address)
-        response = self.client.get(
-            reverse("v1:history:safe-balances-usd", args=(safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        token_dict = asdict(erc20_info)
-        del token_dict["address"]
-        del token_dict["copy_price"]
-        self.assertCountEqual(
-            response.data,
-            [
-                {
-                    "token_address": None,
-                    "token": None,
-                    "balance": str(value),
-                    "eth_value": "0.0",
-                    "timestamp": timestamp_str,
-                    "fiat_balance": "0.0",
-                    "fiat_conversion": "0.0",
-                    "fiat_code": "USD",
-                },  # 7 wei is rounded to 0.0
-                {
-                    "token_address": erc20.address,
-                    "token": token_dict,
-                    "balance": str(tokens_value),
-                    "eth_value": "0.0",
-                    "timestamp": timestamp_str,
-                    "fiat_balance": "0.0",
-                    "fiat_conversion": "0.0",
-                    "fiat_code": "USD",
                 },
             ],
         )
