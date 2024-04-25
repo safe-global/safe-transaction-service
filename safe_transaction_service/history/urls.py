@@ -22,6 +22,11 @@ urlpatterns = [
         views.IndexingView.as_view(),
         name="indexing",
     ),
+    path(
+        "about/deployments/",
+        views.SafeDeployments.as_view(),
+        name="deployments",
+    ),
     path("data-decoder/", views.DataDecoderView.as_view(), name="data-decoder"),
     path("safes/<str:address>/", views.SafeInfoView.as_view(), name="safe-info"),
     path(

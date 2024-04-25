@@ -29,6 +29,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas
+from gnosis.safe.safe_deployments import safe_deployments
 
 from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
@@ -173,6 +174,75 @@ class SingletonsView(ListAPIView):
 
     def get_queryset(self):
         return SafeMasterCopy.objects.relevant()
+
+
+class SafeDeployments(ListAPIView):
+    """
+    Returns a list of safe deployments by version.
+    """
+
+    serializer_class = serializers.SafeDeploymentSerializer
+    pagination_class = None  # Don't show limit/offset in swagger
+
+    _schema_version_param = openapi.Parameter(
+        "version",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        default=None,
+        description="Filter by Safe version",
+    )
+    _schema_contract_param = openapi.Parameter(
+        "contract",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        default=None,
+        description="Filter by Safe contract name",
+    )
+
+    @swagger_auto_schema(
+        responses={404: "Provided version does not exist"},
+        manual_parameters=[
+            _schema_version_param,
+            _schema_contract_param,
+        ],
+    )
+    @method_decorator(cache_page(60))  # 60 seconds
+    def get(self, request):
+        """
+        Get current indexing status for ERC20/721 events
+        """
+        filter_version = self.request.query_params.get("version")
+        filter_contract = self.request.query_params.get("contract")
+
+        if filter_version and filter_version not in safe_deployments.keys():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        versions = [filter_version] if filter_version else list(safe_deployments.keys())
+        chain_id = get_chain_id()
+        data_response = []
+        for version in versions:
+            contracts = []
+            if not filter_contract:
+                for contract_name, addresses in safe_deployments[version].items():
+                    contracts.append(
+                        {
+                            "contract_name": contract_name,
+                            "address": addresses.get(str(chain_id)),
+                        }
+                    )
+            else:
+                # Filter by contract
+                if addresses := safe_deployments[version].get(filter_contract):
+                    contracts.append(
+                        {
+                            "contract_name": filter_contract,
+                            "address": addresses.get(str(chain_id)),
+                        }
+                    )
+
+            data_response.append({"version": version, "contracts": contracts})
+
+        return Response(status=status.HTTP_200_OK, data=data_response)
 
 
 class AllTransactionsListView(ListAPIView):
