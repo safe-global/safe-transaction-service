@@ -324,7 +324,7 @@ class AllTransactionsListView(ListAPIView):
         redis = get_redis()
 
         # Get all relevant elements for a Safe to be cached
-        cache_dir = transaction_service.get_all_txs_cache_dir(safe)
+        cache_dir = transaction_service.get_all_txs_cache_dir_key(safe)
         cache_field = (
             f"{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{ordering}"
         )
