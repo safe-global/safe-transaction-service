@@ -105,12 +105,11 @@ class TransactionService:
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
 
-    def get_all_txs_cache_dir(self, safe_address: ChecksumAddress) -> str:
+    def get_all_txs_cache_dir_key(self, safe_address: ChecksumAddress) -> str:
         return f"all-txs:{safe_address}"
 
     def del_all_txs_cache_dir(self, safe_address: ChecksumAddress) -> None:
-        redis = get_redis()
-        redis.unlink(self.get_all_txs_cache_dir(safe_address))
+        self.redis.unlink(self.get_all_txs_cache_dir_key(safe_address))
 
     # End of cache methods ----------------------------
 

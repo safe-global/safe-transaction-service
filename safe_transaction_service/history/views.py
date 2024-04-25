@@ -331,7 +331,7 @@ class AllTransactionsListView(ListAPIView):
         lock_key = f"locks:{cache_dir}:{cache_field}"
 
         logger.debug(
-            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s cache-key=%s",
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s lock-key=%s",
             self.__class__.__name__,
             safe,
             executed,

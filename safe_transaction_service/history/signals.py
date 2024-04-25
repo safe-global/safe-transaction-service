@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Optional, Tuple, Type, Union
+from typing import List, Optional, Type, Union
 
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
@@ -115,34 +115,53 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
-def get_safe_addresses_from_instance(
+def get_safe_addresses_involved_from_db_instance(
     instance: Union[
         TokenTransfer,
         InternalTx,
         MultisigConfirmation,
         MultisigTransaction,
     ]
-) -> Tuple[Optional[ChecksumAddress], Optional[ChecksumAddress]]:
+) -> List[Optional[ChecksumAddress]]:
+    """
 
+    :param instance:
+    :return: List of Safe addresses from the provided instance
+    """
+    addresses = []
     if isinstance(instance, TokenTransfer):
-        return (instance.to, instance._from)
+        addresses.append(instance.to)
+        addresses.append(instance._from)
+        return addresses
     elif isinstance(instance, MultisigTransaction):
-        return (instance.safe, None)
+        addresses.append(instance.safe)
+        return addresses
     elif isinstance(instance, MultisigConfirmation) and instance.multisig_transaction:
-        return (instance.multisig_transaction.safe, None)
+        addresses.append(instance.multisig_transaction.safe)
+        return addresses
     elif isinstance(instance, InternalTx):
-        return (instance.to, None)
+        addresses.append(instance.to)
+        return addresses
 
-    return (None, None)
+    return addresses
 
 
-def _clean_all_txs_cache(instance):
+def _clean_all_txs_cache(
+    instance: Union[
+        TokenTransfer,
+        InternalTx,
+        MultisigConfirmation,
+        MultisigTransaction,
+    ]
+) -> None:
+    """
+    Remove the all-transactions cache related with instance modified
+
+    :param instance:
+    """
     transaction_service = TransactionServiceProvider()
-    to_address, from_address = get_safe_addresses_from_instance(instance)
-    if to_address:
-        transaction_service.del_all_txs_cache_dir(to_address)
-    if from_address:
-        transaction_service.del_all_txs_cache_dir(from_address)
+    for address in get_safe_addresses_involved_from_db_instance(instance):
+        transaction_service.del_all_txs_cache_dir(address)
 
 
 def _process_webhook(
@@ -161,6 +180,7 @@ def _process_webhook(
         created and deleted
     ), "An instance cannot be created and deleted at the same time"
 
+    # Ignore SafeContract because it is not affecting all-transaction cache.
     if sender != SafeContract:
         _clean_all_txs_cache(instance)
 
