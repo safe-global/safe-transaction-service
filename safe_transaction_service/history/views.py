@@ -208,9 +208,6 @@ class SafeDeploymentsView(ListAPIView):
     )
     @method_decorator(cache_page(60))  # 60 seconds
     def get(self, request):
-        """
-        Get current indexing status for ERC20/721 events
-        """
         filter_version = self.request.query_params.get("version")
         filter_contract = self.request.query_params.get("contract")
 
@@ -218,20 +215,12 @@ class SafeDeploymentsView(ListAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         versions = [filter_version] if filter_version else list(safe_deployments.keys())
-        chain_id = get_chain_id()
+        chain_id = str(get_chain_id())
         data_response = []
         for version in versions:
             contracts = []
-            if not filter_contract:
-                for contract_name, addresses in safe_deployments[version].items():
-                    contracts.append(
-                        {
-                            "contract_name": contract_name,
-                            "address": addresses.get(str(chain_id)),
-                        }
-                    )
-            else:
-                # Filter by contract
+            if filter_contract:
+                # Filter by contract name
                 if addresses := safe_deployments[version].get(filter_contract):
                     contracts.append(
                         {
@@ -239,10 +228,20 @@ class SafeDeploymentsView(ListAPIView):
                             "address": addresses.get(str(chain_id)),
                         }
                     )
+            else:
+                for contract_name, addresses in safe_deployments[version].items():
+                    contracts.append(
+                        {
+                            "contract_name": contract_name,
+                            "address": addresses.get(chain_id),
+                        }
+                    )
 
             data_response.append({"version": version, "contracts": contracts})
 
-        return Response(status=status.HTTP_200_OK, data=data_response)
+        serializer = self.serializer_class(data=data_response, many=True)
+        serializer.is_valid()
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
 class AllTransactionsListView(ListAPIView):
