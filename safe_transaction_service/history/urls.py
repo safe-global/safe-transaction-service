@@ -24,7 +24,7 @@ urlpatterns = [
     ),
     path(
         "about/deployments/",
-        views.SafeDeployments.as_view(),
+        views.SafeDeploymentsView.as_view(),
         name="deployments",
     ),
     path("data-decoder/", views.DataDecoderView.as_view(), name="data-decoder"),

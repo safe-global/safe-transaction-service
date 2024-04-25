@@ -62,6 +62,12 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
+from .mocks.deployments_mock import (
+    mainnet_deployments,
+    mainnet_deployments_1_4_1,
+    mainnet_deployments_1_4_1_multisend,
+    mainnet_deployments_1_4_1_safe,
+)
 from .mocks.mocks_safe_creation import (
     create_cpk_test_data,
     create_test_data_v1_0_0,
@@ -203,6 +209,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 47)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
+
+    # Mock chain id to mainnet
+    @mock.patch("safe_transaction_service.history.views.get_chain_id", return_value=1)
+    def test_safe_deployments_view(self, get_chain_id_mock):
+        url = reverse("v1:history:deployments")
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), mainnet_deployments)
+
+        response = self.client.get(url + "?version=5.0.0", format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        response = self.client.get(url + "?version=1.4.1", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), [mainnet_deployments_1_4_1])
+
+        response = self.client.get(
+            url + "?version=1.4.1&contract=MultiSend", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [{"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_multisend]}],
+        )
+
+        response = self.client.get(url + "?contract=Safe", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [
+                {"version": "1.0.0", "contracts": []},
+                {"version": "1.1.1", "contracts": []},
+                {"version": "1.2.0", "contracts": []},
+                {"version": "1.3.0", "contracts": []},
+                {"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_safe]},
+            ],
+        )
 
     def test_all_transactions_view(self):
         safe_address = Account.create().address

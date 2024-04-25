@@ -176,7 +176,7 @@ class SingletonsView(ListAPIView):
         return SafeMasterCopy.objects.relevant()
 
 
-class SafeDeployments(ListAPIView):
+class SafeDeploymentsView(ListAPIView):
     """
     Returns a list of safe deployments by version.
     """
