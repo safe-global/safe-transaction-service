@@ -75,11 +75,6 @@ urlpatterns = [
         name="safe-balances",
     ),
     path(
-        "safes/<str:address>/balances/usd/",
-        views.SafeBalanceUsdView.as_view(),
-        name="safe-balances-usd",
-    ),
-    path(
         "multisig-transactions/<str:safe_tx_hash>/",
         views.SafeMultisigTransactionDetailView.as_view(),
         name="multisig-transaction",
