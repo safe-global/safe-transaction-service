@@ -162,7 +162,7 @@ class SafeMessageSignatureSerializer(
         return safe_message_confirmation
 
 
-# Reponse serializers
+# Response serializers
 class SafeMessageConfirmationResponseSerializer(serializers.Serializer):
     created = serializers.DateTimeField()
     modified = serializers.DateTimeField()
