@@ -81,7 +81,7 @@ class QueueService:
 
     def get_connection(self) -> Optional[BrokerConnection]:
         """
-        :return: A `BrokerConnection` from the connection pool if there is one available, othwerwise
+        :return: A `BrokerConnection` from the connection pool if there is one available, otherwise
             returns a new BrokerConnection
         """
         if (
