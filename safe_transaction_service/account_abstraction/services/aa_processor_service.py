@@ -27,6 +27,7 @@ from ..models import SafeOperation as SafeOperationModel
 from ..models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ..models import UserOperation as UserOperationModel
 from ..models import UserOperationReceipt as UserOperationReceiptModel
+from ..utils import get_bundler_client
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,7 @@ class ExecutionFromSafeModuleNotDetected(AaProcessorServiceException):
 @cache
 def get_aa_processor_service() -> "AaProcessorService":
     ethereum_client = EthereumClientProvider()
-    bundler_client = (
-        BundlerClient(settings.ETHEREUM_4337_BUNDLER_URL)
-        if settings.ETHEREUM_4337_BUNDLER_URL
-        else None
-    )
+    bundler_client = get_bundler_client()
     if not bundler_client:
         logger.warning("Ethereum 4337 bundler client was not configured")
     supported_entry_points = settings.ETHEREUM_4337_SUPPORTED_ENTRY_POINTS
