@@ -240,7 +240,7 @@ class SafeDeploymentsView(ListAPIView):
             data_response.append({"version": version, "contracts": contracts})
 
         serializer = self.serializer_class(data=data_response, many=True)
-        serializer.is_valid()
+        serializer.is_valid(raise_exception=True)
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
