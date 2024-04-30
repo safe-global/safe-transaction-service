@@ -111,7 +111,7 @@ class TransactionService:
         https://redis.io/docs/latest/develop/data-types/hashes/
 
         :param safe_address:
-        :return: hash key
+        :return: cache hash key
         """
         return f"all-txs:{safe_address}"
 

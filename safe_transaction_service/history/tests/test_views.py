@@ -45,7 +45,6 @@ from ..models import (
     SafeMasterCopy,
 )
 from ..serializers import TransferType
-
 from ..services import TransactionServiceProvider
 from ..views import SafeMultisigTransactionListView
 from .factories import (
@@ -408,12 +407,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             MultisigTransactionFactory(safe=safe_address),
         ]
         # all-txs:{safe_address}
-        cache_dir = f"all-txs:{safe_address}"
+        cache_hash_key = f"all-txs:{safe_address}"
         # {executed}{queued}{trusted}:{limit}:{offset}:{ordering}
-        cache_field = "100:10:0:execution_date"
+        cache_query_field = "100:10:0:execution_date"
         redis = get_redis()
-        redis.unlink(cache_dir)
-        cache_result = redis.hget(cache_dir, cache_field)
+        redis.unlink(cache_hash_key)
+        cache_result = redis.hget(cache_hash_key, cache_query_field)
         # Should be empty at the beginning
         self.assertIsNone(cache_result)
 
@@ -424,7 +423,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
 
-        cache_result = redis.hget(cache_dir, cache_field)
+        cache_result = redis.hget(cache_hash_key, cache_query_field)
         # Should be stored in redis cache
         self.assertIsNotNone(cache_result)
         # Cache should content the expected values
@@ -443,8 +442,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             )
             self.assertEqual(cache_value["safe_nonce"], factory_transaction.nonce)
         # Modify cache to empty list
-        redis.hset(cache_dir, cache_field, pickle.dumps(([], 0)))
-        redis.expire(cache_dir, 60 * 10)
+        redis.hset(cache_hash_key, cache_query_field, pickle.dumps(([], 0)))
+        redis.expire(cache_hash_key, 60 * 10)
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))
             + "?executed=True&queued=False&trusted=False&ordering=execution_date"
