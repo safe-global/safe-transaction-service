@@ -473,11 +473,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         for limit, offset in ((57, 12), (13, 24)):
             with self.subTest(limit=limit, offset=offset):
                 # all-txs:{safe_address}
-                cache_dir = f"all-txs:{safe_address}"
+                cache_hash_key = f"all-txs:{safe_address}"
                 # {executed}{queued}{trusted}:{limit}:{offset}:{ordering}:{relevant_elements}
-                cache_field = f"100:{limit}:{offset}:execution_date"
+                cache_query_field = f"100:{limit}:{offset}:execution_date"
                 redis = get_redis()
-                self.assertFalse(redis.hexists(cache_dir, cache_field))
+                self.assertFalse(redis.hexists(cache_hash_key, cache_query_field))
 
                 response = self.client.get(
                     reverse("v1:history:all-transactions", args=(safe_address,))
@@ -485,7 +485,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 )
                 self.assertEqual(response.data["count"], number_transactions)
                 self.assertEqual(len(response.data["results"]), limit)
-                self.assertTrue(redis.hexists(cache_dir, cache_field))
+                self.assertTrue(redis.hexists(cache_hash_key, cache_query_field))
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
