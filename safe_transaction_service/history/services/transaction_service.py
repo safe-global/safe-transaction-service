@@ -25,7 +25,6 @@ from ..models import (
     InternalTx,
     ModuleTransaction,
     MultisigTransaction,
-    SafeContract,
     TransferDict,
 )
 from ..serializers import (
@@ -106,22 +105,26 @@ class TransactionService:
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
 
-    # End of cache methods ----------------------------
-
-    def get_count_relevant_txs_for_safe(self, safe_address: ChecksumAddress) -> int:
+    def get_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> str:
         """
-        This method searches multiple tables and count every tx or event for a Safe.
-        It will return the same or higher value if compared to counting ``get_all_tx_identifiers``
-        as that method will group some transactions (for example, 3 ERC20 can be grouped in a ``MultisigTransaction``,
-        so it will be ``1`` element for ``get_all_tx_identifiers`` but ``4`` for this function.
-
-        This query should be pretty fast, and it's meant to be used for invalidating caches.
+        Retrieves a redis hash for the provided Safe address that group several fields together, so when something changes for that address everything in cache gets invalidated at once.
+        https://redis.io/docs/latest/develop/data-types/hashes/
 
         :param safe_address:
-        :return: number of relevant txs for a Safe
+        :return: cache hash key
         """
+        return f"all-txs:{safe_address}"
 
-        return SafeContract.objects.get_count_relevant_txs_for_safe(safe_address)
+    def del_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> None:
+        """
+        Deletes the hash for a specific Safe address, invalidating all-transactions cache related with Safe at once.
+
+        :param safe_address:
+        :return:
+        """
+        self.redis.unlink(self.get_all_txs_cache_hash_key(safe_address))
+
+    # End of cache methods ----------------------------
 
     def get_all_tx_identifiers(
         self,

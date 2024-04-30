@@ -324,18 +324,20 @@ class AllTransactionsListView(ListAPIView):
         redis = get_redis()
 
         # Get all relevant elements for a Safe to be cached
-        relevant_elements = transaction_service.get_count_relevant_txs_for_safe(safe)
-        cache_key = f"all-txs:{safe}:{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{ordering}:{relevant_elements}"
-        lock_key = f"locks:{cache_key}"
+        cache_hash_key = transaction_service.get_all_txs_cache_hash_key(safe)
+        cache_query_field = (
+            f"{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{ordering}"
+        )
+        lock_key = f"locks:{cache_hash_key}:{cache_query_field}"
 
         logger.debug(
-            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s cache-key=%s",
+            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s lock-key=%s",
             self.__class__.__name__,
             safe,
             executed,
             queued,
             trusted,
-            cache_key,
+            lock_key,
         )
         if not cache_timeout:
             # Cache disabled
@@ -347,7 +349,7 @@ class AllTransactionsListView(ListAPIView):
             lock_key,
             timeout=settings.GUNICORN_REQUEST_TIMEOUT,  # This prevents a service restart to leave a lock forever
         ):
-            if result := redis.get(cache_key):
+            if result := redis.hget(cache_hash_key, cache_query_field):
                 # Count needs to be retrieved to set it up the paginator
                 page, count = pickle.loads(result)
                 # Setting the paginator like this is not very elegant and needs to be tested really well
@@ -360,10 +362,12 @@ class AllTransactionsListView(ListAPIView):
             page = self.get_page_tx_identifiers(
                 safe, executed, queued, trusted, ordering, limit, offset
             )
-            redis.set(
-                cache_key, pickle.dumps((page, self.paginator.count)), ex=cache_timeout
+            redis.hset(
+                cache_hash_key,
+                cache_query_field,
+                pickle.dumps((page, self.paginator.count)),
             )
-
+            redis.expire(cache_hash_key, cache_timeout)
             return page
 
     def list(self, request, *args, **kwargs):
