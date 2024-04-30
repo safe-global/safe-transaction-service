@@ -124,6 +124,7 @@ def get_safe_addresses_involved_from_db_instance(
     ]
 ) -> List[Optional[ChecksumAddress]]:
     """
+    Retrieves the Safe addresses involved in the provided database instance.
 
     :param instance:
     :return: List of Safe addresses from the provided instance
@@ -161,7 +162,7 @@ def _clean_all_txs_cache(
     """
     transaction_service = TransactionServiceProvider()
     for address in get_safe_addresses_involved_from_db_instance(instance):
-        transaction_service.del_all_txs_cache_dir(address)
+        transaction_service.del_all_txs_cache_hash_key(address)
 
 
 def _process_webhook(

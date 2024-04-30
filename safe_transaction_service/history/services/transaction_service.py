@@ -105,11 +105,24 @@ class TransactionService:
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
 
-    def get_all_txs_cache_dir_key(self, safe_address: ChecksumAddress) -> str:
+    def get_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> str:
+        """
+        Retrieves a redis hash for the provided Safe address that group several fields together, so when something changes for that address everything in cache gets invalidated at once.
+        https://redis.io/docs/latest/develop/data-types/hashes/
+
+        :param safe_address:
+        :return: hash key
+        """
         return f"all-txs:{safe_address}"
 
-    def del_all_txs_cache_dir(self, safe_address: ChecksumAddress) -> None:
-        self.redis.unlink(self.get_all_txs_cache_dir_key(safe_address))
+    def del_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> None:
+        """
+        Deletes the hash for a specific Safe address, invalidating all-transactions cache related with Safe at once.
+
+        :param safe_address:
+        :return:
+        """
+        self.redis.unlink(self.get_all_txs_cache_hash_key(safe_address))
 
     # End of cache methods ----------------------------
 
