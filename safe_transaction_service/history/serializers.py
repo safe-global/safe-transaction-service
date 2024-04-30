@@ -1204,3 +1204,13 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
         raise ValidationError(
             f"Signature does not match provided delegate={delegate} or delegator={delegator}"
         )
+
+
+class SafeDeploymentContractSerializer(serializers.Serializer):
+    contract_name = serializers.CharField()
+    address = EthereumAddressField(allow_null=True)
+
+
+class SafeDeploymentSerializer(serializers.Serializer):
+    version = serializers.CharField(max_length=10)  # Example 1.3.0
+    contracts = SafeDeploymentContractSerializer(many=True)
