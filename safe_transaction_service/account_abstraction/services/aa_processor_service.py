@@ -15,6 +15,7 @@ from gnosis.eth.account_abstraction import (
     BundlerClientException,
     UserOperation,
     UserOperationReceipt,
+    UserOperationV07,
 )
 from gnosis.eth.utils import fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation
@@ -33,6 +34,10 @@ logger = logging.getLogger(__name__)
 
 
 class AaProcessorServiceException(Exception):
+    pass
+
+
+class UserOperationNotSupportedException(Exception):
     pass
 
 
@@ -285,6 +290,10 @@ class AaProcessorService:
                 raise BundlerClientException(
                     f"user-operation={user_operation_hash} returned `null`"
                 )
+            if isinstance(user_operation, UserOperationV07):
+                raise UserOperationNotSupportedException(
+                    f"user-operation={user_operation_hash} for EntryPoint v0.7.0 is not supported"
+                )
 
             try:
                 user_operation_model = UserOperationModel.objects.get(
@@ -355,6 +364,12 @@ class AaProcessorService:
         for log in aa_logs:
             try:
                 self.index_user_operation(safe_address, log, ethereum_tx)
+            except UserOperationNotSupportedException as exc:
+                logger.error(
+                    "[%s] Error processing user-operation: %s",
+                    safe_address,
+                    exc,
+                )
             except BundlerClientException as exc:
                 logger.error(
                     "[%s] Error retrieving user-operation from bundler API: %s",
