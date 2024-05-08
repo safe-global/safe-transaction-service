@@ -3,6 +3,8 @@ from unittest.mock import MagicMock
 
 from django.test import TestCase
 
+from eth_account import Account
+
 from gnosis.eth import EthereumClient
 from gnosis.eth.account_abstraction import BundlerClient
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
@@ -13,6 +15,8 @@ from gnosis.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
     user_operation_receipt_mock,
+    user_operation_v07_hash,
+    user_operation_v07_mock,
 )
 
 from safe_transaction_service.account_abstraction.services import (
@@ -25,6 +29,8 @@ from ...models import SafeOperation as SafeOperationModel
 from ...models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ...models import UserOperation as UserOperationModel
 from ...models import UserOperationReceipt as UserOperationReceiptModel
+from ...services.aa_processor_service import UserOperationNotSupportedException
+from ...utils import get_bundler_client
 from ..mocks import (
     aa_chain_id,
     aa_expected_safe_operation_hash,
@@ -38,13 +44,16 @@ class TestAaProcessorService(TestCase):
 
     def setUp(self):
         super().setUp()
+        get_bundler_client.cache_clear()
         get_aa_processor_service.cache_clear()
         with self.settings(ETHEREUM_4337_BUNDLER_URL="https://localhost"):
             # Bundler must be defined so it's initialized and it can be mocked
             self.aa_processor_service = get_aa_processor_service()
+            self.assertIsNotNone(self.aa_processor_service.bundler_client)
 
     def tearDown(self):
         super().tearDown()
+        get_bundler_client.cache_clear()
         get_aa_processor_service.cache_clear()
 
     @mock.patch.object(
@@ -96,3 +105,52 @@ class TestAaProcessorService(TestCase):
             user_operation_confirmation_model.owner,
             "0x5aC255889882aCd3da2aA939679E3f3d4cea221e",
         )
+
+    @mock.patch.object(
+        BundlerClient,
+        "get_user_operation_receipt",
+        autospec=True,
+        return_value=UserOperationReceiptClass.from_bundler_response(
+            user_operation_receipt_mock["result"]
+        ),
+    )
+    @mock.patch.object(
+        BundlerClient,
+        "get_user_operation_by_hash",
+        autospec=True,
+        return_value=UserOperationClass.from_bundler_response(
+            user_operation_v07_hash.hex(), user_operation_v07_mock["result"]
+        ),
+    )
+    @mock.patch.object(
+        EthereumClient,
+        "get_chain_id",
+        autospec=True,
+        return_value=aa_chain_id,  # Needed for hashes to match
+    )
+    def test_process_aa_transaction_entrypoint_V07(
+        self,
+        get_chain_id_mock: MagicMock,
+        get_user_operation_by_hash_mock: MagicMock,
+        get_user_operation_receipt_mock: MagicMock,
+    ):
+        """
+        Entrypoint v0.7.0 endpoints should be ignored
+        """
+        ethereum_tx = history_factories.EthereumTxFactory(
+            logs=[clean_receipt_log(log) for log in aa_tx_receipt_mock["logs"]]
+        )
+        with self.assertRaisesMessage(
+            UserOperationNotSupportedException, "for EntryPoint v0.7.0 is not supported"
+        ):
+            self.aa_processor_service.index_user_operation(
+                Account.create().address,  # Not relevant
+                user_operation_v07_hash,
+                ethereum_tx,
+            )
+
+        self.aa_processor_service.process_aa_transaction(aa_safe_address, ethereum_tx)
+        self.assertEqual(UserOperationModel.objects.count(), 0)
+        self.assertEqual(SafeOperationModel.objects.count(), 0)
+        self.assertEqual(UserOperationReceiptModel.objects.count(), 0)
+        self.assertEqual(SafeOperationConfirmationModel.objects.count(), 0)
