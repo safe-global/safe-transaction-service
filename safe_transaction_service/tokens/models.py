@@ -1,7 +1,7 @@
 import logging
 import os
 from json import JSONDecodeError
-from typing import Any, Dict, List, Optional
+from typing import Optional, TypedDict
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -128,7 +128,7 @@ class TokenManager(models.Manager):
             )
             return None
 
-        name_and_symbol: List[str] = []
+        name_and_symbol: list[str] = []
         for text in (erc_info.name, erc_info.symbol):
             if isinstance(text, str):
                 text = text.encode()
@@ -302,6 +302,16 @@ class Token(models.Model):
         return self.copy_price or self.address
 
 
+class TokenListToken(TypedDict):
+    symbol: str
+    name: str
+    address: str  # Can be an ENS address
+    decimals: int
+    chainId: int
+    logoURI: str
+    tags: list[str] | None
+
+
 class TokenList(models.Model):
     url = models.URLField(unique=True)
     description = models.CharField(max_length=200)
@@ -309,7 +319,7 @@ class TokenList(models.Model):
     def __str__(self):
         return f"{self.description} token list"
 
-    def get_tokens(self) -> List[Dict[str, Any]]:
+    def get_tokens(self) -> list[TokenListToken]:
         try:
             response = requests.get(self.url, timeout=5)
             if response.ok:
