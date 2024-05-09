@@ -246,7 +246,7 @@ class AaProcessorService:
                 actual_gas_cost=user_operation_receipt.actual_gas_cost,
                 actual_gas_used=user_operation_receipt.actual_gas_used,
                 success=user_operation_receipt.success,
-                reason=user_operation_receipt.reason,
+                reason=user_operation_receipt.reason or "",
                 deposited=deposited,
             ),
             user_operation_receipt,
