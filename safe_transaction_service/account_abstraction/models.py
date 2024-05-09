@@ -117,7 +117,7 @@ class UserOperationReceipt(models.Model):
     actual_gas_cost = Uint256Field()
     actual_gas_used = Uint256Field()
     success = models.BooleanField()
-    reason = models.CharField(max_length=256)
+    reason = models.CharField(max_length=256, blank=True)
     deposited = Uint256Field()
 
     def __str__(self) -> str:
