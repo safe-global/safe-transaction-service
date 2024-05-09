@@ -7,15 +7,16 @@ from django.utils import timezone
 
 from celery import app
 from celery.utils.log import get_task_logger
+from web3.exceptions import Web3Exception
 
-from gnosis.eth.ethereum_client import EthereumNetwork
+from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
 from gnosis.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from .exceptions import TokenListRetrievalException
-from .models import Token, TokenList
+from .models import Token, TokenList, TokenListToken
 
 logger = get_task_logger(__name__)
 
@@ -66,7 +67,7 @@ def update_token_info_from_token_list_task() -> int:
 
     :return: Number of tokens marked as `trusted`
     """
-    tokens = []
+    tokens: list[TokenListToken] = []
     for token_list in TokenList.objects.all():
         try:
             tokens += token_list.get_tokens()
@@ -77,13 +78,24 @@ def update_token_info_from_token_list_task() -> int:
         return 0
 
     # Make sure current chainId matches the one in the list
-    ethereum_network = get_ethereum_network()
+    current_chain_id = get_ethereum_network().value
+    ethereum_client = EthereumClientProvider()
 
-    token_addresses = [
-        fast_to_checksum_address(token["address"])
-        for token in tokens
-        if token.get("chainId") == ethereum_network.value
-    ]
+    token_addresses = []
+    for token in tokens:
+        if token.get("chainId") == current_chain_id:
+            token_address = token["address"]
+            if token_address.startswith("0x"):
+                token_addresses.append(fast_to_checksum_address(token_address))
+            else:
+                # Try ENS resolve
+                try:
+                    if resolved_address := ethereum_client.w3.ens.address(
+                        token_address
+                    ):
+                        token_addresses.append(resolved_address)
+                except (ValueError, Web3Exception):
+                    logger.warning("Cannot resolve %s ENS address", token_address)
 
     with transaction.atomic():
         Token.objects.update(trusted=False)

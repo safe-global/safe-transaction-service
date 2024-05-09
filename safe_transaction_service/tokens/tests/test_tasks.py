@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 
 from django.test import TestCase
 
+from ens import ENS
+
 from gnosis.eth.ethereum_client import EthereumNetwork
 
 from ...utils.redis import get_redis
@@ -51,9 +53,34 @@ class TestTasks(TestCase):
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 0)
 
         # Create a token in the list, it should be updated
-        TokenFactory(address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+        token = TokenFactory(address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+        self.assertFalse(token.trusted)
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
 
         # Create another token in the list, both should be updated
-        TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+        token_2 = TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+        self.assertFalse(token_2.trusted)
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 2)
+
+        # Test ENS
+        get_tokens_mock.return_value.append(
+            {
+                "chainId": 1,
+                "address": "safe.eth",
+                "symbol": "SAFE",
+                "name": "Safe Token",
+                "decimals": 18,
+            }
+        )
+
+        safe_token_address = "0x5aFE3855358E112B5647B952709E6165e1c1eEEe"
+        token_ens = TokenFactory(address=safe_token_address)
+        self.assertFalse(token_ens.trusted)
+
+        # Ens cannot be resolved
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 2)
+
+        with mock.patch.object(ENS, "address", return_value=safe_token_address):
+            self.assertEqual(update_token_info_from_token_list_task.delay().result, 3)
+            token_ens.refresh_from_db()
+            self.assertTrue(token_ens.trusted)
