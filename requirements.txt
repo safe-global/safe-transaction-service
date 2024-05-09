@@ -13,7 +13,7 @@ django-environ==0.11.2
 django-extensions==3.2.3
 django-filter==24.2
 django-imagekit==5.0.0
-django-model-utils==4.5.0
+django-model-utils==4.5.1
 django-redis==5.4.0
 django-s3-storage==0.15.0
 django-timezone-field==6.1.0
