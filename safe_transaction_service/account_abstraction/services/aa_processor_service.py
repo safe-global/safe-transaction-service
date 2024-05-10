@@ -23,7 +23,7 @@ from gnosis.safe.safe_signature import SafeSignature
 
 from safe_transaction_service.history import models as history_models
 
-from ..constants import USER_OPERATION_EVENT_TOPICS, USER_OPERATION_NUMBER_TOPICS
+from ..constants import USER_OPERATION_EVENT_TOPIC, USER_OPERATION_NUMBER_TOPICS
 from ..models import SafeOperation as SafeOperationModel
 from ..models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ..models import UserOperation as UserOperationModel
@@ -85,7 +85,7 @@ class AaProcessorService:
             for log in logs
             if (
                 len(log["topics"]) == USER_OPERATION_NUMBER_TOPICS
-                and HexBytes(log["topics"][0]) in USER_OPERATION_EVENT_TOPICS
+                and HexBytes(log["topics"][0]) == USER_OPERATION_EVENT_TOPIC
                 and fast_to_checksum_address(log["address"])
                 in self.supported_entry_points  # Only index supported entryPoints
                 and fast_to_checksum_address(log["topics"][2][-40:])
@@ -240,13 +240,21 @@ class AaProcessorService:
             tx_hash,
         )
 
+        # Cut reason if longer than `max_length`
+        reason = (
+            user_operation_receipt.reason[
+                : UserOperationReceiptModel._meta.get_field("reason").max_length
+            ]
+            if user_operation_receipt.reason
+            else ""
+        )
         return (
             UserOperationReceiptModel.objects.create(
                 user_operation=user_operation_model,
                 actual_gas_cost=user_operation_receipt.actual_gas_cost,
                 actual_gas_used=user_operation_receipt.actual_gas_used,
                 success=user_operation_receipt.success,
-                reason=user_operation_receipt.reason or "",
+                reason=reason,
                 deposited=deposited,
             ),
             user_operation_receipt,

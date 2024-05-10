@@ -52,7 +52,7 @@ from gnosis.safe.safe import SafeInfo
 from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.account_abstraction.constants import (
-    USER_OPERATION_EVENT_TOPICS,
+    USER_OPERATION_EVENT_TOPIC,
 )
 from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.utils.constants import (
@@ -372,8 +372,7 @@ class EthereumTxManager(models.Manager):
         """
         :return: Transactions containing ERC4337 `UserOperation` event
         """
-        user_operation_event_topic = list(USER_OPERATION_EVENT_TOPICS)[0].hex()
-        query = '{"topics": ["' + user_operation_event_topic + '"]}'
+        query = '{"topics": ["' + USER_OPERATION_EVENT_TOPIC.hex() + '"]}'
 
         return self.raw(
             f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
