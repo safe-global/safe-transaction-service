@@ -3,7 +3,6 @@ from typing import Optional, Sequence
 from django.core.management.base import BaseCommand
 
 from eth_typing import ChecksumAddress
-from hexbytes import HexBytes
 
 from gnosis.eth.utils import fast_to_checksum_address
 
@@ -11,6 +10,7 @@ from safe_transaction_service.history.models import EthereumTx
 
 from ...constants import USER_OPERATION_EVENT_TOPIC
 from ...services import get_aa_processor_service
+from ...utils import get_user_operation_sender_from_user_operation_log
 
 
 class Command(BaseCommand):
@@ -46,8 +46,8 @@ class Command(BaseCommand):
         for tx in EthereumTx.objects.account_abstraction_txs():
             for log in tx.logs:
                 if log["topics"][0] == topic:
-                    safe_address = fast_to_checksum_address(
-                        HexBytes(log["topics"][2])[-20:]
+                    safe_address = get_user_operation_sender_from_user_operation_log(
+                        log
                     )
                     if addresses and safe_address not in addresses:
                         continue
