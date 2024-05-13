@@ -41,10 +41,6 @@ class UserOperationNotSupportedException(Exception):
     pass
 
 
-class ExecutionFromSafeModuleNotDetected(AaProcessorServiceException):
-    pass
-
-
 @cache
 def get_aa_processor_service() -> "AaProcessorService":
     ethereum_client = EthereumClientProvider()
@@ -155,19 +151,22 @@ class AaProcessorService:
         """
 
         if not (module_address := user_operation_receipt.get_module_address()):
+            # UserOperation it's being indexed as UserOperation event been emitted. So
+            # `nonce` was increased and the UserOperation must be indexed, but we should log the information
+            # so it's easy to debug edge cases, as 4337 entrypoint is still a work in progress.
+            logger.info(
+                "[%s] Cannot find ExecutionFromModuleSuccess or ExecutionFromModuleFailure "
+                "events for user-operation-hash=%s , it seems like UserOperation was reverted",
+                user_operation_model.sender,
+                user_operation.user_operation_hash.hex(),
+            )
             if user_operation_receipt.get_deployed_account():
-                # UserOperation `initCode` was executed but `callData` failed, so account was deployed but no
-                # SafeOperation was executed
+                # UserOperation `initCode` was executed but `callData` failed, so account was deployed but
+                # SafeOperation was reverted
                 logger.info(
                     "[%s] user-operation-hash=%s was reverted but contract was deployed",
                     user_operation_model.sender,
                     user_operation.user_operation_hash.hex(),
-                )
-                return None
-            else:
-                raise ExecutionFromSafeModuleNotDetected(
-                    f"Cannot find ExecutionFromModuleSuccess or ExecutionFromModuleFailure events for "
-                    f"user-operation-hash={user_operation.user_operation_hash.hex()}"
                 )
 
         # Build SafeOperation from UserOperation
