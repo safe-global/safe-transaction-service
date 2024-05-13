@@ -1,4 +1,4 @@
-![Build Status](https://github.com/safe-global/safe-transaction-service/workflows/Python%20CI/badge.svg?branch=main)
+[![CI/CD](https://github.com/safe-global/safe-transaction-service/actions/workflows/python.yml/badge.svg)](https://github.com/safe-global/safe-transaction-service/actions/workflows/python.yml)
 [![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-transaction-service/badge.svg?branch=main)](https://coveralls.io/github/safe-global/safe-transaction-service?branch=main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)
