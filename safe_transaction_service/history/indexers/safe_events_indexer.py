@@ -5,6 +5,7 @@ from typing import List, Optional
 from django.db import IntegrityError, transaction
 
 from eth_abi import decode as decode_abi
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from web3.contract.contract import ContractEvent
@@ -299,6 +300,13 @@ class SafeEventsIndexer(EventsIndexer):
         ethereum_block = EthereumBlock.objects.values("number", "timestamp").get(
             txs=ethereum_tx_hash
         )
+        logger.debug(
+            "[%s] %s - tx-hash=%s - Processing event %s",
+            safe_address,
+            event_name,
+            ethereum_tx_hash,
+            decoded_element,
+        )
 
         internal_tx = InternalTx(
             ethereum_tx_id=ethereum_tx_hash,
@@ -364,10 +372,22 @@ class SafeEventsIndexer(EventsIndexer):
             data = HexBytes(args["data"])
             args["data"] = data.hex()
             args["signatures"] = HexBytes(args["signatures"]).hex()
-            args["nonce"], args["sender"], args["threshold"] = decode_abi(
-                ["uint256", "address", "uint256"],
-                internal_tx_decoded.arguments.pop("additionalInfo"),
+            additional_info = HexBytes(
+                internal_tx_decoded.arguments.pop("additionalInfo")
             )
+            try:
+                args["nonce"], args["sender"], args["threshold"] = decode_abi(
+                    ["uint256", "address", "uint256"],
+                    additional_info,
+                )
+            except DecodingError:
+                logger.error(
+                    "[%s] %s - tx-hash=%s - Cannot decode SafeMultiSigTransaction with additionalInfo=%s",
+                    safe_address,
+                    event_name,
+                    ethereum_tx_hash,
+                    additional_info.hex(),
+                )
             if args["value"] and not data:  # Simulate ether transfer
                 child_internal_tx = InternalTx(
                     ethereum_tx_id=ethereum_tx_hash,
@@ -444,5 +464,12 @@ class SafeEventsIndexer(EventsIndexer):
                         exc,
                     )
                     return None
+
+        logger.debug(
+            "[%s] %s - tx-hash=%s - Processed event",
+            safe_address,
+            event_name,
+            ethereum_tx_hash,
+        )
 
         return internal_tx
