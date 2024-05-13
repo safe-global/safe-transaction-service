@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from gnosis.eth.utils import fast_is_checksum_address
 
 from . import pagination, serializers
-from .models import SafeOperation
+from .models import SafeOperation, UserOperation
 
 
 class SafeOperationView(RetrieveAPIView):
@@ -91,3 +91,45 @@ class SafeOperationsView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(status=status.HTTP_201_CREATED)
+
+
+class UserOperationView(RetrieveAPIView):
+    lookup_field = "hash"
+    lookup_url_kwarg = "user_operation_hash"
+    queryset = UserOperation.objects.all()
+    serializer_class = serializers.UserOperationResponseSerializer
+
+
+class UserOperationsView(ListCreateAPIView):
+    filter_backends = [
+        django_filters.rest_framework.DjangoFilterBackend,
+        OrderingFilter,
+    ]
+    ordering = ["-nonce"]
+    ordering_fields = ["nonce"]
+    pagination_class = pagination.DefaultPagination
+    serializer_class = serializers.UserOperationResponseSerializer
+
+    def get_queryset(self):
+        safe = self.kwargs["address"]
+        return UserOperation.objects.filter(sender=safe)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if getattr(self, "swagger_fake_view", False):
+            return context
+
+        context["safe_address"] = self.kwargs["address"]
+        return context
+
+    def get(self, request, address, *args, **kwargs):
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+        return super().get(request, address, *args, **kwargs)

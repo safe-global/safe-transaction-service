@@ -394,3 +394,22 @@ class SafeOperationResponseSerializer(serializers.Serializer):
         """
         signature = HexBytes(obj.build_signature())
         return signature.hex() if signature else None
+
+
+class UserOperationResponseSerializer(serializers.Serializer):
+    ethereum_tx_hash = eth_serializers.HexadecimalField(source="ethereum_tx_id")
+
+    sender = eth_serializers.EthereumAddressField()
+    user_operation_hash = eth_serializers.HexadecimalField(source="hash")
+    nonce = serializers.IntegerField(min_value=0)
+    init_code = eth_serializers.HexadecimalField(allow_null=True)
+    call_data = eth_serializers.HexadecimalField(allow_null=True)
+    call_data_gas_limit = serializers.IntegerField(min_value=0)
+    verification_gas_limit = serializers.IntegerField(min_value=0)
+    pre_verification_gas = serializers.IntegerField(min_value=0)
+    max_fee_per_gas = serializers.IntegerField(min_value=0)
+    max_priority_fee_per_gas = serializers.IntegerField(min_value=0)
+    paymaster = eth_serializers.EthereumAddressField(allow_null=True)
+    paymaster_data = eth_serializers.HexadecimalField(allow_null=True)
+    signature = eth_serializers.HexadecimalField()
+    entry_point = eth_serializers.EthereumAddressField()
