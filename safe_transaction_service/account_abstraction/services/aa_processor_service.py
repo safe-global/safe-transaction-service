@@ -168,6 +168,8 @@ class AaProcessorService:
                     user_operation_model.sender,
                     user_operation.user_operation_hash.hex(),
                 )
+            # As `module_address` cannot be detected there's not enough data to index the SafeOperation
+            return None
 
         # Build SafeOperation from UserOperation
         safe_operation = SafeOperation.from_user_operation(user_operation)
