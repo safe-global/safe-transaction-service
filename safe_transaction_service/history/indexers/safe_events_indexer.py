@@ -296,7 +296,8 @@ class SafeEventsIndexer(EventsIndexer):
         log_index = decoded_element["logIndex"]
         trace_address = str(log_index)
         args = dict(decoded_element["args"])
-        ethereum_tx_hash = decoded_element["transactionHash"]
+        ethereum_tx_hash = HexBytes(decoded_element["transactionHash"])
+        ethereum_tx_hash_hex = ethereum_tx_hash.hex()
         ethereum_block = EthereumBlock.objects.values("number", "timestamp").get(
             txs=ethereum_tx_hash
         )
@@ -304,7 +305,7 @@ class SafeEventsIndexer(EventsIndexer):
             "[%s] %s - tx-hash=%s - Processing event %s",
             safe_address,
             event_name,
-            ethereum_tx_hash,
+            ethereum_tx_hash_hex,
             decoded_element,
         )
 
@@ -385,7 +386,7 @@ class SafeEventsIndexer(EventsIndexer):
                     "[%s] %s - tx-hash=%s - Cannot decode SafeMultiSigTransaction with additionalInfo=%s",
                     safe_address,
                     event_name,
-                    ethereum_tx_hash,
+                    ethereum_tx_hash_hex,
                     additional_info.hex(),
                 )
             if args["value"] and not data:  # Simulate ether transfer
@@ -469,7 +470,7 @@ class SafeEventsIndexer(EventsIndexer):
             "[%s] %s - tx-hash=%s - Processed event",
             safe_address,
             event_name,
-            ethereum_tx_hash,
+            ethereum_tx_hash_hex,
         )
 
         return internal_tx
