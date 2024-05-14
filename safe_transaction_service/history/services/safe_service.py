@@ -47,7 +47,7 @@ class SafeCreationInfo:
     master_copy: Optional[EthereumAddress]
     setup_data: Optional[bytes]
     transaction_hash: str
-    safe_operation: Optional[aa_models.SafeOperation]
+    user_operation: Optional[aa_models.UserOperation]
 
 
 class SafeServiceProvider:
@@ -137,12 +137,14 @@ class SafeService:
         except IOError as exc:
             raise NodeConnectionException from exc
 
-        safe_operation = (
-            aa_models.SafeOperation.objects.filter(
-                user_operation__ethereum_tx=creation_ethereum_tx,
-                user_operation__sender=safe_address,
+        user_operation = (
+            aa_models.UserOperation.objects.filter(
+                ethereum_tx=creation_ethereum_tx,
+                sender=safe_address,
             )
-            .exclude(user_operation__init_code=None)
+            .exclude(init_code=None)
+            .select_related("receipt", "safe_operation")
+            .prefetch_related("safe_operation__confirmations")
             .first()
         )
         return SafeCreationInfo(
@@ -152,7 +154,7 @@ class SafeService:
             master_copy,
             setup_data,
             creation_internal_tx.ethereum_tx_id,
-            safe_operation,
+            user_operation,
         )
 
     def get_safe_info(self, safe_address: ChecksumAddress) -> SafeInfo:

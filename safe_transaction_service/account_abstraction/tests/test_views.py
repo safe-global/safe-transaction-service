@@ -681,6 +681,16 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "paymasterData": "0x",
             "signature": "0x",
             "entryPoint": safe_operation.user_operation.entry_point,
+            "safeOperation": {
+                "created": datetime_to_str(safe_operation.created),
+                "modified": datetime_to_str(safe_operation.modified),
+                "safeOperationHash": safe_operation.hash,
+                "validAfter": datetime_to_str(safe_operation.valid_after),
+                "validUntil": datetime_to_str(safe_operation.valid_until),
+                "moduleAddress": safe_operation.module_address,
+                "confirmations": [],
+                "preparedSignature": None,
+            },
         }
         self.assertDictEqual(
             response.json(),
@@ -723,6 +733,16 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "paymasterData": "0x",
             "signature": "0x",
             "entryPoint": safe_operation.user_operation.entry_point,
+            "safeOperation": {
+                "created": datetime_to_str(safe_operation.created),
+                "modified": datetime_to_str(safe_operation.modified),
+                "safeOperationHash": safe_operation.hash,
+                "validAfter": datetime_to_str(safe_operation.valid_after),
+                "validUntil": datetime_to_str(safe_operation.valid_until),
+                "moduleAddress": safe_operation.module_address,
+                "confirmations": [],
+                "preparedSignature": None,
+            },
         }
         self.assertDictEqual(
             response.json(),
