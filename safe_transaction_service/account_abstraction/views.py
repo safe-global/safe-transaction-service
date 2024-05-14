@@ -17,7 +17,7 @@ class SafeOperationView(RetrieveAPIView):
     queryset = SafeOperation.objects.prefetch_related("confirmations").select_related(
         "user_operation"
     )
-    serializer_class = serializers.SafeOperationResponseSerializer
+    serializer_class = serializers.SafeOperationWithUserOperationResponseSerializer
 
 
 class SafeOperationsView(ListCreateAPIView):
@@ -47,7 +47,7 @@ class SafeOperationsView(ListCreateAPIView):
 
     def get_serializer_class(self):
         if self.request.method == "GET":
-            return serializers.SafeOperationResponseSerializer
+            return serializers.SafeOperationWithUserOperationResponseSerializer
         elif self.request.method == "POST":
             return serializers.SafeOperationSerializer
 
@@ -96,8 +96,12 @@ class SafeOperationsView(ListCreateAPIView):
 class UserOperationView(RetrieveAPIView):
     lookup_field = "hash"
     lookup_url_kwarg = "user_operation_hash"
-    queryset = UserOperation.objects.all()
-    serializer_class = serializers.UserOperationResponseSerializer
+    queryset = (
+        UserOperation.objects.all()
+        .select_related("receipt", "safe_operation")
+        .prefetch_related("safe_operation__confirmations")
+    )
+    serializer_class = serializers.UserOperationWithSafeOperationResponseSerializer
 
 
 class UserOperationsView(ListCreateAPIView):
@@ -108,11 +112,15 @@ class UserOperationsView(ListCreateAPIView):
     ordering = ["-nonce"]
     ordering_fields = ["nonce"]
     pagination_class = pagination.DefaultPagination
-    serializer_class = serializers.UserOperationResponseSerializer
+    serializer_class = serializers.UserOperationWithSafeOperationResponseSerializer
 
     def get_queryset(self):
         safe = self.kwargs["address"]
-        return UserOperation.objects.filter(sender=safe)
+        return (
+            UserOperation.objects.filter(sender=safe)
+            .select_related("receipt", "safe_operation")
+            .prefetch_related("safe_operation__confirmations")
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

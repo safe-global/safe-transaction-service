@@ -757,7 +757,9 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     master_copy = EthereumAddressField(allow_null=True)
     setup_data = HexadecimalField(allow_null=True)
     data_decoded = serializers.SerializerMethodField()
-    safe_operation = aa_serializers.SafeOperationResponseSerializer(allow_null=True)
+    user_operation = aa_serializers.UserOperationWithSafeOperationResponseSerializer(
+        allow_null=True
+    )
 
     def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
         return get_data_decoded_from_data(obj.setup_data or b"")
