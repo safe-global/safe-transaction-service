@@ -572,6 +572,7 @@ SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
     },
+    "DEFAULT_AUTO_SCHEMA_CLASS": "safe_transaction_service.utils.swagger.CustomSwaggerSchema",
 }
 
 # Shell Plus
