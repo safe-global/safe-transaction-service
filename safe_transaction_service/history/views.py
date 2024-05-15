@@ -1327,34 +1327,6 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
 # Deprecated ---------------------------------------------------------------
 
 
-class SafeMultisigTransactionDeprecatedDetailView(SafeMultisigTransactionDetailView):
-    """
-    .. deprecated:: 3.1.13
-    """
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use `multisig-transactions` instead of `transactions`",
-        responses={200: "Ok", 404: "Not found"},
-    )
-    def get(self, *args, **kwargs):
-        return super().get(*args, **kwargs)
-
-
-class MasterCopiesView(SingletonsView):
-    """
-    .. deprecated:: 4.26.0
-    """
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use `singletons` instead of `master-copies`",
-        responses={200: "Ok"},
-    )
-    def get(self, *args, **kwargs):
-        return super().get(*args, **kwargs)
-
-
 class DelegateListView(ListCreateAPIView):
     """
 
@@ -1444,26 +1416,6 @@ class DelegateDeleteView(GenericAPIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
-
-
-class SafeMultisigTransactionDeprecatedListView(SafeMultisigTransactionListView):
-    """
-    .. deprecated:: 3.1.13
-    """
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use `multisig-transactions` instead of `transactions`",
-    )
-    def get(self, *args, **kwargs):
-        return super().get(*args, **kwargs)
-
-    @swagger_auto_schema(
-        deprecated=True,
-        operation_description="Use `multisig-transactions` instead of `transactions`",
-    )
-    def post(self, *args, **kwargs):
-        return super().post(*args, **kwargs)
 
 
 class SafeDelegateDestroyView(DestroyAPIView):

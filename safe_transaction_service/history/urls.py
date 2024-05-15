@@ -92,27 +92,12 @@ urlpatterns = [
     path("modules/<str:address>/safes/", views.ModulesView.as_view(), name="modules"),
     path("owners/<str:address>/safes/", views.OwnersView.as_view(), name="owners"),
     path(
-        "transactions/<str:safe_tx_hash>/",
-        views.SafeMultisigTransactionDeprecatedDetailView.as_view(),
-        name="multisig-transaction-alias",
-    ),  # Deprecated
-    path(
-        "about/master-copies/",
-        views.MasterCopiesView.as_view(),
-        name="master-copies",
-    ),  # Deprecated
-    path(
         "delegates/", views.DelegateListView.as_view(), name="delegates"
     ),  # Deprecated
     path(
         "delegates/<str:delegate_address>/",
         views.DelegateDeleteView.as_view(),
         name="delegate",
-    ),  # Deprecated
-    path(
-        "safes/<str:address>/transactions/",
-        views.SafeMultisigTransactionDeprecatedListView.as_view(),
-        name="multisig-transactions-alias",
     ),  # Deprecated
     path(
         "safes/<str:address>/delegates/<str:delegate_address>/",

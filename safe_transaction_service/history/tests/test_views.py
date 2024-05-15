@@ -3517,10 +3517,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         url = reverse("v1:history:singletons")
         return self._test_singletons_view(url)
 
-    def test_master_copies_view(self):
-        url = reverse("v1:history:master-copies")
-        return self._test_singletons_view(url)
-
     def test_modules_view(self):
         invalid_address = "0x2A"
         response = self.client.get(
