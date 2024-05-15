@@ -2,7 +2,7 @@ import django_filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
 from gnosis.eth.utils import fast_is_checksum_address
@@ -100,7 +100,7 @@ class UserOperationView(RetrieveAPIView):
     serializer_class = serializers.UserOperationResponseSerializer
 
 
-class UserOperationsView(ListCreateAPIView):
+class UserOperationsView(ListAPIView):
     filter_backends = [
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
