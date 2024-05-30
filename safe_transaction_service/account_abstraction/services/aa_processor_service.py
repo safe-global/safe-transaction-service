@@ -331,7 +331,7 @@ class AaProcessorService:
                     nonce=user_operation.nonce,
                     init_code=user_operation.init_code,
                     call_data=user_operation.call_data,
-                    call_data_gas_limit=user_operation.call_gas_limit,
+                    call_gas_limit=user_operation.call_gas_limit,
                     verification_gas_limit=user_operation.verification_gas_limit,
                     pre_verification_gas=user_operation.pre_verification_gas,
                     max_fee_per_gas=user_operation.max_fee_per_gas,

@@ -24,7 +24,7 @@ class UserOperationFactory(DjangoModelFactory):
     nonce = factory.Sequence(lambda n: n)
     init_code = b""
     call_data = b""
-    call_data_gas_limit = factory.fuzzy.FuzzyInteger(50_000, 200_000)
+    call_gas_limit = factory.fuzzy.FuzzyInteger(50_000, 200_000)
     verification_gas_limit = factory.fuzzy.FuzzyInteger(30_000, 50_000)
     pre_verification_gas = factory.fuzzy.FuzzyInteger(20_000, 30_000)
     max_fee_per_gas = factory.fuzzy.FuzzyInteger(20, 50)

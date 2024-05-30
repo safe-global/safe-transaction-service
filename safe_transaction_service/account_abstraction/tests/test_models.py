@@ -40,7 +40,7 @@ class TestModels(TestCase):
             nonce=expected_user_operation.nonce,
             init_code=expected_user_operation.init_code,
             call_data=expected_user_operation.call_data,
-            call_data_gas_limit=expected_user_operation.call_gas_limit,
+            call_gas_limit=expected_user_operation.call_gas_limit,
             verification_gas_limit=expected_user_operation.verification_gas_limit,
             pre_verification_gas=expected_user_operation.pre_verification_gas,
             max_fee_per_gas=expected_user_operation.max_fee_per_gas,
