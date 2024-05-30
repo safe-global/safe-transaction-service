@@ -3248,7 +3248,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "ethereum_tx_hash": internal_tx.ethereum_tx_id,
             "init_code": "0x1234",
             "call_data": "0x",
-            "call_data_gas_limit": safe_operation.user_operation.call_data_gas_limit,
+            "call_gas_limit": safe_operation.user_operation.call_gas_limit,
             "verification_gas_limit": safe_operation.user_operation.verification_gas_limit,
             "pre_verification_gas": safe_operation.user_operation.pre_verification_gas,
             "max_fee_per_gas": safe_operation.user_operation.max_fee_per_gas,

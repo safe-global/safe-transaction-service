@@ -35,7 +35,7 @@ class SafeOperationSerializer(serializers.Serializer):
     nonce = serializers.IntegerField(min_value=0)
     init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
-    call_data_gas_limit = serializers.IntegerField(min_value=0)
+    call_gas_limit = serializers.IntegerField(min_value=0)
     verification_gas_limit = serializers.IntegerField(min_value=0)
     pre_verification_gas = serializers.IntegerField(min_value=0)
     max_fee_per_gas = serializers.IntegerField(min_value=0)
@@ -205,7 +205,7 @@ class SafeOperationSerializer(serializers.Serializer):
             attrs["nonce"],
             fast_keccak(attrs["init_code"] or b""),
             fast_keccak(attrs["call_data"] or b""),
-            attrs["call_data_gas_limit"],
+            attrs["call_gas_limit"],
             attrs["verification_gas_limit"],
             attrs["pre_verification_gas"],
             attrs["max_fee_per_gas"],
@@ -251,7 +251,7 @@ class SafeOperationSerializer(serializers.Serializer):
             self.validated_data["nonce"],
             self.validated_data["init_code"] or b"",
             self.validated_data["call_data"] or b"",
-            self.validated_data["call_data_gas_limit"],
+            self.validated_data["call_gas_limit"],
             self.validated_data["verification_gas_limit"],
             self.validated_data["pre_verification_gas"],
             self.validated_data["max_fee_per_gas"],
@@ -273,7 +273,7 @@ class SafeOperationSerializer(serializers.Serializer):
                 "nonce": user_operation.nonce,
                 "init_code": user_operation.init_code,
                 "call_data": user_operation.call_data,
-                "call_data_gas_limit": user_operation.call_gas_limit,
+                "call_gas_limit": user_operation.call_gas_limit,
                 "verification_gas_limit": user_operation.verification_gas_limit,
                 "pre_verification_gas": user_operation.pre_verification_gas,
                 "max_fee_per_gas": user_operation.max_fee_per_gas,
@@ -330,7 +330,7 @@ class UserOperationResponseSerializer(serializers.Serializer):
     nonce = serializers.IntegerField(min_value=0)
     init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
-    call_data_gas_limit = serializers.IntegerField(min_value=0)
+    call_gas_limit = serializers.IntegerField(min_value=0)
     verification_gas_limit = serializers.IntegerField(min_value=0)
     pre_verification_gas = serializers.IntegerField(min_value=0)
     max_fee_per_gas = serializers.IntegerField(min_value=0)

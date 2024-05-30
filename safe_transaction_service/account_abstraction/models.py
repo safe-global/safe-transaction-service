@@ -40,7 +40,7 @@ class UserOperation(models.Model):
     nonce = Uint256Field()
     init_code = models.BinaryField(null=True, blank=True, editable=True)
     call_data = models.BinaryField(null=True, blank=True, editable=True)
-    call_data_gas_limit = Uint256Field()
+    call_gas_limit = Uint256Field()
     verification_gas_limit = Uint256Field()
     pre_verification_gas = Uint256Field()
     max_fee_per_gas = Uint256Field()
@@ -89,7 +89,7 @@ class UserOperation(models.Model):
             self.nonce,
             HexBytes(self.init_code) if self.init_code else b"",
             HexBytes(self.call_data) if self.call_data else b"",
-            self.call_data_gas_limit,
+            self.call_gas_limit,
             self.verification_gas_limit,
             self.pre_verification_gas,
             self.max_fee_per_gas,
