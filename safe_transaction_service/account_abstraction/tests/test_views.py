@@ -24,7 +24,7 @@ from gnosis.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
 )
-from gnosis.eth.utils import fast_to_checksum_address
+from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.proxy_factory import ProxyFactoryV141
 from gnosis.safe.safe_signature import SafeSignatureEOA
@@ -639,6 +639,115 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                     mock.call(paymaster_address),
                 ],
             )
+
+    def test_safe_operation_confirmations_get_view(self):
+        endpoint = "v1:account_abstraction:safe-operation-confirmations"
+        random_hash = HexBytes(fast_keccak(b""))
+        response = self.client.get(
+            reverse(
+                endpoint,
+                args=(random_hash.hex(),),
+            )
+        )
+        expected_empty = {"count": 0, "next": None, "previous": None, "results": []}
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(response.data, expected_empty)
+
+        safe_operation = factories.SafeOperationFactory()
+        response = self.client.get(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            )
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(response.data, expected_empty)
+
+        # Create a random confirmation, it should not appear
+        factories.SafeOperationConfirmationFactory()
+        response = self.client.get(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            )
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(response.data, expected_empty)
+
+        # Create a confirmation for the SafeOperation
+        safe_operation_confirmation = factories.SafeOperationConfirmationFactory(
+            safe_operation=safe_operation
+        )
+        response = self.client.get(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            )
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = {
+            "count": 1,
+            "next": None,
+            "previous": None,
+            "results": [
+                {
+                    "created": datetime_to_str(safe_operation_confirmation.created),
+                    "modified": datetime_to_str(safe_operation_confirmation.modified),
+                    "owner": safe_operation_confirmation.owner,
+                    "signature": safe_operation_confirmation.signature.hex(),
+                    "signature_type": safe_operation_confirmation.signature_type,
+                }
+            ],
+        }
+        self.assertDictEqual(response.data, expected)
+
+    def test_safe_operation_confirmations_post_view(self):
+        endpoint = "v1:account_abstraction:safe-operation-confirmations"
+        random_hash = HexBytes(fast_keccak(b""))
+        owner_1 = Account.create()
+        data = {"signature": owner_1.signHash(random_hash)["signature"].hex()}
+        response = self.client.post(
+            reverse(
+                endpoint,
+                args=(random_hash.hex(),),
+            ),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string=f"SafeOperation with hash={random_hash.hex()} does not exist",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        safe_operation = factories.SafeOperationFactory()
+        response = self.client.post(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            ),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string=f"SafeOperation with hash={random_hash.hex()} does not exist",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
 
     def test_user_operation_view(self):
         random_user_operation_hash = (

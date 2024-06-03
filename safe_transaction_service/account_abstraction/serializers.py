@@ -22,7 +22,6 @@ from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
 from .helpers import decode_init_code
-from .models import SafeOperation
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
 from .models import UserOperation as UserOperationModel
@@ -31,7 +30,58 @@ from .models import UserOperation as UserOperationModel
 # ================================================ #
 #            Request Serializers
 # ================================================ #
-class SafeOperationSerializer(serializers.Serializer):
+class SafeOperationSignatureValidatorMixin:
+    """
+    Mixin class to validate SafeOperation signatures. _get_owners must be overridden to define
+    the valid owners to sign
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ethereum_client = EthereumClientProvider()
+
+    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+        """
+        :param safe_address:
+        :return: Valid owners to sign the SafeOperation
+        """
+        raise NotImplementedError("Must be implemented in subclass")
+
+    def _validate_signature(
+        self,
+        safe_address: ChecksumAddress,
+        safe_operation_hash: bytes,
+        safe_operation_hash_preimage: bytes,
+        signature: bytes,
+    ) -> List[SafeSignature]:
+        safe_owners = self._get_owners(safe_address)
+        parsed_signatures = SafeSignature.parse_signature(
+            signature, safe_operation_hash, safe_operation_hash_preimage
+        )
+        owners_processed = set()
+        safe_signatures = []
+        for safe_signature in parsed_signatures:
+            owner = safe_signature.owner
+            if owner not in safe_owners:
+                raise ValidationError(
+                    f"Signer={owner} is not an owner. Current owners={safe_owners}. "
+                    f"Safe-operation-hash={safe_operation_hash.hex()}"
+                )
+            if not safe_signature.is_valid(self.ethereum_client, safe_address):
+                raise ValidationError(
+                    f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
+                )
+            if owner in owners_processed:
+                raise ValidationError(f"Signature for owner={owner} is duplicated")
+
+            owners_processed.add(owner)
+            safe_signatures.append(safe_signature)
+        return safe_signatures
+
+
+class SafeOperationSerializer(
+    SafeOperationSignatureValidatorMixin, serializers.Serializer
+):
     nonce = serializers.IntegerField(min_value=0)
     init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
@@ -52,7 +102,6 @@ class SafeOperationSerializer(serializers.Serializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ethereum_client = EthereumClientProvider()
         self._deployment_owners: List[ChecksumAddress] = []
 
     def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
@@ -248,7 +297,7 @@ class SafeOperationSerializer(serializers.Serializer):
     @transaction.atomic
     def save(self, **kwargs):
         user_operation = UserOperationClass(
-            b"",
+            b"",  # Hash will be calculated later
             self.context["safe_address"],
             self.validated_data["nonce"],
             self.validated_data["init_code"] or b"",
@@ -310,6 +359,70 @@ class SafeOperationSerializer(serializers.Serializer):
         return user_operation_model
 
 
+class SafeOperationConfirmationSerializer(
+    SafeOperationSignatureValidatorMixin, serializers.Serializer
+):
+    signature = eth_serializers.HexadecimalField(
+        min_length=65, max_length=SIGNATURE_LENGTH
+    )
+
+    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+        """
+        :param safe_address:
+        :return: Owners for the Safe
+        """
+        return get_safe_owners(safe_address)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        safe_operation_hash = self.context["safe_operation_hash"]
+
+        try:
+            user_operation_model: UserOperationModel = (
+                UserOperationModel.objects.select_related("safe_operation").get(
+                    safe_operation__hash=safe_operation_hash
+                )
+            )
+            safe_operation = user_operation_model.to_safe_operation()
+        except UserOperationModel.DoesNotExist:
+            raise ValidationError(
+                f"SafeOperation with hash={safe_operation_hash} does not exist"
+            )
+
+        safe_signatures = self._validate_signature(
+            safe_operation.safe,
+            safe_operation_hash,
+            safe_operation.safe_operation_hash_preimage,
+            attrs["signature"],
+        )
+        if not safe_signatures:
+            raise ValidationError("At least one signature must be provided")
+
+        attrs["safe_operation_hash"] = safe_operation_hash
+        attrs["safe_signatures"] = safe_signatures
+        return attrs
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        safe_signatures = self.validated_data["safe_signatures"]
+        safe_operation_confirmations: List[SafeOperationConfirmation] = []
+        for safe_signature in safe_signatures:
+            safe_operation_confirmation, created = (
+                SafeOperationConfirmation.objects.get_or_create(
+                    safe_operation=self.context["safe_operation_hash"],
+                    owner=safe_signature.owner,
+                    defaults={
+                        "signature": safe_signature.export_signature(),
+                        "signature_type": safe_signature.signature_type.value,
+                    },
+                )
+            )
+            if created:
+                safe_operation_confirmations.append(safe_operation_confirmation)
+
+        return safe_operation_confirmations
+
+
 # ================================================ #
 #            Request Serializers
 # ================================================ #
@@ -355,7 +468,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
 
-    def get_confirmations(self, obj: SafeOperation) -> Dict[str, Any]:
+    def get_confirmations(self, obj: SafeOperationModel) -> Dict[str, Any]:
         """
         Filters confirmations queryset
 
@@ -366,7 +479,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
             obj.confirmations, many=True
         ).data
 
-    def get_prepared_signature(self, obj: SafeOperation) -> Optional[HexStr]:
+    def get_prepared_signature(self, obj: SafeOperationModel) -> Optional[HexStr]:
         """
         Prepared signature sorted
 
