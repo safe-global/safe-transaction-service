@@ -29,7 +29,10 @@ from ...models import SafeOperation as SafeOperationModel
 from ...models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ...models import UserOperation as UserOperationModel
 from ...models import UserOperationReceipt as UserOperationReceiptModel
-from ...services.aa_processor_service import UserOperationNotSupportedException
+from ...services.aa_processor_service import (
+    UserOperationNotSupportedException,
+    UserOperationReceiptNotFoundException,
+)
 from ...utils import get_bundler_client
 from ..mocks import (
     aa_chain_id,
@@ -105,6 +108,13 @@ class TestAaProcessorService(TestCase):
             user_operation_confirmation_model.owner,
             "0x5aC255889882aCd3da2aA939679E3f3d4cea221e",
         )
+
+        get_user_operation_receipt_mock.return_value = None
+        with self.assertRaisesMessage(
+            UserOperationReceiptNotFoundException,
+            f"Cannot find receipt for user-operation={user_operation_model.hash}",
+        ):
+            self.aa_processor_service.index_user_operation_receipt(user_operation_model)
 
     @mock.patch.object(
         BundlerClient,
