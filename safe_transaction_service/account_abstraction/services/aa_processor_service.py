@@ -37,7 +37,11 @@ class AaProcessorServiceException(Exception):
     pass
 
 
-class UserOperationNotSupportedException(Exception):
+class UserOperationNotSupportedException(AaProcessorServiceException):
+    pass
+
+
+class UserOperationReceiptNotFoundException(AaProcessorServiceException):
     pass
 
 
@@ -211,22 +215,28 @@ class AaProcessorService:
         :return: Tuple with ``UserOperation`` and ``UserOperationReceipt``
         """
         safe_address = user_operation_model.sender
-        user_operation_hash = HexBytes(user_operation_model.hash).hex()
+        user_operation_hash_hex = HexBytes(user_operation_model.hash).hex()
         tx_hash = HexBytes(user_operation_model.ethereum_tx_id).hex()
         logger.debug(
             "[%s] Retrieving UserOperation Receipt with user-operation-hash=%s on tx-hash=%s",
             safe_address,
-            user_operation_hash,
+            user_operation_hash_hex,
             tx_hash,
         )
         user_operation_receipt = self.bundler_client.get_user_operation_receipt(
-            user_operation_hash
+            user_operation_hash_hex
         )
+        if not user_operation_receipt:
+            # This is totally unexpected, receipt should be available in the Bundler RPC
+            raise UserOperationReceiptNotFoundException(
+                f"Cannot find receipt for user-operation={user_operation_hash_hex}"
+            )
+
         if not user_operation_receipt.success:
             logger.info(
                 "[%s] UserOperation user-operation-hash=%s on tx-hash=%s failed, indexing either way",
                 safe_address,
-                user_operation_hash,
+                user_operation_hash_hex,
                 tx_hash,
             )
 
@@ -237,7 +247,7 @@ class AaProcessorService:
         logger.debug(
             "[%s] Storing UserOperation Receipt with user-operation=%s on tx-hash=%s",
             safe_address,
-            user_operation_hash,
+            user_operation_hash_hex,
             tx_hash,
         )
 
@@ -383,15 +393,21 @@ class AaProcessorService:
                     safe_address,
                     exc,
                 )
-            except BundlerClientException as exc:
+            except UserOperationReceiptNotFoundException as exc:
                 logger.error(
-                    "[%s] Error retrieving user-operation from bundler API: %s",
+                    "[%s] Cannot find receipt for user-operation: %s",
                     safe_address,
                     exc,
                 )
             except AaProcessorServiceException as exc:
                 logger.error(
                     "[%s] Error processing user-operation: %s",
+                    safe_address,
+                    exc,
+                )
+            except BundlerClientException as exc:
+                logger.error(
+                    "[%s] Error retrieving user-operation from bundler API: %s",
                     safe_address,
                     exc,
                 )
