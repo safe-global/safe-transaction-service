@@ -5,6 +5,7 @@ from typing import Optional
 from django.db import models
 from django.db.models import Index
 
+from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
@@ -83,6 +84,19 @@ class UserOperation(models.Model):
             else None
         )
 
+        if self.signature:
+            signature = HexBytes(self.signature)
+        else:
+            # Signature stores `valid_after` and `valid_until`, we can build it from SafeOperation fields
+            valid_after, valid_until = [
+                int(valid_date.timestamp()) if valid_date else 0
+                for valid_date in (
+                    self.safe_operation.valid_after,
+                    self.safe_operation.valid_until,
+                )
+            ]
+            signature = encode_packed(["uint48"] * 2, [valid_after, valid_until])
+
         return UserOperationClass(
             HexBytes(self.hash),
             self.sender,
@@ -95,7 +109,7 @@ class UserOperation(models.Model):
             self.max_fee_per_gas,
             self.max_priority_fee_per_gas,
             self.paymaster_and_data if self.paymaster_and_data else b"",
-            HexBytes(self.signature) if self.signature else b"",
+            signature,
             self.entry_point,
             user_operation_metadata,
         )
@@ -105,9 +119,7 @@ class UserOperation(models.Model):
         :return: SafeOperation built from UserOperation
         :raises: ValueError
         """
-        if self.signature and bytes(self.signature):
-            return SafeOperationClass.from_user_operation(self.to_user_operation())
-        raise ValueError("Not enough information to build SafeOperation")
+        return SafeOperationClass.from_user_operation(self.to_user_operation())
 
 
 class UserOperationReceipt(models.Model):

@@ -27,13 +27,13 @@ from gnosis.eth.tests.mocks.mock_bundler import (
 from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
 from gnosis.safe.proxy_factory import ProxyFactoryV141
-from gnosis.safe.safe_signature import SafeSignatureEOA
+from gnosis.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from .. import models
-from ..serializers import SafeOperationSerializer
+from ..serializers import SafeOperationConfirmationSerializer, SafeOperationSerializer
 from . import factories
 
 logger = logging.getLogger(__name__)
@@ -685,6 +685,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.maxDiff = None
         expected = {
             "count": 1,
             "next": None,
@@ -695,16 +696,25 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                     "modified": datetime_to_str(safe_operation_confirmation.modified),
                     "owner": safe_operation_confirmation.owner,
                     "signature": safe_operation_confirmation.signature.hex(),
-                    "signature_type": safe_operation_confirmation.signature_type,
+                    "signature_type": SafeSignatureType(
+                        safe_operation_confirmation.signature_type
+                    ).name,
                 }
             ],
         }
         self.assertDictEqual(response.data, expected)
 
-    def test_safe_operation_confirmations_post_view(self):
+    @mock.patch.object(
+        SafeOperationConfirmationSerializer,
+        "_get_owners",
+    )
+    def test_safe_operation_confirmations_post_view(self, get_owners_mock: MagicMock):
         endpoint = "v1:account_abstraction:safe-operation-confirmations"
         random_hash = HexBytes(fast_keccak(b""))
         owner_1 = Account.create()
+        owner_2 = Account.create()
+        get_owners_mock.return_value = [owner_1.address, owner_2.address]
+
         data = {"signature": owner_1.signHash(random_hash)["signature"].hex()}
         response = self.client.post(
             reverse(
@@ -728,6 +738,48 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         )
 
         safe_operation = factories.SafeOperationFactory()
+
+        # Check no confirmation exists
+        self.assertEqual(models.SafeOperationConfirmation.objects.all().count(), 0)
+        # Add confirmation for owner_1
+        data = {"signature": owner_1.signHash(safe_operation.hash)["signature"].hex()}
+        response = self.client.post(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            ),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(models.SafeOperationConfirmation.objects.all().count(), 1)
+        safe_operation_confirmation_1 = models.SafeOperationConfirmation.objects.get(
+            owner=owner_1.address
+        )
+        self.assertEqual(safe_operation_confirmation_1.safe_operation, safe_operation)
+
+        # Add confirmation for owner_2
+        data = {"signature": owner_2.signHash(safe_operation.hash)["signature"].hex()}
+        response = self.client.post(
+            reverse(
+                endpoint,
+                args=(safe_operation.hash,),
+            ),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(models.SafeOperationConfirmation.objects.all().count(), 2)
+        safe_operation_confirmation_2 = models.SafeOperationConfirmation.objects.get(
+            owner=owner_2.address
+        )
+        self.assertEqual(safe_operation_confirmation_2.safe_operation, safe_operation)
+
+        # Try to add confirmation for random owner
+        random_owner = Account.create()
+        data = {
+            "signature": random_owner.signHash(safe_operation.hash)["signature"].hex()
+        }
         response = self.client.post(
             reverse(
                 endpoint,
@@ -742,12 +794,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string=f"SafeOperation with hash={random_hash.hex()} does not exist",
+                        string=f"Signer={random_owner.address} is not an owner. Current owners=['{owner_1.address}', '{owner_2.address}']. Safe-operation-hash={safe_operation.hash}",
                         code="invalid",
                     )
                 ]
             },
         )
+        self.assertEqual(models.SafeOperationConfirmation.objects.all().count(), 2)
 
     def test_user_operation_view(self):
         random_user_operation_hash = (

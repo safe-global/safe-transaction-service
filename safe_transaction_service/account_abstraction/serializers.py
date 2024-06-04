@@ -56,7 +56,7 @@ class SafeOperationSignatureValidatorMixin:
     ) -> List[SafeSignature]:
         safe_owners = self._get_owners(safe_address)
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_operation_hash, safe_operation_hash_preimage
+            signature, safe_operation_hash, safe_hash_preimage=safe_operation_hash_preimage
         )
         owners_processed = set()
         safe_signatures = []
@@ -110,39 +110,6 @@ class SafeOperationSerializer(
         :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
         """
         return self._deployment_owners or get_safe_owners(safe_address)
-
-    def _validate_signature(
-        self,
-        safe_address: ChecksumAddress,
-        safe_operation_hash: bytes,
-        safe_operation_hash_preimage: bytes,
-        signature: bytes,
-    ) -> List[SafeSignature]:
-        safe_owners = self._get_owners(safe_address)
-        parsed_signatures = SafeSignature.parse_signature(
-            signature,
-            safe_operation_hash,
-            safe_hash_preimage=safe_operation_hash_preimage,
-        )
-        owners_processed = set()
-        safe_signatures = []
-        for safe_signature in parsed_signatures:
-            owner = safe_signature.owner
-            if owner not in safe_owners:
-                raise ValidationError(
-                    f"Signer={owner} is not an owner. Current owners={safe_owners}. "
-                    f"Safe-operation-hash={safe_operation_hash.hex()}"
-                )
-            if not safe_signature.is_valid(self.ethereum_client, safe_address):
-                raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
-                )
-            if owner in owners_processed:
-                raise ValidationError(f"Signature for owner={owner} is duplicated")
-
-            owners_processed.add(owner)
-            safe_signatures.append(safe_signature)
-        return safe_signatures
 
     def validate_init_code(self, init_code: Optional[HexBytes]) -> Optional[HexBytes]:
         """
@@ -375,18 +342,19 @@ class SafeOperationConfirmationSerializer(
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        safe_operation_hash = self.context["safe_operation_hash"]
+        safe_operation_hash_hex = self.context["safe_operation_hash"]
+        safe_operation_hash = HexBytes(safe_operation_hash_hex)
 
         try:
             user_operation_model: UserOperationModel = (
                 UserOperationModel.objects.select_related("safe_operation").get(
-                    safe_operation__hash=safe_operation_hash
+                    safe_operation__hash=safe_operation_hash_hex
                 )
             )
             safe_operation = user_operation_model.to_safe_operation()
         except UserOperationModel.DoesNotExist:
             raise ValidationError(
-                f"SafeOperation with hash={safe_operation_hash} does not exist"
+                f"SafeOperation with hash={safe_operation_hash_hex} does not exist"
             )
 
         safe_signatures = self._validate_signature(
@@ -398,7 +366,7 @@ class SafeOperationConfirmationSerializer(
         if not safe_signatures:
             raise ValidationError("At least one signature must be provided")
 
-        attrs["safe_operation_hash"] = safe_operation_hash
+        attrs["safe_operation_hash"] = safe_operation_hash_hex
         attrs["safe_signatures"] = safe_signatures
         return attrs
 
@@ -409,7 +377,7 @@ class SafeOperationConfirmationSerializer(
         for safe_signature in safe_signatures:
             safe_operation_confirmation, created = (
                 SafeOperationConfirmation.objects.get_or_create(
-                    safe_operation=self.context["safe_operation_hash"],
+                    safe_operation_id=self.context["safe_operation_hash"],
                     owner=safe_signature.owner,
                     defaults={
                         "signature": safe_signature.export_signature(),
