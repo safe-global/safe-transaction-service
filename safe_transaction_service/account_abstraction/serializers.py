@@ -329,6 +329,10 @@ class SafeOperationSerializer(
 class SafeOperationConfirmationSerializer(
     SafeOperationSignatureValidatorMixin, serializers.Serializer
 ):
+    """
+    Validate new confirmations for an existing `SafeOperation`
+    """
+
     signature = eth_serializers.HexadecimalField(
         min_length=65, max_length=SIGNATURE_LENGTH
     )
