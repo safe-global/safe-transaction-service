@@ -9,7 +9,7 @@ class CustomSwaggerSchema(SwaggerAutoSchema):
         "messages": ["messages"],
         "owners": ["owners"],
         "transaction": ["transactions"],
-        "transfers": ["transactions"],
+        "transfer": ["transactions"],
         "multisig-transaction": ["transactions"],
         "user-operation": ["4337"],
         "safe-operation": ["4337"],
