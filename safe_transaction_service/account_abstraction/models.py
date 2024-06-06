@@ -86,8 +86,11 @@ class UserOperation(models.Model):
 
         if self.signature:
             signature = HexBytes(self.signature)
-        else:
-            # Signature stores `valid_after` and `valid_until`, we can build it from SafeOperation fields
+        elif self.safe_operation:
+            # `UserOperation` `signature` is used to store data for the `SafeOperation`
+            # First 6 bytes of the signature are `SafeOperation` `valid_after` and next 6 are `valid_until`
+            # Real user signature is after those 12 bytes
+            # If there's no signature it should be built from `SafeOperation` fields
             valid_after, valid_until = [
                 int(valid_date.timestamp()) if valid_date else 0
                 for valid_date in (
@@ -96,6 +99,8 @@ class UserOperation(models.Model):
                 )
             ]
             signature = encode_packed(["uint48"] * 2, [valid_after, valid_until])
+        else:
+            signature = b""
 
         return UserOperationClass(
             HexBytes(self.hash),

@@ -56,7 +56,9 @@ class SafeOperationSignatureValidatorMixin:
     ) -> List[SafeSignature]:
         safe_owners = self._get_owners(safe_address)
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_operation_hash, safe_hash_preimage=safe_operation_hash_preimage
+            signature,
+            safe_operation_hash,
+            safe_hash_preimage=safe_operation_hash_preimage,
         )
         owners_processed = set()
         safe_signatures = []
