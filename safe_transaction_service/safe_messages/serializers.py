@@ -99,7 +99,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
             )
 
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, message_hash
+            signature, safe_message_hash, safe_hash_preimage=message_hash
         )
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, None
@@ -141,7 +141,7 @@ class SafeMessageSignatureSerializer(
         safe_message_hash = safe_message.message_hash
 
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, message_hash
+            signature, safe_message_hash, safe_hash_preimage=message_hash
         )
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, safe_message
