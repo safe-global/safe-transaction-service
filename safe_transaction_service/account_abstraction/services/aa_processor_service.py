@@ -121,7 +121,7 @@ class AaProcessorService:
         parsed_signatures = SafeSignature.parse_signature(
             signature,
             safe_operation_model.hash,
-            safe_operation.safe_operation_hash_preimage,
+            safe_hash_preimage=safe_operation.safe_operation_hash_preimage,
         )
 
         safe_operation_confirmations = []
