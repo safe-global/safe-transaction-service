@@ -11,6 +11,11 @@ urlpatterns = [
         name="safe-operation",
     ),
     path(
+        "safe-operations/<str:safe_operation_hash>/confirmations/",
+        views.SafeOperationConfirmationsView.as_view(),
+        name="safe-operation-confirmations",
+    ),
+    path(
         "safes/<str:address>/safe-operations/",
         views.SafeOperationsView.as_view(),
         name="safe-operations",

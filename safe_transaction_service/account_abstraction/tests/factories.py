@@ -2,6 +2,7 @@ from django.conf import settings
 from django.utils import timezone
 
 import factory
+from eth_abi.packed import encode_packed
 from eth_account import Account
 from factory.django import DjangoModelFactory
 
@@ -18,6 +19,11 @@ class UserOperationFactory(DjangoModelFactory):
     class Meta:
         model = models.UserOperation
 
+    class Params:
+        # `valid_after` and `valid_until` are params for `SafeOperation` derivated from `UserOperation` signature
+        valid_after = 0
+        valid_until = 0
+
     hash = factory.Sequence(lambda n: fast_keccak_text(f"user-operation-{n}").hex())
     ethereum_tx = factory.SubFactory(history_factories.EthereumTxFactory)
     sender = factory.LazyFunction(lambda: Account.create().address)
@@ -31,8 +37,11 @@ class UserOperationFactory(DjangoModelFactory):
     max_priority_fee_per_gas = factory.fuzzy.FuzzyInteger(0, 10)
     paymaster = NULL_ADDRESS
     paymaster_data = b""
-    signature = b""
     entry_point = settings.ETHEREUM_4337_SUPPORTED_ENTRY_POINTS[0]
+
+    @factory.lazy_attribute
+    def signature(self):
+        return encode_packed(["uint48"] * 2, [self.valid_after, self.valid_until])
 
 
 class UserOperationReceiptFactory(DjangoModelFactory):

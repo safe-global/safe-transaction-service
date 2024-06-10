@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from gnosis.eth.utils import fast_is_checksum_address
 
 from . import pagination, serializers
-from .models import SafeOperation, UserOperation
+from .models import SafeOperation, SafeOperationConfirmation, UserOperation
 
 
 class SafeOperationView(RetrieveAPIView):
@@ -91,6 +91,43 @@ class SafeOperationsView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(status=status.HTTP_201_CREATED)
+
+
+class SafeOperationConfirmationsView(ListCreateAPIView):
+    pagination_class = pagination.DefaultPagination
+
+    def get_queryset(self):
+        return SafeOperationConfirmation.objects.filter(
+            safe_operation__hash=self.kwargs["safe_operation_hash"]
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["safe_operation_hash"] = self.kwargs.get("safe_operation_hash")
+        return context
+
+    def get_serializer_class(self):
+        if self.request.method == "GET":
+            return serializers.SafeOperationConfirmationResponseSerializer
+        elif self.request.method == "POST":
+            return serializers.SafeOperationConfirmationSerializer
+
+    @swagger_auto_schema(responses={400: "Invalid data"})
+    def get(self, request, *args, **kwargs):
+        """
+        Get the list of confirmations for a multisig transaction
+        """
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        responses={201: "Created", 400: "Malformed data", 422: "Error processing data"}
+    )
+    def post(self, request, *args, **kwargs):
+        """
+        Add a confirmation for a transaction. More than one signature can be used. This endpoint does not support
+        the use of delegates to make a transaction trusted.
+        """
+        return super().post(request, *args, **kwargs)
 
 
 class UserOperationView(RetrieveAPIView):

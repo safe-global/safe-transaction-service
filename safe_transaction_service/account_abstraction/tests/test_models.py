@@ -67,11 +67,14 @@ class TestModels(TestCase):
             module_address=expected_module_address,
         )
 
-        self.assertEqual(safe_operation_model.build_signature(), b"")
+        self.assertEqual(
+            safe_operation_model.build_signature(), user_operation.signature[:12]
+        )
         SafeOperationConfirmationFactory(
             safe_operation=safe_operation_model,
             signature=user_operation.signature[12:],
         )
         self.assertEqual(
-            safe_operation_model.build_signature(), expected_safe_operation.signature
+            safe_operation_model.build_signature(),
+            user_operation.signature[:12] + expected_safe_operation.signature,
         )
