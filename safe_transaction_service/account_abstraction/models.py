@@ -5,6 +5,7 @@ from typing import Optional
 from django.db import models
 from django.db.models import Index
 
+from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
@@ -138,8 +139,35 @@ class SafeOperation(TimeStampedModel):
     def __str__(self) -> str:
         return f"{HexBytes(self.hash).hex()} SafeOperation for user-operation={HexBytes(self.user_operation_id).hex()}"
 
+    def build_signature_prefix(self) -> bytes:
+        """
+        `UserOperation` `signature` is used to store data for the `SafeOperation`
+        First 6 bytes of the signature are `SafeOperation` `valid_after` and next 6 are `valid_until`
+        Real user signature is after those 12 bytes
+
+        :return: 12 bytes of `valid` encoded
+        """
+        return encode_packed(
+            ["uint48"] * 2,
+            [
+                int(valid_date.timestamp()) if valid_date else 0
+                for valid_date in (
+                    self.valid_after,
+                    self.valid_until,
+                )
+            ],
+        )
+
     def build_signature(self) -> bytes:
-        return b"".join(
+        """
+        `UserOperation` `signature` is used to store data for the `SafeOperation`
+        First 6 bytes of the signature are `SafeOperation` `valid_after` and next 6 are `valid_until`
+        Real user signature is after those 12 bytes
+
+        :return: 12 bytes of `valid` encoded following by the signature built from the confirmations
+        """
+        valid_encoded = self.build_signature_prefix()
+        confirmations_signature = b"".join(
             [
                 HexBytes(signature)
                 for _, signature in sorted(
@@ -148,6 +176,7 @@ class SafeOperation(TimeStampedModel):
                 )
             ]
         )
+        return valid_encoded + confirmations_signature
 
 
 class SafeOperationConfirmation(TimeStampedModel):

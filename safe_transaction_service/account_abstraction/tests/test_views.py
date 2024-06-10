@@ -83,13 +83,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "paymaster": NULL_ADDRESS,
                 "paymasterData": "0x",
                 "entryPoint": safe_operation.user_operation.entry_point,
-                "signature": "0x",
+                "signature": "0x" + "0" * 24,
             },
             "validAfter": datetime_to_str(safe_operation.valid_after),
             "validUntil": datetime_to_str(safe_operation.valid_until),
             "moduleAddress": safe_operation.module_address,
             "confirmations": [],
-            "preparedSignature": None,
+            "preparedSignature": "0x" + safe_operation.build_signature_prefix().hex(),
         }
         self.assertDictEqual(
             response.json(),
@@ -106,7 +106,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = safe_operation_confirmation.signature.hex()
+        expected["preparedSignature"] = (
+            "0x"
+            + (
+                safe_operation.build_signature_prefix()
+                + safe_operation_confirmation.signature
+            ).hex()
+        )
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
@@ -156,14 +162,14 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
                 "paymaster": NULL_ADDRESS,
                 "paymasterData": "0x",
-                "signature": "0x",
+                "signature": "0x" + "0" * 24,
                 "entryPoint": safe_operation.user_operation.entry_point,
             },
             "validAfter": datetime_to_str(safe_operation.valid_after),
             "validUntil": datetime_to_str(safe_operation.valid_until),
             "moduleAddress": safe_operation.module_address,
             "confirmations": [],
-            "preparedSignature": None,
+            "preparedSignature": "0x" + safe_operation.build_signature_prefix().hex(),
         }
         self.assertDictEqual(
             response.json(),
@@ -178,7 +184,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = safe_operation_confirmation.signature.hex()
+        expected["preparedSignature"] = (
+            "0x"
+            + (
+                safe_operation.build_signature_prefix()
+                + safe_operation_confirmation.signature
+            ).hex()
+        )
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
@@ -685,7 +697,6 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.maxDiff = None
         expected = {
             "count": 1,
             "next": None,
@@ -841,7 +852,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
             "paymaster": NULL_ADDRESS,
             "paymasterData": "0x",
-            "signature": "0x",
+            "signature": "0x" + "0" * 24,
             "entryPoint": safe_operation.user_operation.entry_point,
             "safeOperation": {
                 "created": datetime_to_str(safe_operation.created),
@@ -851,7 +862,8 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "validUntil": datetime_to_str(safe_operation.valid_until),
                 "moduleAddress": safe_operation.module_address,
                 "confirmations": [],
-                "preparedSignature": None,
+                "preparedSignature": "0x"
+                + safe_operation.build_signature_prefix().hex(),
             },
         }
         self.assertDictEqual(
@@ -893,7 +905,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
             "paymaster": NULL_ADDRESS,
             "paymasterData": "0x",
-            "signature": "0x",
+            "signature": "0x" + "0" * 24,
             "entryPoint": safe_operation.user_operation.entry_point,
             "safeOperation": {
                 "created": datetime_to_str(safe_operation.created),
@@ -903,7 +915,8 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "validUntil": datetime_to_str(safe_operation.valid_until),
                 "moduleAddress": safe_operation.module_address,
                 "confirmations": [],
-                "preparedSignature": None,
+                "preparedSignature": "0x"
+                + safe_operation.build_signature_prefix().hex(),
             },
         }
         self.assertDictEqual(

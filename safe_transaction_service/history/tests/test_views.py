@@ -3255,7 +3255,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "max_priority_fee_per_gas": safe_operation.user_operation.max_priority_fee_per_gas,
             "paymaster": safe_operation.user_operation.paymaster,
             "paymaster_data": "0x",
-            "signature": "0x",
+            "signature": "0x" + safe_operation.user_operation.signature.hex(),
             "entry_point": safe_operation.user_operation.entry_point,
             "safe_operation": {
                 "created": datetime_to_str(safe_operation.created),
@@ -3265,7 +3265,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "valid_until": datetime_to_str(safe_operation.valid_until),
                 "module_address": safe_operation.module_address,
                 "confirmations": [],
-                "prepared_signature": None,
+                "prepared_signature": HexBytes(safe_operation.build_signature()).hex(),
             },
         }
 

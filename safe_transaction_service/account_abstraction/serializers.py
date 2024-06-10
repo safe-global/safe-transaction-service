@@ -453,15 +453,15 @@ class SafeOperationResponseSerializer(serializers.Serializer):
             obj.confirmations, many=True
         ).data
 
-    def get_prepared_signature(self, obj: SafeOperationModel) -> Optional[HexStr]:
+    def get_prepared_signature(self, obj: SafeOperationModel) -> HexStr:
         """
         Prepared signature sorted
 
         :param obj: SafeOperation instance
         :return: Serialized queryset
         """
-        signature = HexBytes(obj.build_signature())
-        return signature.hex() if signature else None
+        signature = obj.build_signature()
+        return HexStr(HexBytes(signature).hex())
 
 
 class SafeOperationWithUserOperationResponseSerializer(SafeOperationResponseSerializer):
