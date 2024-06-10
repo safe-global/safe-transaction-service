@@ -5,7 +5,6 @@ from typing import Optional
 from django.db import models
 from django.db.models import Index
 
-from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 
@@ -84,23 +83,9 @@ class UserOperation(models.Model):
             else None
         )
 
-        if self.signature:
-            signature = HexBytes(self.signature)
-        elif self.safe_operation:
-            # `UserOperation` `signature` is used to store data for the `SafeOperation`
-            # First 6 bytes of the signature are `SafeOperation` `valid_after` and next 6 are `valid_until`
-            # Real user signature is after those 12 bytes
-            # If there's no signature it should be built from `SafeOperation` fields
-            valid_after, valid_until = [
-                int(valid_date.timestamp()) if valid_date else 0
-                for valid_date in (
-                    self.safe_operation.valid_after,
-                    self.safe_operation.valid_until,
-                )
-            ]
-            signature = encode_packed(["uint48"] * 2, [valid_after, valid_until])
-        else:
-            signature = b""
+        if not self.signature:
+            raise ValueError("Signature should not be empty")
+        signature = HexBytes(self.signature)
 
         return UserOperationClass(
             HexBytes(self.hash),
