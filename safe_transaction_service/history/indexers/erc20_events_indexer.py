@@ -71,7 +71,7 @@ class Erc20EventsIndexer(EventsIndexer):
         return "erc20_block_number"
 
     @property
-    def database_queryset(self):
+    def database_queryset(self) -> QuerySet:
         return SafeContract.objects.all()
 
     def _do_node_query(
@@ -201,7 +201,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
     def get_almost_updated_addresses(
         self, current_block_number: int
-    ) -> QuerySet[MonitoredAddress]:
+    ) -> QuerySet[SafeContract]:
         """
 
         :param current_block_number:
