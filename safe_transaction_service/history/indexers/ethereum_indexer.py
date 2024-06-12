@@ -4,14 +4,14 @@ from contextlib import contextmanager
 from logging import getLogger
 from typing import Any, List, Optional, Sequence, Tuple
 
-from django.db.models import Min, QuerySet
+from django.db.models import Min
 
 from celery.exceptions import SoftTimeLimitExceeded
+from eth_typing import ChecksumAddress
 from requests import Timeout
 
 from gnosis.eth import EthereumClient
 
-from ..models import MonitoredAddress
 from ..services import IndexingException, IndexService, IndexServiceProvider
 
 logger = getLogger(__name__)
@@ -89,7 +89,7 @@ class EthereumIndexer(ABC):
     @abstractmethod
     def find_relevant_elements(
         self,
-        addresses: Sequence[str],
+        addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
@@ -127,8 +127,10 @@ class EthereumIndexer(ABC):
         return [item for sublist in processed_objects for item in sublist]
 
     def get_block_numbers_for_search(
-        self, addresses: Sequence[str], current_block_number: Optional[int] = None
-    ) -> Optional[Sequence[Tuple[int, int]]]:
+        self,
+        addresses: set[ChecksumAddress],
+        current_block_number: Optional[int] = None,
+    ) -> Optional[Tuple[int, int]]:
         """
         :param addresses:
         :param current_block_number: To prevent fetching it again
@@ -138,7 +140,7 @@ class EthereumIndexer(ABC):
             current_block_number or self.ethereum_client.current_block_number
         )
 
-        from_block_number = self.get_minimum_block_number(addresses)
+        from_block_number = self.get_from_block_number(addresses)
         if from_block_number is None:  # Empty queryset
             return None
 
@@ -177,8 +179,8 @@ class EthereumIndexer(ABC):
             current_block_number - self.confirmations,
         )
 
-    def get_minimum_block_number(
-        self, addresses: Optional[Sequence[str]] = None
+    def get_from_block_number(
+        self, addresses: Optional[set[ChecksumAddress]] = None
     ) -> Optional[int]:
         """
         :param addresses:
@@ -207,7 +209,7 @@ class EthereumIndexer(ABC):
 
     def get_almost_updated_addresses(
         self, current_block_number: int
-    ) -> QuerySet[MonitoredAddress]:
+    ) -> set[ChecksumAddress]:
         """
 
         :param current_block_number:
@@ -219,16 +221,18 @@ class EthereumIndexer(ABC):
         )
 
         from_block_number = max(
-            self.get_minimum_block_number() or 0,
+            self.get_from_block_number() or 0,
             current_block_number - self.updated_blocks_behind,
         )
         to_block_number = current_block_number - self.confirmations
-        almost_updated_addresses = self.database_queryset.filter(
-            **{
-                self.database_field + "__lt": to_block_number,
-                self.database_field + "__gte": from_block_number,
-            }
-        ).order_by(self.database_field)
+        almost_updated_addresses = set(
+            self.database_queryset.filter(
+                **{
+                    self.database_field + "__lt": to_block_number,
+                    self.database_field + "__gte": from_block_number,
+                }
+            ).values_list("address", flat=True)
+        )
 
         logger.debug(
             "%s: Retrieved almost updated monitored addresses", self.__class__.__name__
@@ -237,7 +241,7 @@ class EthereumIndexer(ABC):
 
     def get_not_updated_addresses(
         self, current_block_number: int
-    ) -> QuerySet[MonitoredAddress]:
+    ) -> set[ChecksumAddress]:
         """
         :param current_block_number:
         :return: Addresses not updated (> `updated_blocks_behind` blocks) to be processed
@@ -247,9 +251,15 @@ class EthereumIndexer(ABC):
             self.__class__.__name__,
         )
 
-        not_updated_addresses = self.database_queryset.filter(
-            **{self.database_field + "__lte": current_block_number - self.confirmations}
-        ).order_by(self.database_field)
+        not_updated_addresses = set(
+            self.database_queryset.filter(
+                **{
+                    self.database_field
+                    + "__lte": current_block_number
+                    - self.confirmations
+                }
+            ).values_list("address", flat=True)
+        )
 
         logger.debug(
             "%s: Retrieved not updated monitored addresses",
@@ -258,7 +268,7 @@ class EthereumIndexer(ABC):
         return not_updated_addresses
 
     def update_monitored_addresses(
-        self, addresses: Sequence[str], from_block_number: int, to_block_number: int
+        self, addresses: set[str], from_block_number: int, to_block_number: int
     ) -> bool:
         """
         :param addresses: Addresses to have the block number updated
@@ -365,7 +375,9 @@ class EthereumIndexer(ABC):
                 self.block_process_limit = self.block_process_limit_max
 
     def process_addresses(
-        self, addresses: Sequence[str], current_block_number: Optional[int] = None
+        self,
+        addresses: set[ChecksumAddress],
+        current_block_number: Optional[int] = None,
     ) -> Tuple[Sequence[Any], Optional[int], int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
@@ -433,28 +445,25 @@ class EthereumIndexer(ABC):
         total_number_processed_elements = 0
         start_block: Optional[int] = None
         last_block: Optional[int] = None
-        almost_updated_addresses = list(
-            self.get_almost_updated_addresses(current_block_number)
-        )
-        if almost_updated_addresses:
+        to_block_number: Optional[int] = None
+
+        # First process addresses that are almost updated (usually close to the `current_block_number`)
+        if almost_updated_addresses := self.get_almost_updated_addresses(
+            current_block_number
+        ):
             logger.info(
-                "%s: Processing %d almost updated addresses",
+                "%s: Processing almost updated addresses",
                 self.__class__.__name__,
-                len(almost_updated_addresses),
             )
             updated = False
             while not updated:
-                almost_updated_addresses_to_process = [
-                    monitored_contract.address
-                    for monitored_contract in almost_updated_addresses
-                ]
                 (
                     processed_elements,
                     from_block_number,
                     to_block_number,
                     updated,
                 ) = self.process_addresses(
-                    almost_updated_addresses_to_process,
+                    almost_updated_addresses,
                     current_block_number=current_block_number,
                 )
                 number_processed_elements = len(processed_elements)
@@ -474,40 +483,24 @@ class EthereumIndexer(ABC):
                 "%s: No almost updated addresses to process", self.__class__.__name__
             )
 
-        not_updated_addresses = list(
-            self.get_not_updated_addresses(current_block_number)
-        )
-        if not_updated_addresses:
+        # Then process addresses that are not updated (usually far from the `current_block_number`)
+        if not_updated_addresses := self.get_not_updated_addresses(
+            current_block_number
+        ):
             logger.info(
-                "%s: Processing %d not updated addresses total",
+                "%s: Processing not updated addresses",
                 self.__class__.__name__,
-                len(not_updated_addresses),
             )
 
-            # Not updated addresses are sorted by tx_block_number
-            from_block_number = getattr(not_updated_addresses[0], self.database_field)
             updated = False
             while not updated:
-                # Estimate to_block_number
-                to_block_number_expected = self.get_to_block_number(
-                    from_block_number, current_block_number
-                )
-
-                # Only process addresses whose block is under the `to_block_number`, don't reprocess addresses
-                not_updated_addresses_to_process = [
-                    monitored_contract.address
-                    for monitored_contract in not_updated_addresses
-                    if getattr(monitored_contract, self.database_field)
-                    <= to_block_number_expected
-                ]
-                # Get real `to_block_number` processed
                 (
                     processed_elements,
                     from_block_number,
                     to_block_number,
                     updated,
                 ) = self.process_addresses(
-                    not_updated_addresses_to_process,
+                    not_updated_addresses,
                     current_block_number=current_block_number,
                 )
                 if start_block is None or from_block_number < start_block:

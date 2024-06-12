@@ -126,10 +126,11 @@ class TestCommands(SafeTestCaseMixin, TestCase):
 
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract = SafeContractFactory()
+            addresses = {safe_contract.address}
             buf = StringIO()
             call_command(command, stdout=buf)
             self.assertIn(
-                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
+                f"Start indexing of erc20/721 events for out of sync addresses {addresses}",
                 cm.output[0],
             )
             self.assertIn(
@@ -139,10 +140,11 @@ class TestCommands(SafeTestCaseMixin, TestCase):
 
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract_2 = SafeContractFactory()
+            addresses = {safe_contract_2.address}
             buf = StringIO()
             call_command(command, f"--addresses={safe_contract_2.address}", stdout=buf)
             self.assertIn(
-                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract_2.address]}",
+                f"Start indexing of erc20/721 events for out of sync addresses {addresses}",
                 cm.output[0],
             )
             self.assertIn(
@@ -153,12 +155,13 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         # Test sync task call
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract_2 = SafeContractFactory()
+            addresses = {safe_contract_2.address}
             buf = StringIO()
             call_command(
                 command, f"--addresses={safe_contract_2.address}", "--sync", stdout=buf
             )
             self.assertIn(
-                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract_2.address]}",
+                f"Start indexing of erc20/721 events for out of sync addresses {addresses}",
                 cm.output[0],
             )
             self.assertIn(
