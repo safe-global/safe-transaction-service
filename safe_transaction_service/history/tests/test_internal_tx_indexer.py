@@ -203,9 +203,9 @@ class TestInternalTxIndexer(TestCase):
     ):
         current_block_number = current_block_number_mock.return_value
         internal_tx_indexer = self.internal_tx_indexer
-        addresses = ["0x5aC255889882aCd3da2aA939679E3f3d4cea221e"]
+        addresses = {"0x5aC255889882aCd3da2aA939679E3f3d4cea221e"}
         trace_filter_transactions = OrderedDict(
-            (trace["transactionHash"], []) for trace in trace_filter_mock.return_value
+            (trace["transactionHash"], None) for trace in trace_filter_mock.return_value
         )
         trace_block_transactions = OrderedDict(
             (
@@ -221,12 +221,12 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, 1, current_block_number - 50
         )
-        self.assertEqual(trace_filter_transactions, elements)
+        self.assertDictEqual(trace_filter_transactions, elements)
         trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.tracing,
             from_block=1,
             to_block=current_block_number - 50,
-            to_address=addresses,
+            to_address=list(addresses),
         )
         trace_block_mock.assert_not_called()
         trace_filter_mock.reset_mock()
@@ -235,12 +235,14 @@ class TestInternalTxIndexer(TestCase):
         elements = internal_tx_indexer.find_relevant_elements(
             addresses, current_block_number - 50, current_block_number
         )
-        self.assertEqual(trace_filter_transactions | trace_block_transactions, elements)
+        self.assertDictEqual(
+            trace_filter_transactions | trace_block_transactions, elements
+        )
         trace_filter_mock.assert_called_once_with(
             internal_tx_indexer.ethereum_client.tracing,
             from_block=current_block_number - 50,
             to_block=current_block_number - internal_tx_indexer.number_trace_blocks,
-            to_address=addresses,
+            to_address=list(addresses),
         )
 
         trace_block_mock.assert_called_with(

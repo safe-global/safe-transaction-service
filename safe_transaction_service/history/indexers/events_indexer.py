@@ -7,7 +7,7 @@ from django.conf import settings
 
 import gevent
 from eth_abi.exceptions import DecodingError
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
 from gevent import pool
 from hexbytes import HexBytes
@@ -65,7 +65,7 @@ class EventsIndexer(EthereumIndexer):
         """
 
     @cached_property
-    def events_to_listen(self) -> Dict[bytes, List[ContractEvent]]:
+    def events_to_listen(self) -> Dict[HexStr, List[ContractEvent]]:
         """
         Build a dictionary with a `topic` and a list of ABIs to use for decoding. One single topic can have
         multiple ways of decoding as events with different `indexed` parameters must be decoded
@@ -75,13 +75,13 @@ class EventsIndexer(EthereumIndexer):
         """
         events_to_listen = {}
         for event in self.contract_events:
-            key = HexBytes(event_abi_to_log_topic(event.abi)).hex()
+            key = HexStr(HexBytes(event_abi_to_log_topic(event.abi)).hex())
             events_to_listen.setdefault(key, []).append(event)
         return events_to_listen
 
     def _do_node_query(
         self,
-        addresses: List[ChecksumAddress],
+        addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
     ) -> List[LogReceipt]:
@@ -101,9 +101,10 @@ class EventsIndexer(EthereumIndexer):
         }
 
         if not self.IGNORE_ADDRESSES_ON_LOG_FILTER:
-            # Search logs only for the provided addresses
+            # Search logs only for the provided addresses, otherwise all the events will be
+            # retrieved and then filtering will happen here
             if self.query_chunk_size:
-                addresses_chunks = chunks(addresses, self.query_chunk_size)
+                addresses_chunks = chunks(list(addresses), self.query_chunk_size)
             else:
                 addresses_chunks = [addresses]
 
@@ -132,7 +133,7 @@ class EventsIndexer(EthereumIndexer):
 
     def _find_elements_using_topics(
         self,
-        addresses: List[ChecksumAddress],
+        addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
     ) -> List[LogReceipt]:
@@ -175,7 +176,7 @@ class EventsIndexer(EthereumIndexer):
 
     def find_relevant_elements(
         self,
-        addresses: List[ChecksumAddress],
+        addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
@@ -219,7 +220,9 @@ class EventsIndexer(EthereumIndexer):
         :return: Decode `log_receipt` using all the possible ABIs for the topic. Returns `EventData` if successful,
             or `None` if decoding was not possible
         """
-        for event_to_listen in self.events_to_listen[log_receipt["topics"][0].hex()]:
+        for event_to_listen in self.events_to_listen[
+            HexStr(log_receipt["topics"][0].hex())
+        ]:
             # Try to decode using all the existing ABIs
             # One topic can have multiple matching ABIs due to `indexed` elements changing how to decode it
             try:

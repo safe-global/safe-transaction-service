@@ -67,8 +67,9 @@ class TestTasks(TestCase):
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract = SafeContractFactory()
             index_erc20_events_out_of_sync_task.delay()
+            addresses = {safe_contract.address}
             self.assertIn(
-                f"Start indexing of erc20/721 events for out of sync addresses {[safe_contract.address]}",
+                f"Start indexing of erc20/721 events for out of sync addresses {addresses}",
                 cm.output[0],
             )
             self.assertIn(
