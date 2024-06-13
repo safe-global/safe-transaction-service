@@ -134,6 +134,10 @@ def index_erc20_events_out_of_sync_task(
         list(erc20_events_indexer.get_almost_updated_addresses(current_block_number))[
             :number_of_addresses
         ]
+    addresses = set(addresses) if addresses else  set(
+        list(erc20_events_indexer.get_almost_updated_addresses(current_block_number))[
+            :number_of_addresses
+        ]
     )
 
     if not addresses:
