@@ -130,14 +130,14 @@ def index_erc20_events_out_of_sync_task(
         erc20_events_indexer.block_process_limit_max = block_process_limit_max
 
     current_block_number = erc20_events_indexer.ethereum_client.current_block_number
-    addresses = (set(addresses) if addresses else None) or set(
-        list(erc20_events_indexer.get_almost_updated_addresses(current_block_number))[
-            :number_of_addresses
-        ]
-    addresses = set(addresses) if addresses else  set(
-        list(erc20_events_indexer.get_almost_updated_addresses(current_block_number))[
-            :number_of_addresses
-        ]
+    addresses = (
+        set(addresses)
+        if addresses
+        else set(
+            list(
+                erc20_events_indexer.get_almost_updated_addresses(current_block_number)
+            )[:number_of_addresses]
+        )
     )
 
     if not addresses:

@@ -72,7 +72,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
     @property
     def database_queryset(self) -> QuerySet:
-        return SafeContract.objects
+        return SafeContract.objects.all()
 
     def _do_node_query(
         self,
