@@ -1,6 +1,7 @@
+import datetime
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterator, List, Optional, Sequence
+from typing import Iterator, List, NamedTuple, Optional, Sequence
 
 from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
@@ -22,6 +23,11 @@ from ..models import (
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
+
+
+class AddressesCache(NamedTuple):
+    addresses: set[ChecksumAddress]
+    last_checked: Optional[datetime.datetime]
 
 
 class Erc20EventsIndexerProvider:
@@ -58,6 +64,7 @@ class Erc20EventsIndexer(EventsIndexer):
         super().__init__(*args, **kwargs)
 
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
+        self.addresses_cache: Optional[AddressesCache] = None
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -210,7 +217,32 @@ class Erc20EventsIndexer(EventsIndexer):
 
         logger.debug("%s: Retrieving monitored addresses", self.__class__.__name__)
 
-        addresses = set(self.database_queryset.all().values_list("address", flat=True))
+        last_checked: Optional[datetime.datetime]
+        if self.addresses_cache:
+            # Only search for the new addresses
+            query = self.database_queryset.filter(
+                created__gte=self.addresses_cache.last_checked
+            )
+            addresses = self.addresses_cache.addresses
+            last_checked = self.addresses_cache.last_checked
+        else:
+            query = self.database_queryset.all()
+            addresses = set()
+            last_checked = None
+
+        for created, address in query.values_list("created", "address").order_by(
+            "created"
+        ):
+            addresses.add(address)
+
+        try:
+            last_checked = created
+        except NameError:  # database query empty, `created` not defined
+            pass
+
+        if last_checked:
+            # Don't use caching if list is empty
+            self.addresses_cache = AddressesCache(addresses, last_checked)
 
         logger.debug("%s: Retrieved monitored addresses", self.__class__.__name__)
         return addresses

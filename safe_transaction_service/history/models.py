@@ -1687,6 +1687,7 @@ class SafeContractManager(models.Manager):
 
 class SafeContract(models.Model):
     objects = SafeContractManager()
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
     address = EthereumAddressV2Field(primary_key=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="safe_contracts"
@@ -1705,10 +1706,6 @@ class SafeContract(models.Model):
 
     def __str__(self):
         return f"Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}"
-
-    @property
-    def created(self):
-        return self.ethereum_tx.block.timestamp
 
     @property
     def created_block_number(self) -> Optional[Type[int]]:

@@ -412,3 +412,29 @@ class TestMigrations(TestCase):
             HexBytes(MultisigConfirmation.objects.get().signature),
             safe_signature.export_signature(),
         )
+
+    def test_migration_0082_safecontract_created(self):
+        # Add `created` field to SafeContract
+        old_state = self.migrator.apply_initial_migration(
+            ("history", "0081_internaltx_history_internal_transfer_from"),
+        )
+
+        SafeContract = old_state.apps.get_model("history", "SafeContract")
+
+        EthereumBlock = old_state.apps.get_model("history", "EthereumBlock")
+        EthereumTx = old_state.apps.get_model("history", "EthereumTx")
+        ethereum_tx = self.build_ethereum_tx(EthereumBlock, EthereumTx)
+        SafeContract.objects.create(
+            address=Account.create().address,
+            ethereum_tx=ethereum_tx,
+        )
+
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0082_safecontract_created"),
+        )
+
+        SafeContractNew = new_state.apps.get_model("history", "SafeContract")
+        safe_contract = SafeContractNew.objects.get()
+        self.assertEqual(
+            safe_contract.created, safe_contract.ethereum_tx.block.timestamp
+        )
