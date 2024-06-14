@@ -201,7 +201,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
     def get_almost_updated_addresses(
         self, current_block_number: int
-    ) -> QuerySet[SafeContract]:
+    ) -> set[ChecksumAddress]:
         """
 
         :param current_block_number:
@@ -210,7 +210,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
         logger.debug("%s: Retrieving monitored addresses", self.__class__.__name__)
 
-        addresses = self.database_queryset.all().values_list("address", flat=True)
+        addresses = set(self.database_queryset.all().values_list("address", flat=True))
 
         logger.debug("%s: Retrieved monitored addresses", self.__class__.__name__)
         return addresses

@@ -65,11 +65,13 @@ def check_reorgs_task(self) -> Optional[int]:
             logger.info("Start checking of reorgs")
             reorg_service: ReorgService = ReorgServiceProvider()
             reorg_block_number = reorg_service.check_reorgs()
-            if reorg_block_number:
-                logger.warning("Reorg found for block-number=%d", reorg_block_number)
-                # Stopping running tasks is not possible with gevent
-                reorg_service.recover_from_reorg(reorg_block_number)
-                return reorg_block_number
+            if not reorg_block_number:
+                logger.info("No reorg was found")
+                return None
+            logger.warning("Reorg found for block-number=%d", reorg_block_number)
+            # Stopping running tasks is not possible with gevent
+            reorg_service.recover_from_reorg(reorg_block_number)
+            return reorg_block_number
 
 
 @app.shared_task(soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
