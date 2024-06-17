@@ -13,6 +13,11 @@ from eth_account import Account
 from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ...utils.redis import get_redis
+from ..indexers import (
+    Erc20EventsIndexerProvider,
+    InternalTxIndexerProvider,
+    SafeEventsIndexerProvider,
+)
 from ..models import MultisigTransaction, SafeContract, SafeLastStatus, SafeStatus
 from ..services import CollectiblesService, CollectiblesServiceProvider, IndexService
 from ..services.collectibles_service import CollectibleWithMetadata
@@ -50,6 +55,17 @@ logger = logging.getLogger(__name__)
 
 
 class TestTasks(TestCase):
+    def _delete_singletons(self):
+        Erc20EventsIndexerProvider.del_singleton()
+        InternalTxIndexerProvider.del_singleton()
+        SafeEventsIndexerProvider.del_singleton()
+
+    def setUp(self):
+        self._delete_singletons()
+
+    def tearDown(self):
+        self._delete_singletons()
+
     def test_check_reorgs_task(self):
         self.assertIsNone(check_reorgs_task.delay().result, 0)
 
