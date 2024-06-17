@@ -32,6 +32,6 @@ pillow==10.3.0
 psycogreen==1.0.2
 psycopg2==2.9.9
 redis==5.0.6
-requests==2.32.2
+requests==2.32.3
 safe-eth-py[django]==6.0.0b30
 web3==6.19.0
