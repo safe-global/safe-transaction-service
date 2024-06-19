@@ -79,7 +79,9 @@ def check_sync_status_task() -> bool:
     """
     Check indexing status of the service
     """
-    if not (is_service_synced := IndexServiceProvider().is_service_synced()):
+    if is_service_synced := IndexServiceProvider().is_service_synced():
+        logger.info("Service is synced")
+    else:
         logger.error("Service is out of sync")
 
     return is_service_synced
