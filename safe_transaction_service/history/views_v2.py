@@ -98,12 +98,12 @@ class DelegateListView(ListCreateAPIView):
                     {"name": "version", "type": "string"},
                     {"name": "chainId", "type": "uint256"},
                 ],
-                "AddDelegate": [
-                    {"name": "delegateAddress", "type": "bytes32"},
+                "Delegate": [
+                    {"name": "delegateAddress", "type": "address"},
                     {"name": "totp", "type": "uint256"},
                 ],
             },
-            "primaryType": "AddDelegate",
+            "primaryType": "Delegate",
             "domain": {
                 "name": "Safe Transaction Service",
                 "version": "1.0",

@@ -22,7 +22,7 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
 
         # Hash calculated when totp previous is false
         expected_hash_previous_totp_false = HexBytes(
-            "0xc095ec37d1798b39b8cf9306a3d6788f6118f46a0d18fcfac037c8306bdbf397"
+            "0x40ef28feb993bf127265260d48ab1a427d5b852aa8b38f511fcd368bfc9cbfdf"
         )
 
         result_hash = DelegateSignatureHelperV2.calculate_hash(
@@ -34,7 +34,7 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
 
         # Hash calculated when totp previous is true
         expected_hash_previous_totp_true = HexBytes(
-            "0xbf910dbf371090157231e49e7530c44b5ecf6a24fd4322be85465c13dbcb1459"
+            "0x37fe1c77d467e92109ef91637e30a4053bab963de2ea74f9d6c4ba1918ff32e6"
         )
 
         result_hash = DelegateSignatureHelperV2.calculate_hash(

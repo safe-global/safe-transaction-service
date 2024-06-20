@@ -106,7 +106,7 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
                     {"name": "chainId", "type": "uint256"},
                 ],
                 "Delegate": [
-                    {"name": "delegateAddress", "type": "bytes32"},
+                    {"name": "delegateAddress", "type": "address"},
                     {"name": "totp", "type": "uint256"},
                 ],
             },
