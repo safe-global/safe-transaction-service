@@ -1,6 +1,6 @@
 import re
 import time
-from typing import List
+from typing import List, Optional
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
@@ -85,7 +85,7 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
     def calculate_hash(
         cls,
         delegate_address: ChecksumAddress,
-        chain_id: int,
+        chain_id: Optional[int],
         previous_totp: bool = False,
     ) -> Hash32:
         """
@@ -114,13 +114,15 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
             "domain": {
                 "name": "Safe Transaction Service",
                 "version": "1.0",
-                "chainId": chain_id,
             },
             "message": {
                 "delegateAddress": delegate_address,
                 "totp": totp,
             },
         }
+
+        if chain_id:
+            payload["domain"]["chainId"] = chain_id
 
         return eip712_encode_hash(payload)
 
