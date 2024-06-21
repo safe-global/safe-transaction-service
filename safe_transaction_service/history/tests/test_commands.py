@@ -209,22 +209,23 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                     f"--from-block-number={from_block_number}",
                     stdout=buf,
                 )
+                expected_addresses = {safe_master_copy.address}
                 self.assertIn(
-                    f"Start reindexing addresses {[safe_master_copy.address]}",
+                    f"Start reindexing addresses {expected_addresses}",
                     cm.output[0],
                 )
                 self.assertIn("found 0 traces/events", cm.output[1])
                 self.assertIn(
-                    f"End reindexing addresses {[safe_master_copy.address]}",
+                    f"End reindexing addresses {expected_addresses}",
                     cm.output[3],
                 )
                 find_relevant_elements_mock.assert_any_call(
-                    [safe_master_copy.address],
+                    {safe_master_copy.address},
                     from_block_number,
                     from_block_number + block_process_limit - 1,
                 )
                 find_relevant_elements_mock.assert_any_call(
-                    [safe_master_copy.address],
+                    {safe_master_copy.address},
                     from_block_number + block_process_limit,
                     current_block_number_mock.return_value,
                 )
@@ -251,22 +252,23 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                         f"--from-block-number={from_block_number}",
                         stdout=buf,
                     )
+                    expected_addresses = {safe_l2_master_copy.address}
                     self.assertIn(
-                        f"Start reindexing addresses {[safe_l2_master_copy.address]}",
+                        f"Start reindexing addresses {expected_addresses}",
                         cm.output[0],
                     )
                     self.assertIn("found 0 traces/events", cm.output[1])
                     self.assertIn(
-                        f"End reindexing addresses {[safe_l2_master_copy.address]}",
+                        f"End reindexing addresses {expected_addresses}",
                         cm.output[3],
                     )
                     find_relevant_elements_mock.assert_any_call(
-                        [safe_l2_master_copy.address],
+                        {safe_l2_master_copy.address},
                         from_block_number,
                         from_block_number + block_process_limit - 1,
                     )
                     find_relevant_elements_mock.assert_any_call(
-                        [safe_l2_master_copy.address],
+                        {safe_l2_master_copy.address},
                         from_block_number + block_process_limit,
                         current_block_number_mock.return_value,
                     )
@@ -313,22 +315,23 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                     f"--from-block-number={from_block_number}",
                     stdout=buf,
                 )
+                expected_addresses = {safe_contract.address}
                 self.assertIn(
-                    f"Start reindexing addresses {[safe_contract.address]}",
+                    f"Start reindexing addresses {expected_addresses}",
                     cm.output[0],
                 )
                 self.assertIn("found 0 traces/events", cm.output[1])
                 self.assertIn(
-                    f"End reindexing addresses {[safe_contract.address]}",
+                    f"End reindexing addresses {expected_addresses}",
                     cm.output[3],
                 )
                 find_relevant_elements_mock.assert_any_call(
-                    [safe_contract.address],
+                    {safe_contract.address},
                     from_block_number,
                     from_block_number + block_process_limit - 1,
                 )
                 find_relevant_elements_mock.assert_any_call(
-                    [safe_contract.address],
+                    {safe_contract.address},
                     from_block_number + block_process_limit,
                     current_block_number_mock.return_value,
                 )
