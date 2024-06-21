@@ -392,17 +392,18 @@ class IndexService:
             # No issues on modifying the indexer as we should be provided with a new instance
             indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False
         else:
-            addresses = list(
-                indexer.database_queryset.values_list("address", flat=True)
-            )
+            addresses = set(indexer.database_queryset.values_list("address", flat=True))
 
         element_number: int = 0
         if not addresses:
             logger.warning("No addresses to process")
         else:
             # Don't log all the addresses
+            addresses_len = len(addresses)
             addresses_str = (
-                str(addresses) if len(addresses) < 10 else f"{addresses[:10]}..."
+                str(addresses)
+                if addresses_len < 10
+                else f"{addresses_len} addresses..."
             )
             logger.info("Start reindexing addresses %s", addresses_str)
             current_block_number = self.ethereum_client.current_block_number
