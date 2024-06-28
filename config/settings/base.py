@@ -516,6 +516,14 @@ TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
     "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
 )  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
 
+# ENS
+# ------------------------------------------------------------------------------
+# See https://docs.ens.domains/web/subgraph for more details
+
+ENS_SUBGRAPH_URL = env.str("ENS_SUBGRAPH_URL", default=None)
+ENS_SUBGRAPH_API_KEY = env.str("ENS_SUBGRAPH_API_KEY", default=None)
+ENS_SUBGRAPH_ID = env.str("ENS_SUBGRAPH_ID", default=None)
+
 # Notifications
 # ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
