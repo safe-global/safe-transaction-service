@@ -17,7 +17,7 @@ from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
 from gnosis.eth.clients import EnsClient
 
 from safe_transaction_service.tokens.constants import (
@@ -161,7 +161,41 @@ class CollectiblesService:
         self.ethereum_client = ethereum_client
         self.ethereum_network = ethereum_client.get_network()
         self.redis = redis
-        self.ens_service: EnsClient = EnsClient(self.ethereum_network.value)
+
+        base_url = settings.ENS_SUBGRAPH_URL
+        api_key = settings.ENS_SUBGRAPH_API_KEY
+        subgraph_id = settings.ENS_SUBGRAPH_ID
+
+        if self.ethereum_network == EthereumNetwork.SEPOLIA:
+            config = EnsClient.Config(
+                EthereumNetwork.SEPOLIA,
+                "https://api.studio.thegraph.com/query/49574/enssepolia/version/latest",
+            )
+        elif self.ethereum_network == EthereumNetwork.HOLESKY:
+            config = EnsClient.Config(
+                EthereumNetwork.HOLESKY,
+                "https://api.studio.thegraph.com/query/49574/ensholesky/version/latest",
+            )
+        elif base_url and api_key and subgraph_id:
+            config = EnsClient.SubgraphConfig(
+                network=EthereumNetwork.MAINNET,
+                base_url=base_url,
+                api_key=api_key,
+                subgraph_id=subgraph_id,
+            )
+        else:
+            # Fallback if Subgraph is not configured correctly. This configuration is not suitable for production
+            # environments.
+            logger.warning(
+                "Using fallback EnsClient configuration. This configuration is not suitable for production and it is "
+                "recommended to setup a Subgraph API key. See https://docs.ens.domains/web/subgraph"
+            )
+            config = EnsClient.Config(
+                EthereumNetwork.MAINNET,
+                "https://api.thegraph.com/subgraphs/name/ensdomains/ens/",
+            )
+
+        self.ens_service: EnsClient = EnsClient(config=config)
 
         self.cache_token_info: TTLCache[ChecksumAddress, Erc721InfoWithLogo] = TTLCache(
             maxsize=4096, ttl=self.TOKEN_EXPIRATION
