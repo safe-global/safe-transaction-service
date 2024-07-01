@@ -1,7 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
@@ -134,7 +134,9 @@ class BalanceService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-    ):
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Tuple[List[Balance], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -156,22 +158,42 @@ class BalanceService:
             safe_address
         ).count()
         cache_key = (
-            f"balances:{safe_address}:{only_trusted}:{exclude_spam}:"
+            f"balances:{safe_address}:{only_trusted}:{exclude_spam}:{limit}:{offset}"
             f"{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
         )
+        cache_key_count = f"balances:{safe_address}:{only_trusted}:{exclude_spam}"
         if balances := django_cache.get(cache_key):
-            return balances
+            count = django_cache.get(cache_key_count)
+            return balances, count
         else:
-            balances = self._get_balances(safe_address, only_trusted, exclude_spam)
+            balances, count = self._get_balances(
+                safe_address, only_trusted, exclude_spam, limit, offset
+            )
             django_cache.set(cache_key, balances, 60 * 10)  # 10 minutes cache
-            return balances
+            django_cache.set(cache_key_count, count, 60 * 10)  # 10 minutes cache
+            return balances, count
+
+    def _get_erc20_limits(self, limit, offset) -> Tuple[int, int]:
+        if not limit:
+            # No pagination no limits
+            return 0, None
+
+        if offset == 0:
+            # First page will include also native token balance
+            return offset, limit - 1
+        else:
+            # Include previous ERC20 after first page
+            previous_offset = offset - 1
+            return previous_offset, previous_offset + limit
 
     def _get_balances(
         self,
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-    ) -> List[Balance]:
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Tuple[List[Balance], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -183,18 +205,25 @@ class BalanceService:
         ), f"Not valid address {safe_address} for getting balances"
 
         all_erc20_addresses = ERC20Transfer.objects.tokens_used_by_address(safe_address)
-        for address in all_erc20_addresses:
-            # Store tokens in database if not present
-            self.get_token_info(address)  # This is cached
         erc20_addresses = self._filter_addresses(
             all_erc20_addresses, only_trusted, exclude_spam
         )
+
+        # Add Native token to the list
+        count = len(erc20_addresses) + 1
+        # get paginated limits
+        start, end = self._get_erc20_limits(limit, offset)
+        erc20_addresses_paginated = erc20_addresses[start:end]
+
+        for address in erc20_addresses_paginated:
+            # Store tokens in database if not present
+            self.get_token_info(address)  # This is cached
 
         try:
             raw_balances = []
             # With a lot of addresses an HTTP 413 error will be raised
             for erc20_addresses_chunk in chunks(
-                erc20_addresses, settings.TOKENS_ERC20_GET_BALANCES_BATCH
+                erc20_addresses_paginated, settings.TOKENS_ERC20_GET_BALANCES_BATCH
             ):
                 balances = self.ethereum_client.erc20.get_balances(
                     safe_address, erc20_addresses_chunk
@@ -204,13 +233,16 @@ class BalanceService:
                 raw_balances.extend(balances[1:] if raw_balances else balances)
 
             # Return ether balance if there are no tokens
-            if not raw_balances:
+            if not erc20_addresses_paginated:
                 raw_balances = self.ethereum_client.erc20.get_balances(safe_address, [])
             # First element should be the ether transfer
         except (IOError, ValueError) as exc:
             raise NodeConnectionException from exc
 
         balances = []
+        if offset != 0 and raw_balances:
+            raw_balances = raw_balances[1:]
+
         for balance in raw_balances:
             if not balance["token_address"]:  # Ether
                 balance["token"] = None
@@ -221,7 +253,8 @@ class BalanceService:
             else:
                 continue
             balances.append(Balance(**balance))
-        return balances
+
+        return balances, count
 
     @cachedmethod(cache=operator.attrgetter("cache_token_info"))
     @cache_memoize(60 * 60, prefix="balances-get_token_info")  # 1 hour
