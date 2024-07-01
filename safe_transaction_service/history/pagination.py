@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.http import HttpRequest
 
 from rest_framework.pagination import LimitOffsetPagination
@@ -14,14 +16,20 @@ class SmallPagination(LimitOffsetPagination):
 
 
 class ListPagination(LimitOffsetPagination):
-    max_limit = 10
 
-    def __init__(self, request: HttpRequest):
+    def __init__(
+        self,
+        request: HttpRequest,
+        max_limit: Optional[int] = None,
+        default_limit: Optional[int] = None,
+    ):
         super().__init__()
         self.request = request
         self.limit = self.get_limit(request)
         self.offset = self.get_offset(request)
         self.count: int = 0
+        self.max_limit = max_limit if max_limit else self.max_limit
+        self.default_limit = default_limit if default_limit else self.default_limit
 
     def set_count(self, value):
         self.count = value
