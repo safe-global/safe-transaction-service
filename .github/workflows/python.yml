@@ -11,16 +11,13 @@ on:
 jobs:
   linting:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
       - name: Install dependencies
         run: pip install pre-commit
       - name: Run pre-commit
@@ -28,9 +25,6 @@ jobs:
 
   test-app:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
     services:
       redis:
         image: redis
@@ -68,8 +62,10 @@ jobs:
         docker network create ganache
         docker run --detach --publish 8545:8545 --network ganache -e DOCKER=true trufflesuite/ganache:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --chain.chainId 1337 --chain.networkId 1337 -d
     - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
     - name: Install dependencies
       run: |
         pip install wheel setuptools
