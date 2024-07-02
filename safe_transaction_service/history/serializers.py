@@ -2,6 +2,7 @@ import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
 from django.http import Http404
 
 from drf_yasg.utils import swagger_serializer_method
@@ -403,13 +404,27 @@ class DelegateSerializerMixin:
         delegate: ChecksumAddress,
         signature: EthereumBytes,
         signer: ChecksumAddress,
+        chain_id: Optional[int],
     ) -> bool:
         ethereum_client = EthereumClientProvider()
-        chain_id = ethereum_client.get_chain_id()
+        current_chain = ethereum_client.get_chain_id()
+
+        # If the chain id is not provided and DELEGATE_CHAIN_ID_DEFAULT_ENABLED is enabled, default to the current
+        # ethereum client chain id. Else, use the provided chain id.
+        if not chain_id:
+            chain_id = (
+                current_chain if settings.DELEGATE_CHAIN_ID_DEFAULT_ENABLED else None
+            )
+        # If the chain id is provided but does not match the current chain then throw a validation error
+        elif chain_id != current_chain:
+            raise ValidationError(
+                "The provided chain ID is not the same as the current chain"
+            )
+
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp in (True, False):
             message_hash = DelegateSignatureHelperV2.calculate_hash(
-                delegate, chain_id, previous_totp=previous_totp
+                delegate, chain_id=chain_id, previous_totp=previous_totp
             )
             safe_signatures = SafeSignature.parse_signature(signature, message_hash)
             if not safe_signatures:
@@ -437,6 +452,7 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
     label = serializers.CharField(max_length=50)
+    chain_id = serializers.IntegerField(allow_null=True, required=False, default=None)
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -444,9 +460,13 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
         signature = attrs["signature"]
         delegate = attrs["delegate"]
         delegator = attrs["delegator"]
+        chain_id = attrs["chain_id"]
         self.validate_safe_address_and_delegator(safe_address, delegator)
         if self.validate_delegator_signature(
-            delegate=delegate, signature=signature, signer=delegator
+            delegate=delegate,
+            signature=signature,
+            signer=delegator,
+            chain_id=chain_id,
         ):
             return attrs
         raise ValidationError(
@@ -473,6 +493,7 @@ class DelegateDeleteSerializerV2(DelegateSerializerMixin, serializers.Serializer
     safe = EthereumAddressField(allow_null=True, required=False, default=None)
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
+    chain_id = serializers.IntegerField(allow_null=True, required=False, default=None)
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -480,10 +501,11 @@ class DelegateDeleteSerializerV2(DelegateSerializerMixin, serializers.Serializer
         signature = attrs["signature"]
         delegate = self.context["request"].parser_context["kwargs"]["delegate_address"]
         delegator = attrs["delegator"]
+        chain_id = attrs["chain_id"]
         self.validate_safe_address_and_delegator(safe_address, delegator)
         if self.validate_delegator_signature(
-            delegate, signature, delegator
-        ) or self.validate_delegator_signature(delegate, signature, delegate):
+            delegate, signature, delegator, chain_id
+        ) or self.validate_delegator_signature(delegate, signature, delegate, chain_id):
             return attrs
 
         raise ValidationError(
