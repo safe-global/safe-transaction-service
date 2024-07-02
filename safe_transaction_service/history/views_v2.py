@@ -116,7 +116,7 @@ class DelegateListView(ListCreateAPIView):
         }
         ```
 
-        For the signature we use TOTP with T0=0 and Tx=3600. TOTP is calculated by taking the
+        For the signature we use `TOTP` with `T0=0` and `Tx=3600`. `TOTP` is calculated by taking the
         Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals).
         """
         return super().post(request, **kwargs)
@@ -138,7 +138,7 @@ class DelegateDeleteView(GenericAPIView):
         """
         Removes every delegate/delegator pair found associated with a given delegate address. The
         signature is built the same way as for adding a delegate, but in this case the signer can be
-        either the delegator (owner) or the delegate itself. Check POST /delegates/ to learn more
+        either the `delegator` (owner) or the `delegate` itself. Check `POST /delegates/` to learn more.
         """
         if not fast_is_checksum_address(delegate_address):
             return Response(

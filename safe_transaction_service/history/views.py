@@ -1243,7 +1243,7 @@ class DataDecoderView(GenericAPIView):
     def post(self, request, format=None):
         """
         Returns the decoded data using the Safe Transaction Service internal ABI information given
-        the transaction data as a 0x prefixed hexadecimal string.
+        the transaction data as a `0x` prefixed hexadecimal string.
         If the address of the receiving contract is provided, the decoded data will be more accurate,
         as in case of an ABI collision the Safe Transaction Service would know which ABI to use.
         """
