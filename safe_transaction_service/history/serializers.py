@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from django.http import Http404
 
 from drf_yasg.utils import swagger_serializer_method
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ChecksumAddress
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 
@@ -554,12 +554,13 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
     execution_date = serializers.DateTimeField()
     data = HexadecimalField(allow_null=True, allow_blank=True)
     data_decoded = serializers.SerializerMethodField()
-    transaction_hash = serializers.SerializerMethodField()
-    block_number = serializers.SerializerMethodField()
+    transaction_hash = HexadecimalField(source="internal_tx.ethereum_tx_id")
+    block_number = serializers.IntegerField(source="internal_tx.block_number")
     is_successful = serializers.SerializerMethodField()
-    module_transaction_id = serializers.SerializerMethodField(
+    module_transaction_id = serializers.CharField(
+        source="unique_id",
         help_text="Internally calculated parameter to uniquely identify a moduleTransaction \n"
-        "`ModuleTransactionId = i+tx_hash+trace_address`"
+        "`ModuleTransactionId = i+tx_hash+trace_address`",
     )
 
     class Meta:
@@ -580,9 +581,6 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
             "module_transaction_id",
         )
 
-    def get_block_number(self, obj: ModuleTransaction) -> Optional[int]:
-        return obj.internal_tx.block_number
-
     def get_data_decoded(self, obj: ModuleTransaction) -> Dict[str, Any]:
         return get_data_decoded_from_data(
             obj.data.tobytes() if obj.data else b"", address=obj.to
@@ -590,12 +588,6 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
 
     def get_is_successful(self, obj: ModuleTransaction) -> bool:
         return not obj.failed
-
-    def get_transaction_hash(self, obj: ModuleTransaction) -> HexStr:
-        return obj.internal_tx.ethereum_tx_id
-
-    def get_module_transaction_id(self, obj: ModuleTransaction) -> str:
-        return "i" + obj.internal_tx.ethereum_tx_id[2:] + obj.internal_tx.trace_address
 
 
 class SafeMultisigConfirmationResponseSerializer(GnosisBaseModelSerializer):
@@ -835,9 +827,8 @@ class TransferResponseSerializer(serializers.Serializer):
             return TransferType.UNKNOWN.name
 
     def get_transfer_id(self, obj: TransferDict) -> str:
-        # Remove 0x on transaction_hash
-        transaction_hash = obj["transaction_hash"][2:]
-        if self.get_type(obj) == "ETHER_TRANSFER":
+        transaction_hash = obj["transaction_hash"][2:]  # Remove 0x
+        if self.get_type(obj) == TransferType.ETHER_TRANSFER.name:
             return "i" + transaction_hash + obj["_trace_address"]
         else:
             return "e" + transaction_hash + str(obj["_log_index"])

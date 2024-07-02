@@ -601,7 +601,7 @@ class SafeModuleTransactionListView(ListAPIView):
     def get_queryset(self):
         return (
             ModuleTransaction.objects.filter(safe=self.kwargs["address"])
-            .select_related("internal_tx__ethereum_tx__block")
+            .select_related("internal_tx__ethereum_tx")
             .order_by("-created")
         )
 

@@ -1514,8 +1514,8 @@ class ModuleTransaction(TimeStampedModel):
     internal_tx = models.OneToOneField(
         InternalTx, on_delete=models.CASCADE, related_name="module_tx", primary_key=True
     )
-    safe = EthereumAddressV2Field(
-        db_index=True
+    safe = (
+        EthereumAddressV2Field()
     )  # Just for convenience, it could be retrieved from `internal_tx`
     module = EthereumAddressV2Field(
         db_index=True
@@ -1528,11 +1528,30 @@ class ModuleTransaction(TimeStampedModel):
     )
     failed = models.BooleanField(default=False)
 
+    class Meta:
+        indexes = [
+            # Get ModuleTxs for a Safe sorted by created
+            Index(
+                name="history_moduletransaction_safe",
+                fields=["safe", "created"],
+                include=["internal_tx_id"],
+            ),
+        ]
+
     def __str__(self):
         if self.value:
             return f"{self.safe} - {self.to} - {self.value}"
         else:
             return f"{self.safe} - {self.to} - 0x{bytes(self.data).hex()[:6]}"
+
+    @property
+    def unique_id(self):
+        """
+        :return: Unique identifier for a ModuleTx: `i + tx_hash + trace_address`
+        """
+        return (
+            "i" + self.internal_tx.ethereum_tx_id[2:] + self.internal_tx.trace_address
+        )
 
     @property
     def execution_date(self) -> datetime.datetime:
