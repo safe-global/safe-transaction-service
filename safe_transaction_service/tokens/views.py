@@ -19,6 +19,9 @@ class TokenView(RetrieveAPIView):
 
     @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this does not change often
     def get(self, request, *args, **kwargs):
+        """
+        Returns detailed information on a given token supported in the Safe Transaction Service
+        """
         address = self.kwargs["address"]
         if not fast_is_checksum_address(address):
             return response.Response(
@@ -48,4 +51,7 @@ class TokensView(ListAPIView):
 
     @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
     def get(self, request, *args, **kwargs):
+        """
+        Returns the list of tokens supported in the Safe Transaction Service
+        """
         return super().get(request, *args, **kwargs)
