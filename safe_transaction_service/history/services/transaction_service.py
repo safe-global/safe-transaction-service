@@ -210,7 +210,7 @@ class TransactionService:
         module_tx_ids = (
             ModuleTransaction.objects.filter(safe=safe_address)
             .annotate(
-                execution_date=F("internal_tx__timestamp"),
+                execution_date=F("created"),
                 block=F("internal_tx__block_number"),
                 safe_nonce=Value(0, output_field=Uint256Field()),
             )

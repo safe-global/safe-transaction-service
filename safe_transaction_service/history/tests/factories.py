@@ -221,6 +221,7 @@ class ModuleTransactionFactory(DjangoModelFactory):
     class Meta:
         model = ModuleTransaction
 
+    created = factory.LazyAttribute(lambda o: o.internal_tx.timestamp)
     internal_tx = factory.SubFactory(InternalTxFactory)
     safe = factory.LazyFunction(lambda: Account.create().address)
     module = factory.LazyFunction(lambda: Account.create().address)
