@@ -24,19 +24,27 @@ a transaction that is pending to be sent to the blockchain.
 - [Deploying the service](https://github.com/safe-global/safe-infrastructure)
 
 ## Setup for development
-Use a virtualenv if possible:
+Use a [virtualenv](https://docs.python.org/es/3/library/venv.html) if possible:
 
 ```bash
 python -m venv venv
 ```
 
-Then enter the virtualenv and install the dependencies:
+Then enter the `virtualenv` and install the dependencies:
 
 ```bash
 source venv/bin/activate
 pip install -r requirements-dev.txt
 pre-commit install -f
 cp .env.dev .env
+./run_tests.sh
+```
+
+To run the e2e tests, some environment variables are required:
+
+```bash
+export ETHEREUM_MAINNET_NODE="https://erigon-node-mainnet.dev/"
+export ETHEREUM_4337_BUNDLER_URL="https://eth-sepolia.g.alchemy.com/v2/$API_KEY"
 ./run_tests.sh
 ```
 
