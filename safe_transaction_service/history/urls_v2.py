@@ -16,4 +16,9 @@ urlpatterns = [
         views_v2.DelegateDeleteView.as_view(),
         name="delegate",
     ),
+    path(
+        "safes/<str:address>/balances/",
+        views_v2.SafeBalanceView.as_view(),
+        name="safe-balances",
+    ),
 ]

@@ -903,7 +903,7 @@ class SafeBalanceView(GenericAPIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
             only_trusted, exclude_spam = self.get_parameters()
-            safe_balances = self.get_result(
+            safe_balances, _ = self.get_result(
                 address, only_trusted=only_trusted, exclude_spam=exclude_spam
             )
             serializer = self.get_serializer(safe_balances, many=True)
