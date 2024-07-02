@@ -548,7 +548,7 @@ class AllTransactionsListView(ListAPIView):
         return response
 
 
-class ModuleTransactionView(RetrieveAPIView):
+class SafeModuleTransactionView(RetrieveAPIView):
     serializer_class = serializers.SafeModuleTransactionResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
