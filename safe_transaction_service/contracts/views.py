@@ -10,6 +10,10 @@ from .signals import get_contract_cache_key
 
 
 class ContractView(RetrieveAPIView):
+    """
+    Returns the relevant information of a known smart contract
+    """
+
     lookup_field = "address"
     queryset = Contract.objects.select_related("contract_abi")
     serializer_class = serializers.ContractSerializer
@@ -32,6 +36,10 @@ class ContractView(RetrieveAPIView):
 
 
 class ContractsView(ListAPIView):
+    """
+    Returns the list of known smart contracts with their ABI’s
+    """
+
     filter_backends = [
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,

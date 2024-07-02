@@ -12,6 +12,10 @@ from .models import SafeOperation, SafeOperationConfirmation, UserOperation
 
 
 class SafeOperationView(RetrieveAPIView):
+    """
+    Returns a SafeOperation given its Safe operation hash
+    """
+
     lookup_field = "hash"
     lookup_url_kwarg = "safe_operation_hash"
     queryset = SafeOperation.objects.prefetch_related("confirmations").select_related(
@@ -52,6 +56,9 @@ class SafeOperationsView(ListCreateAPIView):
             return serializers.SafeOperationSerializer
 
     def get(self, request, address, *args, **kwargs):
+        """
+        Returns the list of SafeOperations for a given Safe account
+        """
         if not fast_is_checksum_address(address):
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -69,13 +76,7 @@ class SafeOperationsView(ListCreateAPIView):
     )
     def post(self, request, address, *args, **kwargs):
         """
-        Create a new 4337 ``SafeOperation`` for a Safe.
-
-        :param request:
-        :param address:
-        :param args:
-        :param kwargs:
-        :return:
+        Adds a new SafeOperation for a given Safe account
         """
 
         if not fast_is_checksum_address(address):
@@ -131,6 +132,10 @@ class SafeOperationConfirmationsView(ListCreateAPIView):
 
 
 class UserOperationView(RetrieveAPIView):
+    """
+    Returns a UserOperation given its user operation hash
+    """
+
     lookup_field = "hash"
     lookup_url_kwarg = "user_operation_hash"
     queryset = (
@@ -168,6 +173,9 @@ class UserOperationsView(ListAPIView):
         return context
 
     def get(self, request, address, *args, **kwargs):
+        """
+        Returns the list of UserOperations for a given Safe account
+        """
         if not fast_is_checksum_address(address):
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,

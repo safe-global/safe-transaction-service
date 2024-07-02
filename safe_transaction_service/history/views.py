@@ -169,6 +169,10 @@ class IndexingView(GenericAPIView):
 
 
 class SingletonsView(ListAPIView):
+    """
+    Returns a list of Master Copies configured in the service
+    """
+
     serializer_class = serializers.MasterCopyResponseSerializer
     pagination_class = None
 
@@ -178,7 +182,7 @@ class SingletonsView(ListAPIView):
 
 class SafeDeploymentsView(ListAPIView):
     """
-    Returns a list of safe deployments by version.
+    Returns a list of safe deployments by version
     """
 
     serializer_class = serializers.SafeDeploymentSerializer
@@ -503,8 +507,8 @@ class AllTransactionsListView(ListAPIView):
         ],
     )
     def get(self, request, *args, **kwargs):
-        f"""
-        Returns a paginated list of transactions for a Safe. The list has different structures depending on the
+        """
+        Returns all the transactions for a given Safe address. The list has different structures depending on the
         transaction type:
         - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`. If the query parameter `queued=False` is
         set only the transactions with `safe nonce < current Safe nonce` will be displayed. By default, only the
@@ -512,7 +516,7 @@ class AllTransactionsListView(ListAPIView):
         by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
-          Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
+          Only 1000 newest transfers will be returned.
         Ordering_fields: ["execution_date"] eg: `execution_date` or `-execution_date`
         """
         address = kwargs["address"]
@@ -558,7 +562,7 @@ class ModuleTransactionView(RetrieveAPIView):
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, module_transaction_id: str, *args, **kwargs) -> Response:
         """
-        :return: module transaction filtered by module_transaction_id
+        Returns a transaction executed from a module given its associated module transaction ID
         """
         if module_transaction_id and not is_valid_unique_transfer_id(
             module_transaction_id
@@ -606,7 +610,7 @@ class SafeModuleTransactionListView(ListAPIView):
     )
     def get(self, request, address, format=None):
         """
-        Returns the module transaction of a Safe
+        Returns all the transactions executed from modules given a Safe address
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -643,7 +647,8 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
     @swagger_auto_schema(responses={400: "Invalid data"})
     def get(self, request, *args, **kwargs):
         """
-        Get the list of confirmations for a multisig transaction
+        Returns the list of confirmations for the multi-signature transaction associated with
+        the given Safe transaction hash
         """
         return super().get(request, *args, **kwargs)
 
@@ -652,13 +657,18 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         """
-        Add a confirmation for a transaction. More than one signature can be used. This endpoint does not support
-        the use of delegates to make a transaction trusted.
+        Adds a new confirmation to the pending multi-signature transaction associated with the
+        given Safe transaction hash. Multiple signatures can be submitted at once. This endpoint
+        does not support the use of delegates to make transactions trusted.
         """
         return super().post(request, *args, **kwargs)
 
 
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
+    """
+    Returns a multi-signature transaction given its Safe transaction hash
+    """
+
     serializer_class = serializers.SafeMultisigTransactionResponseSerializer
     lookup_field = "safe_tx_hash"
     lookup_url_kwarg = "safe_tx_hash"
@@ -680,10 +690,10 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
     )
     def delete(self, request, safe_tx_hash: HexStr):
         """
-        Delete a queued but not executed multisig transaction. Only the proposer can delete the transaction.
-        Delegates are not valid, if the transaction was proposed by a delegator the owner who delegated to
-        the delegate must be used.
-        An EOA is required to sign the following EIP712 data:
+        Removes the queued but not executed multi-signature transaction associated with the given Safe tansaction hash.
+        Only the proposer can delete the transaction.
+        If the transaction was proposed by a delegate, the Safe owner who delegated to the delegate must be used.
+        An EOA is required to sign the following EIP-712 data:
 
         ```python
          {
@@ -770,8 +780,8 @@ class SafeMultisigTransactionListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         """
-        Returns a paginated list of Multisig Transactions for a Safe.
-        By default only ``trusted`` multisig transactions are returned.
+        Returns all the multi-signature transactions for a given Safe address.
+        By default, only ``trusted`` multisig transactions are returned.
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
@@ -798,7 +808,8 @@ class SafeMultisigTransactionListView(ListAPIView):
     )
     def post(self, request, address, format=None):
         """
-        Creates a Multisig Transaction with its confirmations and retrieves all the information related.
+        Creates a multi-signature transaction for a given Safe account with its confirmations and
+        retrieves all the information related.
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -874,7 +885,7 @@ class SafeBalanceView(GenericAPIView):
     @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
-        Get balance for Ether and ERC20 tokens
+        Get balance for Ether and ERC20 tokens of a given Safe account
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -967,7 +978,7 @@ class TransferView(RetrieveAPIView):
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, transfer_id: str, *args, **kwargs) -> Response:
         """
-        :return: transfer filtered by transfer_id
+        Returns a token transfer associated with the given transfer ID
         """
 
         if transfer_id and not is_valid_unique_transfer_id(transfer_id):
@@ -1030,9 +1041,9 @@ class SafeTransferListView(ListAPIView):
         }
     )
     def get(self, request, address, format=None):
-        f"""
-        Returns ether/tokens transfers for a Safe.
-        Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
+        """
+        Returns the list of token transfers for a given Safe address.
+        Only 1000 newest transfers will be returned.
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1055,9 +1066,9 @@ class SafeIncomingTransferListView(SafeTransferListView):
         }
     )
     def get(self, *args, **kwargs):
-        f"""
+        """
         Returns incoming ether/tokens transfers for a Safe.
-        Only `{settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS}` newest transfers will be returned.
+        Only 1000 newest transfers will be returned.
         """
         return super().get(*args, **kwargs)
 
@@ -1092,7 +1103,7 @@ class SafeCreationView(GenericAPIView):
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, *args, **kwargs):
         """
-        Get status of the safe
+        Returns detailed information on the Safe creation transaction of a given Safe account
         """
 
         if not fast_is_checksum_address(address):
@@ -1126,7 +1137,7 @@ class SafeInfoView(GenericAPIView):
     )
     def get(self, request, address, *args, **kwargs):
         """
-        Get status of the safe
+        Returns detailed information of a given Safe account
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1170,7 +1181,7 @@ class ModulesView(GenericAPIView):
     @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
         """
-        Return Safes where the module address provided is enabled
+        Returns the list of Safe modules enabled for a given Safe account
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1201,7 +1212,7 @@ class OwnersView(GenericAPIView):
     @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
         """
-        Return Safes where the address provided is an owner
+        Returns the list of Safe accounts that have the given address as their owner
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1231,10 +1242,10 @@ class DataDecoderView(GenericAPIView):
     )
     def post(self, request, format=None):
         """
-        Returns decoded information using tx service internal ABI information given the tx
-        data as a `0x` prefixed hexadecimal string.
-        If address of the receiving contract is provided decoded data will be more accurate,
-        as in case of ABI collision service will know which ABI to use.
+        Returns the decoded data using the Safe Transaction Service internal ABI information given
+        the transaction data as a 0x prefixed hexadecimal string.
+        If the address of the receiving contract is provided, the decoded data will be more accurate,
+        as in case of an ABI collision the Safe Transaction Service would know which ABI to use.
         """
 
         serializer = self.get_serializer(data=request.data)
@@ -1276,7 +1287,7 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
     )
     def post(self, request, address, *args, **kwargs):
         """
-        Estimates `safeTxGas` for a Safe Multisig Transaction.
+        Returns the estimated `safeTxGas` for a given Safe address and multi-signature transaction
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -1348,7 +1359,7 @@ class DelegateListView(ListCreateAPIView):
     @swagger_auto_schema(deprecated=True, responses={400: "Invalid data"})
     def get(self, request, **kwargs):
         """
-        Get list of delegates
+        Returns a list with all the delegates
         """
         return super().get(request, **kwargs)
 
@@ -1357,15 +1368,16 @@ class DelegateListView(ListCreateAPIView):
     )
     def post(self, request, **kwargs):
         """
-        Create a delegate for a Safe address with a custom label. Calls with same delegate but different label or
-        signer will update the label or delegator if different.
+        Adds a new Safe delegate with a custom label. Calls with same delegate but different label or
+        signer will update the label or delegator if a different one is provided
         For the signature we are using TOTP with `T0=0` and `Tx=3600`. TOTP is calculated by taking the
         Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
-        For signature this hash need to be signed: keccak(checksummed address + str(int(current_epoch // 3600)))
-        For example:
-             - We want to add the delegate `0x132512f995866CcE1b0092384A6118EDaF4508Ff` and `epoch=1586779140`.
+        To generate the signature, this hash needs to be signed: keccak(checksummed address + str(int(current_epoch //
+        3600)))
+        As an example, if the 0x132512f995866CcE1b0092384A6118EDaF4508Ff delegate is added and epoch=1586779140:
              - `TOTP = epoch // 3600 = 1586779140 // 3600 = 440771`
-             - The hash to sign by a Safe owner would be `keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771")`
+             - keccak("0x132512f995866CcE1b0092384A6118EDaF4508Ff440771") would be the hash a Safe owner would
+             need to sign.`
         """
         return super().post(request, **kwargs)
 
