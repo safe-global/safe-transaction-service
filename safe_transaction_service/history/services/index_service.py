@@ -13,6 +13,7 @@ from gnosis.eth import EthereumClient, EthereumClientProvider
 from ..models import EthereumBlock, EthereumTx
 from ..models import IndexingStatus as IndexingStatusDb
 from ..models import (
+    InternalTx,
     InternalTxDecoded,
     ModuleTransaction,
     MultisigConfirmation,
@@ -76,7 +77,6 @@ class IndexServiceProvider:
             del cls.instance
 
 
-# TODO Test IndexService
 class IndexService:
     def __init__(
         self,
@@ -353,7 +353,39 @@ class IndexService:
             queryset = queryset.filter(internal_tx___from__in=addresses)
         queryset.update(processed=False)
 
-    def reprocess_addresses(self, addresses: List[str]):
+    @transaction.atomic
+    def fix_out_of_order(self, address: ChecksumAddress, internal_tx: InternalTx):
+        """
+        Fix a Safe that has transactions out of order (not processed transactions
+        in between processed ones, usually due a reindex), by reprocessing all of them
+
+        :param address: Safe to fix
+        :param internal_tx: Only reprocess transactions from `internal_tx` and newer
+        :return:
+        """
+
+        timestamp = internal_tx.timestamp
+        tx_hash_hex = HexBytes(internal_tx.ethereum_tx_id).hex()
+        logger.info(
+            "[%s] Fixing out of order from tx %s with timestamp %s",
+            address,
+            tx_hash_hex,
+            timestamp,
+        )
+        logger.info("[%s] Marking InternalTxDecoded as not processed", address)
+        InternalTxDecoded.objects.filter(
+            internal_tx___from=address, internal_tx__timestamp__gte=timestamp
+        ).update(processed=False)
+        logger.info("[%s] Removing SafeStatus newer than timestamp", address)
+        SafeStatus.objects.filter(
+            address=address, internal_tx__timestamp__gte=timestamp
+        ).delete()
+        logger.info("[%s] Removing and rebuilding SafeLastStatus", address)
+        SafeLastStatus.objects.filter(address=address).delete()
+        SafeLastStatus.objects.get_or_generate(address)
+        logger.info("[%s] Ended fixing out of order", address)
+
+    def reprocess_addresses(self, addresses: List[ChecksumAddress]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
         every `InternalTxDecoded` not processed to be processed again
@@ -367,7 +399,7 @@ class IndexService:
         return self._reprocess(addresses)
 
     def reprocess_all(self):
-        return self._reprocess(None)
+        return self._reprocess([])
 
     def _reindex(
         self,

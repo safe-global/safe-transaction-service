@@ -163,3 +163,33 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.assertEqual(SafeLastStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 2)
+
+    def test_fix_out_of_order(self):
+        index_service: IndexService = self.index_service
+        self.assertIsNone(index_service.reprocess_addresses([]))
+
+        safe_status = SafeStatusFactory()
+        safe_address = safe_status.address
+        safe_status_2 = SafeStatusFactory(address=safe_address)
+        safe_status_3 = SafeStatusFactory(address=safe_address)
+        safe_status_4 = SafeStatusFactory(address=safe_address)
+        random_safe_status = SafeStatusFactory()  # It should not be removed
+        SafeLastStatus.objects.get_or_generate(safe_address)
+        MultisigTransactionFactory()  # It shouldn't be deleted (safe not matching)
+        MultisigTransactionFactory(
+            safe=safe_status.address, origin={}
+        )  # It should be deleted
+        MultisigTransactionFactory(
+            safe=safe_status.address, ethereum_tx=None
+        )  # It shouldn't be deleted
+        MultisigTransactionFactory(
+            safe=safe_status.address, origin="Something"
+        )  # It shouldn't be deleted
+        self.assertEqual(MultisigTransaction.objects.count(), 4)
+        self.assertEqual(SafeStatus.objects.count(), 5)
+        self.assertIsNone(
+            index_service.fix_out_of_order(safe_address, safe_status_3.internal_tx)
+        )
+        self.assertEqual(SafeStatus.objects.count(), 3)
+        self.assertEqual(SafeLastStatus.objects.count(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 4)
