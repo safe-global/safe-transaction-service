@@ -174,7 +174,6 @@ class DelegateDeleteView(GenericAPIView):
 
 class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
-    pagination_class = None  # Don't show limit/offset in swagger
 
     def get_parameters(self) -> Tuple[bool, bool]:
         """

@@ -650,7 +650,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                             "name": erc20.functions.name().call(),
                             "symbol": erc20.functions.symbol().call(),
                             "decimals": erc20.functions.decimals().call(),
-                            "logoUri": Token.objects.first().get_full_logo_uri(),
+                            "logoUri": Token.objects.get(
+                                address=erc20.address
+                            ).get_full_logo_uri(),
                         },
                     },
                 ],
@@ -677,7 +679,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                             "name": other_erc20.functions.name().call(),
                             "symbol": other_erc20.functions.symbol().call(),
                             "decimals": other_erc20.functions.decimals().call(),
-                            "logoUri": Token.objects.first().get_full_logo_uri(),
+                            "logoUri": Token.objects.get(
+                                address=other_erc20.address
+                            ).get_full_logo_uri(),
                         },
                     },
                 ],
