@@ -32,20 +32,26 @@ from .models import UserOperation as UserOperationModel
 # ================================================ #
 class SafeOperationSignatureValidatorMixin:
     """
-    Mixin class to validate SafeOperation signatures. _get_owners must be overridden to define
+    Mixin class to validate SafeOperation signatures. `_get_owners` can be overridden to define
     the valid owners to sign
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ethereum_client = EthereumClientProvider()
+        self._deployment_owners: List[ChecksumAddress] = []
 
     def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
         """
         :param safe_address:
-        :return: Valid owners to sign the SafeOperation
+        :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
         """
-        raise NotImplementedError("Must be implemented in subclass")
+        try:
+            return get_safe_owners(safe_address)
+        except ValidationError as exc:
+            if self._deployment_owners:
+                return self._deployment_owners
+            raise exc
 
     def _validate_signature(
         self,
@@ -101,17 +107,6 @@ class SafeOperationSerializer(
     valid_after = serializers.DateTimeField(allow_null=True)  # Epoch uint48
     valid_until = serializers.DateTimeField(allow_null=True)  # Epoch uint48
     module_address = eth_serializers.EthereumAddressField()
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._deployment_owners: List[ChecksumAddress] = []
-
-    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
-        """
-        :param safe_address:
-        :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
-        """
-        return self._deployment_owners or get_safe_owners(safe_address)
 
     def validate_init_code(self, init_code: Optional[HexBytes]) -> Optional[HexBytes]:
         """
@@ -285,7 +280,7 @@ class SafeOperationSerializer(
             self.validated_data["chain_id"]
         )
 
-        user_operation_model, created = UserOperationModel.objects.get_or_create(
+        user_operation_model, _ = UserOperationModel.objects.get_or_create(
             hash=user_operation_hash,
             defaults={
                 "ethereum_tx": None,
@@ -305,14 +300,15 @@ class SafeOperationSerializer(
             },
         )
 
-        if created:
-            safe_operation_model = SafeOperationModel.objects.create(
-                hash=self.validated_data["safe_operation_hash"],
-                user_operation=user_operation_model,
-                valid_after=self.validated_data["valid_after"],
-                valid_until=self.validated_data["valid_until"],
-                module_address=self.validated_data["module_address"],
-            )
+        safe_operation_model, _ = SafeOperationModel.objects.get_or_create(
+            hash=self.validated_data["safe_operation_hash"],
+            defaults={
+                "user_operation": user_operation_model,
+                "valid_after": self.validated_data["valid_after"],
+                "valid_until": self.validated_data["valid_until"],
+                "module_address": self.validated_data["module_address"],
+            },
+        )
 
         safe_signatures = self.validated_data["safe_signatures"]
         for safe_signature in safe_signatures:
@@ -339,13 +335,6 @@ class SafeOperationConfirmationSerializer(
         min_length=65, max_length=SIGNATURE_LENGTH
     )
 
-    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
-        """
-        :param safe_address:
-        :return: Owners for the Safe
-        """
-        return get_safe_owners(safe_address)
-
     def validate(self, attrs):
         attrs = super().validate(attrs)
         safe_operation_hash_hex = self.context["safe_operation_hash"]
@@ -362,6 +351,13 @@ class SafeOperationConfirmationSerializer(
             raise ValidationError(
                 f"SafeOperation with hash={safe_operation_hash_hex} does not exist"
             )
+
+        # Parse valid owners from init code
+        if user_operation_model.init_code:
+            decoded_init_code = decode_init_code(
+                bytes(user_operation_model.init_code), self.ethereum_client
+            )
+            self._deployment_owners = decoded_init_code.owners
 
         safe_signatures = self._validate_signature(
             safe_operation.safe,
