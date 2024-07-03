@@ -173,7 +173,14 @@ class BalanceService:
             django_cache.set(cache_key_count, count, 60 * 10)  # 10 minutes cache
             return balances, count
 
-    def _get_erc20_limits(self, limit, offset) -> Tuple[int, int]:
+    def _get_erc20_list_limits(self, limit: int, offset: int) -> Tuple[int, int]:
+        """
+        Calculates the number of elements that must be taken from ERC20 list and return the start and end limits.
+
+        :param limit:
+        :param offset:
+        :return: Tuple start, end
+        """
         if not limit:
             # No pagination no limits
             return 0, None
@@ -241,6 +248,7 @@ class BalanceService:
 
         balances = []
         if offset != 0 and raw_balances:
+            # Remove ethereum balance if is not the first page
             raw_balances = raw_balances[1:]
 
         for balance in raw_balances:
