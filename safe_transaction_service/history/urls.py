@@ -61,7 +61,7 @@ urlpatterns = [
     ),
     path(
         "module-transaction/<str:module_transaction_id>",
-        views.ModuleTransactionView.as_view(),
+        views.SafeModuleTransactionView.as_view(),
         name="module-transaction",
     ),
     path(

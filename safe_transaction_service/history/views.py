@@ -548,7 +548,7 @@ class AllTransactionsListView(ListAPIView):
         return response
 
 
-class ModuleTransactionView(RetrieveAPIView):
+class SafeModuleTransactionView(RetrieveAPIView):
     serializer_class = serializers.SafeModuleTransactionResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
@@ -601,7 +601,7 @@ class SafeModuleTransactionListView(ListAPIView):
     def get_queryset(self):
         return (
             ModuleTransaction.objects.filter(safe=self.kwargs["address"])
-            .select_related("internal_tx__ethereum_tx__block")
+            .select_related("internal_tx__ethereum_tx")
             .order_by("-created")
         )
 
