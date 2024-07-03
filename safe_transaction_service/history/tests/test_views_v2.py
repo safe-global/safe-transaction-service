@@ -250,6 +250,58 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_delegate_creation_without_chain_id(self):
+        chain_id = None
+        delegate = Account.create()
+        delegator = Account.create()
+        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+            delegate.address, chain_id, False
+        )
+        data = {
+            "label": "Kim Wexler",
+            "delegate": delegate.address,
+            "delegator": delegator.address,
+            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+        }
+
+        response = self.client.post(
+            reverse("v2:history:delegates"), format="json", data=data
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+
+    def test_delegate_creation_without_chain_id_with_safe(self):
+        safe = SafeContractFactory()
+        chain_id = None
+        delegate = Account.create()
+        delegator = Account.create()
+        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+            delegate.address, chain_id, False
+        )
+        data = {
+            "label": "Kim Wexler",
+            "safe": safe.address,
+            "delegate": delegate.address,
+            "delegator": delegator.address,
+            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+        }
+
+        with mock.patch(
+            "safe_transaction_service.history.serializers.get_safe_owners",
+            return_value=[delegator.address],
+        ):
+            response = self.client.post(
+                reverse("v2:history:delegates"), format="json", data=data
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+        safe_contract_delegate = SafeContractDelegate.objects.get()
+        self.assertEqual(safe_contract_delegate.delegate, delegate.address)
+        self.assertEqual(safe_contract_delegate.delegator, delegator.address)
+        self.assertEqual(safe_contract_delegate.safe_contract_id, safe.address)
+
     def test_delegates_get(self):
         url = reverse("v2:history:delegates")
         response = self.client.get(url, format="json")
@@ -461,7 +513,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             self.assertIn(
-                "Signature is not valid",
+                f"Signature does not match provided delegate={delegate.address} or delegator={delegator.address}",
                 response.data["non_field_errors"][0],
             )
 

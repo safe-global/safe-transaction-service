@@ -103,7 +103,6 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
                 "EIP712Domain": [
                     {"name": "name", "type": "string"},
                     {"name": "version", "type": "string"},
-                    {"name": "chainId", "type": "uint256"},
                 ],
                 "Delegate": [
                     {"name": "delegateAddress", "type": "address"},
@@ -122,6 +121,9 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
         }
 
         if chain_id:
+            payload["types"]["EIP712Domain"].append(
+                {"name": "chainId", "type": "uint256"}
+            )
             payload["domain"]["chainId"] = chain_id
 
         return eip712_encode_hash(payload)

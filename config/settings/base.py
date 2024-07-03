@@ -516,16 +516,6 @@ TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
     "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
 )  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
 
-# Delegates
-# ------------------------------------------------------------------------------
-
-# If set to True, the Transaction Service will set the chain id as the current one in the EIP-712 Delegates payload (
-# if the clients don't provide one). Else (if set to False), if the client does not provide a chain id, the payload
-# can be used across chains.
-DELEGATE_CHAIN_ID_DEFAULT_ENABLED = env.bool(
-    "DELEGATE_CHAIN_ID_DEFAULT_ENABLED", default=True
-)
-
 # Notifications
 # ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
