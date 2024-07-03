@@ -219,7 +219,7 @@ class BalanceService:
         # Add Native token to the list
         count = len(erc20_addresses) + 1
         # get paginated limits
-        start, end = self._get_erc20_limits(limit, offset)
+        start, end = self._get_erc20_list_limits(limit, offset)
         erc20_addresses_paginated = erc20_addresses[start:end]
 
         for address in erc20_addresses_paginated:
