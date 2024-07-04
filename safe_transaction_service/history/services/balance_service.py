@@ -189,9 +189,12 @@ class BalanceService:
         """
         Get the erc20 page for a given Safe if the limit is defined.
 
+        :param safe_address:
+        :param only_trusted:
+        :param exclude_spam:
         :param limit:
         :param offset:
-        :return: Tuple start, end
+        :return: list of ERC20 addresses and count of all ERC20 addresses for a given Safe
         """
         all_erc20_addresses = ERC20Transfer.objects.tokens_used_by_address(safe_address)
         erc20_count = len(all_erc20_addresses)

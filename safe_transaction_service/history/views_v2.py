@@ -29,7 +29,8 @@ class SafeCollectiblesView(GenericAPIView):
     @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
-        Get collectibles (ERC721 tokens) and information about them of a given Safe account
+        Get paginated collectibles (ERC721 tokens) and information about them of a given Safe account.
+        The maximum limit allowed is 10.
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -194,7 +195,8 @@ class SafeBalanceView(GenericAPIView):
     @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
-        Get balance for Ether and ERC20 tokens
+        Get paginated balances for Ether and ERC20 tokens.
+        The maximum limit allowed is 200.
         """
         if not fast_is_checksum_address(address):
             return Response(
