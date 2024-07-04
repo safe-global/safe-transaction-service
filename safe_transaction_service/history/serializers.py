@@ -1,3 +1,4 @@
+import itertools
 import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -407,7 +408,9 @@ class DelegateSerializerMixin:
         ethereum_client = EthereumClientProvider()
         chain_id = ethereum_client.get_chain_id()
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
-        for previous_totp in (True, False):
+        for previous_totp, chain_id in list(
+            itertools.product((True, False), (chain_id, None))
+        ):
             message_hash = DelegateSignatureHelperV2.calculate_hash(
                 delegate, chain_id, previous_totp=previous_totp
             )
