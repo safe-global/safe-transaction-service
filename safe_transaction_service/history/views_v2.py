@@ -1,4 +1,5 @@
 import logging
+from typing import List, Tuple
 
 from django.db.models import Q
 
@@ -14,6 +15,8 @@ from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
 from .models import SafeContract, SafeContractDelegate
+from .services import BalanceServiceProvider
+from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
 from .views import swagger_safe_balance_schema
 
@@ -26,7 +29,8 @@ class SafeCollectiblesView(GenericAPIView):
     @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
-        Get collectibles (ERC721 tokens) and information about them of a given Safe account
+        Get paginated collectibles (ERC721 tokens) and information about them of a given Safe account.
+        The maximum limit allowed is 10.
         """
         if not fast_is_checksum_address(address):
             return Response(
@@ -50,7 +54,7 @@ class SafeCollectiblesView(GenericAPIView):
             self.request.query_params.get("exclude_spam", False)
         )
 
-        paginator = pagination.ListPagination(self.request)
+        paginator = pagination.ListPagination(self.request, max_limit=10)
         limit = paginator.limit
         offset = paginator.offset
         (
@@ -167,3 +171,61 @@ class DelegateDeleteView(GenericAPIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+class SafeBalanceView(GenericAPIView):
+    serializer_class = serializers.SafeBalanceResponseSerializer
+
+    def get_parameters(self) -> Tuple[bool, bool]:
+        """
+        Parse query parameters:
+        :return: Tuple with only_trusted, exclude_spam
+        """
+        only_trusted = parse_boolean_query_param(
+            self.request.query_params.get("trusted", False)
+        )
+        exclude_spam = parse_boolean_query_param(
+            self.request.query_params.get("exclude_spam", False)
+        )
+        return only_trusted, exclude_spam
+
+    def get_result(self, *args, **kwargs) -> Tuple[List[Balance], int]:
+        return BalanceServiceProvider().get_balances(*args, **kwargs)
+
+    @swagger_safe_balance_schema(serializer_class)
+    def get(self, request, address):
+        """
+        Get paginated balances for Ether and ERC20 tokens.
+        The maximum limit allowed is 200.
+        """
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+        else:
+            try:
+                SafeContract.objects.get(address=address)
+            except SafeContract.DoesNotExist:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            only_trusted, exclude_spam = self.get_parameters()
+            paginator = pagination.ListPagination(
+                self.request, max_limit=200, default_limit=100
+            )
+            limit = paginator.limit
+            offset = paginator.offset
+            safe_balances, count = self.get_result(
+                address,
+                only_trusted=only_trusted,
+                exclude_spam=exclude_spam,
+                limit=limit,
+                offset=offset,
+            )
+            paginator.set_count(count)
+            serializer = self.get_serializer(safe_balances, many=True)
+            return paginator.get_paginated_response(serializer.data)
