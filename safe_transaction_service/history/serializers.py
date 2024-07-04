@@ -1,6 +1,5 @@
 import itertools
 import json
-import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -49,8 +48,6 @@ from .models import (
     TransferDict,
 )
 from .services.safe_service import SafeCreationInfo
-
-logger = logging.getLogger(__name__)
 
 
 def get_data_decoded_from_data(data: bytes, address: Optional[ChecksumAddress] = None):
@@ -410,18 +407,16 @@ class DelegateSerializerMixin:
     ) -> bool:
         ethereum_client = EthereumClientProvider()
         chain_id = ethereum_client.get_chain_id()
-
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp, chain_id in list(
             itertools.product((True, False), (chain_id, None))
         ):
             message_hash = DelegateSignatureHelperV2.calculate_hash(
-                delegate, chain_id=chain_id, previous_totp=previous_totp
+                delegate, chain_id, previous_totp=previous_totp
             )
             safe_signatures = SafeSignature.parse_signature(signature, message_hash)
             if not safe_signatures:
-                logger.debug(f"Signature not valid for chain_id={chain_id}")
-                continue
+                raise ValidationError("Signature is not valid")
 
             if len(safe_signatures) > 1:
                 raise ValidationError(
@@ -454,9 +449,7 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
         delegator = attrs["delegator"]
         self.validate_safe_address_and_delegator(safe_address, delegator)
         if self.validate_delegator_signature(
-            delegate=delegate,
-            signature=signature,
-            signer=delegator,
+            delegate=delegate, signature=signature, signer=delegator
         ):
             return attrs
         raise ValidationError(

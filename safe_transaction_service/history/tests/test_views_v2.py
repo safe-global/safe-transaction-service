@@ -513,7 +513,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
             self.assertIn(
-                f"Signature does not match provided delegate={delegate.address} or delegator={delegator.address}",
+                "Signature is not valid",
                 response.data["non_field_errors"][0],
             )
 
