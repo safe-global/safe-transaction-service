@@ -17,7 +17,7 @@ from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
 
-from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
+from gnosis.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
 from gnosis.eth.clients import EnsClient
 
 from safe_transaction_service.tokens.constants import (
@@ -138,7 +138,7 @@ class CollectibleWithMetadata(Collectible):
 class CollectiblesServiceProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            cls.instance = CollectiblesService(EthereumClientProvider(), get_redis())
+            cls.instance = CollectiblesService(get_auto_ethereum_client(), get_redis())
 
         return cls.instance
 

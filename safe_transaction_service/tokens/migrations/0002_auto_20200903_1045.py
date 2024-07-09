@@ -5,12 +5,12 @@ from django.db import migrations, models
 from eth_abi.exceptions import DecodingError
 from web3.exceptions import Web3Exception
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 
 
 def fix_token_decimals(apps, schema_editor):
     Token = apps.get_model("tokens", "Token")
-    ethereum_client = EthereumClientProvider()
+    ethereum_client = get_auto_ethereum_client()
 
     for token in Token.objects.filter(decimals=0):
         try:

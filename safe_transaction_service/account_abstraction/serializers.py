@@ -11,7 +11,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 import gnosis.eth.django.serializers as eth_serializers
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
 from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
 from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
@@ -38,7 +38,7 @@ class SafeOperationSignatureValidatorMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ethereum_client = EthereumClientProvider()
+        self.ethereum_client = get_auto_ethereum_client()
         self._deployment_owners: List[ChecksumAddress] = []
 
     def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:

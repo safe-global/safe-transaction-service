@@ -25,7 +25,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from gnosis.eth import EthereumClient, EthereumClientProvider, EthereumNetwork
+from gnosis.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.utils import fast_is_checksum_address
 from gnosis.safe import CannotEstimateGas
@@ -136,7 +136,7 @@ class AboutEthereumRPCView(APIView):
         """
         Get information about the Ethereum RPC node used by the service
         """
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         return Response(self._get_info(ethereum_client))
 
 

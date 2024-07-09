@@ -9,7 +9,7 @@ from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from web3.types import LogReceipt
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.account_abstraction import (
     BundlerClient,
     BundlerClientException,
@@ -47,7 +47,7 @@ class UserOperationReceiptNotFoundException(AaProcessorServiceException):
 
 @cache
 def get_aa_processor_service() -> "AaProcessorService":
-    ethereum_client = EthereumClientProvider()
+    ethereum_client = get_auto_ethereum_client()
     bundler_client = get_bundler_client()
     if not bundler_client:
         logger.warning("Ethereum 4337 bundler client was not configured")

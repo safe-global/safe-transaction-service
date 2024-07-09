@@ -2,7 +2,7 @@ from typing import Iterator
 
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 
 from ...models import EthereumTx
 
@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ethereum_client = EthereumClientProvider()
+        self.ethereum_client = get_auto_ethereum_client()
 
     def fix_ethereum_txs(self, ethereum_txs: Iterator[EthereumTx]):
         if ethereum_txs:

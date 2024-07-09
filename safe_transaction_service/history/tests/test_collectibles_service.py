@@ -11,8 +11,8 @@ from gnosis.eth import EthereumClient
 from gnosis.eth.ethereum_client import (
     Erc721Info,
     Erc721Manager,
-    EthereumClientProvider,
     InvalidERC721Info,
+    get_auto_ethereum_client,
 )
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
@@ -65,8 +65,8 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         mainnet_node = just_test_if_mainnet_node()
         try:
             ethereum_client = EthereumClient(mainnet_node)
-            EthereumClientProvider.instance = ethereum_client
             collectibles_service = CollectiblesService(ethereum_client, get_redis())
+            collectibles_service.ethereum_client = ethereum_client
 
             # Caches empty
             self.assertFalse(collectibles_service.cache_token_info)
@@ -173,7 +173,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             # Caches not empty
             self.assertTrue(collectibles_service.cache_token_info)
         finally:
-            del EthereumClientProvider.instance
+            del get_auto_ethereum_client.instance
 
     @mock.patch.object(CollectiblesService, "get_metadata", autospec=True)
     @mock.patch.object(CollectiblesService, "get_collectibles", autospec=True)

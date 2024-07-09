@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 from gnosis.eth.ethereum_client import InvalidERC20Info
 from gnosis.eth.utils import fast_to_checksum_address
 
@@ -25,7 +25,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         tokens = options["tokens"]
         no_prompt = options["no_prompt"]
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
 
         for token_address in tokens:
             token_address = fast_to_checksum_address(token_address)

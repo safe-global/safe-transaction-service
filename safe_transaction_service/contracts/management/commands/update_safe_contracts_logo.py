@@ -1,7 +1,7 @@
 from django.core.files import File
 from django.core.management import BaseCommand, CommandError
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 from gnosis.safe.safe_deployments import safe_deployments
 
 from config.settings.base import STATICFILES_DIRS
@@ -59,7 +59,7 @@ class Command(BaseCommand):
         safe_version = options["safe_version"]
         force_update_contract_names = options["force_update_contract_names"]
         logo_path = options["logo_path"]
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         chain_id = ethereum_client.get_chain_id()
         logo_file = File(open(logo_path, "rb"))
         if not safe_version:

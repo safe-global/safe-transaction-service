@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 
 from ...models import EthereumTx
 from ...utils import clean_receipt_log
@@ -11,7 +11,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # We need to add `address` to the logs, so we exclude empty logs and logs already containing `address`
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         queryset = EthereumTx.objects.exclude(logs__0__has_key="address").exclude(
             logs=[]
         )
