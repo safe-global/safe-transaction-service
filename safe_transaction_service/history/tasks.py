@@ -461,7 +461,9 @@ def process_decoded_internal_txs_for_safe_task(
                 tx_processor.clear_cache(safe_address)
                 index_service.fix_out_of_order(
                     safe_address,
-                    InternalTxDecoded.objects.pending_for_safe(safe_address)[0],
+                    InternalTxDecoded.objects.pending_for_safe(safe_address)[
+                        0
+                    ].internal_tx,
                 )
 
             # Use chunks for memory issues
