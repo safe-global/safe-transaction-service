@@ -199,10 +199,12 @@ class BalanceService:
         :return: list of ERC20 addresses and count of all ERC20 addresses for a given Safe
         """
         all_erc20_addresses = ERC20Transfer.objects.tokens_used_by_address(safe_address)
+        logger.debug(f"Get erc20 addresses from transfers: {all_erc20_addresses}")
         erc20_count = len(all_erc20_addresses)
         erc20_addresses = self._filter_addresses(
             all_erc20_addresses, only_trusted, exclude_spam
         )
+        logger.debug(f"Filtered erc20 addresses: {all_erc20_addresses}")
         if not limit:
             # No pagination no limits
             return erc20_addresses[0:None], erc20_count
