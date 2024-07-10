@@ -518,7 +518,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         valid_until = timezone.now() + datetime.timedelta(minutes=90)
         data["valid_until"] = datetime_to_str(valid_until)
         new_safe_operation = dataclasses.replace(
-            safe_operation, valid_until=int(valid_until.timestamp())
+            safe_operation, valid_until=int(valid_until.timestamp() * 1_000)
         )
         safe_operation_hash = new_safe_operation.get_safe_operation_hash(
             safe_4337_chain_id_mock, safe_4337_module_address_mock

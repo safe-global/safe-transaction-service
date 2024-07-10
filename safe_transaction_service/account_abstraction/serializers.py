@@ -208,7 +208,7 @@ class SafeOperationSerializer(
         attrs = super().validate(attrs)
 
         valid_after, valid_until = [
-            int(attrs[key].timestamp()) if attrs[key] else 0
+            int(attrs[key].timestamp() * 1_000) if attrs[key] else 0
             for key in ("valid_after", "valid_until")
         ]
         if valid_after and valid_until and valid_after > valid_until:
