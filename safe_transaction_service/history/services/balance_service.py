@@ -167,6 +167,8 @@ class BalanceService:
             f"{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
         )
         cache_key_count = f"balances-count:{safe_address}:{only_trusted}:{exclude_spam}"
+        logger.debug(f"Get balances cache key: {cache_key}")
+        logger.debug(f"Get balances cache count key: {cache_key_count}")
         if balances := django_cache.get(cache_key):
             count = django_cache.get(cache_key_count)
             return balances, count
