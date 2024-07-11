@@ -29,8 +29,8 @@ class SafeOperationsView(ListCreateAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
-    ordering = ["-user_operation__nonce"]
-    ordering_fields = ["user_operation__nonce"]
+    ordering = ["-user_operation__nonce", "-created"]
+    ordering_fields = ["user_operation__nonce", "created"]
     pagination_class = pagination.DefaultPagination
 
     def get_queryset(self):
@@ -151,8 +151,8 @@ class UserOperationsView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
-    ordering = ["-nonce"]
-    ordering_fields = ["nonce"]
+    ordering = ["-nonce", "-ethereum_tx__block__timestamp"]
+    ordering_fields = ["nonce", "ethereum_tx__block__timestamp"]
     pagination_class = pagination.DefaultPagination
     serializer_class = serializers.UserOperationWithSafeOperationResponseSerializer
 
