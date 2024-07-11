@@ -167,8 +167,6 @@ class BalanceService:
             f"{number_erc20_events}:{number_eth_events}:{events_sending_eth}"
         )
         cache_key_count = f"balances-count:{safe_address}:{only_trusted}:{exclude_spam}"
-        logger.debug(f"Get balances cache key: {cache_key}")
-        logger.debug(f"Get balances cache count key: {cache_key_count}")
         if balances := django_cache.get(cache_key):
             count = django_cache.get(cache_key_count)
             return balances, count
@@ -251,21 +249,15 @@ class BalanceService:
             safe_address, only_trusted, exclude_spam, limit, offset
         )
 
-        logger.debug(f"Get page of erc20 addresses: {erc20_addresses_page}")
-
         try:
             raw_balances = []
             # With a lot of addresses an HTTP 413 error will be raised
             for erc20_addresses_chunk in chunks(
                 erc20_addresses_page, settings.TOKENS_ERC20_GET_BALANCES_BATCH
             ):
-                logger.debug(
-                    f"Getting balances for erc20 addresses chunk {erc20_addresses_chunk}"
-                )
                 balances = self.ethereum_client.erc20.get_balances(
                     safe_address, erc20_addresses_chunk
                 )
-                logger.debug(f"Balances for erc20 addresses chunk {balances}")
 
                 # Skip ether transfer if already there
                 raw_balances.extend(balances[1:] if raw_balances else balances)
@@ -281,8 +273,6 @@ class BalanceService:
             # Remove ethereum balance if is not the first page
             raw_balances = raw_balances[1:]
 
-        logger.debug(f"Raw balances: {raw_balances}")
-
         for balance in raw_balances:
             if not balance["token_address"]:  # Ether
                 balance["token"] = None
@@ -293,8 +283,6 @@ class BalanceService:
             else:
                 continue
             balances.append(Balance(**balance))
-
-        logger.debug(f"Processed balances: {balances}")
 
         # Add Native token to the list
         count = erc20_count + 1
