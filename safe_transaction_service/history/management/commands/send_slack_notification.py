@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 import requests
 from requests import RequestException
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 
 from safe_transaction_service import __version__
 
@@ -14,7 +14,7 @@ class Command(BaseCommand):
     help = "Send slack notification"
 
     def handle(self, *args, **options):
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         app_name = apps.get_app_config("history").verbose_name
         network_name = ethereum_client.get_network().name.capitalize()
         startup_message = f"Starting {app_name} version {__version__} on {network_name}"

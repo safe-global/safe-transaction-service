@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 from gnosis.eth.ethereum_client import InvalidERC20Info, InvalidERC721Info
 
 from ...clients import CoinMarketCapClient
@@ -28,7 +28,7 @@ class Command(BaseCommand):
         download_folder = options["download_folder"]
         store_db = options["store_db"]
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         coinmarketcap_client = CoinMarketCapClient(api_key)
 
         self.stdout.write(self.style.SUCCESS("Importing tokens from Coinmarketcap"))

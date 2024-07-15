@@ -3,7 +3,7 @@ import logging
 
 from django.db import migrations
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 
 from ..utils import clean_receipt_log
 
@@ -19,7 +19,7 @@ def fix_module_transactions(apps, schema_editor):
 
 def fix_ethereum_logs(apps, schema_editor):
     EthereumTx = apps.get_model("history", "EthereumTx")
-    ethereum_client = EthereumClientProvider()
+    ethereum_client = get_auto_ethereum_client()
 
     # We need to add `address` to the logs, so we exclude empty logs and logs already containing `address`
     queryset = EthereumTx.objects.exclude(logs__0__has_key="address").exclude(logs=[])

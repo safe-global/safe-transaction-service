@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Union
 from eth_typing import ChecksumAddress
 from web3 import Web3
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.contracts import (
     get_cpk_factory_contract,
     get_proxy_factory_V1_3_0_contract,
@@ -55,7 +55,7 @@ class SafeServiceProvider:
         if not hasattr(cls, "instance"):
             from django.conf import settings
 
-            ethereum_client = EthereumClientProvider()
+            ethereum_client = get_auto_ethereum_client()
             ethereum_tracing_client = (
                 EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
                 if settings.ETHEREUM_TRACING_NODE_URL

@@ -10,7 +10,7 @@ from django.http import HttpRequest
 from hexbytes import HexBytes
 from rest_framework.authtoken.admin import TokenAdmin
 
-from gnosis.eth import EthereumClientProvider
+from gnosis.eth import get_auto_ethereum_client
 from gnosis.eth.django.admin import AdvancedAdminSearchMixin
 from gnosis.safe import SafeTx
 
@@ -407,7 +407,7 @@ class MultisigTransactionAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         # Calculate new tx hash
         # All the numbers are decimals, they need to be parsed as integers for SafeTx
         safe_tx = SafeTx(
-            EthereumClientProvider(),
+            get_auto_ethereum_client(),
             obj.safe,
             obj.to,
             int(obj.value),
@@ -519,7 +519,7 @@ class SafeContractERC20ListFilter(admin.SimpleListFilter):
         )
 
     def queryset(self, request, queryset):
-        current_block_number = EthereumClientProvider().current_block_number
+        current_block_number = get_auto_ethereum_client().current_block_number
         condition = {"erc20_block_number__gte": current_block_number - 200}
         if self.value() == "YES":
             return queryset.filter(**condition)

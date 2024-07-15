@@ -12,7 +12,7 @@ from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.utils import fast_is_checksum_address
 
 from safe_transaction_service.tokens.models import Token
@@ -68,7 +68,7 @@ class Balance:
 class BalanceServiceProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            cls.instance = BalanceService(EthereumClientProvider(), get_redis())
+            cls.instance = BalanceService(get_auto_ethereum_client(), get_redis())
         return cls.instance
 
     @classmethod

@@ -14,7 +14,7 @@ from hexbytes import HexBytes
 from packaging.version import Version
 from web3 import Web3
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.contracts import (
     get_safe_V1_0_0_contract,
@@ -64,7 +64,7 @@ class SafeTxProcessorProvider:
         if not hasattr(cls, "instance"):
             from django.conf import settings
 
-            ethereum_client = EthereumClientProvider()
+            ethereum_client = get_auto_ethereum_client()
             ethereum_tracing_client = (
                 EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
                 if settings.ETHEREUM_TRACING_NODE_URL

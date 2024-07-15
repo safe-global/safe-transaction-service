@@ -6,7 +6,7 @@ from django.conf import settings
 
 from eth_typing import ChecksumAddress
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.clients import (
     BlockscoutClient,
     BlockScoutConfigurationProblem,
@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 @cache
 def get_contract_metadata_service():
-    return ContractMetadataService(EthereumClientProvider(), settings.ETHERSCAN_API_KEY)
+    return ContractMetadataService(
+        get_auto_ethereum_client(), settings.ETHERSCAN_API_KEY
+    )
 
 
 class ContractMetadataService:

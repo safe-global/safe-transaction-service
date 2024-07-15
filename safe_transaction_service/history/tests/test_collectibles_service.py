@@ -7,12 +7,12 @@ from django.test import TestCase
 
 from eth_account import Account
 
-from gnosis.eth import EthereumClient
+from gnosis.eth import EthereumNetwork
 from gnosis.eth.ethereum_client import (
     Erc721Info,
     Erc721Manager,
-    EthereumClientProvider,
     InvalidERC721Info,
+    get_auto_ethereum_client,
 )
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
@@ -60,120 +60,125 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         "safe_transaction_service.history.services.collectibles_service.CollectiblesService._retrieve_metadata_from_uri"
     )
     def test_get_collectibles(self, retrieve_metadata_from_uri_mock: MagicMock):
+        mainnet_node = just_test_if_mainnet_node()
         retrieve_metadata_from_uri_mock.return_value = dappcon_nft_metadata_mock
 
-        mainnet_node = just_test_if_mainnet_node()
         try:
-            ethereum_client = EthereumClient(mainnet_node)
-            EthereumClientProvider.instance = ethereum_client
-            collectibles_service = CollectiblesService(ethereum_client, get_redis())
+            with self.settings(ETHEREUM_NODE_URL=mainnet_node):
+                get_auto_ethereum_client.cache_clear()
+                ethereum_client = get_auto_ethereum_client()
+                self.assertEqual(ethereum_client.get_network(), EthereumNetwork.MAINNET)
+                collectibles_service = CollectiblesService(ethereum_client, get_redis())
+                collectibles_service.ethereum_client = ethereum_client
 
-            # Caches empty
-            self.assertFalse(collectibles_service.cache_token_info)
+                # Caches empty
+                self.assertFalse(collectibles_service.cache_token_info)
 
-            safe_address = "0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7"
-            ens_address = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85"
-            ens_logo_uri = "/media/tokens/logos/ENS.png"
-            ens_token_id = 93288724337340885726942883352789513739931149355867373088241393067029827792979
-            dappcon_2020_address = "0x202d2f33449Bf46d6d32Ae7644aDA130876461a4"
-            dappcon_token_id = 13
-            dappcon_logo_uri = Token(
-                address=dappcon_2020_address, name="", symbol=""
-            ).get_full_logo_uri()
-            self.assertEqual(
-                collectibles_service.get_collectibles(safe_address), ([], 0)
-            )
-
-            erc721_addresses = [
-                (dappcon_2020_address, dappcon_token_id),
-                (ens_address, ens_token_id),  # ENS
-            ]
-
-            for erc721_address, token_id in erc721_addresses:
-                ERC721TransferFactory(
-                    to=safe_address, address=erc721_address, token_id=token_id
+                safe_address = "0xfF501B324DC6d78dC9F983f140B9211c3EdB4dc7"
+                ens_address = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85"
+                ens_logo_uri = "/media/tokens/logos/ENS.png"
+                ens_token_id = 93288724337340885726942883352789513739931149355867373088241393067029827792979
+                dappcon_2020_address = "0x202d2f33449Bf46d6d32Ae7644aDA130876461a4"
+                dappcon_token_id = 13
+                dappcon_logo_uri = Token(
+                    address=dappcon_2020_address, name="", symbol=""
+                ).get_full_logo_uri()
+                self.assertEqual(
+                    collectibles_service.get_collectibles(safe_address), ([], 0)
                 )
 
-            expected = [
-                Collectible(
-                    token_name="Ethereum Name Service",
-                    token_symbol="ENS",
-                    logo_uri=ens_logo_uri,
-                    address=ens_address,
-                    id=ens_token_id,
-                    uri=None,
-                ),
-                Collectible(
-                    token_name="DappCon2020",
-                    token_symbol="D20",
-                    logo_uri=dappcon_logo_uri,
-                    address=dappcon_2020_address,
-                    id=dappcon_token_id,
-                    uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
-                ),
-            ]
-            collectibles, _ = collectibles_service.get_collectibles(safe_address)
-            self.assertEqual(len(collectibles), len(expected))
-            self.assertCountEqual(collectibles, expected)
+                erc721_addresses = [
+                    (dappcon_2020_address, dappcon_token_id),
+                    (ens_address, ens_token_id),  # ENS
+                ]
 
-            expected = [
-                CollectibleWithMetadata(
-                    token_name="Ethereum Name Service",
-                    token_symbol="ENS",
-                    logo_uri=ens_logo_uri,
-                    address=ens_address,
-                    id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
-                    uri=None,
-                    metadata={
-                        "name": ".eth",
-                        "description": "Unknown .eth ENS Domain",
-                        "image": settings.TOKENS_ENS_IMAGE_URL,
-                    },
-                ),
-                CollectibleWithMetadata(
-                    token_name="DappCon2020",
-                    token_symbol="D20",
-                    logo_uri=dappcon_logo_uri,
-                    address=dappcon_2020_address,
-                    id=13,
-                    uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
-                    metadata=dappcon_nft_metadata_mock,
-                ),
-            ]
-            collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata_paginated(
-                    safe_address
+                for erc721_address, token_id in erc721_addresses:
+                    ERC721TransferFactory(
+                        to=safe_address, address=erc721_address, token_id=token_id
+                    )
+
+                expected = [
+                    Collectible(
+                        token_name="Ethereum Name Service",
+                        token_symbol="ENS",
+                        logo_uri=ens_logo_uri,
+                        address=ens_address,
+                        id=ens_token_id,
+                        uri=None,
+                    ),
+                    Collectible(
+                        token_name="DappCon2020",
+                        token_symbol="D20",
+                        logo_uri=dappcon_logo_uri,
+                        address=dappcon_2020_address,
+                        id=dappcon_token_id,
+                        uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
+                    ),
+                ]
+                collectibles, _ = collectibles_service.get_collectibles(safe_address)
+                self.assertEqual(len(collectibles), len(expected))
+                self.assertCountEqual(collectibles, expected)
+
+                expected = [
+                    CollectibleWithMetadata(
+                        token_name="Ethereum Name Service",
+                        token_symbol="ENS",
+                        logo_uri=ens_logo_uri,
+                        address=ens_address,
+                        id=93288724337340885726942883352789513739931149355867373088241393067029827792979,
+                        uri=None,
+                        metadata={
+                            "name": ".eth",
+                            "description": "Unknown .eth ENS Domain",
+                            "image": settings.TOKENS_ENS_IMAGE_URL,
+                        },
+                    ),
+                    CollectibleWithMetadata(
+                        token_name="DappCon2020",
+                        token_symbol="D20",
+                        logo_uri=dappcon_logo_uri,
+                        address=dappcon_2020_address,
+                        id=13,
+                        uri="https://us-central1-thing-1d2be.cloudfunctions.net/getThing?thingId=Q1c8y3PwYomxjW25sW3l",
+                        metadata=dappcon_nft_metadata_mock,
+                    ),
+                ]
+                collectibles_with_metadata = (
+                    collectibles_service.get_collectibles_with_metadata_paginated(
+                        safe_address
+                    )
                 )
-            )
-            self.assertCountEqual(collectibles_with_metadata[0], expected)
-            self.assertEqual(collectibles_with_metadata[1], 2)
+                self.assertCountEqual(collectibles_with_metadata[0], expected)
+                self.assertEqual(collectibles_with_metadata[1], 2)
 
-            # Set ens trusted to only retrieve trusted tokens
-            Token.objects.filter(address=ens_address).update(trusted=True)
-            collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata_paginated(
-                    safe_address, only_trusted=True
+                # Set ens trusted to only retrieve trusted tokens
+                Token.objects.filter(address=ens_address).update(trusted=True)
+                collectibles_with_metadata = (
+                    collectibles_service.get_collectibles_with_metadata_paginated(
+                        safe_address, only_trusted=True
+                    )
                 )
-            )
 
-            self.assertCountEqual(collectibles_with_metadata[0], expected[:1])
-            self.assertEqual(collectibles_with_metadata[1], 1)
+                self.assertCountEqual(collectibles_with_metadata[0], expected[:1])
+                self.assertEqual(collectibles_with_metadata[1], 1)
 
-            # Set ens spam so it will be excluded
-            Token.objects.filter(address=ens_address).update(trusted=False, spam=True)
-            collectibles_with_metadata = (
-                collectibles_service.get_collectibles_with_metadata_paginated(
-                    safe_address, exclude_spam=True
+                # Set ens spam so it will be excluded
+                Token.objects.filter(address=ens_address).update(
+                    trusted=False, spam=True
                 )
-            )
+                collectibles_with_metadata = (
+                    collectibles_service.get_collectibles_with_metadata_paginated(
+                        safe_address, exclude_spam=True
+                    )
+                )
 
-            self.assertCountEqual(collectibles_with_metadata[0], expected[1:])
-            self.assertEqual(collectibles_with_metadata[1], 1)
+                self.assertCountEqual(collectibles_with_metadata[0], expected[1:])
+                self.assertEqual(collectibles_with_metadata[1], 1)
 
-            # Caches not empty
-            self.assertTrue(collectibles_service.cache_token_info)
+                # Caches not empty
+                self.assertTrue(collectibles_service.cache_token_info)
         finally:
-            del EthereumClientProvider.instance
+            get_auto_ethereum_client.cache_clear()
 
     @mock.patch.object(CollectiblesService, "get_metadata", autospec=True)
     @mock.patch.object(CollectiblesService, "get_collectibles", autospec=True)

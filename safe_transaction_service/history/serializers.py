@@ -10,7 +10,7 @@ from eth_typing import ChecksumAddress
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 
-from gnosis.eth import EthereumClient, EthereumClientProvider
+from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.constants import NULL_ADDRESS
 from gnosis.eth.django.models import EthereumAddressV2Field as EthereumAddressDbField
 from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
@@ -91,7 +91,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
             )
 
         safe_address = multisig_transaction.safe
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)
         safe_tx = safe.build_multisig_tx(
             multisig_transaction.to,
@@ -111,7 +111,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
             signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
         )
         signature_owners = []
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
             if owner not in safe_owners:
@@ -177,7 +177,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
     def validate(self, attrs):
         super().validate(attrs)
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         safe_address = attrs["safe"]
 
         safe = Safe(safe_address, ethereum_client)
@@ -348,7 +348,7 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         safe_address = self.context["safe_address"]
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)
         exc = None
         # Retry thrice to get an estimation
@@ -405,7 +405,7 @@ class DelegateSerializerMixin:
         signature: EthereumBytes,
         signer: ChecksumAddress,
     ) -> bool:
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         chain_id = ethereum_client.get_chain_id()
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp, chain_id in list(
@@ -517,7 +517,7 @@ class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
         if not proposer or proposer == NULL_ADDRESS:
             raise ValidationError("Old transactions without proposer cannot be deleted")
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         chain_id = ethereum_client.get_chain_id()
         safe_address = multisig_tx.safe
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
@@ -1031,7 +1031,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         signature = attrs["signature"]
         delegate = attrs["delegate"]  # Delegate address to be added/removed
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         valid_delegators = self.get_valid_delegators(
             ethereum_client, safe_address, delegate
         )
@@ -1131,7 +1131,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
             "delegator"
         ]  # Delegator giving permissions to delegate (signer)
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         if safe_address:
             # Valid delegators must be owners
             valid_delegators = get_safe_owners(safe_address)
@@ -1186,7 +1186,7 @@ class DelegateDeleteSerializer(DelegateSignatureCheckerMixin, serializers.Serial
         delegate = attrs["delegate"]  # Delegate address to be added/removed
         delegator = attrs["delegator"]  # Delegator
 
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
         # Tries to find a valid delegator using multiple strategies
         for operation_hash in DelegateSignatureHelper.calculate_all_possible_hashes(
             delegate

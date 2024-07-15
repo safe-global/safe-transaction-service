@@ -9,7 +9,7 @@ from celery import app
 from celery.utils.log import get_task_logger
 from web3.exceptions import Web3Exception
 
-from gnosis.eth.ethereum_client import EthereumClientProvider, EthereumNetwork
+from gnosis.eth.ethereum_client import EthereumNetwork, get_auto_ethereum_client
 from gnosis.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
@@ -79,7 +79,7 @@ def update_token_info_from_token_list_task() -> int:
 
     # Make sure current chainId matches the one in the list
     current_chain_id = get_ethereum_network().value
-    ethereum_client = EthereumClientProvider()
+    ethereum_client = get_auto_ethereum_client()
 
     token_addresses = []
     for token in tokens:
