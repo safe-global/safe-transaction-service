@@ -382,7 +382,6 @@ class IndexService:
         ).delete()
         logger.info("[%s] Removing and rebuilding SafeLastStatus", address)
         SafeLastStatus.objects.filter(address=address).delete()
-        SafeLastStatus.objects.get_or_generate(address)
         logger.info("[%s] Ended fixing out of order", address)
 
     def reprocess_addresses(self, addresses: List[ChecksumAddress]):

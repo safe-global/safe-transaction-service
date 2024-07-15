@@ -191,5 +191,5 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
             index_service.fix_out_of_order(safe_address, safe_status_3.internal_tx)
         )
         self.assertEqual(SafeStatus.objects.count(), 3)
-        self.assertEqual(SafeLastStatus.objects.count(), 1)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 4)
