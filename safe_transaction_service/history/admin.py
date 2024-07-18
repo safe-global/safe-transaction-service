@@ -32,7 +32,6 @@ from .models import (
     SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
-    WebHook,
 )
 from .services import IndexServiceProvider
 from .utils import HexField
@@ -637,31 +636,3 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
 @admin.register(SafeStatus)
 class SafeStatusAdmin(SafeLastStatusAdmin):
     pass
-
-
-@admin.register(WebHook)
-class WebHookAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
-    list_display = (
-        "pk",
-        "url",
-        "authorization",
-        "address",
-        "pending_multisig_transaction",
-        "new_confirmation",
-        "new_executed_multisig_transaction",
-        "new_incoming_transaction",
-        "new_safe",
-        "new_module_transaction",
-        "new_outgoing_transaction",
-    )
-    list_filter = (
-        "pending_multisig_transaction",
-        "new_confirmation",
-        "new_executed_multisig_transaction",
-        "new_incoming_transaction",
-        "new_safe",
-        "new_module_transaction",
-        "new_outgoing_transaction",
-    )
-    ordering = ["-pk"]
-    search_fields = ["==address", "==url"]

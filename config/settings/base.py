@@ -269,10 +269,6 @@ CELERY_ROUTES = (
             {"queue": "tokens", "delivery_mode": "transient"},
         ),
         (
-            "safe_transaction_service.history.tasks.send_webhook_task",
-            {"queue": "webhooks", "delivery_mode": "transient"},
-        ),
-        (
             "safe_transaction_service.events.tasks.send_event_to_queue_task",
             {"queue": "webhooks", "delivery_mode": "transient"},
         ),
