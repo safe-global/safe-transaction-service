@@ -4,7 +4,7 @@ from typing import List, Sequence
 
 from django.db import models
 
-from gnosis.eth.django.models import EthereumAddressV2Field
+from gnosis.eth.django.models import EthereumAddressBinaryField
 
 from safe_transaction_service.history.models import SafeContract
 
@@ -65,7 +65,7 @@ class FirebaseDeviceOwner(models.Model):
     firebase_device = models.ForeignKey(
         FirebaseDevice, on_delete=models.CASCADE, related_name="owners"
     )
-    owner = EthereumAddressV2Field(db_index=True)
+    owner = EthereumAddressBinaryField(db_index=True)
 
     class Meta:
         verbose_name = "Firebase Device Owner"

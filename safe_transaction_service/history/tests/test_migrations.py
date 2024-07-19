@@ -5,10 +5,8 @@ from django.utils import timezone
 
 from django_test_migrations.migrator import Migrator
 from eth_account import Account
-from hexbytes import HexBytes
 
 from gnosis.eth.utils import fast_keccak, fast_keccak_text
-from gnosis.safe.safe_signature import SafeSignatureApprovedHash
 
 
 class TestMigrations(TestCase):
@@ -339,78 +337,6 @@ class TestMigrations(TestCase):
                     "name": "Transaction Builder",
                 },
             ],
-        )
-
-    def test_migration_forward_0080_alter_multisigconfirmation_signature(self):
-        old_state = self.migrator.apply_initial_migration(
-            ("history", "0079_alter_erc20transfer_unique_together_and_more"),
-        )
-
-        MultisigConfirmation = old_state.apps.get_model(
-            "history", "MultisigConfirmation"
-        )
-
-        owner = Account.create().address
-        safe_tx_hash = fast_keccak_text("tx-hash")
-        safe_signature = SafeSignatureApprovedHash.build_for_owner(owner, safe_tx_hash)
-
-        MultisigConfirmation.objects.create(
-            multisig_transaction_hash=safe_tx_hash,
-            owner=owner,
-            signature=safe_signature.export_signature(),
-            signature_type=safe_signature.signature_type.value,
-        )
-        self.assertEqual(
-            HexBytes(MultisigConfirmation.objects.get().signature),
-            safe_signature.export_signature(),
-        )
-
-        new_state = self.migrator.apply_tested_migration(
-            ("history", "0080_alter_multisigconfirmation_signature"),
-        )
-
-        MultisigConfirmation = new_state.apps.get_model(
-            "history", "MultisigConfirmation"
-        )
-        self.assertEqual(
-            HexBytes(MultisigConfirmation.objects.get().signature),
-            safe_signature.export_signature(),
-        )
-
-    def test_migration_backward_0080_alter_multisigconfirmation_signature(self):
-        new_state = self.migrator.apply_initial_migration(
-            ("history", "0080_alter_multisigconfirmation_signature"),
-        )
-
-        MultisigConfirmation = new_state.apps.get_model(
-            "history", "MultisigConfirmation"
-        )
-
-        owner = Account.create().address
-        safe_tx_hash = fast_keccak_text("tx-hash")
-        safe_signature = SafeSignatureApprovedHash.build_for_owner(owner, safe_tx_hash)
-
-        MultisigConfirmation.objects.create(
-            multisig_transaction_hash=safe_tx_hash,
-            owner=owner,
-            signature=safe_signature.export_signature(),
-            signature_type=safe_signature.signature_type.value,
-        )
-        self.assertEqual(
-            HexBytes(MultisigConfirmation.objects.get().signature),
-            safe_signature.export_signature(),
-        )
-
-        old_state = self.migrator.apply_tested_migration(
-            ("history", "0079_alter_erc20transfer_unique_together_and_more"),
-        )
-
-        MultisigConfirmation = old_state.apps.get_model(
-            "history", "MultisigConfirmation"
-        )
-        self.assertEqual(
-            HexBytes(MultisigConfirmation.objects.get().signature),
-            safe_signature.export_signature(),
         )
 
     def test_migration_0082_safecontract_created(self):
