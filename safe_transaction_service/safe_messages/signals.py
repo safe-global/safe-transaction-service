@@ -7,7 +7,7 @@ from django.dispatch import receiver
 
 from safe_transaction_service.events.services.queue_service import get_queue_service
 from safe_transaction_service.history.services.notification_service import (
-    build_message_payload,
+    build_event_payload,
 )
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
@@ -37,7 +37,7 @@ def process_notification_event(
     **kwargs,
 ) -> None:
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
-    payloads = build_message_payload(sender, instance)
+    payloads = build_event_payload(sender, instance)
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )

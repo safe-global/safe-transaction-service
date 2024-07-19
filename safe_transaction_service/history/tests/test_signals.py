@@ -21,9 +21,9 @@ from ..models import (
     InternalTx,
     MultisigConfirmation,
     MultisigTransaction,
-    NotificationEventType,
+    TransactionServiceEventType,
 )
-from ..signals import build_message_payload, is_relevant_notification
+from ..signals import build_event_payload, is_relevant_notification
 from .factories import (
     ERC20TransferFactory,
     InternalTxFactory,
@@ -38,81 +38,88 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             [
                 payload["type"]
-                for payload in build_message_payload(
+                for payload in build_event_payload(
                     ERC20Transfer, ERC20TransferFactory()
                 )
             ],
             [
-                NotificationEventType.INCOMING_TOKEN.name,
-                NotificationEventType.OUTGOING_TOKEN.name,
+                TransactionServiceEventType.INCOMING_TOKEN.name,
+                TransactionServiceEventType.OUTGOING_TOKEN.name,
             ],
         )
         self.assertEqual(
             [
                 payload["type"]
-                for payload in build_message_payload(InternalTx, InternalTxFactory())
+                for payload in build_event_payload(InternalTx, InternalTxFactory())
             ],
             [
-                NotificationEventType.INCOMING_ETHER.name,
-                NotificationEventType.OUTGOING_ETHER.name,
+                TransactionServiceEventType.INCOMING_ETHER.name,
+                TransactionServiceEventType.OUTGOING_ETHER.name,
             ],
         )
         self.assertEqual(
             [
                 payload["chainId"]
-                for payload in build_message_payload(
+                for payload in build_event_payload(
                     ERC20Transfer, ERC20TransferFactory()
                 )
             ],
             [str(EthereumNetwork.GANACHE.value), str(EthereumNetwork.GANACHE.value)],
         )
 
-        payload = build_message_payload(
+        payload = build_event_payload(
             MultisigConfirmation, MultisigConfirmationFactory()
         )[0]
-        self.assertEqual(payload["type"], NotificationEventType.NEW_CONFIRMATION.name)
+        self.assertEqual(
+            payload["type"], TransactionServiceEventType.NEW_CONFIRMATION.name
+        )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
-        payload = build_message_payload(
+        payload = build_event_payload(
             MultisigTransaction, MultisigTransactionFactory()
         )[0]
         self.assertEqual(
-            payload["type"], NotificationEventType.EXECUTED_MULTISIG_TRANSACTION.name
+            payload["type"],
+            TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
-        payload = build_message_payload(
+        payload = build_event_payload(
             MultisigTransaction, MultisigTransactionFactory(ethereum_tx=None)
         )[0]
         self.assertEqual(
-            payload["type"], NotificationEventType.PENDING_MULTISIG_TRANSACTION.name
+            payload["type"],
+            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
-        payload = build_message_payload(
+        payload = build_event_payload(
             MultisigTransaction,
             MultisigTransactionFactory(ethereum_tx=None),
             deleted=True,
         )[0]
         self.assertEqual(
-            payload["type"], NotificationEventType.DELETED_MULTISIG_TRANSACTION.name
+            payload["type"],
+            TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
-        payload = build_message_payload(SafeMessage, safe_message)[0]
-        self.assertEqual(payload["type"], NotificationEventType.MESSAGE_CREATED.name)
+        payload = build_event_payload(SafeMessage, safe_message)[0]
+        self.assertEqual(
+            payload["type"], TransactionServiceEventType.MESSAGE_CREATED.name
+        )
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
-        payload = build_message_payload(
+        payload = build_event_payload(
             SafeMessageConfirmation,
             SafeMessageConfirmationFactory(safe_message=safe_message),
         )[0]
         self.assertEqual(
-            payload["type"], NotificationEventType.MESSAGE_CONFIRMATION.name
+            payload["type"], TransactionServiceEventType.MESSAGE_CONFIRMATION.name
         )
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
@@ -170,7 +177,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         pending_multisig_transaction_payload = {
             "address": multisig_tx.safe,
             "safeTxHash": multisig_tx.safe_tx_hash,
-            "type": NotificationEventType.EXECUTED_MULTISIG_TRANSACTION.name,
+            "type": TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
             "failed": "false",
             "txHash": multisig_tx.ethereum_tx_id,
             "chainId": str(EthereumNetwork.GANACHE.value),
@@ -185,7 +192,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         deleted_multisig_transaction_payload = {
             "address": multisig_tx.safe,
             "safeTxHash": safe_tx_hash,
-            "type": NotificationEventType.DELETED_MULTISIG_TRANSACTION.name,
+            "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(deleted_multisig_transaction_payload)

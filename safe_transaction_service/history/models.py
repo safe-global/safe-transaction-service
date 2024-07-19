@@ -2046,7 +2046,7 @@ class SafeStatus(SafeStatusBase):
         )
 
 
-class NotificationEventType(Enum):
+class TransactionServiceEventType(Enum):
     NEW_CONFIRMATION = 0
     PENDING_MULTISIG_TRANSACTION = 1
     EXECUTED_MULTISIG_TRANSACTION = 2

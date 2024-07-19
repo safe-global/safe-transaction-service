@@ -10,7 +10,7 @@ from gnosis.eth import EthereumNetwork
 from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.events.services.queue_service import QueueService
-from safe_transaction_service.history.models import NotificationEventType
+from safe_transaction_service.history.models import TransactionServiceEventType
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
@@ -34,7 +34,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         process_notification_event(SafeMessage, safe_message, True)
         message_created_payload = {
             "address": safe_address,
-            "type": NotificationEventType.MESSAGE_CREATED.name,
+            "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
@@ -43,7 +43,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
 
         message_confirmation_payload = {
             "address": safe_address,
-            "type": NotificationEventType.MESSAGE_CONFIRMATION.name,
+            "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
@@ -61,7 +61,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         safe_message = SafeMessageFactory(safe=safe_address)
         message_created_payload = {
             "address": safe_address,
-            "type": NotificationEventType.MESSAGE_CREATED.name,
+            "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
@@ -69,7 +69,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         send_event_mock.assert_called_with(message_created_payload)
         message_confirmation_payload = {
             "address": safe_address,
-            "type": NotificationEventType.MESSAGE_CONFIRMATION.name,
+            "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }

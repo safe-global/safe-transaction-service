@@ -14,9 +14,9 @@ from safe_transaction_service.history.models import (
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
-    NotificationEventType,
     SafeContract,
     TokenTransfer,
+    TransactionServiceEventType,
 )
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
@@ -25,7 +25,7 @@ from safe_transaction_service.safe_messages.models import (
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 
-def build_message_payload(
+def build_event_payload(
     sender: Type[Model],
     instance: Union[
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
@@ -43,7 +43,7 @@ def build_message_payload(
         payloads = [
             {
                 "address": instance.multisig_transaction.safe,  # This could make a db call
-                "type": NotificationEventType.NEW_CONFIRMATION.name,
+                "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
                 "safeTxHash": HexBytes(
                     instance.multisig_transaction.safe_tx_hash
@@ -54,7 +54,7 @@ def build_message_payload(
         payloads = [
             {
                 "address": instance.safe,
-                "type": NotificationEventType.DELETED_MULTISIG_TRANSACTION.name,
+                "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
                 "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
             }
         ]
@@ -65,30 +65,34 @@ def build_message_payload(
             "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
         }
         if instance.executed:
-            payload["type"] = NotificationEventType.EXECUTED_MULTISIG_TRANSACTION.name
+            payload["type"] = (
+                TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name
+            )
             payload["failed"] = json.dumps(
                 instance.failed
             )  # Firebase only accepts strings
             payload["txHash"] = HexBytes(instance.ethereum_tx_id).hex()
         else:
-            payload["type"] = NotificationEventType.PENDING_MULTISIG_TRANSACTION.name
+            payload["type"] = (
+                TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name
+            )
         payloads = [payload]
     elif sender == InternalTx and instance.is_ether_transfer:  # INCOMING_ETHER
         incoming_payload = {
             "address": instance.to,
-            "type": NotificationEventType.INCOMING_ETHER.name,
+            "type": TransactionServiceEventType.INCOMING_ETHER.name,
             "txHash": HexBytes(instance.ethereum_tx_id).hex(),
             "value": str(instance.value),
         }
         outgoing_payload = dict(incoming_payload)
-        outgoing_payload["type"] = NotificationEventType.OUTGOING_ETHER.name
+        outgoing_payload["type"] = TransactionServiceEventType.OUTGOING_ETHER.name
         outgoing_payload["address"] = instance._from
         payloads = [incoming_payload, outgoing_payload]
     elif sender in (ERC20Transfer, ERC721Transfer):
         # INCOMING_TOKEN / OUTGOING_TOKEN
         incoming_payload = {
             "address": instance.to,
-            "type": NotificationEventType.INCOMING_TOKEN.name,
+            "type": TransactionServiceEventType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
             "txHash": HexBytes(instance.ethereum_tx_id).hex(),
         }
@@ -97,14 +101,14 @@ def build_message_payload(
         else:
             incoming_payload["tokenId"] = str(instance.token_id)
         outgoing_payload = dict(incoming_payload)
-        outgoing_payload["type"] = NotificationEventType.OUTGOING_TOKEN.name
+        outgoing_payload["type"] = TransactionServiceEventType.OUTGOING_TOKEN.name
         outgoing_payload["address"] = instance._from
         payloads = [incoming_payload, outgoing_payload]
     elif sender == SafeContract:  # Safe created
         payloads = [
             {
                 "address": instance.address,
-                "type": NotificationEventType.SAFE_CREATED.name,
+                "type": TransactionServiceEventType.SAFE_CREATED.name,
                 "txHash": HexBytes(instance.ethereum_tx_id).hex(),
                 "blockNumber": instance.created_block_number,
             }
@@ -113,7 +117,7 @@ def build_message_payload(
         payloads = [
             {
                 "address": instance.safe,
-                "type": NotificationEventType.MODULE_TRANSACTION.name,
+                "type": TransactionServiceEventType.MODULE_TRANSACTION.name,
                 "module": instance.module,
                 "txHash": HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
             }
@@ -122,7 +126,7 @@ def build_message_payload(
         payloads = [
             {
                 "address": instance.safe,
-                "type": NotificationEventType.MESSAGE_CREATED.name,
+                "type": TransactionServiceEventType.MESSAGE_CREATED.name,
                 "messageHash": HexBytes(instance.message_hash).hex(),
             }
         ]
@@ -130,7 +134,7 @@ def build_message_payload(
         payloads = [
             {
                 "address": instance.safe_message.safe,  # This could make a db call
-                "type": NotificationEventType.MESSAGE_CONFIRMATION.name,
+                "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
                 "messageHash": HexBytes(instance.safe_message.message_hash).hex(),
             }
         ]

@@ -25,10 +25,7 @@ from .models import (
     TokenTransfer,
 )
 from .services import TransactionServiceProvider
-from .services.notification_service import (
-    build_message_payload,
-    is_relevant_notification,
-)
+from .services.notification_service import build_event_payload, is_relevant_notification
 
 logger = getLogger(__name__)
 
@@ -188,7 +185,7 @@ def _process_notification_event(
         _clean_all_txs_cache(instance)
 
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
-    payloads = build_message_payload(sender, instance, deleted=deleted)
+    payloads = build_event_payload(sender, instance, deleted=deleted)
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
