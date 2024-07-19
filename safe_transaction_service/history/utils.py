@@ -1,7 +1,9 @@
 from typing import Any, Dict, Optional, Union
+from urllib.parse import urlparse
 
 from django import forms
 from django.core import exceptions
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
 from hexbytes import HexBytes
@@ -51,3 +53,18 @@ def clean_receipt_log(receipt_log: LogReceipt) -> Optional[Dict[str, Any]]:
         "topics": [topic.hex() for topic in receipt_log["topics"]],
     }
     return parsed_log
+
+
+def validate_url(url: str) -> None:
+    result = urlparse(url)
+    if not all(
+        (
+            result.scheme
+            in (
+                "http",
+                "https",
+            ),
+            result.netloc,
+        )
+    ):
+        raise ValidationError(f"{url} is not a valid url")

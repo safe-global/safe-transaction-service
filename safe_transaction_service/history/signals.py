@@ -25,8 +25,7 @@ from .models import (
     TokenTransfer,
 )
 from .services import TransactionServiceProvider
-from .services.webhooks import build_webhook_payload, is_relevant_notification
-from .tasks import send_webhook_task
+from .services.notification_service import build_event_payload, is_relevant_notification
 
 logger = getLogger(__name__)
 
@@ -165,7 +164,7 @@ def _clean_all_txs_cache(
         transaction_service.del_all_txs_cache_hash_key(address)
 
 
-def _process_webhook(
+def _process_notification_event(
     sender: Type[Model],
     instance: Union[
         TokenTransfer,
@@ -186,7 +185,7 @@ def _process_webhook(
         _clean_all_txs_cache(instance)
 
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
-    payloads = build_webhook_payload(sender, instance, deleted=deleted)
+    payloads = build_event_payload(sender, instance, deleted=deleted)
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
@@ -194,13 +193,10 @@ def _process_webhook(
         if address := payload.get("address"):
             if is_relevant_notification(sender, instance, created):
                 logger.debug(
-                    "Triggering send_webhook and send_notification tasks for created=%s object=%s",
+                    "Triggering send_notification tasks for created=%s object=%s",
                     created,
                     instance,
                 )
-                send_webhook_task.apply_async(
-                    args=(address, payload), priority=2  # Almost lowest priority
-                )  # Almost the lowest priority
                 send_notification_task.apply_async(
                     args=(address, payload),
                     countdown=5,
@@ -219,27 +215,37 @@ def _process_webhook(
 @receiver(
     post_save,
     sender=ModuleTransaction,
-    dispatch_uid="module_transaction.process_webhook",
+    dispatch_uid="module_transaction.process_notification_event",
 )
 @receiver(
     post_save,
     sender=MultisigConfirmation,
-    dispatch_uid="multisig_confirmation.process_webhook",
+    dispatch_uid="multisig_confirmation.process_notification_event",
 )
 @receiver(
     post_save,
     sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_webhook",
+    dispatch_uid="multisig_transaction.process_notification_event",
 )
 @receiver(
-    post_save, sender=ERC20Transfer, dispatch_uid="erc20_transfer.process_webhook"
+    post_save,
+    sender=ERC20Transfer,
+    dispatch_uid="erc20_transfer.process_notification_event",
 )
 @receiver(
-    post_save, sender=ERC721Transfer, dispatch_uid="erc721_transfer.process_webhook"
+    post_save,
+    sender=ERC721Transfer,
+    dispatch_uid="erc721_transfer.process_notification_event",
 )
-@receiver(post_save, sender=InternalTx, dispatch_uid="internal_tx.process_webhook")
-@receiver(post_save, sender=SafeContract, dispatch_uid="safe_contract.process_webhook")
-def process_webhook(
+@receiver(
+    post_save, sender=InternalTx, dispatch_uid="internal_tx.process_notification_event"
+)
+@receiver(
+    post_save,
+    sender=SafeContract,
+    dispatch_uid="safe_contract.process_notification_event",
+)
+def process_notification_event(
     sender: Type[Model],
     instance: Union[
         TokenTransfer,
@@ -251,18 +257,18 @@ def process_webhook(
     created: bool,
     **kwargs,
 ) -> None:
-    return _process_webhook(sender, instance, created, False)
+    return _process_notification_event(sender, instance, created, False)
 
 
 @receiver(
     post_delete,
     sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_delete_webhook",
+    dispatch_uid="multisig_transaction.process_delete_notification",
 )
-def process_delete_webhook(
+def process_delete_notification(
     sender: Type[Model], instance: MultisigTransaction, *args, **kwargs
 ):
-    return _process_webhook(sender, instance, False, True)
+    return _process_notification_event(sender, instance, False, True)
 
 
 @receiver(

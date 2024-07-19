@@ -8,7 +8,7 @@ from safe_transaction_service.history.models import (
     MultisigTransaction,
     SafeContractDelegate,
     SafeLastStatus,
-    WebHookType,
+    TransactionServiceEventType,
 )
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
@@ -29,10 +29,10 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
     if not payload_type:
         # Don't send notifications for empty payload (it shouldn't happen)
         return False
-    elif payload_type == WebHookType.PENDING_MULTISIG_TRANSACTION.name:
+    elif payload_type == TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name:
         # Don't send notifications for pending multisig transactions
         return False
-    elif payload_type == WebHookType.NEW_CONFIRMATION.name:
+    elif payload_type == TransactionServiceEventType.NEW_CONFIRMATION.name:
         # If MultisigTransaction is executed don't notify about a new confirmation
         # try:
         #     return not MultisigTransaction.objects.get(safe_tx_hash=payload.get('safeTxHash')).executed
@@ -42,13 +42,13 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
         # All confirmations are disabled for now
         return False
     elif payload_type in (
-        WebHookType.OUTGOING_ETHER.name,
-        WebHookType.OUTGOING_TOKEN.name,
+        TransactionServiceEventType.OUTGOING_ETHER.name,
+        TransactionServiceEventType.OUTGOING_TOKEN.name,
     ):
         return False
     elif payload_type in (
-        WebHookType.INCOMING_ETHER.name,
-        WebHookType.INCOMING_TOKEN.name,
+        TransactionServiceEventType.INCOMING_ETHER.name,
+        TransactionServiceEventType.INCOMING_TOKEN.name,
     ):
         # Only send ETH/token pushes when they weren't triggered by a tx from some account other than the Safe.
         # If Safe triggers a transaction to transfer Ether/Tokens into itself, 2 notifications will be generated, and
@@ -61,7 +61,10 @@ def filter_notification(payload: Dict[str, Any]) -> bool:
 
 
 def is_pending_multisig_transaction(payload: Dict[str, Any]) -> bool:
-    return payload.get("type", "") == WebHookType.PENDING_MULTISIG_TRANSACTION.name
+    return (
+        payload.get("type", "")
+        == TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name
+    )
 
 
 @app.shared_task()
@@ -186,7 +189,7 @@ def send_notification_owner_task(address: str, safe_tx_hash: str) -> Tuple[int, 
         return 0, 0
 
     payload = {
-        "type": WebHookType.CONFIRMATION_REQUEST.name,
+        "type": TransactionServiceEventType.CONFIRMATION_REQUEST.name,
         "address": address,
         "safeTxHash": safe_tx_hash,
         "chainId": str(get_chain_id()),

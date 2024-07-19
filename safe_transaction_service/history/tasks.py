@@ -3,14 +3,11 @@ import dataclasses
 import datetime
 import json
 import random
-from functools import cache
-from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlparse
+from typing import Optional, Tuple
 
 from django.conf import settings
 from django.utils import timezone
 
-import requests
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
@@ -35,8 +32,6 @@ from .models import (
     SafeContract,
     SafeLastStatus,
     SafeStatus,
-    WebHook,
-    WebHookType,
 )
 from .services import (
     CollectiblesServiceProvider,
@@ -492,85 +487,6 @@ def process_decoded_internal_txs_for_safe_task(
                     number_processed,
                 )
                 return number_processed
-
-
-@cache
-def get_webhook_http_session(
-    webhook_url: str, authorization: Optional[str]
-) -> requests.Session:
-    logger.debug("Getting http session for url=%s", webhook_url)
-    session = requests.Session()
-    if authorization:
-        session.headers.update({"Authorization": authorization})
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=1,  # Doing all the connections to the same url
-        pool_maxsize=500,  # Number of concurrent connections
-        pool_block=False,
-    )
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
-
-
-@app.shared_task(
-    autoretry_for=(IOError,), default_retry_delay=15, retry_kwargs={"max_retries": 3}
-)
-@close_gevent_db_connection_decorator
-def send_webhook_task(address: Optional[str], payload: Dict[str, Any]) -> int:
-    if not (address and payload):
-        return 0
-
-    webhooks = WebHook.objects.matching_for_address(address)
-    if not webhooks:
-        logger.debug("There is no webhook configured for address=%s", address)
-        return 0
-
-    sent_requests = 0
-    webhook_type = WebHookType[payload["type"]]
-    for webhook in webhooks:
-        if not webhook.is_valid_for_webhook_type(webhook_type):
-            logger.debug(
-                "There is no webhook configured for webhook_type=%s",
-                webhook_type.name,
-            )
-            continue
-
-        full_url = webhook.url
-        parsed_url = urlparse(full_url)
-        base_url = (
-            f"{parsed_url.scheme}://{parsed_url.netloc}"  # Remove url path for logging
-        )
-        if webhook.address:
-            logger.info(
-                "Sending webhook for address=%s base-url=%s and payload=%s",
-                address,
-                base_url,
-                payload,
-            )
-        else:  # Generic WebHook
-            logger.info(
-                "Sending webhook for base-url=%s and payload=%s", base_url, payload
-            )
-
-        r = get_webhook_http_session(full_url, webhook.authorization).post(
-            full_url, json=payload, timeout=5
-        )
-        if r.ok:
-            logger.info(
-                "Webhook for base-url=%s and payload=%s was sent successfully",
-                base_url,
-                payload,
-            )
-        else:
-            logger.warning(
-                "Webhook failed with status-code=%d posting to url=%s with content=%s",
-                r.status_code,
-                base_url,
-                r.content,
-            )
-
-        sent_requests += 1
-    return sent_requests
 
 
 @app.shared_task(

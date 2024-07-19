@@ -12,9 +12,9 @@ from safe_transaction_service.history.models import (
     InternalTxType,
     MultisigConfirmation,
     MultisigTransaction,
-    WebHookType,
+    TransactionServiceEventType,
 )
-from safe_transaction_service.history.signals import build_webhook_payload
+from safe_transaction_service.history.signals import build_event_payload
 from safe_transaction_service.history.tests.factories import (
     InternalTxFactory,
     MultisigConfirmationFactory,
@@ -35,14 +35,14 @@ from .factories import FirebaseDeviceOwnerFactory
 class TestViews(TestCase):
     def test_filter_notification(self):
         multisig_confirmation = MultisigConfirmationFactory()
-        confirmation_notification = build_webhook_payload(
+        confirmation_notification = build_event_payload(
             MultisigConfirmation, multisig_confirmation
         )[0]
         # Confirmations for executed transaction should be filtered out
         self.assertFalse(filter_notification(confirmation_notification))
         multisig_confirmation.multisig_transaction.ethereum_tx.block = None
         multisig_confirmation.multisig_transaction.ethereum_tx.save()
-        confirmation_notification = build_webhook_payload(
+        confirmation_notification = build_event_payload(
             MultisigConfirmation, multisig_confirmation
         )[0]
         # All confirmations are disabled for now
@@ -51,14 +51,14 @@ class TestViews(TestCase):
 
         # Pending multisig transaction should be filtered out
         multisig_transaction = MultisigTransactionFactory()
-        transaction_notification = build_webhook_payload(
+        transaction_notification = build_event_payload(
             MultisigTransaction, multisig_transaction
         )[0]
         self.assertTrue(filter_notification(transaction_notification))
 
         multisig_transaction.ethereum_tx = None
         multisig_transaction.save()
-        pending_transaction_notification = build_webhook_payload(
+        pending_transaction_notification = build_event_payload(
             MultisigTransaction, multisig_transaction
         )[0]
         self.assertNotEqual(multisig_transaction, pending_transaction_notification)
@@ -73,7 +73,7 @@ class TestViews(TestCase):
         (
             incoming_internal_tx_payload,
             outgoing_internal_tx_payload,
-        ) = build_webhook_payload(InternalTx, internal_tx)
+        ) = build_event_payload(InternalTx, internal_tx)
 
         self.assertEqual(outgoing_internal_tx_payload["address"], internal_tx._from)
         self.assertFalse(filter_notification(outgoing_internal_tx_payload))
@@ -222,7 +222,7 @@ class TestViews(TestCase):
         safe_tx_hash = fast_keccak_text("hola").hex()
         payload = {
             "address": safe_address,
-            "type": WebHookType.PENDING_MULTISIG_TRANSACTION.name,
+            "type": TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
             "safeTxHash": safe_tx_hash,
         }
 

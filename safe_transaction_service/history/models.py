@@ -18,7 +18,6 @@ from typing import (
     TypedDict,
     Union,
 )
-from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -2047,7 +2046,7 @@ class SafeStatus(SafeStatusBase):
         )
 
 
-class WebHookType(Enum):
+class TransactionServiceEventType(Enum):
     NEW_CONFIRMATION = 0
     PENDING_MULTISIG_TRANSACTION = 1
     EXECUTED_MULTISIG_TRANSACTION = 2
@@ -2061,100 +2060,3 @@ class WebHookType(Enum):
     MESSAGE_CREATED = 10
     MESSAGE_CONFIRMATION = 11
     DELETED_MULTISIG_TRANSACTION = 12
-
-
-class WebHookQuerySet(models.QuerySet):
-    def matching_for_address(self, address: str):
-        return self.filter(Q(address=address) | Q(address=None))
-
-
-def _validate_webhook_url(url: str) -> None:
-    result = urlparse(url)
-    if not all(
-        (
-            result.scheme
-            in (
-                "http",
-                "https",
-            ),
-            result.netloc,
-        )
-    ):
-        raise ValidationError(f"{url} is not a valid url")
-
-
-class WebHook(models.Model):
-    objects = WebHookQuerySet.as_manager()
-    address = EthereumAddressBinaryField(db_index=True, null=True, blank=True)
-    url = models.CharField(max_length=255, validators=[_validate_webhook_url])
-    authorization = models.CharField(
-        max_length=500,
-        null=True,
-        blank=True,
-        default=None,
-        help_text="Set HTTP Authorization header with the value",
-    )
-    # Configurable webhook types to listen to
-    new_confirmation = models.BooleanField(default=True, help_text="New confirmation")
-    pending_multisig_transaction = models.BooleanField(
-        default=True, help_text="New pending multisig transaction"
-    )
-    new_executed_multisig_transaction = models.BooleanField(
-        default=True, help_text="New mined multisig transaction"
-    )
-    new_incoming_transaction = models.BooleanField(
-        default=True, help_text="New incoming transaction of eth/token"
-    )
-    new_safe = models.BooleanField(default=True, help_text="New Safe created")
-    new_module_transaction = models.BooleanField(
-        default=True, help_text="New mined module transaction"
-    )
-    new_outgoing_transaction = models.BooleanField(
-        default=True, help_text="New outgoing transaction of eth/token"
-    )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["address", "url"], name="unique_webhook_address_url"
-            )
-        ]
-
-    def __str__(self):
-        if self.address:
-            return f"Webhook for safe={self.address} to url={self.url}"
-        else:
-            return f"Webhook to every address to url={self.url}"
-
-    def is_valid_for_webhook_type(self, webhook_type: WebHookType):
-        if webhook_type == WebHookType.NEW_CONFIRMATION and not self.new_confirmation:
-            return False
-        elif (
-            webhook_type == WebHookType.PENDING_MULTISIG_TRANSACTION
-            and not self.pending_multisig_transaction
-        ):
-            return False
-        elif (
-            webhook_type == WebHookType.EXECUTED_MULTISIG_TRANSACTION
-            and not self.new_executed_multisig_transaction
-        ):
-            return False
-        elif (
-            webhook_type in (WebHookType.INCOMING_TOKEN, WebHookType.INCOMING_ETHER)
-            and not self.new_incoming_transaction
-        ):
-            return False
-        elif webhook_type == WebHookType.SAFE_CREATED and not self.new_safe:
-            return False
-        elif (
-            webhook_type == WebHookType.MODULE_TRANSACTION
-            and not self.new_module_transaction
-        ):
-            return False
-        elif (
-            webhook_type in (WebHookType.OUTGOING_TOKEN, WebHookType.OUTGOING_ETHER)
-            and not self.new_outgoing_transaction
-        ):
-            return False
-        else:
-            return True

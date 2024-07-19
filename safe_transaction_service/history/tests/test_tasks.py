@@ -7,10 +7,7 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.utils import timezone
 
-import requests
 from eth_account import Account
-
-from gnosis.eth import EthereumClient, EthereumNetwork
 
 from ...utils.redis import get_redis
 from ..indexers import (
@@ -24,7 +21,6 @@ from ..services.collectibles_service import CollectibleWithMetadata
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
-    get_webhook_http_session,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -41,14 +37,11 @@ from ..tasks import (
     retry_get_metadata_task,
 )
 from .factories import (
-    ERC20TransferFactory,
     EthereumBlockFactory,
     InternalTxDecodedFactory,
-    InternalTxFactory,
     MultisigTransactionFactory,
     SafeContractFactory,
     SafeStatusFactory,
-    WebHookFactory,
 )
 
 logger = logging.getLogger(__name__)
@@ -149,31 +142,6 @@ class TestTasks(TestCase):
             to_block_number=ethereum_block_3.number,
             addresses=None,
         )
-
-    @patch.object(EthereumClient, "get_network", return_value=EthereumNetwork.GANACHE)
-    @patch.object(requests.Session, "post")
-    def test_send_webhook_task(self, mock_post: MagicMock, get_network_mock: MagicMock):
-        ERC20TransferFactory()
-
-        with self.assertRaises(AssertionError):
-            mock_post.assert_called()
-
-        to = Account.create().address
-        WebHookFactory(address="")
-        WebHookFactory(address=Account.create().address)
-        WebHookFactory(address=to)
-        InternalTxFactory(to=to)
-        # 3 webhooks: INCOMING_ETHER for Webhook with `to`, and then `INCOMING_ETHER` and `OUTGOING_ETHER`
-        # for the WebHook without address set
-        self.assertEqual(mock_post.call_count, 3)
-
-    def test_get_webhook_http_session(self):
-        session = get_webhook_http_session("http://random-url", None)
-        self.assertNotIn("Authorization", session.headers)
-
-        secret_token = "IDDQD"
-        session = get_webhook_http_session("http://random-url", secret_token)
-        self.assertEqual(session.headers["Authorization"], secret_token)
 
     def test_process_decoded_internal_txs_task(self):
         owner = Account.create().address

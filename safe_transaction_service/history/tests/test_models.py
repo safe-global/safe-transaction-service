@@ -34,7 +34,6 @@ from ..models import (
     SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
-    WebHook,
 )
 from ..utils import clean_receipt_log
 from .factories import (
@@ -52,7 +51,6 @@ from .factories import (
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
     SafeStatusFactory,
-    WebHookFactory,
 )
 from .mocks.mocks_ethereum_tx import type_0_tx, type_2_tx
 from .mocks.mocks_internal_tx_indexer import block_result
@@ -1657,67 +1655,3 @@ class TestMultisigTransactions(TestCase):
             MultisigTransaction.objects.last_valid_transaction(safe_address),
             multisig_transaction_2,
         )
-
-
-class TestWebHook(TestCase):
-    def test_matching_for_address(self):
-        addresses = [Account.create().address for _ in range(3)]
-        webhook_0 = WebHookFactory(address=addresses[0])
-        webhook_1 = WebHookFactory(address=addresses[1])
-
-        self.assertCountEqual(
-            WebHook.objects.matching_for_address(addresses[0]), [webhook_0]
-        )
-        self.assertCountEqual(
-            WebHook.objects.matching_for_address(addresses[1]), [webhook_1]
-        )
-
-        webhook_2 = WebHookFactory(address=None)
-        self.assertCountEqual(
-            WebHook.objects.matching_for_address(addresses[0]), [webhook_0, webhook_2]
-        )
-        self.assertCountEqual(
-            WebHook.objects.matching_for_address(addresses[1]), [webhook_1, webhook_2]
-        )
-        self.assertCountEqual(
-            WebHook.objects.matching_for_address(addresses[2]), [webhook_2]
-        )
-
-    def test_optional_auth(self):
-        web_hook = WebHookFactory.create(authorization=None)
-
-        web_hook.full_clean()
-
-    def test_invalid_urls(self) -> None:
-        param_list = [
-            "foo://bar",
-            "foo",
-            "://",
-        ]
-        for invalid_url in param_list:
-            with self.subTest(msg=f"{invalid_url} is not a valid url"):
-                with self.assertRaises(ValidationError):
-                    web_hook = WebHookFactory.create(url=invalid_url)
-                    web_hook.full_clean()
-
-            with self.subTest(msg=f"{invalid_url} is not a valid url"):
-                with self.assertRaises(ValidationError):
-                    web_hook = WebHookFactory.create(url=invalid_url)
-                    web_hook.full_clean()
-
-    def test_valid_urls(self) -> None:
-        param_list = [
-            "http://tx-service",
-            "https://tx-service",
-            "https://tx-service:8000",
-            "https://safe-transaction.mainnet.gnosis.io",
-            "http://mainnet-safe-transaction-web.safe.svc.cluster.local",
-        ]
-        for valid_url in param_list:
-            with self.subTest(msg=f"Valid url {valid_url} should not throw"):
-                web_hook = WebHookFactory.create(url=valid_url)
-                web_hook.full_clean()
-
-            with self.subTest(msg=f"Valid url {valid_url} should not throw"):
-                web_hook = WebHookFactory.create(url=valid_url)
-                web_hook.full_clean()
