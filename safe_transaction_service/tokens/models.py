@@ -19,7 +19,7 @@ from pilkit.processors import Resize
 from web3.exceptions import Web3Exception
 
 from gnosis.eth import InvalidERC20Info, InvalidERC721Info, get_auto_ethereum_client
-from gnosis.eth.django.models import EthereumAddressV2Field
+from gnosis.eth.django.models import EthereumAddressBinaryField
 
 from .clients.zerion_client import (
     BalancerTokenAdapterClient,
@@ -205,7 +205,7 @@ class TokenQuerySet(models.QuerySet):
 class Token(models.Model):
     objects = TokenManager.from_queryset(TokenQuerySet)()
     pool_tokens = PoolTokenManager()
-    address = EthereumAddressV2Field(primary_key=True)
+    address = EthereumAddressBinaryField(primary_key=True)
     name = models.CharField(max_length=60)
     symbol = models.CharField(max_length=60)
     decimals = models.PositiveSmallIntegerField(
@@ -232,7 +232,7 @@ class Token(models.Model):
     trusted = models.BooleanField(
         default=False, help_text="Spam and trusted cannot be both True"
     )
-    copy_price = EthereumAddressV2Field(
+    copy_price = EthereumAddressBinaryField(
         null=True, blank=True, help_text="If provided, copy the price from the token"
     )
 

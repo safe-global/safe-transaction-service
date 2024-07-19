@@ -12,7 +12,9 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from gnosis.eth import EthereumClient, get_auto_ethereum_client
 from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.django.models import EthereumAddressV2Field as EthereumAddressDbField
+from gnosis.eth.django.models import (
+    EthereumAddressBinaryField as EthereumAddressDbField,
+)
 from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
 from gnosis.eth.django.serializers import (
     EthereumAddressField,
@@ -21,7 +23,7 @@ from gnosis.eth.django.serializers import (
 )
 from gnosis.safe import Safe
 from gnosis.safe.safe_signature import EthereumBytes, SafeSignature, SafeSignatureType
-from gnosis.safe.serializers import SafeMultisigTxSerializerV1
+from gnosis.safe.serializers import SafeMultisigTxSerializer
 
 from safe_transaction_service.account_abstraction import serializers as aa_serializers
 from safe_transaction_service.contracts.tx_decoder import (
@@ -152,7 +154,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         return multisig_confirmations
 
 
-class SafeMultisigTransactionSerializer(SafeMultisigTxSerializerV1):
+class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
     to = EthereumAddressField(allow_zero_address=True, allow_sentinel_address=True)
     contract_transaction_hash = Sha3HashField()
     sender = EthereumAddressField()
@@ -616,7 +618,7 @@ class SafeMultisigConfirmationResponseSerializer(GnosisBaseModelSerializer):
         return SafeSignatureType(obj.signature_type).name
 
 
-class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializerV1):
+class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     execution_date = serializers.DateTimeField()
     submission_date = serializers.DateTimeField(
         source="created"

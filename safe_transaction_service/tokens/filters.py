@@ -1,7 +1,7 @@
 from django_filters import rest_framework as filters
 
 from gnosis.eth.django.filters import EthereumAddressFilter
-from gnosis.eth.django.models import EthereumAddressV2Field
+from gnosis.eth.django.models import EthereumAddressBinaryField
 
 from .models import Token
 
@@ -16,5 +16,5 @@ class TokenFilter(filters.FilterSet):
             "decimals": ["lt", "gt", "exact"],
         }
         filter_overrides = {
-            EthereumAddressV2Field: {"filter_class": EthereumAddressFilter},
+            EthereumAddressBinaryField: {"filter_class": EthereumAddressFilter},
         }
