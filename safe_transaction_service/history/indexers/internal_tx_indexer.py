@@ -18,7 +18,12 @@ from safe_transaction_service.contracts.tx_decoder import (
 )
 from safe_transaction_service.utils.utils import chunks
 
-from ..models import InternalTx, InternalTxDecoded, SafeMasterCopy
+from ..models import (
+    InternalTx,
+    InternalTxDecoded,
+    SafeMasterCopy,
+    SafeRelevantTransaction,
+)
 from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
@@ -270,6 +275,21 @@ class InternalTxIndexer(EthereumIndexer):
                 )
                 raise
 
+    def filter_relevant_txs(
+        self, internal_txs: Generator[InternalTx, None, None]
+    ) -> Generator[InternalTx, None, None]:
+        for internal_tx in internal_txs:
+            if internal_tx.is_relevant:
+                if internal_tx.is_ether_transfer:
+                    SafeRelevantTransaction.objects.get_or_create(
+                        ethereum_tx_id=internal_tx.ethereum_tx_id,
+                        safe=internal_tx._from,
+                        defaults={
+                            "timestamp": internal_tx.timestamp,
+                        },
+                    )
+                yield internal_tx
+
     def process_elements(
         self, tx_hash_with_traces: OrderedDict[bytes, Optional[FilterTrace]]
     ) -> List[HexBytes]:
@@ -333,13 +353,10 @@ class InternalTxIndexer(EthereumIndexer):
 
         with transaction.atomic():
             logger.debug("Storing traces")
-            revelant_internal_txs_batch = (
-                trace for trace in internal_txs if trace.is_relevant
-            )
             traces_stored = InternalTx.objects.bulk_create_from_generator(
-                revelant_internal_txs_batch, ignore_conflicts=True
+                self.filter_relevant_txs(internal_txs), ignore_conflicts=True
             )
-            logger.debug("End storing of %d traces", traces_stored)
+            logger.debug("Stored %d traces", traces_stored)
 
             logger.debug("Start decoding and storing of decoded traces")
             #  Pass `tx_hashes` instead of `InternalTxs` to `_get_internal_txs_to_decode`

@@ -41,6 +41,7 @@ from ..models import (
     SafeContractDelegate,
     SafeLastStatus,
     SafeMasterCopy,
+    SafeRelevantTransaction,
     SafeStatus,
 )
 
@@ -548,6 +549,11 @@ class SafeTxProcessor(TxProcessor):
                         "failed": failed,
                     },
                 )
+                SafeRelevantTransaction.objects.get_or_create(
+                    ethereum_tx=ethereum_tx,
+                    safe=contract_address,
+                    defaults={"timestamp": ethereum_tx.created},
+                )
                 # Detect 4337 UserOperations in this transaction
                 number_detected_user_operations = (
                     self.aa_processor_service.process_aa_transaction(
@@ -661,6 +667,11 @@ class SafeTxProcessor(TxProcessor):
                         "failed": failed,
                         "trusted": True,
                     },
+                )
+                SafeRelevantTransaction.objects.get_or_create(
+                    ethereum_tx=ethereum_tx,
+                    safe=contract_address,
+                    defaults={"timestamp": ethereum_tx.created},
                 )
 
                 # Don't modify created

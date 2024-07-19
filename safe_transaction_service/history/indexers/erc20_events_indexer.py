@@ -18,6 +18,7 @@ from ..models import (
     ERC721Transfer,
     IndexingStatus,
     SafeContract,
+    SafeRelevantTransaction,
     TokenTransfer,
 )
 from .events_indexer import EventsIndexer
@@ -55,9 +56,9 @@ class Erc20EventsIndexer(EventsIndexer):
     ERC20 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 value)`
     ERC721 Transfer Event: `Transfer(address indexed from, address indexed to, uint256 indexed tokenId)`
 
-    As `event topic` is the same both events can be indexed together, and then tell
-    apart based on the `indexed` part as `indexed` elements are stored in a different way in the
-    `ethereum tx receipt`.
+    `Event topic` is the same for both events, so they can be indexed together.
+     Then we can split them apart based on the `indexed` part as `indexed` elements
+     are stored in a different way in the `Ethereum Tx Receipt`.
     """
 
     def __init__(self, *args, **kwargs):
@@ -156,6 +157,15 @@ class Erc20EventsIndexer(EventsIndexer):
             except ValueError:
                 pass
 
+    def events_to_safe_relevant_transaction(
+        self, log_receipts: Sequence[EventData]
+    ) -> Iterator[SafeRelevantTransaction]:
+        for log_receipt in log_receipts:
+            try:
+                yield from SafeRelevantTransaction.from_erc20_721_event(log_receipt)
+            except ValueError:
+                pass
+
     def process_elements(
         self, log_receipts: Sequence[EventData]
     ) -> List[TokenTransfer]:
@@ -185,15 +195,28 @@ class Erc20EventsIndexer(EventsIndexer):
                     log_receipt["logIndex"],
                 )
             ]
+            logger.debug("Storing Transfer Events")
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
                 self.events_to_erc20_transfer(not_processed_log_receipts),
                 ignore_conflicts=True,
             )
+            logger.debug("Stored %d ERC20 Events", result_erc20)
             result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
                 self.events_to_erc721_transfer(not_processed_log_receipts),
                 ignore_conflicts=True,
             )
-            logger.debug("Stored TokenTransfer objects")
+            logger.debug("Stored %d ERC721 Events", result_erc721)
+            result_safe_relevant_transaction = (
+                SafeRelevantTransaction.objects.bulk_create_from_generator(
+                    self.events_to_safe_relevant_transaction(
+                        not_processed_log_receipts
+                    ),
+                    ignore_conflicts=True,
+                )
+            )
+            logger.debug(
+                "Stored %d Safe Relevant Transactions", result_safe_relevant_transaction
+            )
             logger.debug("Marking events as processed")
             for log_receipt in not_processed_log_receipts:
                 self.element_already_processed_checker.mark_as_processed(
