@@ -9,7 +9,7 @@ import gnosis.eth.django.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("history", "0084_alter_erc20transfer__from_and_more"),
+        ("history", "0085_delete_webhook"),
     ]
 
     operations = [
