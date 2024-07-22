@@ -354,7 +354,9 @@ class IndexService:
         queryset.update(processed=False)
 
     @transaction.atomic
-    def fix_out_of_order(self, address: ChecksumAddress, internal_tx: InternalTx):
+    def fix_out_of_order(
+        self, address: ChecksumAddress, internal_tx: InternalTx
+    ) -> None:
         """
         Fix a Safe that has transactions out of order (not processed transactions
         in between processed ones, usually due a reindex), by reprocessing all of them
@@ -372,7 +374,10 @@ class IndexService:
             tx_hash_hex,
             timestamp,
         )
-        logger.info("[%s] Marking InternalTxDecoded as not processed", address)
+        logger.info(
+            "[%s] Marking InternalTxDecoded newer than timestamp as not processed",
+            address,
+        )
         InternalTxDecoded.objects.filter(
             internal_tx___from=address, internal_tx__timestamp__gte=timestamp
         ).update(processed=False)
@@ -380,7 +385,7 @@ class IndexService:
         SafeStatus.objects.filter(
             address=address, internal_tx__timestamp__gte=timestamp
         ).delete()
-        logger.info("[%s] Removing and rebuilding SafeLastStatus", address)
+        logger.info("[%s] Removing SafeLastStatus", address)
         SafeLastStatus.objects.filter(address=address).delete()
         logger.info("[%s] Ended fixing out of order", address)
 

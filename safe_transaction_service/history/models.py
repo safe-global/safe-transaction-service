@@ -1101,11 +1101,11 @@ class InternalTx(models.Model):
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
-    def out_of_order_for_safe(self, safe_address: ChecksumAddress):
+    def out_of_order_for_safe(self, safe_address: ChecksumAddress) -> bool:
         """
         :param safe_address:
-        :return: `True` if there are transactions out of order (processed transactions newer
-            than no processed transactions, due to a reindex), `False` otherwise
+        :return: `True` if there are internal txs out of order (processed newer
+            than no processed, e.g. due to a reindex), `False` otherwise
         """
 
         return (

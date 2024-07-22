@@ -146,12 +146,18 @@ class SafeTxProcessor(TxProcessor):
             Version("1.3.0"),  # ChainId was included
         )
 
-    def clear_cache(self, safe_address: Optional[ChecksumAddress] = None) -> None:
+    def clear_cache(self, safe_address: Optional[ChecksumAddress] = None) -> bool:
+        """
+        :param safe_address:
+        :return: `True` if anything was deleted from cache, `False` otherwise
+        """
         if safe_address:
-            if safe_address in self.safe_last_status_cache:
+            if result := (safe_address in self.safe_last_status_cache):
                 del self.safe_last_status_cache[safe_address]
+            return result
         else:
             self.safe_last_status_cache.clear()
+            return True
 
     def is_failed(
         self, ethereum_tx: EthereumTx, safe_tx_hash: Union[HexStr, bytes]

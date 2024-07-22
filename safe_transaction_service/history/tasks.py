@@ -453,13 +453,13 @@ def process_decoded_internal_txs_for_safe_task(
             # Check if a new decoded tx appeared before other already processed (due to a reindex)
             if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
                 logger.error("[%s] Found out of order transactions", safe_address)
-                tx_processor.clear_cache(safe_address)
                 index_service.fix_out_of_order(
                     safe_address,
                     InternalTxDecoded.objects.pending_for_safe(safe_address)[
                         0
                     ].internal_tx,
                 )
+                tx_processor.clear_cache(safe_address)
 
             # Use chunks for memory issues
             number_processed = 0
