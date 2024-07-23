@@ -55,6 +55,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (01:51.856 on Mainnet staging)
+        # (02:14:07.346 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -68,6 +69,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (01:00.737 on Mainnet staging)
+        # (01:50:06.427 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -81,6 +83,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (00:11.169 on Mainnet staging)
+        # (00:12.703 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -94,6 +97,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (00:06.158 on Mainnet staging)
+        # (00:01.352 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -107,6 +111,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (00:03.430 on Mainnet staging)
+        # (31:30.351 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -122,6 +127,7 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (00:47.880 on Mainnet staging)
+        # (11:01.540 on Optimism Production)
         migrations.RunSQL(
             """
             INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -136,6 +142,7 @@ class Migration(migrations.Migration):
             """
         ),
         # (01:52.434 on Mainnet staging)
+        # (12:06.667 on Optimism Production)
         migrations.RunSQL(
             """
         INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
@@ -161,4 +168,5 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         # (~03:30 on Mainnet staging) Altering table afterward (applying indexes, constraints...)
+        # (~22:00 on Optimism production) Altering table afterward (applying indexes, constraints...)
     ]
