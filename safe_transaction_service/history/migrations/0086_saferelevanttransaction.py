@@ -46,4 +46,119 @@ class Migration(migrations.Migration):
                 "unique_together": {("ethereum_tx", "safe")},
             },
         ),
+        migrations.RunSQL(
+            """
+            ALTER TABLE "history_saferelevanttransaction"
+            ADD CONSTRAINT "history_saferelevanttran_temporalc"
+            UNIQUE ("ethereum_tx_id", "safe");
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (01:51.856 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_erc20transfer"."ethereum_tx_id" AS "ethereum_tx_id",
+                    "history_erc20transfer"."timestamp" AS "timestamp",
+                    "history_erc20transfer"."to" AS "safe"
+                    FROM "history_erc20transfer"
+                    JOIN "history_safecontract" ON ("to" = "history_safecontract"."address")
+            ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (01:00.737 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_erc20transfer"."ethereum_tx_id" AS "ethereum_tx_id",
+                    "history_erc20transfer"."timestamp" AS "timestamp",
+                    "history_erc20transfer"."_from" AS "safe"
+                    FROM "history_erc20transfer"
+                    JOIN "history_safecontract" ON ("_from" = "history_safecontract"."address")
+            ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (00:11.169 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_erc721transfer"."ethereum_tx_id" AS "ethereum_tx_id",
+                "history_erc721transfer"."timestamp" AS "timestamp",
+                "history_erc721transfer"."to" AS "safe"
+                FROM "history_erc721transfer"
+                JOIN "history_safecontract" ON ("to" = "history_safecontract"."address")
+            ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (00:06.158 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_erc721transfer"."ethereum_tx_id" AS "ethereum_tx_id",
+                "history_erc721transfer"."timestamp" AS "timestamp",
+                "history_erc721transfer"."_from" AS "safe"
+                FROM "history_erc721transfer"
+                JOIN "history_safecontract" ON ("_from" = "history_safecontract"."address")
+            ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (00:03.430 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_internaltx"."ethereum_tx_id" AS "ethereum_tx_id",
+                "history_internaltx"."timestamp" AS "timestamp",
+                "history_internaltx"."to" AS "safe"
+                FROM "history_internaltx"
+                JOIN "history_safecontract" ON ("to" = "history_safecontract"."address")
+            WHERE "history_internaltx"."call_type" = 0
+                AND "history_internaltx"."value" > 0
+            ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (00:47.880 on Mainnet staging)
+        migrations.RunSQL(
+            """
+            INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+            SELECT "history_internaltx"."ethereum_tx_id" AS "ethereum_tx_id",
+                "history_moduletransaction"."created" AS "timestamp",
+                "history_moduletransaction"."safe" AS "safe"
+                FROM "history_moduletransaction"
+                JOIN "history_internaltx" ON (
+                    "history_moduletransaction"."internal_tx_id" = "history_internaltx"."id"
+                )
+            ON CONFLICT DO NOTHING
+            """
+        ),
+        # (01:52.434 on Mainnet staging)
+        migrations.RunSQL(
+            """
+        INSERT INTO history_saferelevanttransaction(ethereum_tx_id, timestamp, safe)
+        SELECT "history_multisigtransaction"."ethereum_tx_id" AS "ethereum_tx_id",
+            "history_ethereumblock"."timestamp" AS "timestamp",
+            "history_multisigtransaction"."safe" AS "safe"
+            FROM "history_multisigtransaction"
+            JOIN "history_ethereumtx" ON (
+                "history_multisigtransaction"."ethereum_tx_id" = "history_ethereumtx"."tx_hash"
+            )
+            JOIN "history_ethereumblock" ON (
+                "history_ethereumtx"."block_id" = "history_ethereumblock"."number"
+            )
+        ON CONFLICT DO NOTHING
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            """
+            ALTER TABLE "history_saferelevanttransaction"
+            DROP CONSTRAINT "history_saferelevanttran_temporalc"
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        # (~03:30 on Mainnet staging) Altering table afterward (applying indexes, constraints...)
     ]
