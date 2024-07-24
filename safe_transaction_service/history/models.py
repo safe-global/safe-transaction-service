@@ -1843,6 +1843,9 @@ class SafeRelevantTransaction(models.Model):
         unique_together = (("ethereum_tx", "safe"),)
         verbose_name_plural = "Safe Relevant Transactions"
 
+    def __str__(self):
+        return f"[{self.safe}] {self.timestamp} - {self.ethereum_tx_id}"
+
     @classmethod
     def from_erc20_721_event(
         cls, event_data: EventData

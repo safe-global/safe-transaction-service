@@ -26,6 +26,7 @@ from ..models import (
     SafeContract,
     SafeContractDelegate,
     SafeLastStatus,
+    SafeRelevantTransaction,
     SafeStatus,
 )
 from .factories import (
@@ -60,6 +61,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         fallback_handler = Account.create().address
         master_copy = Account.create().address
         threshold = 1
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 0)
         tx_processor.process_decoded_transaction(
             InternalTxDecodedFactory(
                 function_name="setup",
@@ -70,6 +72,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 internal_tx___from=safe_address,
             )
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 0)
         self.assertTrue(SafeContract.objects.get(address=safe_address))
         safe_status = SafeStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status.enabled_modules, [])
@@ -94,6 +97,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 1)
 
         self.assertEqual(SafeStatus.objects.count(), 3)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
@@ -127,6 +131,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 2)
         self.assertEqual(SafeStatus.objects.count(), 5)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
@@ -183,6 +188,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 3)
         # At least 1 confirmation is always added by `execTransaction` and 1 should be removed
         self.assertEqual(
             MultisigConfirmation.objects.count(), number_confirmations + 1 - 1
@@ -221,6 +227,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 4)
         self.assertEqual(SafeStatus.objects.count(), 9)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
@@ -241,6 +248,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 5)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
@@ -261,6 +269,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 6)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
@@ -279,6 +288,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ),
             ]
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 7)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
@@ -293,16 +303,16 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         ):
             # call_trace has [] as a trace address and module txs need to get the grandfather tx, so [0,0] must
             # be used
-            module_internal_tx_decoded = InternalTxDecodedFactory(
-                function_name="execTransactionFromModule",
-                internal_tx___from=safe_address,
-                internal_tx__trace_address="0,0",
-            )
             tx_processor.process_decoded_transactions(
                 [
-                    module_internal_tx_decoded,
+                    InternalTxDecodedFactory(
+                        function_name="execTransactionFromModule",
+                        internal_tx___from=safe_address,
+                        internal_tx__trace_address="0,0",
+                    )
                 ]
             )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 8)
         safe_status = SafeStatus.objects.last_for_address(safe_address)
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
@@ -345,19 +355,18 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                     approve_hash_decoded_tx,
                 ]
             )
-            safe_status = SafeStatus.objects.last_for_address(safe_address)
-            safe_last_status = SafeLastStatus.objects.get(address=safe_address)
-            self.assertEqual(
-                safe_status, SafeStatus.from_status_instance(safe_last_status)
-            )
-            self.assertEqual(safe_status.nonce, 8)
-            multisig_confirmation = MultisigConfirmation.objects.get(
-                multisig_transaction_hash=hash_to_approve
-            )
-            self.assertEqual(
-                multisig_confirmation.signature_type,
-                SafeSignatureType.APPROVED_HASH.value,
-            )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 9)
+        safe_status = SafeStatus.objects.last_for_address(safe_address)
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
+        self.assertEqual(safe_status.nonce, 8)
+        multisig_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=hash_to_approve
+        )
+        self.assertEqual(
+            multisig_confirmation.signature_type,
+            SafeSignatureType.APPROVED_HASH.value,
+        )
 
     def test_tx_processor_is_failed(self):
         tx_processor = self.tx_processor
