@@ -28,6 +28,7 @@ from ..models import (
     InternalTxDecoded,
     InternalTxType,
     SafeMasterCopy,
+    SafeRelevantTransaction,
 )
 from .events_indexer import EventsIndexer
 
@@ -454,6 +455,15 @@ class SafeEventsIndexer(EventsIndexer):
                     internal_tx.save()
                     if child_internal_tx:
                         child_internal_tx.save()
+                        if child_internal_tx.is_ether_transfer:
+                            # Store Ether Transfers as relevant transactions for a Safe
+                            SafeRelevantTransaction.objects.get_or_create(
+                                ethereum_tx_id=ethereum_tx_hash,
+                                safe=safe_address,
+                                defaults={
+                                    "timestamp": ethereum_block["timestamp"],
+                                },
+                            )
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
                 except IntegrityError as exc:

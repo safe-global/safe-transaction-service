@@ -3,7 +3,7 @@ from django.test import TestCase
 from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexerProvider
-from ..models import ERC20Transfer, EthereumTx, IndexingStatus
+from ..models import ERC20Transfer, EthereumTx, IndexingStatus, SafeRelevantTransaction
 from .factories import EthereumTxFactory, SafeContractFactory
 from .mocks.mocks_erc20_events_indexer import log_receipt_mock
 
@@ -35,9 +35,19 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(
             ERC20Transfer.objects.tokens_used_by_address(safe_contract.address)
         )
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 0)
         self.assertEqual(
             erc20_events_indexer.start(),
             (1, self.ethereum_client.current_block_number + 1),
+        )
+
+        # Store one entry for the sender and other for the receiver
+        self.assertEqual(SafeRelevantTransaction.objects.count(), 2)
+        self.assertEqual(
+            SafeRelevantTransaction.objects.filter(
+                safe=safe_contract.address, ethereum_tx_id=tx_hash
+            ).count(),
+            1,
         )
 
         # Erc20/721 last indexed block number is stored on IndexingStatus

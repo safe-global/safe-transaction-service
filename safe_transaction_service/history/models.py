@@ -145,7 +145,10 @@ class BulkCreateSignalMixin:
         return result
 
     def bulk_create_from_generator(
-        self, objs: Iterator[Any], batch_size: int = 100, ignore_conflicts: bool = False
+        self,
+        objs: Iterator[Any],
+        batch_size: int = 10_000,
+        ignore_conflicts: bool = False,
     ) -> int:
         """
         Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
@@ -258,7 +261,7 @@ class EthereumBlockManager(models.Manager):
                     f"Marking block as not confirmed"
                 )
 
-    @lru_cache(maxsize=10_000)
+    @lru_cache(maxsize=100_000)
     def get_timestamp_by_hash(self, block_hash: HexBytes) -> datetime.datetime:
         try:
             return self.values("timestamp").get(block_hash=block_hash)["timestamp"]
@@ -1812,6 +1815,71 @@ class SafeContractDelegate(models.Model):
             f"Delegator={self.delegator} Delegate={self.delegate} for Safe={self.safe_contract_id} - "
             f"Label={self.label}"
         )
+
+
+class SafeRelevantTransactionManager(BulkCreateSignalMixin, models.Manager):
+    pass
+
+
+class SafeRelevantTransaction(models.Model):
+    """
+    Holds relevant transactions for a Safe. That way there's no need for UNION or JOIN all the transaction tables
+    to get that information (MultisigTransaction, ModuleTransaction, ERC20Transfer...)
+    """
+
+    objects = SafeRelevantTransactionManager()
+    timestamp = models.DateTimeField()
+    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    safe = (
+        EthereumAddressBinaryField()
+    )  # Not using a ForeignKey as Safe might not be created yet in `SafeContract` table
+
+    class Meta:
+        indexes = [
+            Index(
+                fields=["safe", "-timestamp"]
+            ),  # Get transactions for a Safe sorted by timestamp
+        ]
+        unique_together = (("ethereum_tx", "safe"),)
+        verbose_name_plural = "Safe Relevant Transactions"
+
+    def __str__(self):
+        return f"[{self.safe}] {self.timestamp} - {self.ethereum_tx_id}"
+
+    @classmethod
+    def from_erc20_721_event(
+        cls, event_data: EventData
+    ) -> List["SafeRelevantTransaction"]:
+        """
+        Does not create the model, as it requires that `ethereum_tx` exists
+
+        :param event_data:
+        :return: `ERC20Transfer`
+        :raises: ValueError
+        """
+
+        try:
+            timestamp = EthereumBlock.objects.get_timestamp_by_hash(
+                event_data["blockHash"]
+            )
+        except EthereumBlock.DoesNotExist:
+            # Block is not found and should be present on DB. Reorg
+            EthereumTx.objects.get(
+                event_data["transactionHash"]
+            ).block.set_not_confirmed()
+            raise
+        return [
+            SafeRelevantTransaction(
+                ethereum_tx_id=event_data["transactionHash"],
+                timestamp=timestamp,
+                safe=event_data["args"]["from"],
+            ),
+            SafeRelevantTransaction(
+                ethereum_tx_id=event_data["transactionHash"],
+                timestamp=timestamp,
+                safe=event_data["args"]["to"],
+            ),
+        ]
 
 
 class SafeStatusBase(models.Model):
