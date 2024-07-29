@@ -1181,7 +1181,7 @@ class ModulesView(GenericAPIView):
     @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
         """
-        Returns the list of Safe modules enabled for a given Safe account
+        Returns the list of Safes that have the provided module enabled
         """
         if not fast_is_checksum_address(address):
             return Response(
