@@ -184,16 +184,19 @@ class TransactionService:
             safe_address,
             len(ids_not_cached),
         )
-        ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {
-            multisig_tx.safe_tx_hash: [multisig_tx]
-            for multisig_tx in MultisigTransaction.objects.filter(
+        ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {}
+        for multisig_tx in (
+            MultisigTransaction.objects.filter(
                 safe=safe_address, ethereum_tx_id__in=ids_not_cached
             )
             .with_confirmations_required()
             .prefetch_related("confirmations")
             .select_related("ethereum_tx__block")
             .order_by("-nonce", "-created")
-        }
+        ):
+            ids_with_multisig_txs.setdefault(
+                multisig_tx.internal_tx.ethereum_tx_id, []
+            ).append(multisig_tx)
         logger.debug(
             "[%s] Got %d Multisig txs from identifiers",
             safe_address,
