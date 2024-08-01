@@ -251,7 +251,7 @@ class AllTransactionsListView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     )
-    ordering_fields = ["execution_date"]
+    ordering_fields = ["timestamp"]
     allowed_ordering_fields = ordering_fields + [
         f"-{ordering_field}" for ordering_field in ordering_fields
     ]
@@ -325,11 +325,7 @@ class AllTransactionsListView(ListAPIView):
         if not tx_identifiers_page:
             return self.get_paginated_response([])
 
-        # Tx identifiers are retrieved using `safe_tx_hash` attribute name due to how Django
-        # handles `UNION` of all the Transaction models using the first model attribute name
-        all_tx_identifiers = [
-            element["ethereum_tx_id"] for element in tx_identifiers_page
-        ]
+        all_tx_identifiers = [element.ethereum_tx_id for element in tx_identifiers_page]
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe, all_tx_identifiers
         )
@@ -388,7 +384,7 @@ class AllTransactionsListView(ListAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
                 data={
                     "code": 1,
-                    "message": "Ordering field is not valid, only `execution_date` is allowed",
+                    "message": f"Ordering field is not valid, only f{self.allowed_ordering_fields} are allowed",
                     "arguments": [ordering],
                 },
             )

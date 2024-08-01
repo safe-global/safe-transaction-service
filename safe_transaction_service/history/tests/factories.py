@@ -297,10 +297,10 @@ class MultisigTransactionFactory(DjangoModelFactory):
     def safe_relevant_tx(self, create, extracted, **kwargs):
         if not create or not self.ethereum_tx:
             return
-        SafeRelevantTransactionFactory(
+        SafeRelevantTransaction.objects.get_or_create(
             safe=self.safe,
             ethereum_tx_id=self.ethereum_tx_id,
-            timestamp=self.ethereum_tx.block.timestamp,
+            defaults={"timestamp": self.ethereum_tx.block.timestamp},
         )
 
 

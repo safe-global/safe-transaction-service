@@ -187,7 +187,7 @@ class TransactionService:
         ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {
             multisig_tx.safe_tx_hash: [multisig_tx]
             for multisig_tx in MultisigTransaction.objects.filter(
-                safe=safe_address, safe_tx_hash__in=ids_not_cached
+                safe=safe_address, ethereum_tx_id__in=ids_not_cached
             )
             .with_confirmations_required()
             .prefetch_related("confirmations")
@@ -225,8 +225,8 @@ class TransactionService:
             len(ids_with_plain_ethereum_txs),
         )
 
-        # We also need the in/out transfers for the MultisigTxs, we add the MultisigTx Ethereum Tx hashes
-        # to not cached ids
+        # We also need the in/out transfers for the MultisigTxs,
+        # add the MultisigTx Ethereum Tx hashes to not cached ids
         all_ids = ids_not_cached + [
             multisig_tx.ethereum_tx_id
             for multisig_txs in ids_with_multisig_txs.values()
