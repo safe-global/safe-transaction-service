@@ -283,7 +283,7 @@ class InternalTxIndexer(EthereumIndexer):
                 if internal_tx.is_ether_transfer:
                     SafeRelevantTransaction.objects.get_or_create(
                         ethereum_tx_id=internal_tx.ethereum_tx_id,
-                        safe=internal_tx._from,
+                        safe=internal_tx.to,
                         defaults={
                             "timestamp": internal_tx.timestamp,
                         },

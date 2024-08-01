@@ -453,17 +453,17 @@ class SafeEventsIndexer(EventsIndexer):
             with transaction.atomic():
                 try:
                     internal_tx.save()
+                    if internal_tx.is_ether_transfer:
+                        # Store Incoming Ether Transfers as relevant transactions for a Safe
+                        SafeRelevantTransaction.objects.get_or_create(
+                            ethereum_tx_id=ethereum_tx_hash,
+                            safe=safe_address,
+                            defaults={
+                                "timestamp": ethereum_block["timestamp"],
+                            },
+                        )
                     if child_internal_tx:
                         child_internal_tx.save()
-                        if child_internal_tx.is_ether_transfer:
-                            # Store Ether Transfers as relevant transactions for a Safe
-                            SafeRelevantTransaction.objects.get_or_create(
-                                ethereum_tx_id=ethereum_tx_hash,
-                                safe=safe_address,
-                                defaults={
-                                    "timestamp": ethereum_block["timestamp"],
-                                },
-                            )
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
                 except IntegrityError as exc:
