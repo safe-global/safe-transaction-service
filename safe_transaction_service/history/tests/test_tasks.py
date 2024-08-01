@@ -308,13 +308,20 @@ class TestTasks(TestCase):
 
         self.assertEqual(remove_not_trusted_multisig_txs_task.delay().result, 0)
 
-        multisig_tx_expected_to_be_deleted = MultisigTransactionFactory(
-            trusted=False, modified=timezone.now() - datetime.timedelta(days=32)
-        )
-        MultisigTransactionFactory(
+        multisig_tx_expected_to_be_deleted = MultisigTransactionFactory(trusted=False)
+        multisig_tx_not_expected_to_be_deleted = MultisigTransactionFactory(
             trusted=True, modified=timezone.now() - datetime.timedelta(days=32)
         )
+        for multisig_tx in (
+            multisig_tx_expected_to_be_deleted,
+            multisig_tx_not_expected_to_be_deleted,
+        ):
+            # Modified is updated by the factory when saved on PostGeneration
+            MultisigTransaction.objects.filter(
+                safe_tx_hash=multisig_tx.safe_tx_hash
+            ).update(modified=timezone.now() - datetime.timedelta(days=32))
 
+        self.assertEqual(MultisigTransaction.objects.count(), 4)
         self.assertEqual(remove_not_trusted_multisig_txs_task.delay().result, 1)
 
         self.assertFalse(
