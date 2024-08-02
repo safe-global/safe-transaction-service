@@ -124,18 +124,14 @@ class TestTransactionService(TestCase):
         internal_tx_in = InternalTxFactory(to=safe_address, value=4)
         internal_tx_out = InternalTxFactory(_from=safe_address, value=5)
         erc20_transfer_in = ERC20TransferFactory(to=safe_address)
-        erc20_transfer_out = ERC20TransferFactory(
-            _from=safe_address
-        )  # Should not appear
+        erc20_transfer_out = ERC20TransferFactory(_from=safe_address)
         another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         another_safe_multisig_transaction = (
             MultisigTransactionFactory()
         )  # Should not appear, it's for another Safe
 
-        queryset = transaction_service.get_all_tx_identifiers(
-            safe_address, queued=False, trusted=False
-        )
-        all_tx_hashes = [q["safe_tx_hash"] for q in queryset]
+        queryset = transaction_service.get_all_tx_identifiers(safe_address)
+        all_tx_hashes = [q.ethereum_tx_id for q in queryset]
 
         self.assertEqual(len(self.transaction_service.redis.keys("tx-service:*")), 0)
         all_txs = transaction_service.get_all_txs_from_identifiers(
@@ -179,10 +175,8 @@ class TestTransactionService(TestCase):
             ethereum_tx=module_transaction.internal_tx.ethereum_tx,
         )
 
-        queryset_2 = transaction_service.get_all_tx_identifiers(
-            safe_address, queued=False, trusted=False
-        )
-        all_tx_hashes_2 = [q["safe_tx_hash"] for q in queryset_2]
+        queryset_2 = transaction_service.get_all_tx_identifiers(safe_address)
+        all_tx_hashes_2 = [q.ethereum_tx_id for q in queryset_2]
 
         all_txs_2 = transaction_service.get_all_txs_from_identifiers(
             safe_address, all_tx_hashes_2

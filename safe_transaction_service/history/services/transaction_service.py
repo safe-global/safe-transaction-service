@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import HexStr
 from redis import Redis
 
 from gnosis.eth import EthereumClient, get_auto_ethereum_client
@@ -103,25 +103,6 @@ class TransactionService:
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
 
-    def get_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> str:
-        """
-        Retrieves a redis hash for the provided Safe address that group several fields together, so when something changes for that address everything in cache gets invalidated at once.
-        https://redis.io/docs/latest/develop/data-types/hashes/
-
-        :param safe_address:
-        :return: cache hash key
-        """
-        return f"all-txs:{safe_address}"
-
-    def del_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> None:
-        """
-        Deletes the hash for a specific Safe address, invalidating all-transactions cache related with Safe at once.
-
-        :param safe_address:
-        :return:
-        """
-        self.redis.unlink(self.get_all_txs_cache_hash_key(safe_address))
-
     # End of cache methods ----------------------------
 
     def get_all_tx_identifiers(
@@ -185,6 +166,7 @@ class TransactionService:
             len(ids_not_cached),
         )
         ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {}
+        number_multisig_txs = 0
         for multisig_tx in (
             MultisigTransaction.objects.filter(
                 safe=safe_address, ethereum_tx_id__in=ids_not_cached
@@ -194,26 +176,29 @@ class TransactionService:
             .select_related("ethereum_tx__block")
             .order_by("-nonce", "-created")
         ):
-            ids_with_multisig_txs.setdefault(
-                multisig_tx.internal_tx.ethereum_tx_id, []
-            ).append(multisig_tx)
+            ids_with_multisig_txs.setdefault(multisig_tx.ethereum_tx_id, []).append(
+                multisig_tx
+            )
+            number_multisig_txs += 1
         logger.debug(
             "[%s] Got %d Multisig txs from identifiers",
             safe_address,
-            len(ids_with_multisig_txs),
+            number_multisig_txs,
         )
 
         ids_with_module_txs: Dict[HexStr, List[ModuleTransaction]] = {}
+        number_module_txs = 0
         for module_tx in ModuleTransaction.objects.filter(
             safe=safe_address, internal_tx__ethereum_tx__in=ids_not_cached
         ).select_related("internal_tx"):
             ids_with_module_txs.setdefault(
                 module_tx.internal_tx.ethereum_tx_id, []
             ).append(module_tx)
+            number_module_txs += 1
         logger.debug(
             "[%s] Got %d Module txs from identifiers",
             safe_address,
-            len(ids_with_module_txs),
+            number_module_txs,
         )
 
         ids_with_plain_ethereum_txs: Dict[HexStr, List[EthereumTx]] = {

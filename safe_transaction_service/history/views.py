@@ -357,16 +357,18 @@ class AllTransactionsListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         """
-        Returns all the transactions for a given Safe address. The list has different structures depending on the
-        transaction type:
-        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`. If the query parameter `queued=False` is
-        set only the transactions with `safe nonce < current Safe nonce` will be displayed. By default, only the
-        `trusted` transactions will be displayed (transactions indexed, with at least one confirmation or proposed
-        by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
+        Returns all the *executed* transactions for a given Safe address.
+        The list has different structures depending on the transaction type:
+        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`.
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
-          Only 1000 newest transfers will be returned.
-        Ordering_fields: ["execution_date"] eg: `execution_date` or `-execution_date`
+        Ordering_fields: ["timestamp"] eg: `-timestamp` (default one) or `timestamp`
+
+        Note: This endpoint has a bug that will be fixed in next versions of the endpoint. Pagination is done
+        using the `Transaction Hash`, and due to that the number of relevant transactions with the same
+        `Transaction Hash` cannot be known beforehand. So if there are only 2 transactions
+        with the same `Transaction Hash`, `count` of the endpoint will be 1
+        but there will be 2 transactions in the list.
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
