@@ -258,6 +258,7 @@ class EventsIndexer(EthereumIndexer):
         if not log_receipts:
             return []
 
+        logger.debug("Excluding events processed recently")
         # Ignore already processed events
         not_processed_log_receipts = [
             log_receipt
@@ -268,9 +269,11 @@ class EventsIndexer(EthereumIndexer):
                 log_receipt["logIndex"],
             )
         ]
+        logger.debug("Decoding `log_receipts` of the events")
         decoded_elements: List[EventData] = self.decode_elements(
             not_processed_log_receipts
         )
+        logger.debug("Decoded `log_receipts` of the events")
         tx_hashes = OrderedDict.fromkeys(
             [event["transactionHash"] for event in not_processed_log_receipts]
         ).keys()
