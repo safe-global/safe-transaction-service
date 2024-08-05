@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import pickle
 from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
@@ -35,7 +34,6 @@ from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
-from ..utils.redis import get_redis
 from . import filters, pagination, serializers
 from .helpers import add_tokens_to_transfers, is_valid_unique_transfer_id
 from .models import (
@@ -253,7 +251,7 @@ class AllTransactionsListView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     )
-    ordering_fields = ["execution_date"]
+    ordering_fields = ["timestamp"]
     allowed_ordering_fields = ordering_fields + [
         f"-{ordering_field}" for ordering_field in ordering_fields
     ]
@@ -262,53 +260,11 @@ class AllTransactionsListView(ListAPIView):
         serializers.AllTransactionsSchemaSerializer
     )  # Just for docs, not used
 
-    _schema_executed_param = openapi.Parameter(
-        "executed",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_BOOLEAN,
-        default=False,
-        description="If `True` only executed transactions are returned",
-    )
-    _schema_queued_param = openapi.Parameter(
-        "queued",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_BOOLEAN,
-        default=True,
-        description="If `True` transactions with `nonce >= Safe current nonce` "
-        "are also returned",
-    )
-    _schema_trusted_param = openapi.Parameter(
-        "trusted",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_BOOLEAN,
-        default=True,
-        description="If `True` just trusted transactions are shown (indexed, "
-        "added by a delegate or with at least one confirmation)",
-    )
     _schema_200_response = openapi.Response(
         "A list with every element with the structure of one of these transaction"
         "types",
         serializers.AllTransactionsSchemaSerializer,
     )
-
-    def get_parameters(self) -> Tuple[bool, bool, bool]:
-        """
-        Parse query parameters:
-        - queued: Default, True. If `queued=True` transactions with `nonce >= Safe current nonce` are also shown
-        - trusted: Default, True. If `trusted=True` just trusted transactions are shown (indexed, added by a delegate
-        or with at least one confirmation)
-        :return: Tuple with queued, trusted
-        """
-        executed = parse_boolean_query_param(
-            self.request.query_params.get("executed", False)
-        )
-        queued = parse_boolean_query_param(
-            self.request.query_params.get("queued", True)
-        )
-        trusted = parse_boolean_query_param(
-            self.request.query_params.get("trusted", True)
-        )
-        return executed, queued, trusted
 
     def get_ordering_parameter(self) -> Optional[str]:
         return self.request.query_params.get(OrderingFilter.ordering_param)
@@ -316,9 +272,6 @@ class AllTransactionsListView(ListAPIView):
     def get_page_tx_identifiers(
         self,
         safe: ChecksumAddress,
-        executed: bool,
-        queued: bool,
-        trusted: bool,
         ordering: Optional[str],
         limit: int,
         offset: int,
@@ -328,9 +281,6 @@ class AllTransactionsListView(ListAPIView):
         identifiers (``safeTxHash`` or ``txHash``) filtered
 
         :param safe:
-        :param executed:
-        :param queued:
-        :param trusted:
         :param ordering:
         :param limit:
         :param offset:
@@ -339,29 +289,21 @@ class AllTransactionsListView(ListAPIView):
         transaction_service = TransactionServiceProvider()
 
         logger.debug(
-            "%s: Getting all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s ordering=%s limit=%d offset=%d",
+            "%s: Getting all tx identifiers for Safe=%s ordering=%s limit=%d offset=%d",
             self.__class__.__name__,
             safe,
-            executed,
-            queued,
-            trusted,
             ordering,
             limit,
             offset,
         )
         queryset = self.filter_queryset(
-            transaction_service.get_all_tx_identifiers(
-                safe, executed=executed, queued=queued, trusted=trusted
-            )
+            transaction_service.get_all_tx_identifiers(safe)
         )
         page = self.paginate_queryset(queryset)
         logger.debug(
-            "%s: Got all tx identifiers for Safe=%s executed=%s queued=%s trusted=%s ordering=%s limit=%d offset=%d",
+            "%s: Got all tx identifiers for Safe=%s ordering=%s limit=%d offset=%d",
             self.__class__.__name__,
             safe,
-            executed,
-            queued,
-            trusted,
             ordering,
             limit,
             offset,
@@ -369,128 +311,40 @@ class AllTransactionsListView(ListAPIView):
 
         return page
 
-    def get_cached_page_tx_identifiers(
-        self,
-        safe: ChecksumAddress,
-        executed: bool,
-        queued: bool,
-        trusted: bool,
-        ordering: Optional[str],
-        limit: int,
-        offset: int,
-    ) -> Optional[Response]:
-        """
-        Cache for tx identifiers. A quick ``SQL COUNT`` in all the transactions/events
-        tables will determinate if cache for the provided values is still valid or not
-
-        :param safe:
-        :param executed:
-        :param queued:
-        :param trusted:
-        :param ordering:
-        :param limit:
-        :param offset:
-        :return:
-        """
-        transaction_service = TransactionServiceProvider()
-        cache_timeout = settings.CACHE_ALL_TXS_VIEW
-        redis = get_redis()
-
-        # Get all relevant elements for a Safe to be cached
-        cache_hash_key = transaction_service.get_all_txs_cache_hash_key(safe)
-        cache_query_field = (
-            f"{int(executed)}{int(queued)}{int(trusted)}:{limit}:{offset}:{ordering}"
-        )
-        lock_key = f"locks:{cache_hash_key}:{cache_query_field}"
-
-        logger.debug(
-            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s lock-key=%s",
-            self.__class__.__name__,
-            safe,
-            executed,
-            queued,
-            trusted,
-            lock_key,
-        )
-        if not cache_timeout:
-            # Cache disabled
-            return self.get_page_tx_identifiers(
-                safe, executed, queued, trusted, ordering, limit, offset
-            )
-
-        with redis.lock(
-            lock_key,
-            timeout=settings.GUNICORN_REQUEST_TIMEOUT,  # This prevents a service restart to leave a lock forever
-        ):
-            if result := redis.hget(cache_hash_key, cache_query_field):
-                # Count needs to be retrieved to set it up the paginator
-                page, count = pickle.loads(result)
-                # Setting the paginator like this is not very elegant and needs to be tested really well
-                self.paginator.count = count
-                self.paginator.limit = limit
-                self.paginator.offset = offset
-                self.paginator.request = self.request
-                return page
-
-            page = self.get_page_tx_identifiers(
-                safe, executed, queued, trusted, ordering, limit, offset
-            )
-            redis.hset(
-                cache_hash_key,
-                cache_query_field,
-                pickle.dumps((page, self.paginator.count)),
-            )
-            redis.expire(cache_hash_key, cache_timeout)
-            return page
-
     def list(self, request, *args, **kwargs):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
-        executed, queued, trusted = self.get_parameters()
         ordering = self.get_ordering_parameter()
         # Trick to get limit and offset
         list_pagination = DummyPagination(self.request)
         limit, offset = list_pagination.limit, list_pagination.offset
 
-        tx_identifiers_page = self.get_cached_page_tx_identifiers(
-            safe, executed, queued, trusted, ordering, limit, offset
+        tx_identifiers_page = self.get_page_tx_identifiers(
+            safe, ordering, limit, offset
         )
         if not tx_identifiers_page:
             return self.get_paginated_response([])
 
-        # Tx identifiers are retrieved using `safe_tx_hash` attribute name due to how Django
-        # handles `UNION` of all the Transaction models using the first model attribute name
-        all_tx_identifiers = [
-            element["safe_tx_hash"] for element in tx_identifiers_page
-        ]
+        all_tx_identifiers = [element.ethereum_tx_id for element in tx_identifiers_page]
         all_txs = transaction_service.get_all_txs_from_identifiers(
             safe, all_tx_identifiers
         )
         logger.debug(
-            "%s: Got all txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s",
+            "%s: Got all txs from identifiers for Safe=%s",
             self.__class__.__name__,
             safe,
-            executed,
-            queued,
-            trusted,
         )
         all_txs_serialized = transaction_service.serialize_all_txs(all_txs)
         logger.debug(
-            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s were serialized",
+            "%s: All txs from identifiers for Safe=%s were serialized",
             self.__class__.__name__,
             safe,
-            executed,
-            queued,
-            trusted,
         )
         paginated_response = self.get_paginated_response(all_txs_serialized)
         logger.debug(
-            "%s: All txs from identifiers for Safe=%s executed=%s queued=%s trusted=%s: %s",
+            "%s: All txs from identifiers for Safe=%s: %s",
             self.__class__.__name__,
             safe,
-            executed,
-            queued,
-            trusted,
             paginated_response.data["results"],
         )
         return paginated_response
@@ -500,24 +354,21 @@ class AllTransactionsListView(ListAPIView):
             200: _schema_200_response,
             422: "code = 1: Checksum address validation failed",
         },
-        manual_parameters=[
-            _schema_executed_param,
-            _schema_queued_param,
-            _schema_trusted_param,
-        ],
     )
     def get(self, request, *args, **kwargs):
         """
-        Returns all the transactions for a given Safe address. The list has different structures depending on the
-        transaction type:
-        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`. If the query parameter `queued=False` is
-        set only the transactions with `safe nonce < current Safe nonce` will be displayed. By default, only the
-        `trusted` transactions will be displayed (transactions indexed, with at least one confirmation or proposed
-        by a delegate). If you need that behaviour to be disabled set the query parameter `trusted=False`
+        Returns all the *executed* transactions for a given Safe address.
+        The list has different structures depending on the transaction type:
+        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`.
         - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
         - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
-          Only 1000 newest transfers will be returned.
-        Ordering_fields: ["execution_date"] eg: `execution_date` or `-execution_date`
+        Ordering_fields: ["timestamp"] eg: `-timestamp` (default one) or `timestamp`
+
+        Note: This endpoint has a bug that will be fixed in next versions of the endpoint. Pagination is done
+        using the `Transaction Hash`, and due to that the number of relevant transactions with the same
+        `Transaction Hash` cannot be known beforehand. So if there are only 2 transactions
+        with the same `Transaction Hash`, `count` of the endpoint will be 1
+        but there will be 2 transactions in the list.
         """
         address = kwargs["address"]
         if not fast_is_checksum_address(address):
@@ -535,7 +386,7 @@ class AllTransactionsListView(ListAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
                 data={
                     "code": 1,
-                    "message": "Ordering field is not valid, only `execution_date` is allowed",
+                    "message": f"Ordering field is not valid, only f{self.allowed_ordering_fields} are allowed",
                     "arguments": [ordering],
                 },
             )

@@ -24,7 +24,6 @@ from .models import (
     SafeStatus,
     TokenTransfer,
 )
-from .services import TransactionServiceProvider
 from .services.notification_service import build_event_payload, is_relevant_notification
 
 logger = getLogger(__name__)
@@ -146,24 +145,6 @@ def get_safe_addresses_involved_from_db_instance(
     return addresses
 
 
-def _clean_all_txs_cache(
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-    ]
-) -> None:
-    """
-    Remove the all-transactions cache related with instance modified
-
-    :param instance:
-    """
-    transaction_service = TransactionServiceProvider()
-    for address in get_safe_addresses_involved_from_db_instance(instance):
-        transaction_service.del_all_txs_cache_hash_key(address)
-
-
 def _process_notification_event(
     sender: Type[Model],
     instance: Union[
@@ -179,10 +160,6 @@ def _process_notification_event(
     assert not (
         created and deleted
     ), "An instance cannot be created and deleted at the same time"
-
-    # Ignore SafeContract because it is not affecting all-transaction cache.
-    if sender != SafeContract:
-        _clean_all_txs_cache(instance)
 
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_event_payload(sender, instance, deleted=deleted)

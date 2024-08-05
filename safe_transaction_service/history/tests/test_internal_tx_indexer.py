@@ -181,6 +181,9 @@ class TestInternalTxIndexer(TestCase):
                 )
             ),
         )
+        self.assertEqual(
+            SafeRelevantTransaction.objects.count(), 2
+        )  # 2 Ether Transfers
 
     def test_internal_tx_indexer(self):
         self._test_internal_tx_indexer()
