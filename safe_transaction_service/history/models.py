@@ -514,6 +514,8 @@ class TokenTransfer(models.Model):
             Index(fields=["address"]),
             Index(fields=["_from", "timestamp"]),
             Index(fields=["to", "timestamp"]),
+            Index(fields=["_from", "address"]),  # Get token addresses used by a sender
+            Index(fields=["to", "address"]),  # Get token addresses used by a receiver
         ]
         constraints = [
             models.UniqueConstraint(
