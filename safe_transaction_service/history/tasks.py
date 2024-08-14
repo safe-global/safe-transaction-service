@@ -249,6 +249,7 @@ def index_safe_events_task(self) -> Optional[Tuple[int, int]]:
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
+            logger.info("Start process decoded internal txs")
             count = 0
             banned_safes = set(SafeContract.objects.get_banned_safes())
             for (
