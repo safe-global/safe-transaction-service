@@ -21,6 +21,7 @@ from gnosis.eth.contracts import (
     get_safe_V1_4_1_contract,
 )
 
+from ...utils.utils import FixedSizeDict
 from ..models import (
     EthereumBlock,
     EthereumTxCallType,
@@ -61,6 +62,11 @@ class SafeEventsIndexer(EventsIndexer):
     IGNORE_ADDRESSES_ON_LOG_FILTER = (
         True  # Search for logs in every address (like the ProxyFactory)
     )
+    SAFE_SETUP_FUNCTION_NAME = "setup"
+
+    def __init__(self, *args, **kwargs):
+        self.safe_setup_cache = FixedSizeDict(maxlen=10_000)  # Around 1MiB
+        super().__init__(*args, **kwargs)
 
     @cached_property
     def contract_events(self) -> List[ContractEvent]:
@@ -277,11 +283,14 @@ class SafeEventsIndexer(EventsIndexer):
         :param safe_address:
         :return: ``True`` if ``SafeSetup`` event was processed, ``False`` otherwise
         """
-        return InternalTxDecoded.objects.filter(
-            function_name="setup",
-            internal_tx___from=safe_address,
-            internal_tx__contract_address=None,
-        ).exists()
+        return (
+            safe_address in self.safe_setup_cache
+            or InternalTxDecoded.objects.filter(
+                function_name="setup",
+                internal_tx___from=safe_address,
+                internal_tx__contract_address=None,
+            ).exists()
+        )
 
     @transaction.atomic
     def decode_elements(self, *args) -> List[EventData]:
@@ -349,7 +358,8 @@ class SafeEventsIndexer(EventsIndexer):
                 # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
                 # the master copy used. Without tracing it cannot be detected otherwise
                 InternalTx.objects.filter(
-                    contract_address=safe_address, decoded_tx__function_name="setup"
+                    contract_address=safe_address,
+                    decoded_tx__function_name=self.SAFE_SETUP_FUNCTION_NAME,
                 ).update(to=to, contract_address=None, trace_address=new_trace_address)
                 # Add creation internal tx. _from is the address of the proxy instead of the safe_address
                 internal_tx.contract_address = safe_address
@@ -365,7 +375,7 @@ class SafeEventsIndexer(EventsIndexer):
                 # creates a Safe and configure it in the next transaction. Remove it if that's the case
                 InternalTx.objects.filter(contract_address=safe_address).delete()
                 internal_tx.contract_address = safe_address
-                internal_tx_decoded.function_name = "setup"
+                internal_tx_decoded.function_name = self.SAFE_SETUP_FUNCTION_NAME
                 args["payment"] = 0
                 args["paymentReceiver"] = NULL_ADDRESS
                 args["_threshold"] = args.pop("threshold")
@@ -467,6 +477,11 @@ class SafeEventsIndexer(EventsIndexer):
                         child_internal_tx.save()
                     if internal_tx_decoded:
                         internal_tx_decoded.save()
+                        if (
+                            internal_tx_decoded.function_name
+                            == self.SAFE_SETUP_FUNCTION_NAME
+                        ):
+                            self.safe_setup_cache[safe_address] = True
                 except IntegrityError as exc:
                     logger.info(
                         "Ignoring already processed event %s for Safe %s on tx-hash=%s: %s",
