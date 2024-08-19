@@ -1,5 +1,6 @@
 import json
 import logging
+import pickle
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
@@ -402,6 +403,99 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["results"][1]["transaction_hash"],
             multisig_transaction.ethereum_tx_id,
         )
+
+    def test_all_transactions_cache_view(self):
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        # Older transaction
+        factory_transactions = [
+            MultisigTransactionFactory(safe=safe_address),
+            MultisigTransactionFactory(safe=safe_address),
+        ]
+        # all-txs:{safe_address}
+        cache_hash_key = f"all-txs:{safe_address}"
+        # {limit}:{offset}:{ordering}
+        cache_query_field = "10:0:timestamp"
+        redis = get_redis()
+        redis.unlink(cache_hash_key)
+        cache_result = redis.hget(cache_hash_key, cache_query_field)
+        # Should be empty at the beginning
+        self.assertIsNone(cache_result)
+
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?ordering=timestamp"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+        cache_result = redis.hget(cache_hash_key, cache_query_field)
+        # Should be stored in redis cache
+        self.assertIsNotNone(cache_result)
+        # Cache should content the expected values
+        cache_values, cache_count = pickle.loads(cache_result)
+        self.assertEqual(cache_count, 2)
+        for cache_value, factory_transaction in zip(cache_values, factory_transactions):
+            self.assertEqual(
+                cache_value.ethereum_tx.tx_hash, factory_transaction.ethereum_tx.tx_hash
+            )
+            self.assertEqual(
+                cache_value.ethereum_tx.created, factory_transaction.ethereum_tx.created
+            )
+            self.assertEqual(
+                cache_value.ethereum_tx.execution_date,
+                factory_transaction.ethereum_tx.execution_date,
+            )
+            self.assertEqual(
+                cache_value.ethereum_tx.block.number,
+                factory_transaction.ethereum_tx.block_id,
+            )
+            self.assertEqual(
+                cache_value.ethereum_tx.nonce, factory_transaction.ethereum_tx.nonce
+            )
+        # Modify cache to empty list
+        redis.hset(cache_hash_key, cache_query_field, pickle.dumps(([], 0)))
+        redis.expire(cache_hash_key, 60 * 10)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?ordering=timestamp"
+        )
+        # Response should be returned from cache
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        # Cache should be invalidated because there is new transaction
+        MultisigTransactionFactory(safe=safe_address)
+        response = self.client.get(
+            reverse("v1:history:all-transactions", args=(safe_address,))
+            + "?ordering=timestamp"
+        )
+        self.assertEqual(response.data["count"], 3)
+
+    def test_all_transactions_cache_limit_offset_view(self):
+        """
+        Test limit and offset
+        """
+        safe_address = "0x54f3c8e4Bf7bFDFF39B36d1FAE4e5ceBdD93C6A9"
+        number_transactions = 100
+        for _ in range(number_transactions):
+            MultisigTransactionFactory(safe=safe_address)
+
+        for limit, offset in ((57, 12), (13, 24)):
+            with self.subTest(limit=limit, offset=offset):
+                # all-txs:{safe_address}
+                cache_hash_key = f"all-txs:{safe_address}"
+                # {limit}:{offset}:{ordering}
+                cache_query_field = f"{limit}:{offset}:timestamp"
+                redis = get_redis()
+                self.assertFalse(redis.hexists(cache_hash_key, cache_query_field))
+
+                response = self.client.get(
+                    reverse("v1:history:all-transactions", args=(safe_address,))
+                    + f"?ordering=timestamp&limit={limit}&offset={offset}"
+                )
+                self.assertEqual(response.data["count"], number_transactions)
+                self.assertEqual(len(response.data["results"]), limit)
+                self.assertTrue(redis.hexists(cache_hash_key, cache_query_field))
 
     def test_all_transactions_wrong_transfer_type_view(self):
         # No token in database, so we must trust the event
