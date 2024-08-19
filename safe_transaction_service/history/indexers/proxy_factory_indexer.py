@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
@@ -84,6 +84,13 @@ class ProxyFactoryIndexer(EventsIndexer):
                 address=contract_address,
                 ethereum_tx_id=decoded_element["transactionHash"],
             )
+
+    def _process_decoded_elements(self, decoded_elements: List[EventData]) -> List[Any]:
+        processed_elements = []
+        for decoded_element in decoded_elements:
+            if processed_element := self._process_decoded_element(decoded_element):
+                processed_elements.append(processed_element)
+        return processed_elements
 
     def process_elements(
         self, log_receipts: Sequence[LogReceipt]

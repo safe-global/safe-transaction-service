@@ -1,7 +1,7 @@
 import datetime
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterator, List, NamedTuple, Optional, Sequence
+from typing import Any, Iterator, List, NamedTuple, Optional, Sequence
 
 from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
@@ -137,6 +137,9 @@ class Erc20EventsIndexer(EventsIndexer):
         :param decoded_element:
         :return:
         """
+        pass
+
+    def _process_decoded_elements(self, decoded_element: List[EventData]) -> List[Any]:
         pass
 
     def events_to_erc20_transfer(
