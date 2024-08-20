@@ -287,6 +287,56 @@ class SafeEventsIndexer(EventsIndexer):
     def decode_elements(self, *args) -> List[EventData]:
         return super().decode_elements(*args)
 
+    def _get_internal_tx_from_decoded_event(self, decoded_event, **kwargs):
+        ethereum_tx_hash = HexBytes(decoded_event["transactionHash"])
+        ethereum_block_number = decoded_event["blockNumber"]
+        ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
+            decoded_event["blockHash"]
+        )
+        address = decoded_event["address"]
+        default_trace_address = str(decoded_event["logIndex"])
+
+        # Setting default values
+        internal_tx = InternalTx(
+            ethereum_tx_id=ethereum_tx_hash,
+            timestamp=ethereum_block_timestamp,
+            block_number=ethereum_block_number,
+            _from=address,
+            gas=50000,
+            data=b"",
+            to=decoded_event["args"].get("to", NULL_ADDRESS),
+            value=decoded_event["args"].get("value", 0),
+            gas_used=50000,
+            contract_address=None,
+            code=None,
+            output=None,
+            refund_address=None,
+            tx_type=InternalTxType.CALL.value,
+            call_type=EthereumTxCallType.CALL.value,
+            trace_address=default_trace_address,
+            error=None,
+        )
+        # Overriding passed keys
+        for key, value in kwargs.items():
+            if hasattr(internal_tx, key):
+                setattr(internal_tx, key, value)
+            else:
+                raise AttributeError(f"Invalid atribute {key} for InternalTx")
+
+        return internal_tx
+
+    def _get_internal_decoded_tx_for_setup_event(self, event, internal_tx):
+        setup_args = dict(event["args"])
+        setup_args["payment"] = 0
+        setup_args["paymentReceiver"] = NULL_ADDRESS
+        setup_args["_threshold"] = setup_args.pop("threshold")
+        setup_args["_owners"] = setup_args.pop("owners")
+        return InternalTxDecoded(
+            internal_tx=internal_tx,
+            function_name="setup",
+            arguments=setup_args,
+        )
+
     @transaction.atomic
     def _process_decoded_element(
         self, decoded_element: EventData
@@ -311,24 +361,8 @@ class SafeEventsIndexer(EventsIndexer):
             decoded_element,
         )
 
-        internal_tx = InternalTx(
-            ethereum_tx_id=ethereum_tx_hash,
-            timestamp=ethereum_block_timestamp,
-            block_number=ethereum_block_number,
-            _from=safe_address,
-            gas=50000,
-            data=b"",
-            to=NULL_ADDRESS,  # It should be Master copy address but we cannot detect it
-            value=0,
-            gas_used=50000,
-            contract_address=None,
-            code=None,
-            output=None,
-            refund_address=None,
-            tx_type=InternalTxType.CALL.value,
-            call_type=EthereumTxCallType.DELEGATE_CALL.value,
-            trace_address=trace_address,
-            error=None,
+        internal_tx = self._get_internal_tx_from_decoded_event(
+            decoded_element, call_type=EthereumTxCallType.DELEGATE_CALL.value
         )
         child_internal_tx: Optional[InternalTx] = None  # For Ether transfers
         internal_tx_decoded = InternalTxDecoded(
@@ -336,10 +370,11 @@ class SafeEventsIndexer(EventsIndexer):
             function_name="",
             arguments=args,
         )
-        if event_name == "ProxyCreation":
+
+        if event_name == "ProxyCreation" or event_name == "SafeSetup":
+            # Will ignore this events because were indexed in process_safe_creation_events
             internal_tx = None
-        elif event_name == "SafeSetup":
-            internal_tx = None
+
         elif event_name == "SafeMultiSigTransaction":
             internal_tx_decoded.function_name = "execTransaction"
             data = HexBytes(args["data"])
@@ -362,25 +397,13 @@ class SafeEventsIndexer(EventsIndexer):
                     additional_info.hex(),
                 )
             if args["value"] and not data:  # Simulate ether transfer
-                child_internal_tx = InternalTx(
-                    ethereum_tx_id=ethereum_tx_hash,
-                    timestamp=ethereum_block_timestamp,
-                    block_number=ethereum_block_number,
-                    _from=safe_address,
+                child_internal_tx = self._get_internal_tx_from_decoded_event(
+                    decoded_element,
                     gas=23000,
-                    data=b"",
-                    to=args["to"],
-                    value=args["value"],
                     gas_used=23000,
-                    contract_address=None,
-                    code=None,
-                    output=None,
-                    refund_address=None,
-                    tx_type=InternalTxType.CALL.value,
-                    call_type=EthereumTxCallType.CALL.value,
                     trace_address=f"{trace_address},0",
-                    error=None,
                 )
+
         elif event_name == "SafeModuleTransaction":
             internal_tx_decoded.function_name = "execTransactionFromModule"
             args["data"] = HexBytes(args["data"]).hex()
@@ -456,7 +479,7 @@ class SafeEventsIndexer(EventsIndexer):
 
         return internal_tx
 
-    def get_safe_setup_events(self, decoded_elements):
+    def _get_safe_creation_events(self, decoded_elements):
         safe_setup_events: Dict[ChecksumAddress, List[Dict]] = {}
         for decoded_element in decoded_elements:
             event_name = decoded_element["event"]
@@ -469,34 +492,8 @@ class SafeEventsIndexer(EventsIndexer):
 
         return safe_setup_events
 
-    def get_internal_tx_from_event(
-        self, event, safe_address, to_address, trace_address, tx_type, call_type
-    ):
-        event_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
-            event["blockHash"]
-        )
-        internal_tx = InternalTx(
-            ethereum_tx_id=HexBytes(event["transactionHash"]),
-            timestamp=event_block_timestamp,
-            block_number=event["blockNumber"],
-            _from=event["address"],
-            gas=50000,
-            data=b"",
-            to=to_address,
-            value=0,
-            gas_used=50000,
-            contract_address=safe_address,
-            code=None,
-            output=None,
-            refund_address=None,
-            tx_type=tx_type,
-            call_type=call_type,
-            trace_address=trace_address,
-            error=None,
-        )
-        return internal_tx
-
-    def process_safe_creation_events(self, safe_setup_events):
+    @transaction.atomic
+    def _process_safe_creation_events(self, safe_setup_events):
         internal_txs = []
         internal_decoded_txs = []
         for safe_address, events in safe_setup_events.items():
@@ -511,36 +508,32 @@ class SafeEventsIndexer(EventsIndexer):
                     else:
                         setup_event = events[1]
                         proxy_creation_event = events[0]
+
                     # Generate InternalTx and internalDecodedTx for SafeSetup event
                     setup_trace_address = f"{str(proxy_creation_event['logIndex'])},0"
                     singleton = proxy_creation_event["args"].get("singleton")
-                    setup_args = dict(setup_event["args"])
-                    setup_internal_tx = self.get_internal_tx_from_event(
+                    setup_internal_tx = self._get_internal_tx_from_decoded_event(
                         setup_event,
-                        None,
-                        singleton,
-                        setup_trace_address,
-                        InternalTxType.CALL.value,
-                        EthereumTxCallType.DELEGATE_CALL.value,
+                        to=singleton,
+                        trace_address=setup_trace_address,
+                        call_type=EthereumTxCallType.DELEGATE_CALL.value,
                     )
-                    setup_args["payment"] = 0
-                    setup_args["paymentReceiver"] = NULL_ADDRESS
-                    setup_args["_threshold"] = setup_args.get("threshold")
-                    setup_args["_owners"] = setup_args.get("owners")
-                    setup_internal_tx_decoded = InternalTxDecoded(
-                        internal_tx=setup_internal_tx,
-                        function_name="setup",
-                        arguments=setup_args,
+
+                    # Generate InternalDecodedTx for SafeSetup event
+                    setup_internal_tx_decoded = (
+                        self._get_internal_decoded_tx_for_setup_event(
+                            setup_event, setup_internal_tx
+                        )
                     )
+
                     # Generate InternalTx for ProxyCreation
-                    proxy_trace_address = str(proxy_creation_event["logIndex"])
-                    proxy_creation_internal_tx = self.get_internal_tx_from_event(
-                        proxy_creation_event,
-                        safe_address,
-                        NULL_ADDRESS,
-                        proxy_trace_address,
-                        InternalTxType.CREATE.value,
-                        None,
+                    proxy_creation_internal_tx = (
+                        self._get_internal_tx_from_decoded_event(
+                            proxy_creation_event,
+                            contract_address=proxy_creation_event["args"].get("proxy"),
+                            tx_type=InternalTxType.CREATE.value,
+                            call_type=None,
+                        )
                     )
                     internal_txs.append(setup_internal_tx)
                     internal_txs.append(proxy_creation_internal_tx)
@@ -556,24 +549,16 @@ class SafeEventsIndexer(EventsIndexer):
                         InternalTx.objects.filter(
                             contract_address=safe_address
                         ).delete()
-                        setup_internal_tx = self.get_internal_tx_from_event(
+                        setup_internal_tx = self._get_internal_tx_from_decoded_event(
                             setup_event,
-                            safe_address,
-                            NULL_ADDRESS,
-                            trace_address,
-                            InternalTxType.CALL.value,
-                            EthereumTxCallType.DELEGATE_CALL.value,
+                            call_type=EthereumTxCallType.DELEGATE_CALL.value,
                         )
-                        setup_internal_tx_decoded = InternalTxDecoded(
-                            internal_tx=setup_internal_tx,
-                            function_name="setup",
-                            arguments=setup_args,
+                        # Generate InternalDecodedTx for SafeSetup event
+                        setup_internal_tx_decoded = (
+                            self._get_internal_decoded_tx_for_setup_event(
+                                setup_event, setup_internal_tx
+                            )
                         )
-                        setup_args = dict(setup_event["args"])
-                        setup_args["payment"] = 0
-                        setup_args["paymentReceiver"] = NULL_ADDRESS
-                        setup_args["_threshold"] = setup_args.pop("threshold")
-                        setup_args["_owners"] = setup_args.pop("owners")
                         internal_txs.append(setup_internal_tx)
                         internal_decoded_txs.append(setup_internal_tx_decoded)
                     else:  # event is ProxyCreation
@@ -592,32 +577,41 @@ class SafeEventsIndexer(EventsIndexer):
                             trace_address=new_trace_address,
                         )
 
-                        proxy_creation_internal_tx = self.get_internal_tx_from_event(
-                            proxy_creation_event,
-                            safe_address,
-                            NULL_ADDRESS,
-                            proxy_trace_address,
-                            InternalTxType.CREATE.value,
-                            None,
+                        proxy_creation_internal_tx = (
+                            self._get_internal_tx_from_decoded_event(
+                                proxy_creation_event,
+                                contract_address=proxy_creation_event["args"].get(
+                                    "proxy"
+                                ),
+                                tx_type=InternalTxType.CREATE.value,
+                                call_type=None,
+                            )
                         )
                         internal_txs.append(proxy_creation_internal_tx)
 
                 else:
-                    print("More events than expected")
-                    print(events)
+                    logger.ERROR(
+                        f"Received more creation events than expected {number_of_events} internal_txs "
+                    )
 
-        InternalTx.objects.bulk_create(internal_txs)
-        InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
-        logger.info(f"Inserted {len(internal_txs)} internal_txs ")
-        logger.info(f"Inserted {len(internal_decoded_txs)} internal_decoded_txs")
+        with transaction.atomic():
+            InternalTx.objects.bulk_create(internal_txs)
+            InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
+            logger.info(f"Inserted {len(internal_txs)} internal_txs ")
+            logger.info(f"Inserted {len(internal_decoded_txs)} internal_decoded_txs")
 
         return internal_txs
 
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> List[Any]:
         processed_elements = []
-        safe_setup_events = self.get_safe_setup_events(decoded_elements)
-        creation_events_processed = self.process_safe_creation_events(safe_setup_events)
+        # Extract Safe creation events from decoded_elements list
+        safe_setup_events = self._get_safe_creation_events(decoded_elements)
+        # Process safe creation events
+        creation_events_processed = self._process_safe_creation_events(
+            safe_setup_events
+        )
         processed_elements.extend(creation_events_processed)
+        # Process the rest of events
         for decoded_element in decoded_elements:
             if processed_element := self._process_decoded_element(decoded_element):
                 processed_elements.append(processed_element)
