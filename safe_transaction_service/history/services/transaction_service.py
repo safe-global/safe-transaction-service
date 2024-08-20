@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from redis import Redis
 
 from gnosis.eth import EthereumClient, get_auto_ethereum_client
@@ -102,6 +102,23 @@ class TransactionService:
             for key in to_store.keys():
                 pipe.expire(key, 60 * 60)  # Expire in one hour
             pipe.execute()
+
+    def get_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> str:
+        """
+        Retrieves a redis hash for the provided Safe address that group several fields together, so when something changes for that address everything in cache gets invalidated at once.
+        https://redis.io/docs/latest/develop/data-types/hashes/
+        :param safe_address:
+        :return: cache hash key
+        """
+        return f"all-txs:{safe_address}"
+
+    def del_all_txs_cache_hash_key(self, safe_address: ChecksumAddress) -> None:
+        """
+        Deletes the hash for a specific Safe address, invalidating all-transactions cache related with Safe at once.
+        :param safe_address:
+        :return:
+        """
+        self.redis.unlink(self.get_all_txs_cache_hash_key(safe_address))
 
     # End of cache methods ----------------------------
 
