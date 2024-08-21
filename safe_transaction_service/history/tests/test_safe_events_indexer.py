@@ -26,7 +26,11 @@ from ..models import (
     SafeStatus,
 )
 from .factories import EthereumTxFactory, SafeMasterCopyFactory
-from .mocks.mocks_safe_events_indexer import safe_events_mock
+from .mocks.mocks_safe_events_indexer import (
+    proxy_creation_event_mock,
+    safe_events_mock,
+    setup_event_mock,
+)
 
 
 class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
@@ -217,7 +221,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
         self.assertEqual(self.safe_events_indexer.start(), (2, 1))
-        self.assertEqual(InternalTxDecoded.objects.count(), 1)
+        self.assertEqual(InternalTxDecoded.objects.count(), 1)  # Just setup is decoded
         self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory and setup
         create_internal_tx = InternalTx.objects.filter(
             contract_address=safe_address
@@ -706,6 +710,43 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         with self.safe_events_indexer.auto_adjust_block_limit(100, 104):
             pass
         self.assertEqual(self.safe_events_indexer.block_process_limit, 5)
+
+    def test_get_safe_creation_events(self):
+        decoded_elements = self.safe_events_indexer.decode_elements(safe_events_mock)
+        self.assertEqual(len(decoded_elements), 28)
+        safe_creation_events = self.safe_events_indexer._get_safe_creation_events(
+            decoded_elements
+        )
+        self.assertEqual(len(safe_creation_events), 1)
+        safe_address = "0x0059c65c3d2325D77E9288E022D24d3972b1799D"  # Safe address created in safe_events_mock
+        self.assertEqual(len(safe_creation_events[safe_address]), 2)
+        self.assertEqual(safe_creation_events[safe_address][0]["event"], "SafeSetup")
+        self.assertEqual(
+            safe_creation_events[safe_address][1]["event"], "ProxyCreation"
+        )
+
+        # Add a ProxyCreation and SafeSetup event for different safe address
+        safe_events_mock.append(proxy_creation_event_mock)
+        safe_events_mock.append(setup_event_mock)
+        decoded_elements = self.safe_events_indexer.decode_elements(safe_events_mock)
+        safe_creation_events = self.safe_events_indexer._get_safe_creation_events(
+            decoded_elements
+        )
+        self.assertEqual(len(safe_creation_events), 3)
+        new_setup_event = "0x33310eeBb69B19963dA4a16Aeafac78AB6901fbB"
+        self.assertEqual(len(safe_creation_events[new_setup_event]), 1)
+        self.assertEqual(safe_creation_events[new_setup_event][0]["event"], "SafeSetup")
+        new_proxy_event = "0x999E362288fA8313c56b59e7AB0ead4afA92441e"
+        self.assertEqual(len(safe_creation_events[new_proxy_event]), 1)
+        self.assertEqual(
+            safe_creation_events[new_proxy_event][0]["event"], "ProxyCreation"
+        )
+        # Previous events should remains equal
+        self.assertEqual(len(safe_creation_events[safe_address]), 2)
+        self.assertEqual(safe_creation_events[safe_address][0]["event"], "SafeSetup")
+        self.assertEqual(
+            safe_creation_events[safe_address][1]["event"], "ProxyCreation"
+        )
 
 
 class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
