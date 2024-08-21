@@ -542,7 +542,7 @@ class SafeEventsIndexer(EventsIndexer):
                     internal_decoded_txs.append(setup_internal_tx_decoded)
 
                 elif number_of_events == 1:
-                    trace_address = str(setup_event["logIndex"])
+                    trace_address = str(events[0]["logIndex"])
                     # If we have just 1 event in the batch we must ensure that we store it
                     if events[0]["event"] == "SafeSetup":
                         setup_event = events[0]
@@ -564,9 +564,9 @@ class SafeEventsIndexer(EventsIndexer):
                         internal_txs.append(setup_internal_tx)
                         internal_decoded_txs.append(setup_internal_tx_decoded)
                     else:  # event is ProxyCreation
-                        proxy_event = events[0]
+                        proxy_creation_event = events[0]
                         new_trace_address = f"{trace_address},0"
-                        to = proxy_event["args"].get("singleton")
+                        to = proxy_creation_event["args"].pop("singleton")
 
                         # Try to update InternalTx created by SafeSetup (if Safe was created using the ProxyFactory) with
                         # the master copy used. Without tracing it cannot be detected otherwise
@@ -608,12 +608,14 @@ class SafeEventsIndexer(EventsIndexer):
         processed_elements = []
         # Extract Safe creation events from decoded_elements list
         safe_setup_events = self._get_safe_creation_events(decoded_elements)
-        # Process safe creation events
-        creation_events_processed = self._process_safe_creation_events(
-            safe_setup_events
-        )
-        processed_elements.extend(creation_events_processed)
-        # Process the rest of events
+        if safe_setup_events:
+            # Process safe creation events
+            creation_events_processed = self._process_safe_creation_events(
+                safe_setup_events
+            )
+            processed_elements.extend(creation_events_processed)
+
+        # Process the rest of Safe events
         for decoded_element in decoded_elements:
             if processed_element := self._process_decoded_element(decoded_element):
                 processed_elements.append(processed_element)
