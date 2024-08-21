@@ -349,7 +349,6 @@ class SafeEventsIndexer(EventsIndexer):
         args = dict(decoded_element["args"])
         ethereum_tx_hash = HexBytes(decoded_element["transactionHash"])
         ethereum_tx_hash_hex = ethereum_tx_hash.hex()
-        ethereum_block_number = decoded_element["blockNumber"]
         ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
             decoded_element["blockHash"]
         )
