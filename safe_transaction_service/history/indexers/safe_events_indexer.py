@@ -362,7 +362,10 @@ class SafeEventsIndexer(EventsIndexer):
         )
 
         internal_tx = self._get_internal_tx_from_decoded_event(
-            decoded_element, call_type=EthereumTxCallType.DELEGATE_CALL.value
+            decoded_element,
+            call_type=EthereumTxCallType.DELEGATE_CALL.value,
+            to=NULL_ADDRESS,
+            value=0,
         )
         child_internal_tx: Optional[InternalTx] = None  # For Ether transfers
         internal_tx_decoded = InternalTxDecoded(
