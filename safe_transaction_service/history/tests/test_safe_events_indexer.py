@@ -4,6 +4,7 @@ from eth_account import Account
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from web3 import Web3
+from web3.auto import w3
 from web3.datastructures import AttributeDict
 from web3.types import LogReceipt
 
@@ -750,6 +751,58 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             safe_creation_events[safe_address][1]["event"], "ProxyCreation"
         )
+
+    def test_proxy_creation_event_without_initializer(self):
+
+        initial_block_number = self.ethereum_client.current_block_number + 1
+        safe_l2_master_copy = SafeMasterCopyFactory(
+            address=self.safe_contract.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version=self.safe_contract_version,
+            l2=True,
+        )
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract.address,
+            initializer=b"",
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        self.assertEqual(InternalTx.objects.count(), 0)
+        self.assertEqual(InternalTxDecoded.objects.count(), 0)
+        self.assertEqual(self.safe_events_indexer.start(), (1, 1))
+        self.assertEqual(
+            InternalTxDecoded.objects.count(), 0
+        )  # Just created without setup
+        self.assertEqual(InternalTx.objects.count(), 1)  # Proxy factory
+        # Call setup
+        owner_account_1 = self.ethereum_test_account
+        owners = [owner_account_1.address]
+        threshold = 1
+        to = NULL_ADDRESS
+        data = b""
+        fallback_handler = NULL_ADDRESS
+        payment_token = NULL_ADDRESS
+        payment = 0
+        payment_receiver = NULL_ADDRESS
+        deployed_safe_contract = get_safe_V1_4_1_contract(self.w3, safe_address)
+        setup_call = deployed_safe_contract.functions.setup(
+            owners,
+            threshold,
+            to,
+            data,
+            fallback_handler,
+            payment_token,
+            payment,
+            payment_receiver,
+        ).build_transaction(
+            {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
+        )
+        signed_tx = owner_account_1.sign_transaction(setup_call)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        self.assertEqual(self.safe_events_indexer.start(), (1, 1))
+        self.assertEqual(InternalTx.objects.count(), 2)
+        self.assertEqual(InternalTxDecoded.objects.count(), 1)
 
 
 class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
