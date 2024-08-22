@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import pickle
 from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
@@ -35,7 +34,6 @@ from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
-from ..utils.redis import get_redis
 from . import filters, pagination, serializers
 from .helpers import add_tokens_to_transfers, is_valid_unique_transfer_id
 from .models import (
@@ -313,64 +311,6 @@ class AllTransactionsListView(ListAPIView):
 
         return page
 
-    def get_cached_page_tx_identifiers(
-        self,
-        safe: ChecksumAddress,
-        ordering: Optional[str],
-        limit: int,
-        offset: int,
-    ) -> Optional[Response]:
-        """
-        Cache for tx identifiers. A quick ``SQL COUNT`` in all the transactions/events
-        tables will determinate if cache for the provided values is still valid or not
-        :param safe:
-        :param ordering:
-        :param limit:
-        :param offset:
-        :return:
-        """
-        transaction_service = TransactionServiceProvider()
-        cache_timeout = settings.CACHE_ALL_TXS_VIEW
-        redis = get_redis()
-
-        # Get all relevant elements for a Safe to be cached
-        cache_hash_key = transaction_service.get_all_txs_cache_hash_key(safe)
-        cache_query_field = f"{limit}:{offset}:{ordering}"
-        lock_key = f"locks:{cache_hash_key}:{cache_query_field}"
-
-        logger.debug(
-            "%s: All txs from identifiers for Safe=%s lock-key=%s",
-            self.__class__.__name__,
-            safe,
-            lock_key,
-        )
-        if not cache_timeout:
-            # Cache disabled
-            return self.get_page_tx_identifiers(safe, ordering, limit, offset)
-
-        with redis.lock(
-            lock_key,
-            timeout=settings.GUNICORN_REQUEST_TIMEOUT,  # This prevents a service restart to leave a lock forever
-        ):
-            if result := redis.hget(cache_hash_key, cache_query_field):
-                # Count needs to be retrieved to set it up the paginator
-                page, count = pickle.loads(result)
-                # Setting the paginator like this is not very elegant and needs to be tested really well
-                self.paginator.count = count
-                self.paginator.limit = limit
-                self.paginator.offset = offset
-                self.paginator.request = self.request
-                return page
-
-            page = self.get_page_tx_identifiers(safe, ordering, limit, offset)
-            redis.hset(
-                cache_hash_key,
-                cache_query_field,
-                pickle.dumps((page, self.paginator.count)),
-            )
-            redis.expire(cache_hash_key, cache_timeout)
-            return page
-
     def list(self, request, *args, **kwargs):
         transaction_service = TransactionServiceProvider()
         safe = self.kwargs["address"]
@@ -379,7 +319,7 @@ class AllTransactionsListView(ListAPIView):
         list_pagination = DummyPagination(self.request)
         limit, offset = list_pagination.limit, list_pagination.offset
 
-        tx_identifiers_page = self.get_cached_page_tx_identifiers(
+        tx_identifiers_page = self.get_page_tx_identifiers(
             safe, ordering, limit, offset
         )
         if not tx_identifiers_page:
