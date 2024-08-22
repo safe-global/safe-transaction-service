@@ -286,7 +286,6 @@ class EventsIndexer(EthereumIndexer):
         logger.debug("End prefetching and storing of ethereum txs")
         logger.debug("Processing %d decoded events", len(decoded_elements))
         processed_elements = self._process_decoded_elements(decoded_elements)
-
         logger.debug("End processing %d decoded events", len(decoded_elements))
 
         logger.debug("Marking events as processed")
