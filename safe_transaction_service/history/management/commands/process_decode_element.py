@@ -17,7 +17,7 @@ class Command(BaseCommand):
 
         start_block = 1799327
         relevant = indexer.find_relevant_elements(
-            addresses, start_block, start_block + 50
+            addresses, start_block, start_block + 100
         )
         start = time.time()
         indexer.process_elements(relevant)

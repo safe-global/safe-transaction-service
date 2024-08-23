@@ -287,7 +287,17 @@ class SafeEventsIndexer(EventsIndexer):
     def decode_elements(self, *args) -> List[EventData]:
         return super().decode_elements(*args)
 
-    def _get_internal_tx_from_decoded_event(self, decoded_event, **kwargs):
+    def _get_internal_tx_from_decoded_event(
+        self, decoded_event: EventData, **kwargs
+    ) -> InternalTx:
+        """
+        Creates an InternalTx instance from the given decoded_event.
+        Allows overriding object parameters with additional keyword arguments.
+
+        :param decoded_event:
+        :param kwargs:
+        :return:
+        """
         ethereum_tx_hash = HexBytes(decoded_event["transactionHash"])
         ethereum_block_number = decoded_event["blockNumber"]
         ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
@@ -324,18 +334,6 @@ class SafeEventsIndexer(EventsIndexer):
                 raise AttributeError(f"Invalid atribute {key} for InternalTx")
 
         return internal_tx
-
-    def _get_internal_decoded_tx_for_setup_event(self, event, internal_tx):
-        setup_args = dict(event["args"])
-        setup_args["payment"] = 0
-        setup_args["paymentReceiver"] = NULL_ADDRESS
-        setup_args["_threshold"] = setup_args.pop("threshold")
-        setup_args["_owners"] = setup_args.pop("owners")
-        return InternalTxDecoded(
-            internal_tx=internal_tx,
-            function_name="setup",
-            arguments=setup_args,
-        )
 
     @transaction.atomic
     def _process_decoded_element(
@@ -481,7 +479,15 @@ class SafeEventsIndexer(EventsIndexer):
 
         return internal_tx
 
-    def _get_safe_creation_events(self, decoded_elements):
+    def _get_safe_creation_events(
+        self, decoded_elements: List[EventData]
+    ) -> Dict[ChecksumAddress, List[EventData]]:
+        """
+        Get the creation events (ProxyCreation and SafeSetup) from decoded elements and generates a dictionary that groups these events by Safe address.
+
+        :param decoded_elements:
+        :return:
+        """
         safe_setup_events: Dict[ChecksumAddress, List[Dict]] = {}
         for decoded_element in decoded_elements:
             event_name = decoded_element["event"]
@@ -495,7 +501,15 @@ class SafeEventsIndexer(EventsIndexer):
         return safe_setup_events
 
     @transaction.atomic
-    def _process_safe_creation_events(self, safe_setup_events):
+    def _process_safe_creation_events(
+        self, safe_setup_events: Dict[ChecksumAddress, List[EventData]]
+    ) -> List[InternalTx]:
+        """
+        Process creation events (ProxyCreation and SafeSetup).
+
+        :param safe_setup_events:
+        :return:
+        """
         internal_txs = []
         internal_decoded_txs = []
         # Check if were indexed
@@ -508,13 +522,25 @@ class SafeEventsIndexer(EventsIndexer):
         addresses_to_index = set(safe_setup_events_addresses) - set(indexed_addresses)
         for safe_address in addresses_to_index:
             events = safe_setup_events[safe_address]
-            for event in events:
+            for event_position, event in enumerate(events):
                 if event["event"] == "SafeSetup":
                     setup_event = event
-                    # Usually SafeSetup is the first event and next is ProxyCreation when ProxyCreation is called with initializer.
+                    # If we have both events we should extract Singleton and trace_address from ProxyCreation event
                     if len(events) > 1:
-                        proxy_creation_event = events[1]
+                        if (
+                            event_position == 0
+                            and events[1]["event"] == "ProxyCreation"
+                        ):
+                            # Usually SafeSetup is the first event and next is ProxyCreation when ProxyCreation is called with initializer.
+                            proxy_creation_event = events[1]
+                        elif (
+                            event_position == 1
+                            and events[0]["event"] == "ProxyCreation"
+                        ):
+                            # ProxyCreation first and SafeSetup later
+                            proxy_creation_event = events[1]
                     else:
+                        # Proxy was created in previous blocks.
                         proxy_creation_event = None
                         # TODO store decoded ProxyCreation event to get the singleton address
 
@@ -536,8 +562,15 @@ class SafeEventsIndexer(EventsIndexer):
                         call_type=EthereumTxCallType.DELEGATE_CALL.value,
                     )
                     # Generate InternalDecodedTx for SafeSetup event
-                    internal_tx_decoded = self._get_internal_decoded_tx_for_setup_event(
-                        setup_event, internal_tx
+                    setup_args = dict(event["args"])
+                    setup_args["payment"] = 0
+                    setup_args["paymentReceiver"] = NULL_ADDRESS
+                    setup_args["_threshold"] = setup_args.pop("threshold")
+                    setup_args["_owners"] = setup_args.pop("owners")
+                    internal_tx_decoded = InternalTxDecoded(
+                        internal_tx=internal_tx,
+                        function_name="setup",
+                        arguments=setup_args,
                     )
                     internal_txs.append(internal_tx)
                     internal_decoded_txs.append(internal_tx_decoded)
