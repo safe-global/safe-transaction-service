@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
 
@@ -57,6 +58,7 @@ class TransactionService:
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
         self.redis = redis
+        self.cache_expiration = settings.CACHE_ALL_TXS_VIEW
 
     #  Cache methods ---------------------------------
     def get_cache_key(self, safe_address: str, tx_id: str):
@@ -100,7 +102,7 @@ class TransactionService:
             pipe = self.redis.pipeline()
             pipe.mset(to_store)
             for key in to_store.keys():
-                pipe.expire(key, 60 * 60)  # Expire in one hour
+                pipe.expire(key, self.cache_expiration)
             pipe.execute()
 
     # End of cache methods ----------------------------
