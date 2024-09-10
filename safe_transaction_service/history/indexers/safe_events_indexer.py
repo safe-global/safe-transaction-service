@@ -596,6 +596,12 @@ class SafeEventsIndexer(EventsIndexer):
 
         with transaction.atomic():
             InternalTx.objects.bulk_create(internal_txs, ignore_conflicts=True)
+            [
+                internal_decoded_tx
+                for internal_decoded_tx in internal_decoded_txs
+                if internal_decoded_tx.internal_tx_id is not None
+            ]
+
             InternalTxDecoded.objects.bulk_create(
                 internal_decoded_txs, ignore_conflicts=True
             )

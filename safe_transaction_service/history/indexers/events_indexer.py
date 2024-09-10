@@ -174,10 +174,6 @@ class EventsIndexer(EthereumIndexer):
     def _process_decoded_element(self, decoded_element: EventData) -> Any:
         pass
 
-    @abstractmethod
-    def _process_decoded_elements(self, decoded_element: List[EventData]) -> List[Any]:
-        pass
-
     def find_relevant_elements(
         self,
         addresses: set[ChecksumAddress],
@@ -251,6 +247,13 @@ class EventsIndexer(EthereumIndexer):
             if decoded_element := self.decode_element(log_receipt):
                 decoded_elements.append(decoded_element)
         return decoded_elements
+
+    def _process_decoded_elements(self, decoded_elements: List[EventData]) -> List[Any]:
+        processed_elements = []
+        for decoded_element in decoded_elements:
+            if processed_element := self._process_decoded_element(decoded_element):
+                processed_elements.append(processed_element)
+        return processed_elements
 
     def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
         """
