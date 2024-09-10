@@ -524,7 +524,9 @@ class SafeEventsIndexer(EventsIndexer):
             function_name="setup",
             internal_tx__contract_address=None,
         ).values_list("internal_tx___from", flat=True)
+        # Ignoring the already indexed contracts
         addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
+
         for safe_address in addresses_to_index:
             events = safe_addresses_with_creation_events[safe_address]
             for event_position, event in enumerate(events):
