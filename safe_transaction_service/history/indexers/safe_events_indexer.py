@@ -488,40 +488,45 @@ class SafeEventsIndexer(EventsIndexer):
         :param decoded_elements:
         :return:
         """
-        safe_setup_events: Dict[ChecksumAddress, List[Dict]] = {}
+        safe_creation_events: Dict[ChecksumAddress, List[Dict]] = {}
         for decoded_element in decoded_elements:
             event_name = decoded_element["event"]
             if event_name == "SafeSetup":
                 safe_address = decoded_element["address"]
-                safe_setup_events.setdefault(safe_address, []).append(decoded_element)
+                safe_creation_events.setdefault(safe_address, []).append(
+                    decoded_element
+                )
             elif event_name == "ProxyCreation":
                 safe_address = decoded_element["args"].get("proxy")
-                safe_setup_events.setdefault(safe_address, []).append(decoded_element)
+                safe_creation_events.setdefault(safe_address, []).append(
+                    decoded_element
+                )
 
-        return safe_setup_events
+        return safe_creation_events
 
     @transaction.atomic
     def _process_safe_creation_events(
-        self, safe_setup_events: Dict[ChecksumAddress, List[EventData]]
+        self,
+        safe_addresses_with_creation_events: Dict[ChecksumAddress, List[EventData]],
     ) -> List[InternalTx]:
         """
         Process creation events (ProxyCreation and SafeSetup).
 
-        :param safe_setup_events:
+        :param safe_addresses_with_creation_events:
         :return:
         """
         internal_txs = []
         internal_decoded_txs = []
         # Check if were indexed
-        safe_setup_events_addresses = list(safe_setup_events.keys())
+        safe_creation_events_addresses = set(safe_addresses_with_creation_events.keys())
         indexed_addresses = InternalTxDecoded.objects.filter(
-            internal_tx___from__in=safe_setup_events_addresses,
+            internal_tx___from__in=safe_creation_events_addresses,
             function_name="setup",
             internal_tx__contract_address=None,
         ).values_list("internal_tx___from", flat=True)
-        addresses_to_index = set(safe_setup_events_addresses) - set(indexed_addresses)
+        addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
         for safe_address in addresses_to_index:
-            events = safe_setup_events[safe_address]
+            events = safe_addresses_with_creation_events[safe_address]
             for event_position, event in enumerate(events):
                 if event["event"] == "SafeSetup":
                     setup_event = event
@@ -598,11 +603,13 @@ class SafeEventsIndexer(EventsIndexer):
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> List[Any]:
         processed_elements = []
         # Extract Safe creation events by Safe from decoded_elements list
-        safe_setup_events = self._get_safe_creation_events(decoded_elements)
-        if safe_setup_events:
+        safe_addresses_creation_events = self._get_safe_creation_events(
+            decoded_elements
+        )
+        if safe_addresses_creation_events:
             # Process safe creation events
             creation_events_processed = self._process_safe_creation_events(
-                safe_setup_events
+                safe_addresses_creation_events
             )
             processed_elements.extend(creation_events_processed)
 
