@@ -372,7 +372,7 @@ class SafeEventsIndexer(EventsIndexer):
         )
 
         if event_name == "ProxyCreation" or event_name == "SafeSetup":
-            # Will ignore this events because were indexed in process_safe_creation_events
+            # Will ignore these events because were indexed in process_safe_creation_events
             internal_tx = None
 
         elif event_name == "SafeMultiSigTransaction":
@@ -531,7 +531,7 @@ class SafeEventsIndexer(EventsIndexer):
                             event_position == 0
                             and events[1]["event"] == "ProxyCreation"
                         ):
-                            # Usually SafeSetup is the first event and next is ProxyCreation when ProxyCreation is called with initializer.
+                            # Usually SafeSetup is the first event and next is ProxyCreation when ProxyFactory is called with initializer.
                             proxy_creation_event = events[1]
                         elif (
                             event_position == 1
@@ -597,7 +597,7 @@ class SafeEventsIndexer(EventsIndexer):
 
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> List[Any]:
         processed_elements = []
-        # Extract Safe creation events from decoded_elements list
+        # Extract Safe creation events by Safe from decoded_elements list
         safe_setup_events = self._get_safe_creation_events(decoded_elements)
         if safe_setup_events:
             # Process safe creation events
