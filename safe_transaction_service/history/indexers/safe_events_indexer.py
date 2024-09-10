@@ -543,7 +543,7 @@ class SafeEventsIndexer(EventsIndexer):
                             and events[0]["event"] == "ProxyCreation"
                         ):
                             # ProxyCreation first and SafeSetup later
-                            proxy_creation_event = events[1]
+                            proxy_creation_event = events[0]
                     else:
                         # Proxy was created in previous blocks.
                         proxy_creation_event = None

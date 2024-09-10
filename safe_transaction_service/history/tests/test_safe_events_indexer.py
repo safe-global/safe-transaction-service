@@ -775,6 +775,10 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             InternalTxDecoded.objects.count(), 0
         )  # Just created without setup
         self.assertEqual(InternalTx.objects.count(), 1)  # Proxy factory
+        # Proxy creation InternalTx must contain the Safe address
+        self.assertEqual(
+            InternalTx.objects.filter(contract_address=safe_address).count(), 1
+        )
         # Call setup
         owner_account_1 = self.ethereum_test_account
         owners = [owner_account_1.address]
@@ -803,6 +807,41 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         self.assertEqual(InternalTx.objects.count(), 2)
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
+        # TODO get singleton address when setup and creation are not indexed together
+        # self.assertEqual(InternalTx.objects.filter(contract_address=None, to=self.safe_contract.address).count(), 1)
+        # ProxyCreation first and SafeSetup later indexed together
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract_V1_3_0.address,
+            initializer=b"",
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        deployed_safe_contract = get_safe_V1_4_1_contract(self.w3, safe_address)
+        setup_call = deployed_safe_contract.functions.setup(
+            owners,
+            threshold,
+            to,
+            data,
+            fallback_handler,
+            payment_token,
+            payment,
+            payment_receiver,
+        ).build_transaction(
+            {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
+        )
+        signed_tx = owner_account_1.sign_transaction(setup_call)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        self.assertEqual(self.safe_events_indexer.start(), (2, 2))
+        # Proxy creation InternalTx must contain the Safe address
+        self.assertEqual(
+            InternalTx.objects.filter(contract_address=safe_address).count(), 1
+        )
+        self.assertEqual(
+            InternalTx.objects.filter(
+                contract_address=None, to=self.safe_contract_V1_3_0.address
+            ).count(),
+            1,
+        )
 
 
 class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
