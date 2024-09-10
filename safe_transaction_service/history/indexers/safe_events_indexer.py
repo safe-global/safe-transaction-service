@@ -593,10 +593,10 @@ class SafeEventsIndexer(EventsIndexer):
                     logger.error(f"Event is not a Safe creation event {event['event']}")
 
         with transaction.atomic():
-            InternalTx.objects.bulk_create(internal_txs)
-            InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
-            logger.info(f"Inserted {len(internal_txs)} internal_txs ")
-            logger.info(f"Inserted {len(internal_decoded_txs)} internal_decoded_txs")
+            InternalTx.objects.bulk_create(internal_txs, ignore_conflicts=True)
+            InternalTxDecoded.objects.bulk_create(
+                internal_decoded_txs, ignore_conflicts=True
+            )
 
         return internal_txs
 
