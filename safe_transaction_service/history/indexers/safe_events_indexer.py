@@ -549,7 +549,10 @@ class SafeEventsIndexer(EventsIndexer):
                     else:
                         # Proxy was created in previous blocks.
                         proxy_creation_event = None
-                        # TODO store decoded ProxyCreation event to get the singleton address
+                        # Safe was created and configure it in the next transaction. Remove it if that's the case
+                        InternalTx.objects.filter(
+                            contract_address=safe_address
+                        ).delete()
 
                     # Generate InternalTx and internalDecodedTx for SafeSetup event
                     setup_trace_address = (

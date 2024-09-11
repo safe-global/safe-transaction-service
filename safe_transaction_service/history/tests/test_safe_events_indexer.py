@@ -805,7 +805,8 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         signed_tx = owner_account_1.sign_transaction(setup_call)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
-        self.assertEqual(InternalTx.objects.count(), 2)
+        # We remove the proxyCreation internaltx
+        self.assertEqual(InternalTx.objects.count(), 1)
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
         # TODO get singleton address when setup and creation are not indexed together
         # self.assertEqual(InternalTx.objects.filter(contract_address=None, to=self.safe_contract.address).count(), 1)
