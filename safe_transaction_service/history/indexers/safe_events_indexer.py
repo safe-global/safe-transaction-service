@@ -594,19 +594,43 @@ class SafeEventsIndexer(EventsIndexer):
                 else:
                     logger.error(f"Event is not a Safe creation event {event['event']}")
 
+        # Store which internal txs where inserted into database
+        stored_internal_txs: List[InternalTx] = []
         with transaction.atomic():
-            InternalTx.objects.bulk_create(internal_txs, ignore_conflicts=True)
-            [
-                internal_decoded_tx
-                for internal_decoded_tx in internal_decoded_txs
-                if internal_decoded_tx.internal_tx_id is not None
-            ]
+            try:
+                InternalTx.objects.bulk_create(internal_txs)
+                InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
+                stored_internal_txs = internal_txs
+            except IntegrityError:
+                pass
 
-            InternalTxDecoded.objects.bulk_create(
-                internal_decoded_txs, ignore_conflicts=True
-            )
+        if internal_txs and not stored_internal_txs:
+            # Fallback handler in case of integrity error
+            with transaction.atomic():
+                # Skip previous inserted instances
+                for internal_tx in internal_txs:
+                    try:
+                        InternalTx.save(internal_tx)
+                        stored_internal_txs.append(internal_tx)
+                    except IntegrityError:
+                        logger.info(
+                            "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
+                            internal_tx.ethereum_tx_id.hex(),
+                            internal_tx.trace_address,
+                        )
+                        pass
+                for internal_decoded_tx in internal_decoded_txs:
+                    try:
+                        InternalTxDecoded.save(internal_decoded_tx)
+                    except IntegrityError:
+                        logger.info(
+                            "Ignoring already processed InternalDecodedTx with tx-hash=%s and trace-address=%s",
+                            internal_decoded_tx.internal_tx.ethereum_tx_id.hex(),
+                            internal_decoded_tx.internal_tx.trace_address,
+                        )
+                        pass
 
-        return internal_txs
+        return stored_internal_txs
 
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> List[Any]:
         processed_elements = []
