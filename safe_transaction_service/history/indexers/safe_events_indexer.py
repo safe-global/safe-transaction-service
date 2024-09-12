@@ -504,7 +504,6 @@ class SafeEventsIndexer(EventsIndexer):
 
         return safe_creation_events
 
-    @transaction.atomic
     def _process_safe_creation_events(
         self,
         safe_addresses_with_creation_events: Dict[ChecksumAddress, List[EventData]],
@@ -609,29 +608,35 @@ class SafeEventsIndexer(EventsIndexer):
 
         if internal_txs and not stored_internal_txs:
             # Fallback handler in case of integrity error
-            with transaction.atomic():
-                # Skip previous inserted instances
-                for internal_tx in internal_txs:
-                    try:
+            for internal_decoded_tx in internal_decoded_txs:
+                try:
+                    with transaction.atomic():
+                        # Insert first the internal_tx with internalDecodedTx relation
+                        InternalTx.save(internal_decoded_tx.internal_tx)
+                        InternalTxDecoded.save(internal_decoded_tx)
+                        # Remove inserted internal transactions from the list
+                        internal_txs.remove(internal_decoded_tx.internal_tx)
+                        stored_internal_txs.append(internal_tx)
+                except IntegrityError:
+                    logger.info(
+                        "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
+                        internal_decoded_tx.internal_tx.ethereum_tx_id.hex(),
+                        internal_decoded_tx.internal_tx.trace_address,
+                    )
+                    pass
+            # Insert the remaining InternalTxs
+            for internal_tx in internal_txs:
+                try:
+                    with transaction.atomic():
                         InternalTx.save(internal_tx)
                         stored_internal_txs.append(internal_tx)
-                    except IntegrityError:
-                        logger.info(
-                            "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
-                            internal_tx.ethereum_tx_id.hex(),
-                            internal_tx.trace_address,
-                        )
-                        pass
-                for internal_decoded_tx in internal_decoded_txs:
-                    try:
-                        InternalTxDecoded.save(internal_decoded_tx)
-                    except IntegrityError:
-                        logger.info(
-                            "Ignoring already processed InternalDecodedTx with tx-hash=%s and trace-address=%s",
-                            internal_decoded_tx.internal_tx.ethereum_tx_id.hex(),
-                            internal_decoded_tx.internal_tx.trace_address,
-                        )
-                        pass
+                except IntegrityError:
+                    logger.info(
+                        "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
+                        internal_tx.ethereum_tx_id.hex(),
+                        internal_tx.trace_address,
+                    )
+                    pass
 
         return stored_internal_txs
 
