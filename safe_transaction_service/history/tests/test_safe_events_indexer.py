@@ -728,7 +728,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
         # Add a ProxyCreation and SafeSetup event for different safe address
         modified_safe_events_mock = safe_events_mock.copy()  # Avoid race conditions
-        modified_safe_events_mock.append(proxy_creation_event_mock)
+        modified_safe_events_mock.append(proxy_creation_event_mock[0])
         modified_safe_events_mock.append(setup_events_mock[0])
         decoded_elements = self.safe_events_indexer.decode_elements(
             modified_safe_events_mock
