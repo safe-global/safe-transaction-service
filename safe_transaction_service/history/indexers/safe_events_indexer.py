@@ -640,7 +640,7 @@ class SafeEventsIndexer(EventsIndexer):
 
         return stored_internal_txs
 
-    def _process_decoded_elements(self, decoded_elements: list[EventData]) -> List[Any]:
+    def _process_decoded_elements(self, decoded_elements: list[EventData]) -> list[Any]:
         processed_elements = []
         # Extract Safe creation events by Safe from decoded_elements list
         safe_addresses_creation_events = self._get_safe_creation_events(
