@@ -604,7 +604,7 @@ class SafeEventsIndexer(EventsIndexer):
                 InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
                 stored_internal_txs = internal_txs
             except IntegrityError:
-                pass
+                logger.info("Cannot bulk create the provided Safe Creation Events, trying one by one")
 
         if internal_txs and not stored_internal_txs:
             # Fallback handler in case of integrity error
