@@ -564,8 +564,11 @@ class SafeEventsIndexer(EventsIndexer):
                         if proxy_creation_event
                         else NULL_ADDRESS
                     )
+                    # Keep previous implementation
+                    contract_address = None if proxy_creation_event else safe_address
                     internal_tx = self._get_internal_tx_from_decoded_event(
                         setup_event,
+                        contract_address=contract_address,
                         to=singleton,
                         trace_address=setup_trace_address,
                         call_type=EthereumTxCallType.DELEGATE_CALL.value,
