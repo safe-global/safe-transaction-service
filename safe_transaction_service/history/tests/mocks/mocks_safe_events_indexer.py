@@ -603,3 +603,99 @@ safe_events_mock = [
         }
     ),
 ]
+
+setup_events_mock = [
+    AttributeDict(
+        {
+            "address": "0x33310eeBb69B19963dA4a16Aeafac78AB6901fbB",
+            "blockHash": HexBytes(
+                "0xdfa4d85183c64488211b6a270a9b1231463d014538fe61586fe83a650ca62576"
+            ),
+            "blockNumber": 76,
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b",
+            "logIndex": 0,
+            "removed": False,
+            "topics": [
+                HexBytes(
+                    "0x141df868a6331af528e38c83b7aa03edc19be66e37ae67f9285bf4f8e3c6a1a8"
+                ),
+                HexBytes(
+                    "0x000000000000000000000000a21e2615ed32ce9ddfc53a1b0ccfe689e9152f25"
+                ),
+            ],
+            "transactionHash": HexBytes(
+                "0x2b4d9886e32fdd5b05072b592c7b5d2e50020282cd7d234a2054e71458887c36"
+            ),
+            "transactionIndex": 0,
+        }
+    ),
+    AttributeDict(
+        {
+            "address": "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD",
+            "blockHash": HexBytes(
+                "0x1ab0d0bcde388ace7010770e9c6fa19c8840ea8f6134c93e52d91b08b44a327f"
+            ),
+            "blockNumber": 76,
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b",
+            "logIndex": 0,
+            "removed": False,
+            "topics": [
+                HexBytes(
+                    "0x141df868a6331af528e38c83b7aa03edc19be66e37ae67f9285bf4f8e3c6a1a8"
+                ),
+                HexBytes(
+                    "0x000000000000000000000000a21e2615ed32ce9ddfc53a1b0ccfe689e9152f25"
+                ),
+            ],
+            "transactionHash": HexBytes(
+                "0xd2ccece7094e36e82acc441a163d2f07dbfb82f1948988d89fef9d941fb2a890"
+            ),
+            "transactionIndex": 0,
+        }
+    ),
+]
+
+proxy_creation_event_mock = [
+    AttributeDict(
+        {
+            "address": "0xA21E2615ED32CE9DdFc53A1B0ccFE689e9152f25",
+            "blockHash": HexBytes(
+                "0xdfa4d85183c64488211b6a270a9b1231463d014538fe61586fe83a650ca62576"
+            ),
+            "blockNumber": 76,
+            "data": "0x000000000000000000000000999e362288fa8313c56b59e7ab0ead4afa92441e0000000000000000000000009c82244a30cd4b2591f9a8e8ad0dab0fa643ee34",
+            "logIndex": 1,
+            "removed": False,
+            "topics": [
+                HexBytes(
+                    "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235"
+                )
+            ],
+            "transactionHash": HexBytes(
+                "0x2b4d9886e32fdd5b05072b592c7b5d2e50020282cd7d234a2054e71458887c36"
+            ),
+            "transactionIndex": 0,
+        }
+    ),
+    AttributeDict(
+        {
+            "address": "0xA21E2615ED32CE9DdFc53A1B0ccFE689e9152f25",
+            "blockHash": HexBytes(
+                "0x34920c133603319a4b40255b3f20512172aa58388b27ac8bb06dfed3aad8135f"
+            ),
+            "blockNumber": 77,
+            "data": "0x0000000000000000000000003fc91a3afd70395cd496c647d5a6cc9d4b2b7fad0000000000000000000000009c82244a30cd4b2591f9a8e8ad0dab0fa643ee34",
+            "logIndex": 1,
+            "removed": False,
+            "topics": [
+                HexBytes(
+                    "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235"
+                )
+            ],
+            "transactionHash": HexBytes(
+                "0x0e7cba26c17906a9e752198a0b09a5a3e25866055a4684334fd70affc866ec07"
+            ),
+            "transactionIndex": 0,
+        }
+    ),
+]
