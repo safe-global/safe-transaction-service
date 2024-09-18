@@ -5,10 +5,9 @@ from django.test import TestCase
 
 from eth_account import Account
 from requests.exceptions import ConnectionError as RequestsConnectionError
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
-from gnosis.eth.utils import fast_keccak_text
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from safe_eth.eth.utils import fast_keccak_text
 
 from ..models import (
     EthereumTx,

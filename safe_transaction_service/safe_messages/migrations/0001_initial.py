@@ -5,8 +5,7 @@ import django.utils.timezone
 from django.db import migrations, models
 
 import model_utils.fields
-
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -36,16 +35,16 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "message_hash",
-                    gnosis.eth.django.models.Keccak256Field(
+                    safe_eth.eth.django.models.Keccak256Field(
                         primary_key=True, serialize=False
                     ),
                 ),
                 (
                     "safe",
-                    gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
                 ),
                 ("message", models.JSONField()),
-                ("proposed_by", gnosis.eth.django.models.EthereumAddressV2Field()),
+                ("proposed_by", safe_eth.eth.django.models.EthereumAddressV2Field()),
                 ("safe_app_id", models.PositiveIntegerField(blank=True, null=True)),
             ],
             options={
@@ -82,9 +81,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "owner",
-                    gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
                 ),
-                ("signature", gnosis.eth.django.models.HexField(max_length=5000)),
+                ("signature", safe_eth.eth.django.models.HexField(max_length=5000)),
                 (
                     "signature_type",
                     models.PositiveSmallIntegerField(

@@ -5,8 +5,7 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from django_test_migrations.migrator import Migrator
-
-from gnosis.eth import EthereumNetwork
+from safe_eth.eth import EthereumNetwork
 
 # https://github.com/python/cpython/issues/100950
 token_list_migration = importlib.import_module(

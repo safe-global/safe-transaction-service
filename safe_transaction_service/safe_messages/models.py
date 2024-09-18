@@ -5,13 +5,12 @@ from django.db.models import JSONField
 
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
-
-from gnosis.eth.django.models import (
+from safe_eth.eth.django.models import (
     EthereumAddressBinaryField,
     HexV2Field,
     Keccak256Field,
 )
-from gnosis.safe.safe_signature import SafeSignatureType
+from safe_eth.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 

@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from gnosis.eth import EthereumNetwork
+from safe_eth.eth import EthereumNetwork
 
 from safe_transaction_service.history.tests.utils import skip_on
 

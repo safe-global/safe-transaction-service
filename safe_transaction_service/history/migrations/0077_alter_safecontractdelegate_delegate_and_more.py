@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="safecontractdelegate",
             name="delegate",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="safecontractdelegate",
             name="delegator",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
     ]

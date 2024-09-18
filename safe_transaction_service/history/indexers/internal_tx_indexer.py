@@ -7,9 +7,8 @@ from django.db import transaction
 
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
+from safe_eth.eth import EthereumClient
 from web3.types import BlockTrace, FilterTrace
-
-from gnosis.eth import EthereumClient
 
 from safe_transaction_service.contracts.tx_decoder import (
     CannotDecode,

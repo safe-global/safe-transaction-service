@@ -4,8 +4,7 @@ from typing import List, Optional
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
-
-from gnosis.eth.eip712 import eip712_encode_hash
+from safe_eth.eth.eip712 import eip712_encode_hash
 
 from safe_transaction_service.history.models import TransferDict
 from safe_transaction_service.tokens.models import Token

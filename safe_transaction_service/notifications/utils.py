@@ -7,8 +7,7 @@ from django.conf import settings
 
 from eth_account.messages import defunct_hash_message
 from hexbytes import HexBytes
-
-from gnosis.eth.utils import fast_keccak
+from safe_eth.eth.utils import fast_keccak
 
 from safe_transaction_service.utils.redis import get_redis
 

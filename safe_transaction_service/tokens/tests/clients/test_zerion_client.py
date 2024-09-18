@@ -1,8 +1,7 @@
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth import EthereumClient
+from safe_eth.eth import EthereumClient
 
 from safe_transaction_service.history.tests.utils import just_test_if_mainnet_node
 

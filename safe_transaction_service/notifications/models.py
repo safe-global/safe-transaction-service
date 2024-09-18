@@ -4,7 +4,7 @@ from typing import List, Sequence
 
 from django.db import models
 
-from gnosis.eth.django.models import EthereumAddressBinaryField
+from safe_eth.eth.django.models import EthereumAddressBinaryField
 
 from safe_transaction_service.history.models import SafeContract
 

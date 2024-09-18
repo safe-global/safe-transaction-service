@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="signature",
-            field=gnosis.eth.django.models.HexField(
+            field=safe_eth.eth.django.models.HexField(
                 default=None, max_length=5000, null=True
             ),
         ),

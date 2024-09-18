@@ -9,21 +9,20 @@ from drf_yasg.utils import swagger_serializer_method
 from eth_typing import ChecksumAddress
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.django.models import (
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.django.models import (
     EthereumAddressBinaryField as EthereumAddressDbField,
 )
-from gnosis.eth.django.models import Keccak256Field as Keccak256DbField
-from gnosis.eth.django.serializers import (
+from safe_eth.eth.django.models import Keccak256Field as Keccak256DbField
+from safe_eth.eth.django.serializers import (
     EthereumAddressField,
     HexadecimalField,
     Sha3HashField,
 )
-from gnosis.safe import Safe
-from gnosis.safe.safe_signature import EthereumBytes, SafeSignature, SafeSignatureType
-from gnosis.safe.serializers import SafeMultisigTxSerializer
+from safe_eth.safe import Safe
+from safe_eth.safe.safe_signature import EthereumBytes, SafeSignature, SafeSignatureType
+from safe_eth.safe.serializers import SafeMultisigTxSerializer
 
 from safe_transaction_service.account_abstraction import serializers as aa_serializers
 from safe_transaction_service.contracts.tx_decoder import (

@@ -1,7 +1,6 @@
 from django_filters import rest_framework as filters
-
-from gnosis.eth.django.filters import EthereumAddressFilter
-from gnosis.eth.django.models import EthereumAddressBinaryField
+from safe_eth.eth.django.filters import EthereumAddressFilter
+from safe_eth.eth.django.models import EthereumAddressBinaryField
 
 from .models import Token
 

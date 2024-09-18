@@ -8,17 +8,16 @@ from django.db.models import Index
 from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
-
-from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.account_abstraction import UserOperationMetadata
-from gnosis.eth.django.models import (
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.account_abstraction import UserOperationMetadata
+from safe_eth.eth.django.models import (
     EthereumAddressBinaryField,
     HexV2Field,
     Keccak256Field,
     Uint256Field,
 )
-from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
-from gnosis.safe.safe_signature import SafeSignatureType
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
+from safe_eth.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.history import models as history_models
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH

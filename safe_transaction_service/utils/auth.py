@@ -6,9 +6,9 @@ from django.contrib.auth.middleware import RemoteUserMiddleware
 class CustomHeaderRemoteUserMiddleware(RemoteUserMiddleware):
     """
     Headers that buzfeed SSO sends
-    X-Forwarded-Email: tanjiro.kamado@gnosis.pm
+    X-Forwarded-Email: tanjiro.kamado@safe.global
     X-Forwarded-For: 81.211.153.216, 81.13.44.29
-    X-Forwarded-Groups: developers@gnosis.pm
+    X-Forwarded-Groups: developers@safe.global
     X-Forwarded-Host: safe-transaction.dev.gnosisdev.com
     X-Forwarded-Host: safe-transaction.dev.gnosisdev.com
     X-Forwarded-Port: 443

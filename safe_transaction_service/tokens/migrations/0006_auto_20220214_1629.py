@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="token",
             name="copy_price",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 help_text="If provided, copy the price from the token", null=True
             ),
         ),

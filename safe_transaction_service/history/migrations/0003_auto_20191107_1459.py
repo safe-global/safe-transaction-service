@@ -7,8 +7,7 @@ import django.utils.timezone
 from django.db import migrations, models
 
 import model_utils.fields
-
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -29,8 +28,8 @@ class Migration(migrations.Migration):
                 ("gas_limit", models.PositiveIntegerField()),
                 ("gas_used", models.PositiveIntegerField()),
                 ("timestamp", models.DateTimeField()),
-                ("block_hash", gnosis.eth.django.models.Sha3HashField(unique=True)),
-                ("parent_hash", gnosis.eth.django.models.Sha3HashField(unique=True)),
+                ("block_hash", safe_eth.eth.django.models.Sha3HashField(unique=True)),
+                ("parent_hash", safe_eth.eth.django.models.Sha3HashField(unique=True)),
                 ("confirmed", models.BooleanField(db_index=True, default=False)),
             ],
         ),
@@ -55,13 +54,13 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tx_hash",
-                    gnosis.eth.django.models.Sha3HashField(
+                    safe_eth.eth.django.models.Sha3HashField(
                         primary_key=True, serialize=False, unique=True
                     ),
                 ),
                 (
                     "gas_used",
-                    gnosis.eth.django.models.Uint256Field(default=None, null=True),
+                    safe_eth.eth.django.models.Uint256Field(default=None, null=True),
                 ),
                 ("status", models.IntegerField(default=None, null=True)),
                 (
@@ -70,21 +69,21 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "_from",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
-                ("gas", gnosis.eth.django.models.Uint256Field()),
-                ("gas_price", gnosis.eth.django.models.Uint256Field()),
+                ("gas", safe_eth.eth.django.models.Uint256Field()),
+                ("gas_price", safe_eth.eth.django.models.Uint256Field()),
                 ("data", models.BinaryField(null=True)),
-                ("nonce", gnosis.eth.django.models.Uint256Field()),
+                ("nonce", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "to",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
-                ("value", gnosis.eth.django.models.Uint256Field()),
+                ("value", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "block",
                     models.ForeignKey(
@@ -114,23 +113,23 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "_from",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
-                ("gas", gnosis.eth.django.models.Uint256Field()),
+                ("gas", safe_eth.eth.django.models.Uint256Field()),
                 ("data", models.BinaryField(null=True)),
                 (
                     "to",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
-                ("value", gnosis.eth.django.models.Uint256Field()),
-                ("gas_used", gnosis.eth.django.models.Uint256Field()),
+                ("value", safe_eth.eth.django.models.Uint256Field()),
+                ("gas_used", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "contract_address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
@@ -138,7 +137,7 @@ class Migration(migrations.Migration):
                 ("output", models.BinaryField(null=True)),
                 (
                     "refund_address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         db_index=True, null=True
                     ),
                 ),
@@ -177,7 +176,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         primary_key=True, serialize=False
                     ),
                 ),
@@ -194,7 +193,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         primary_key=True, serialize=False
                     ),
                 ),
@@ -217,7 +216,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="multisigconfirmation",
             name="multisig_transaction_hash",
-            field=gnosis.eth.django.models.Sha3HashField(db_index=True, null=True),
+            field=safe_eth.eth.django.models.Sha3HashField(db_index=True, null=True),
         ),
         migrations.AddField(
             model_name="multisigtransaction",
@@ -237,14 +236,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="signature",
-            field=gnosis.eth.django.models.HexField(
+            field=safe_eth.eth.django.models.HexField(
                 default=None, max_length=500, null=True
             ),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressField(
+            field=safe_eth.eth.django.models.EthereumAddressField(
                 db_index=True, null=True
             ),
         ),
@@ -278,7 +277,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         primary_key=True, serialize=False
                     ),
                 ),
@@ -348,17 +347,17 @@ class Migration(migrations.Migration):
                         to="history.InternalTx",
                     ),
                 ),
-                ("address", gnosis.eth.django.models.EthereumAddressField()),
+                ("address", safe_eth.eth.django.models.EthereumAddressField()),
                 (
                     "owners",
                     django.contrib.postgres.fields.ArrayField(
-                        base_field=gnosis.eth.django.models.EthereumAddressField(),
+                        base_field=safe_eth.eth.django.models.EthereumAddressField(),
                         size=None,
                     ),
                 ),
-                ("threshold", gnosis.eth.django.models.Uint256Field()),
-                ("nonce", gnosis.eth.django.models.Uint256Field(default=0)),
-                ("master_copy", gnosis.eth.django.models.EthereumAddressField()),
+                ("threshold", safe_eth.eth.django.models.Uint256Field()),
+                ("nonce", safe_eth.eth.django.models.Uint256Field(default=0)),
+                ("master_copy", safe_eth.eth.django.models.EthereumAddressField()),
             ],
             options={
                 "verbose_name_plural": "Safe statuses",
@@ -380,13 +379,13 @@ class Migration(migrations.Migration):
                 ("log_index", models.PositiveIntegerField()),
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
                 ),
-                ("topic", gnosis.eth.django.models.Sha3HashField(db_index=True)),
+                ("topic", safe_eth.eth.django.models.Sha3HashField(db_index=True)),
                 (
                     "topics",
                     django.contrib.postgres.fields.ArrayField(
-                        base_field=gnosis.eth.django.models.Sha3HashField(), size=None
+                        base_field=safe_eth.eth.django.models.Sha3HashField(), size=None
                     ),
                 ),
                 ("arguments", django.contrib.postgres.fields.jsonb.JSONField()),

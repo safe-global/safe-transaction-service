@@ -1,4 +1,4 @@
-from gnosis.eth import EthereumNetwork, get_auto_ethereum_client
+from safe_eth.eth import EthereumNetwork, get_auto_ethereum_client
 
 
 def get_chain_id() -> int:

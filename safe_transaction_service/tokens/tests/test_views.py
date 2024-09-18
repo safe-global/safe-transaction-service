@@ -8,9 +8,8 @@ from eth_account import Account
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
-
-from gnosis.eth.ethereum_client import Erc20Manager, InvalidERC20Info
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.ethereum_client import Erc20Manager, InvalidERC20Info
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import Token
 from .factories import TokenFactory

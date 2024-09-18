@@ -2,8 +2,7 @@ import time
 from contextlib import contextmanager
 
 from gevent.pool import Pool
-
-from gnosis.eth import EthereumClient
+from safe_eth.eth import EthereumClient
 
 
 @contextmanager

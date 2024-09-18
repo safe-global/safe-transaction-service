@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="ethereumblock",
             name="gas_limit",
-            field=gnosis.eth.django.models.Uint256Field(),
+            field=safe_eth.eth.django.models.Uint256Field(),
         ),
         migrations.AlterField(
             model_name="ethereumblock",
             name="gas_used",
-            field=gnosis.eth.django.models.Uint256Field(),
+            field=safe_eth.eth.django.models.Uint256Field(),
         ),
     ]

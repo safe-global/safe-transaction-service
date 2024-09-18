@@ -3,7 +3,7 @@
 import django.contrib.postgres.fields
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -90,154 +90,154 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="erc20transfer",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="erc20transfer",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="erc20transfer",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="ethereumtx",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="ethereumtx",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="internaltx",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(null=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(null=True),
         ),
         migrations.AlterField(
             model_name="internaltx",
             name="contract_address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="internaltx",
             name="refund_address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="internaltx",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(null=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(null=True),
         ),
         migrations.AlterField(
             model_name="moduletransaction",
             name="module",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="moduletransaction",
             name="safe",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="moduletransaction",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="owner",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="gas_token",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(null=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(null=True),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="refund_receiver",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(null=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(null=True),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="safe",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="proxyfactory",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 primary_key=True, serialize=False
             ),
         ),
         migrations.AlterField(
             model_name="safecontract",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 primary_key=True, serialize=False
             ),
         ),
         migrations.AlterField(
             model_name="safecontractdelegate",
             name="delegate",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="safecontractdelegate",
             name="delegator",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="safemastercopy",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 primary_key=True, serialize=False
             ),
         ),
         migrations.AlterField(
             model_name="safestatus",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
         ),
         migrations.AlterField(
             model_name="safestatus",
             name="enabled_modules",
             field=django.contrib.postgres.fields.ArrayField(
-                base_field=gnosis.eth.django.models.EthereumAddressV2Field(),
+                base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
                 default=list,
                 size=None,
             ),
@@ -245,31 +245,32 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="safestatus",
             name="fallback_handler",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="safestatus",
             name="guard",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 default=None, null=True
             ),
         ),
         migrations.AlterField(
             model_name="safestatus",
             name="master_copy",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AlterField(
             model_name="safestatus",
             name="owners",
             field=django.contrib.postgres.fields.ArrayField(
-                base_field=gnosis.eth.django.models.EthereumAddressV2Field(), size=None
+                base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
+                size=None,
             ),
         ),
         migrations.AlterField(
             model_name="webhook",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 db_index=True, null=True
             ),
         ),

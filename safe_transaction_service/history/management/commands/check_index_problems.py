@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import EthereumClient
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import get_safe_V1_3_0_contract
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.contracts import get_safe_V1_3_0_contract
 
 from ...models import MultisigTransaction, SafeLastStatus
 from ...services import IndexServiceProvider

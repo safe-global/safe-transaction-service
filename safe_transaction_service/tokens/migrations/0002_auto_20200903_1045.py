@@ -3,9 +3,8 @@
 from django.db import migrations, models
 
 from eth_abi.exceptions import DecodingError
+from safe_eth.eth import get_auto_ethereum_client
 from web3.exceptions import Web3Exception
-
-from gnosis.eth import get_auto_ethereum_client
 
 
 def fix_token_decimals(apps, schema_editor):

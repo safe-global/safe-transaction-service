@@ -4,9 +4,8 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.clients import BlockscoutClient, EtherscanClient, SourcifyClient
-from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
+from safe_eth.eth.clients import BlockscoutClient, EtherscanClient, SourcifyClient
+from safe_eth.eth.ethereum_client import EthereumClient, EthereumNetwork
 
 from ...services.contract_metadata_service import get_contract_metadata_service
 from ..mocks.contract_metadata_mocks import (

@@ -5,8 +5,7 @@ from django.utils import timezone
 
 from django_test_migrations.migrator import Migrator
 from eth_account import Account
-
-from gnosis.eth.utils import fast_keccak, fast_keccak_text
+from safe_eth.eth.utils import fast_keccak, fast_keccak_text
 
 
 class TestMigrations(TestCase):

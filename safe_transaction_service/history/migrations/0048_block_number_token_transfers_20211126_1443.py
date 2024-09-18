@@ -3,7 +3,7 @@
 import django.utils.timezone
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -43,22 +43,22 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="erc20transfer",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AlterField(
             model_name="erc20transfer",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="_from",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="to",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AddIndex(
             model_name="erc20transfer",
@@ -87,12 +87,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="erc20transfer",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AlterField(
             model_name="erc721transfer",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressField(),
+            field=safe_eth.eth.django.models.EthereumAddressField(),
         ),
         migrations.AddIndex(
             model_name="erc20transfer",

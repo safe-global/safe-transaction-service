@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from typing import List, Sequence
 
 from hexbytes import HexBytes
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.constants import NULL_ADDRESS
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.constants import NULL_ADDRESS
 
 from .kleros_abi import kleros_abi
 

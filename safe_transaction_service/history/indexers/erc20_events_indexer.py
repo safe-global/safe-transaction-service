@@ -7,10 +7,9 @@ from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
 
 from eth_typing import ChecksumAddress
+from safe_eth.eth import EthereumClient
 from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
-
-from gnosis.eth import EthereumClient
 
 from ...utils.utils import FixedSizeDict
 from ..models import (

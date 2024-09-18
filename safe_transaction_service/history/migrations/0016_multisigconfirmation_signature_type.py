@@ -3,8 +3,7 @@
 from django.db import migrations, models
 
 from hexbytes import HexBytes
-
-from gnosis.safe.safe_signature import (
+from safe_eth.safe.safe_signature import (
     SafeSignature,
     SafeSignatureApprovedHash,
     SafeSignatureType,

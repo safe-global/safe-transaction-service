@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexerProvider
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus, SafeRelevantTransaction

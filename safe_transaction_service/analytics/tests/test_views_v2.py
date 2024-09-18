@@ -4,8 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
-
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.history.tests.factories import MultisigTransactionFactory
 

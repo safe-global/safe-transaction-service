@@ -3,7 +3,7 @@ import unittest
 
 from django.test import TestCase
 
-from gnosis.eth.utils import fast_is_checksum_address
+from safe_eth.eth.utils import fast_is_checksum_address
 
 from ...clients import CoinMarketCapClient
 

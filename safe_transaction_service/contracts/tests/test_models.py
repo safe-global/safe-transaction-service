@@ -8,9 +8,8 @@ from django.db.transaction import atomic
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.ethereum_client import EthereumNetwork
-from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
+from safe_eth.eth.ethereum_client import EthereumNetwork
+from safe_eth.eth.tests.clients.mocks import sourcify_safe_metadata
 
 from ..models import Contract, ContractAbi, validate_abi
 from .factories import ContractAbiFactory, ContractFactory

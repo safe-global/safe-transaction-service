@@ -5,17 +5,16 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+import safe_eth.eth.django.serializers as eth_serializers
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-
-import gnosis.eth.django.serializers as eth_serializers
-from gnosis.eth import get_auto_ethereum_client
-from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
-from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.eth import get_auto_ethereum_client
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
+from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id

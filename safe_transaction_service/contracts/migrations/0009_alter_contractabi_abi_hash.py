@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="contractabi",
             name="abi_hash",
-            field=gnosis.eth.django.models.Keccak256Field(
+            field=safe_eth.eth.django.models.Keccak256Field(
                 blank=True, default=None, null=True, unique=True
             ),
         ),

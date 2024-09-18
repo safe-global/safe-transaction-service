@@ -4,10 +4,9 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.ethereum_client import TracingManager
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.ethereum_client import TracingManager
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..models import SafeMasterCopy
 from ..services.safe_service import (

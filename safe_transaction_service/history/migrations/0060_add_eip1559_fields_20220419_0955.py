@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,14 +14,14 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="ethereumtx",
             name="max_fee_per_gas",
-            field=gnosis.eth.django.models.Uint256Field(
+            field=safe_eth.eth.django.models.Uint256Field(
                 blank=True, default=None, null=True
             ),
         ),
         migrations.AddField(
             model_name="ethereumtx",
             name="max_priority_fee_per_gas",
-            field=gnosis.eth.django.models.Uint256Field(
+            field=safe_eth.eth.django.models.Uint256Field(
                 blank=True, default=None, null=True
             ),
         ),

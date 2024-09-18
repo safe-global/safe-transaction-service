@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, PropertyMock
 
 from django.test import TestCase
 
-from gnosis.eth import EthereumClient
+from safe_eth.eth import EthereumClient
 
 from ..models import (
     EthereumBlock,

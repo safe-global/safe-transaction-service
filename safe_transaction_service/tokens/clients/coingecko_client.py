@@ -4,8 +4,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 from eth_typing import ChecksumAddress
-
-from gnosis.eth import EthereumNetwork
+from safe_eth.eth import EthereumNetwork
 
 from safe_transaction_service.tokens.clients.base_client import BaseHTTPClient
 from safe_transaction_service.tokens.clients.exceptions import (

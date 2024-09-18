@@ -16,10 +16,9 @@ from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
+from safe_eth.eth import InvalidERC20Info, InvalidERC721Info, get_auto_ethereum_client
+from safe_eth.eth.django.models import EthereumAddressBinaryField
 from web3.exceptions import Web3Exception
-
-from gnosis.eth import InvalidERC20Info, InvalidERC721Info, get_auto_ethereum_client
-from gnosis.eth.django.models import EthereumAddressBinaryField
 
 from .clients.zerion_client import (
     BalancerTokenAdapterClient,

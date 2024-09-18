@@ -7,8 +7,7 @@ from django.db.models import Min, Q
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 
 from ..models import EthereumBlock, EthereumTx
 from ..models import IndexingStatus as IndexingStatusDb

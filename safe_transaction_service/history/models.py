@@ -36,19 +36,18 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from packaging.version import Version
-from web3.types import EventData
-
-from gnosis.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
-from gnosis.eth.django.models import (
+from safe_eth.eth.constants import ERC20_721_TRANSFER_TOPIC, NULL_ADDRESS
+from safe_eth.eth.django.models import (
     EthereumAddressBinaryField,
     HexV2Field,
     Keccak256Field,
     Uint256Field,
 )
-from gnosis.eth.utils import fast_to_checksum_address
-from gnosis.safe import SafeOperationEnum
-from gnosis.safe.safe import SafeInfo
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe import SafeOperationEnum
+from safe_eth.safe.safe import SafeInfo
+from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
+from web3.types import EventData
 
 from safe_transaction_service.account_abstraction.constants import (
     USER_OPERATION_EVENT_TOPIC,

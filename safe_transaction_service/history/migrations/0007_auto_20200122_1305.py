@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="safestatus",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressField(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressField(db_index=True),
         ),
         migrations.CreateModel(
             name="WebHook",
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
                 ),
                 ("url", models.URLField()),
                 ("new_confirmation", models.BooleanField(default=True)),

@@ -6,9 +6,8 @@ from unittest.mock import MagicMock, PropertyMock
 from django.test import TestCase
 
 from eth_typing import HexStr
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.ethereum_client import TracingManager
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.ethereum_client import TracingManager
 
 from ..indexers import InternalTxIndexer, InternalTxIndexerProvider
 from ..indexers.internal_tx_indexer import InternalTxIndexerWithTraceBlock

@@ -3,7 +3,7 @@ import logging
 
 from django.db import migrations
 
-from gnosis.eth import get_auto_ethereum_client
+from safe_eth.eth import get_auto_ethereum_client
 
 from ..utils import clean_receipt_log
 

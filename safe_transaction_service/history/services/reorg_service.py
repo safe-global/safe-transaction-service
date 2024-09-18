@@ -5,8 +5,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 
 from hexbytes import HexBytes
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 
 from ..indexers import (
     Erc20EventsIndexerProvider,

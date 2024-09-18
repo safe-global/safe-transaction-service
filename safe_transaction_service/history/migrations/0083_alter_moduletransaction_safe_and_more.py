@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="moduletransaction",
             name="safe",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(),
         ),
         migrations.AddIndex(
             model_name="moduletransaction",

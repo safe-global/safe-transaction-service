@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -64,29 +64,29 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="ethereumblock",
             name="block_hash",
-            field=gnosis.eth.django.models.Keccak256Field(unique=True),
+            field=safe_eth.eth.django.models.Keccak256Field(unique=True),
         ),
         migrations.AlterField(
             model_name="ethereumblock",
             name="parent_hash",
-            field=gnosis.eth.django.models.Keccak256Field(unique=True),
+            field=safe_eth.eth.django.models.Keccak256Field(unique=True),
         ),
         migrations.AlterField(
             model_name="ethereumtx",
             name="tx_hash",
-            field=gnosis.eth.django.models.Keccak256Field(
+            field=safe_eth.eth.django.models.Keccak256Field(
                 primary_key=True, serialize=False
             ),
         ),
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="multisig_transaction_hash",
-            field=gnosis.eth.django.models.Keccak256Field(db_index=True, null=True),
+            field=safe_eth.eth.django.models.Keccak256Field(db_index=True, null=True),
         ),
         migrations.AlterField(
             model_name="multisigtransaction",
             name="safe_tx_hash",
-            field=gnosis.eth.django.models.Keccak256Field(
+            field=safe_eth.eth.django.models.Keccak256Field(
                 primary_key=True, serialize=False
             ),
         ),

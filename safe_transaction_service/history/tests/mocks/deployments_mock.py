@@ -52,36 +52,72 @@ mainnet_deployments_1_3_0 = {
             "address": "0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4",
         },
         {
+            "contractName": "CompatibilityFallbackHandler",
+            "address": "0x017062a1dE2FE6b99BE3d9d37841FeD19F573804",
+        },
+        {
             "contractName": "CreateCall",
             "address": "0x7cbB62EaA69F79e6873cD1ecB2392971036cFAa4",
+        },
+        {
+            "contractName": "CreateCall",
+            "address": "0xB19D6FFc2182150F8Eb585b79D4ABcd7C5640A9d",
         },
         {
             "contractName": "GnosisSafe",
             "address": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
         },
         {
+            "contractName": "GnosisSafe",
+            "address": "0x69f4D1788e39c87893C980c06EdF4b7f686e2938",
+        },
+        {
             "contractName": "GnosisSafeL2",
             "address": "0x3E5c63644E683549055b9Be8653de26E0B4CD36E",
+        },
+        {
+            "contractName": "GnosisSafeL2",
+            "address": "0xfb1bffC9d739B8D520DaF37dF666da4C687191EA",
         },
         {
             "contractName": "MultiSend",
             "address": "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761",
         },
         {
+            "contractName": "MultiSend",
+            "address": "0x998739BFdAAdde7C933B942a68053933098f9EDa",
+        },
+        {
             "contractName": "MultiSendCallOnly",
             "address": "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
+        },
+        {
+            "contractName": "MultiSendCallOnly",
+            "address": "0xA1dabEF33b3B82c7814B6D82A79e50F4AC44102B",
         },
         {
             "contractName": "GnosisSafeProxyFactory",
             "address": "0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2",
         },
         {
+            "contractName": "GnosisSafeProxyFactory",
+            "address": "0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC",
+        },
+        {
             "contractName": "SignMessageLib",
             "address": "0xA65387F16B013cf2Af4605Ad8aA5ec25a2cbA3a2",
         },
         {
+            "contractName": "SignMessageLib",
+            "address": "0x98FFBBF51bb33A056B08ddf711f289936AafF717",
+        },
+        {
             "contractName": "SimulateTxAccessor",
             "address": "0x59AD6735bCd8152B84860Cb256dD9e96b85F69Da",
+        },
+        {
+            "contractName": "SimulateTxAccessor",
+            "address": "0x727a77a074D1E6c4530e814F89E618a3298FC044",
         },
     ],
 }

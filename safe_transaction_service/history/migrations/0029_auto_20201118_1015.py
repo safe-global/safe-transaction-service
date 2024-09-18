@@ -3,7 +3,7 @@
 import django.contrib.postgres.fields
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             model_name="safestatus",
             name="owners",
             field=django.contrib.postgres.fields.ArrayField(
-                base_field=gnosis.eth.django.models.EthereumAddressField(),
+                base_field=safe_eth.eth.django.models.EthereumAddressField(),
                 db_index=True,
                 size=None,
             ),

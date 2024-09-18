@@ -8,9 +8,8 @@ from eth_typing import ChecksumAddress
 from packaging import version as semantic_version
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-
-from gnosis.eth.django.serializers import EthereumAddressField, HexadecimalField
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.eth.django.serializers import EthereumAddressField, HexadecimalField
+from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 
 from safe_transaction_service.history.models import SafeContract, SafeContractDelegate
 from safe_transaction_service.utils.serializers import get_safe_owners

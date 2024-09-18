@@ -5,8 +5,7 @@ import django.utils.timezone
 from django.db import migrations, models
 
 import model_utils.fields
-
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -39,7 +38,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "hash",
-                    gnosis.eth.django.models.Keccak256Field(
+                    safe_eth.eth.django.models.Keccak256Field(
                         primary_key=True, serialize=False
                     ),
                 ),
@@ -47,7 +46,7 @@ class Migration(migrations.Migration):
                 ("valid_until", models.DateTimeField(null=True)),
                 (
                     "module_address",
-                    gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
                 ),
             ],
             options={
@@ -82,10 +81,10 @@ class Migration(migrations.Migration):
                         verbose_name="modified",
                     ),
                 ),
-                ("owner", gnosis.eth.django.models.EthereumAddressV2Field()),
+                ("owner", safe_eth.eth.django.models.EthereumAddressV2Field()),
                 (
                     "signature",
-                    gnosis.eth.django.models.HexV2Field(
+                    safe_eth.eth.django.models.HexV2Field(
                         default=None, max_length=5000, null=True
                     ),
                 ),
@@ -119,25 +118,25 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "hash",
-                    gnosis.eth.django.models.Keccak256Field(
+                    safe_eth.eth.django.models.Keccak256Field(
                         primary_key=True, serialize=False
                     ),
                 ),
                 (
                     "sender",
-                    gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
                 ),
-                ("nonce", gnosis.eth.django.models.Uint256Field()),
+                ("nonce", safe_eth.eth.django.models.Uint256Field()),
                 ("init_code", models.BinaryField(blank=True, editable=True, null=True)),
                 ("call_data", models.BinaryField(blank=True, editable=True, null=True)),
-                ("call_data_gas_limit", gnosis.eth.django.models.Uint256Field()),
-                ("verification_gas_limit", gnosis.eth.django.models.Uint256Field()),
-                ("pre_verification_gas", gnosis.eth.django.models.Uint256Field()),
-                ("max_fee_per_gas", gnosis.eth.django.models.Uint256Field()),
-                ("max_priority_fee_per_gas", gnosis.eth.django.models.Uint256Field()),
+                ("call_data_gas_limit", safe_eth.eth.django.models.Uint256Field()),
+                ("verification_gas_limit", safe_eth.eth.django.models.Uint256Field()),
+                ("pre_verification_gas", safe_eth.eth.django.models.Uint256Field()),
+                ("max_fee_per_gas", safe_eth.eth.django.models.Uint256Field()),
+                ("max_priority_fee_per_gas", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "paymaster",
-                    gnosis.eth.django.models.EthereumAddressV2Field(
+                    safe_eth.eth.django.models.EthereumAddressV2Field(
                         blank=True, db_index=True, null=True
                     ),
                 ),
@@ -148,7 +147,7 @@ class Migration(migrations.Migration):
                 ("signature", models.BinaryField(blank=True, editable=True, null=True)),
                 (
                     "entry_point",
-                    gnosis.eth.django.models.EthereumAddressV2Field(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressV2Field(db_index=True),
                 ),
                 (
                     "ethereum_tx",
@@ -182,11 +181,11 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("actual_gas_cost", gnosis.eth.django.models.Uint256Field()),
-                ("actual_gas_used", gnosis.eth.django.models.Uint256Field()),
+                ("actual_gas_cost", safe_eth.eth.django.models.Uint256Field()),
+                ("actual_gas_used", safe_eth.eth.django.models.Uint256Field()),
                 ("success", models.BooleanField()),
                 ("reason", models.CharField(max_length=256)),
-                ("deposited", gnosis.eth.django.models.Uint256Field()),
+                ("deposited", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "user_operation",
                     models.OneToOneField(

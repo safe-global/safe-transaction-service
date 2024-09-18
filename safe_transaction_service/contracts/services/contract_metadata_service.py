@@ -5,9 +5,8 @@ from typing import Optional
 from django.conf import settings
 
 from eth_typing import ChecksumAddress
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
-from gnosis.eth.clients import (
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.clients import (
     BlockscoutClient,
     BlockScoutConfigurationProblem,
     ContractMetadata,
