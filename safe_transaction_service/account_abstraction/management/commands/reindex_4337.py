@@ -3,8 +3,7 @@ from typing import Optional, Sequence
 from django.core.management.base import BaseCommand
 
 from eth_typing import ChecksumAddress
-
-from gnosis.eth.utils import fast_to_checksum_address
+from safe_eth.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.history.models import EthereumTx
 

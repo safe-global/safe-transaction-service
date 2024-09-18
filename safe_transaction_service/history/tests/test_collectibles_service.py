@@ -6,15 +6,14 @@ from django.conf import settings
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth import EthereumNetwork
-from gnosis.eth.ethereum_client import (
+from safe_eth.eth import EthereumNetwork
+from safe_eth.eth.ethereum_client import (
     Erc721Info,
     Erc721Manager,
     InvalidERC721Info,
     get_auto_ethereum_client,
 )
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from safe_transaction_service.tokens.constants import ENS_CONTRACTS_WITH_TLD
 from safe_transaction_service.tokens.models import Token

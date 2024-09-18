@@ -3,8 +3,7 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from hexbytes import HexBytes
-
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.history.helpers import DelegateSignatureHelperV2
 

@@ -1,8 +1,8 @@
 from django.core.files import File
 from django.core.management import BaseCommand, CommandError
 
-from gnosis.eth import get_auto_ethereum_client
-from gnosis.safe.safe_deployments import safe_deployments
+from safe_eth.eth import get_auto_ethereum_client
+from safe_eth.safe.safe_deployments import safe_deployments
 
 from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
@@ -80,7 +80,7 @@ class Command(BaseCommand):
 
         for version in versions:
             for contract_name, addresses in safe_deployments[version].items():
-                if (contract_address := addresses.get(str(chain_id))) is not None:
+                for contract_address in addresses.get(str(chain_id), []):
                     display_name = generate_safe_contract_display_name(
                         contract_name, version
                     )

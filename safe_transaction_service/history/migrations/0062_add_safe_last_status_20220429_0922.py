@@ -5,7 +5,7 @@ import django.contrib.postgres.indexes
 import django.db.models.deletion
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 def init_safe_last_status(apps, schema_editor):
@@ -48,31 +48,34 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressV2Field(
+                    safe_eth.eth.django.models.EthereumAddressV2Field(
                         db_index=True, primary_key=True, serialize=False
                     ),
                 ),
                 (
                     "owners",
                     django.contrib.postgres.fields.ArrayField(
-                        base_field=gnosis.eth.django.models.EthereumAddressV2Field(),
+                        base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
                         size=None,
                     ),
                 ),
-                ("threshold", gnosis.eth.django.models.Uint256Field()),
-                ("nonce", gnosis.eth.django.models.Uint256Field(default=0)),
-                ("master_copy", gnosis.eth.django.models.EthereumAddressV2Field()),
-                ("fallback_handler", gnosis.eth.django.models.EthereumAddressV2Field()),
+                ("threshold", safe_eth.eth.django.models.Uint256Field()),
+                ("nonce", safe_eth.eth.django.models.Uint256Field(default=0)),
+                ("master_copy", safe_eth.eth.django.models.EthereumAddressV2Field()),
+                (
+                    "fallback_handler",
+                    safe_eth.eth.django.models.EthereumAddressV2Field(),
+                ),
                 (
                     "guard",
-                    gnosis.eth.django.models.EthereumAddressV2Field(
+                    safe_eth.eth.django.models.EthereumAddressV2Field(
                         default=None, null=True
                     ),
                 ),
                 (
                     "enabled_modules",
                     django.contrib.postgres.fields.ArrayField(
-                        base_field=gnosis.eth.django.models.EthereumAddressV2Field(),
+                        base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
                         default=list,
                         size=None,
                     ),

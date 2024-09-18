@@ -3,14 +3,13 @@ from django.test import TestCase
 from eth_account import Account
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
+from safe_eth.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
+from safe_eth.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
+from safe_eth.safe import Safe
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from web3 import Web3
 from web3.datastructures import AttributeDict
 from web3.types import LogReceipt
-
-from gnosis.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
-from gnosis.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
-from gnosis.safe import Safe
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..indexers import SafeEventsIndexer, SafeEventsIndexerProvider
 from ..indexers.tx_processor import SafeTxProcessor

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 from urllib.parse import urljoin
 
-from gnosis.eth.utils import fast_to_checksum_address
+from safe_eth.eth.utils import fast_to_checksum_address
 
 from .base_client import BaseHTTPClient
 

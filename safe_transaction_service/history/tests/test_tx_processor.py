@@ -5,11 +5,10 @@ from django.test import TestCase
 
 from eth_account import Account
 from eth_utils import keccak
-
-from gnosis.eth.ethereum_client import TracingManager
-from gnosis.eth.utils import fast_keccak_text
-from gnosis.safe.safe_signature import SafeSignatureType
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.ethereum_client import TracingManager
+from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.safe.safe_signature import SafeSignatureType
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
 from safe_transaction_service.safe_messages.tests.factories import (

@@ -5,8 +5,7 @@ from django.test import TestCase
 
 from eth_account import Account
 from hexbytes import HexBytes
-
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..utils import get_hash_for_message, get_safe_message_hash_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
@@ -35,7 +34,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         ]:
             with self.subTest(input=input):
                 with mock.patch(
-                    "gnosis.safe.safe.Safe.domain_separator",
+                    "safe_eth.safe.safe.Safe.domain_separator",
                     return_value=mock_domain_separator,
                     new_callable=PropertyMock,
                 ):

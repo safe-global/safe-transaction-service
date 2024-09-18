@@ -3,7 +3,7 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("timestamp", models.DateTimeField()),
-                ("safe", gnosis.eth.django.models.EthereumAddressBinaryField()),
+                ("safe", safe_eth.eth.django.models.EthereumAddressBinaryField()),
                 (
                     "ethereum_tx",
                     models.ForeignKey(

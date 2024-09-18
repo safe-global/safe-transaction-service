@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -18,28 +18,28 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="safeoperation",
             name="module_address",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(db_index=True),
         ),
         migrations.AlterField(
             model_name="safeoperationconfirmation",
             name="owner",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(),
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(),
         ),
         migrations.AlterField(
             model_name="useroperation",
             name="entry_point",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(db_index=True),
         ),
         migrations.AlterField(
             model_name="useroperation",
             name="paymaster",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(
                 blank=True, db_index=True, null=True
             ),
         ),
         migrations.AlterField(
             model_name="useroperation",
             name="sender",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(db_index=True),
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(db_index=True),
         ),
     ]

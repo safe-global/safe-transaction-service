@@ -7,10 +7,9 @@ from django.utils import timezone
 
 from celery import app
 from celery.utils.log import get_task_logger
+from safe_eth.eth.ethereum_client import EthereumNetwork, get_auto_ethereum_client
+from safe_eth.eth.utils import fast_to_checksum_address
 from web3.exceptions import Web3Exception
-
-from gnosis.eth.ethereum_client import EthereumNetwork, get_auto_ethereum_client
-from gnosis.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator

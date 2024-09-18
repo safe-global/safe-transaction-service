@@ -1,13 +1,13 @@
 from django.test import TestCase
 
-from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.tests.mocks.mock_bundler import (
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.tests.mocks.mock_bundler import (
     safe_4337_module_address_mock,
     safe_4337_safe_operation_hash_mock,
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
 )
-from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 
 from safe_transaction_service.history.tests import factories as history_factories
 

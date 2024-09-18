@@ -1,8 +1,7 @@
 from enum import Enum
 
 from rest_framework import serializers
-
-from gnosis.eth.django.serializers import EthereumAddressField
+from safe_eth.eth.django.serializers import EthereumAddressField
 
 from .models import Token
 

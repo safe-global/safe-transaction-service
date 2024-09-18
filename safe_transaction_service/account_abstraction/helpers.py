@@ -2,11 +2,10 @@ import dataclasses
 from typing import List
 
 from eth_typing import ChecksumAddress
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.contracts import get_safe_V1_4_1_contract
-from gnosis.eth.utils import fast_to_checksum_address
-from gnosis.safe.proxy_factory import ProxyFactoryV141
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.contracts import get_safe_V1_4_1_contract
+from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe.proxy_factory import ProxyFactoryV141
 
 
 @dataclasses.dataclass(eq=True, frozen=True)

@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="ethereumtx",
             name="tx_hash",
-            field=gnosis.eth.django.models.Sha3HashField(
+            field=safe_eth.eth.django.models.Sha3HashField(
                 primary_key=True, serialize=False
             ),
         ),

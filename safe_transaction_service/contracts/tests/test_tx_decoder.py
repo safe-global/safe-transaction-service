@@ -3,10 +3,9 @@ import logging
 from django.test import TestCase
 
 from hexbytes import HexBytes
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.safe.multi_send import MultiSendOperation
 from web3 import Web3
-
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.safe.multi_send import MultiSendOperation
 
 from safe_transaction_service.contracts.tests.factories import (
     ContractAbiFactory,

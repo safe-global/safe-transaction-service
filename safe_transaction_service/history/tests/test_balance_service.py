@@ -1,8 +1,7 @@
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.tests.ethereum_test_case import EthereumTestCaseMixin
+from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory

@@ -3,7 +3,7 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -26,12 +26,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
                 ),
-                ("_from", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
-                ("to", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
+                (
+                    "_from",
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
+                ),
+                ("to", safe_eth.eth.django.models.EthereumAddressField(db_index=True)),
                 ("log_index", models.PositiveIntegerField()),
-                ("value", gnosis.eth.django.models.Uint256Field()),
+                ("value", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "ethereum_tx",
                     models.ForeignKey(
@@ -59,12 +62,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
                 ),
-                ("_from", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
-                ("to", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
+                (
+                    "_from",
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
+                ),
+                ("to", safe_eth.eth.django.models.EthereumAddressField(db_index=True)),
                 ("log_index", models.PositiveIntegerField()),
-                ("token_id", gnosis.eth.django.models.Uint256Field()),
+                ("token_id", safe_eth.eth.django.models.Uint256Field()),
                 (
                     "ethereum_tx",
                     models.ForeignKey(

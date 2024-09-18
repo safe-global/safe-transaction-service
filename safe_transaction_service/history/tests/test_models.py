@@ -9,9 +9,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from eth_account import Account
-
-from gnosis.eth.utils import fast_keccak_text
-from gnosis.safe.safe_signature import SafeSignatureType
+from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.safe.safe_signature import SafeSignatureType
 
 from safe_transaction_service.account_abstraction.tests.mocks import aa_tx_receipt_mock
 from safe_transaction_service.contracts.models import ContractQuerySet

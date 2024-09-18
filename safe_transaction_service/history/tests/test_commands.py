@@ -9,10 +9,9 @@ from django.test import TestCase
 
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
-
-from gnosis.eth.account_abstraction import BundlerClient
-from gnosis.eth.ethereum_client import EthereumClient, EthereumNetwork
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.account_abstraction import BundlerClient
+from safe_eth.eth.ethereum_client import EthereumClient, EthereumNetwork
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
 from ..models import (

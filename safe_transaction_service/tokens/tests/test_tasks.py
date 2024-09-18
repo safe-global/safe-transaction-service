@@ -5,8 +5,7 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from ens import ENS
-
-from gnosis.eth.ethereum_client import EthereumNetwork
+from safe_eth.eth.ethereum_client import EthereumNetwork
 
 from ...utils.redis import get_redis
 from ..models import TokenList

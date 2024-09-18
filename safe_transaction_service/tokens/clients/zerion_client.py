@@ -2,10 +2,9 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from eth_typing import ChecksumAddress
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.constants import NULL_ADDRESS
 from web3.exceptions import ContractLogicError
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.constants import NULL_ADDRESS
 
 
 @dataclass

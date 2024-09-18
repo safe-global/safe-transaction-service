@@ -1,9 +1,8 @@
 from django.test import TestCase
 
 from hexbytes import HexBytes
-
-from gnosis.eth.tests.mocks.mock_bundler import user_operation_mock
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.tests.mocks.mock_bundler import user_operation_mock
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..helpers import DecodedInitCode, decode_init_code
 

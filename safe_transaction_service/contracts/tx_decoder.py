@@ -24,13 +24,7 @@ from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
-from web3 import Web3
-from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
-from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
-from web3.contract import Contract
-from web3.types import ABIFunction
-
-from gnosis.eth.contracts import (
+from safe_eth.eth.contracts import (
     get_erc20_contract,
     get_erc721_contract,
     get_kyber_network_proxy_contract,
@@ -42,7 +36,12 @@ from gnosis.eth.contracts import (
     get_safe_V1_4_1_contract,
     get_uniswap_exchange_contract,
 )
-from gnosis.safe.multi_send import MultiSend
+from safe_eth.safe.multi_send import MultiSend
+from web3 import Web3
+from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
+from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
+from web3.contract import Contract
+from web3.types import ABIFunction
 
 from safe_transaction_service.contracts.models import ContractAbi
 from safe_transaction_service.utils.utils import running_on_gevent

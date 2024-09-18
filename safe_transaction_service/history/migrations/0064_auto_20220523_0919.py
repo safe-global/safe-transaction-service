@@ -3,7 +3,7 @@
 import django.contrib.postgres.fields
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             model_name="safelaststatus",
             name="enabled_modules",
             field=django.contrib.postgres.fields.ArrayField(
-                base_field=gnosis.eth.django.models.EthereumAddressV2Field(),
+                base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
                 blank=True,
                 default=list,
                 size=None,
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
             model_name="safestatus",
             name="enabled_modules",
             field=django.contrib.postgres.fields.ArrayField(
-                base_field=gnosis.eth.django.models.EthereumAddressV2Field(),
+                base_field=safe_eth.eth.django.models.EthereumAddressV2Field(),
                 blank=True,
                 default=list,
                 size=None,

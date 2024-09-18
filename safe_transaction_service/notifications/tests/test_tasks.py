@@ -3,8 +3,7 @@ from unittest import mock
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.utils import fast_keccak_text
+from safe_eth.eth.utils import fast_keccak_text
 
 from safe_transaction_service.history.models import (
     EthereumTxCallType,

@@ -2,8 +2,7 @@ from django.contrib import admin
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-
-from gnosis.eth.django.admin import AdvancedAdminSearchMixin
+from safe_eth.eth.django.admin import AdvancedAdminSearchMixin
 
 from .models import SafeOperation, UserOperation, UserOperationReceipt
 

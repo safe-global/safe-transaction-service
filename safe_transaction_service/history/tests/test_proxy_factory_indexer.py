@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.test import TestCase
 
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..indexers import ProxyFactoryIndexerProvider
 from ..models import SafeContract

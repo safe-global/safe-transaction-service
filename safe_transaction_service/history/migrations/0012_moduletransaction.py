@@ -5,8 +5,7 @@ import django.utils.timezone
 from django.db import migrations, models
 
 import model_utils.fields
-
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -44,13 +43,16 @@ class Migration(migrations.Migration):
                         to="history.InternalTx",
                     ),
                 ),
-                ("safe", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
+                (
+                    "safe",
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
+                ),
                 (
                     "module",
-                    gnosis.eth.django.models.EthereumAddressField(db_index=True),
+                    safe_eth.eth.django.models.EthereumAddressField(db_index=True),
                 ),
-                ("to", gnosis.eth.django.models.EthereumAddressField(db_index=True)),
-                ("value", gnosis.eth.django.models.Uint256Field()),
+                ("to", safe_eth.eth.django.models.EthereumAddressField(db_index=True)),
+                ("value", safe_eth.eth.django.models.Uint256Field()),
                 ("data", models.BinaryField(null=True)),
                 (
                     "operation",

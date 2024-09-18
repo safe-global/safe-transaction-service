@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="multisigconfirmation",
             name="signature",
-            field=gnosis.eth.django.models.HexField(max_length=500, null=True),
+            field=safe_eth.eth.django.models.HexField(max_length=500, null=True),
         ),
         migrations.AlterField(
             model_name="multisigconfirmation",
@@ -24,11 +24,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="block_number",
-            field=gnosis.eth.django.models.Uint256Field(null=True),
+            field=safe_eth.eth.django.models.Uint256Field(null=True),
         ),
         migrations.AlterField(
             model_name="multisigconfirmation",
             name="transaction_hash",
-            field=gnosis.eth.django.models.Sha3HashField(null=True),
+            field=safe_eth.eth.django.models.Sha3HashField(null=True),
         ),
     ]

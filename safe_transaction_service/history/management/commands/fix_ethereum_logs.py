@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import get_auto_ethereum_client
+from safe_eth.eth import get_auto_ethereum_client
 
 from ...models import EthereumTx
 from ...utils import clean_receipt_log

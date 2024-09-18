@@ -1,4 +1,4 @@
-from gnosis.eth.clients import ContractMetadata
+from safe_eth.eth.clients import ContractMetadata
 
 etherscan_metadata_mock = ContractMetadata(
     "Etherscan Uxio Contract",

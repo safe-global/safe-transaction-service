@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="multisigtransaction",
             name="gas_token",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 blank=True, null=True
             ),
         ),
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="multisigtransaction",
             name="refund_receiver",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(
                 blank=True, null=True
             ),
         ),

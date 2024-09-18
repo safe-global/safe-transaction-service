@@ -6,8 +6,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from eth_account import Account
-
-from gnosis.eth.ethereum_client import Erc20Info, Erc20Manager
+from safe_eth.eth.ethereum_client import Erc20Info, Erc20Manager
 
 from ..clients.zerion_client import (
     BalancerTokenAdapterClient,
@@ -56,7 +55,7 @@ class TestModels(TestCase):
             f"https://tokens-logo.localhost/tokens/logos/{t.address}.png",
         )
 
-        assets_url = "https://assets.gnosis.io"
+        assets_url = "https://assets.safe_eth.io"
         with self.settings(AWS_S3_PUBLIC_URL=assets_url):
             self.assertEqual(
                 t.get_full_logo_uri(), f"{assets_url}/tokens/logos/{t.address}.png"

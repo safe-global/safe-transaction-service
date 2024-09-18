@@ -12,11 +12,10 @@ from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
-
-from gnosis.eth import EthereumClient
-from gnosis.eth.account_abstraction import UserOperation as UserOperationClass
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.tests.mocks.mock_bundler import (
+from safe_eth.eth import EthereumClient
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.tests.mocks.mock_bundler import (
     safe_4337_address,
     safe_4337_chain_id_mock,
     safe_4337_module_address_mock,
@@ -24,11 +23,11 @@ from gnosis.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
 )
-from gnosis.eth.utils import fast_keccak, fast_to_checksum_address
-from gnosis.safe.account_abstraction import SafeOperation as SafeOperationClass
-from gnosis.safe.proxy_factory import ProxyFactoryV141
-from gnosis.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
+from safe_eth.safe.proxy_factory import ProxyFactoryV141
+from safe_eth.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.utils.utils import datetime_to_str
 

@@ -10,8 +10,7 @@ from django.utils import timezone
 
 from eth_typing import HexStr
 from redis import Redis
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis

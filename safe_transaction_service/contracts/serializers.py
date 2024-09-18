@@ -1,6 +1,5 @@
 from rest_framework import serializers
-
-from gnosis.eth.django.serializers import EthereumAddressField
+from safe_eth.eth.django.serializers import EthereumAddressField
 
 
 class ContractAbiSerializer(serializers.Serializer):

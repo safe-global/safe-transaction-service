@@ -23,12 +23,11 @@ from rest_framework.generics import (
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from gnosis.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.utils import fast_is_checksum_address
-from gnosis.safe import CannotEstimateGas
-from gnosis.safe.safe_deployments import safe_deployments
+from safe_eth.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.utils import fast_is_checksum_address
+from safe_eth.safe import CannotEstimateGas
+from safe_eth.safe.safe_deployments import safe_deployments
 
 from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
@@ -224,20 +223,22 @@ class SafeDeploymentsView(ListAPIView):
             if filter_contract:
                 # Filter by contract name
                 if addresses := safe_deployments[version].get(filter_contract):
-                    contracts.append(
-                        {
-                            "contract_name": filter_contract,
-                            "address": addresses.get(str(chain_id)),
-                        }
-                    )
+                    for address in addresses.get(str(chain_id)):
+                        contracts.append(
+                            {
+                                "contract_name": filter_contract,
+                                "address": address,
+                            }
+                        )
             else:
                 for contract_name, addresses in safe_deployments[version].items():
-                    contracts.append(
-                        {
-                            "contract_name": contract_name,
-                            "address": addresses.get(chain_id),
-                        }
-                    )
+                    for address in addresses.get(chain_id):
+                        contracts.append(
+                            {
+                                "contract_name": contract_name,
+                                "address": address,
+                            }
+                        )
 
             data_response.append({"version": version, "contracts": contracts})
 

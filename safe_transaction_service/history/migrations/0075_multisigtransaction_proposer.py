@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="multisigtransaction",
             name="proposer",
-            field=gnosis.eth.django.models.EthereumAddressV2Field(null=True),
+            field=safe_eth.eth.django.models.EthereumAddressV2Field(null=True),
         ),
     ]

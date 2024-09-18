@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from gnosis.eth import get_auto_ethereum_client
-from gnosis.eth.ethereum_client import InvalidERC20Info, InvalidERC721Info
+from safe_eth.eth import get_auto_ethereum_client
+from safe_eth.eth.ethereum_client import InvalidERC20Info, InvalidERC721Info
 
 from ...clients import CoinMarketCapClient
 from ...models import Token

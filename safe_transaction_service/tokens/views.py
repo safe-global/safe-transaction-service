@@ -5,8 +5,7 @@ import django_filters.rest_framework
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-
-from gnosis.eth.utils import fast_is_checksum_address
+from safe_eth.eth.utils import fast_is_checksum_address
 
 from . import filters, serializers
 from .models import Token

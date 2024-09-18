@@ -9,8 +9,7 @@ from django.db.models import Min
 from celery.exceptions import SoftTimeLimitExceeded
 from eth_typing import ChecksumAddress
 from requests import Timeout
-
-from gnosis.eth import EthereumClient
+from safe_eth.eth import EthereumClient
 
 from ..services import IndexingException, IndexService, IndexServiceProvider
 

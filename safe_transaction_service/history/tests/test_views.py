@@ -15,14 +15,13 @@ from requests import ReadTimeout
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
-
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.ethereum_client import EthereumClient, TracingManager
-from gnosis.eth.utils import fast_is_checksum_address, fast_keccak_text
-from gnosis.safe import CannotEstimateGas, Safe, SafeOperationEnum
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureType
-from gnosis.safe.signatures import signature_to_bytes
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.ethereum_client import EthereumClient, TracingManager
+from safe_eth.eth.utils import fast_is_checksum_address, fast_keccak_text
+from safe_eth.safe import CannotEstimateGas, Safe, SafeOperationEnum
+from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.safe.signatures import signature_to_bytes
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.account_abstraction.tests import factories as aa_factories
 from safe_transaction_service.contracts.models import ContractQuerySet
@@ -210,6 +209,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
     def test_safe_deployments_view(self, get_chain_id_mock):
         url = reverse("v1:history:deployments")
         response = self.client.get(url, format="json")
+        self.maxDiff = None
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json(), mainnet_deployments)
 

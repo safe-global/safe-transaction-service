@@ -4,8 +4,7 @@ from django.core.management.base import BaseCommand
 
 import requests
 from requests import RequestException
-
-from gnosis.eth import get_auto_ethereum_client
+from safe_eth.eth import get_auto_ethereum_client
 
 from safe_transaction_service import __version__
 

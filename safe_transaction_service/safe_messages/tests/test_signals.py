@@ -5,9 +5,8 @@ from django.db.models.signals import post_save
 from django.test import TestCase
 
 import factory
-
-from gnosis.eth import EthereumNetwork
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth import EthereumNetwork
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from safe_transaction_service.events.services.queue_service import QueueService
 from safe_transaction_service.history.models import TransactionServiceEventType

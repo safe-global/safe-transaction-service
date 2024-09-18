@@ -1,8 +1,7 @@
 import factory
 from eth_account import Account
 from factory.django import DjangoModelFactory
-
-from gnosis.eth.tests.clients.mocks import sourcify_safe_metadata
+from safe_eth.eth.tests.clients.mocks import sourcify_safe_metadata
 
 from ..models import Contract, ContractAbi
 

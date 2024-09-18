@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.core.management import call_command
 from django.test import TestCase
 
-from gnosis.eth import EthereumClient
+from safe_eth.eth import EthereumClient
 
 from safe_transaction_service.contracts.models import Contract
 from safe_transaction_service.contracts.tests.factories import ContractFactory

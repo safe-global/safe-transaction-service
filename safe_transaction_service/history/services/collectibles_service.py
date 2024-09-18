@@ -16,9 +16,8 @@ from cache_memoize import cache_memoize
 from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from redis import Redis
-
-from gnosis.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
-from gnosis.eth.clients import EnsClient
+from safe_eth.eth import EthereumClient, EthereumNetwork, get_auto_ethereum_client
+from safe_eth.eth.clients import EnsClient
 
 from safe_transaction_service.tokens.constants import (
     CRYPTO_KITTIES_CONTRACT_ADDRESSES,

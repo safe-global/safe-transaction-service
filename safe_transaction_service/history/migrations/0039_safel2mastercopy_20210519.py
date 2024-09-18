@@ -3,7 +3,7 @@
 import django.db.models.manager
 from django.db import migrations, models
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 import safe_transaction_service.history.models
 
@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "address",
-                    gnosis.eth.django.models.EthereumAddressField(
+                    safe_eth.eth.django.models.EthereumAddressField(
                         primary_key=True, serialize=False
                     ),
                 ),

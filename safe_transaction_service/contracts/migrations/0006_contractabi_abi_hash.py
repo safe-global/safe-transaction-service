@@ -3,9 +3,8 @@ import json
 
 from django.db import IntegrityError, migrations, transaction
 
+import safe_eth.eth.django.models
 from web3 import Web3
-
-import gnosis.eth.django.models
 
 
 def add_hash_for_contract_abis(apps, schema_editor):
@@ -30,7 +29,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="contractabi",
             name="abi_hash",
-            field=gnosis.eth.django.models.Sha3HashField(
+            field=safe_eth.eth.django.models.Sha3HashField(
                 blank=True, default=None, null=True, unique=True
             ),
         ),

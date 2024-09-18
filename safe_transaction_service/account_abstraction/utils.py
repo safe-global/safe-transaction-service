@@ -6,10 +6,9 @@ from django.conf import settings
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
+from safe_eth.eth.account_abstraction import BundlerClient
+from safe_eth.eth.utils import fast_to_checksum_address
 from web3.types import LogReceipt
-
-from gnosis.eth.account_abstraction import BundlerClient
-from gnosis.eth.utils import fast_to_checksum_address
 
 logger = logging.getLogger(__name__)
 

@@ -7,19 +7,18 @@ from django.db import transaction
 
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
-from web3.types import LogReceipt
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
-from gnosis.eth.account_abstraction import (
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.account_abstraction import (
     BundlerClient,
     BundlerClientException,
     UserOperation,
     UserOperationReceipt,
     UserOperationV07,
 )
-from gnosis.eth.utils import fast_to_checksum_address
-from gnosis.safe.account_abstraction import SafeOperation
-from gnosis.safe.safe_signature import SafeSignature
+from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation
+from safe_eth.safe.safe_signature import SafeSignature
+from web3.types import LogReceipt
 
 from safe_transaction_service.history import models as history_models
 

@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -15,14 +15,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="token",
             name="address",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(
                 primary_key=True, serialize=False
             ),
         ),
         migrations.AlterField(
             model_name="token",
             name="copy_price",
-            field=gnosis.eth.django.models.EthereumAddressBinaryField(
+            field=safe_eth.eth.django.models.EthereumAddressBinaryField(
                 blank=True,
                 help_text="If provided, copy the price from the token",
                 null=True,

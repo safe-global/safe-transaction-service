@@ -6,10 +6,9 @@ from eth_account import Account
 from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.safe.signatures import signature_to_bytes
-from gnosis.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.safe.signatures import signature_to_bytes
+from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ...tokens.models import Token
 from ..helpers import DelegateSignatureHelperV2
@@ -504,7 +503,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
 
         # Try an invalid signature
         with mock.patch(
-            "gnosis.safe.safe_signature.SafeSignature.parse_signature",
+            "safe_eth.safe.safe_signature.SafeSignature.parse_signature",
             return_value=[],
         ) as parse_signature_mock:
             # No signatures

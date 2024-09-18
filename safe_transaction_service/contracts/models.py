@@ -15,11 +15,10 @@ from botocore.exceptions import ClientError
 from cachetools import TTLCache, cachedmethod
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
+from safe_eth.eth.clients import ContractMetadata
+from safe_eth.eth.django.models import EthereumAddressBinaryField, Keccak256Field
+from safe_eth.eth.utils import fast_keccak
 from web3._utils.normalizers import normalize_abi
-
-from gnosis.eth.clients import ContractMetadata
-from gnosis.eth.django.models import EthereumAddressBinaryField, Keccak256Field
-from gnosis.eth.utils import fast_keccak
 
 logger = getLogger(__name__)
 

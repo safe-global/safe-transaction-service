@@ -12,17 +12,16 @@ from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
 from packaging.version import Version
-from web3 import Web3
-
-from gnosis.eth import EthereumClient, get_auto_ethereum_client
-from gnosis.eth.constants import NULL_ADDRESS
-from gnosis.eth.contracts import (
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.contracts import (
     get_safe_V1_0_0_contract,
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
 )
-from gnosis.safe import SafeTx
-from gnosis.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
+from safe_eth.safe import SafeTx
+from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
+from web3 import Web3
 
 from safe_transaction_service.account_abstraction.services import (
     AaProcessorService,

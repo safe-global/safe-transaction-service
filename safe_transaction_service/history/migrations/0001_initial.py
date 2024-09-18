@@ -5,8 +5,7 @@ import django.utils.timezone
 from django.db import migrations, models
 
 import model_utils.fields
-
-import gnosis.eth.django.models
+import safe_eth.eth.django.models
 
 
 class Migration(migrations.Migration):
@@ -36,13 +35,13 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "safe_tx_hash",
-                    gnosis.eth.django.models.Sha3HashField(
+                    safe_eth.eth.django.models.Sha3HashField(
                         primary_key=True, serialize=False
                     ),
                 ),
-                ("safe", gnosis.eth.django.models.EthereumAddressField()),
-                ("to", gnosis.eth.django.models.EthereumAddressField()),
-                ("value", gnosis.eth.django.models.Uint256Field()),
+                ("safe", safe_eth.eth.django.models.EthereumAddressField()),
+                ("to", safe_eth.eth.django.models.EthereumAddressField()),
+                ("value", safe_eth.eth.django.models.Uint256Field()),
                 ("data", models.BinaryField(null=True)),
                 (
                     "operation",
@@ -50,15 +49,18 @@ class Migration(migrations.Migration):
                         choices=[(0, "CALL"), (1, "DELEGATE_CALL"), (2, "CREATE")]
                     ),
                 ),
-                ("safe_tx_gas", gnosis.eth.django.models.Uint256Field()),
-                ("base_gas", gnosis.eth.django.models.Uint256Field()),
-                ("gas_price", gnosis.eth.django.models.Uint256Field()),
-                ("gas_token", gnosis.eth.django.models.EthereumAddressField(null=True)),
+                ("safe_tx_gas", safe_eth.eth.django.models.Uint256Field()),
+                ("base_gas", safe_eth.eth.django.models.Uint256Field()),
+                ("gas_price", safe_eth.eth.django.models.Uint256Field()),
+                (
+                    "gas_token",
+                    safe_eth.eth.django.models.EthereumAddressField(null=True),
+                ),
                 (
                     "refund_receiver",
-                    gnosis.eth.django.models.EthereumAddressField(null=True),
+                    safe_eth.eth.django.models.EthereumAddressField(null=True),
                 ),
-                ("nonce", gnosis.eth.django.models.Uint256Field()),
+                ("nonce", safe_eth.eth.django.models.Uint256Field()),
                 ("mined", models.BooleanField(default=False)),
                 ("execution_date", models.DateTimeField(blank=True, null=True)),
             ],
@@ -94,15 +96,15 @@ class Migration(migrations.Migration):
                         verbose_name="modified",
                     ),
                 ),
-                ("owner", gnosis.eth.django.models.EthereumAddressField()),
-                ("transaction_hash", gnosis.eth.django.models.Sha3HashField()),
+                ("owner", safe_eth.eth.django.models.EthereumAddressField()),
+                ("transaction_hash", safe_eth.eth.django.models.Sha3HashField()),
                 (
                     "confirmation_type",
                     models.PositiveSmallIntegerField(
                         choices=[(0, "CONFIRMATION"), (1, "EXECUTION")]
                     ),
                 ),
-                ("block_number", gnosis.eth.django.models.Uint256Field()),
+                ("block_number", safe_eth.eth.django.models.Uint256Field()),
                 ("block_date_time", models.DateTimeField()),
                 ("mined", models.BooleanField(default=False)),
                 (
