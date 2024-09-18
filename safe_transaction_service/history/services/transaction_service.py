@@ -1,5 +1,6 @@
 import logging
 import pickle
+import zlib
 from collections import defaultdict
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -72,7 +73,7 @@ class TransactionService:
             for id_to_search in ids_to_search
         ]
         return [
-            pickle.loads(data) if data else None
+            pickle.loads(zlib.decompress(data)) if data else None
             for data in self.redis.mget(keys_to_search)
         ]
 
@@ -90,7 +91,9 @@ class TransactionService:
         """
         # Just store executed transactions older than 10 minutes
         to_store = {
-            self.get_cache_key(safe_address, tx_hash): pickle.dumps(txs)
+            self.get_cache_key(safe_address, tx_hash): zlib.compress(
+                pickle.dumps(txs), level=1
+            )
             for tx_hash, txs in ids_with_txs
             if all(
                 tx.execution_date
