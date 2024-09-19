@@ -491,10 +491,24 @@ class TokenTransferQuerySet(models.QuerySet):
 
 
 class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
-    def tokens_used_by_address(self, address: ChecksumAddress) -> Set[ChecksumAddress]:
-        return set(
-            self.to_or_from(address).values_list("address", flat=True).distinct()
-        )
+    def tokens_used_by_address(self, address: ChecksumAddress) -> list[ChecksumAddress]:
+        """
+        :param address:
+        :return: All the token addresses an `address` has sent or received
+        """
+        q1 = self.filter(_from=address).distinct()
+        q2 = self.filter(to=address).distinct()
+        return q1.union(q2).values_list("address", flat=True)
+
+    def fast_count(self, address: ChecksumAddress) -> int:
+        """
+        :param address:
+        :return: Optimized count using database indexes for the number of transfers for an address.
+                 Transfers sent from an address to itself (not really common) will be counted twice
+        """
+        q1 = self.filter(_from=address)
+        q2 = self.filter(to=address)
+        return q1.union(q2, all=True).count()
 
 
 class TokenTransfer(models.Model):

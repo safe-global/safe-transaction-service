@@ -157,7 +157,7 @@ class BalanceService:
             .filter(safe=safe_address)
             .count()
         )
-        number_erc20_events = ERC20Transfer.objects.to_or_from(safe_address).count()
+        number_erc20_events = ERC20Transfer.objects.fast_count(safe_address)
         number_eth_events = InternalTx.objects.ether_txs_for_address(
             safe_address
         ).count()
