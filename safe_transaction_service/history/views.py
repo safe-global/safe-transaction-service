@@ -223,7 +223,7 @@ class SafeDeploymentsView(ListAPIView):
             if filter_contract:
                 # Filter by contract name
                 if addresses := safe_deployments[version].get(filter_contract):
-                    for address in addresses.get(str(chain_id)):
+                    for address in addresses.get(chain_id, []):
                         contracts.append(
                             {
                                 "contract_name": filter_contract,
@@ -232,7 +232,7 @@ class SafeDeploymentsView(ListAPIView):
                         )
             else:
                 for contract_name, addresses in safe_deployments[version].items():
-                    for address in addresses.get(chain_id):
+                    for address in addresses.get(chain_id, []):
                         contracts.append(
                             {
                                 "contract_name": contract_name,
