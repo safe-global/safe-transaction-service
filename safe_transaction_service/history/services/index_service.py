@@ -475,7 +475,7 @@ class IndexService:
         addresses: Optional[ChecksumAddress] = None,
     ) -> int:
         """
-        Reindexes master copies in parallel with the current running indexer, so service will have no missing txs
+        Reindex master copies in parallel with the current running indexer, so service will have no missing txs
         while reindexing
 
         :param from_block_number: Block number to start indexing from
@@ -510,7 +510,7 @@ class IndexService:
         addresses: Optional[ChecksumAddress] = None,
     ) -> int:
         """
-        Reindexes erc20/721 events parallel with the current running indexer, so service will have no missing
+        Reindex erc20/721 events parallel with the current running indexer, so service will have no missing
         events while reindexing
 
         :param from_block_number: Block number to start indexing from

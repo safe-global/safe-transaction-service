@@ -186,14 +186,13 @@ class BalanceService:
         offset: int = 0,
     ) -> Tuple[List[ChecksumAddress], int]:
         """
-        Get the erc20 page for a given Safe if the limit is defined.
-
         :param safe_address:
         :param only_trusted:
         :param exclude_spam:
         :param limit:
         :param offset:
-        :return: list of ERC20 addresses and count of all ERC20 addresses for a given Safe
+        :return: List of ERC20 token addresses (paginated if `limit` is provided)
+            and count of all ERC20 addresses for a given Safe
         """
         all_erc20_addresses = ERC20Transfer.objects.tokens_used_by_address(safe_address)
         for address in all_erc20_addresses:
@@ -206,8 +205,8 @@ class BalanceService:
         erc20_count = len(erc20_addresses)
 
         if not limit:
-            # No pagination no limits
-            return erc20_addresses[0:None], erc20_count
+            # No limit, no pagination
+            return erc20_addresses, erc20_count
 
         if offset == 0:
             # First page will include also native token balance
