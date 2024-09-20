@@ -621,7 +621,7 @@ class SafeTxProcessor(TxProcessor):
                         self.get_safe_version_from_master_copy(
                             safe_last_status.master_copy
                         )
-                        or "1.0.0"
+                        or "1.3.0"
                     )
                 else:
                     base_gas = arguments["dataGas"]
