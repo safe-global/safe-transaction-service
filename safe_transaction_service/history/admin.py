@@ -530,10 +530,11 @@ class SafeContractAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     inlines = (SafeContractDelegateInline,)
     list_display = (
         "created_block_number",
+        "banned",
         "address",
         "ethereum_tx_id",
     )
-    list_filter = (SafeContractERC20ListFilter,)
+    list_filter = (SafeContractERC20ListFilter, "banned")
     list_select_related = ("ethereum_tx",)
     ordering = ["-ethereum_tx__block_id"]
     raw_id_fields = ("ethereum_tx",)
