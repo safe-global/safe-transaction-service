@@ -5,7 +5,6 @@ import json
 import random
 from typing import Optional, Tuple
 
-from django.conf import settings
 from django.utils import timezone
 
 from celery import app
@@ -24,15 +23,7 @@ from .indexers import (
     ProxyFactoryIndexerProvider,
     SafeEventsIndexerProvider,
 )
-from .indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
-from .models import (
-    EthereumBlock,
-    InternalTxDecoded,
-    MultisigTransaction,
-    SafeContract,
-    SafeLastStatus,
-    SafeStatus,
-)
+from .models import EthereumBlock, InternalTxDecoded, MultisigTransaction, SafeContract
 from .services import (
     CollectiblesServiceProvider,
     IndexingException,
@@ -279,6 +270,29 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
 
 
 @app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+def process_decoded_internal_txs_for_safe_task(
+    self, safe_address: ChecksumAddress, reindex_master_copies: bool = True
+) -> Optional[int]:
+    """
+    Process decoded internal txs for one Safe. Processing decoded transactions
+    could be slow and this way multiple Safes can be processed at the same time
+
+    :param safe_address:
+    :param reindex_master_copies: Trigger auto reindexing if a problem is found
+    :return: Number of `InternalTxDecoded` processed
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self, lock_name_suffix=safe_address):
+            logger.info("[%s] Start processing decoded internal txs", safe_address)
+            index_service: IndexService = IndexServiceProvider()
+            number_processed = index_service.process_address(safe_address)
+            logger.info(
+                "[%s] Processed %d decoded transactions", safe_address, number_processed
+            )
+            return number_processed
+
+
+@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
 def reindex_mastercopies_last_hours_task(self, hours: float = 2.5) -> Optional[int]:
     """
     Reindexes last hours for master copies to prevent indexing issues
@@ -382,118 +396,6 @@ def reindex_erc20_events_task(
             index_service.reindex_erc20_events(
                 from_block_number, to_block_number=to_block_number, addresses=addresses
             )
-
-
-@app.shared_task(bind=True, soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
-def process_decoded_internal_txs_for_safe_task(
-    self, safe_address: ChecksumAddress, reindex_master_copies: bool = True
-) -> Optional[int]:
-    """
-    Process decoded internal txs for one Safe. Processing decoded transactions is very slow and this way multiple
-    Safes can be processed at the same time
-
-    :param safe_address:
-    :param reindex_master_copies: Trigger auto reindexing if a problem is found
-    :return:
-    """
-    with contextlib.suppress(LockError):
-        with only_one_running_task(self, lock_name_suffix=safe_address):
-            logger.info("[%s] Start processing decoded internal txs", safe_address)
-
-            tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
-            index_service: IndexService = IndexServiceProvider()
-
-            # Check if something is wrong during indexing
-            try:
-                safe_last_status = SafeLastStatus.objects.get_or_generate(
-                    address=safe_address
-                )
-            except SafeLastStatus.DoesNotExist:
-                safe_last_status = None
-
-            if safe_last_status and safe_last_status.is_corrupted():
-                try:
-                    # Find first corrupted safe status
-                    previous_safe_status: Optional[SafeStatus] = None
-                    for safe_status in SafeStatus.objects.filter(
-                        address=safe_address
-                    ).sorted_reverse_by_mined():
-                        if safe_status.is_corrupted():
-                            message = (
-                                f"[{safe_address}] A problem was found in SafeStatus "
-                                f"with nonce={safe_status.nonce} "
-                                f"on internal-tx-id={safe_status.internal_tx_id} "
-                                f"tx-hash={safe_status.internal_tx.ethereum_tx_id} "
-                            )
-                            logger.error(message)
-                            logger.info(
-                                "[%s] Processing traces again",
-                                safe_address,
-                            )
-                            if reindex_master_copies and previous_safe_status:
-                                block_number = previous_safe_status.block_number
-                                to_block_number = safe_last_status.block_number
-                                logger.info(
-                                    "[%s] Last known not corrupted SafeStatus with nonce=%d on block=%d , "
-                                    "reindexing until block=%d",
-                                    safe_address,
-                                    previous_safe_status.nonce,
-                                    block_number,
-                                    to_block_number,
-                                )
-                                # Setting the safe address reindexing should be very fast
-                                reindex_master_copies_task.delay(
-                                    block_number,
-                                    to_block_number=to_block_number,
-                                    addresses=[safe_address],
-                                )
-                            logger.info(
-                                "[%s] Processing traces again after reindexing",
-                                safe_address,
-                            )
-                            raise ValueError(message)
-                        previous_safe_status = safe_status
-                finally:
-                    tx_processor.clear_cache(safe_address)
-                    index_service.reprocess_addresses([safe_address])
-
-            # Check if a new decoded tx appeared before other already processed (due to a reindex)
-            if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
-                logger.error("[%s] Found out of order transactions", safe_address)
-                index_service.fix_out_of_order(
-                    safe_address,
-                    InternalTxDecoded.objects.pending_for_safe(safe_address)[
-                        0
-                    ].internal_tx,
-                )
-                tx_processor.clear_cache(safe_address)
-
-            # Use chunks for memory issues
-            number_processed = 0
-            while True:
-                internal_txs_decoded_queryset = (
-                    InternalTxDecoded.objects.pending_for_safe(safe_address)[
-                        : settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH
-                    ]
-                )
-                if not internal_txs_decoded_queryset:
-                    break
-                number_processed += len(
-                    tx_processor.process_decoded_transactions(
-                        internal_txs_decoded_queryset
-                    )
-                )
-
-            logger.info(
-                "[%s] Processed %d decoded transactions", safe_address, number_processed
-            )
-            if number_processed:
-                logger.info(
-                    "[%s] %d decoded internal txs successfully processed",
-                    safe_address,
-                    number_processed,
-                )
-                return number_processed
 
 
 @app.shared_task(
