@@ -255,15 +255,21 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
             for (
                 safe_to_process
             ) in InternalTxDecoded.objects.safes_pending_to_be_processed().iterator():
-                if safe_to_process not in banned_safes:
-                    count += 1
-                    process_decoded_internal_txs_for_safe_task.delay(
-                        safe_to_process, reindex_master_copies=True
-                    )
-                else:
+                if safe_to_process in banned_safes:
                     logger.info(
                         "Ignoring decoded internal txs for banned safe %s",
                         safe_to_process,
+                    )
+                    # Mark traces as processed so they are not reprocessed all the time
+                    # If not, `InternalTxDecoded` index with `decoded=True` can grow to
+                    # a point were `safes_pending_to_be_processed` takes minutes to complete
+                    InternalTxDecoded.objects.for_safe(safe_to_process).update(
+                        processed=True
+                    )
+                else:
+                    count += 1
+                    process_decoded_internal_txs_for_safe_task.delay(
+                        safe_to_process, reindex_master_copies=True
                     )
 
             if not count:
