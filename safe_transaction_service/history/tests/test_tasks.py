@@ -172,7 +172,7 @@ class TestTasks(TestCase):
         fallback_handler = Account.create().address
         master_copy = Account.create().address
         threshold = 1
-        InternalTxDecodedFactory(
+        internal_tx_decoded = InternalTxDecodedFactory(
             function_name="setup",
             owner=owner,
             threshold=threshold,
@@ -182,7 +182,10 @@ class TestTasks(TestCase):
         )
         SafeContractFactory(address=safe_address, banned=True)
         self.assertTrue(SafeContract.objects.get(address=safe_address).banned)
+        self.assertFalse(internal_tx_decoded.processed)
         process_decoded_internal_txs_task.delay()
+        internal_tx_decoded.refresh_from_db()
+        self.assertTrue(internal_tx_decoded.processed)
         self.assertEqual(SafeStatus.objects.filter(address=safe_address).count(), 0)
 
     def test_process_decoded_internal_txs_for_safe_task(self):
