@@ -399,7 +399,7 @@ class IndexService:
         SafeLastStatus.objects.filter(address=address).delete()
         logger.info("[%s] Ended fixing out of order", address)
 
-    def process_address(self, safe_address: ChecksumAddress) -> int:
+    def process_decoded_txs(self, safe_address: ChecksumAddress) -> int:
         """
         Process all the pending `InternalTxDecoded` for a Safe
 
@@ -417,19 +417,19 @@ class IndexService:
             self.tx_processor.clear_cache(safe_address)
 
         # Use chunks for memory issues
-        number_processed = 0
+        total_processed_txs = 0
         while True:
             internal_txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safe(
                 safe_address
             )[: self.eth_internal_tx_decoded_process_batch]
             if not internal_txs_decoded_queryset:
                 break
-            number_processed += len(
+            total_processed_txs += len(
                 self.tx_processor.process_decoded_transactions(
                     internal_txs_decoded_queryset
                 )
             )
-        return number_processed
+        return total_processed_txs
 
     def reprocess_addresses(self, addresses: List[ChecksumAddress]):
         """

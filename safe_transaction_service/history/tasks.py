@@ -285,7 +285,7 @@ def process_decoded_internal_txs_for_safe_task(
         with only_one_running_task(self, lock_name_suffix=safe_address):
             logger.info("[%s] Start processing decoded internal txs", safe_address)
             index_service: IndexService = IndexServiceProvider()
-            number_processed = index_service.process_address(safe_address)
+            number_processed = index_service.process_decoded_txs(safe_address)
             logger.info(
                 "[%s] Processed %d decoded transactions", safe_address, number_processed
             )

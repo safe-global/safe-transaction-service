@@ -194,10 +194,10 @@ class TestTasks(TestCase):
         SafeLastStatus.objects.update_or_create_from_safe_status(safe_status_0)
         with self.assertLogs(logger=task_logger) as cm:
             with patch.object(
-                IndexService, "process_address", return_value=5
-            ) as process_address_mock:
+                IndexService, "process_decoded_txs", return_value=5
+            ) as process_decoded_txs_mock:
                 process_decoded_internal_txs_for_safe_task.delay(safe_address)
-                process_address_mock.assert_called_with(safe_address)
+                process_decoded_txs_mock.assert_called_with(safe_address)
                 self.assertIn(
                     f"[{safe_address}] Start processing decoded internal txs",
                     cm.output[0],
