@@ -23,6 +23,7 @@ from ..services.index_service import (
 )
 from .factories import (
     EthereumTxFactory,
+    InternalTxDecodedFactory,
     MultisigTransactionFactory,
     SafeMasterCopyFactory,
     SafeStatusFactory,
@@ -124,6 +125,51 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         # Test connection error to the node
         current_block_number_mock.side_effect = RequestsConnectionError
         self.assertFalse(self.index_service.is_service_synced())
+
+    def test_process_decoded_txs(self):
+        safe_address = Account.create().address
+        with mock.patch.object(
+            IndexService, "fix_out_of_order"
+        ) as fix_out_of_order_mock:
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 0)
+            fix_out_of_order_mock.assert_not_called()
+
+            # Setup for a random Safe should not be processed
+            InternalTxDecodedFactory(
+                function_name="setup",
+            )
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 0)
+
+            setup_internal_tx = InternalTxDecodedFactory(
+                function_name="setup",
+                internal_tx___from=safe_address,
+            )
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 1)
+            fix_out_of_order_mock.assert_not_called()
+            # After processed, it should not be processed again
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 0)
+
+            exec_transactions = [
+                InternalTxDecodedFactory(
+                    function_name="execTransaction",
+                    internal_tx___from=safe_address,
+                )
+                for _ in range(3)
+            ]
+
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 3)
+            fix_out_of_order_mock.assert_not_called()
+            # After processed, they should not be processed again
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 0)
+
+            # Add a transaction out of order
+            exec_transactions[1].processed = False
+            exec_transactions[1].save(update_fields=["processed"])
+            self.assertEqual(self.index_service.process_decoded_txs(safe_address), 1)
+            # Out of order transaction was detected
+            fix_out_of_order_mock.assert_called_with(
+                safe_address, exec_transactions[1].internal_tx
+            )
 
     def test_reprocess_addresses(self):
         index_service: IndexService = self.index_service

@@ -1927,7 +1927,11 @@ class SafeStatusBase(models.Model):
         """
         SafeStatus nonce must be incremental. If current nonce is bigger than the number of SafeStatus for that Safe
         something is wrong. There could be more SafeStatus than nonce (e.g. a call to a MultiSend
-        adding owners and enabling a Module in the same contract `execTransaction`)
+        adding owners and enabling a Module in the same contract `execTransaction`), but never less.
+
+        However, there's the possibility that there isn't a problem in the indexer. For example,
+        in a L2 network a Safe could be migrated from L1 to L2 and some transactions will never be detected
+        by the indexer.
 
         :return: `True` if corrupted, `False` otherwise
         """
