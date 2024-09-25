@@ -92,10 +92,12 @@ class BalanceService:
         exclude_spam: bool,
     ) -> List[ChecksumAddress]:
         """
+        Filter the provided `erc20_addresses` list and tokens with `events_bugged=True` by spam or trusted.
+
         :param erc20_addresses:
         :param only_trusted:
         :param exclude_spam:
-        :return: ERC20 tokens filtered by spam or trusted
+        :return: ERC20 tokens filtered.
         """
         base_queryset = Token.objects.filter(
             Q(address__in=erc20_addresses) | Q(events_bugged=True)
