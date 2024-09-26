@@ -19,7 +19,7 @@ if [ ${RUN_MIGRATIONS:-0} = 1 ]; then
   python manage.py setup_service
 
   echo "==> $(date +%H:%M:%S) ==> Setting contracts... "
-  python manage.py update_safe_contracts_logo
+  python manage.py setup_safe_contracts
 fi
 
 echo "==> $(date +%H:%M:%S) ==> Check RPC connected matches previously used RPC... "
