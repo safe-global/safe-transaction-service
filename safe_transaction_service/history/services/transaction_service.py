@@ -91,7 +91,7 @@ class TransactionService:
         # Just store executed transactions older than 10 minutes
         to_store = {
             self.get_cache_key(safe_address, tx_hash): zlib.compress(
-                pickle.dumps(txs), level=1
+                pickle.dumps(txs), level=settings.CACHE_ALL_TXS_COMPRESSION_LEVEL
             )
             for tx_hash, txs in ids_with_txs
             if all(
