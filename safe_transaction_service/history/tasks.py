@@ -254,9 +254,9 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     # Mark traces as processed so they are not reprocessed all the time
                     # If not, `InternalTxDecoded` index with `decoded=True` can grow to
                     # a point were `safes_pending_to_be_processed` takes minutes to complete
-                    InternalTxDecoded.objects.for_safe(safe_to_process).update(
-                        processed=True
-                    )
+                    InternalTxDecoded.objects.for_safe(
+                        safe_to_process
+                    ).not_processed().update(processed=True)
                 else:
                     count += 1
                     process_decoded_internal_txs_for_safe_task.delay(
