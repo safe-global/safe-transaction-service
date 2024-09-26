@@ -589,4 +589,4 @@ TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS = env.int(
 )  # Don't return more than 1_000 transfers
 
 # Compression level – an integer from 0 to 9. 0 means not compression
-CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESION_LEVEL", default=0)
+CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESSION_LEVEL", default=0)
