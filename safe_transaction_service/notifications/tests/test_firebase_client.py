@@ -48,7 +48,7 @@ class TestFirebaseClient(TestCase):
                     ]
                     batch_response = BatchResponse(responses)
                     with mock.patch(
-                        "firebase_admin.messaging.send_multicast",
+                        "firebase_admin.messaging.send_each_for_multicast",
                         return_value=batch_response,
                     ):
                         (
