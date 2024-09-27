@@ -159,7 +159,9 @@ class FirebaseClient(MessagingClient):
             data=data,
             tokens=tokens,
         )
-        batch_response: BatchResponse = messaging.send_multicast(message, app=self.app)
+        batch_response: BatchResponse = messaging.send_each_for_multicast(
+            message, app=self.app
+        )
         responses: List[SendResponse] = batch_response.responses
         # Check if there are invalid tokens
         invalid_tokens = [
