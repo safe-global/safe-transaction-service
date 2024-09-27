@@ -112,6 +112,8 @@ def send_notification_task(
         success_count, failure_count, invalid_tokens = firebase_client.send_message(
             tokens, payload
         )
+        if failure_count:
+            logger.error("Push notification failed for %i devices", failure_count)
         if invalid_tokens:
             logger.info(
                 "Removing invalid tokens for safe=%s. Tokens=%s",
