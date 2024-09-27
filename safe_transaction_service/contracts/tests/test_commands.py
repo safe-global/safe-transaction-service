@@ -30,7 +30,7 @@ class TestCommands(TestCase):
 
     @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=137)
     def test_update_safe_contracts_logo(self, mock_chain_id: MagicMock):
-        command = "update_safe_contracts_logo"
+        command = "setup_safe_contracts"
         buf = StringIO()
         random_contract = ContractFactory()
         previous_random_contract_logo = random_contract.logo.read()
