@@ -325,6 +325,19 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "safe_transaction_service.history.exceptions.custom_exception_handler",
 }
 
+# INDEXER LOG LEVEL
+ERC20_721_INDEXER_LOG_LEVEL = env("ERC20_INDEXER_LOG_LEVEL", default="INFO")
+PROXY_FACTORY_INDEXER_LOG_LEVEL = env("PROXY_FACTORY_INDEXER_LOG_LEVEL", default="INFO")
+SAFE_EVENTS_INDEXER_LOG_LEVEL = env("SAFE_EVENTS_INDEXER_LOG_LEVEL", default="INFO")
+INTERNAL_TX_INDEXER_LOG_LEVEL = env("INTERNAL_TX_INDEXER_LOG_LEVEL", default="INFO")
+# API LOG LEVEL
+API_LOG_LEVEL = env("API_LOG_LEVEL", default="INFO")
+BALANCES_API_LOG_LEVEL = env("BALANCES_API_LOG_LEVEL", default="WARNING")
+MESSAGES_API_LOG_LEVEL = env("MESSAGES_API_LOG_LEVEL", default="INFO")
+ALL_TRANSACTIONS_API_LOG_LEVEL = env("ALL_TRANSACTIONS_API_LOG_LEVEL", default="INFO")
+COLLECTIBLES_API_LOG_LEVEL = env("COLLECTIBLES_API_LOG_LEVEL", default="WARNING")
+
+
 # LOGGING
 # ------------------------------------------------------------------------------
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#logging
@@ -396,11 +409,58 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        # BALANCES LOG
+        "safe_transaction_service.history.views.SafeBalanceView": {
+            "level": BALANCES_API_LOG_LEVEL,
+        },
         "safe_transaction_service.history.services.balance_service": {
-            "level": "DEBUG" if DEBUG else "WARNING",
+            "level": BALANCES_API_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.views_v2.SafeBalanceView": {
+            "level": BALANCES_API_LOG_LEVEL,
+        },
+        # COLLECTIBLES LOG
+        "safe_transaction_service.history.views_v2.SafeCollectiblesView": {
+            "level": COLLECTIBLES_API_LOG_LEVEL,
         },
         "safe_transaction_service.history.services.collectibles_service": {
-            "level": "DEBUG" if DEBUG else "WARNING",
+            "level": COLLECTIBLES_API_LOG_LEVEL,
+        },
+        # ALL-TRANSACTIONS LOG
+        "safe_transaction_service.history.views.AllTransactionsListView": {
+            "level": ALL_TRANSACTIONS_API_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.services.transaction_service": {
+            "level": ALL_TRANSACTIONS_API_LOG_LEVEL,
+        },
+        # MESSAGES_API_LOG_LEVEL: NO LOGS FOR NOW
+        # ERC20_721_INDEXER_LOG_LEVEL
+        "safe_transaction_service.history.indexers.erc20_events_indexer": {
+            "level": ERC20_721_INDEXER_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.tasks.index_erc20_events_task": {
+            "level": ERC20_721_INDEXER_LOG_LEVEL,
+        },
+        # PROXY_FACTORY_INDEXER_LOG_LEVEL
+        "safe_transaction_service.history.indexers.proxy_factory_indexer": {
+            "level": PROXY_FACTORY_INDEXER_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.tasks.index_new_proxies_task": {
+            "level": PROXY_FACTORY_INDEXER_LOG_LEVEL,
+        },
+        # SAFE_EVENTS_INDEXER_LOG_LEVEL
+        "safe_transaction_service.history.indexers.safe_events_indexer": {
+            "level": SAFE_EVENTS_INDEXER_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.tasks.index_safe_events_task": {
+            "level": SAFE_EVENTS_INDEXER_LOG_LEVEL,
+        },
+        # INTERNAL_TX_INDEXER_LOG_LEVEL
+        "safe_transaction_service.history.indexers.internal_tx_indexer": {
+            "level": INTERNAL_TX_INDEXER_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.tasks.index_internal_txs_task": {
+            "level": INTERNAL_TX_INDEXER_LOG_LEVEL,
         },
         "celery": {
             "handlers": ["console"],
