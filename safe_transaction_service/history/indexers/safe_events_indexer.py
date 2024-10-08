@@ -554,7 +554,7 @@ class SafeEventsIndexer(EventsIndexer):
 
                     # Generate InternalTx and internalDecodedTx for SafeSetup event
                     setup_trace_address = (
-                        f"{str(proxy_creation_event['logIndex'])},0"
+                        f"{proxy_creation_event['logIndex']},0"
                         if proxy_creation_event
                         else str(setup_event["logIndex"])
                     )

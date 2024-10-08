@@ -3113,6 +3113,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "factory_address": internal_tx._from,
                 "master_copy": None,
                 "setup_data": None,
+                "salt_nonce": None,
                 "data_decoded": None,
                 "transaction_hash": internal_tx.ethereum_tx_id,
                 "user_operation": None,
@@ -3188,11 +3189,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         ):
             # `another_trace_2` should change the `creator` and `master_copy` and `setup_data` should appear
 
-            for test_data, data_decoded in [
-                (create_test_data_v1_0_0, data_decoded_v1_0_0),
-                (create_test_data_v1_1_1, data_decoded_v1_1_1),
-                (create_cpk_test_data, data_decoded_cpk),
-                (create_v1_4_1_test_data, data_decoded_v1_4_1),
+            for test_data, data_decoded, salt_nonce in [
+                (create_test_data_v1_0_0, data_decoded_v1_0_0, None),
+                (create_test_data_v1_1_1, data_decoded_v1_1_1, "3087219459602"),
+                (
+                    create_cpk_test_data,
+                    data_decoded_cpk,
+                    "94030236624644942756909922368015716412234033278725318725234853277280604175973",
+                ),
+                (create_v1_4_1_test_data, data_decoded_v1_4_1, "1694202208610"),
             ]:
                 with self.subTest(test_data=test_data, data_decoded=data_decoded):
                     another_trace_2["action"]["input"] = HexBytes(test_data["data"])
@@ -3213,6 +3218,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                             "factory_address": internal_tx._from,
                             "master_copy": test_data["master_copy"],
                             "setup_data": test_data["setup_data"],
+                            "salt_nonce": salt_nonce,
                             "data_decoded": data_decoded,
                             "user_operation": None,
                         },
