@@ -30,7 +30,10 @@ from safe_transaction_service.contracts.tx_decoder import (
     get_db_tx_decoder,
 )
 from safe_transaction_service.tokens.serializers import TokenInfoResponseSerializer
-from safe_transaction_service.utils.serializers import get_safe_owners
+from safe_transaction_service.utils.serializers import (
+    EpochDateTimeField,
+    get_safe_owners,
+)
 
 from .exceptions import NodeConnectionException
 from .helpers import (
@@ -702,9 +705,12 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
 
 class IndexingStatusSerializer(serializers.Serializer):
     current_block_number = serializers.IntegerField()
+    current_block_timestamp = EpochDateTimeField()
     erc20_block_number = serializers.IntegerField()
+    erc20_block_timestamp = EpochDateTimeField()
     erc20_synced = serializers.BooleanField()
     master_copies_block_number = serializers.IntegerField()
+    master_copies_block_timestamp = EpochDateTimeField()
     master_copies_synced = serializers.BooleanField()
     synced = serializers.BooleanField()
 
