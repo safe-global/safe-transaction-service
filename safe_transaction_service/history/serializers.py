@@ -758,6 +758,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
     factory_address = EthereumAddressField()
     master_copy = EthereumAddressField(allow_null=True)
     setup_data = HexadecimalField(allow_null=True)
+    salt_nonce = serializers.CharField()
     data_decoded = serializers.SerializerMethodField()
     user_operation = aa_serializers.UserOperationWithSafeOperationResponseSerializer(
         allow_null=True

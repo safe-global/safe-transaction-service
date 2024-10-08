@@ -955,7 +955,11 @@ class SafeCreationView(GenericAPIView):
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, address, *args, **kwargs):
         """
-        Returns detailed information on the Safe creation transaction of a given Safe account
+        Returns detailed information on the Safe creation transaction of a given Safe.
+
+        Note: When event indexing is being used and multiple Safes are deployed in the same transaction
+        the result might not be accurate due to the indexer not knowing which events belong to which Safe
+        deployment.
         """
 
         if not fast_is_checksum_address(address):

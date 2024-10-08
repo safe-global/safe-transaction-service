@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -12,6 +12,7 @@ from safe_eth.eth.contracts import (
 )
 from safe_eth.safe import Safe
 from safe_eth.safe.exceptions import CannotRetrieveSafeInfoException
+from safe_eth.safe.multi_send import MultiSend
 from safe_eth.safe.safe import SafeInfo
 from web3 import Web3
 
@@ -45,8 +46,16 @@ class SafeCreationInfo:
     factory_address: EthereumAddress
     master_copy: Optional[EthereumAddress]
     setup_data: Optional[bytes]
+    salt_nonce: Optional[int]
     transaction_hash: str
     user_operation: Optional[aa_models.UserOperation]
+
+
+@dataclass
+class ProxyCreationData:
+    singleton: ChecksumAddress
+    initializer: bytes
+    salt_nonce: Optional[int]
 
 
 class SafeServiceProvider:
@@ -112,25 +121,28 @@ class SafeService:
             creator = (parent_internal_tx or creation_ethereum_tx)._from
             proxy_factory = creation_internal_tx._from
 
-            master_copy: Optional[str] = None
-            setup_data: Optional[bytes] = None
+            singleton: Optional[str] = None
+            initializer: Optional[bytes] = None
+            salt_nonce: Optional[int] = None
+
+            # For L2s, as traces are "simulated", they don't hold `data` and creation ethereum_tx must be used
             data_tx = parent_internal_tx if parent_internal_tx else creation_ethereum_tx
 
             # A regular ether transfer could trigger a Safe deployment, so it's not guaranteed that there will be
             # ``data`` for the transaction
-            if data_tx.data:
-                data = bytes(data_tx.data)
-                result = self._decode_proxy_factory(
-                    data
-                ) or self._decode_cpk_proxy_factory(data)
-                if result:
-                    master_copy, setup_data = result
-            if not (master_copy and setup_data):
+            results = self._decode_creation_data(data_tx.data)
+            if len(results) == 1:
+                # TODO Support multiple Proxy deployments in the same transaction
+                result = results[0]
+                singleton = result.singleton
+                initializer = result.initializer
+                salt_nonce = result.salt_nonce
+            if not (singleton and initializer):
                 if setup_internal_tx := self._get_next_internal_tx(
                     creation_internal_tx
                 ):
-                    master_copy = setup_internal_tx.to
-                    setup_data = setup_internal_tx.data
+                    singleton = setup_internal_tx.to
+                    initializer = setup_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
         except IOError as exc:
@@ -150,8 +162,9 @@ class SafeService:
             created_time,
             creator,
             proxy_factory,
-            master_copy,
-            setup_data,
+            singleton,
+            initializer,
+            salt_nonce,
             creation_internal_tx.ethereum_tx_id,
             user_operation,
         )
@@ -200,14 +213,43 @@ class SafeService:
         except SafeLastStatus.DoesNotExist as exc:
             raise CannotGetSafeInfoFromDB(safe_address) from exc
 
+    def _decode_creation_data(self, data: Union[bytes, str]) -> list[ProxyCreationData]:
+        """
+        Decode creation data for Safe ProxyFactory deployments.
+
+        For L1 networks the trace is present, so no need for `MultiSend` decoding. At much one
+        `ProxyCreationData` will be returned.
+
+        For L2 networks the data for the whole transaction will be decoded, so an approximation must
+        be done to find the function parameters. There could be more than one `ProxyCreationData` when
+        deploying Safes via contracts like `MultiSend`.
+
+        :return: `ProxyCreationData`, `None` if it cannot be decoded
+        """
+        if not data:
+            return []
+
+        # Try to decode using MultiSend. If not, take the original data
+        multisend_data = [
+            multisend_tx.data for multisend_tx in MultiSend.from_transaction_data(data)
+        ] or [data]
+        results = []
+        for data in multisend_data:
+            result = self._decode_proxy_factory(data) or self._decode_cpk_proxy_factory(
+                data
+            )
+            if result:
+                results.append(result)
+        return results
+
     def _decode_proxy_factory(
         self, data: Union[bytes, str]
-    ) -> Optional[Tuple[str, bytes]]:
+    ) -> Optional[ProxyCreationData]:
         """
-        Decode contract creation function for Safe ProxyFactory deployments
+        Decode contract creation function for Safe ProxyFactory 1.3.0 and 1.4.1 deployments
 
         :param data:
-        :return: Tuple with the `master_copy` and `setup_data`, `None` if it cannot be decoded
+        :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
         if not data:
             return None
@@ -223,22 +265,24 @@ class SafeService:
                 ) = self.proxy_factory_v1_4_1_contract.decode_function_input(data)
             except ValueError:
                 return None
-        master_copy = (
+
+        singleton = (
             data_decoded.get("masterCopy")
             or data_decoded.get("_mastercopy")
             or data_decoded.get("_singleton")
             or data_decoded.get("singleton")
         )
-        setup_data = data_decoded.get("data") or data_decoded.get("initializer")
-        if master_copy and setup_data is not None:
-            return master_copy, setup_data
+        initializer = data_decoded.get("data") or data_decoded.get("initializer")
+        salt_nonce = data_decoded.get("saltNonce")
+        if singleton is not None and initializer is not None:
+            return ProxyCreationData(singleton, initializer, salt_nonce)
 
         logger.error("Problem decoding proxy factory, data_decoded=%s", data_decoded)
         return None
 
     def _decode_cpk_proxy_factory(
         self, data: Union[bytes, str]
-    ) -> Optional[Tuple[str, bytes]]:
+    ) -> Optional[ProxyCreationData]:
         """
         Decode contract creation function for Safe Contract Proxy Kit Safe deployments (function is different
         from the regular ProxyFactory)
@@ -246,7 +290,7 @@ class SafeService:
         More info: https://github.com/5afe/contract-proxy-kit
 
         :param data:
-        :return: Tuple with the `master_copy` and `setup_data`, `None` if it cannot be decoded
+        :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
         if not data:
             return None
@@ -256,7 +300,8 @@ class SafeService:
             )
             master_copy = data_decoded.get("masterCopy")
             setup_data = data_decoded.get("data")
-            return master_copy, setup_data
+            salt_nonce = data_decoded.get("saltNonce")
+            return ProxyCreationData(master_copy, setup_data, salt_nonce)
         except ValueError:
             return None
 
