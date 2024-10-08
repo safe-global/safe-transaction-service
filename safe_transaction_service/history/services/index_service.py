@@ -28,9 +28,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class IndexingStatus:
     current_block_number: int
+    current_block_timestamp: int
     erc20_block_number: int
+    erc20_block_timestamp: int
     erc20_synced: bool
     master_copies_block_number: int
+    master_copies_block_timestamp: int
     master_copies_synced: bool
     synced: bool
 
@@ -146,11 +149,21 @@ class IndexService:
             current_block_number - master_copies_block_number <= self.eth_reorg_blocks
         )
 
+        blocks = self.ethereum_client.get_blocks(
+            [current_block_number, erc20_block_number, master_copies_block_number]
+        )
+        current_block_timestamp = blocks[0]["timestamp"]
+        erc20_block_timestamp = blocks[1]["timestamp"]
+        master_copies_block_timestamp = blocks[2]["timestamp"]
+
         return IndexingStatus(
             current_block_number=current_block_number,
+            current_block_timestamp=current_block_timestamp,
             erc20_block_number=erc20_block_number,
+            erc20_block_timestamp=erc20_block_timestamp,
             erc20_synced=erc20_synced,
             master_copies_block_number=master_copies_block_number,
+            master_copies_block_timestamp=master_copies_block_timestamp,
             master_copies_synced=master_copies_synced,
             synced=erc20_synced and master_copies_synced,
         )

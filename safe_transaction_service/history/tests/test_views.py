@@ -56,6 +56,7 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
+from .mocks.blocks import mocked_blocks
 from .mocks.deployments_mock import (
     mainnet_deployments,
     mainnet_deployments_1_4_1,
@@ -120,7 +121,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         new_callable=PropertyMock,
         return_value=2_000,
     )
-    def test_indexing_view(self, current_block_number_mock: PropertyMock):
+    @mock.patch("safe_eth.eth.ethereum_client.EthereumClient.get_blocks")
+    def test_indexing_view(
+        self, mock_get_blocks: MagicMock, current_block_number_mock: PropertyMock
+    ):
+        mock_get_blocks.return_value = mocked_blocks
         IndexingStatus.objects.set_erc20_721_indexing_status(2_005)
         url = reverse("v1:history:indexing")
         response = self.client.get(url, format="json")
@@ -131,6 +136,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 2_000)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], True)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         IndexingStatus.objects.set_erc20_721_indexing_status(500)
         response = self.client.get(url, format="json")
@@ -141,6 +153,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 2000)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         safe_master_copy = SafeMasterCopyFactory(tx_block_number=2000)
         response = self.client.get(url, format="json")
@@ -151,6 +170,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 1999)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         safe_master_copy.tx_block_number = 600
         safe_master_copy.save(update_fields=["tx_block_number"])
@@ -161,6 +187,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 599)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         IndexingStatus.objects.set_erc20_721_indexing_status(10)
         SafeMasterCopyFactory(tx_block_number=8)
@@ -172,6 +205,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 7)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         SafeMasterCopyFactory(tx_block_number=11)
         response = self.client.get(url, format="json")
@@ -182,6 +222,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 7)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         IndexingStatus.objects.set_erc20_721_indexing_status(2_000)
         SafeMasterCopy.objects.update(tx_block_number=2_000)
@@ -193,6 +240,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 1999)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], True)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
         SafeMasterCopyFactory(tx_block_number=48)
         response = self.client.get(url, format="json")
@@ -203,6 +257,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 47)
         self.assertEqual(response.data["master_copies_synced"], False)
         self.assertEqual(response.data["synced"], False)
+        self.assertEqual(
+            response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
+        )
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+        )
 
     # Mock chain id to mainnet
     @mock.patch("safe_transaction_service.history.views.get_chain_id", return_value=1)
