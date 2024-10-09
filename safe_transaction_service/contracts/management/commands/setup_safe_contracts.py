@@ -7,7 +7,7 @@ from safe_eth.safe.safe_deployments import safe_deployments
 from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
 
-TRUSTED_FOR_DELEGATE_CALL = ["MultiSendCallOnly", "MultiSend"]
+TRUSTED_FOR_DELEGATE_CALL = ["MultiSendCallOnly", "MultiSend", "SafeToL2Migration"]
 
 
 def generate_safe_contract_display_name(contract_name: str, version: str) -> str:
