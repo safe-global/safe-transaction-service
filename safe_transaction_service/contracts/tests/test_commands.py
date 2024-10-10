@@ -60,7 +60,7 @@ class TestCommands(TestCase):
         self.assertEqual(current_no_safe_contract_logo, previous_random_contract_logo)
 
         # Missing safe addresses should be added
-        self.assertEqual(Contract.objects.count(), 19)
+        self.assertEqual(Contract.objects.count(), 22)
 
         # Contract name and display name should be correctly generated
         safe_l2_130_address = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E"
@@ -91,4 +91,11 @@ class TestCommands(TestCase):
         self.assertEqual(contract.name, "MultiSendCallOnly")
         self.assertEqual(contract.display_name, "Safe: MultiSendCallOnly 1.4.1")
         # MultiSendCallOnly should be trusted for delegate calls
+        self.assertTrue(contract.trusted_for_delegate_call)
+
+        safe_to_l2_migration = "0xfF83F6335d8930cBad1c0D439A841f01888D9f69"
+        contract = Contract.objects.get(address=safe_to_l2_migration)
+        self.assertEqual(contract.name, "SafeToL2Migration")
+        self.assertEqual(contract.display_name, "SafeToL2Migration 1.4.1")
+        # SafeToL2Migration should be trusted for delegate calls
         self.assertTrue(contract.trusted_for_delegate_call)

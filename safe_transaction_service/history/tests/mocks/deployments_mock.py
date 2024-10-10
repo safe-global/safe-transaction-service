@@ -30,8 +30,20 @@ mainnet_deployments_1_4_1 = {
             "address": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
         },
         {
+            "contractName": "SafeMigration",
+            "address": "0x526643F69b81B008F46d95CD5ced5eC0edFFDaC6",
+        },
+        {
             "contractName": "SafeProxyFactory",
             "address": "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67",
+        },
+        {
+            "contractName": "SafeToL2Migration",
+            "address": "0xfF83F6335d8930cBad1c0D439A841f01888D9f69",
+        },
+        {
+            "contractName": "SafeToL2Setup",
+            "address": "0xBD89A1CE4DDe368FFAB0eC35506eEcE0b1fFdc54",
         },
         {
             "contractName": "SignMessageLib",

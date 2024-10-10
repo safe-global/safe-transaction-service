@@ -29,6 +29,7 @@ from safe_eth.eth.contracts import (
     get_erc721_contract,
     get_kyber_network_proxy_contract,
     get_multi_send_contract,
+    get_safe_to_l2_migration_contract,
     get_safe_V0_0_1_contract,
     get_safe_V1_0_0_contract,
     get_safe_V1_1_1_contract,
@@ -476,6 +477,9 @@ class TxDecoder(SafeTxDecoder):
         ]
 
         gnosis_safe = [gnosis_safe_allowance_module_abi]
+
+        safe_to_l2_migration = [get_safe_to_l2_migration_contract(self.dummy_w3).abi]
+
         erc_contracts = [
             get_erc721_contract(self.dummy_w3).abi,
             get_erc20_contract(self.dummy_w3).abi,
@@ -502,6 +506,7 @@ class TxDecoder(SafeTxDecoder):
             + sight_contracts
             + gnosis_protocol
             + gnosis_safe
+            + safe_to_l2_migration
             + erc_contracts
             + self.multisend_abis
             + supported_abis
