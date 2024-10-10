@@ -10,11 +10,13 @@ from safe_transaction_service.analytics.services.analytics_service import (
     AnalyticsService,
 )
 from safe_transaction_service.history.models import MultisigTransaction
+from safe_transaction_service.utils.celery import task_timeout
 from safe_transaction_service.utils.redis import get_redis
-from safe_transaction_service.utils.tasks import LOCK_TIMEOUT, SOFT_TIMEOUT
+from safe_transaction_service.utils.tasks import LOCK_TIMEOUT
 
 
-@app.shared_task(soft_time_limit=SOFT_TIMEOUT, time_limit=LOCK_TIMEOUT)
+@app.shared_task()
+@task_timeout(timeout_seconds=LOCK_TIMEOUT)
 def get_transactions_per_safe_app_task():
     today = timezone.now()
     last_week = today - relativedelta(days=7)
