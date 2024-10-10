@@ -42,7 +42,9 @@ class PatchedCeleryFormatter(ColorFormatter):  # pragma: no cover
 
 def task_timeout(timeout_seconds: int, raise_exception: Optional[bool] = False):
     """
-    Catches Timeout exceptions and logs a clear, task-specific message. Ensures better tracking of hard limit errors and maintains consistent log formatting, improving visibility beyond Celery's generic error output.
+    Catches Timeout exceptions and logs a clear, task-specific message.
+    Ensures better tracking of hard limit errors and maintains consistent log formatting,
+    improving visibility beyond Celery's generic error output.
 
     :param timeout_seconds:
     :param raise_exception: if True, raise TaskTimeoutException
@@ -57,9 +59,8 @@ def task_timeout(timeout_seconds: int, raise_exception: Optional[bool] = False):
                     return func(*args, **kwargs)
             except Timeout:
                 logger = get_task_logger(func.__name__)
-                logger.error("Task exceeded timeout %i seconds", timeout_seconds)
+                logger.error("Task timeout exceeded: %i seconds", timeout_seconds)
                 if raise_exception:
-                    logger.error("Raising exception")
                     raise TaskTimeoutException()
                 return None
 
