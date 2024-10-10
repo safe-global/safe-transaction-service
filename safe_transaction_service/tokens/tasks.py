@@ -14,6 +14,7 @@ from web3.exceptions import Web3Exception
 from safe_transaction_service.utils.ethereum import get_ethereum_network
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
+from ..utils.celery import task_timeout
 from .exceptions import TokenListRetrievalException
 from .models import Token, TokenList, TokenListToken
 
@@ -42,8 +43,9 @@ class EthValueWithTimestamp:
         return f"{self.eth_value}:{self.timestamp.timestamp()}"
 
 
-@app.shared_task(soft_time_limit=TASK_SOFT_TIME_LIMIT, time_limit=TASK_TIME_LIMIT)
+@app.shared_task()
 @close_gevent_db_connection_decorator
+@task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def fix_pool_tokens_task() -> Optional[int]:
     """
     Fix names for generic pool tokens, like Balancer or Uniswap
