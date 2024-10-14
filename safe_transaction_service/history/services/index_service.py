@@ -427,7 +427,6 @@ class IndexService:
                 safe_address,
                 InternalTxDecoded.objects.pending_for_safe(safe_address)[0].internal_tx,
             )
-            self.tx_processor.clear_cache(safe_address)
 
         # Use chunks for memory issues
         total_processed_txs = 0
