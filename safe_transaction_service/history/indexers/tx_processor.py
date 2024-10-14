@@ -325,9 +325,15 @@ class SafeTxProcessor(TxProcessor):
     def process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
     ) -> bool:
-        processed_successfully = self.__process_decoded_transaction(internal_tx_decoded)
-        internal_tx_decoded.set_processed()
-        self.clear_cache()
+        contract_address = internal_tx_decoded.internal_tx._from
+        self.clear_cache(safe_address=contract_address)
+        try:
+            processed_successfully = self.__process_decoded_transaction(
+                internal_tx_decoded
+            )
+            internal_tx_decoded.set_processed()
+        finally:
+            self.clear_cache(safe_address=contract_address)
         return processed_successfully
 
     @transaction.atomic
@@ -341,16 +347,26 @@ class SafeTxProcessor(TxProcessor):
         """
         internal_tx_ids = []
         results = []
+        contract_addresses = set()
 
+        # Clear cache for the involved Safes
         for internal_tx_decoded in internal_txs_decoded:
-            internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
-            results.append(self.__process_decoded_transaction(internal_tx_decoded))
+            contract_address = internal_tx_decoded.internal_tx._from
+            contract_addresses.add(contract_address)
+            self.clear_cache(safe_address=contract_address)
 
-        # Set all as decoded in the same batch
-        InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
-            processed=True
-        )
-        self.clear_cache()
+        try:
+            for internal_tx_decoded in internal_txs_decoded:
+                internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
+                results.append(self.__process_decoded_transaction(internal_tx_decoded))
+
+            # Set all as decoded in the same batch
+            InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
+                processed=True
+            )
+        finally:
+            for contract_address in contract_addresses:
+                self.clear_cache(safe_address=contract_address)
         return results
 
     def __process_decoded_transaction(
