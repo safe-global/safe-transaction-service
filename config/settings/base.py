@@ -590,3 +590,11 @@ TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS = env.int(
 
 # Compression level – an integer from 0 to 9. 0 means not compression
 CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESSION_LEVEL", default=0)
+
+# Contracts configuration
+REINDEX_CONTRACTS_METADATA_BATCH = env.int(
+    "REINDEX_CONTRACTS_METADATA_BATCH", default=100
+)
+REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
+    "REINDEX_CONTRACTS_METADATA_COUNTDOWN", default=1
+)
