@@ -392,3 +392,33 @@ class TestTxDecoder(TestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
         self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
+
+        #  Test fallback calls
+        example_not_matched_abi = [
+            {
+                "inputs": [],
+                "name": "claimOwner",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+        ]
+
+        example_not_matched_data = (
+            Web3()
+            .eth.contract(abi=example_not_matched_abi)
+            .functions.claimOwner()
+            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+        )
+
+        fallback_abi = [
+            {"stateMutability": "payable", "type": "fallback"},
+        ]
+
+        contract_fallback_abi = ContractAbiFactory(abi=fallback_abi)
+        contract = ContractFactory(contract_abi=contract_fallback_abi)
+        fn_name, arguments = db_tx_decoder.decode_transaction(
+            example_not_matched_data, address=contract.address
+        )
+        self.assertEqual(fn_name, "fallback")
+        self.assertEqual(arguments, {})

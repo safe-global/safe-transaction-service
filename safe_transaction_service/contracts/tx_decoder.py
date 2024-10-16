@@ -552,6 +552,34 @@ class DbTxDecoder(TxDecoder):
 
     cache_abis_by_address = TTLCache(maxsize=2048, ttl=60 * 5)  # 5 minutes of caching
 
+    @classmethod
+    def get_most_relevant_contract_abi(cls, address: ChecksumAddress):
+        """
+        Retrieves the most relevant ABI for the contract at the given address.
+
+        :param address: Contract address
+        :return: List of ABI data if found, `None` otherwise.
+        """
+        return (
+            ContractAbi.objects.filter(contracts__address=address)
+            .order_by("relevance")
+            .values_list("abi", flat=True)
+            .first()
+        )
+
+    def contract_has_fallback_call(self, address: ChecksumAddress) -> bool:
+        """
+        :param address: Contract address
+        :return: `True` if the contract has a fallback call with `stateMutability` payable
+        """
+        abi = self.get_most_relevant_contract_abi(address)
+        if abi:
+            return any(
+                fn_abi.get("type") == "fallback"
+                and fn_abi.get("stateMutability") == "payable"
+                for fn_abi in abi
+            )
+
     @cachedmethod(cache=operator.attrgetter("cache_abis_by_address"))
     def get_contract_abi(
         self, address: ChecksumAddress
@@ -560,13 +588,9 @@ class DbTxDecoder(TxDecoder):
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
         """
-        abis = (
-            ContractAbi.objects.filter(contracts__address=address)
-            .order_by("relevance")
-            .values_list("abi", flat=True)
-        )
-        if abis:
-            return self._generate_selectors_with_abis_from_abi(abis[0])
+        abi = self.get_most_relevant_contract_abi(address)
+        if abi:
+            return self._generate_selectors_with_abis_from_abi(abi)
 
     def get_abi_function(
         self, data: bytes, address: Optional[ChecksumAddress] = None
@@ -590,6 +614,12 @@ class DbTxDecoder(TxDecoder):
                     # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
+        # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
+        elif address and self.contract_has_fallback_call(address):
+            return ABIFunction(
+                name="fallback",
+                type="fallback",
+            )
 
     def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()
