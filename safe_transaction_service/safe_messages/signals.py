@@ -1,6 +1,7 @@
 import logging
 from typing import Type, Union
 
+from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -36,13 +37,16 @@ def process_notification_event(
     created: bool,
     **kwargs,
 ) -> None:
+    if settings.DISABLE_NOTIFICATIONS_AND_EVENTS:
+        return None
+
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_event_payload(sender, instance)
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
     for payload in payloads:
-        if address := payload.get("address"):
+        if payload.get("address"):
             logger.debug(
                 "Triggering send_notification tasks for created=%s object=%s",
                 created,
