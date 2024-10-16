@@ -28,7 +28,12 @@ from safe_transaction_service.utils.ethereum import get_chain_id
 def build_event_payload(
     sender: Type[Model],
     instance: Union[
-        TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
+        TokenTransfer,
+        InternalTx,
+        MultisigConfirmation,
+        MultisigTransaction,
+        SafeMessage,
+        SafeMessageConfirmation,
     ],
     deleted: bool = False,
 ) -> List[Dict[str, Any]]:

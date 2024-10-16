@@ -625,6 +625,12 @@ EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT = env.int(
     "EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT", default=0
 )
 
+# Events and notifications
+# ------------------------------------------------------------------------------
+DISABLE_NOTIFICATIONS_AND_EVENTS = env.bool(
+    "DISABLE_NOTIFICATIONS_AND_EVENTS", default=False
+)  # Increases indexing speed for initial sync by disabling sending notifications and events to the queue
+
 # Cache
 CACHE_ALL_TXS_VIEW = env.int(
     "CACHE_ALL_TXS_VIEW", default=10 * 60
