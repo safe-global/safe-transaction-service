@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, List, Type, TypedDict, Union
 
 from django.db.models import Model
 from django.utils import timezone
@@ -184,3 +184,17 @@ def is_relevant_notification(
     elif instance.created + timedelta(minutes=minutes) < timezone.now():
         return False
     return True
+
+
+class ReorgPayload(TypedDict):
+    type: str
+    blockNumber: int
+    chainId: str
+
+
+def build_reorg_payload(block_number: int) -> ReorgPayload:
+    return ReorgPayload(
+        type=TransactionServiceEventType.REORG_DETECTED.name,
+        blockNumber=block_number,
+        chainId=str(get_chain_id()),
+    )
