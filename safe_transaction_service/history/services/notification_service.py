@@ -193,6 +193,12 @@ class ReorgPayload(TypedDict):
 
 
 def build_reorg_payload(block_number: int) -> ReorgPayload:
+    """
+    Build a reorg payload with the provided block_number and the configured chain_id.
+
+    :param block_number:
+    :return:
+    """
     return ReorgPayload(
         type=TransactionServiceEventType.REORG_DETECTED.name,
         blockNumber=block_number,
