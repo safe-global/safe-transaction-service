@@ -226,7 +226,7 @@ class SafeTxDecoder:
         return fn_abi["name"], list(zip(names, types, values))
 
     def _generate_selectors_with_abis_from_abi(
-        self, abi: ABIFunction
+        self, abi: Sequence[ABIFunction]
     ) -> Dict[bytes, ABIFunction]:
         """
         :param abi: ABI
@@ -239,7 +239,7 @@ class SafeTxDecoder:
         }
 
     def _generate_selectors_with_abis_from_abis(
-        self, abis: Sequence[ABIFunction]
+        self, abis: Sequence[Sequence[ABIFunction]]
     ) -> Dict[bytes, ABIFunction]:
         """
         :param abis: Contract ABIs. Last ABIs on the Sequence have preference if there's a collision on the
@@ -336,7 +336,7 @@ class SafeTxDecoder:
         }
         return fn_name, decoded_transactions
 
-    def get_supported_abis(self) -> Iterable[ABIFunction]:
+    def get_supported_abis(self) -> List[Sequence[ABIFunction]]:
         safe_abis = [
             get_safe_V0_0_1_contract(self.dummy_w3).abi,
             get_safe_V1_0_0_contract(self.dummy_w3).abi,
@@ -376,7 +376,7 @@ class TxDecoder(SafeTxDecoder):
     """
 
     @cached_property
-    def multisend_abis(self) -> List[ABIFunction]:
+    def multisend_abis(self) -> List[Sequence[ABIFunction]]:
         return [get_multi_send_contract(self.dummy_w3).abi]
 
     @cached_property
@@ -551,44 +551,55 @@ class DbTxDecoder(TxDecoder):
     """
 
     cache_abis_by_address = TTLCache(maxsize=2048, ttl=60 * 5)  # 5 minutes of caching
+    cache_contract_abi_selectors_with_functions_by_address = TTLCache(
+        maxsize=2048, ttl=60 * 5
+    )  # 5 minutes of caching
 
-    @classmethod
-    def get_most_relevant_contract_abi(cls, address: ChecksumAddress):
+    @cachedmethod(cache=operator.attrgetter("cache_abis_by_address"))
+    def get_contract_abi(self, address: ChecksumAddress) -> Optional[List[ABIFunction]]:
         """
-        Retrieves the most relevant ABI for the contract at the given address.
+        Retrieves the ABI for the contract at the given address.
 
         :param address: Contract address
         :return: List of ABI data if found, `None` otherwise.
         """
         return (
             ContractAbi.objects.filter(contracts__address=address)
-            .order_by("relevance")
             .values_list("abi", flat=True)
             .first()
         )
 
-    def contract_has_fallback_call(self, address: ChecksumAddress) -> bool:
+    def get_contract_fallback_function(
+        self, address: ChecksumAddress
+    ) -> Optional[ABIFunction]:
         """
         :param address: Contract address
-        :return: `True` if the contract has a fallback call with `stateMutability` payable
+        :return: Fallback ABIFunction if found, `None` otherwise.
         """
-        abi = self.get_most_relevant_contract_abi(address)
+        abi = self.get_contract_abi(address)
         if abi:
-            return any(
-                fn_abi.get("type") == "fallback"
-                and fn_abi.get("stateMutability") == "payable"
-                for fn_abi in abi
+            return next(
+                (
+                    dict(fn_abi, name="fallback")
+                    for fn_abi in abi
+                    if fn_abi.get("type") == "fallback"
+                ),
+                None,
             )
 
-    @cachedmethod(cache=operator.attrgetter("cache_abis_by_address"))
-    def get_contract_abi(
+    @cachedmethod(
+        cache=operator.attrgetter(
+            "cache_contract_abi_selectors_with_functions_by_address"
+        )
+    )
+    def get_contract_abi_selectors_with_functions(
         self, address: ChecksumAddress
     ) -> Optional[Dict[bytes, ABIFunction]]:
         """
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
         """
-        abi = self.get_most_relevant_contract_abi(address)
+        abi = self.get_contract_abi(address)
         if abi:
             return self._generate_selectors_with_abis_from_abi(abi)
 
@@ -605,7 +616,9 @@ class DbTxDecoder(TxDecoder):
         if selector in self.fn_selectors_with_abis:
             # Try to use specific ABI if address provided
             if address:
-                contract_selectors_with_abis = self.get_contract_abi(address)
+                contract_selectors_with_abis = (
+                    self.get_contract_abi_selectors_with_functions(address)
+                )
                 if (
                     contract_selectors_with_abis
                     and selector in contract_selectors_with_abis
@@ -615,11 +628,8 @@ class DbTxDecoder(TxDecoder):
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
         # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
-        elif address and self.contract_has_fallback_call(address):
-            return ABIFunction(
-                name="fallback",
-                type="fallback",
-            )
+        elif address:
+            return self.get_contract_fallback_function(address)
 
     def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()

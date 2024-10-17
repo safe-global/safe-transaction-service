@@ -392,8 +392,12 @@ class TestTxDecoder(TestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
         self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
+        self.assertIn(
+            (contract.address,),
+            DbTxDecoder.cache_contract_abi_selectors_with_functions_by_address,
+        )
 
-        #  Test fallback calls
+    def test_decode_fallback_calls_db_tx_decoder(self):
         example_not_matched_abi = [
             {
                 "inputs": [],
@@ -415,6 +419,7 @@ class TestTxDecoder(TestCase):
             {"stateMutability": "payable", "type": "fallback"},
         ]
 
+        db_tx_decoder = DbTxDecoder()
         contract_fallback_abi = ContractAbiFactory(abi=fallback_abi)
         contract = ContractFactory(contract_abi=contract_fallback_abi)
         fn_name, arguments = db_tx_decoder.decode_transaction(
@@ -422,3 +427,4 @@ class TestTxDecoder(TestCase):
         )
         self.assertEqual(fn_name, "fallback")
         self.assertEqual(arguments, {})
+        self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
