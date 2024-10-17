@@ -25,7 +25,15 @@ from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
 from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
-from django.db.models.expressions import F, OuterRef, RawSQL, Subquery, Value, When
+from django.db.models.expressions import (
+    F,
+    Func,
+    OuterRef,
+    RawSQL,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce
 from django.db.models.query import RawQuerySet
 from django.db.models.signals import post_save
@@ -1388,25 +1396,45 @@ class MultisigTransactionQuerySet(models.QuerySet):
               higher than 7).
         We need to get the previous entry to get the proper threshold at that point before it's changed.
         """
-        threshold_safe_status_query = (
-            SafeStatus.objects.filter(
-                address=OuterRef("safe"),
-                nonce=OuterRef("nonce"),
-            )
-            .order_by("-internal_tx_id")
-            .values("threshold")
+        safe_status = SafeStatus.objects.filter(
+            address=OuterRef("safe"),
+            nonce=OuterRef("nonce"),
         )
 
-        threshold_safe_last_status_query = SafeLastStatus.objects.filter(
-            address=OuterRef("safe")
-        ).values("threshold")
+        threshold_safe_status_query = safe_status.order_by("-internal_tx_id").values(
+            "threshold"
+        )
+
+        safe_last_status = SafeLastStatus.objects.filter(address=OuterRef("safe"))
+        threshold_safe_last_status_query = safe_last_status.values("threshold")
+
+        # As a fallback, if there are no SafeStatus and SafeLastStatus information (maybe due to the Safe
+        # being reprocessed due to a reorg, use the number of confirmations for the transaction
+        confirmations = (
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_id=OuterRef("safe_tx_hash")
+            )
+            .annotate(count=Func(F("owner"), function="Count"))
+            .values("count")
+            .order_by("count")
+        )
 
         threshold_queries = Case(
             When(
-                ethereum_tx__isnull=True,
-                then=Subquery(threshold_safe_last_status_query[:1]),
+                Exists(safe_status),
+                then=Subquery(threshold_safe_status_query[:1]),
             ),
-            default=Subquery(threshold_safe_status_query[:1]),
+            default=Case(
+                When(
+                    Exists(safe_last_status),
+                    then=Subquery(threshold_safe_last_status_query[:1]),
+                ),
+                default=Coalesce(
+                    Subquery(confirmations, output_field=Uint256Field()),
+                    0,
+                    output_field=Uint256Field(),
+                ),
+            ),
         )
 
         return self.annotate(confirmations_required=threshold_queries)
