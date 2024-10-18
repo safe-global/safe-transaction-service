@@ -17,6 +17,7 @@ from safe_eth.safe.safe import SafeInfo
 from web3 import Web3
 
 from safe_transaction_service.account_abstraction import models as aa_models
+from safe_transaction_service.utils.abis import gelato_relay_1_balance_v2_abi
 
 from ..exceptions import NodeConnectionException
 from ..models import InternalTx, SafeLastStatus, SafeMasterCopy
@@ -95,6 +96,9 @@ class SafeService:
         self.proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(dummy_w3)
         self.proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(dummy_w3)
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
+        self.gelato_relay_1_balance_v2_contract = dummy_w3.eth.contract(
+            abi=gelato_relay_1_balance_v2_abi
+        )
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
         """
@@ -228,6 +232,15 @@ class SafeService:
         """
         if not data:
             return []
+
+        # Try to decode using Gelato Relayer
+        try:
+            _, decoded_gelato_data = (
+                self.gelato_relay_1_balance_v2_contract.decode_function_input(data)
+            )
+            data = decoded_gelato_data["_data"]
+        except ValueError:
+            pass
 
         # Try to decode using MultiSend. If not, take the original data
         multisend_data = [
