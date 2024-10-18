@@ -1550,25 +1550,57 @@ class TestMultisigTransactions(TestCase):
     def test_with_confirmations_required(self):
         # This should never be picked, Safe not matching
         SafeStatusFactory(nonce=0, threshold=4)
-
         multisig_transaction = MultisigTransactionFactory(nonce=0)
-        self.assertIsNone(
+        safe_address = multisig_transaction.safe
+
+        self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
-            .confirmations_required
+            .confirmations_required,
+            0,
         )
 
         # SafeStatus not matching the nonce (looking for threshold in nonce=0)
-        safe_status = SafeStatusFactory(
-            address=multisig_transaction.safe, nonce=1, threshold=8
-        )
-        self.assertIsNone(
+        safe_status = SafeStatusFactory(address=safe_address, nonce=1, threshold=8)
+        self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
-            .confirmations_required
+            .confirmations_required,
+            0,
         )
 
-        safe_status.nonce = 0
+        # Add confirmations. Without SafeStatus, confirmations for the transaction are used
+        number_confirmations = 5
+        for _ in range(number_confirmations):
+            MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            number_confirmations,
+        )
+
+        # If there's SafeLastStatus present, it should be returned
+        # Not matching SafeLastStatus should return the number of confirmations
+        SafeLastStatusFactory(nonce=2, threshold=16)
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            number_confirmations,
+        )
+
+        SafeLastStatusFactory(address=safe_address, nonce=2, threshold=15)
+        self.assertEqual(
+            MultisigTransaction.objects.with_confirmations_required()
+            .first()
+            .confirmations_required,
+            15,
+        )
+
+        # Update SafeStatus to match the Multisig Tx nonce
+        safe_status.nonce = multisig_transaction.nonce
         safe_status.save(update_fields=["nonce"])
 
         self.assertEqual(
@@ -1579,7 +1611,7 @@ class TestMultisigTransactions(TestCase):
         )
 
         # It will not be picked, as nonce is still matching the previous SafeStatus
-        SafeStatusFactory(address=multisig_transaction.safe, nonce=1, threshold=15)
+        new_safe_status = SafeStatusFactory(address=safe_address, nonce=1, threshold=15)
         self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
@@ -1587,33 +1619,8 @@ class TestMultisigTransactions(TestCase):
             8,
         )
 
-        multisig_transaction.nonce = 1
+        multisig_transaction.nonce = new_safe_status.nonce
         multisig_transaction.save(update_fields=["nonce"])
-        self.assertEqual(
-            MultisigTransaction.objects.with_confirmations_required()
-            .first()
-            .confirmations_required,
-            15,
-        )
-
-        # As EthereumTx is empty, the latest Safe Status will be used if available
-        multisig_transaction.ethereum_tx = None
-        multisig_transaction.save(update_fields=["ethereum_tx"])
-        self.assertIsNone(
-            MultisigTransaction.objects.with_confirmations_required()
-            .first()
-            .confirmations_required
-        )
-
-        # Not matching address should not return anything
-        SafeLastStatusFactory(nonce=2, threshold=16)
-        self.assertIsNone(
-            MultisigTransaction.objects.with_confirmations_required()
-            .first()
-            .confirmations_required
-        )
-
-        SafeLastStatusFactory(address=multisig_transaction.safe, nonce=2, threshold=15)
         self.assertEqual(
             MultisigTransaction.objects.with_confirmations_required()
             .first()
