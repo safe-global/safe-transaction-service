@@ -41,7 +41,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--force-update-contracts",
-            help="Update all the information related to the safe contracts",
+            help="Update all the information related to the Safe contracts",
             action="store_true",
             default=False,
         )
