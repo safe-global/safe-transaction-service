@@ -15,6 +15,7 @@ from redis.exceptions import LockError
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
+from ..events.services.queue_service import get_queue_service
 from ..utils.celery import task_timeout
 from ..utils.tasks import LOCK_TIMEOUT, only_one_running_task
 from .indexers import (
@@ -38,6 +39,7 @@ from .services.collectibles_service import (
     CollectibleWithMetadata,
     MetadataRetrievalExceptionTimeout,
 )
+from .services.notification_service import build_reorg_payload
 
 logger = get_task_logger(__name__)
 
@@ -59,6 +61,10 @@ def check_reorgs_task(self) -> Optional[int]:
             logger.warning("Reorg found for block-number=%d", reorg_block_number)
             # Stopping running tasks is not possible with gevent
             reorg_service.recover_from_reorg(reorg_block_number)
+            logger.info("Publish reorg event for block-number=%d", reorg_block_number)
+            payload_event = build_reorg_payload(reorg_block_number)
+            queue_service = get_queue_service()
+            queue_service.send_event(payload_event)
             return reorg_block_number
 
 
