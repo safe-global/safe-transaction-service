@@ -1,15 +1,18 @@
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from eth_typing import ChecksumAddress
+from eth_utils import event_abi_to_log_topic
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.eth.contracts import (
     get_cpk_factory_contract,
     get_proxy_factory_V1_3_0_contract,
     get_proxy_factory_V1_4_1_contract,
 )
+from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe import Safe
 from safe_eth.safe.exceptions import CannotRetrieveSafeInfoException
 from safe_eth.safe.multi_send import MultiSend
@@ -99,6 +102,9 @@ class SafeService:
         self.gelato_relay_1_balance_v2_contract = dummy_w3.eth.contract(
             abi=gelato_relay_1_balance_v2_abi
         )
+        self.proxy_creation_event_topic = event_abi_to_log_topic(
+            self.proxy_factory_v1_4_1_contract.events.ProxyCreation().abi
+        )
 
     def get_safe_creation_info(self, safe_address: str) -> Optional[SafeCreationInfo]:
         """
@@ -135,8 +141,16 @@ class SafeService:
             # A regular ether transfer could trigger a Safe deployment, so it's not guaranteed that there will be
             # ``data`` for the transaction
             results = self._decode_creation_data(data_tx.data)
+
+            if len(results) > 1:
+                # If there are more than one deployment, we need to know which one is for the providen Safe
+                deployed_safes = self._get_deployed_safes(creation_ethereum_tx.logs)
+                if len(deployed_safes) == len(results):
+                    for deployed_safe, result in zip(deployed_safes, results):
+                        if safe_address == deployed_safes:
+                            results = [result]
+
             if len(results) == 1:
-                # TODO Support multiple Proxy deployments in the same transaction
                 result = results[0]
                 singleton = result.singleton
                 initializer = result.initializer
@@ -216,6 +230,20 @@ class SafeService:
             return SafeLastStatus.objects.get_or_generate(safe_address).get_safe_info()
         except SafeLastStatus.DoesNotExist as exc:
             raise CannotGetSafeInfoFromDB(safe_address) from exc
+
+    def _get_deployed_safes(self, logs: list[dict[str, Any]]) -> list[ChecksumAddress]:
+        """
+        :param logs:
+        :return: list of Safes deployed
+        """
+
+        return [
+            fast_to_checksum_address(HexBytes(log["topics"][1])[12:])
+            for log in logs
+            if log["topics"]
+            and len(log["topics"]) == 2
+            and HexBytes(log["topics"][0]) == self.proxy_creation_event_topic
+        ]
 
     def _decode_creation_data(self, data: Union[bytes, str]) -> list[ProxyCreationData]:
         """

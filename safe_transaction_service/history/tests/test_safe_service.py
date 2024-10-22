@@ -16,7 +16,13 @@ from ..services.safe_service import (
     SafeInfo,
     SafeServiceProvider,
 )
-from .factories import InternalTxFactory, SafeLastStatusFactory, SafeMasterCopyFactory
+from ..utils import clean_receipt_log
+from .factories import (
+    EthereumTxFactory,
+    InternalTxFactory,
+    SafeLastStatusFactory,
+    SafeMasterCopyFactory,
+)
 from .mocks.mock_safe_creation import (
     gelato_relay_creation_mock,
     multiple_safes_same_tx_creation_mock,
@@ -188,3 +194,17 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             multiple_safes_same_tx_creation_mock["data"]
         )
         self.assertEqual(len(results), 2)
+        ethereum_tx = EthereumTxFactory(
+            logs=[
+                clean_receipt_log(log)
+                for log in multiple_safes_same_tx_creation_mock["tx_logs"]
+            ]
+        )
+        safes = self.safe_service._get_safes_deployed(ethereum_tx.logs)
+        self.assertEqual(
+            safes,
+            [
+                "0xf9418A8bd460e6Bc187155106109E83dC6366Ea4",
+                "0x8FdA41dB43D5676c8fcc95d2E508d9f4070381d8",
+            ],
+        )
