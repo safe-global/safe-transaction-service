@@ -19,6 +19,7 @@ from ..services.safe_service import (
 from .factories import InternalTxFactory, SafeLastStatusFactory, SafeMasterCopyFactory
 from .mocks.mock_safe_creation import (
     gelato_relay_creation_mock,
+    multiple_safes_same_tx_creation_mock,
     multisend_creation_mock,
 )
 from .mocks.traces import create_trace, creation_internal_txs
@@ -181,3 +182,9 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                 self.assertEqual(
                     result.salt_nonce, creation_mock["expected_salt_nonce"]
                 )
+
+    def test_decode_creation_data_multiple_safes_same_tx(self):
+        results = self.safe_service._decode_creation_data(
+            multiple_safes_same_tx_creation_mock["data"]
+        )
+        self.assertEqual(len(results), 2)
