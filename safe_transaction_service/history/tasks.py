@@ -510,7 +510,7 @@ def remove_not_trusted_multisig_txs_task(
 @app.shared_task()
 @close_gevent_db_connection_decorator
 def delete_expired_delegates():
-    logger.info("Deleting expired Safe Contract Delegates")
+    logger.info("Deleting expired Safe Delegates")
     now = timezone.now()
     deleted, _ = SafeContractDelegate.objects.filter(expiry_date__lte=now).delete()
     return deleted
