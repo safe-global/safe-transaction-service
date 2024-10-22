@@ -262,7 +262,7 @@ class SafeService:
             )
             return decoded_gelato_data["_data"]
         except ValueError:
-            pass
+            return data
 
     def _decode_proxy_factory(
         self, data: Union[bytes, str]
