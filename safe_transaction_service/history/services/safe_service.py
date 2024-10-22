@@ -17,7 +17,7 @@ from safe_eth.safe.safe import SafeInfo
 from web3 import Web3
 
 from safe_transaction_service.account_abstraction import models as aa_models
-from safe_transaction_service.utils.abis import gelato_relay_1_balance_v2_abi
+from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
 
 from ..exceptions import NodeConnectionException
 from ..models import InternalTx, SafeLastStatus, SafeMasterCopy
@@ -221,12 +221,12 @@ class SafeService:
         """
         Decode creation data for Safe ProxyFactory deployments.
 
-        For L1 networks the trace is present, so no need for `MultiSend` decoding. At much one
+        For L1 networks the trace is present, so no need for `MultiSend` or `Gelato Relay` decoding. At much one
         `ProxyCreationData` will be returned.
 
         For L2 networks the data for the whole transaction will be decoded, so an approximation must
         be done to find the function parameters. There could be more than one `ProxyCreationData` when
-        deploying Safes via contracts like `MultiSend`.
+        deploying Safes via contracts like `MultiSend`. `MultiSend` and `Gelato Relay` transactions are supported.
 
         :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
@@ -234,13 +234,7 @@ class SafeService:
             return []
 
         # Try to decode using Gelato Relayer
-        try:
-            _, decoded_gelato_data = (
-                self.gelato_relay_1_balance_v2_contract.decode_function_input(data)
-            )
-            data = decoded_gelato_data["_data"]
-        except ValueError:
-            pass
+        data = self._decode_gelato_relay(data)
 
         # Try to decode using MultiSend. If not, take the original data
         multisend_data = [
@@ -254,6 +248,21 @@ class SafeService:
             if result:
                 results.append(result)
         return results
+
+    def _decode_gelato_relay(self, data: bytes | str) -> bytes | str:
+        """
+        Try to decode transaction for Gelato Relayer
+
+        :param data:
+        :return: Decoded `data` if possible, original `data` otherwise
+        """
+        try:
+            _, decoded_gelato_data = (
+                self.gelato_relay_1_balance_v2_contract.decode_function_input(data)
+            )
+            return decoded_gelato_data["_data"]
+        except ValueError:
+            pass
 
     def _decode_proxy_factory(
         self, data: Union[bytes, str]
