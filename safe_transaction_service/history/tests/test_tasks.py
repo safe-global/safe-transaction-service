@@ -33,7 +33,7 @@ from ..services.collectibles_service import CollectibleWithMetadata
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
-    delete_expired_delegates,
+    delete_expired_delegates_task,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -344,19 +344,19 @@ class TestTasks(TestCase):
         )
 
     def test_delete_expired_delegates_task(self):
-        self.assertEqual(delete_expired_delegates.delay().result, 0)
+        self.assertEqual(delete_expired_delegates_task.delay().result, 0)
 
         SafeContractDelegateFactory()
         SafeContractDelegateFactory(expiry_date=None)
 
-        self.assertEqual(delete_expired_delegates.delay().result, 0)
+        self.assertEqual(delete_expired_delegates_task.delay().result, 0)
 
         safe_contract_delegate_expected_to_be_deleted = SafeContractDelegateFactory(
             expiry_date=timezone.now() - datetime.timedelta(hours=1)
         )
 
         self.assertEqual(SafeContractDelegate.objects.count(), 3)
-        self.assertEqual(delete_expired_delegates.delay().result, 1)
+        self.assertEqual(delete_expired_delegates_task.delay().result, 1)
 
         self.assertFalse(
             SafeContractDelegate.objects.filter(

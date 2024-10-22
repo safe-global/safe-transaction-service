@@ -135,7 +135,7 @@ TASKS = [
         cron=CronDefinition(minute=0, hour=0),  # Every day at 00:00 - 0 0 * * *
     ),
     CeleryTaskConfiguration(
-        name="safe_transaction_service.history.tasks.delete_expired_delegates",
+        name="safe_transaction_service.history.tasks.delete_expired_delegates_task",
         description="Remove expired Safe Contract Delegates (every hour at minute 0)",
         cron=CronDefinition(minute=0),  # Every hour at minute 0 - 0 * * * *
     ),
