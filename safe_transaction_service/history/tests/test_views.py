@@ -2162,6 +2162,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(safe_contract_delegate.delegator, delegator.address)
             self.assertEqual(safe_contract_delegate.label, label)
             self.assertEqual(safe_contract_delegate.safe_contract_id, safe_address)
+            self.assertEqual(safe_contract_delegate.expiry_date, None)
 
             # Update label
             label = "Jimmy McGill"
@@ -2171,6 +2172,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(SafeContractDelegate.objects.count(), 1)
             safe_contract_delegate = SafeContractDelegate.objects.get()
             self.assertEqual(safe_contract_delegate.label, label)
+            self.assertEqual(safe_contract_delegate.expiry_date, None)
 
         # Create delegate without a Safe
         another_label = "Kim Wexler"
@@ -2232,12 +2234,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "delegator": safe_contract_delegate_1.delegator,
                 "label": safe_contract_delegate_1.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_1.expiry_date),
             },
             {
                 "delegate": safe_contract_delegate_2.delegate,
                 "delegator": safe_contract_delegate_2.delegator,
                 "label": safe_contract_delegate_2.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_2.expiry_date),
             },
         ]
         response = self.client.get(
@@ -2255,12 +2259,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "delegator": safe_contract_delegate_1.delegator,
                 "label": safe_contract_delegate_1.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_1.expiry_date),
             },
             {
                 "delegate": safe_contract_delegate_3.delegate,
                 "delegator": safe_contract_delegate_3.delegator,
                 "label": safe_contract_delegate_3.label,
                 "safe": safe_contract_delegate_3.safe_contract_id,
+                "expiry_date": datetime_to_str(safe_contract_delegate_3.expiry_date),
             },
         ]
         response = self.client.get(

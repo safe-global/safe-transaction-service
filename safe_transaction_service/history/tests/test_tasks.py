@@ -16,7 +16,13 @@ from ..indexers import (
     InternalTxIndexerProvider,
     SafeEventsIndexerProvider,
 )
-from ..models import MultisigTransaction, SafeContract, SafeLastStatus, SafeStatus
+from ..models import (
+    MultisigTransaction,
+    SafeContract,
+    SafeContractDelegate,
+    SafeLastStatus,
+    SafeStatus,
+)
 from ..services import (
     CollectiblesService,
     CollectiblesServiceProvider,
@@ -27,6 +33,7 @@ from ..services.collectibles_service import CollectibleWithMetadata
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
+    delete_expired_delegates,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -46,6 +53,7 @@ from .factories import (
     EthereumBlockFactory,
     InternalTxDecodedFactory,
     MultisigTransactionFactory,
+    SafeContractDelegateFactory,
     SafeContractFactory,
     SafeStatusFactory,
 )
@@ -332,5 +340,28 @@ class TestTasks(TestCase):
         self.assertFalse(
             MultisigTransaction.objects.filter(
                 safe_tx_hash=multisig_tx_expected_to_be_deleted.safe_tx_hash
+            ).exists()
+        )
+
+    def test_delete_expired_delegates_task(self):
+        self.assertEqual(delete_expired_delegates.delay().result, 0)
+
+        SafeContractDelegateFactory()
+        SafeContractDelegateFactory(expiry_date=None)
+
+        self.assertEqual(delete_expired_delegates.delay().result, 0)
+
+        safe_contract_delegate_expected_to_be_deleted = SafeContractDelegateFactory(
+            expiry_date=timezone.now() - datetime.timedelta(hours=1)
+        )
+
+        self.assertEqual(SafeContractDelegate.objects.count(), 3)
+        self.assertEqual(delete_expired_delegates.delay().result, 1)
+
+        self.assertFalse(
+            SafeContractDelegate.objects.filter(
+                safe_contract=safe_contract_delegate_expected_to_be_deleted.safe_contract,
+                delegate=safe_contract_delegate_expected_to_be_deleted.delegate,
+                delegator=safe_contract_delegate_expected_to_be_deleted.delegator,
             ).exists()
         )

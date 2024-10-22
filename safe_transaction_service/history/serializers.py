@@ -1,9 +1,11 @@
+import datetime
 import itertools
 import json
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from django.http import Http404
+from django.utils import timezone
 
 from drf_yasg.utils import swagger_serializer_method
 from eth_typing import ChecksumAddress
@@ -377,6 +379,7 @@ class SafeDelegateResponseSerializer(serializers.Serializer):
     delegate = EthereumAddressField()
     delegator = EthereumAddressField()
     label = serializers.CharField(max_length=50)
+    expiry_date = serializers.DateTimeField()
 
 
 class DelegateSerializerMixin:
@@ -444,6 +447,24 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
     delegator = EthereumAddressField()
     signature = HexadecimalField(min_length=65, max_length=MAX_SIGNATURE_LENGTH)
     label = serializers.CharField(max_length=50)
+    expiry_date = serializers.DateTimeField(
+        allow_null=True, required=False, default=None
+    )
+
+    def validate_expiry_date(
+        self, expiry_date: Optional[datetime.datetime]
+    ) -> Optional[datetime.datetime]:
+        """
+        Make sure ``expiry_date`` is not previous to the current timestamp
+
+        :param expiry_date:
+        :return: `expiry_date`
+        """
+        if expiry_date and expiry_date <= timezone.now():
+            raise ValidationError(
+                "`expiry_date` cannot be previous to the current timestamp"
+            )
+        return expiry_date
 
     def validate(self, attrs):
         super().validate(attrs)
@@ -465,12 +486,14 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
         delegate = self.validated_data["delegate"]
         delegator = self.validated_data["delegator"]
         label = self.validated_data["label"]
+        expiry_date = self.validated_data["expiry_date"]
         obj, _ = SafeContractDelegate.objects.update_or_create(
             safe_contract_id=safe_address,
             delegate=delegate,
             delegator=delegator,
             defaults={
                 "label": label,
+                "expiry_date": expiry_date,
             },
         )
         return obj

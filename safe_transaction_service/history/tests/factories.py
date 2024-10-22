@@ -1,3 +1,4 @@
+import datetime
 from typing import Any, Dict
 
 from django.utils import timezone
@@ -335,6 +336,7 @@ class SafeContractDelegateFactory(DjangoModelFactory):
     label = factory.Faker("name")
     read = True
     write = True
+    expiry_date = timezone.now() + datetime.timedelta(minutes=90)
 
 
 class MonitoredAddressFactory(DjangoModelFactory):

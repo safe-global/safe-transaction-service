@@ -1784,11 +1784,15 @@ class SafeContractDelegateManager(models.Manager):
         if not owner_addresses:
             return self.none()
 
-        return self.filter(
-            # If safe_contract is null on SafeContractDelegate, delegates are valid for every Safe
-            Q(safe_contract_id=safe_address)
-            | Q(safe_contract=None)
-        ).filter(delegator__in=owner_addresses)
+        return (
+            self.filter(
+                # If safe_contract is null on SafeContractDelegate, delegates are valid for every Safe
+                Q(safe_contract_id=safe_address)
+                | Q(safe_contract=None)
+            )
+            .filter(delegator__in=owner_addresses)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=timezone.now()))
+        )
 
     def get_for_safe_and_delegate(
         self,
@@ -1844,6 +1848,7 @@ class SafeContractDelegate(models.Model):
     label = models.CharField(max_length=50)
     read = models.BooleanField(default=True)  # For permissions in the future
     write = models.BooleanField(default=True)
+    expiry_date = models.DateTimeField(null=True, db_index=True)
 
     class Meta:
         constraints = [

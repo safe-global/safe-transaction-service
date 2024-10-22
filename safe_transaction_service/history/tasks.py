@@ -25,7 +25,13 @@ from .indexers import (
     ProxyFactoryIndexerProvider,
     SafeEventsIndexerProvider,
 )
-from .models import EthereumBlock, InternalTxDecoded, MultisigTransaction, SafeContract
+from .models import (
+    EthereumBlock,
+    InternalTxDecoded,
+    MultisigTransaction,
+    SafeContract,
+    SafeContractDelegate,
+)
 from .services import (
     CollectiblesServiceProvider,
     IndexingException,
@@ -498,4 +504,13 @@ def remove_not_trusted_multisig_txs_task(
         .filter(modified__lt=timezone.now() - time_delta)
         .delete()
     )
+    return deleted
+
+
+@app.shared_task()
+@close_gevent_db_connection_decorator
+def delete_expired_delegates():
+    logger.info("Deleting expired Safe Contract Delegates")
+    now = timezone.now()
+    deleted, _ = SafeContractDelegate.objects.filter(expiry_date__lte=now).delete()
     return deleted
