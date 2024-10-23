@@ -2,6 +2,7 @@ import datetime
 from enum import Enum
 from itertools import chain
 
+from django.conf import settings
 from django.utils import timezone
 
 from celery import app
@@ -98,16 +99,23 @@ def reindex_contracts_without_metadata_task() -> int:
 
     :return: Number of contracts missing
     """
-    i = 0
+    batch_size = settings.REINDEX_CONTRACTS_METADATA_BATCH
+    countdown_increment = settings.REINDEX_CONTRACTS_METADATA_COUNTDOWN
+    total_addresses_reindexed = 0
+    countdown = 0
     for address in (
         Contract.objects.without_metadata().values_list("address", flat=True).iterator()
     ):
         logger.info("Reindexing contract %s", address)
         create_or_update_contract_with_metadata_task.apply_async(
-            (address,), priority=1
+            (address,), priority=1, countdown=countdown
         )  # Lowest priority
-        i += 1
-    return i
+        total_addresses_reindexed += 1
+        # Increment the countdown each time total_addresses_reindexed reaches a multiple of batch_size.
+        countdown += (
+            countdown_increment if total_addresses_reindexed % batch_size == 0 else 0
+        )
+    return total_addresses_reindexed
 
 
 @app.shared_task(

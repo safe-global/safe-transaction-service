@@ -672,3 +672,15 @@ TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS = env.int(
 
 # Compression level – an integer from 0 to 9. 0 means not compression
 CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESSION_LEVEL", default=0)
+
+# Contracts reindex batch configuration
+# ------------------------------------------------------------------------------
+# The following configuration prevents overwhelming third-party data sources by controlling the rate of requests.
+# Defines the batch size to limit the number of reindex contracts tasks sent to Celery concurrently.
+REINDEX_CONTRACTS_METADATA_BATCH = env.int(
+    "REINDEX_CONTRACTS_METADATA_BATCH", default=100
+)
+# Defines the delay countdown between batches of reindex contract tasks.
+REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
+    "REINDEX_CONTRACTS_METADATA_COUNTDOWN", default=0
+)
