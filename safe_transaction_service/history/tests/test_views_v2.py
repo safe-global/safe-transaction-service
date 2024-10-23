@@ -1,6 +1,8 @@
+from datetime import timedelta
 from unittest import mock
 
 from django.urls import reverse
+from django.utils import timezone
 
 from eth_account import Account
 from hexbytes import HexBytes
@@ -11,6 +13,7 @@ from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ...tokens.models import Token
+from ...utils.utils import datetime_to_str
 from ..helpers import DelegateSignatureHelperV2
 from ..models import SafeContractDelegate
 from .factories import (
@@ -169,6 +172,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             "delegator": delegator.address,
             "label": label,
             "signature": "0x" + "1" * 130,
+            "expiry_date": datetime_to_str(timezone.now() + timedelta(minutes=30)),
         }
         response = self.client.post(url, format="json", data=data)
         self.assertIn(
@@ -224,6 +228,19 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             self.assertEqual(SafeContractDelegate.objects.count(), 1)
             safe_contract_delegate = SafeContractDelegate.objects.get()
             self.assertEqual(safe_contract_delegate.label, label)
+
+            # Create expired delegate
+            data["expiry_date"] = datetime_to_str(timezone.now() - timedelta(hours=1))
+            response = self.client.post(url, format="json", data=data)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+            # Remove expiry date
+            data["expiry_date"] = None
+            response = self.client.post(url, format="json", data=data)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(SafeContractDelegate.objects.count(), 1)
+            safe_contract_delegate = SafeContractDelegate.objects.get()
+            self.assertIsNone(safe_contract_delegate.expiry_date)
 
         # Create delegate without a Safe
         hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
@@ -327,12 +344,14 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                 "delegator": safe_contract_delegate_1.delegator,
                 "label": safe_contract_delegate_1.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_1.expiry_date),
             },
             {
                 "delegate": safe_contract_delegate_2.delegate,
                 "delegator": safe_contract_delegate_2.delegator,
                 "label": safe_contract_delegate_2.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_2.expiry_date),
             },
         ]
         response = self.client.get(
@@ -350,12 +369,14 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                 "delegator": safe_contract_delegate_1.delegator,
                 "label": safe_contract_delegate_1.label,
                 "safe": safe_contract.address,
+                "expiry_date": datetime_to_str(safe_contract_delegate_1.expiry_date),
             },
             {
                 "delegate": safe_contract_delegate_3.delegate,
                 "delegator": safe_contract_delegate_3.delegator,
                 "label": safe_contract_delegate_3.label,
                 "safe": safe_contract_delegate_3.safe_contract_id,
+                "expiry_date": datetime_to_str(safe_contract_delegate_3.expiry_date),
             },
         ]
         response = self.client.get(

@@ -1,3 +1,4 @@
+import datetime
 import logging
 from datetime import timedelta
 from unittest import mock
@@ -1092,6 +1093,31 @@ class TestSafeContractDelegate(TestCase):
                 ],
             ),
             [safe_contract_delegate_another_safe, safe_contract_delegate_without_safe],
+        )
+
+        # Check expired delegate
+        safe_contract_delegate_expired = SafeContractDelegateFactory(
+            expiry_date=timezone.now() - datetime.timedelta(hours=1)
+        )
+        safe_contract_delegate_not_expired = SafeContractDelegateFactory(
+            safe_contract=safe_contract_delegate_expired.safe_contract
+        )
+        safe_contract_delegate_not_expired_2 = SafeContractDelegateFactory(
+            safe_contract=safe_contract_delegate_expired.safe_contract
+        )
+        expired_delegate_safe_address = (
+            safe_contract_delegate_expired.safe_contract.address
+        )
+        self.assertCountEqual(
+            SafeContractDelegate.objects.get_for_safe(
+                expired_delegate_safe_address,
+                [
+                    safe_contract_delegate_expired.delegator,
+                    safe_contract_delegate_not_expired.delegator,
+                    safe_contract_delegate_not_expired_2.delegator,
+                ],
+            ),
+            [safe_contract_delegate_not_expired, safe_contract_delegate_not_expired_2],
         )
 
     def test_get_for_safe_and_delegate(self):
