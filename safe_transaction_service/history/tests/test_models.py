@@ -52,9 +52,9 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
-from .mocks.mock_safe_creation import multiple_safes_same_tx_creation_mock
 from .mocks.mocks_ethereum_tx import type_0_tx, type_2_tx
 from .mocks.mocks_internal_tx_indexer import block_result
+from .mocks.mocks_safe_creation import multiple_safes_same_tx_creation_mock
 
 logger = logging.getLogger(__name__)
 

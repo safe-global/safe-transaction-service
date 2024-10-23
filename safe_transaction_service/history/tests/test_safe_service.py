@@ -24,7 +24,7 @@ from .factories import (
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
-from .mocks.mock_safe_creation import (
+from .mocks.mocks_safe_creation import (
     gelato_relay_creation_mock,
     multiple_safes_same_tx_creation_mock,
     multisend_creation_mock,
