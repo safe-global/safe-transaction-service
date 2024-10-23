@@ -111,6 +111,7 @@ def reindex_contracts_without_metadata_task() -> int:
             (address,), priority=1, countdown=countdown
         )  # Lowest priority
         total_addresses_reindexed += 1
+        # Increment the countdown each time total_addresses_reindexed reaches a multiple of batch_size.
         countdown += (
             countdown_increment if total_addresses_reindexed % batch_size == 0 else 0
         )
