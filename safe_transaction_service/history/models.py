@@ -65,6 +65,7 @@ from safe_transaction_service.utils.constants import (
     SIGNATURE_LENGTH as MAX_SIGNATURE_LENGTH,
 )
 
+from .constants import SAFE_PROXY_FACTORY_CREATION_EVENT_TOPIC
 from .utils import clean_receipt_log
 
 logger = getLogger(__name__)
@@ -451,6 +452,20 @@ class EthereumTx(TimeStampedModel):
                     "transaction_index",
                 ]
             )
+
+    def get_deployed_proxies_from_logs(self) -> list[ChecksumAddress]:
+        """
+        :return: list of `SafeProxyFactory` proxies that emitted the `ProxyCreation` event on this transaction
+        """
+        return [
+            # Deployed address is `indexed`, so it will be stored in topics[1]
+            # Topics are 32 bit, and we are only interested in the last 20 holding the address
+            fast_to_checksum_address(HexBytes(log["topics"][1])[12:])
+            for log in self.logs
+            if log["topics"] and len(log["topics"]) == 2
+            # topics[0] holds the event "signature"
+            and HexBytes(log["topics"][0]) == SAFE_PROXY_FACTORY_CREATION_EVENT_TOPIC
+        ]
 
 
 class TokenTransferQuerySet(models.QuerySet):
