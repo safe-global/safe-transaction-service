@@ -16,6 +16,7 @@ from ..services.safe_service import (
     SafeInfo,
     SafeServiceProvider,
 )
+from ..services.safe_service import logger as safe_service_logger
 from ..utils import clean_receipt_log
 from .factories import (
     EthereumTxFactory,
@@ -230,3 +231,18 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                 self.assertEqual(
                     proxy_creation_data.salt_nonce, creation_mock["expected_salt_nonce"]
                 )
+
+        with self.assertLogs(safe_service_logger, level="WARNING") as cm:
+            random_safe_address = Account.create().address
+            self.assertIsNone(
+                self.safe_service._process_creation_data(
+                    random_safe_address,
+                    multiple_safes_same_tx_creation_mock["data"],
+                    ethereum_tx,
+                )
+            )
+
+            self.assertIn(
+                f'[{random_safe_address}] Proxy creation data is not matching the proxies deployed {multiple_safes_same_tx_creation_mock["proxies_deployed"]}',
+                cm.output[0],
+            )

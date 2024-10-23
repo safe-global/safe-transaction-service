@@ -238,20 +238,28 @@ class SafeService:
         :return: ProxyCreationData for the provided Safe
         """
 
-        results = self._decode_creation_data(data)
+        proxy_creation_data_list = self._decode_creation_data(data)
 
-        if not results:
+        if not proxy_creation_data_list:
             return None
 
-        if len(results) == 1:
-            return results[0]
+        if len(proxy_creation_data_list) == 1:
+            return proxy_creation_data_list[0]
 
         # If there are more than one deployment, we need to know which one is the one we need
         deployed_safes = ethereum_tx.get_deployed_proxies_from_logs()
-        if len(deployed_safes) == len(results):
-            for deployed_safe, result in zip(deployed_safes, results):
+        if len(deployed_safes) == len(proxy_creation_data_list):
+            for deployed_safe, proxy_creation_data in zip(
+                deployed_safes, proxy_creation_data_list
+            ):
                 if safe_address == deployed_safe:
-                    return result
+                    return proxy_creation_data
+
+        logger.warning(
+            "[%s] Proxy creation data is not matching the proxies deployed %s",
+            safe_address,
+            deployed_safes,
+        )
         return None
 
     def _decode_creation_data(self, data: Union[bytes, str]) -> list[ProxyCreationData]:
