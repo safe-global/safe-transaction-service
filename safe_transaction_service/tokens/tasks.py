@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from celery import app
 from celery.utils.log import get_task_logger
+from eth_typing import ChecksumAddress
 from safe_eth.eth.ethereum_client import EthereumNetwork, get_auto_ethereum_client
 from safe_eth.eth.utils import fast_to_checksum_address
 from web3.exceptions import Web3Exception
@@ -59,12 +60,30 @@ def fix_pool_tokens_task() -> Optional[int]:
         return number
 
 
+def _parse_token_address_from_token_list(
+    token_address: str,
+) -> Optional[ChecksumAddress]:
+    if token_address.startswith("0x"):  # Ignore ENS names
+        return fast_to_checksum_address(token_address)
+    else:
+        # Try ENS resolve
+        ethereum_client = get_auto_ethereum_client()
+        try:
+            if resolved_address := ethereum_client.w3.ens.address(token_address):
+                return resolved_address
+        except (ValueError, Web3Exception):
+            logger.warning("Cannot resolve %s ENS address", token_address)
+    return None
+
+
 @app.shared_task()
 @close_gevent_db_connection_decorator
 def update_token_info_from_token_list_task() -> int:
     """
     If there's at least one valid token list with at least 1 token, every token in the DB is marked as `not trusted`
-    and then every token on the list is marked as `trusted`
+    and then every token on the list is marked as `trusted`.
+
+    `logoURI` is also stored for the tokens with logos
 
     :return: Number of tokens marked as `trusted`
     """
@@ -75,29 +94,21 @@ def update_token_info_from_token_list_task() -> int:
         except TokenListRetrievalException:
             logger.error("Cannot read tokens from %s", token_list)
 
-    if not tokens:
+    current_chain_id = get_ethereum_network().value
+
+    # Some lists are meant to be used for multiple chains
+    filtered_tokens = [
+        token for token in tokens if token.get("chainId") == current_chain_id
+    ]
+    if not filtered_tokens:
         return 0
 
-    # Make sure current chainId matches the one in the list
-    current_chain_id = get_ethereum_network().value
-    ethereum_client = get_auto_ethereum_client()
-
-    token_addresses = []
-    for token in tokens:
-        if token.get("chainId") == current_chain_id:
-            token_address = token["address"]
-            if token_address.startswith("0x"):
-                token_addresses.append(fast_to_checksum_address(token_address))
-            else:
-                # Try ENS resolve
-                try:
-                    if resolved_address := ethereum_client.w3.ens.address(
-                        token_address
-                    ):
-                        token_addresses.append(resolved_address)
-                except (ValueError, Web3Exception):
-                    logger.warning("Cannot resolve %s ENS address", token_address)
-
+    tokens_updated_count = 0
     with transaction.atomic():
         Token.objects.update(trusted=False)
-        return Token.objects.filter(address__in=token_addresses).update(trusted=True)
+        for token in filtered_tokens:
+            token_address = _parse_token_address_from_token_list(token["address"])
+            tokens_updated_count += Token.objects.filter(address=token_address).update(
+                logo_uri=token.get("logoURI") or "", trusted=True
+            )
+        return tokens_updated_count

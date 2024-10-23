@@ -221,6 +221,11 @@ class Token(models.Model):
         format="PNG",
         processors=[Resize(256, 256, upscale=False)],
     )
+    logo_uri = models.URLField(
+        default="",
+        blank=True,
+        help_text="If provided, return this URI instead of the stored logo",
+    )
     events_bugged = models.BooleanField(
         default=False,
         help_text="Set `True` if token does not send `Transfer` event sometimes (e.g. WETH on minting)",
@@ -278,21 +283,23 @@ class Token(models.Model):
     def get_full_logo_uri(self) -> str:
         if self.logo:
             return self.logo.url
-        elif settings.AWS_S3_PUBLIC_URL:
+
+        if self.logo_uri:
+            return self.logo_uri
+
+        if settings.AWS_S3_PUBLIC_URL:
             return urljoin(
                 settings.AWS_S3_PUBLIC_URL,
                 get_token_logo_path(
                     self, self.address + settings.TOKENS_LOGO_EXTENSION
                 ),
             )
-        else:
-            # Old behaviour
-            return urljoin(
-                settings.TOKENS_LOGO_BASE_URI,
-                get_token_logo_path(
-                    self, self.address + settings.TOKENS_LOGO_EXTENSION
-                ),
-            )
+
+        # Old behaviour
+        return urljoin(
+            settings.TOKENS_LOGO_BASE_URI,
+            get_token_logo_path(self, self.address + settings.TOKENS_LOGO_EXTENSION),
+        )
 
     def get_price_address(self) -> ChecksumAddress:
         """

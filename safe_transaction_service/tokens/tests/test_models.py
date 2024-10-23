@@ -61,6 +61,11 @@ class TestModels(TestCase):
                 t.get_full_logo_uri(), f"{assets_url}/tokens/logos/{t.address}.png"
             )
 
+        random_url = "http://random-url/logo.png"
+        t.logo_uri = random_url
+        t.save(update_fields=["logo_uri"])
+        self.assertEqual(t.get_full_logo_uri(), random_url)
+
     def test_token_trusted_spam_queryset(self):
         spam_tokens = [TokenFactory(spam=True), TokenFactory(spam=True)]
         not_spam_tokens = [
