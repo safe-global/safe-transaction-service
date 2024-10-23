@@ -52,9 +52,18 @@ class TestTasks(TestCase):
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 0)
 
         # Create a token in the list, it should be updated
-        token = TokenFactory(address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+        token = TokenFactory(
+            address="0x4A64515E5E1d1073e83f30cB97BEd20400b66E10", logo=None
+        )
         self.assertFalse(token.trusted)
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+        self.assertEqual(
+            token.logo_uri,
+            "https://cloudflare-ipfs.com/ipfs/QmYNLKHDEoG9FLJtbJ1r8HCyi7by9gksuacRkhkakxwEQ8",
+        )
+        self.assertEqual(token.get_full_logo_uri(), token.logo_uri)
 
         # Create another token in the list, both should be updated
         token_2 = TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
