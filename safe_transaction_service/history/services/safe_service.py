@@ -381,7 +381,7 @@ class SafeService:
         except ValueError:
             return None
 
-    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx:
+    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
         if parent_trace := internal_tx.get_parent():
             return parent_trace
         if not self.ethereum_tracing_client:
