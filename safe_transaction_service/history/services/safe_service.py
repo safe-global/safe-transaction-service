@@ -1,10 +1,11 @@
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional
 
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.eth.contracts import (
     get_cpk_factory_contract,
@@ -140,8 +141,12 @@ class SafeService:
 
             # A regular ether transfer could trigger a Safe deployment, so it's not guaranteed that there will be
             # ``data`` for the transaction
-            proxy_creation_data = self._process_creation_data(
-                safe_address, data_tx.data, creation_ethereum_tx
+            proxy_creation_data = (
+                self._process_creation_data(
+                    safe_address, HexBytes(data_tx.data), creation_ethereum_tx
+                )
+                if data_tx.data
+                else None
             )
 
             if proxy_creation_data:
@@ -227,7 +232,7 @@ class SafeService:
     def _process_creation_data(
         self,
         safe_address: ChecksumAddress,
-        data: Union[bytes, str],
+        data: bytes,
         ethereum_tx: EthereumTx,
     ) -> Optional[ProxyCreationData]:
         """
@@ -262,7 +267,7 @@ class SafeService:
         )
         return None
 
-    def _decode_creation_data(self, data: Union[bytes, str]) -> list[ProxyCreationData]:
+    def _decode_creation_data(self, data: bytes) -> list[ProxyCreationData]:
         """
         Decode creation data for Safe ProxyFactory deployments.
 
@@ -278,7 +283,7 @@ class SafeService:
         if not data:
             return []
 
-        # Try to decode using Gelato Relayer
+        # Try to decode using Gelato Relayer (relayer must be the first call)
         data = self._decode_gelato_relay(data)
 
         # Try to decode using MultiSend. If not, take the original data
@@ -294,7 +299,7 @@ class SafeService:
                 results.append(result)
         return results
 
-    def _decode_gelato_relay(self, data: bytes | str) -> bytes | str:
+    def _decode_gelato_relay(self, data: bytes) -> bytes:
         """
         Try to decode transaction for Gelato Relayer
 
@@ -305,13 +310,11 @@ class SafeService:
             _, decoded_gelato_data = (
                 self.gelato_relay_1_balance_v2_contract.decode_function_input(data)
             )
-            return decoded_gelato_data["_data"]
+            return HexBytes(decoded_gelato_data["_data"])
         except ValueError:
             return data
 
-    def _decode_proxy_factory(
-        self, data: Union[bytes, str]
-    ) -> Optional[ProxyCreationData]:
+    def _decode_proxy_factory(self, data: bytes) -> Optional[ProxyCreationData]:
         """
         Decode contract creation function for Safe ProxyFactory 1.3.0 and 1.4.1 deployments
 
@@ -347,9 +350,7 @@ class SafeService:
         logger.error("Problem decoding proxy factory, data_decoded=%s", data_decoded)
         return None
 
-    def _decode_cpk_proxy_factory(
-        self, data: Union[bytes, str]
-    ) -> Optional[ProxyCreationData]:
+    def _decode_cpk_proxy_factory(self, data: bytes) -> Optional[ProxyCreationData]:
         """
         Decode contract creation function for Safe Contract Proxy Kit Safe deployments (function is different
         from the regular ProxyFactory)
