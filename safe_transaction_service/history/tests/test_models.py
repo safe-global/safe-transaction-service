@@ -51,6 +51,7 @@ from .factories import (
     SafeMasterCopyFactory,
     SafeStatusFactory,
 )
+from .mocks.mock_safe_creation import multiple_safes_same_tx_creation_mock
 from .mocks.mocks_ethereum_tx import type_0_tx, type_2_tx
 from .mocks.mocks_internal_tx_indexer import block_result
 
@@ -375,6 +376,18 @@ class TestEthereumTx(TestCase):
         ethereum_txs = EthereumTx.objects.account_abstraction_txs()
         self.assertEqual(len(ethereum_txs), 1)
         self.assertEqual(ethereum_txs[0], ethereum_tx)
+
+    def test_get_deployed_proxies_from_logs(self):
+        ethereum_tx = EthereumTxFactory(
+            logs=[
+                clean_receipt_log(log)
+                for log in multiple_safes_same_tx_creation_mock["tx_logs"]
+            ]
+        )
+        self.assertEqual(
+            ethereum_tx.get_deployed_proxies_from_logs(),
+            multiple_safes_same_tx_creation_mock["proxies_deployed"],
+        )
 
 
 class TestTokenTransfer(TestCase):

@@ -177,34 +177,56 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
     def test_decode_creation_data(self):
         for creation_mock in (multisend_creation_mock, gelato_relay_creation_mock):
             with self.subTest(creation_mock=creation_mock):
-                results = self.safe_service._decode_creation_data(creation_mock["data"])
-                self.assertEqual(len(results), 1)
-                result = results[0]
-                self.assertEqual(result.singleton, creation_mock["expected_singleton"])
+                proxy_creation_data_list = self.safe_service._decode_creation_data(
+                    creation_mock["data"]
+                )
+                self.assertEqual(len(proxy_creation_data_list), 1)
+                proxy_creation_data = proxy_creation_data_list[0]
                 self.assertEqual(
-                    result.initializer,
+                    proxy_creation_data.singleton, creation_mock["expected_singleton"]
+                )
+                self.assertEqual(
+                    proxy_creation_data.initializer,
                     creation_mock["expected_initializer"],
                 )
                 self.assertEqual(
-                    result.salt_nonce, creation_mock["expected_salt_nonce"]
+                    proxy_creation_data.salt_nonce, creation_mock["expected_salt_nonce"]
                 )
 
     def test_decode_creation_data_multiple_safes_same_tx(self):
-        results = self.safe_service._decode_creation_data(
-            multiple_safes_same_tx_creation_mock["data"]
-        )
-        self.assertEqual(len(results), 2)
         ethereum_tx = EthereumTxFactory(
             logs=[
                 clean_receipt_log(log)
                 for log in multiple_safes_same_tx_creation_mock["tx_logs"]
             ]
         )
-        safes = self.safe_service._get_safes_deployed(ethereum_tx.logs)
         self.assertEqual(
-            safes,
-            [
-                "0xf9418A8bd460e6Bc187155106109E83dC6366Ea4",
-                "0x8FdA41dB43D5676c8fcc95d2E508d9f4070381d8",
-            ],
+            ethereum_tx.get_deployed_proxies_from_logs(),
+            multiple_safes_same_tx_creation_mock["proxies_deployed"],
         )
+
+        # There are 2 Safe creations inside of this transaction
+        results = self.safe_service._decode_creation_data(
+            multiple_safes_same_tx_creation_mock["data"]
+        )
+        self.assertEqual(len(results), 2)
+
+        # We need to get the right one for every Safe
+        for safe_address in multiple_safes_same_tx_creation_mock["proxies_deployed"]:
+            with self.subTest(safe_address=safe_address):
+                proxy_creation_data = self.safe_service._process_creation_data(
+                    safe_address,
+                    multiple_safes_same_tx_creation_mock["data"],
+                    ethereum_tx,
+                )
+                creation_mock = multiple_safes_same_tx_creation_mock[safe_address]
+                self.assertEqual(
+                    proxy_creation_data.singleton, creation_mock["expected_singleton"]
+                )
+                self.assertEqual(
+                    proxy_creation_data.initializer,
+                    creation_mock["expected_initializer"],
+                )
+                self.assertEqual(
+                    proxy_creation_data.salt_nonce, creation_mock["expected_salt_nonce"]
+                )
