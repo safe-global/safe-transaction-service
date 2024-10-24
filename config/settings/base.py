@@ -7,6 +7,8 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers as default_cors_headers
 
+from safe_transaction_service import __version__
+
 from ..gunicorn import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,
@@ -102,6 +104,7 @@ THIRD_PARTY_APPS = [
     "drf_yasg",
     "django_s3_storage",
     "rest_framework.authtoken",
+    "drf_spectacular",
 ]
 LOCAL_APPS = [
     "safe_transaction_service.account_abstraction.apps.AccountAbstractionConfig",
@@ -322,7 +325,9 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
+    "ALLOWED_VERSIONS": ["v1", "v2"],
     "EXCEPTION_HANDLER": "safe_transaction_service.history.exceptions.custom_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # INDEXER LOG LEVEL
@@ -684,3 +689,13 @@ REINDEX_CONTRACTS_METADATA_BATCH = env.int(
 REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
     "REINDEX_CONTRACTS_METADATA_COUNTDOWN", default=0
 )
+
+# DRF ESPECTACULAR
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Safe Transaction Service",
+    "DESCRIPTION": "Your project description",
+    "VERSION": __version__,
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
+    "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
+}
