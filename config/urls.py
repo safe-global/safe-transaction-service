@@ -5,6 +5,11 @@ from django.http import HttpResponse
 from django.urls import path, re_path
 from django.views import defaults as default_views
 
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
@@ -84,12 +89,33 @@ if settings.ENABLE_ANALYTICS:
         ),
     ]
 
-urlpatterns = swagger_urlpatterns + [
-    path(settings.ADMIN_URL, admin.site.urls),
-    path("api/v1/", include((urlpatterns_v1, "v1"))),
-    path("api/v2/", include((urlpatterns_v2, "v2"))),
-    path("check/", lambda request: HttpResponse("Ok"), name="check"),
+
+openapi_v3_urls = [
+    # YOUR PATTERNS
+    path("api/schema/", SpectacularAPIView().as_view(), name="schema"),
+    # Optional UI:
+    path(
+        "api/schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path(
+        "api/schema/redoc/",
+        SpectacularRedocView.as_view(url_name="schema"),
+        name="redoc",
+    ),
 ]
+
+urlpatterns = (
+    swagger_urlpatterns
+    + openapi_v3_urls
+    + [
+        path(settings.ADMIN_URL, admin.site.urls),
+        path("api/v1/", include((urlpatterns_v1, "v1"))),
+        path("api/v2/", include((urlpatterns_v2, "v2"))),
+        path("check/", lambda request: HttpResponse("Ok"), name="check"),
+    ]
+)
 
 
 if settings.DEBUG:
