@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import safe_eth.eth.django.serializers as eth_serializers
@@ -64,6 +65,19 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
     signature = eth_serializers.HexadecimalField(
         min_length=65, max_length=SIGNATURE_LENGTH
     )
+    origin = serializers.CharField(max_length=200, allow_null=True, default=None)
+
+    def validate_origin(self, origin):
+        # Origin field on db is a JsonField
+        if origin:
+            try:
+                origin = json.loads(origin)
+            except ValueError:
+                pass
+        else:
+            origin = {}
+
+        return origin
 
     def validate_message(self, value: Union[str, Dict[str, Any]]):
         if isinstance(value, str):
@@ -183,6 +197,7 @@ class SafeMessageResponseSerializer(serializers.Serializer):
     safe_app_id = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
+    origin = serializers.SerializerMethodField()
 
     def get_confirmations(self, obj: SafeMessage) -> Dict[str, Any]:
         """
@@ -204,3 +219,6 @@ class SafeMessageResponseSerializer(serializers.Serializer):
         """
         signature = HexBytes(obj.build_signature())
         return HexBytes(signature).hex() if signature else None
+
+    def get_origin(self, obj: SafeMessage) -> str:
+        return obj.origin if isinstance(obj.origin, str) else json.dumps(obj.origin)

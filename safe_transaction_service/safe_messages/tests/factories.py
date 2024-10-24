@@ -15,6 +15,7 @@ class SafeMessageFactory(DjangoModelFactory):
     message = factory.Sequence(lambda n: f"message-{n}")
     proposed_by = factory.LazyFunction(lambda: Account.create().address)
     safe_app_id = factory.Sequence(lambda n: n)
+    origin = factory.Sequence(lambda n: {"url": f"random-url-{n}"})
 
     @factory.lazy_attribute
     def message_hash(self):
