@@ -28,6 +28,7 @@ class SafeMessage(TimeStampedModel):
     message = JSONField()  # String if EIP191, object if EIP712
     proposed_by = EthereumAddressBinaryField()  # Owner proposing the message
     safe_app_id = models.PositiveIntegerField(blank=True, null=True)
+    origin = models.JSONField(default=dict)  # To store arbitrary data
 
     class Meta:
         ordering = ["created"]

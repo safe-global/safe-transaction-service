@@ -1,3 +1,4 @@
+import json
 import logging
 from unittest import mock
 from unittest.mock import MagicMock
@@ -58,6 +59,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
+                "origin": json.dumps(safe_message.origin),
                 "preparedSignature": None,
                 "confirmations": [],
             },
@@ -81,6 +83,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
+                "origin": json.dumps(safe_message.origin),
                 "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
@@ -117,6 +120,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
+                "origin": json.dumps(safe_message.origin),
                 "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
@@ -434,6 +438,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
+                        "origin": json.dumps(safe_message.origin),
                         "preparedSignature": None,
                         "confirmations": [],
                     }
@@ -464,6 +469,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
+                        "origin": json.dumps(safe_message.origin),
                         "preparedSignature": safe_message_confirmation.signature.hex(),
                         "confirmations": [
                             {
@@ -511,6 +517,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "message": safe_message.message,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
+                        "origin": json.dumps(safe_message.origin),
                         "preparedSignature": safe_message_confirmation.signature.hex(),
                         "confirmations": [
                             {
@@ -556,6 +563,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
+                "origin": json.dumps(safe_message.origin),
                 "preparedSignature": None,
                 "confirmations": [],
             },
@@ -579,6 +587,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "message": safe_message.message,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
+                "origin": json.dumps(safe_message.origin),
                 "preparedSignature": safe_message_confirmation.signature.hex(),
                 "confirmations": [
                     {
