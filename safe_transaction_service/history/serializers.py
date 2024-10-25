@@ -292,6 +292,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             ):
                 trusted = user.has_perm("history.create_trusted")
 
+        proposed_by_delegate = None
         if self.validated_data["sender"] in self.validated_data["safe_owners"]:
             proposer = self.validated_data["sender"]
         else:
@@ -304,6 +305,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
                 .first()
                 .delegator
             )
+            proposed_by_delegate = self.validated_data["sender"]
 
         multisig_transaction, created = MultisigTransaction.objects.get_or_create(
             safe_tx_hash=safe_tx_hash,
@@ -324,6 +326,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
                 "origin": origin,
                 "trusted": trusted,
                 "proposer": proposer,
+                "proposed_by_delegate": proposed_by_delegate,
             },
         )
 
@@ -653,6 +656,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     transaction_hash = Sha3HashField(source="ethereum_tx_id")
     safe_tx_hash = Sha3HashField()
     proposer = EthereumAddressField()
+    proposed_by_delegate = EthereumAddressField(allow_null=True)
     executor = serializers.SerializerMethodField()
     value = serializers.CharField()
     is_executed = serializers.BooleanField(source="executed")

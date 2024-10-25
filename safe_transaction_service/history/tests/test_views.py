@@ -860,6 +860,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["max_fee_per_gas"])
         self.assertIsNone(response.data["max_priority_fee_per_gas"])
         self.assertIsNone(response.data["proposer"])
+        self.assertIsNone(response.data["proposed_by_delegate"])
+
         self.assertEqual(
             response.data["data_decoded"],
             {
@@ -911,6 +913,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             format="json",
         )
         self.assertEqual(response.data["proposer"], proposer)
+
+        # Check proposed_by_delegate
+        delegate = Account.create().address
+        multisig_tx.proposed_by_delegate = delegate
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.data["proposer"], proposer)
+        self.assertEqual(response.data["proposed_by_delegate"], delegate)
 
     def test_delete_multisig_transaction(self):
         owner_account = Account.create()
@@ -1086,6 +1099,20 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 1)
         self.assertEqual(response.data["results"][0]["proposer"], proposer)
+        self.assertIsNone(response.data["results"][0]["proposed_by_delegate"])
+
+        # Check proposed_by_delegate
+        delegate = Account.create().address
+        multisig_tx.proposed_by_delegate = delegate
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["proposer"], proposer)
+        self.assertEqual(response.data["results"][0]["proposed_by_delegate"], delegate)
 
         # Check not trusted
         response = self.client.get(
@@ -1388,6 +1415,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["executor"])
         self.assertEqual(len(response.data["confirmations"]), 0)
         self.assertEqual(response.data["proposer"], data["sender"])
+        self.assertIsNone(response.data["proposed_by_delegate"])
 
         # Test confirmation with signature
         data["signature"] = safe_owner_1.signHash(safe_tx.safe_tx_hash)[
@@ -2011,6 +2039,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Proposer should be the owner address not the delegate
         self.assertNotEqual(multisig_transaction.proposer, safe_delegate.address)
         self.assertEqual(multisig_transaction.proposer, safe_owners[0].address)
+        self.assertEqual(
+            multisig_transaction.proposed_by_delegate, safe_delegate.address
+        )
 
         data["signature"] = data["signature"] + data["signature"][2:]
         response = self.client.post(

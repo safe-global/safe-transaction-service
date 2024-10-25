@@ -1482,6 +1482,7 @@ class MultisigTransaction(TimeStampedModel):
     safe_tx_hash = Keccak256Field(primary_key=True)
     safe = EthereumAddressBinaryField(db_index=True)
     proposer = EthereumAddressBinaryField(null=True)
+    proposed_by_delegate = EthereumAddressBinaryField(null=True, blank=True)
     ethereum_tx = models.ForeignKey(
         EthereumTx,
         null=True,
