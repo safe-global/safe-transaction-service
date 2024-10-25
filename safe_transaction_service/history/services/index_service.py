@@ -124,7 +124,8 @@ class IndexService:
         )["min_master_copies_block_number"]
 
     def get_indexing_status(self) -> IndexingStatus:
-        current_block_number = self.ethereum_client.current_block_number
+        current_block = self.ethereum_client.get_block("latest")
+        current_block_number = current_block["number"]
 
         # Indexing points to the next block to be indexed, we need the previous ones
         erc20_block_number = min(
@@ -149,12 +150,15 @@ class IndexService:
             current_block_number - master_copies_block_number <= self.eth_reorg_blocks
         )
 
-        blocks = self.ethereum_client.get_blocks(
-            [current_block_number, erc20_block_number, master_copies_block_number]
-        )
-        current_block_timestamp = blocks[0]["timestamp"]
-        erc20_block_timestamp = blocks[1]["timestamp"]
-        master_copies_block_timestamp = blocks[2]["timestamp"]
+        if erc20_block_number == master_copies_block_number == current_block_number:
+            erc20_block, master_copies_block = [current_block, current_block]
+        else:
+            erc20_block, master_copies_block = self.ethereum_client.get_blocks(
+                [erc20_block_number, master_copies_block_number]
+            )
+        current_block_timestamp = current_block["timestamp"]
+        erc20_block_timestamp = erc20_block["timestamp"]
+        master_copies_block_timestamp = master_copies_block["timestamp"]
 
         return IndexingStatus(
             current_block_number=current_block_number,
