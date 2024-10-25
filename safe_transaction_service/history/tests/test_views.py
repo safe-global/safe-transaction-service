@@ -1,7 +1,7 @@
 import json
 import logging
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -117,15 +117,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     @mock.patch.object(
         EthereumClient,
-        "current_block_number",
-        new_callable=PropertyMock,
-        return_value=2_000,
+        "get_block",
+        return_value=mocked_blocks[0],
     )
-    @mock.patch("safe_eth.eth.ethereum_client.EthereumClient.get_blocks")
-    def test_indexing_view(
-        self, mock_get_blocks: MagicMock, current_block_number_mock: PropertyMock
-    ):
-        mock_get_blocks.return_value = mocked_blocks
+    @mock.patch.object(
+        EthereumClient,
+        "get_blocks",
+        return_value=mocked_blocks[1:],
+    )
+    def test_indexing_view(self, mock_get_blocks: MagicMock, mock_get_block: MagicMock):
         IndexingStatus.objects.set_erc20_721_indexing_status(2_005)
         url = reverse("v1:history:indexing")
         response = self.client.get(url, format="json")
@@ -136,12 +136,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["master_copies_block_number"], 2_000)
         self.assertEqual(response.data["master_copies_synced"], True)
         self.assertEqual(response.data["synced"], True)
+        # Same block, so they should share the same timestamp
         self.assertEqual(
             response.data["current_block_timestamp"], "2024-06-03T18:29:23Z"
         )
-        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:35Z")
+        self.assertEqual(response.data["erc20_block_timestamp"], "2024-06-03T18:29:23Z")
         self.assertEqual(
-            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:47Z"
+            response.data["master_copies_block_timestamp"], "2024-06-03T18:29:23Z"
         )
 
         IndexingStatus.objects.set_erc20_721_indexing_status(500)

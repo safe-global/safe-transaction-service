@@ -19,7 +19,7 @@ mocked_blocks = [
             "0x221ee008a8c5aafb557a4654110c3aeb8ae9c3af0f5ff7271edc7c91b2d95e07"
         ),
         "nonce": HexBytes("0x0000000000000000"),
-        "number": 20013090,
+        "number": 2_000,  # Modified
         "parentBeaconBlockRoot": HexBytes(
             "0x87c7c94ff2fdca52510b51b932364c1fae94cb20cc9657e6de84f19921745603"
         ),
