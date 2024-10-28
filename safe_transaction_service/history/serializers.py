@@ -1245,3 +1245,9 @@ class SafeDeploymentContractSerializer(serializers.Serializer):
 class SafeDeploymentSerializer(serializers.Serializer):
     version = serializers.CharField(max_length=10)  # Example 1.3.0
     contracts = SafeDeploymentContractSerializer(many=True)
+
+
+class CodeErrorResponse(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    arguments = serializers.ListField()

@@ -7,8 +7,13 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters
-from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from eth_typing import ChecksumAddress, HexStr
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
@@ -150,6 +155,7 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
             return Response(self._get_info(ethereum_client))
 
 
+@extend_schema(responses={200: serializers.IndexingStatusSerializer})
 class IndexingView(GenericAPIView):
     serializer_class = serializers.IndexingStatusSerializer
     pagination_class = None  # Don't show limit/offset in swagger
@@ -165,6 +171,7 @@ class IndexingView(GenericAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+@extend_schema(responses={200: serializers.MasterCopyResponseSerializer})
 class SingletonsView(ListAPIView):
     """
     Returns a list of Master Copies configured in the service
@@ -177,6 +184,26 @@ class SingletonsView(ListAPIView):
         return SafeMasterCopy.objects.relevant()
 
 
+@extend_schema(
+    responses={
+        200: serializers.SafeDeploymentSerializer,
+        404: OpenApiResponse(description="Provided version does not exist"),
+    },
+    parameters=[
+        OpenApiParameter(
+            "version",
+            OpenApiTypes.STR,
+            default=None,
+            description="Filter by Safe version",
+        ),
+        OpenApiParameter(
+            "contract",
+            OpenApiTypes.STR,
+            default=None,
+            description="Filter by Safe contract name",
+        ),
+    ],
+)
 class SafeDeploymentsView(ListAPIView):
     """
     Returns a list of safe deployments by version
@@ -185,28 +212,6 @@ class SafeDeploymentsView(ListAPIView):
     serializer_class = serializers.SafeDeploymentSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    _schema_version_param = openapi.Parameter(
-        "version",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_STRING,
-        default=None,
-        description="Filter by Safe version",
-    )
-    _schema_contract_param = openapi.Parameter(
-        "contract",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_STRING,
-        default=None,
-        description="Filter by Safe contract name",
-    )
-
-    @swagger_auto_schema(
-        responses={404: "Provided version does not exist"},
-        manual_parameters=[
-            _schema_version_param,
-            _schema_contract_param,
-        ],
-    )
     @method_decorator(cache_page(60))  # 60 seconds
     def get(self, request):
         filter_version = self.request.query_params.get("version")
@@ -247,6 +252,24 @@ class SafeDeploymentsView(ListAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+@extend_schema(
+    tags=["transactions"],
+    responses={
+        200: OpenApiResponse(
+            response=serializers.AllTransactionsSchemaSerializer,
+            description="A list with every element with the structure of one of these transaction"
+            "types",
+        ),
+        422: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Checksum address validation failed",
+        ),
+        400: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Ordering field is not valid",
+        ),
+    },
+)
 class AllTransactionsListView(ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
@@ -260,12 +283,6 @@ class AllTransactionsListView(ListAPIView):
     serializer_class = (
         serializers.AllTransactionsSchemaSerializer
     )  # Just for docs, not used
-
-    _schema_200_response = openapi.Response(
-        "A list with every element with the structure of one of these transaction"
-        "types",
-        serializers.AllTransactionsSchemaSerializer,
-    )
 
     def get_ordering_parameter(self) -> Optional[str]:
         return self.request.query_params.get(OrderingFilter.ordering_param)
@@ -350,12 +367,6 @@ class AllTransactionsListView(ListAPIView):
         )
         return paginated_response
 
-    @swagger_auto_schema(
-        responses={
-            200: _schema_200_response,
-            422: "code = 1: Checksum address validation failed",
-        },
-    )
     def get(self, request, *args, **kwargs):
         """
         Returns all the *executed* transactions for a given Safe address.
@@ -400,17 +411,21 @@ class AllTransactionsListView(ListAPIView):
         return response
 
 
+@extend_schema(
+    tags=["transactions"],
+    responses={
+        200: serializers.SafeModuleTransactionResponseSerializer,
+        404: OpenApiResponse(description="ModuleTransaction does not exist"),
+        400: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Invalid moduleTransactionId",
+        ),
+    },
+)
 class SafeModuleTransactionView(RetrieveAPIView):
     serializer_class = serializers.SafeModuleTransactionResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    @swagger_auto_schema(
-        responses={
-            200: serializer_class(),
-            404: "ModuleTransaction does not exist",
-            400: "Invalid moduleTransactionId",
-        }
-    )
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, module_transaction_id: str, *args, **kwargs) -> Response:
         """
@@ -440,6 +455,16 @@ class SafeModuleTransactionView(RetrieveAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
 
+@extend_schema(
+    tags=["transactions"],
+    responses={
+        200: serializers.SafeModuleTransactionResponseSerializer,
+        422: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Checksum address validation failed",
+        ),
+    },
+)
 class SafeModuleTransactionListView(ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
@@ -451,15 +476,16 @@ class SafeModuleTransactionListView(ListAPIView):
     serializer_class = serializers.SafeModuleTransactionResponseSerializer
 
     def get_queryset(self):
+        # Just for swagger doc
+        if getattr(self, "swagger_fake_view", False):
+            return ModuleTransaction.objects.none()
+
         return (
             ModuleTransaction.objects.filter(safe=self.kwargs["address"])
             .select_related("internal_tx__ethereum_tx")
             .order_by("-created")
         )
 
-    @swagger_auto_schema(
-        responses={400: "Invalid data", 422: "Invalid ethereum address"}
-    )
     def get(self, request, address, format=None):
         """
         Returns all the transactions executed from modules given a Safe address
@@ -496,7 +522,13 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         elif self.request.method == "POST":
             return serializers.SafeMultisigConfirmationSerializer
 
-    @swagger_auto_schema(responses={400: "Invalid data"})
+    @extend_schema(
+        tags=["transactions"],
+        responses={
+            200: serializers.SafeMultisigConfirmationResponseSerializer,
+            400: OpenApiResponse(description="Invalid data"),
+        },
+    )
     def get(self, request, *args, **kwargs):
         """
         Returns the list of confirmations for the multi-signature transaction associated with
@@ -504,8 +536,13 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         """
         return super().get(request, *args, **kwargs)
 
-    @swagger_auto_schema(
-        responses={201: "Created", 400: "Malformed data", 422: "Error processing data"}
+    @extend_schema(
+        tags=["transactions"],
+        responses={
+            201: OpenApiResponse(description="Created"),
+            400: OpenApiResponse(description="Malformed data"),
+            422: OpenApiResponse(description="Error processing data"),
+        },
     )
     def post(self, request, *args, **kwargs):
         """
@@ -516,6 +553,18 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
+@extend_schema_view(
+    get=extend_schema(tags=["transactions"]),
+    delete=extend_schema(
+        tags=["transactions"],
+        request=serializers.SafeMultisigTransactionDeleteSerializer,
+        responses={
+            204: OpenApiResponse(description="Deleted"),
+            404: OpenApiResponse(description="Transaction not found"),
+            400: OpenApiResponse(description="Error processing data"),
+        },
+    ),
+)
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
     """
     Returns a multi-signature transaction given its Safe transaction hash
@@ -532,14 +581,6 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
             .select_related("ethereum_tx__block")
         )
 
-    @swagger_auto_schema(
-        request_body=serializers.SafeMultisigTransactionDeleteSerializer(),
-        responses={
-            204: "Deleted",
-            404: "Transaction not found",
-            400: "Error processing data",
-        },
-    )
     def delete(self, request, safe_tx_hash: HexStr):
         """
         Removes the queued but not executed multi-signature transaction associated with the given Safe tansaction hash.
@@ -597,6 +638,9 @@ class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = pagination.DefaultPagination
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            # Just for openApi doc purposes
+            return MultisigTransaction.objects.none()
         return (
             MultisigTransaction.objects.filter(safe=self.kwargs["address"])
             .with_confirmations_required()
@@ -627,8 +671,18 @@ class SafeMultisigTransactionListView(ListAPIView):
         elif self.request.method == "POST":
             return serializers.SafeMultisigTransactionSerializer
 
-    @swagger_auto_schema(
-        responses={400: "Invalid data", 422: "Invalid ethereum address"}
+    @extend_schema(
+        tags=["transactions"],
+        responses={
+            200: OpenApiResponse(
+                response=serializers.SafeMultisigTransactionResponseSerializer
+            ),
+            400: OpenApiResponse(description="Invalid data"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid ethereum address",
+            ),
+        },
     )
     def get(self, request, *args, **kwargs):
         """
@@ -650,13 +704,21 @@ class SafeMultisigTransactionListView(ListAPIView):
         response.data["count_unique_nonce"] = self.get_unique_nonce(address)
         return response
 
-    @swagger_auto_schema(
+    @extend_schema(
+        tags=["transactions"],
+        request=serializers.SafeMultisigTransactionSerializer,
         responses={
-            201: "Created or signature updated",
-            400: "Invalid data",
-            422: "Invalid ethereum address/User is not an owner/Invalid safeTxHash/"
-            "Invalid signature/Nonce already executed/Sender is not an owner",
-        }
+            201: OpenApiResponse(
+                response=serializers.SafeMultisigTransactionSerializer,
+                description="Created or signature updated",
+            ),
+            400: OpenApiResponse(description="Invalid data"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid ethereum address | User is not an owner | Invalid safeTxHash |"
+                "Invalid signature | Nonce already executed | Sender is not an owner",
+            ),
+        },
     )
     def post(self, request, address, format=None):
         """
@@ -686,27 +748,27 @@ class SafeMultisigTransactionListView(ListAPIView):
 
 
 def swagger_safe_balance_schema(serializer_class, deprecated: bool = False):
-    _schema_token_trusted_param = openapi.Parameter(
+    _schema_token_trusted_param = OpenApiParameter(
         "trusted",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_BOOLEAN,
+        location="query",
+        type=OpenApiTypes.BOOL,
         default=False,
         description="If `True` just trusted tokens will be returned",
     )
-    _schema_token_exclude_spam_param = openapi.Parameter(
+    _schema_token_exclude_spam_param = OpenApiParameter(
         "exclude_spam",
-        openapi.IN_QUERY,
-        type=openapi.TYPE_BOOLEAN,
+        location="query",
+        type=OpenApiTypes.BOOL,
         default=False,
         description="If `True` spam tokens will not be returned",
     )
-    return swagger_auto_schema(
+    return extend_schema(
         responses={
-            200: serializer_class(many=True),
-            404: "Safe not found",
-            422: "Safe address checksum not valid",
+            200: OpenApiResponse(response=serializer_class(many=True)),
+            404: OpenApiResponse(description="Safe not found"),
+            422: OpenApiResponse(description="Safe address checksum not valid"),
         },
-        manual_parameters=[
+        parameters=[
             _schema_token_trusted_param,
             _schema_token_exclude_spam_param,
         ],
@@ -820,12 +882,15 @@ class TransferView(RetrieveAPIView):
             log_index = int(transfer_id[65:])
             return self.get_erc20_erc721_transfer(tx_hash, log_index)
 
-    @swagger_auto_schema(
+    @extend_schema(
+        tags=["transactions"],
         responses={
-            200: serializers.TransferWithTokenInfoResponseSerializer(),
-            404: "Transfer does not exist",
-            400: "Invalid transferId",
-        }
+            200: OpenApiResponse(
+                response=serializers.TransferWithTokenInfoResponseSerializer
+            ),
+            404: OpenApiResponse(description="Transfer does not exist"),
+            400: OpenApiResponse(description="Invalid transferId"),
+        },
     )
     @method_decorator(cache_page(60 * 60))  # 1 hour
     def get(self, request, transfer_id: str, *args, **kwargs) -> Response:
@@ -870,6 +935,9 @@ class SafeTransferListView(ListAPIView):
         )
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            # Just for openApi doc purposes
+            return InternalTx.objects.none()
         address = self.kwargs["address"]
         return self.get_transfers(address)
 
@@ -886,11 +954,15 @@ class SafeTransferListView(ListAPIView):
             )
             return Response(serializer.data)
 
-    @swagger_auto_schema(
+    @extend_schema(
+        tags=["transactions"],
         responses={
             200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
-            422: "Safe address checksum not valid",
-        }
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Safe address checksum not valid",
+            ),
+        },
     )
     def get(self, request, address, format=None):
         """
@@ -911,11 +983,16 @@ class SafeTransferListView(ListAPIView):
 
 
 class SafeIncomingTransferListView(SafeTransferListView):
-    @swagger_auto_schema(
+
+    @extend_schema(
+        tags=["transactions"],
         responses={
             200: serializers.TransferWithTokenInfoResponseSerializer(many=True),
-            422: "Safe address checksum not valid",
-        }
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Safe address checksum not valid",
+            ),
+        },
     )
     def get(self, *args, **kwargs):
         """
@@ -944,12 +1021,12 @@ class SafeCreationView(GenericAPIView):
     serializer_class = serializers.SafeCreationInfoResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    @swagger_auto_schema(
+    @extend_schema(
         responses={
             200: serializer_class(),
-            404: "Safe creation not found",
-            422: "Owner address checksum not valid",
-            503: "Problem connecting to Ethereum network",
+            404: OpenApiResponse(description="Safe creation not found"),
+            422: OpenApiResponse(description="Owner address checksum not valid"),
+            503: OpenApiResponse(description="Problem connecting to Ethereum network"),
         }
     )
     @method_decorator(cache_page(60 * 60))  # 1 hour
@@ -984,11 +1061,13 @@ class SafeInfoView(GenericAPIView):
     serializer_class = serializers.SafeInfoResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    @swagger_auto_schema(
+    @extend_schema(
         responses={
             200: serializer_class(),
-            404: "Safe not found",
-            422: "code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info",
+            404: OpenApiResponse(description="Safe not found"),
+            422: OpenApiResponse(
+                description="code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info"
+            ),
         }
     )
     def get(self, request, address, *args, **kwargs):
@@ -1028,10 +1107,13 @@ class ModulesView(GenericAPIView):
     serializer_class = serializers.ModulesResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    @swagger_auto_schema(
+    @extend_schema(
         responses={
             200: serializers.ModulesResponseSerializer(),
-            422: "Module address checksum not valid",
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Module address checksum not valid",
+            ),
         }
     )
     @method_decorator(cache_page(15))  # 15 seconds
@@ -1059,10 +1141,13 @@ class OwnersView(GenericAPIView):
     serializer_class = serializers.OwnerResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    @swagger_auto_schema(
+    @extend_schema(
         responses={
             200: serializers.OwnerResponseSerializer(),
-            422: "Owner address checksum not valid",
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Owner address checksum not valid",
+            ),
         }
     )
     @method_decorator(cache_page(15))  # 15 seconds
@@ -1089,11 +1174,17 @@ class OwnersView(GenericAPIView):
 class DataDecoderView(GenericAPIView):
     serializer_class = serializers.DataDecoderSerializer
 
-    @swagger_auto_schema(
+    @extend_schema(
         responses={
-            200: "Decoded data",
-            404: "Cannot find function selector to decode data",
-            422: "Invalid data",
+            200: OpenApiResponse(
+                description="Decoded data", response=serializers.DataDecoderSerializer
+            ),
+            404: OpenApiResponse(
+                description="Cannot find function selector to decode data"
+            ),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse, description="Invalid data"
+            ),
         }
     )
     def post(self, request, format=None):
@@ -1133,13 +1224,16 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
             context["safe_address"] = self.kwargs["address"]
         return context
 
-    @swagger_auto_schema(
+    @extend_schema(
+        tags=["transactions"],
         responses={
             200: response_serializer,
-            400: "Data not valid",
-            404: "Safe not found",
-            422: "Tx not valid",
-        }
+            400: OpenApiResponse(description="Data not valid"),
+            404: OpenApiResponse(description="Safe not found"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse, description="Tx not valid"
+            ),
+        },
     )
     def post(self, request, address, *args, **kwargs):
         """
@@ -1212,15 +1306,21 @@ class DelegateListView(ListCreateAPIView):
         elif self.request.method == "POST":
             return serializers.DelegateSerializer
 
-    @swagger_auto_schema(deprecated=True, responses={400: "Invalid data"})
+    @extend_schema(
+        deprecated=True, responses={400: OpenApiResponse(description="Invalid data")}
+    )
     def get(self, request, **kwargs):
         """
         Returns a list with all the delegates
         """
         return super().get(request, **kwargs)
 
-    @swagger_auto_schema(
-        deprecated=True, responses={202: "Accepted", 400: "Malformed data"}
+    @extend_schema(
+        deprecated=True,
+        responses={
+            202: OpenApiResponse(description="Accepted"),
+            400: OpenApiResponse(description="Malformed data"),
+        },
     )
     def post(self, request, **kwargs):
         """
@@ -1247,14 +1347,17 @@ class DelegateDeleteView(GenericAPIView):
 
     serializer_class = serializers.DelegateDeleteSerializer
 
-    @swagger_auto_schema(
+    @extend_schema(
         deprecated=True,
-        request_body=serializer_class(),
+        request=serializer_class(),
         responses={
-            204: "Deleted",
-            400: "Malformed data",
-            404: "Delegate not found",
-            422: "Invalid Ethereum address/Error processing data",
+            204: OpenApiResponse(description="Deleted"),
+            400: OpenApiResponse(description="Malformed data"),
+            404: OpenApiResponse(description="Delegate not found"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid Ethereum address/Error processing data",
+            ),
         },
     )
     def delete(self, request, delegate_address, *args, **kwargs):
@@ -1302,14 +1405,18 @@ class SafeDelegateDestroyView(DestroyAPIView):
             delegate=self.kwargs["delegate_address"],
         )
 
-    @swagger_auto_schema(
+    @extend_schema(
+        tags=["delegates"],
         deprecated=True,
-        request_body=serializer_class(),
+        request=serializer_class(),
         responses={
-            204: "Deleted",
-            400: "Malformed data",
-            404: "Delegate not found",
-            422: "Invalid Ethereum address/Error processing data",
+            204: OpenApiResponse(description="Deleted"),
+            400: OpenApiResponse(description="Malformed data"),
+            404: OpenApiResponse(description="Delegate not found"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid Ethereum address | Error processing data",
+            ),
         },
     )
     def delete(self, request, address, delegate_address, *args, **kwargs):
