@@ -96,9 +96,12 @@ def update_token_info_from_token_list_task() -> int:
 
     current_chain_id = get_ethereum_network().value
 
-    # Some lists are meant to be used for multiple chains
+    # Some lists are meant to be used for multiple chains. Also, some lists have no address
+    # or multiple address for bridged tokens, those cases are excluded for now
     filtered_tokens = [
-        token for token in tokens if token.get("chainId") == current_chain_id
+        token
+        for token in tokens
+        if token.get("chainId") in (None, current_chain_id) and token.get("address")
     ]
     if not filtered_tokens:
         return 0
@@ -107,8 +110,8 @@ def update_token_info_from_token_list_task() -> int:
     with transaction.atomic():
         Token.objects.update(trusted=False)
         for token in filtered_tokens:
-            token_address = _parse_token_address_from_token_list(token["address"])
-            tokens_updated_count += Token.objects.filter(address=token_address).update(
-                logo_uri=token.get("logoURI") or "", trusted=True
-            )
+            if token_address := _parse_token_address_from_token_list(token["address"]):
+                tokens_updated_count += Token.objects.filter(
+                    address=token_address
+                ).update(logo_uri=token.get("logoURI") or "", trusted=True)
         return tokens_updated_count
