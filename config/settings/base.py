@@ -698,4 +698,7 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
     "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
+    ],
 }
