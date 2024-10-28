@@ -1,5 +1,5 @@
 import django_filters
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
@@ -10,6 +10,7 @@ from . import pagination, serializers
 from .models import SafeOperation, SafeOperationConfirmation, UserOperation
 
 
+@extend_schema(tags=["4337"])
 class SafeOperationView(RetrieveAPIView):
     """
     Returns a SafeOperation given its Safe operation hash
@@ -54,6 +55,7 @@ class SafeOperationsView(ListCreateAPIView):
         elif self.request.method == "POST":
             return serializers.SafeOperationSerializer
 
+    @extend_schema(tags=["4337"])
     def get(self, request, address, *args, **kwargs):
         """
         Returns the list of SafeOperations for a given Safe account
@@ -69,8 +71,9 @@ class SafeOperationsView(ListCreateAPIView):
             )
         return super().get(request, address, *args, **kwargs)
 
-    @swagger_auto_schema(
-        request_body=serializers.SafeOperationSerializer,
+    @extend_schema(
+        tags=["4337"],
+        request=serializers.SafeOperationSerializer,
         responses={201: "Created"},
     )
     def post(self, request, address, *args, **kwargs):
@@ -112,15 +115,26 @@ class SafeOperationConfirmationsView(ListCreateAPIView):
         elif self.request.method == "POST":
             return serializers.SafeOperationConfirmationSerializer
 
-    @swagger_auto_schema(responses={400: "Invalid data"})
+    @extend_schema(
+        tags=["4337"],
+        responses={
+            200: serializers.SafeOperationConfirmationResponseSerializer,
+            400: OpenApiResponse(description="Invalid data"),
+        },
+    )
     def get(self, request, *args, **kwargs):
         """
         Get the list of confirmations for a multisig transaction
         """
         return super().get(request, *args, **kwargs)
 
-    @swagger_auto_schema(
-        responses={201: "Created", 400: "Malformed data", 422: "Error processing data"}
+    @extend_schema(
+        tags=["4337"],
+        responses={
+            201: OpenApiResponse(description="Created"),
+            400: OpenApiResponse(description="Malformed data"),
+            422: OpenApiResponse(description="Error processing data"),
+        },
     )
     def post(self, request, *args, **kwargs):
         """
@@ -130,6 +144,7 @@ class SafeOperationConfirmationsView(ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
+@extend_schema(tags=["4337"])
 class UserOperationView(RetrieveAPIView):
     """
     Returns a UserOperation given its user operation hash
@@ -171,6 +186,7 @@ class UserOperationsView(ListAPIView):
         context["safe_address"] = self.kwargs["address"]
         return context
 
+    @extend_schema(tags=["4337"])
     def get(self, request, address, *args, **kwargs):
         """
         Returns the list of UserOperations for a given Safe account
