@@ -1,6 +1,6 @@
 import logging
 
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, DestroyAPIView
 from rest_framework.response import Response
@@ -29,8 +29,11 @@ class FirebaseDeviceCreateView(CreateAPIView):
         serializers.FirebaseDeviceSerializerWithOwnersResponseSerializer
     )
 
-    @swagger_auto_schema(
-        responses={200: response_serializer_class(), 400: "Invalid data"}
+    @extend_schema(
+        responses={
+            200: response_serializer_class(),
+            400: OpenApiResponse(description="Invalid data"),
+        }
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
