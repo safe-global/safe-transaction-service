@@ -694,5 +694,3 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
     ],
 }
-
-SWAGGER_CACHE_KEY = "swagger_urls"

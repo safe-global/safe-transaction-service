@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path
 from django.views import defaults as default_views
+from django.views.decorators.cache import cache_page
 
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -11,27 +12,25 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-from safe_transaction_service.utils.redis import cache_view_response
-
 schema_cache_timeout = 60 * 60 * 24 * 7  # 1 week
 swagger_urlpatterns = [
     path(
         "",
-        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+        cache_page(schema_cache_timeout, cache="local_storage")(
             SpectacularSwaggerView.as_view(url_name="schema-json")
         ),
         name="schema-swagger-ui",
     ),
     path(
         r"schema/",
-        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+        cache_page(schema_cache_timeout, cache="local_storage")(
             SpectacularAPIView().as_view()
         ),
         name="schema-json",
     ),
     path(
         "redoc/",
-        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+        cache_page(schema_cache_timeout, cache="local_storage")(
             SpectacularRedocView.as_view(url_name="schema-redoc")
         ),
         name="schema-redoc",
