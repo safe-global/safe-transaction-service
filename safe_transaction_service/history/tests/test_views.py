@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from unittest import mock
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.urls import reverse
+from django.utils import timezone
 
 import eth_abi
 from eth_account import Account
@@ -935,7 +937,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         # Add our test MultisigTransaction to the database
-        multisig_transaction = MultisigTransactionFactory(safe_tx_hash=safe_tx_hash)
+        safe = SafeContractFactory()
+        multisig_transaction = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash, safe=safe.address
+        )
 
         # Add other MultisigTransactions to the database to make sure they are not deleted
         MultisigTransactionFactory()
@@ -1018,25 +1023,95 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string="Provided owner is not the proposer of the transaction",
+                        string="Provided signer is not the proposer or the delegate user who proposed the transaction",
                         code="invalid",
                     )
                 ]
             },
         )
 
-        # Use a proper signature
+        # Calculate a valid message_hash
         message_hash = DeleteMultisigTxSignatureHelper.calculate_hash(
-            multisig_transaction.safe,
+            safe.address,
             safe_tx_hash,
             self.ethereum_client.get_chain_id(),
             previous_totp=False,
         )
-        data = {
-            "signature": owner_account.signHash(message_hash)[
-                "signature"
-            ].hex()  # Random signature
-        }
+
+        # Use an expired user delegate
+        safe_delegate = Account.create()
+        safe_contract_delegate = SafeContractDelegateFactory(
+            safe_contract_id=multisig_transaction.safe,
+            delegate=safe_delegate.address,
+            delegator=owner_account.address,
+            expiry_date=timezone.now() - datetime.timedelta(minutes=1),
+        )
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.proposed_by_delegate = safe_delegate.address
+        multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
+        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Provided signer is not the proposer or the delegate user who proposed the transaction",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a deleted user delegate
+        safe_contract_delegate.delete()
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.proposed_by_delegate = safe_delegate.address
+        multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
+        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertDictEqual(
+            response.data,
+            {
+                "non_field_errors": [
+                    ErrorDetail(
+                        string="Provided signer is not the proposer or the delegate user who proposed the transaction",
+                        code="invalid",
+                    )
+                ]
+            },
+        )
+
+        # Use a proper signature of an user delegate
+        SafeContractDelegateFactory(
+            safe_contract_id=multisig_transaction.safe,
+            delegate=safe_delegate.address,
+            delegator=owner_account.address,
+        )
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.proposed_by_delegate = safe_delegate.address
+        multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
+        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertTrue(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+        response = self.client.delete(url, format="json", data=data)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(MultisigTransaction.objects.count(), 2)
+        self.assertFalse(
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
+        )
+
+        # Use a proper signature of a proposer user
+        multisig_transaction = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash, safe=safe.address, ethereum_tx=None
+        )
+        multisig_transaction.proposer = owner_account.address
+        multisig_transaction.save(update_fields=["proposer"])
+        data = {"signature": owner_account.signHash(message_hash)["signature"].hex()}
         self.assertEqual(MultisigTransaction.objects.count(), 3)
         self.assertTrue(
             MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
