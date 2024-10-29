@@ -111,7 +111,14 @@ def update_token_info_from_token_list_task() -> int:
         Token.objects.update(trusted=False)
         for token in filtered_tokens:
             if token_address := _parse_token_address_from_token_list(token["address"]):
+                logo_uri = token.get("logoURI") or ""
+                if len(logo_uri) > 200:
+                    # URLField has a limit of 200 chars
+                    logger.error(
+                        "Logo uri for token %s is exceeding 200 chars", token_address
+                    )
+                    logo_uri = ""
                 tokens_updated_count += Token.objects.filter(
                     address=token_address
-                ).update(logo_uri=token.get("logoURI") or "", trusted=True)
+                ).update(logo_uri=logo_uri, trusted=True)
         return tokens_updated_count
