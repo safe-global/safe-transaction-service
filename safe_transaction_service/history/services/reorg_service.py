@@ -108,6 +108,13 @@ class ReorgService:
             for database_block, blockchain_block in zip(
                 database_blocks, blockchain_blocks
             ):
+                if not blockchain_block:
+                    logger.error(
+                        "Block with number=%d cannot be retrieved from the RPC",
+                        database_block.number,
+                    )
+                    continue
+
                 if HexBytes(blockchain_block["hash"]) == HexBytes(
                     database_block.block_hash
                 ):
