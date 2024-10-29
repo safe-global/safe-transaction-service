@@ -2,7 +2,7 @@ from django.conf import settings
 from django.conf.urls import include
 from django.contrib import admin
 from django.http import HttpResponse
-from django.urls import path, re_path
+from django.urls import path
 from django.views import defaults as default_views
 
 from drf_spectacular.views import (
@@ -10,38 +10,30 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
-from drf_yasg import openapi
-from drf_yasg.views import get_schema_view
-from rest_framework import permissions
 
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Safe Transaction Service API",
-        default_version="v1",
-        description="API to keep track of transactions sent via Safe smart contracts",
-        license=openapi.License(name="MIT License"),
-    ),
-    validators=["flex", "ssv"],
-    public=True,
-    permission_classes=[permissions.AllowAny],
-)
+from safe_transaction_service.utils.redis import cache_view_response
 
-schema_cache_timeout = 60 * 5  # 5 minutes
-
+schema_cache_timeout = 60 * 60 * 24 * 7  # 1 week
 swagger_urlpatterns = [
     path(
         "",
-        schema_view.with_ui("swagger", cache_timeout=schema_cache_timeout),
+        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+            SpectacularSwaggerView.as_view(url_name="schema-json")
+        ),
         name="schema-swagger-ui",
     ),
-    re_path(
-        r"^swagger(?P<format>\.json|\.yaml)$",
-        schema_view.without_ui(cache_timeout=schema_cache_timeout),
+    path(
+        r"schema/",
+        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+            SpectacularAPIView().as_view()
+        ),
         name="schema-json",
     ),
     path(
         "redoc/",
-        schema_view.with_ui("redoc", cache_timeout=schema_cache_timeout),
+        cache_view_response(schema_cache_timeout, settings.SWAGGER_CACHE_KEY)(
+            SpectacularRedocView.as_view(url_name="schema-redoc")
+        ),
         name="schema-redoc",
     ),
 ]
@@ -90,32 +82,12 @@ if settings.ENABLE_ANALYTICS:
     ]
 
 
-openapi_v3_urls = [
-    # YOUR PATTERNS
-    path("api/schema/", SpectacularAPIView().as_view(), name="schema"),
-    # Optional UI:
-    path(
-        "api/schema/swagger-ui/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
-        name="swagger-ui",
-    ),
-    path(
-        "api/schema/redoc/",
-        SpectacularRedocView.as_view(url_name="schema"),
-        name="redoc",
-    ),
+urlpatterns = swagger_urlpatterns + [
+    path(settings.ADMIN_URL, admin.site.urls),
+    path("api/v1/", include((urlpatterns_v1, "v1"))),
+    path("api/v2/", include((urlpatterns_v2, "v2"))),
+    path("check/", lambda request: HttpResponse("Ok"), name="check"),
 ]
-
-urlpatterns = (
-    swagger_urlpatterns
-    + openapi_v3_urls
-    + [
-        path(settings.ADMIN_URL, admin.site.urls),
-        path("api/v1/", include((urlpatterns_v1, "v1"))),
-        path("api/v2/", include((urlpatterns_v2, "v2"))),
-        path("check/", lambda request: HttpResponse("Ok"), name="check"),
-    ]
-)
 
 
 if settings.DEBUG:

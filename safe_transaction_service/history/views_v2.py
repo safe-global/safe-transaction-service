@@ -4,7 +4,7 @@ from typing import List, Tuple
 from django.db.models import Q
 
 import django_filters
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListCreateAPIView
 from rest_framework.response import Response
@@ -79,14 +79,25 @@ class DelegateListView(ListCreateAPIView):
         elif self.request.method == "POST":
             return serializers.DelegateSerializerV2
 
-    @swagger_auto_schema(responses={400: "Invalid data"})
+    @extend_schema(
+        responses={
+            200: serializers.SafeDelegateResponseSerializer,
+            400: OpenApiResponse(description="Invalid data"),
+        }
+    )
     def get(self, request, **kwargs):
         """
         Returns a list with all the delegates
         """
         return super().get(request, **kwargs)
 
-    @swagger_auto_schema(responses={202: "Accepted", 400: "Malformed data"})
+    @extend_schema(
+        request=serializers.DelegateSerializerV2,
+        responses={
+            202: OpenApiResponse(description="Accepted"),
+            400: OpenApiResponse(description="Malformed data"),
+        },
+    )
     def post(self, request, **kwargs):
         """
         Adds a new Safe delegate with a custom label. Calls with same delegate but different label or
@@ -128,13 +139,15 @@ class DelegateListView(ListCreateAPIView):
 class DelegateDeleteView(GenericAPIView):
     serializer_class = serializers.DelegateDeleteSerializerV2
 
-    @swagger_auto_schema(
-        request_body=serializer_class(),
+    @extend_schema(
+        request=serializer_class(),
         responses={
-            204: "Deleted",
-            400: "Malformed data",
-            404: "Delegate not found",
-            422: "Invalid Ethereum address/Error processing data",
+            204: OpenApiResponse(description="Deleted"),
+            400: OpenApiResponse(description="Malformed data"),
+            404: OpenApiResponse(description="Delegate not found"),
+            422: OpenApiResponse(
+                description="Invalid Ethereum address/Error processing data"
+            ),
         },
     )
     def delete(self, request, delegate_address, *args, **kwargs):

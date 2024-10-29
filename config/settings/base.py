@@ -101,7 +101,6 @@ THIRD_PARTY_APPS = [
     "django_extensions",
     "corsheaders",
     "rest_framework",
-    "drf_yasg",
     "django_s3_storage",
     "rest_framework.authtoken",
     "drf_spectacular",
@@ -659,13 +658,6 @@ AWS_CONFIGURED = bool(
 ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://ipfs.io/ipfs/")
 
-SWAGGER_SETTINGS = {
-    "SECURITY_DEFINITIONS": {
-        "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
-    },
-    "DEFAULT_AUTO_SCHEMA_CLASS": "safe_transaction_service.utils.swagger.CustomSwaggerSchema",
-}
-
 # Shell Plus
 # ------------------------------------------------------------------------------
 SHELL_PLUS_PRINT_SQL_TRUNCATE = env.int("SHELL_PLUS_PRINT_SQL_TRUNCATE", default=10_000)
@@ -693,7 +685,7 @@ REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
 # DRF ESPECTACULAR
 SPECTACULAR_SETTINGS = {
     "TITLE": "Safe Transaction Service",
-    "DESCRIPTION": "Your project description",
+    "DESCRIPTION": "API to keep track of transactions sent via Safe smart contracts",
     "VERSION": __version__,
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
@@ -702,3 +694,5 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
     ],
 }
+
+SWAGGER_CACHE_KEY = "swagger_urls"
