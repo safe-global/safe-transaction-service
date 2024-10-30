@@ -24,6 +24,9 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.dummy.DummyCache",
     },
+    "local_storage": {
+        "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+    },
 }
 
 # PASSWORDS

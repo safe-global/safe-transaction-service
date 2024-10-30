@@ -2,7 +2,7 @@ from django.conf import settings
 from django.conf.urls import include
 from django.contrib import admin
 from django.http import HttpResponse
-from django.urls import path
+from django.urls import path, re_path
 from django.views import defaults as default_views
 from django.views.decorators.cache import cache_page
 
@@ -21,8 +21,8 @@ swagger_urlpatterns = [
         ),
         name="schema-swagger-ui",
     ),
-    path(
-        r"schema/",
+    re_path(
+        r"^schema\/(?:\?format=(?P<format>json|yaml))?$",
         cache_page(schema_cache_timeout, cache="local_storage")(
             SpectacularAPIView().as_view()
         ),
