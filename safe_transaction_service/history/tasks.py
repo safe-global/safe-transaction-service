@@ -280,6 +280,8 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
             else:
                 logger.info("%d Safes to process", count)
 
+            return count
+
 
 @app.shared_task(bind=True)
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
