@@ -544,7 +544,7 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
         """
         Removes the queued but not executed multi-signature transaction associated with the given Safe tansaction hash.
         Only the proposer or the delegate user who proposed the transaction can delete it.
-        If the transaction was proposed by a delegate, must still be a valid delegate for the transaction proposer.
+        If the transaction was proposed by a delegate, it must still be a valid delegate for the transaction proposer.
         An EOA is required to sign the following EIP-712 data:
 
         ```python
