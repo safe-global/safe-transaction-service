@@ -52,6 +52,13 @@ def shutdown_worker():
         logger.warning("No redis locks to release")
 
 
+def get_task_lock_name(task_name: str, lock_name_suffix: Optional[str] = None) -> str:
+    lock_name = f"locks:tasks:{task_name}"
+    if lock_name_suffix:
+        lock_name += f":{lock_name_suffix}"
+    return lock_name
+
+
 @contextlib.contextmanager
 def only_one_running_task(
     task: CeleryTask,
@@ -74,9 +81,7 @@ def only_one_running_task(
     if WORKER_STOPPED:
         raise LockError("Worker is stopping")
     redis = get_redis()
-    lock_name = f"locks:tasks:{task.name}"
-    if lock_name_suffix:
-        lock_name += f":{lock_name_suffix}"
+    lock_name = get_task_lock_name(task.name, lock_name_suffix=lock_name_suffix)
     with redis.lock(lock_name, blocking=False, timeout=lock_timeout) as lock:
         try:
             ACTIVE_LOCKS.add(lock_name)

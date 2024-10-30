@@ -270,10 +270,10 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                         safe_to_process
                     ).not_processed().update(processed=True)
                 else:
-                    count += 1
                     process_decoded_internal_txs_for_safe_task.delay(
                         safe_to_process, reindex_master_copies=True
                     )
+                    count += 1
 
             if not count:
                 logger.info("No Safes to process")
