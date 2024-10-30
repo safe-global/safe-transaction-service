@@ -571,19 +571,19 @@ class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
                 raise ValidationError("Only EOA and ETH_SIGN signatures are supported")
 
             # The transaction can be deleted by the proposer or by the delegate user who proposed it.
-            if safe_signature.owner == proposer:
+            owner = safe_signature.owner
+            if owner == proposer:
                 return attrs
-            if (
-                multisig_tx.proposed_by_delegate
-                and safe_signature.owner == multisig_tx.proposed_by_delegate
-            ):
+
+            proposed_by_delegate = multisig_tx.proposed_by_delegate
+            if proposed_by_delegate and owner == proposed_by_delegate:
                 delegates_for_proposer = (
                     SafeContractDelegate.objects.get_delegates_for_safe_and_owners(
                         safe_address, [proposer]
                     )
                 )
                 # Check if it's still a valid delegate.
-                if safe_signature.owner in delegates_for_proposer:
+                if owner in delegates_for_proposer:
                     return attrs
 
         raise ValidationError(
