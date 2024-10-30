@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-TASK_CONCURRENCY=${CELERYD_CONCURRENCY:-15000}
+TASK_CONCURRENCY=${CELERYD_CONCURRENCY:-5000}
+PREFETCH_MULTIPLIER=${CELERYD_PREFETCH_MULTIPLIER:-2}  # Default is 4
 
 # DEBUG set in .env_docker_compose
 if [ ${DEBUG:-0} = 1 ]; then
@@ -30,6 +31,7 @@ exec celery --no-color -A config.celery_app worker \
      --pool=gevent \
      --loglevel $log_level \
      --concurrency="${TASK_CONCURRENCY}" \
+     --prefetch-multiplier="${PREFETCH_MULTIPLIER}" \
      --without-heartbeat \
      --without-gossip \
      --without-mingle -E -Q "$WORKER_QUEUES"
