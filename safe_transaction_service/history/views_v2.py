@@ -4,7 +4,8 @@ from typing import List, Tuple
 from django.db.models import Q
 
 import django_filters
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListCreateAPIView
 from rest_framework.response import Response
@@ -17,15 +18,49 @@ from .models import SafeContract, SafeContractDelegate
 from .services import BalanceServiceProvider
 from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
-from .views import swagger_safe_balance_schema
+from .views import swagger_assets_parameters
 
 logger = logging.getLogger(__name__)
 
 
+def swagger_pagination_parameters():
+    """
+    Pagination parameters are ignored with custom pagination
+
+    :return: swagger pagination parameters
+    """
+    return [
+        OpenApiParameter(
+            "limit",
+            location="query",
+            type=OpenApiTypes.INT,
+            description=pagination.ListPagination.limit_query_description,
+        ),
+        OpenApiParameter(
+            "offset",
+            location="query",
+            type=OpenApiTypes.INT,
+            description=pagination.ListPagination.offset_query_description,
+        ),
+    ]
+
+
+@extend_schema(
+    parameters=swagger_assets_parameters() + swagger_pagination_parameters(),
+    responses={
+        200: OpenApiResponse(
+            response=serializers.SafeCollectibleResponseSerializer(many=True)
+        ),
+        404: OpenApiResponse(description="Safe not found"),
+        422: OpenApiResponse(
+            description="Safe address checksum not valid",
+            response=serializers.CodeErrorResponse,
+        ),
+    },
+)
 class SafeCollectiblesView(GenericAPIView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 
-    @swagger_safe_balance_schema(serializer_class)
     def get(self, request, address):
         """
         Get paginated collectibles (ERC721 tokens) and information about them of a given Safe account.
@@ -204,7 +239,19 @@ class SafeBalanceView(GenericAPIView):
     def get_result(self, *args, **kwargs) -> Tuple[List[Balance], int]:
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
-    @swagger_safe_balance_schema(serializer_class)
+    @extend_schema(
+        parameters=swagger_assets_parameters() + swagger_pagination_parameters(),
+        responses={
+            200: OpenApiResponse(
+                response=serializers.SafeCollectibleResponseSerializer(many=True)
+            ),
+            404: OpenApiResponse(description="Safe not found"),
+            422: OpenApiResponse(
+                description="Safe address checksum not valid",
+                response=serializers.CodeErrorResponse,
+            ),
+        },
+    )
     def get(self, request, address):
         """
         Get paginated balances for Ether and ERC20 tokens.

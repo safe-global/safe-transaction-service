@@ -687,10 +687,13 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Safe Transaction Service",
     "DESCRIPTION": "API to keep track of transactions sent via Safe smart contracts",
     "VERSION": __version__,
+    "SWAGGER_UI_FAVICON_HREF": "static/safe/favicon.png",
+    "OAS_VERSION": "3.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
     "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
     ],
+    "SORT_OPERATION_PARAMETERS": False,
 }

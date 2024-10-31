@@ -747,33 +747,29 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_201_CREATED)
 
 
-def swagger_safe_balance_schema(serializer_class, deprecated: bool = False):
-    _schema_token_trusted_param = OpenApiParameter(
-        "trusted",
-        location="query",
-        type=OpenApiTypes.BOOL,
-        default=False,
-        description="If `True` just trusted tokens will be returned",
-    )
-    _schema_token_exclude_spam_param = OpenApiParameter(
-        "exclude_spam",
-        location="query",
-        type=OpenApiTypes.BOOL,
-        default=False,
-        description="If `True` spam tokens will not be returned",
-    )
-    return extend_schema(
-        responses={
-            200: OpenApiResponse(response=serializer_class(many=True)),
-            404: OpenApiResponse(description="Safe not found"),
-            422: OpenApiResponse(description="Safe address checksum not valid"),
-        },
-        parameters=[
-            _schema_token_trusted_param,
-            _schema_token_exclude_spam_param,
-        ],
-        deprecated=deprecated,
-    )
+def swagger_assets_parameters():
+    """
+    Return the swagger doc of ERC20, ERC721 default filters
+    Used for documentation purposes
+
+    :return:
+    """
+    return [
+        OpenApiParameter(
+            "trusted",
+            location="query",
+            type=OpenApiTypes.BOOL,
+            default=False,
+            description="If `True` just trusted tokens will be returned",
+        ),
+        OpenApiParameter(
+            "exclude_spam",
+            location="query",
+            type=OpenApiTypes.BOOL,
+            default=False,
+            description="If `True` spam tokens will not be returned",
+        ),
+    ]
 
 
 class SafeBalanceView(GenericAPIView):
@@ -796,7 +792,17 @@ class SafeBalanceView(GenericAPIView):
     def get_result(self, *args, **kwargs):
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
-    @swagger_safe_balance_schema(serializer_class)
+    @extend_schema(
+        parameters=swagger_assets_parameters(),
+        responses={
+            200: OpenApiResponse(
+                response=serializers.SafeBalanceResponseSerializer(many=True)
+            ),
+            404: OpenApiResponse(description="Safe not found"),
+            422: OpenApiResponse(description="Safe address checksum not valid"),
+        },
+        deprecated=False,
+    )
     def get(self, request, address):
         """
         Get balance for Ether and ERC20 tokens of a given Safe account

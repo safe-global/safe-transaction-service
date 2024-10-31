@@ -2,15 +2,25 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 import django_filters.rest_framework
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import response, status
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from ..history.serializers import CodeErrorResponse
 from . import filters, serializers
 from .models import Token
 
 
+@extend_schema(
+    responses={
+        200: OpenApiResponse(response=serializers.TokenInfoResponseSerializer),
+        422: OpenApiResponse(
+            response=CodeErrorResponse, description="Invalid ethereum address"
+        ),
+    }
+)
 class TokenView(RetrieveAPIView):
     serializer_class = serializers.TokenInfoResponseSerializer
     lookup_field = "address"
