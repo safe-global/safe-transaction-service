@@ -276,11 +276,14 @@ class SafeEventsIndexer(EventsIndexer):
         :param safe_address:
         :return: ``True`` if ``SafeSetup`` event was processed, ``False`` otherwise
         """
-        return InternalTxDecoded.objects.filter(
-            function_name="setup",
-            internal_tx___from=safe_address,
-            internal_tx__contract_address=None,
-        ).exists()
+        return (
+            InternalTxDecoded.objects.for_safe(safe_address)
+            .filter(
+                function_name="setup",
+                internal_tx__contract_address=None,
+            )
+            .exists()
+        )
 
     @transaction.atomic
     def decode_elements(self, *args) -> List[EventData]:
@@ -368,6 +371,7 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx=internal_tx,
             function_name="",
             arguments=args,
+            safe=safe_address,
         )
 
         if event_name == "ProxyCreation" or event_name == "SafeSetup":
@@ -518,10 +522,10 @@ class SafeEventsIndexer(EventsIndexer):
         # Check if were indexed
         safe_creation_events_addresses = set(safe_addresses_with_creation_events.keys())
         indexed_addresses = InternalTxDecoded.objects.filter(
-            internal_tx___from__in=safe_creation_events_addresses,
+            safe__in=safe_creation_events_addresses,
             function_name="setup",
             internal_tx__contract_address=None,
-        ).values_list("internal_tx___from", flat=True)
+        ).values_list("safe", flat=True)
         # Ignoring the already indexed contracts
         addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
 
@@ -582,6 +586,7 @@ class SafeEventsIndexer(EventsIndexer):
                         internal_tx=internal_tx,
                         function_name="setup",
                         arguments=setup_args,
+                        safe=safe_address,
                     )
                     internal_txs.append(internal_tx)
                     internal_decoded_txs.append(internal_tx_decoded)
