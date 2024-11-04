@@ -227,11 +227,7 @@ class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
         if self.value() == "YES":
             return queryset.filter(
                 Q(
-                    Exists(
-                        SafeContract.objects.filter(
-                            address=OuterRef("internal_tx___from")
-                        )
-                    )
+                    Exists(SafeContract.objects.filter(address=OuterRef("safe")))
                 )  # Just Safes indexed
                 | Q(function_name="setup")  # Safes pending to be indexed
             )
@@ -241,6 +237,7 @@ class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
 class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     actions = ["process_again"]
     list_display = (
+        "safe",
         "block_number",
         "processed",
         "internal_tx_id",
@@ -260,7 +257,7 @@ class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     search_fields = [
         "==function_name",
         "==internal_tx__to",
-        "==internal_tx___from",
+        "==safe",
         "==internal_tx__ethereum_tx__tx_hash",
         "==internal_tx__block_number",
     ]

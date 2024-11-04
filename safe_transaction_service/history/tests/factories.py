@@ -190,9 +190,12 @@ class InternalTxDecodedFactory(DjangoModelFactory):
             "operation": 0,
         }
 
-    internal_tx = factory.SubFactory(InternalTxFactory)
+    internal_tx = factory.SubFactory(
+        InternalTxFactory, _from=factory.SelfAttribute("..safe")
+    )
     function_name = factory.fuzzy.FuzzyText(prefix="safe-", suffix="fn")
     processed = False
+    safe = factory.LazyFunction(lambda: Account.create().address)
 
     @factory.lazy_attribute
     def arguments(self) -> Dict[str, Any]:

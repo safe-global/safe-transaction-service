@@ -188,7 +188,7 @@ class TestTasks(TestCase):
             threshold=threshold,
             fallback_handler=fallback_handler,
             internal_tx__to=master_copy,
-            internal_tx___from=safe_address,
+            safe=safe_address,
         )
         process_decoded_internal_txs_task.delay()
         self.assertTrue(SafeContract.objects.get(address=safe_address))
@@ -211,7 +211,7 @@ class TestTasks(TestCase):
             threshold=threshold,
             fallback_handler=fallback_handler,
             internal_tx__to=master_copy,
-            internal_tx___from=safe_address,
+            safe=safe_address,
         )
         SafeContractFactory(address=safe_address, banned=True)
         self.assertTrue(SafeContract.objects.get(address=safe_address).banned)

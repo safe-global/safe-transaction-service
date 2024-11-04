@@ -27,6 +27,7 @@ class Command(BaseCommand):
                     internal_tx=internal_tx,
                     function_name=function_name,
                     arguments=arguments,
+                    safe=internal_tx._from,
                 )
                 found += 1
                 self.stdout.write(
