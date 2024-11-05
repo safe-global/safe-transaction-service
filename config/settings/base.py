@@ -683,6 +683,7 @@ TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS = env.int(
 
 # Compression level – an integer from 0 to 9. 0 means not compression
 CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESSION_LEVEL", default=0)
+DEFAULT_CACHE_PAGE_TIMEOUT = env.int("DEFAULT_CACHE_PAGE_TIMEOUT", default=60)
 
 # Contracts reindex batch configuration
 # ------------------------------------------------------------------------------

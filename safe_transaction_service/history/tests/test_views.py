@@ -33,7 +33,7 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
 
-from ...utils.redis import get_redis
+from ...utils.redis import get_redis, remove_cache_view_by_instance
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
@@ -1210,6 +1210,23 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 2)
         self.assertEqual(response.data["count_unique_nonce"], 1)
 
+        #
+        # Mock get_queryset with empty queryset return value to get proper error in case of fail
+        with mock.patch.object(
+            SafeMultisigTransactionListView,
+            "get_queryset",
+            return_value=MultisigTransaction.objects.none(),
+        ) as patched_queryset:
+            response = self.client.get(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            # view shouldn't be called
+            patched_queryset.assert_not_called()
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 2)
+            self.assertEqual(response.data["count_unique_nonce"], 1)
+
     def test_get_multisig_transactions_unique_nonce(self):
         """
         Unique nonce should follow the trusted filter
@@ -1279,6 +1296,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ContractFactory(
                 address=multisig_transaction.to, trusted_for_delegate_call=True
             )
+            # Force to clean cache because we are not cleaning the cache on contracts change
+            remove_cache_view_by_instance(multisig_transaction)
             response = self.client.get(
                 reverse("v1:history:multisig-transactions", args=(safe_address,)),
                 format="json",

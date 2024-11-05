@@ -38,6 +38,11 @@ from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
+from ..utils.redis import (
+    LIST_MODULETRANSACTIONS_VIEW_CACHE_KEY,
+    LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY,
+    cache_page_for_address,
+)
 from . import filters, pagination, serializers
 from .helpers import add_tokens_to_transfers, is_valid_unique_transfer_id
 from .models import (
@@ -486,6 +491,9 @@ class SafeModuleTransactionListView(ListAPIView):
             .order_by("-created")
         )
 
+    @cache_page_for_address(
+        cache_tag=LIST_MODULETRANSACTIONS_VIEW_CACHE_KEY, timeout=60
+    )
     def get(self, request, address, format=None):
         """
         Returns all the transactions executed from modules given a Safe address
@@ -683,6 +691,9 @@ class SafeMultisigTransactionListView(ListAPIView):
                 description="Invalid ethereum address",
             ),
         },
+    )
+    @cache_page_for_address(
+        cache_tag=LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY, timeout=2
     )
     def get(self, request, *args, **kwargs):
         """

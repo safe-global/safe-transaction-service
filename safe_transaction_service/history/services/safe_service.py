@@ -115,9 +115,7 @@ class SafeService:
         try:
             # Get first the actual creation transaction for the safe
             creation_internal_tx = (
-                InternalTx.objects.filter(
-                    ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
-                )
+                InternalTx.objects.filter(ethereum_tx__status=1)
                 .select_related("ethereum_tx__block")
                 .get(contract_address=safe_address)
             )
