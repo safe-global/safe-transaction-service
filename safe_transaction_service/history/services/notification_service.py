@@ -246,8 +246,9 @@ def _build_delegate_payload(
 def build_save_delegate_payload(
     instance: SafeContractDelegate, created: bool = True
 ) -> DelegatePayload:
-    event_type = TransactionServiceEventType.NEW_DELEGATE
-    if not created:
+    if created:
+        event_type = TransactionServiceEventType.NEW_DELEGATE
+    else:
         event_type = TransactionServiceEventType.UPDATED_DELEGATE
     return _build_delegate_payload(event_type, instance)
 
