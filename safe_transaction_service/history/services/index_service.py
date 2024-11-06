@@ -71,6 +71,7 @@ class IndexServiceProvider:
                 settings.ETH_REORG_BLOCKS,
                 settings.ETH_L2_NETWORK,
                 settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH,
+                settings.PROCESSING_ENABLE_OUT_OF_ORDER_CHECK,
             )
         return cls.instance
 
@@ -87,6 +88,7 @@ class IndexService:
         eth_reorg_blocks: int,
         eth_l2_network: bool,
         eth_internal_tx_decoded_process_batch: int,
+        processing_enable_out_of_order_check: bool,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
@@ -94,6 +96,7 @@ class IndexService:
         self.eth_internal_tx_decoded_process_batch = (
             eth_internal_tx_decoded_process_batch
         )
+        self.processing_enable_out_of_order_check = processing_enable_out_of_order_check
 
         # Prevent circular import
         from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
@@ -431,12 +434,15 @@ class IndexService:
         """
 
         # Check if a new decoded tx appeared before other already processed (due to a reindex)
-        if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
-            logger.error("[%s] Found out of order transactions", safe_address)
-            self.fix_out_of_order(
-                safe_address,
-                InternalTxDecoded.objects.pending_for_safe(safe_address)[0].internal_tx,
-            )
+        if self.processing_enable_out_of_order_check:
+            if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
+                logger.error("[%s] Found out of order transactions", safe_address)
+                self.fix_out_of_order(
+                    safe_address,
+                    InternalTxDecoded.objects.pending_for_safe(safe_address)[
+                        0
+                    ].internal_tx,
+                )
 
         # Use chunks for memory issues
         total_processed_txs = 0

@@ -582,6 +582,12 @@ ETH_REORG_BLOCKS = env.int(
     "ETH_REORG_BLOCKS", default=200 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable
 
+# Events processing
+# ------------------------------------------------------------------------------
+PROCESSING_ENABLE_OUT_OF_ORDER_CHECK = env.bool(
+    "PROCESSING_ENABLE_OUT_OF_ORDER_CHECK", default=True
+)  # Enable out of order check, in case some transactions appear after a reindex so Safes don't get corrupt. Disabling it can speed up processing
+
 # Tokens
 # ------------------------------------------------------------------------------
 TOKENS_LOGO_BASE_URI = env.str(
