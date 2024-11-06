@@ -233,7 +233,7 @@ def _build_delegate_payload(
     """
     return DelegatePayload(
         type=event_type.name,
-        safeAddress=instance.safe_contract.address if instance.safe_contract else None,
+        safeAddress=instance.safe_contract_id if instance.safe_contract_id else None,
         delegate=instance.delegate,
         delegator=instance.delegator,
         label=instance.label,
