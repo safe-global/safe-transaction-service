@@ -213,7 +213,7 @@ class DelegatePayload(TypedDict):
     delegate: str
     delegator: str
     label: str
-    expiryDate: Optional[int]
+    expiryDateSeconds: Optional[int]
 
 
 def _build_delegate_payload(
@@ -237,7 +237,7 @@ def _build_delegate_payload(
         delegate=instance.delegate,
         delegator=instance.delegator,
         label=instance.label,
-        expiryDate=(
+        expiryDateSeconds=(
             int(instance.expiry_date.timestamp()) if instance.expiry_date else None
         ),
     )

@@ -210,7 +210,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegate": delegate_for_safe.delegate,
             "delegator": delegate_for_safe.delegator,
             "label": delegate_for_safe.label,
-            "expiryDate": int(delegate_for_safe.expiry_date.timestamp()),
+            "expiryDateSeconds": int(delegate_for_safe.expiry_date.timestamp()),
         }
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
@@ -223,7 +223,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegate": permanent_delegate_without_safe.delegate,
             "delegator": permanent_delegate_without_safe.delegator,
             "label": permanent_delegate_without_safe.label,
-            "expiryDate": None,
+            "expiryDateSeconds": None,
         }
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
@@ -242,7 +242,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegate": delegate_to_update.delegate,
             "delegator": delegate_to_update.delegator,
             "label": new_label,
-            "expiryDate": int(new_expiry_date.timestamp()),
+            "expiryDateSeconds": int(new_expiry_date.timestamp()),
         }
         send_event_mock.assert_called_with(updated_delegate_user_payload)
 
@@ -255,6 +255,6 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegate": delegate_to_delete.delegate,
             "delegator": delegate_to_delete.delegator,
             "label": delegate_to_delete.label,
-            "expiryDate": int(delegate_to_delete.expiry_date.timestamp()),
+            "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
         }
         send_event_mock.assert_called_with(updated_delegate_user_payload)
