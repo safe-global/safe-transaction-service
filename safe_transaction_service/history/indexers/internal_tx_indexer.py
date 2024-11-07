@@ -249,7 +249,6 @@ class InternalTxIndexer(EthereumIndexer):
                     function_name=function_name,
                     arguments=arguments,
                     processed=False,
-                    safe=internal_tx._from,
                 )
             except CannotDecode as exc:
                 logger.debug("Cannot decode %s: %s", data.hex(), exc)

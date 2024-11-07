@@ -142,7 +142,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
 
             setup_internal_tx = InternalTxDecodedFactory(
                 function_name="setup",
-                safe=safe_address,
+                internal_tx___from=safe_address,
             )
             self.assertEqual(self.index_service.process_decoded_txs(safe_address), 1)
             fix_out_of_order_mock.assert_not_called()
@@ -152,7 +152,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
             exec_transactions = [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                 )
                 for _ in range(3)
             ]

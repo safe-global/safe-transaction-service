@@ -665,10 +665,7 @@ class TestInternalTx(TestCase):
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
 
         InternalTxDecoded.objects.create(
-            function_name="alo",
-            arguments={},
-            internal_tx=internal_tx,
-            safe=internal_tx._from,
+            function_name="alo", arguments={}, internal_tx=internal_tx
         )
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
 
@@ -746,14 +743,18 @@ class TestInternalTxDecoded(TestCase):
         )
 
         safe_address_1 = SafeContractFactory().address
-        internal_tx_decoded_1 = InternalTxDecodedFactory(safe=safe_address_1)
-        InternalTxDecodedFactory(safe=safe_address_1)
+        internal_tx_decoded_1 = InternalTxDecodedFactory(
+            internal_tx___from=safe_address_1
+        )
+        InternalTxDecodedFactory(internal_tx___from=safe_address_1)
         results = InternalTxDecoded.objects.safes_pending_to_be_processed()
         self.assertIsInstance(results, QuerySet)
         self.assertCountEqual(results, [safe_address_1])
 
         safe_address_2 = SafeContractFactory().address
-        internal_tx_decoded_2 = InternalTxDecodedFactory(safe=safe_address_2)
+        internal_tx_decoded_2 = InternalTxDecodedFactory(
+            internal_tx___from=safe_address_2
+        )
         self.assertCountEqual(
             InternalTxDecoded.objects.safes_pending_to_be_processed(),
             [safe_address_1, safe_address_2],
@@ -771,7 +772,7 @@ class TestInternalTxDecoded(TestCase):
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         i = InternalTxDecodedFactory(
-            safe=random_safe,
+            internal_tx___from=random_safe,
             internal_tx__block_number=10,
             processed=False,
         )
@@ -781,14 +782,14 @@ class TestInternalTxDecoded(TestCase):
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         InternalTxDecodedFactory(
-            safe=random_safe,
+            internal_tx___from=random_safe,
             internal_tx__block_number=11,
             processed=False,
         )
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         InternalTxDecodedFactory(
-            safe=random_safe, internal_tx__block_number=9, processed=False
+            internal_tx___from=random_safe, internal_tx__block_number=9, processed=False
         )
         self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
         i.processed = False
@@ -797,17 +798,17 @@ class TestInternalTxDecoded(TestCase):
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         InternalTxDecodedFactory(
-            safe=random_safe, internal_tx__block_number=8, processed=True
+            internal_tx___from=random_safe, internal_tx__block_number=8, processed=True
         )
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         InternalTxDecodedFactory(
-            safe=random_safe, internal_tx__block_number=9, processed=True
+            internal_tx___from=random_safe, internal_tx__block_number=9, processed=True
         )
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
         InternalTxDecodedFactory(
-            safe=random_safe, internal_tx__block_number=10, processed=True
+            internal_tx___from=random_safe, internal_tx__block_number=10, processed=True
         )
         self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 

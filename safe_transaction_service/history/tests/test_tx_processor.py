@@ -68,7 +68,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 threshold=threshold,
                 fallback_handler=fallback_handler,
                 internal_tx__to=master_copy,
-                safe=safe_address,
+                internal_tx___from=safe_address,
                 internal_tx__value=0,
             )
         )
@@ -88,14 +88,14 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="addOwnerWithThreshold",
                     owner=new_owner,
                     threshold=threshold,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -125,14 +125,14 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="swapOwner",
                     old_owner=owner,
                     owner=another_owner,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -185,14 +185,14 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="removeOwner",
                     old_owner=another_owner,
                     threshold=threshold,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -228,13 +228,13 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="setFallbackHandler",
                     fallback_handler=fallback_handler,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -252,13 +252,13 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="changeMasterCopy",
                     master_copy=master_copy,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -276,13 +276,13 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="enableModule",
                     module=module,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -298,13 +298,13 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             [
                 InternalTxDecodedFactory(
                     function_name="execTransaction",
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
                 InternalTxDecodedFactory(
                     function_name="disableModule",
                     module=module,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                     internal_tx__value=0,
                 ),
             ]
@@ -328,7 +328,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 [
                     InternalTxDecodedFactory(
                         function_name="execTransactionFromModule",
-                        safe=safe_address,
+                        internal_tx___from=safe_address,
                         internal_tx__trace_address="0,0",
                         internal_tx__value=0,
                     )
@@ -355,7 +355,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         approve_hash_decoded_tx = InternalTxDecodedFactory(
             function_name="approveHash",
             hash_to_approve=hash_to_approve,
-            safe=safe_address,
+            internal_tx___from=safe_address,
             internal_tx__trace_address="0,1,0",
             internal_tx__value=0,
         )
@@ -374,7 +374,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 [
                     InternalTxDecodedFactory(
                         function_name="execTransaction",
-                        safe=safe_address,
+                        internal_tx___from=safe_address,
                         internal_tx__value=0,
                     ),
                     approve_hash_decoded_tx,
@@ -489,18 +489,18 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 threshold=threshold,
                 fallback_handler=fallback_handler,
                 internal_tx__to=safe_1_1_0_master_copy.address,
-                safe=safe_address,
+                internal_tx___from=safe_address,
             )
         )
         tx_processor.process_decoded_transactions(
             [
                 InternalTxDecodedFactory(
-                    function_name="execTransaction", safe=safe_address
+                    function_name="execTransaction", internal_tx___from=safe_address
                 ),
                 InternalTxDecodedFactory(
                     function_name="changeMasterCopy",
                     master_copy=safe_1_2_0_master_copy.address,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                 ),
             ]
         )
@@ -518,12 +518,12 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         tx_processor.process_decoded_transactions(
             [
                 InternalTxDecodedFactory(
-                    function_name="execTransaction", safe=safe_address
+                    function_name="execTransaction", internal_tx___from=safe_address
                 ),
                 InternalTxDecodedFactory(
                     function_name="changeMasterCopy",
                     master_copy=safe_1_3_0_master_copy.address,
-                    safe=safe_address,
+                    internal_tx___from=safe_address,
                 ),
             ]
         )
@@ -541,7 +541,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         safe_last_status = SafeLastStatusFactory()
         module_internal_tx_decoded = InternalTxDecodedFactory(
             function_name="execTransactionFromModule",
-            safe=safe_last_status.address,
+            internal_tx___from=safe_last_status.address,
             internal_tx__to="0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
             internal_tx__trace_address="0,0,0,4",
             internal_tx__ethereum_tx__tx_hash="0x59f20a56a94ad4ee934468eb26b9148151289c97fefece779e05d98befd156f0",
