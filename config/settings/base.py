@@ -7,6 +7,8 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers as default_cors_headers
 
+from safe_transaction_service import __version__
+
 from ..gunicorn import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,
@@ -99,9 +101,9 @@ THIRD_PARTY_APPS = [
     "django_extensions",
     "corsheaders",
     "rest_framework",
-    "drf_yasg",
     "django_s3_storage",
     "rest_framework.authtoken",
+    "drf_spectacular",
 ]
 LOCAL_APPS = [
     "safe_transaction_service.account_abstraction.apps.AccountAbstractionConfig",
@@ -330,7 +332,9 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
+    "ALLOWED_VERSIONS": ["v1", "v2"],
     "EXCEPTION_HANDLER": "safe_transaction_service.history.exceptions.custom_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # INDEXER LOG LEVEL
@@ -668,13 +672,6 @@ AWS_CONFIGURED = bool(
 ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://ipfs.io/ipfs/")
 
-SWAGGER_SETTINGS = {
-    "SECURITY_DEFINITIONS": {
-        "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
-    },
-    "DEFAULT_AUTO_SCHEMA_CLASS": "safe_transaction_service.utils.swagger.CustomSwaggerSchema",
-}
-
 # Shell Plus
 # ------------------------------------------------------------------------------
 SHELL_PLUS_PRINT_SQL_TRUNCATE = env.int("SHELL_PLUS_PRINT_SQL_TRUNCATE", default=10_000)
@@ -698,3 +695,19 @@ REINDEX_CONTRACTS_METADATA_BATCH = env.int(
 REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
     "REINDEX_CONTRACTS_METADATA_COUNTDOWN", default=0
 )
+
+# DRF ESPECTACULAR
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Safe Transaction Service",
+    "DESCRIPTION": "API to keep track of transactions sent via Safe smart contracts",
+    "VERSION": __version__,
+    "SWAGGER_UI_FAVICON_HREF": "static/safe/favicon.png",
+    "OAS_VERSION": "3.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
+    "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
+    ],
+    "SORT_OPERATION_PARAMETERS": False,
+}

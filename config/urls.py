@@ -4,39 +4,35 @@ from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path, re_path
 from django.views import defaults as default_views
+from django.views.decorators.cache import cache_page
 
-from drf_yasg import openapi
-from drf_yasg.views import get_schema_view
-from rest_framework import permissions
-
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Safe Transaction Service API",
-        default_version="v1",
-        description="API to keep track of transactions sent via Safe smart contracts",
-        license=openapi.License(name="MIT License"),
-    ),
-    validators=["flex", "ssv"],
-    public=True,
-    permission_classes=[permissions.AllowAny],
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
 )
 
-schema_cache_timeout = 60 * 5  # 5 minutes
-
+schema_cache_timeout = 60 * 60 * 24 * 7  # 1 week
 swagger_urlpatterns = [
     path(
         "",
-        schema_view.with_ui("swagger", cache_timeout=schema_cache_timeout),
+        cache_page(schema_cache_timeout, cache="local_storage")(
+            SpectacularSwaggerView.as_view(url_name="schema-json")
+        ),
         name="schema-swagger-ui",
     ),
     re_path(
-        r"^swagger(?P<format>\.json|\.yaml)$",
-        schema_view.without_ui(cache_timeout=schema_cache_timeout),
+        r"^schema\/(?:\?format=(?P<format>json|yaml))?$",
+        cache_page(schema_cache_timeout, cache="local_storage")(
+            SpectacularAPIView().as_view()
+        ),
         name="schema-json",
     ),
     path(
         "redoc/",
-        schema_view.with_ui("redoc", cache_timeout=schema_cache_timeout),
+        cache_page(schema_cache_timeout, cache="local_storage")(
+            SpectacularRedocView.as_view(url_name="schema-redoc")
+        ),
         name="schema-redoc",
     ),
 ]
@@ -83,6 +79,7 @@ if settings.ENABLE_ANALYTICS:
             ),
         ),
     ]
+
 
 urlpatterns = swagger_urlpatterns + [
     path(settings.ADMIN_URL, admin.site.urls),

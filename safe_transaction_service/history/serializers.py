@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 from django.http import Http404
 from django.utils import timezone
 
-from drf_yasg.utils import swagger_serializer_method
 from eth_typing import ChecksumAddress
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
@@ -694,9 +693,6 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         if obj.ethereum_tx_id:
             return obj.ethereum_tx.block_id
 
-    @swagger_serializer_method(
-        serializer_or_field=SafeMultisigConfirmationResponseSerializer
-    )
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
         Filters confirmations queryset
@@ -1261,3 +1257,9 @@ class SafeDeploymentContractSerializer(serializers.Serializer):
 class SafeDeploymentSerializer(serializers.Serializer):
     version = serializers.CharField(max_length=10)  # Example 1.3.0
     contracts = SafeDeploymentContractSerializer(many=True)
+
+
+class CodeErrorResponse(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    arguments = serializers.ListField()
