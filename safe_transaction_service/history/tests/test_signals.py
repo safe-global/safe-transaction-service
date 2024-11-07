@@ -211,6 +211,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegator": delegate_for_safe.delegator,
             "label": delegate_for_safe.label,
             "expiryDateSeconds": int(delegate_for_safe.expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
@@ -224,6 +225,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegator": permanent_delegate_without_safe.delegator,
             "label": permanent_delegate_without_safe.label,
             "expiryDateSeconds": None,
+            "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
@@ -243,6 +245,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegator": delegate_to_update.delegator,
             "label": new_label,
             "expiryDateSeconds": int(new_expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(updated_delegate_user_payload)
 
@@ -256,5 +259,6 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "delegator": delegate_to_delete.delegator,
             "label": delegate_to_delete.label,
             "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(updated_delegate_user_payload)
