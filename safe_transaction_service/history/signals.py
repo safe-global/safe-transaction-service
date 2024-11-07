@@ -20,12 +20,18 @@ from .models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeContractDelegate,
     SafeLastStatus,
     SafeMasterCopy,
     SafeStatus,
     TokenTransfer,
 )
-from .services.notification_service import build_event_payload, is_relevant_notification
+from .services.notification_service import (
+    build_delete_delegate_payload,
+    build_event_payload,
+    build_save_delegate_payload,
+    is_relevant_notification,
+)
 
 logger = getLogger(__name__)
 
@@ -288,3 +294,32 @@ def add_to_historical_table(
     safe_status = SafeStatus.from_status_instance(instance)
     safe_status.save()
     return safe_status
+
+
+@receiver(
+    post_save,
+    sender=SafeContractDelegate,
+    dispatch_uid="safe_contract_delegate.process_save_delegate_user_event",
+)
+def process_save_delegate_user_event(
+    sender: Type[Model],
+    instance: SafeContractDelegate,
+    created: bool,
+    **kwargs,
+):
+    payload_event = build_save_delegate_payload(instance, created)
+    queue_service = get_queue_service()
+    queue_service.send_event(payload_event)
+
+
+@receiver(
+    post_delete,
+    sender=SafeContractDelegate,
+    dispatch_uid="safe_contract_delegate.process_delete_delegate_user_event",
+)
+def process_delete_delegate_user_event(
+    sender: Type[Model], instance: SafeContractDelegate, *args, **kwargs
+):
+    payload_event = build_delete_delegate_payload(instance)
+    queue_service = get_queue_service()
+    queue_service.send_event(payload_event)

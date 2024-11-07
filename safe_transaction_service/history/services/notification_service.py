@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Any, Dict, List, Type, TypedDict, Union
+from typing import Any, Dict, List, Optional, Type, TypedDict, Union
 
 from django.db.models import Model
 from django.utils import timezone
@@ -15,6 +15,7 @@ from safe_transaction_service.history.models import (
     MultisigConfirmation,
     MultisigTransaction,
     SafeContract,
+    SafeContractDelegate,
     TokenTransfer,
     TransactionServiceEventType,
 )
@@ -203,4 +204,58 @@ def build_reorg_payload(block_number: int) -> ReorgPayload:
         type=TransactionServiceEventType.REORG_DETECTED.name,
         blockNumber=block_number,
         chainId=str(get_chain_id()),
+    )
+
+
+class DelegatePayload(TypedDict):
+    type: str
+    safeAddress: Optional[str]
+    delegate: str
+    delegator: str
+    label: str
+    expiryDateSeconds: Optional[int]
+    chainId: str
+
+
+def _build_delegate_payload(
+    event_type: Union[
+        TransactionServiceEventType.NEW_DELEGATE,
+        TransactionServiceEventType.UPDATED_DELEGATE,
+        TransactionServiceEventType.DELETED_DELEGATE,
+    ],
+    instance: SafeContractDelegate,
+) -> DelegatePayload:
+    """
+    Build a delegate payload with the specified event type and SafeContractDelegate instance data.
+
+    :param event_type: The transaction event type, restricted to NEW_DELEGATE, UPDATED_DELEGATE, or DELETED_DELEGATE.
+    :param instance: An instance of SafeContractDelegate.
+    :return: A DelegatePayload dictionary with details about the delegate.
+    """
+    return DelegatePayload(
+        type=event_type.name,
+        safeAddress=instance.safe_contract_id if instance.safe_contract_id else None,
+        delegate=instance.delegate,
+        delegator=instance.delegator,
+        label=instance.label,
+        expiryDateSeconds=(
+            int(instance.expiry_date.timestamp()) if instance.expiry_date else None
+        ),
+        chainId=str(get_chain_id()),
+    )
+
+
+def build_save_delegate_payload(
+    instance: SafeContractDelegate, created: bool = True
+) -> DelegatePayload:
+    if created:
+        event_type = TransactionServiceEventType.NEW_DELEGATE
+    else:
+        event_type = TransactionServiceEventType.UPDATED_DELEGATE
+    return _build_delegate_payload(event_type, instance)
+
+
+def build_delete_delegate_payload(instance: SafeContractDelegate) -> DelegatePayload:
+    return _build_delegate_payload(
+        TransactionServiceEventType.DELETED_DELEGATE, instance
     )

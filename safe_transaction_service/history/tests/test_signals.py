@@ -1,9 +1,11 @@
+import datetime
 from datetime import timedelta
 from unittest import mock
 from unittest.mock import MagicMock
 
 from django.db.models.signals import post_save
 from django.test import TestCase
+from django.utils import timezone
 
 import factory
 from safe_eth.eth import EthereumNetwork
@@ -28,6 +30,8 @@ from .factories import (
     InternalTxFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
+    SafeContractDelegateFactory,
+    SafeContractFactory,
 )
 
 
@@ -195,3 +199,66 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(deleted_multisig_transaction_payload)
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_delegates_signals_are_correctly_fired(self, send_event_mock: MagicMock):
+        # New delegate should fire an event
+        delegate_for_safe = SafeContractDelegateFactory()
+        new_delegate_user_payload = {
+            "type": TransactionServiceEventType.NEW_DELEGATE.name,
+            "safeAddress": delegate_for_safe.safe_contract.address,
+            "delegate": delegate_for_safe.delegate,
+            "delegator": delegate_for_safe.delegator,
+            "label": delegate_for_safe.label,
+            "expiryDateSeconds": int(delegate_for_safe.expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        send_event_mock.assert_called_with(new_delegate_user_payload)
+
+        permanent_delegate_without_safe = SafeContractDelegateFactory(
+            safe_contract=None, expiry_date=None
+        )
+        new_delegate_user_payload = {
+            "type": TransactionServiceEventType.NEW_DELEGATE.name,
+            "safeAddress": None,
+            "delegate": permanent_delegate_without_safe.delegate,
+            "delegator": permanent_delegate_without_safe.delegator,
+            "label": permanent_delegate_without_safe.label,
+            "expiryDateSeconds": None,
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        send_event_mock.assert_called_with(new_delegate_user_payload)
+
+        # Updated delegate should fire an event
+        delegate_to_update = SafeContractDelegateFactory()
+        new_safe = SafeContractFactory()
+        new_label = "Updated Label"
+        new_expiry_date = timezone.now() + datetime.timedelta(minutes=5)
+        delegate_to_update.safe_contract = new_safe
+        delegate_to_update.label = new_label
+        delegate_to_update.expiry_date = new_expiry_date
+        delegate_to_update.save()
+        updated_delegate_user_payload = {
+            "type": TransactionServiceEventType.UPDATED_DELEGATE.name,
+            "safeAddress": new_safe.address,
+            "delegate": delegate_to_update.delegate,
+            "delegator": delegate_to_update.delegator,
+            "label": new_label,
+            "expiryDateSeconds": int(new_expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        send_event_mock.assert_called_with(updated_delegate_user_payload)
+
+        # Deleted delegate should fire an event
+        delegate_to_delete = SafeContractDelegateFactory()
+        delegate_to_delete.delete()
+        updated_delegate_user_payload = {
+            "type": TransactionServiceEventType.DELETED_DELEGATE.name,
+            "safeAddress": delegate_to_delete.safe_contract.address,
+            "delegate": delegate_to_delete.delegate,
+            "delegator": delegate_to_delete.delegator,
+            "label": delegate_to_delete.label,
+            "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        send_event_mock.assert_called_with(updated_delegate_user_payload)
