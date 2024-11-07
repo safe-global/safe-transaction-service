@@ -126,7 +126,22 @@ class UserOperationReceipt(models.Model):
         return f"{HexBytes(self.user_operation_id).hex()} UserOperationReceipt"
 
 
+class SafeOperationQuerySet(models.QuerySet):
+    def executed(self):
+        return self.exclude(user_operation__ethereum_tx=None)
+
+    def not_executed(self):
+        return self.filter(user_operation__ethereum_tx=None)
+
+    def with_confirmations(self):
+        return self.exclude(confirmations__isnull=True)
+
+    def without_confirmations(self):
+        return self.filter(confirmations__isnull=True)
+
+
 class SafeOperation(TimeStampedModel):
+    objects = SafeOperationQuerySet.as_manager()
     hash = Keccak256Field(primary_key=True)  # safeOperationHash
     user_operation = models.OneToOneField(
         UserOperation, on_delete=models.CASCADE, related_name="safe_operation"
