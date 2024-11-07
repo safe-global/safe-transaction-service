@@ -175,6 +175,16 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {"count": 1, "next": None, "previous": None, "results": [expected]},
         )
 
+        # Check confirmations flag
+        response = self.client.get(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
+            + "?has_confirmations=True"
+        )
+        self.assertDictEqual(
+            response.json(),
+            {"count": 0, "next": None, "previous": None, "results": []},
+        )
+
         # Add a confirmation
         safe_operation_confirmation = factories.SafeOperationConfirmationFactory(
             safe_operation=safe_operation
@@ -199,6 +209,47 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "signatureType": "EOA",
             }
         ]
+        self.assertDictEqual(
+            response.json(),
+            {"count": 1, "next": None, "previous": None, "results": [expected]},
+        )
+
+        # Check executed flag
+        response = self.client.get(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
+            + "?executed=False"
+        )
+        self.assertDictEqual(
+            response.json(),
+            {"count": 0, "next": None, "previous": None, "results": []},
+        )
+
+        response = self.client.get(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
+            + "?executed=True"
+        )
+        self.assertDictEqual(
+            response.json(),
+            {"count": 1, "next": None, "previous": None, "results": [expected]},
+        )
+
+        # Set transaction as not executed and check again
+        safe_operation.user_operation.ethereum_tx = None
+        safe_operation.user_operation.save(update_fields=["ethereum_tx"])
+        response = self.client.get(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
+            + "?executed=True"
+        )
+        self.assertDictEqual(
+            response.json(),
+            {"count": 0, "next": None, "previous": None, "results": []},
+        )
+
+        response = self.client.get(
+            reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
+            + "?executed=False"
+        )
+        expected["userOperation"]["ethereumTxHash"] = None
         self.assertDictEqual(
             response.json(),
             {"count": 1, "next": None, "previous": None, "results": [expected]},
