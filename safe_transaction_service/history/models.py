@@ -1168,7 +1168,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :param safe_address:
         :return: Queryset of all InternalTxDecoded for one Safe with `safe_address`
         """
-        return self.filter(safe=safe_address)
+        return self.filter(internal_tx___from=safe_address)
 
     def processed(self):
         return self.filter(processed=True)
@@ -1204,7 +1204,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         return (
             self.pending_for_safes()
-            .for_safe(safe_address)
+            .filter(internal_tx___from=safe_address)
             .select_related("internal_tx", "internal_tx__ethereum_tx")
         )
 
@@ -1212,7 +1212,11 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         :return: List of Safe addresses that have transactions pending to be processed
         """
-        return self.not_processed().values_list("safe", flat=True).distinct("safe")
+        return (
+            self.not_processed()
+            .values_list("internal_tx___from", flat=True)
+            .distinct("internal_tx___from")
+        )
 
 
 class InternalTxDecoded(models.Model):
@@ -1226,13 +1230,12 @@ class InternalTxDecoded(models.Model):
     function_name = models.CharField(max_length=256, db_index=True)
     arguments = JSONField()
     processed = models.BooleanField(default=False)
-    safe = EthereumAddressBinaryField(db_index=True)
 
     class Meta:
         indexes = [
             models.Index(
                 name="history_decoded_processed_idx",
-                fields=["safe"],
+                fields=["processed"],
                 condition=Q(processed=False),
             )
         ]

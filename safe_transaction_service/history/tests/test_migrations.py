@@ -5,7 +5,6 @@ from django.utils import timezone
 
 from django_test_migrations.migrator import Migrator
 from eth_account import Account
-from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_keccak, fast_keccak_text
 
 
@@ -363,52 +362,4 @@ class TestMigrations(TestCase):
         safe_contract = SafeContractNew.objects.get()
         self.assertEqual(
             safe_contract.created, safe_contract.ethereum_tx.block.timestamp
-        )
-
-    def test_migration_0091_add_safe_internal_tx_decoded(self):
-        # Add `safe` field to InternalTxDecoded
-        old_state = self.migrator.apply_initial_migration(
-            ("history", "0090_multisigtransaction_proposed_by_delegate"),
-        )
-
-        EthereumBlock = old_state.apps.get_model("history", "EthereumBlock")
-        EthereumTx = old_state.apps.get_model("history", "EthereumTx")
-        InternalTx = old_state.apps.get_model("history", "InternalTx")
-        InternalTxDecoded = old_state.apps.get_model("history", "InternalTxDecoded")
-        ethereum_tx = self.build_ethereum_tx(EthereumBlock, EthereumTx)
-        random_safe_address = Account.create().address
-        internal_tx = InternalTx.objects.create(
-            ethereum_tx=ethereum_tx,
-            timestamp=timezone.now(),
-            block_number=ethereum_tx.block.number,
-            _from=random_safe_address,
-            gas=5,
-            data=b"",
-            to=NULL_ADDRESS,
-            value=0,
-            gas_used=10,
-            contract_address=None,
-            code=None,
-            output=None,
-            refund_address=None,
-            tx_type=0,
-            call_type=0,
-            trace_address="0",
-            error=None,
-        )
-        InternalTxDecoded.objects.create(
-            internal_tx=internal_tx,
-            function_name="anything",
-            arguments={},
-            processed=True,
-        )
-
-        new_state = self.migrator.apply_tested_migration(
-            ("history", "0091_add_safe_internal_tx_decoded"),
-        )
-
-        InternalTxDecodedNew = new_state.apps.get_model("history", "InternalTxDecoded")
-        internal_tx_decoded_new = InternalTxDecodedNew.objects.get()
-        self.assertEqual(
-            internal_tx_decoded_new.safe, internal_tx._from, random_safe_address
         )
