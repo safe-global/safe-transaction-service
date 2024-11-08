@@ -206,7 +206,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         delegate_for_safe = SafeContractDelegateFactory()
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
-            "safeAddress": delegate_for_safe.safe_contract.address,
+            "address": delegate_for_safe.safe_contract.address,
             "delegate": delegate_for_safe.delegate,
             "delegator": delegate_for_safe.delegator,
             "label": delegate_for_safe.label,
@@ -220,7 +220,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         )
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
-            "safeAddress": None,
+            "address": None,
             "delegate": permanent_delegate_without_safe.delegate,
             "delegator": permanent_delegate_without_safe.delegator,
             "label": permanent_delegate_without_safe.label,
@@ -240,7 +240,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         delegate_to_update.save()
         updated_delegate_user_payload = {
             "type": TransactionServiceEventType.UPDATED_DELEGATE.name,
-            "safeAddress": new_safe.address,
+            "address": new_safe.address,
             "delegate": delegate_to_update.delegate,
             "delegator": delegate_to_update.delegator,
             "label": new_label,
@@ -254,7 +254,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         delegate_to_delete.delete()
         updated_delegate_user_payload = {
             "type": TransactionServiceEventType.DELETED_DELEGATE.name,
-            "safeAddress": delegate_to_delete.safe_contract.address,
+            "address": delegate_to_delete.safe_contract.address,
             "delegate": delegate_to_delete.delegate,
             "delegator": delegate_to_delete.delegator,
             "label": delegate_to_delete.label,
