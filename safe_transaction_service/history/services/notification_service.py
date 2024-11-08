@@ -209,7 +209,7 @@ def build_reorg_payload(block_number: int) -> ReorgPayload:
 
 class DelegatePayload(TypedDict):
     type: str
-    safeAddress: Optional[str]
+    address: Optional[str]
     delegate: str
     delegator: str
     label: str
@@ -234,7 +234,7 @@ def _build_delegate_payload(
     """
     return DelegatePayload(
         type=event_type.name,
-        safeAddress=instance.safe_contract_id if instance.safe_contract_id else None,
+        address=instance.safe_contract_id if instance.safe_contract_id else None,
         delegate=instance.delegate,
         delegator=instance.delegator,
         label=instance.label,
