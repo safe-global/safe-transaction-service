@@ -34,7 +34,6 @@ from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from ...utils.redis import get_redis
-from ..cache import remove_cache_view_by_instance
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
@@ -1316,16 +1315,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ContractFactory(
                 address=multisig_transaction.to, trusted_for_delegate_call=True
             )
-            # Force to clean cache because we are not cleaning the cache on contracts change
-            remove_cache_view_by_instance(multisig_transaction)
-            response = self.client.get(
-                reverse("v1:history:multisig-transactions", args=(safe_address,)),
-                format="json",
-            )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertEqual(
-                response.data["results"][0]["data_decoded"], {"param1": "value"}
-            )
+            # Force don't use cache because we are not cleaning the cache on contracts change
+            with mock.patch(
+                "safe_transaction_service.history.views.settings.CACHE_VIEW_DEFAULT_TIMEOUT",
+                0,
+            ):
+                response = self.client.get(
+                    reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response.data["results"][0]["data_decoded"], {"param1": "value"}
+                )
         finally:
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 

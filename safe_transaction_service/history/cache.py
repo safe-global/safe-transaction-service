@@ -1,5 +1,5 @@
 import json
-from functools import wraps
+from functools import cache, wraps
 from typing import List, Optional, Union
 from urllib.parse import urlencode
 
@@ -41,6 +41,13 @@ class CacheSafeTxsView:
         """
         return f"{self.cache_tag}:{self.address}"
 
+    @cache
+    def is_enabled(self):
+        if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
+            return True
+        else:
+            return False
+
     def get_cache_data(self, cache_path: str) -> Optional[str]:
         """
         Return the cache for the provided cache_path
@@ -48,8 +55,11 @@ class CacheSafeTxsView:
         :param cache_path:
         :return:
         """
-        logger.debug(f"Getting from cache {self.cache_name}{cache_path}")
-        return self.redis.hget(self.cache_name, cache_path)
+        if self.is_enabled():
+            logger.debug(f"Getting from cache {self.cache_name}{cache_path}")
+            return self.redis.hget(self.cache_name, cache_path)
+        else:
+            return None
 
     def set_cache_data(self, cache_path: str, data: str, timeout: int):
         """
@@ -59,11 +69,14 @@ class CacheSafeTxsView:
         :param timeout:
         :return:
         """
-        logger.debug(
-            f"Setting cache {self.cache_name}{cache_path} with TTL {timeout} seconds"
-        )
-        self.redis.hset(self.cache_name, cache_path, data)
-        self.redis.expire(self.cache_name, timeout)
+        if self.is_enabled():
+            logger.debug(
+                f"Setting cache {self.cache_name}{cache_path} with TTL {timeout} seconds"
+            )
+            self.redis.hset(self.cache_name, cache_path, data)
+            self.redis.expire(self.cache_name, timeout)
+        else:
+            logger.warning("Cache txs view is disabled")
 
     def remove_cache(self):
         """
