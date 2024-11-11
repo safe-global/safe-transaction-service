@@ -42,7 +42,11 @@ class CacheSafeTxsView:
         return f"{self.cache_tag}:{self.address}"
 
     @cache
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
+        """
+
+        :return: True if cache is enabled False otherwise
+        """
         if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
             return True
         else:
@@ -64,6 +68,7 @@ class CacheSafeTxsView:
     def set_cache_data(self, cache_path: str, data: str, timeout: int):
         """
         Set a cache for provided data with the provided timeout
+
         :param cache_path:
         :param data:
         :param timeout:
@@ -85,7 +90,6 @@ class CacheSafeTxsView:
         :param cache_name:
         :return:
         """
-        cache_name = self.cache_name
         logger.debug(f"Removing all the cache for {self.cache_name}")
         self.redis.unlink(self.cache_name)
 
