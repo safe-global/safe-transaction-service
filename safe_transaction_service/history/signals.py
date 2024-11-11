@@ -10,7 +10,7 @@ from django.utils import timezone
 from safe_transaction_service.notifications.tasks import send_notification_task
 
 from ..events.services.queue_service import get_queue_service
-from ..utils.redis import remove_cache_view_by_instance
+from .cache import remove_cache_view_by_instance
 from .models import (
     ERC20Transfer,
     ERC721Transfer,

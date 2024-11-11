@@ -33,17 +33,24 @@ from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
 
-from ...utils.redis import get_redis, remove_cache_view_by_instance
+from ...utils.redis import get_redis
+from ..cache import remove_cache_view_by_instance
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
+    InternalTx,
+    ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
     SafeContractDelegate,
     SafeMasterCopy,
 )
 from ..serializers import TransferType
-from ..views import SafeMultisigTransactionListView
+from ..views import (
+    SafeModuleTransactionListView,
+    SafeMultisigTransactionListView,
+    SafeTransferListView,
+)
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
@@ -641,6 +648,19 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+        # Test that the result should be cached
+        # Mock get_queryset with empty queryset return value to get proper error in case of fail
+        with mock.patch.object(
+            SafeModuleTransactionListView,
+            "get_queryset",
+            return_value=ModuleTransaction.objects.none(),
+        ) as patched_queryset:
+            response = self.client.get(url, format="json")
+            # queryset shouldn't be called
+            patched_queryset.assert_not_called()
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 1)
 
     def test_get_module_transaction(self):
         wrong_module_transaction_id = "wrong_module_transaction_id"
@@ -3084,13 +3104,26 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         for result in response.data["results"]:
             self.assertEqual(result["type"], TransferType.ETHER_TRANSFER.name)
 
-        response = self.client.get(
-            reverse("v1:history:transfers", args=(safe_address,)) + "?ether=false",
-            format="json",
-        )
+        url = reverse("v1:history:transfers", args=(safe_address,)) + "?ether=false"
+        response = self.client.get(url, format="json")
         self.assertGreater(len(response.data["results"]), 0)
         for result in response.data["results"]:
             self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
+
+        # Test that the result should be cached
+        # Mock get_queryset with empty queryset return value to get proper error in case of fail
+        with mock.patch.object(
+            SafeTransferListView,
+            "get_queryset",
+            return_value=InternalTx.objects.none(),
+        ) as patched_queryset:
+            response = self.client.get(url, format="json")
+            # queryset shouldn't be called
+            patched_queryset.assert_not_called()
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertGreater(len(response.data["results"]), 0)
+            for result in response.data["results"]:
+                self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
 
     def test_get_transfer_view(self):
         # test wrong random transfer_id
