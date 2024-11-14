@@ -40,6 +40,7 @@ class EthereumIndexer(ABC):
         updated_blocks_behind: int = 20,
         query_chunk_size: Optional[int] = 1_000,
         block_auto_process_limit: bool = True,
+        **kwargs,
     ):
         """
         :param ethereum_client:
