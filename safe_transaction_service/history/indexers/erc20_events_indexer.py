@@ -279,12 +279,16 @@ class Erc20EventsIndexer(EventsIndexer):
         500k sounds like a good compromise memory/speed wise
         """
         created: Optional[datetime.datetime] = None
-        for created, address in (
+        for i, (created, address) in enumerate(
             query.values_list("created", "address")
             .order_by("created")
             .iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
         ):
             addresses.add(address)
+
+            # Store addresses in cache every chunk, just in case task is interrupted during address loading
+            if i % self.eth_erc20_load_addresses_chunk_size == 0:
+                self.addresses_cache = AddressesCache(addresses, created)
 
         if created:
             last_checked = created
