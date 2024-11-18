@@ -1,5 +1,5 @@
 import json
-from functools import cache, wraps
+from functools import cached_property, wraps
 from typing import List, Optional, Union
 from urllib.parse import urlencode
 
@@ -20,6 +20,10 @@ from safe_transaction_service.utils.redis import get_redis, logger
 
 
 class CacheSafeTxsView:
+    """
+    A generic caching class for managing cached responses from transactions endpoints.
+    """
+
     # Cache tags
     LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY = "multisigtransactionsview"
     LIST_MODULETRANSACTIONS_VIEW_CACHE_KEY = "moduletransactionsview"
@@ -29,9 +33,9 @@ class CacheSafeTxsView:
         self.redis = get_redis()
         self.address = address
         self.cache_tag = cache_tag
-        self.cache_name = self.get_cache_name()
 
-    def get_cache_name(self) -> str:
+    @cached_property
+    def cache_name(self) -> str:
         """
         Calculate the cache_name from the cache_tag and address
 
@@ -41,16 +45,13 @@ class CacheSafeTxsView:
         """
         return f"{self.cache_tag}:{self.address}"
 
-    @cache
-    def is_enabled(self) -> bool:
+    @cached_property
+    def enabled(self) -> bool:
         """
 
         :return: True if cache is enabled False otherwise
         """
-        if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
-            return True
-        else:
-            return False
+        return bool(settings.CACHE_VIEW_DEFAULT_TIMEOUT)
 
     def get_cache_data(self, cache_path: str) -> Optional[str]:
         """
@@ -59,7 +60,7 @@ class CacheSafeTxsView:
         :param cache_path:
         :return:
         """
-        if self.is_enabled():
+        if self.enabled:
             logger.debug(f"Getting from cache {self.cache_name}{cache_path}")
             return self.redis.hget(self.cache_name, cache_path)
         else:
@@ -74,7 +75,7 @@ class CacheSafeTxsView:
         :param timeout:
         :return:
         """
-        if self.is_enabled():
+        if self.enabled:
             logger.debug(
                 f"Setting cache {self.cache_name}{cache_path} with TTL {timeout} seconds"
             )
@@ -110,11 +111,11 @@ def cache_txs_view_for_address(
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            # Get query parameters
-            query_params = request.request.GET.dict()
-            cache_path = f"{urlencode(query_params)}"
+            # Get sorted query parameters
+            query_params = sorted(request.request.GET.dict().items())
+            cache_path = urlencode(query_params)
             # Calculate cache_name
-            address = request.kwargs["address"]
+            address = request.kwargs.get("address")
             cache_txs_view: Optional[CacheSafeTxsView] = None
             if address:
                 cache_txs_view = CacheSafeTxsView(cache_tag, address)
@@ -135,7 +136,7 @@ def cache_txs_view_for_address(
             # Get response from the view
             response = view_func(request, *args, **kwargs)
             if response.status_code == 200:
-                # Just store success responses and if cache is enabled with DEFAULT_CACHE_PAGE_TIMEOUT !=0
+                # Just store success responses and if cache is enabled with DEFAULT_CACHE_PAGE_TIMEOUT > 0
                 if cache_txs_view:
                     cache_txs_view.set_cache_data(
                         cache_path, json.dumps(response.data), timeout

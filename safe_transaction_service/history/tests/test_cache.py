@@ -38,6 +38,7 @@ class TestCacheSafeTxsView(TestCase):
         cache_path = "cache_path"
         some_data = "TestData"
         cache_instance = CacheSafeTxsView(cache_tag, safe_address)
+        self.assertFalse(cache_instance.enabled)
         cache_instance.set_cache_data(cache_path, some_data, 120)
         self.assertIsNone(cache_instance.get_cache_data(cache_path))
 
