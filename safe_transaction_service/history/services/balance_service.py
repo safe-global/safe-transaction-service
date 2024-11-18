@@ -85,7 +85,7 @@ class BalanceService:
             maxsize=4096, ttl=60 * 30
         )  # 2 hours of caching
 
-    def _filter_addresses(
+    def _filter_tokens(
         self,
         erc20_addresses: Sequence[ChecksumAddress],
         only_trusted: bool,
@@ -200,7 +200,7 @@ class BalanceService:
         for address in all_erc20_addresses:
             # Store tokens in database if not present
             self.get_token_info(address)  # This is cached
-        erc20_addresses = self._filter_addresses(
+        erc20_addresses = self._filter_tokens(
             all_erc20_addresses, only_trusted, exclude_spam
         )
         # Total count should take into account the request filters

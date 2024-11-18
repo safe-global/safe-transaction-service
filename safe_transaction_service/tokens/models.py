@@ -86,6 +86,10 @@ class TokenManager(models.Manager):
     def create_from_blockchain(
         self, token_address: ChecksumAddress
     ) -> Optional["Token"]:
+        if TokenNotValid.objects.filter(address=token_address).exists():
+            # If token is not valid, ignore it
+            return None
+
         ethereum_client = get_auto_ethereum_client()
         if token_address in ENS_CONTRACTS_WITH_TLD:  # Special case for ENS
             return self.create(
@@ -118,6 +122,7 @@ class TokenManager(models.Manager):
                 logger.debug(
                     "Cannot find anything on blockchain for token=%s", token_address
                 )
+                TokenNotValid.objects.create(address=token_address)
                 return None
 
         # Ignore tokens with empty name or symbol
@@ -125,6 +130,7 @@ class TokenManager(models.Manager):
             logger.warning(
                 "Token with address=%s has not name or symbol", token_address
             )
+            TokenNotValid.objects.create(address=token_address)
             return None
 
         name_and_symbol: list[str] = []
@@ -306,6 +312,15 @@ class Token(models.Model):
         :return: Address to use to retrieve the token price
         """
         return self.copy_price or self.address
+
+
+class TokenNotValid(models.Model):
+    """
+    Stores information about tokens not valid (missing name or symbol, for example), so they are not requested
+    again to the RPC
+    """
+
+    address = EthereumAddressBinaryField(primary_key=True)
 
 
 class TokenListToken(TypedDict):

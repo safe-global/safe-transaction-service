@@ -14,7 +14,7 @@ from ..clients.zerion_client import (
     ZerionUniswapV2TokenAdapterClient,
 )
 from ..exceptions import TokenListRetrievalException
-from ..models import Token, TokenManager
+from ..models import Token, TokenManager, TokenNotValid
 from ..models import logger as token_model_logger
 from .factories import TokenFactory, TokenListFactory
 from .mocks import token_list_mock
@@ -196,11 +196,10 @@ class TestModels(TestCase):
         ),
     )
     def test_create_from_blockchain_with_empty_name(self, get_info: MagicMock):
-        self.assertIsNone(
-            Token.objects.create_from_blockchain(
-                "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
-            )
-        )
+        self.assertEqual(TokenNotValid.objects.count(), 0)
+        address = "0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"
+        self.assertIsNone(Token.objects.create_from_blockchain(address))
+        self.assertEqual(TokenNotValid.objects.get(address=address).address, address)
 
     @mock.patch.object(TokenManager, "create", side_effect=ValueError)
     @mock.patch.object(
@@ -224,6 +223,9 @@ class TestModels(TestCase):
                 "Problem creating token with address=0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413 name=PESETA symbol=PTA decimals=18",
                 cm.output[0],
             )
+
+        # Token should not be marked as not valid if there's a blockchain error
+        self.assertEqual(TokenNotValid.objects.count(), 0)
 
 
 class TestTokenListModel(TestCase):
