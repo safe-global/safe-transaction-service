@@ -37,6 +37,7 @@ from ...utils.redis import get_redis
 from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
+    InternalTxType,
     MultisigConfirmation,
     MultisigTransaction,
     SafeContractDelegate,
@@ -3274,6 +3275,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 contract_address=safe_address,
                 trace_address="0,0",
                 ethereum_tx__status=1,
+                tx_type=InternalTxType.CREATE.value,
             )
             response = self.client.get(
                 reverse("v1:history:safe-creation", args=(safe_address,)),
