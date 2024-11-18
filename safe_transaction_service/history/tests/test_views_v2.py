@@ -684,7 +684,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         ERC20TransferFactory(address=other_erc20.address, to=safe_address)
 
         with mock.patch(
-            "safe_transaction_service.history.services.balance_service.BalanceService._filter_addresses",
+            "safe_transaction_service.history.services.balance_service.BalanceService._filter_tokens",
             return_value=[erc20.address, other_erc20.address],
         ):
             response = self.client.get(
