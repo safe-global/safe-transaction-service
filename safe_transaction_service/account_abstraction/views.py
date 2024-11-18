@@ -6,7 +6,7 @@ from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIV
 from rest_framework.response import Response
 from safe_eth.eth.utils import fast_is_checksum_address
 
-from . import pagination, serializers
+from . import filters, pagination, serializers
 from .models import SafeOperation, SafeOperationConfirmation, UserOperation
 
 
@@ -29,11 +29,15 @@ class SafeOperationsView(ListCreateAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
+    filterset_class = filters.SafeOperationFilter
     ordering = ["-user_operation__nonce", "-created"]
     ordering_fields = ["user_operation__nonce", "created"]
     pagination_class = pagination.DefaultPagination
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SafeOperation.objects.none()
+
         safe = self.kwargs["address"]
         return (
             SafeOperation.objects.filter(user_operation__sender=safe)
@@ -43,9 +47,6 @@ class SafeOperationsView(ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        if getattr(self, "swagger_fake_view", False):
-            return context
-
         context["safe_address"] = self.kwargs["address"]
         return context
 
@@ -100,6 +101,9 @@ class SafeOperationConfirmationsView(ListCreateAPIView):
     pagination_class = pagination.DefaultPagination
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SafeOperationConfirmation.objects.none()
+
         return SafeOperationConfirmation.objects.filter(
             safe_operation__hash=self.kwargs["safe_operation_hash"]
         )
@@ -171,6 +175,9 @@ class UserOperationsView(ListAPIView):
     serializer_class = serializers.UserOperationWithSafeOperationResponseSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return UserOperation.objects.none()
+
         safe = self.kwargs["address"]
         return (
             UserOperation.objects.filter(sender=safe)
@@ -180,9 +187,6 @@ class UserOperationsView(ListAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        if getattr(self, "swagger_fake_view", False):
-            return context
-
         context["safe_address"] = self.kwargs["address"]
         return context
 

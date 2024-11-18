@@ -8,7 +8,7 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
-from ..models import SafeMasterCopy
+from ..models import InternalTxType, SafeMasterCopy
 from ..services.safe_service import (
     CannotGetSafeInfoFromBlockchain,
     CannotGetSafeInfoFromDB,
@@ -36,6 +36,36 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
     def setUp(self) -> None:
         self.safe_service = SafeServiceProvider()
 
+    def test_get_safe_creation_info(self):
+        """
+        get_safe_creation_info should only return the TX of type CREATE
+        """
+        random_address = Account.create().address
+        self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
+
+        InternalTxFactory(
+            contract_address=random_address,
+            tx_type=InternalTxType.CREATE.value,
+            ethereum_tx__status=0,
+        )
+
+        self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
+
+        InternalTxFactory(
+            contract_address=random_address,
+            ethereum_tx__status=1,
+            tx_type=InternalTxType.CREATE.value,
+        )
+
+        InternalTxFactory(
+            contract_address=random_address,
+            ethereum_tx__status=1,
+            tx_type=InternalTxType.CALL.value,
+        )
+
+        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
+        self.assertIsInstance(safe_creation_info, SafeCreationInfo)
+
     def test_get_safe_creation_info_with_tracing(self):
         """
         Traces are not stored on DB, so they must be recovered from the node
@@ -43,7 +73,11 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         random_address = Account.create().address
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
-        InternalTxFactory(contract_address=random_address, ethereum_tx__status=0)
+        InternalTxFactory(
+            contract_address=random_address,
+            tx_type=InternalTxType.CREATE.value,
+            ethereum_tx__status=0,
+        )
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
         with mock.patch.object(
@@ -55,6 +89,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             InternalTxFactory(
                 contract_address=random_address,
                 ethereum_tx__status=1,
+                tx_type=InternalTxType.CREATE.value,
                 trace_address="0",
             )
             safe_creation_info = self.safe_service.get_safe_creation_info(
@@ -73,7 +108,10 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
         creation_trace = InternalTxFactory(
-            contract_address=random_address, ethereum_tx__status=1, trace_address="0"
+            contract_address=random_address,
+            tx_type=InternalTxType.CREATE.value,
+            ethereum_tx__status=1,
+            trace_address="0",
         )
         safe_creation = self.safe_service.get_safe_creation_info(random_address)
         self.assertEqual(safe_creation.creator, creation_trace.ethereum_tx._from)
@@ -105,6 +143,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         creation_trace = InternalTxFactory(
             contract_address=random_address,
             ethereum_tx__status=1,
+            tx_type=InternalTxType.CREATE.value,
             trace_address="0",
             ethereum_tx__data=None,
         )
@@ -124,7 +163,10 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
     ):
         random_address = Account.create().address
         InternalTxFactory(
-            contract_address=random_address, ethereum_tx__status=1, trace_address=""
+            contract_address=random_address,
+            tx_type=InternalTxType.CREATE.value,
+            ethereum_tx__status=1,
+            trace_address="",
         )
         safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
         self.assertIsInstance(safe_creation_info, SafeCreationInfo)

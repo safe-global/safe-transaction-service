@@ -40,7 +40,10 @@ class Erc20EventsIndexerProvider:
     def get_new_instance(cls) -> "Erc20EventsIndexer":
         from django.conf import settings
 
-        return Erc20EventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
+        return Erc20EventsIndexer(
+            EthereumClient(settings.ETHEREUM_NODE_URL),
+            eth_erc20_load_addresses_chunk_size=settings.ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE,
+        )
 
     @classmethod
     def del_singleton(cls):
@@ -65,6 +68,9 @@ class Erc20EventsIndexer(EventsIndexer):
 
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
         self.addresses_cache: Optional[AddressesCache] = None
+        self.eth_erc20_load_addresses_chunk_size = kwargs.get(
+            "eth_erc20_load_addresses_chunk_size", 500_000
+        )
 
     @property
     def contract_events(self) -> List[ContractEvent]:
@@ -252,15 +258,40 @@ class Erc20EventsIndexer(EventsIndexer):
             addresses = set()
             last_checked = None
 
-        for created, address in query.values_list("created", "address").order_by(
-            "created"
+        """
+        Chunk size optimization
+        -----------------------
+        Testing with 3M Safes
+        2k - 90 seconds
+        100k - 73 seconds
+        500k - 60 seconds
+        1M - 60 seconds
+        3M - 60 seconds
+
+        Testing with 15M Safes
+        50k - 854 seconds
+        500k - 460 seconds
+        750k - 415 seconds
+        1M - 430 seconds
+        2M - 398 seconds
+        3M - 407 seconds
+
+        500k sounds like a good compromise memory/speed wise
+        """
+        created: Optional[datetime.datetime] = None
+        for i, (created, address) in enumerate(
+            query.values_list("created", "address")
+            .order_by("created")
+            .iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
         ):
             addresses.add(address)
 
-        try:
+            # Store addresses in cache every chunk, just in case task is interrupted during address loading
+            if i % self.eth_erc20_load_addresses_chunk_size == 0:
+                self.addresses_cache = AddressesCache(addresses, created)
+
+        if created:
             last_checked = created
-        except NameError:  # database query empty, `created` not defined
-            pass
 
         if last_checked:
             # Don't use caching if list is empty

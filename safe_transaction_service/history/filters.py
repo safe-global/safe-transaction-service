@@ -4,19 +4,10 @@ import django_filters
 from django_filters import rest_framework as filters
 from rest_framework.exceptions import ValidationError
 from safe_eth.eth.django.filters import EthereumAddressFilter, Keccak256Filter
-from safe_eth.eth.django.models import (
-    EthereumAddressBinaryField,
-    Keccak256Field,
-    Uint256Field,
-)
+
+from safe_transaction_service.utils.filters import filter_overrides
 
 from .models import ModuleTransaction, MultisigTransaction
-
-filter_overrides = {
-    Uint256Field: {"filter_class": django_filters.NumberFilter},
-    Keccak256Field: {"filter_class": Keccak256Filter},
-    EthereumAddressBinaryField: {"filter_class": EthereumAddressFilter},
-}
 
 
 class DelegateListFilter(filters.FilterSet):

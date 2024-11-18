@@ -71,11 +71,15 @@ class SafeMessagesView(ListCreateAPIView):
     parser_classes = (DisableCamelCaseForMessageParser,)
     renderer_classes = (DisableCamelCaseForMessageRenderer,)
 
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SafeMessage.objects.none()
+
+        safe = self.kwargs["address"]
+        return SafeMessage.objects.filter(safe=safe).prefetch_related("confirmations")
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        if getattr(self, "swagger_fake_view", False):
-            return context
-
         context["safe_address"] = self.kwargs["address"]
         return context
 
@@ -132,7 +136,3 @@ class SafeMessagesView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(status=status.HTTP_201_CREATED)
-
-    def get_queryset(self):
-        safe = self.kwargs["address"]
-        return SafeMessage.objects.filter(safe=safe).prefetch_related("confirmations")

@@ -200,6 +200,9 @@ https://docs.safe.global/api-supported-networks
 ### What means banned field in SafeContract model?
 The `banned` field in the `SafeContract` model is used to prevent indexing of certain Safes that have an unsupported `MasterCopy` or unverified proxies that have issues during indexing. This field does not remove the banned Safe and indexing can be resumed once the issue has been resolved.
 
+### Why is my ERC20 token not indexed?
+For an ERC20 token to be indexed it needs to have `name`, `symbol`, `decimals` and `balanceOf()`, otherwise the service will ignore it and add it to the `TokenNotValid` model.
+
 ## Troubleshooting
 
 ### Issues installing grpc on an Apple silicon system

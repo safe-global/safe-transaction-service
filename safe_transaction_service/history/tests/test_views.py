@@ -38,6 +38,7 @@ from ..helpers import DelegateSignatureHelper, DeleteMultisigTxSignatureHelper
 from ..models import (
     IndexingStatus,
     InternalTx,
+    InternalTxType,
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
@@ -3328,6 +3329,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 contract_address=safe_address,
                 trace_address="0,0",
                 ethereum_tx__status=1,
+                tx_type=InternalTxType.CREATE.value,
             )
             response = self.client.get(
                 reverse("v1:history:safe-creation", args=(safe_address,)),

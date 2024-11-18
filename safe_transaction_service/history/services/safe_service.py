@@ -22,7 +22,13 @@ from safe_transaction_service.account_abstraction import models as aa_models
 from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
 
 from ..exceptions import NodeConnectionException
-from ..models import EthereumTx, InternalTx, SafeLastStatus, SafeMasterCopy
+from ..models import (
+    EthereumTx,
+    InternalTx,
+    InternalTxType,
+    SafeLastStatus,
+    SafeMasterCopy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +122,8 @@ class SafeService:
             # Get first the actual creation transaction for the safe
             creation_internal_tx = (
                 InternalTx.objects.filter(
-                    ethereum_tx__status=1  # Ignore Internal Transactions for failed Transactions
+                    ethereum_tx__status=1,  # Ignore Internal Transactions for failed Transactions
+                    tx_type=InternalTxType.CREATE.value,
                 )
                 .select_related("ethereum_tx__block")
                 .get(contract_address=safe_address)
