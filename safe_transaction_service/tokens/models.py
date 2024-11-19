@@ -122,7 +122,7 @@ class TokenManager(models.Manager):
                 logger.debug(
                     "Cannot find anything on blockchain for token=%s", token_address
                 )
-                TokenNotValid.objects.create(address=token_address)
+                TokenNotValid.objects.get_or_create(address=token_address)
                 return None
 
         # Ignore tokens with empty name or symbol
@@ -130,7 +130,7 @@ class TokenManager(models.Manager):
             logger.warning(
                 "Token with address=%s has not name or symbol", token_address
             )
-            TokenNotValid.objects.create(address=token_address)
+            TokenNotValid.objects.get_or_create(address=token_address)
             return None
 
         name_and_symbol: list[str] = []

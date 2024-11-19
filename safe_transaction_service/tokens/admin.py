@@ -5,7 +5,7 @@ from safe_transaction_service.utils.admin import (
     HasLogoFilterAdmin,
 )
 
-from .models import Token, TokenList
+from .models import Token, TokenList, TokenNotValid
 
 
 @admin.register(Token)
@@ -34,3 +34,10 @@ class TokenListAdmin(admin.ModelAdmin):
     )
     ordering = ("pk",)
     search_fields = ["url", "description"]
+
+
+@admin.register(TokenNotValid)
+class TokenNotValidAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
+    list_display = ("address",)
+    ordering = ("address",)
+    search_fields = ["==address"]
