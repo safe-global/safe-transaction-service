@@ -97,7 +97,7 @@ class CacheSafeTxsView:
 
 def cache_txs_view_for_address(
     cache_tag: str,
-    parameter_key: Optional["str"] = "address",
+    parameter_key: str = "address",
     timeout: int = settings.CACHE_VIEW_DEFAULT_TIMEOUT,
 ):
     """
