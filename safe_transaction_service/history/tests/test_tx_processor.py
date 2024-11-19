@@ -16,7 +16,11 @@ from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageFactory,
 )
 
-from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
+from ..indexers.tx_processor import (
+    ModuleCannotBeDisabled,
+    SafeTxProcessor,
+    SafeTxProcessorProvider,
+)
 from ..models import (
     InternalTxDecoded,
     ModuleTransaction,
@@ -575,6 +579,38 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             self.assertEqual(
                 module_tx.value, module_internal_tx_decoded.arguments["value"]
             )
+
+    def test_process_disable_module_tx(self):
+        safe_tx_processor = self.tx_processor
+        safe_last_status = SafeLastStatusFactory(nonce=0)
+        safe_address = safe_last_status.address
+        module = Account.create().address
+        disable_module_tx_decoded = InternalTxDecodedFactory(
+            function_name="disableModule",
+            module=module,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+
+        with self.assertRaises(ModuleCannotBeDisabled):
+            safe_tx_processor.process_decoded_transaction(disable_module_tx_decoded)
+
+        enable_module_tx_decoded = InternalTxDecodedFactory(
+            function_name="enableModule",
+            module=module,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        self.assertTrue(
+            safe_tx_processor.process_decoded_transaction(enable_module_tx_decoded)
+        )
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_last_status.enabled_modules, [module])
+        self.assertTrue(
+            safe_tx_processor.process_decoded_transaction(disable_module_tx_decoded)
+        )
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_last_status.enabled_modules, [])
 
     def test_store_new_safe_status(self):
         # Create a new SafeLastStatus
