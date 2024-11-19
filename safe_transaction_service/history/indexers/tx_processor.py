@@ -55,6 +55,10 @@ class OwnerCannotBeRemoved(TxProcessorException):
     pass
 
 
+class ModuleCannotBeDisabled(TxProcessorException):
+    pass
+
+
 class UserOperationFailed(TxProcessorException):
     pass
 
@@ -306,6 +310,38 @@ class SafeTxProcessor(TxProcessor):
         )
         safe_message_models.SafeMessageConfirmation.objects.filter(owner=owner).delete()
 
+    def disable_module(
+        self,
+        internal_tx: InternalTx,
+        safe_status: SafeStatus,
+        module: ChecksumAddress,
+    ) -> None:
+        """
+        Disables a module for a Safe by removing it from the enabled modules list.
+
+        :param internal_tx:
+        :param safe_status:
+        :param module:
+        :return:
+        :raises ModuleCannotBeRemoved: If the module is not in the list of enabled modules.
+        """
+        contract_address = internal_tx._from
+        if module not in safe_status.enabled_modules:
+            logger.error(
+                "[%s] Error processing trace=%s with tx-hash=%s. Cannot disable module=%s . "
+                "Current enabled modules=%s",
+                contract_address,
+                internal_tx.trace_address,
+                internal_tx.ethereum_tx_id,
+                module,
+                safe_status.enabled_modules,
+            )
+            raise ModuleCannotBeDisabled(
+                f"Cannot disable module {module}. Current enabled modules {safe_status.enabled_modules}"
+            )
+
+        safe_status.enabled_modules.remove(module)
+
     def store_new_safe_status(
         self, safe_last_status: SafeLastStatus, internal_tx: InternalTx
     ) -> SafeLastStatus:
@@ -511,7 +547,7 @@ class SafeTxProcessor(TxProcessor):
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "disableModule":
                 logger.debug("[%s] Disabling Module", contract_address)
-                safe_last_status.enabled_modules.remove(arguments["module"])
+                self.disable_module(internal_tx, safe_last_status, arguments["module"])
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name in {
                 "execTransactionFromModule",
