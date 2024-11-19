@@ -55,6 +55,10 @@ class OwnerCannotBeRemoved(TxProcessorException):
     pass
 
 
+class ModuleCannotBeRemoved(TxProcessorException):
+    pass
+
+
 class UserOperationFailed(TxProcessorException):
     pass
 
@@ -511,6 +515,11 @@ class SafeTxProcessor(TxProcessor):
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name == "disableModule":
                 logger.debug("[%s] Disabling Module", contract_address)
+                module_address = arguments["module"]
+                if module_address not in safe_last_status.enabled_modules:
+                    raise ModuleCannotBeRemoved(
+                        f"Cannot remove module {module_address}. Current modules {safe_last_status.enabled_modules}"
+                    )
                 safe_last_status.enabled_modules.remove(arguments["module"])
                 self.store_new_safe_status(safe_last_status, internal_tx)
             elif function_name in {
