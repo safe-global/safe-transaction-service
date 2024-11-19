@@ -96,7 +96,9 @@ class CacheSafeTxsView:
 
 
 def cache_txs_view_for_address(
-    cache_tag: str, timeout: int = settings.CACHE_VIEW_DEFAULT_TIMEOUT
+    cache_tag: str,
+    parameter_key: Optional["str"] = "address",
+    timeout: int = settings.CACHE_VIEW_DEFAULT_TIMEOUT,
 ):
     """
     Custom cache decorator that caches the view response.
@@ -115,7 +117,7 @@ def cache_txs_view_for_address(
             query_params = sorted(request.request.GET.dict().items())
             cache_path = urlencode(query_params)
             # Calculate cache_name
-            address = request.kwargs.get("address")
+            address = request.kwargs.get(parameter_key)
             cache_txs_view: Optional[CacheSafeTxsView] = None
             if address:
                 cache_txs_view = CacheSafeTxsView(cache_tag, address)
