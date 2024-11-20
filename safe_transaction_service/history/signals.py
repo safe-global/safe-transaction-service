@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import List, Optional, Type, Union
+from typing import Type, Union
 
 from django.conf import settings
 from django.db.models import Model
@@ -7,11 +7,10 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from eth_typing import ChecksumAddress
-
 from safe_transaction_service.notifications.tasks import send_notification_task
 
 from ..events.services.queue_service import get_queue_service
+from .cache import remove_cache_view_by_instance
 from .models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -120,38 +119,6 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
-def get_safe_addresses_involved_from_db_instance(
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-    ]
-) -> List[Optional[ChecksumAddress]]:
-    """
-    Retrieves the Safe addresses involved in the provided database instance.
-
-    :param instance:
-    :return: List of Safe addresses from the provided instance
-    """
-    addresses = []
-    if isinstance(instance, TokenTransfer):
-        addresses.append(instance.to)
-        addresses.append(instance._from)
-        return addresses
-    elif isinstance(instance, MultisigTransaction):
-        addresses.append(instance.safe)
-        return addresses
-    elif isinstance(instance, MultisigConfirmation) and instance.multisig_transaction:
-        addresses.append(instance.multisig_transaction.safe)
-        return addresses
-    elif isinstance(instance, InternalTx):
-        addresses.append(instance.to)
-        return addresses
-
-    return addresses
-
-
 def _process_notification_event(
     sender: Type[Model],
     instance: Union[
@@ -179,6 +146,8 @@ def _process_notification_event(
         created and deleted
     ), "An instance cannot be created and deleted at the same time"
 
+    logger.debug("Removing cache for object=%s", instance)
+    remove_cache_view_by_instance(instance)
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_event_payload(sender, instance, deleted=deleted)
     logger.debug(

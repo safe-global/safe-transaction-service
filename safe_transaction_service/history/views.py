@@ -39,6 +39,7 @@ from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
+from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .helpers import add_tokens_to_transfers, is_valid_unique_transfer_id
 from .models import (
     ERC20Transfer,
@@ -486,6 +487,9 @@ class SafeModuleTransactionListView(ListAPIView):
             .order_by("-created")
         )
 
+    @cache_txs_view_for_address(
+        cache_tag=CacheSafeTxsView.LIST_MODULETRANSACTIONS_VIEW_CACHE_KEY
+    )
     def get(self, request, address, format=None):
         """
         Returns all the transactions executed from modules given a Safe address
@@ -683,6 +687,9 @@ class SafeMultisigTransactionListView(ListAPIView):
                 description="Invalid ethereum address",
             ),
         },
+    )
+    @cache_txs_view_for_address(
+        cache_tag=CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY
     )
     def get(self, request, *args, **kwargs):
         """
@@ -970,6 +977,7 @@ class SafeTransferListView(ListAPIView):
             ),
         },
     )
+    @cache_txs_view_for_address(CacheSafeTxsView.LIST_TRANSFERS_VIEW_CACHE_KEY)
     def get(self, request, address, format=None):
         """
         Returns the list of token transfers for a given Safe address.
