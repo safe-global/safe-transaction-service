@@ -339,11 +339,7 @@ class IndexService:
         # TODO Remove, this is meant to detect a bug on production
         for tx_hash, ethereum_tx in ethereum_txs_dict.items():
             if not ethereum_tx:
-                logger.error(
-                    "Unexpected missing tx with tx-hash=%s . Exists on database=%s",
-                    tx_hash,
-                    EthereumTx.objects.filter(tx_hash=tx_hash).exists(),
-                )
+                logger.error("Unexpected missing tx with tx-hash=%s", tx_hash)
 
         return list(ethereum_txs_dict.values())
 
