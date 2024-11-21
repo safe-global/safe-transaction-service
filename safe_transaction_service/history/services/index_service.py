@@ -342,7 +342,7 @@ class IndexService:
                 logger.error(
                     "Unexpected missing tx with tx-hash=%s . Exists on database=%s",
                     tx_hash,
-                    EthereumTx.objects.filter(tx_hash=tx_hash).exists(),
+                    list(ethereum_txs_dict.items()),
                 )
 
         return list(ethereum_txs_dict.values())
