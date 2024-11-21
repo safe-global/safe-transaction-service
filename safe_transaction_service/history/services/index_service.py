@@ -250,9 +250,15 @@ class IndexService:
         # Get receipts for hashes not in db
         logger.debug("Get tx receipts for hashes not on db")
         tx_receipts = []
+        fetched_tx_receipts = self.ethereum_client.get_transaction_receipts(
+            tx_hashes_not_in_db
+        )
+        assert len(fetched_tx_receipts) == len(
+            tx_hashes_not_in_db
+        ), "Fetched tx receipts are not matching the hashes as parameters"
         for tx_hash, tx_receipt in zip(
             tx_hashes_not_in_db,
-            self.ethereum_client.get_transaction_receipts(tx_hashes_not_in_db),
+            fetched_tx_receipts,
         ):
             tx_receipt = tx_receipt or self.ethereum_client.get_transaction_receipt(
                 tx_hash
@@ -273,6 +279,9 @@ class IndexService:
         logger.debug("Got tx receipts. Now getting transactions not on db")
         # Get transactions for hashes not in db
         fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
+        assert len(fetched_txs) == len(
+            tx_hashes_not_in_db
+        ), "Fetched txs are not matching the hashes as parameters"
         block_hashes = set()
         txs = []
         for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs):
