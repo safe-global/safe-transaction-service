@@ -253,6 +253,14 @@ class IndexService:
         fetched_tx_receipts = self.ethereum_client.get_transaction_receipts(
             tx_hashes_not_in_db
         )
+        if len(fetched_tx_receipts) != len(tx_hashes_not_in_db):
+            logger.error(
+                "%d != %d . Asked for %s but only got %s",
+                len(fetched_tx_receipts),
+                len(tx_hashes_not_in_db),
+                tx_hashes_not_in_db,
+                fetched_tx_receipts,
+            )
         assert len(fetched_tx_receipts) == len(
             tx_hashes_not_in_db
         ), "Fetched tx receipts are not matching the hashes as parameters"
