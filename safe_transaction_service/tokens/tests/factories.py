@@ -24,3 +24,4 @@ class TokenListFactory(DjangoModelFactory):
         model = models.TokenList
 
     url = factory.Faker("url")
+    description = factory.Faker("company")

@@ -10,7 +10,7 @@ from safe_eth.eth.utils import fast_is_checksum_address
 
 from ..history.serializers import CodeErrorResponse
 from . import filters, serializers
-from .models import Token
+from .models import Token, TokenList
 
 
 @extend_schema(
@@ -57,6 +57,19 @@ class TokensView(ListAPIView):
     ordering_fields = "__all__"
     ordering = ("name",)
     queryset = Token.objects.all()
+
+    @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
+    def get(self, request, *args, **kwargs):
+        """
+        Returns the list of tokens supported in the Safe Transaction Service
+        """
+        return super().get(request, *args, **kwargs)
+
+
+class TokenListsView(ListAPIView):
+    serializer_class = serializers.TokenListSerializer
+    ordering = ("pk",)
+    queryset = TokenList.objects.all()
 
     @method_decorator(cache_page(60 * 15))  # Cache 15 minutes
     def get(self, request, *args, **kwargs):
