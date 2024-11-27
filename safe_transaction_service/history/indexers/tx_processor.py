@@ -722,7 +722,7 @@ class SafeTxProcessor(TxProcessor):
                 SafeRelevantTransaction.objects.get_or_create(
                     ethereum_tx=ethereum_tx,
                     safe=contract_address,
-                    defaults={"timestamp": ethereum_tx.block.timestamp},
+                    defaults={"timestamp": internal_tx.timestamp},
                 )
 
                 # Don't modify created
