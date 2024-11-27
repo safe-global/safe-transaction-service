@@ -511,19 +511,21 @@ class SafeEventsIndexer(EventsIndexer):
         Process creation events (ProxyCreation and SafeSetup).
 
         :param safe_addresses_with_creation_events:
-        :return:
+        :return: Dictionary with a Safe address and a list of creation related events (ProxyCreation and SafeSetup)
         """
         internal_txs = []
         internal_decoded_txs = []
-        # Check if were indexed
+        # Check if contracts were already indexed
         safe_creation_events_addresses = set(safe_addresses_with_creation_events.keys())
-        indexed_addresses = InternalTxDecoded.objects.filter(
-            internal_tx___from__in=safe_creation_events_addresses,
-            function_name="setup",
-            internal_tx__contract_address=None,
-        ).values_list("internal_tx___from", flat=True)
-        # Ignoring the already indexed contracts
-        addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
+        indexed_addresses = set(
+            InternalTxDecoded.objects.filter(
+                internal_tx___from__in=safe_creation_events_addresses,
+                function_name="setup",
+                internal_tx__contract_address=None,
+            ).values_list("internal_tx___from", flat=True)
+        )
+        # Ignoring already indexed contracts
+        addresses_to_index = safe_creation_events_addresses - indexed_addresses
 
         for safe_address in addresses_to_index:
             events = safe_addresses_with_creation_events[safe_address]
