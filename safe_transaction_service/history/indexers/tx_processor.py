@@ -603,7 +603,7 @@ class SafeTxProcessor(TxProcessor):
                 SafeRelevantTransaction.objects.get_or_create(
                     ethereum_tx=ethereum_tx,
                     safe=contract_address,
-                    defaults={"timestamp": ethereum_tx.created},
+                    defaults={"timestamp": internal_tx.timestamp},
                 )
                 # Detect 4337 UserOperations in this transaction
                 number_detected_user_operations = (
@@ -722,7 +722,7 @@ class SafeTxProcessor(TxProcessor):
                 SafeRelevantTransaction.objects.get_or_create(
                     ethereum_tx=ethereum_tx,
                     safe=contract_address,
-                    defaults={"timestamp": ethereum_tx.created},
+                    defaults={"timestamp": internal_tx.timestamp},
                 )
 
                 # Don't modify created
