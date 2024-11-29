@@ -9,7 +9,8 @@ from django.utils import timezone
 
 from eth_account import Account
 
-from ...events.services import QueueService
+from safe_transaction_service.events.services import QueueService
+
 from ...utils.redis import get_redis
 from ..indexers import (
     Erc20EventsIndexerProvider,
@@ -30,6 +31,7 @@ from ..services import (
     ReorgService,
 )
 from ..services.collectibles_service import CollectibleWithMetadata
+from ..services.index_service import SpecificIndexingStatus
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
@@ -128,16 +130,23 @@ class TestTasks(TestCase):
     def test_index_safe_events_task(self):
         self.assertEqual(index_safe_events_task.delay().result, (0, 0))
 
+    @patch.object(IndexService, "get_master_copies_indexing_status")
     @patch.object(IndexService, "reindex_master_copies")
     def test_reindex_mastercopies_last_hours_task(
-        self, reindex_master_copies_mock: MagicMock
+        self,
+        reindex_master_copies_mock: MagicMock,
+        get_master_copies_indexing_status_mock: MagicMock,
     ):
+        get_master_copies_indexing_status_mock.return_value = SpecificIndexingStatus(
+            0, 0, True
+        )
+
         now = timezone.now()
         one_hour_ago = now - datetime.timedelta(hours=1)
         one_day_ago = now - datetime.timedelta(days=1)
         one_week_ago = now - datetime.timedelta(weeks=1)
 
-        reindex_mastercopies_last_hours_task()
+        self.assertFalse(reindex_mastercopies_last_hours_task())
         reindex_master_copies_mock.assert_not_called()
 
         ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
@@ -145,36 +154,51 @@ class TestTasks(TestCase):
         ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
-        reindex_mastercopies_last_hours_task()
+        self.assertTrue(reindex_mastercopies_last_hours_task())
         reindex_master_copies_mock.assert_called_once_with(
             ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
             addresses=None,
         )
 
+        get_master_copies_indexing_status_mock.return_value = SpecificIndexingStatus(
+            0, 0, False
+        )
+        self.assertFalse(reindex_mastercopies_last_hours_task())
+
+    @patch.object(IndexService, "get_erc20_indexing_status")
     @patch.object(IndexService, "reindex_erc20_events")
     def test_reindex_erc20_erc721_last_hours_task(
-        self, reindex_erc20_events: MagicMock
+        self,
+        reindex_erc20_events_mock: MagicMock,
+        get_erc20_indexing_status_mock: MagicMock,
     ):
+        get_erc20_indexing_status_mock.return_value = SpecificIndexingStatus(0, 0, True)
+
         now = timezone.now()
         one_hour_ago = now - datetime.timedelta(hours=1)
         one_day_ago = now - datetime.timedelta(days=1)
         one_week_ago = now - datetime.timedelta(weeks=1)
 
-        reindex_erc20_erc721_last_hours_task()
-        reindex_erc20_events.assert_not_called()
+        self.assertFalse(reindex_erc20_erc721_last_hours_task())
+        reindex_erc20_events_mock.assert_not_called()
 
         ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
         ethereum_block_1 = EthereumBlockFactory(timestamp=one_day_ago)
         ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
-        reindex_erc20_erc721_last_hours_task()
-        reindex_erc20_events.assert_called_once_with(
+        self.assertTrue(reindex_erc20_erc721_last_hours_task())
+        reindex_erc20_events_mock.assert_called_once_with(
             ethereum_block_1.number,
             to_block_number=ethereum_block_3.number,
             addresses=None,
         )
+
+        get_erc20_indexing_status_mock.return_value = SpecificIndexingStatus(
+            0, 0, False
+        )
+        self.assertFalse(reindex_erc20_erc721_last_hours_task())
 
     def test_process_decoded_internal_txs_task(self):
         owner = Account.create().address
