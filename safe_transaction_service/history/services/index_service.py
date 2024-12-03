@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class IndexingStatus:
+class AllIndexingStatus:
     current_block_number: int
     current_block_timestamp: int
     erc20_block_number: int
@@ -39,10 +39,10 @@ class IndexingStatus:
 
 
 @dataclass
-class ERC20IndexingStatus:
+class SpecificIndexingStatus:
     current_block_number: int
-    erc20_block_number: int
-    erc20_synced: bool
+    block_number: int
+    synced: bool
 
 
 class IndexingException(Exception):
@@ -126,16 +126,23 @@ class IndexService:
             min_master_copies_block_number=Min("tx_block_number")
         )["min_master_copies_block_number"]
 
-    def get_indexing_status(self) -> IndexingStatus:
-        current_block = self.ethereum_client.get_block("latest")
-        current_block_number = current_block["number"]
-
-        # Indexing points to the next block to be indexed, we need the previous ones
+    def get_erc20_indexing_status(
+        self, current_block_number: int
+    ) -> SpecificIndexingStatus:
         erc20_block_number = min(
             max(self.get_erc20_721_current_indexing_block_number() - 1, 0),
             current_block_number,
         )
+        erc20_synced = (
+            current_block_number - erc20_block_number <= self.eth_reorg_blocks
+        )
+        return SpecificIndexingStatus(
+            current_block_number, erc20_block_number, erc20_synced
+        )
 
+    def get_master_copies_indexing_status(
+        self, current_block_number: int
+    ) -> SpecificIndexingStatus:
         if (
             master_copies_current_indexing_block_number := self.get_master_copies_current_indexing_block_number()
         ) is None:
@@ -146,33 +153,50 @@ class IndexService:
                 current_block_number,
             )
 
-        erc20_synced = (
-            current_block_number - erc20_block_number <= self.eth_reorg_blocks
-        )
         master_copies_synced = (
             current_block_number - master_copies_block_number <= self.eth_reorg_blocks
         )
+        return SpecificIndexingStatus(
+            current_block_number, master_copies_block_number, master_copies_synced
+        )
 
-        if erc20_block_number == master_copies_block_number == current_block_number:
+    def get_indexing_status(self) -> AllIndexingStatus:
+        current_block = self.ethereum_client.get_block("latest")
+        current_block_number = current_block["number"]
+
+        erc20_indexing_status = self.get_erc20_indexing_status(current_block_number)
+        master_copies_indexing_status = self.get_master_copies_indexing_status(
+            current_block_number
+        )
+
+        if (
+            erc20_indexing_status.block_number
+            == master_copies_indexing_status.block_number
+            == current_block_number
+        ):
             erc20_block, master_copies_block = [current_block, current_block]
         else:
             erc20_block, master_copies_block = self.ethereum_client.get_blocks(
-                [erc20_block_number, master_copies_block_number]
+                [
+                    erc20_indexing_status.block_number,
+                    master_copies_indexing_status.block_number,
+                ]
             )
         current_block_timestamp = current_block["timestamp"]
         erc20_block_timestamp = erc20_block["timestamp"]
         master_copies_block_timestamp = master_copies_block["timestamp"]
 
-        return IndexingStatus(
+        return AllIndexingStatus(
             current_block_number=current_block_number,
             current_block_timestamp=current_block_timestamp,
-            erc20_block_number=erc20_block_number,
+            erc20_block_number=erc20_indexing_status.block_number,
             erc20_block_timestamp=erc20_block_timestamp,
-            erc20_synced=erc20_synced,
-            master_copies_block_number=master_copies_block_number,
+            erc20_synced=erc20_indexing_status.synced,
+            master_copies_block_number=master_copies_indexing_status.block_number,
             master_copies_block_timestamp=master_copies_block_timestamp,
-            master_copies_synced=master_copies_synced,
-            synced=erc20_synced and master_copies_synced,
+            master_copies_synced=master_copies_indexing_status.synced,
+            synced=erc20_indexing_status.synced
+            and master_copies_indexing_status.synced,
         )
 
     def is_service_synced(self) -> bool:
