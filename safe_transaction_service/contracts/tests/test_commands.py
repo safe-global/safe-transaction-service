@@ -60,7 +60,7 @@ class TestCommands(TestCase):
         self.assertEqual(current_no_safe_contract_logo, previous_random_contract_logo)
 
         # Missing safe addresses should be added
-        self.assertEqual(Contract.objects.count(), 22)
+        self.assertEqual(Contract.objects.count(), 31)
 
         # Contract name and display name should be correctly generated
         safe_l2_130_address = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E"
