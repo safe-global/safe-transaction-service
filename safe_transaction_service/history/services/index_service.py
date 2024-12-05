@@ -360,11 +360,6 @@ class IndexService:
                 ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
         logger.debug("Blocks, transactions and receipts were inserted")
 
-        # TODO Remove, this is meant to detect a bug on production
-        for tx_hash, ethereum_tx in ethereum_txs_dict.items():
-            if not ethereum_tx:
-                logger.error("Unexpected missing tx with tx-hash=%s", tx_hash)
-
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
