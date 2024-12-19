@@ -69,16 +69,22 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "safeOperationHash": safe_operation.hash,
             "userOperation": {
                 "sender": safe_operation.user_operation.sender,
-                "nonce": safe_operation.user_operation.nonce,
+                "nonce": str(safe_operation.user_operation.nonce),
                 "userOperationHash": safe_operation.user_operation.hash,
                 "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
                 "initCode": "0x",
                 "callData": "0x",
-                "callGasLimit": safe_operation.user_operation.call_gas_limit,
-                "verificationGasLimit": safe_operation.user_operation.verification_gas_limit,
-                "preVerificationGas": safe_operation.user_operation.pre_verification_gas,
-                "maxFeePerGas": safe_operation.user_operation.max_fee_per_gas,
-                "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
+                "callGasLimit": str(safe_operation.user_operation.call_gas_limit),
+                "verificationGasLimit": str(
+                    safe_operation.user_operation.verification_gas_limit
+                ),
+                "preVerificationGas": str(
+                    safe_operation.user_operation.pre_verification_gas
+                ),
+                "maxFeePerGas": str(safe_operation.user_operation.max_fee_per_gas),
+                "maxPriorityFeePerGas": str(
+                    safe_operation.user_operation.max_priority_fee_per_gas
+                ),
                 "paymaster": NULL_ADDRESS,
                 "paymasterData": "0x",
                 "entryPoint": safe_operation.user_operation.entry_point,
@@ -149,16 +155,22 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "safeOperationHash": safe_operation.hash,
             "userOperation": {
                 "sender": safe_operation.user_operation.sender,
-                "nonce": safe_operation.user_operation.nonce,
+                "nonce": str(safe_operation.user_operation.nonce),
                 "userOperationHash": safe_operation.user_operation.hash,
                 "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
                 "initCode": "0x",
                 "callData": "0x",
-                "callGasLimit": safe_operation.user_operation.call_gas_limit,
-                "verificationGasLimit": safe_operation.user_operation.verification_gas_limit,
-                "preVerificationGas": safe_operation.user_operation.pre_verification_gas,
-                "maxFeePerGas": safe_operation.user_operation.max_fee_per_gas,
-                "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
+                "callGasLimit": str(safe_operation.user_operation.call_gas_limit),
+                "verificationGasLimit": str(
+                    safe_operation.user_operation.verification_gas_limit
+                ),
+                "preVerificationGas": str(
+                    safe_operation.user_operation.pre_verification_gas
+                ),
+                "maxFeePerGas": str(safe_operation.user_operation.max_fee_per_gas),
+                "maxPriorityFeePerGas": str(
+                    safe_operation.user_operation.max_priority_fee_per_gas
+                ),
                 "paymaster": NULL_ADDRESS,
                 "paymasterData": "0x",
                 "signature": "0x" + "0" * 24,
@@ -890,16 +902,22 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = {
             "sender": safe_operation.user_operation.sender,
-            "nonce": safe_operation.user_operation.nonce,
+            "nonce": str(safe_operation.user_operation.nonce),
             "userOperationHash": safe_operation.user_operation.hash,
             "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
             "initCode": "0x",
             "callData": "0x",
-            "callGasLimit": safe_operation.user_operation.call_gas_limit,
-            "verificationGasLimit": safe_operation.user_operation.verification_gas_limit,
-            "preVerificationGas": safe_operation.user_operation.pre_verification_gas,
-            "maxFeePerGas": safe_operation.user_operation.max_fee_per_gas,
-            "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
+            "callGasLimit": str(safe_operation.user_operation.call_gas_limit),
+            "verificationGasLimit": str(
+                safe_operation.user_operation.verification_gas_limit
+            ),
+            "preVerificationGas": str(
+                safe_operation.user_operation.pre_verification_gas
+            ),
+            "maxFeePerGas": str(safe_operation.user_operation.max_fee_per_gas),
+            "maxPriorityFeePerGas": str(
+                safe_operation.user_operation.max_priority_fee_per_gas
+            ),
             "paymaster": NULL_ADDRESS,
             "paymasterData": "0x",
             "signature": "0x" + "0" * 24,
@@ -935,7 +953,8 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             response.json(), {"count": 0, "next": None, "previous": None, "results": []}
         )
         safe_operation = factories.SafeOperationFactory(
-            user_operation__sender=safe_address
+            user_operation__sender=safe_address,
+            user_operation__nonce=131872201376309576872419307987365003264,
         )
         response = self.client.get(
             reverse("v1:account_abstraction:user-operations", args=(safe_address,))
@@ -943,16 +962,22 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected = {
             "sender": safe_operation.user_operation.sender,
-            "nonce": safe_operation.user_operation.nonce,
+            "nonce": str(safe_operation.user_operation.nonce),
             "userOperationHash": safe_operation.user_operation.hash,
             "ethereumTxHash": safe_operation.user_operation.ethereum_tx_id,
             "initCode": "0x",
             "callData": "0x",
-            "callGasLimit": safe_operation.user_operation.call_gas_limit,
-            "verificationGasLimit": safe_operation.user_operation.verification_gas_limit,
-            "preVerificationGas": safe_operation.user_operation.pre_verification_gas,
-            "maxFeePerGas": safe_operation.user_operation.max_fee_per_gas,
-            "maxPriorityFeePerGas": safe_operation.user_operation.max_priority_fee_per_gas,
+            "callGasLimit": str(safe_operation.user_operation.call_gas_limit),
+            "verificationGasLimit": str(
+                safe_operation.user_operation.verification_gas_limit
+            ),
+            "preVerificationGas": str(
+                safe_operation.user_operation.pre_verification_gas
+            ),
+            "maxFeePerGas": str(safe_operation.user_operation.max_fee_per_gas),
+            "maxPriorityFeePerGas": str(
+                safe_operation.user_operation.max_priority_fee_per_gas
+            ),
             "paymaster": NULL_ADDRESS,
             "paymasterData": "0x",
             "signature": "0x" + "0" * 24,

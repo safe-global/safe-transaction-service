@@ -3379,16 +3379,22 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected["user_operation"] = {
             "sender": safe_operation.user_operation.sender,
-            "nonce": safe_operation.user_operation.nonce,
+            "nonce": str(safe_operation.user_operation.nonce),
             "user_operation_hash": safe_operation.user_operation.hash,
             "ethereum_tx_hash": internal_tx.ethereum_tx_id,
             "init_code": "0x1234",
             "call_data": "0x",
-            "call_gas_limit": safe_operation.user_operation.call_gas_limit,
-            "verification_gas_limit": safe_operation.user_operation.verification_gas_limit,
-            "pre_verification_gas": safe_operation.user_operation.pre_verification_gas,
-            "max_fee_per_gas": safe_operation.user_operation.max_fee_per_gas,
-            "max_priority_fee_per_gas": safe_operation.user_operation.max_priority_fee_per_gas,
+            "call_gas_limit": str(safe_operation.user_operation.call_gas_limit),
+            "verification_gas_limit": str(
+                safe_operation.user_operation.verification_gas_limit
+            ),
+            "pre_verification_gas": str(
+                safe_operation.user_operation.pre_verification_gas
+            ),
+            "max_fee_per_gas": str(safe_operation.user_operation.max_fee_per_gas),
+            "max_priority_fee_per_gas": str(
+                safe_operation.user_operation.max_priority_fee_per_gas
+            ),
             "paymaster": safe_operation.user_operation.paymaster,
             "paymaster_data": "0x",
             "signature": "0x" + safe_operation.user_operation.signature.hex(),
@@ -3518,7 +3524,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data,
             {
                 "address": blockchain_safe.address,
-                "nonce": 0,
+                "nonce": "0",
                 "threshold": blockchain_safe.retrieve_threshold(),
                 "owners": blockchain_safe.retrieve_owners(),
                 "master_copy": blockchain_safe.retrieve_master_copy_address(),

@@ -809,7 +809,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
 
 class SafeInfoResponseSerializer(serializers.Serializer):
     address = EthereumAddressField()
-    nonce = serializers.IntegerField()
+    nonce = serializers.CharField()
     threshold = serializers.IntegerField()
     owners = serializers.ListField(child=EthereumAddressField())
     master_copy = EthereumAddressField()
