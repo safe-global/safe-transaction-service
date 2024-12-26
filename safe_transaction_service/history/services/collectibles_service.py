@@ -198,6 +198,10 @@ class CollectiblesService:
                 "https://api.studio.thegraph.com/query/49574/ensholesky/version/latest",
             )
         else:
+            logger.warning(
+                "No fallback Ens Client configuration for network=%s available",
+                self.ethereum_network,
+            )
             return EnsClient.Config("")
 
     def get_metadata_cache_key(self, address: str, token_id: int):
