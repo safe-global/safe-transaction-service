@@ -172,11 +172,12 @@ class CollectiblesService:
                 api_key=api_key,
                 subgraph_id=subgraph_id,
             )
-        # Else, provide fallback for Sepolia, Holesky and Mainnet
+        # Else, provide fallback for Sepolia, Holesky or empty configuration.
         else:
             logger.warning(
                 "Using fallback EnsClient configuration. This configuration is not suitable for production and it is "
-                "recommended to setup a Subgraph API key. See https://docs.ens.domains/web/subgraph"
+                "recommended to setup a Subgraph API key. Mandatory for networks other than Sepolia or Holesky."
+                "See https://docs.ens.domains/web/subgraph"
             )
             config = self.fallback_ens_client()
 
@@ -197,9 +198,11 @@ class CollectiblesService:
                 "https://api.studio.thegraph.com/query/49574/ensholesky/version/latest",
             )
         else:
-            return EnsClient.Config(
-                "https://api.thegraph.com/subgraphs/name/ensdomains/ens/",
+            logger.warning(
+                "No fallback Ens Client configuration for network=%s available",
+                self.ethereum_network,
             )
+            return EnsClient.Config("")
 
     def get_metadata_cache_key(self, address: str, token_id: int):
         return f"metadata:{address}:{token_id}"
