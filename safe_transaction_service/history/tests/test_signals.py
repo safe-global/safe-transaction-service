@@ -179,6 +179,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
         pending_multisig_transaction_payload = {
             "address": multisig_tx.safe,
+            "to": multisig_tx.to,
             "safeTxHash": multisig_tx.safe_tx_hash,
             "type": TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
             "failed": "false",
