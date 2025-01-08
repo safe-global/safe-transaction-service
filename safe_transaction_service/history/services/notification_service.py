@@ -69,6 +69,7 @@ def build_event_payload(
             "address": instance.safe,
             #  'type': None,  It will be assigned later
             "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
+            "to": instance.to,
         }
         if instance.executed:
             payload["type"] = (
