@@ -66,7 +66,7 @@ DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
-DATABASES["default"]["ENGINE"] = "django_db_geventpool.backends.postgresql_psycopg2"
+DATABASES["default"]["ENGINE"] = "django_db_geventpool.backends.postgresql_psycopg3"
 DATABASES["default"]["CONN_MAX_AGE"] = 0
 DB_MAX_CONNS = env.int("DB_MAX_CONNS", default=50)
 DATABASES["default"]["OPTIONS"] = {
