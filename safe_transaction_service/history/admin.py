@@ -444,7 +444,7 @@ class ModuleTransactionAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     search_fields = ["==safe", "==module", "==to"]
 
     def data_hex(self, o: ModuleTransaction):
-        return HexBytes(o.data.tobytes()).hex() if o.data else None
+        return HexBytes(o.data).hex() if o.data else None
 
     def tx_hash(self, o: ModuleTransaction):
         return o.internal_tx.ethereum_tx_id

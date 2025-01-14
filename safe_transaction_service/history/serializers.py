@@ -630,9 +630,7 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
         )
 
     def get_data_decoded(self, obj: ModuleTransaction) -> Dict[str, Any]:
-        return get_data_decoded_from_data(
-            obj.data.tobytes() if obj.data else b"", address=obj.to
-        )
+        return get_data_decoded_from_data(obj.data if obj.data else b"", address=obj.to)
 
     def get_is_successful(self, obj: ModuleTransaction) -> bool:
         return not obj.failed
@@ -738,7 +736,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         # If delegate call contract must be whitelisted (security)
         if obj.data_should_be_decoded():
             return get_data_decoded_from_data(
-                obj.data.tobytes() if obj.data else b"", address=obj.to
+                obj.data if obj.data else b"", address=obj.to
             )
 
 

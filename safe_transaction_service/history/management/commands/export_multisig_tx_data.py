@@ -61,9 +61,7 @@ class Command(BaseCommand):
                                 str(m.failed),
                                 m.origin,
                                 (
-                                    json.dumps(
-                                        decoder.get_data_decoded(m.data.tobytes())
-                                    )
+                                    json.dumps(decoder.get_data_decoded(m.data))
                                     if m.data
                                     else ""
                                 ),
