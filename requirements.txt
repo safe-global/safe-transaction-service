@@ -34,4 +34,4 @@ psycopg[binary]==3.2.3
 redis==5.2.1
 requests==2.32.3
 safe-eth-py[django]==6.3.0
-web3==6.20.2
+web3==7.6.1
