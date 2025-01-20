@@ -69,7 +69,7 @@ services:
       - .env
     environment:
       RUN_MIGRATIONS: 1
-      WORKER_QUEUES: "default,indexing"
+      WORKER_QUEUES: "default,indexing,processing"
     depends_on:
       - db
       - redis
