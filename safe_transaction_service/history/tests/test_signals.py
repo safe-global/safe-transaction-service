@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 import factory
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
@@ -179,9 +180,10 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
         pending_multisig_transaction_payload = {
             "address": multisig_tx.safe,
-            "to": multisig_tx.to,
-            "safeTxHash": multisig_tx.safe_tx_hash,
             "type": TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
+            "safeTxHash": multisig_tx.safe_tx_hash,
+            "to": multisig_tx.to,
+            "data": HexBytes(multisig_tx.data).hex() if multisig_tx.data else None,
             "failed": "false",
             "txHash": multisig_tx.ethereum_tx_id,
             "chainId": str(EthereumNetwork.GANACHE.value),
@@ -195,8 +197,8 @@ class TestSignals(SafeTestCaseMixin, TestCase):
 
         deleted_multisig_transaction_payload = {
             "address": multisig_tx.safe,
-            "safeTxHash": safe_tx_hash,
             "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
+            "safeTxHash": safe_tx_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(deleted_multisig_transaction_payload)

@@ -70,6 +70,7 @@ def build_event_payload(
             #  'type': None,  It will be assigned later
             "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
             "to": instance.to,
+            "data": HexBytes(instance.data).hex() if instance.data else None,
         }
         if instance.executed:
             payload["type"] = (
