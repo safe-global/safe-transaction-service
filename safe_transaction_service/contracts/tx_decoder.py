@@ -21,7 +21,7 @@ import gevent
 from cachetools import TTLCache, cachedmethod
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
-from eth_typing import ChecksumAddress, HexStr
+from eth_typing import ABIFunction, ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from safe_eth.eth.contracts import (
@@ -38,11 +38,11 @@ from safe_eth.eth.contracts import (
     get_uniswap_exchange_contract,
 )
 from safe_eth.safe.multi_send import MultiSend
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.contract import Contract
-from web3.types import ABIFunction
 
 from safe_transaction_service.contracts.models import ContractAbi
 from safe_transaction_service.utils.utils import running_on_gevent
@@ -212,7 +212,10 @@ class SafeTxDecoder:
         params = data[4:]
         fn_abi = self.get_abi_function(data, address)
         if not fn_abi:
-            raise CannotDecode(data.hex())
+            # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
+            if address and self.has_contract_fallback_function(address):
+                return "fallback", []
+            raise CannotDecode(to_0x_hex_str(data))
         try:
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
@@ -220,7 +223,7 @@ class SafeTxDecoder:
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
         except (ValueError, DecodingError) as exc:
-            logger.warning("Cannot decode %s", data.hex())
+            logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
         return fn_abi["name"], list(zip(names, types, values))
@@ -263,7 +266,7 @@ class SafeTxDecoder:
         :return: Dict[str, Any]
         """
         if isinstance(value_decoded, bytes):
-            value_decoded = HexBytes(value_decoded).hex()
+            value_decoded = to_0x_hex_str(HexBytes(value_decoded))
         return value_decoded
 
     def add_abi(self, abi: ABIFunction) -> bool:
@@ -397,7 +400,9 @@ class TxDecoder(SafeTxDecoder):
                     "operation": multisend_tx.operation.value,
                     "to": multisend_tx.to,
                     "value": str(multisend_tx.value),
-                    "data": multisend_tx.data.hex() if multisend_tx.data else None,
+                    "data": (
+                        to_0x_hex_str(multisend_tx.data) if multisend_tx.data else None
+                    ),
                     "data_decoded": self.get_data_decoded(
                         multisend_tx.data, address=multisend_tx.to
                     ),
@@ -407,7 +412,7 @@ class TxDecoder(SafeTxDecoder):
         except ValueError:
             logger.warning(
                 "Problem decoding multisend transaction with data=%s",
-                HexBytes(data).hex(),
+                to_0x_hex_str(HexBytes(data)),
                 exc_info=True,
             )
 
@@ -569,23 +574,19 @@ class DbTxDecoder(TxDecoder):
             .first()
         )
 
-    def get_contract_fallback_function(
-        self, address: ChecksumAddress
-    ) -> Optional[ABIFunction]:
+    def has_contract_fallback_function(self, address: ChecksumAddress) -> bool:
         """
         :param address: Contract address
         :return: Fallback ABIFunction if found, `None` otherwise.
         """
         abi = self.get_contract_abi(address)
-        if abi:
-            return next(
-                (
-                    dict(fn_abi, name="fallback")
-                    for fn_abi in abi
-                    if fn_abi.get("type") == "fallback"
-                ),
-                None,
-            )
+        if not abi:
+            return False
+        return bool(
+            dict(fn_abi, name="fallback")
+            for fn_abi in abi
+            if fn_abi.get("type") == "fallback"
+        )
 
     @cachedmethod(
         cache=operator.attrgetter(
@@ -627,9 +628,6 @@ class DbTxDecoder(TxDecoder):
                     # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
-        # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
-        elif address:
-            return self.get_contract_fallback_function(address)
 
     def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()

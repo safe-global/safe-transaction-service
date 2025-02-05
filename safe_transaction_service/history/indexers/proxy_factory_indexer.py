@@ -9,6 +9,7 @@ from safe_eth.eth.contracts import (
     get_proxy_factory_V1_3_0_contract,
     get_proxy_factory_V1_4_1_contract,
 )
+from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
 
@@ -72,7 +73,7 @@ class ProxyFactoryIndexer(EventsIndexer):
         contract_address = decoded_element["args"]["proxy"]
         if contract_address != NULL_ADDRESS:
             if (block_number := decoded_element["blockNumber"]) == 0:
-                transaction_hash = decoded_element["transactionHash"].hex()
+                transaction_hash = to_0x_hex_str(decoded_element["transactionHash"])
                 log_msg = (
                     f"Events are reporting blockNumber=0 for tx-hash={transaction_hash}"
                 )

@@ -8,6 +8,7 @@ from django.db import transaction
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
+from safe_eth.util.util import to_0x_hex_str
 from web3.types import BlockTrace, FilterTrace
 
 from safe_transaction_service.contracts.tx_decoder import (
@@ -251,9 +252,11 @@ class InternalTxIndexer(EthereumIndexer):
                     processed=False,
                 )
             except CannotDecode as exc:
-                logger.debug("Cannot decode %s: %s", data.hex(), exc)
+                logger.debug("Cannot decode %s: %s", to_0x_hex_str(data), exc)
             except UnexpectedProblemDecoding as exc:
-                logger.warning("Unexpected problem decoding %s: %s", data.hex(), exc)
+                logger.warning(
+                    "Unexpected problem decoding %s: %s", to_0x_hex_str(data), exc
+                )
 
     def trace_transactions(
         self, tx_hashes: Sequence[HexStr], batch_size: int

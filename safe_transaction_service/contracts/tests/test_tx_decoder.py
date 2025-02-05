@@ -5,6 +5,7 @@ from django.test import TestCase
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.safe.multi_send import MultiSendOperation
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
 from safe_transaction_service.contracts.tests.factories import (
@@ -186,7 +187,7 @@ class TestTxDecoder(TestCase):
                 "operation": operation,
                 "to": safe_contract_address,
                 "value": value,
-                "data": change_master_copy_data.hex(),
+                "data": to_0x_hex_str(change_master_copy_data),
                 "data_decoded": {
                     "method": "changeMasterCopy",
                     "parameters": [
@@ -202,7 +203,7 @@ class TestTxDecoder(TestCase):
                 "operation": operation,
                 "to": safe_contract_address,
                 "value": value,
-                "data": change_fallback_manager_data.hex(),
+                "data": to_0x_hex_str(change_fallback_manager_data),
                 "data_decoded": {
                     "method": "setFallbackHandler",
                     "parameters": [
@@ -231,7 +232,7 @@ class TestTxDecoder(TestCase):
                             "operation": operation,
                             "to": safe_contract_address,
                             "value": value,
-                            "data": change_master_copy_data.hex(),
+                            "data": to_0x_hex_str(change_master_copy_data),
                             "data_decoded": {
                                 "method": "changeMasterCopy",
                                 "parameters": [
@@ -247,7 +248,7 @@ class TestTxDecoder(TestCase):
                             "operation": operation,
                             "to": safe_contract_address,
                             "value": value,
-                            "data": change_fallback_manager_data.hex(),
+                            "data": to_0x_hex_str(change_fallback_manager_data),
                             "data_decoded": {
                                 "method": "setFallbackHandler",
                                 "parameters": [

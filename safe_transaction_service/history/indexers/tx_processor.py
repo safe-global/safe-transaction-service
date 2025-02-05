@@ -21,7 +21,9 @@ from safe_eth.eth.contracts import (
 )
 from safe_eth.safe import SafeTx
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureApprovedHash
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
+from web3.exceptions import Web3RPCError
 
 from safe_transaction_service.account_abstraction.services import (
     AaProcessorService,
@@ -420,7 +422,7 @@ class SafeTxProcessor(TxProcessor):
         logger.debug(
             "[%s] Start processing InternalTxDecoded in tx-hash=%s",
             contract_address,
-            HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id).hex(),
+            to_0x_hex_str(HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id)),
         )
 
         if internal_tx.gas_used < 1000:
@@ -562,17 +564,21 @@ class SafeTxProcessor(TxProcessor):
                     # Regular Safe indexed using tracing
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                     # The trace that is being processed is the last one, so indexer needs to get the previous trace
-                    previous_trace = (
-                        self.ethereum_tracing_client.tracing.get_previous_trace(
-                            internal_tx.ethereum_tx_id,
-                            internal_tx.trace_address_as_list,
-                            skip_delegate_calls=True,
+                    try:
+                        previous_trace = (
+                            self.ethereum_tracing_client.tracing.get_previous_trace(
+                                internal_tx.ethereum_tx_id,
+                                internal_tx.trace_address_as_list,
+                                skip_delegate_calls=True,
+                            )
                         )
-                    )
+                    except Web3RPCError:
+                        previous_trace = None
+
                     if not previous_trace:
                         message = (
                             f"[{contract_address}] Cannot find previous trace for "
-                            f"tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} "
+                            f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
                             f"and trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)
@@ -632,7 +638,7 @@ class SafeTxProcessor(TxProcessor):
                     )
                     if not previous_trace:
                         message = (
-                            f"[{contract_address}] Cannot find previous trace for tx-hash={HexBytes(internal_tx.ethereum_tx_id).hex()} and "
+                            f"[{contract_address}] Cannot find previous trace for tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} and "
                             f"trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)

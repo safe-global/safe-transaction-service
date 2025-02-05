@@ -18,6 +18,7 @@ from safe_eth.eth.account_abstraction import (
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.account_abstraction import SafeOperation
 from safe_eth.safe.safe_signature import SafeSignature
+from safe_eth.util.util import to_0x_hex_str
 from web3.types import LogReceipt
 
 from safe_transaction_service.history import models as history_models
@@ -161,7 +162,7 @@ class AaProcessorService:
                 "[%s] Cannot find ExecutionFromModuleSuccess or ExecutionFromModuleFailure "
                 "events for user-operation-hash=%s , it seems like UserOperation was reverted",
                 user_operation_model.sender,
-                user_operation.user_operation_hash.hex(),
+                to_0x_hex_str(user_operation.user_operation_hash),
             )
             if user_operation_receipt.get_deployed_account():
                 # UserOperation `initCode` was executed but `callData` failed, so account was deployed but
@@ -169,7 +170,7 @@ class AaProcessorService:
                 logger.info(
                     "[%s] user-operation-hash=%s was reverted but contract was deployed",
                     user_operation_model.sender,
-                    user_operation.user_operation_hash.hex(),
+                    to_0x_hex_str(user_operation.user_operation_hash),
                 )
             # As `module_address` cannot be detected there's not enough data to index the SafeOperation
             return None
@@ -195,8 +196,8 @@ class AaProcessorService:
             logger.debug(
                 "[%s] safe-operation-hash=%s for user-operation-hash=%s was already indexed",
                 user_operation_model.sender,
-                HexBytes(safe_operation_hash).hex(),
-                user_operation.user_operation_hash.hex(),
+                to_0x_hex_str(HexBytes(safe_operation_hash)),
+                to_0x_hex_str(user_operation.user_operation_hash),
             )
         self.index_safe_operation_confirmations(
             HexBytes(safe_operation.signature), safe_operation_model, safe_operation
@@ -214,8 +215,8 @@ class AaProcessorService:
         :return: Tuple with ``UserOperation`` and ``UserOperationReceipt``
         """
         safe_address = user_operation_model.sender
-        user_operation_hash_hex = HexBytes(user_operation_model.hash).hex()
-        tx_hash = HexBytes(user_operation_model.ethereum_tx_id).hex()
+        user_operation_hash_hex = to_0x_hex_str(HexBytes(user_operation_model.hash))
+        tx_hash = to_0x_hex_str(HexBytes(user_operation_model.ethereum_tx_id))
         logger.debug(
             "[%s] Retrieving UserOperation Receipt with user-operation-hash=%s on tx-hash=%s",
             safe_address,
@@ -285,7 +286,7 @@ class AaProcessorService:
         :param ethereum_tx: Stored EthereumTx in database containing the ``UserOperation``
         :return: tuple of ``UserOperationModel`` and ``UserOperation``
         """
-        user_operation_hash_hex = user_operation_hash.hex()
+        user_operation_hash_hex = to_0x_hex_str(user_operation_hash)
         # If the UserOperationReceipt is present, UserOperation was already processed and mined
         if self.is_user_operation_indexed(user_operation_hash_hex):
             logger.warning(

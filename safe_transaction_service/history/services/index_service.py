@@ -8,6 +8,7 @@ from django.db.models import Min, Q
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.util.util import to_0x_hex_str
 
 from ..models import EthereumBlock, EthereumTx
 from ..models import IndexingStatus as IndexingStatusDb
@@ -252,7 +253,7 @@ class IndexService:
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
-            [HexBytes(tx_hash).hex() for tx_hash in tx_hashes]
+            [to_0x_hex_str(HexBytes(tx_hash)) for tx_hash in tx_hashes]
         )
         db_ethereum_txs = EthereumTx.objects.filter(tx_hash__in=tx_hashes).exclude(
             block=None
@@ -283,13 +284,13 @@ class IndexService:
             )  # Retry fetching if failed
             if not tx_receipt:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx-receipt with tx-hash={HexBytes(tx_hash).hex()}"
+                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
 
             if tx_receipt.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx-receipt with "
-                    f"tx-hash={HexBytes(tx_hash).hex()}"
+                    f"tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
 
             tx_receipts.append(tx_receipt)
@@ -305,16 +306,16 @@ class IndexService:
             )  # Retry fetching if failed
             if not tx:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx with tx-hash={HexBytes(tx_hash).hex()}"
+                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
 
             if tx.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx with "
-                    f"tx-hash={HexBytes(tx_hash).hex()}"
+                    f"tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
 
-            block_hashes.add(tx["blockHash"].hex())
+            block_hashes.add(to_0x_hex_str(tx["blockHash"]))
             txs.append(tx)
         logger.debug("Got txs from RPC. Getting %d blocks", len(block_hashes))
 
@@ -328,7 +329,7 @@ class IndexService:
                 raise BlockNotFoundException(
                     f"Block with hash={block_hash} was not found"
                 )
-            assert block_hash == block["hash"].hex()
+            assert block_hash == to_0x_hex_str(block["hash"])
             block_dict[block["hash"]] = block
 
         logger.debug(
@@ -352,7 +353,9 @@ class IndexService:
                     ethereum_tx = EthereumTx.objects.create_from_tx_dict(
                         tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block
                     )
-                ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash).hex()] = ethereum_tx
+                ethereum_txs_dict[to_0x_hex_str(HexBytes(ethereum_tx.tx_hash))] = (
+                    ethereum_tx
+                )
             except IntegrityError:  # Tx exists
                 ethereum_tx = EthereumTx.objects.get(tx_hash=tx["hash"])
                 # For txs stored before being mined
@@ -422,7 +425,7 @@ class IndexService:
         """
 
         timestamp = internal_tx.timestamp
-        tx_hash_hex = HexBytes(internal_tx.ethereum_tx_id).hex()
+        tx_hash_hex = to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))
         logger.info(
             "[%s] Fixing out of order from tx %s with timestamp %s",
             address,

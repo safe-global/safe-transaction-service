@@ -15,6 +15,7 @@ from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
 from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
 from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
@@ -72,11 +73,11 @@ class SafeOperationSignatureValidatorMixin:
             if owner not in safe_owners:
                 raise ValidationError(
                     f"Signer={owner} is not an owner. Current owners={safe_owners}. "
-                    f"Safe-operation-hash={safe_operation_hash.hex()}"
+                    f"Safe-operation-hash={to_0x_hex_str(safe_operation_hash)}"
                 )
             if not safe_signature.is_valid(self.ethereum_client, safe_address):
                 raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
+                    f"Signature={to_0x_hex_str(safe_signature.signature)} for owner={owner} is not valid"
                 )
             if owner in owners_processed:
                 raise ValidationError(f"Signature for owner={owner} is duplicated")
@@ -241,7 +242,7 @@ class SafeOperationSerializer(
 
         if SafeOperationModel.objects.filter(hash=safe_operation_hash).exists():
             raise ValidationError(
-                f"SafeOperation with hash={safe_operation_hash.hex()} already exists"
+                f"SafeOperation with hash={to_0x_hex_str(safe_operation_hash)} already exists"
             )
 
         safe_signatures = self._validate_signature(
@@ -456,7 +457,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
         :return: Serialized queryset
         """
         signature = obj.build_signature()
-        return HexStr(HexBytes(signature).hex())
+        return to_0x_hex_str(HexBytes(signature))
 
 
 class SafeOperationWithUserOperationResponseSerializer(SafeOperationResponseSerializer):

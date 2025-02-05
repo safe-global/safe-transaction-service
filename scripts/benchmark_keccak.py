@@ -3,15 +3,16 @@ import os
 import sha3
 from Crypto.Hash import keccak as crypto_keccak
 from eth_hash.auto import keccak as eth_hash_keccak
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
 
 def eth_hash_benchmark() -> str:
-    return eth_hash_keccak(os.urandom(32)).hex()
+    return to_0x_hex_str(eth_hash_keccak(os.urandom(32)))
 
 
 def web3_benchmark() -> str:
-    return Web3.keccak(os.urandom(32)).hex()
+    return to_0x_hex_str(Web3.keccak(os.urandom(32)))
 
 
 def cryptodome_benchmark() -> str:

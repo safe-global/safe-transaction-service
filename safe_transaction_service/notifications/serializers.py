@@ -122,7 +122,7 @@ class FirebaseDeviceSerializer(serializers.Serializer):
                 else:
                     owners_to_not_register.append(owner)
                     # raise ValidationError(f'Owner={owner} is not an owner of any of the safes={data["safes"]}. '
-                    #                       f'Expected hash to sign {hash_to_sign.hex()}')
+                    #                       f'Expected hash to sign {to_0x_hex_str(hash_to_sign)}')
         return owners_to_register, owners_to_not_register
 
     def validate(self, attrs: Dict[str, Any]):

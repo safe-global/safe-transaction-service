@@ -3,6 +3,7 @@ from django.contrib import admin
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from safe_eth.eth.django.admin import AdvancedAdminSearchMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from .models import SafeOperation, UserOperation, UserOperationReceipt
 
@@ -42,11 +43,11 @@ class ForeignClassToUserOperationAdmin(AdvancedAdminSearchMixin, admin.ModelAdmi
 
     @admin.display()
     def ethereum_tx(self, obj: ForeignClassToUserOperationType) -> str:
-        return HexBytes(obj.user_operation.ethereum_tx.tx_hash).hex()
+        return to_0x_hex_str(HexBytes(obj.user_operation.ethereum_tx.tx_hash))
 
     @admin.display()
     def user_operation_hash(self, obj: ForeignClassToUserOperationType) -> str:
-        return HexBytes(obj.user_operation.hash).hex()
+        return to_0x_hex_str(HexBytes(obj.user_operation.hash))
 
     @admin.display()
     def user_operation_sender(

@@ -17,6 +17,7 @@ from safe_eth.eth.contracts import (
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
 )
+from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
 from web3.types import EventData
 
@@ -345,7 +346,7 @@ class SafeEventsIndexer(EventsIndexer):
         trace_address = str(log_index)
         args = dict(decoded_element["args"])
         ethereum_tx_hash = HexBytes(decoded_element["transactionHash"])
-        ethereum_tx_hash_hex = ethereum_tx_hash.hex()
+        ethereum_tx_hash_hex = to_0x_hex_str(ethereum_tx_hash)
         ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
             decoded_element["blockHash"]
         )
@@ -377,8 +378,8 @@ class SafeEventsIndexer(EventsIndexer):
         elif event_name == "SafeMultiSigTransaction":
             internal_tx_decoded.function_name = "execTransaction"
             data = HexBytes(args["data"])
-            args["data"] = data.hex()
-            args["signatures"] = HexBytes(args["signatures"]).hex()
+            args["data"] = to_0x_hex_str(data)
+            args["signatures"] = to_0x_hex_str(HexBytes(args["signatures"]))
             additional_info = HexBytes(
                 internal_tx_decoded.arguments.pop("additionalInfo")
             )
@@ -393,7 +394,7 @@ class SafeEventsIndexer(EventsIndexer):
                     safe_address,
                     event_name,
                     ethereum_tx_hash_hex,
-                    additional_info.hex(),
+                    to_0x_hex_str(additional_info),
                 )
             if args["value"] and not data:  # Simulate ether transfer
                 child_internal_tx = self._get_internal_tx_from_decoded_event(
@@ -405,10 +406,10 @@ class SafeEventsIndexer(EventsIndexer):
 
         elif event_name == "SafeModuleTransaction":
             internal_tx_decoded.function_name = "execTransactionFromModule"
-            args["data"] = HexBytes(args["data"]).hex()
+            args["data"] = to_0x_hex_str(HexBytes(args["data"]))
         elif event_name == "ApproveHash":
             internal_tx_decoded.function_name = "approveHash"
-            args["hashToApprove"] = args.pop("approvedHash").hex()
+            args["hashToApprove"] = to_0x_hex_str(args.pop("approvedHash"))
         elif event_name == "EnabledModule":
             internal_tx_decoded.function_name = "enableModule"
         elif event_name == "DisabledModule":
@@ -464,7 +465,7 @@ class SafeEventsIndexer(EventsIndexer):
                         "Ignoring already processed event %s for Safe %s on tx-hash=%s: %s",
                         event_name,
                         safe_address,
-                        decoded_element["transactionHash"].hex(),
+                        to_0x_hex_str(decoded_element["transactionHash"]),
                         exc,
                     )
                     return None
@@ -624,7 +625,7 @@ class SafeEventsIndexer(EventsIndexer):
                 except IntegrityError:
                     logger.info(
                         "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
-                        internal_decoded_tx.internal_tx.ethereum_tx_id.hex(),
+                        to_0x_hex_str(internal_decoded_tx.internal_tx.ethereum_tx_id),
                         internal_decoded_tx.internal_tx.trace_address,
                     )
                     pass
@@ -637,7 +638,7 @@ class SafeEventsIndexer(EventsIndexer):
                 except IntegrityError:
                     logger.info(
                         "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
-                        internal_tx.ethereum_tx_id.hex(),
+                        to_0x_hex_str(internal_tx.ethereum_tx_id),
                         internal_tx.trace_address,
                     )
                     pass
