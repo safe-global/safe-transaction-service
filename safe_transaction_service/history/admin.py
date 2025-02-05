@@ -12,6 +12,7 @@ from rest_framework.authtoken.admin import TokenAdmin
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.django.admin import AdvancedAdminSearchMixin
 from safe_eth.safe import SafeTx
+from safe_eth.util.util import to_0x_hex_str
 
 from .models import (
     Chain,
@@ -444,7 +445,7 @@ class ModuleTransactionAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     search_fields = ["==safe", "==module", "==to"]
 
     def data_hex(self, o: ModuleTransaction):
-        return HexBytes(o.data).hex() if o.data else None
+        return to_0x_hex_str(HexBytes(o.data)) if o.data else None
 
     def tx_hash(self, o: ModuleTransaction):
         return o.internal_tx.ethereum_tx_id

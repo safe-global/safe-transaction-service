@@ -6,6 +6,7 @@ from django.utils import timezone
 from django_test_migrations.migrator import Migrator
 from eth_account import Account
 from safe_eth.eth.utils import fast_keccak, fast_keccak_text
+from safe_eth.util.util import to_0x_hex_str
 
 
 class TestMigrations(TestCase):
@@ -53,7 +54,7 @@ class TestMigrations(TestCase):
         ]
         for origin in origins:
             MultisigTransactionOld.objects.create(
-                safe_tx_hash=fast_keccak_text(f"multisig-tx-{origin}").hex(),
+                safe_tx_hash=to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origin}")),
                 safe=Account.create().address,
                 value=0,
                 operation=0,
@@ -72,21 +73,21 @@ class TestMigrations(TestCase):
         )
 
         # String should keep string
-        hash = fast_keccak_text(f"multisig-tx-{origins[0]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[0]}"))
         self.assertEqual(MultisigTransactionNew.objects.get(pk=hash).origin, origins[0])
 
         # String json should be converted to json
-        hash = fast_keccak_text(f"multisig-tx-{origins[1]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[1]}"))
         self.assertEqual(
             MultisigTransactionNew.objects.get(pk=hash).origin, json.loads(origins[1])
         )
 
         # Empty string should be empty object
-        hash = fast_keccak_text(f"multisig-tx-{origins[2]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[2]}"))
         self.assertEqual(MultisigTransactionNew.objects.get(pk=hash).origin, {})
 
         # None should be empty object
-        hash = fast_keccak_text(f"multisig-tx-{origins[2]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[2]}"))
         self.assertEqual(MultisigTransactionNew.objects.get(pk=hash).origin, {})
 
     def test_migration_backward_0068(self):
@@ -99,7 +100,7 @@ class TestMigrations(TestCase):
         origins = ["{ TestString", {"url": "https://example.com", "name": "app"}, {}]
         for origin in origins:
             MultisigTransactionNew.objects.create(
-                safe_tx_hash=fast_keccak_text(f"multisig-tx-{origin}").hex(),
+                safe_tx_hash=to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origin}")),
                 safe=Account.create().address,
                 value=0,
                 operation=0,
@@ -118,17 +119,17 @@ class TestMigrations(TestCase):
         )
 
         # String should keep string
-        hash = fast_keccak_text(f"multisig-tx-{origins[0]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[0]}"))
         self.assertEqual(MultisigTransactionOld.objects.get(pk=hash).origin, origins[0])
 
         # Json should be converted to a string json
-        hash = fast_keccak_text(f"multisig-tx-{origins[1]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[1]}"))
         self.assertEqual(
             MultisigTransactionOld.objects.get(pk=hash).origin, json.dumps(origins[1])
         )
 
         # Empty object should be None
-        hash = fast_keccak_text(f"multisig-tx-{origins[2]}").hex()
+        hash = to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origins[2]}"))
         self.assertEqual(MultisigTransactionOld.objects.get(pk=hash).origin, None)
 
     def test_migration_forward_0069(self):
@@ -262,7 +263,7 @@ class TestMigrations(TestCase):
         MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
         for origin in origins:
             MultisigTransaction.objects.create(
-                safe_tx_hash=fast_keccak_text(f"multisig-tx-{origin}").hex(),
+                safe_tx_hash=to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origin}")),
                 safe=Account.create().address,
                 value=0,
                 operation=0,
@@ -310,7 +311,7 @@ class TestMigrations(TestCase):
         MultisigTransaction = new_state.apps.get_model("history", "MultisigTransaction")
         for origin in origins:
             MultisigTransaction.objects.create(
-                safe_tx_hash=fast_keccak_text(f"multisig-tx-{origin}").hex(),
+                safe_tx_hash=to_0x_hex_str(fast_keccak_text(f"multisig-tx-{origin}")),
                 safe=Account.create().address,
                 value=0,
                 operation=0,

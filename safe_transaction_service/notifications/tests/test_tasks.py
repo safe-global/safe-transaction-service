@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from eth_account import Account
 from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.models import (
     EthereumTxCallType,
@@ -91,7 +92,7 @@ class TestViews(TestCase):
         safe_address = safe_contract.address
         threshold = 2
         owners = [Account.create().address for _ in range(2)]
-        safe_tx_hash = fast_keccak_text("hola").hex()
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("hola"))
         with self.assertLogs(logger=task_logger) as cm:
             self.assertEqual(
                 send_notification_owner_task.delay(safe_address, safe_tx_hash).result,
@@ -183,7 +184,7 @@ class TestViews(TestCase):
                 self.assertIn("does not require more confirmations", cm.output[0])
 
     def test_send_notification_owner_delegate_task(self):
-        safe_tx_hash = fast_keccak_text("aloha").hex()
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("aloha"))
         safe_contract = SafeContractFactory()
         safe_address = safe_contract.address
         safe_status = SafeLastStatusFactory(address=safe_address, threshold=3)
@@ -218,7 +219,7 @@ class TestViews(TestCase):
 
     def test_send_notification_owner_task_called(self):
         safe_address = Account.create().address
-        safe_tx_hash = fast_keccak_text("hola").hex()
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("hola"))
         payload = {
             "address": safe_address,
             "type": TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,

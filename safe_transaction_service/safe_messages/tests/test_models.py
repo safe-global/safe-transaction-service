@@ -6,6 +6,7 @@ from django.test import TestCase
 from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from ..utils import get_hash_for_message, get_safe_message_hash_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
@@ -59,9 +60,11 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         message_hash = safe_message.message_hash
         self.assertEqual(
             message_hash,
-            get_safe_message_hash_for_message(
-                safe_message.safe, get_hash_for_message(message)
-            ).hex(),
+            to_0x_hex_str(
+                get_safe_message_hash_for_message(
+                    safe_message.safe, get_hash_for_message(message)
+                )
+            ),
         )
         recovered_owner = Account._recover_hash(
             safe_message.message_hash,

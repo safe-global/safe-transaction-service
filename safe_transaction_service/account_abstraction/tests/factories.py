@@ -8,6 +8,7 @@ from factory.django import DjangoModelFactory
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.tests import factories as history_factories
 
@@ -23,7 +24,9 @@ class UserOperationFactory(DjangoModelFactory):
         valid_after = 0
         valid_until = 0
 
-    hash = factory.Sequence(lambda n: fast_keccak_text(f"user-operation-{n}").hex())
+    hash = factory.Sequence(
+        lambda n: to_0x_hex_str(fast_keccak_text(f"user-operation-{n}"))
+    )
     ethereum_tx = factory.SubFactory(history_factories.EthereumTxFactory)
     sender = factory.LazyFunction(lambda: Account.create().address)
     nonce = factory.Sequence(lambda n: n)
@@ -59,7 +62,9 @@ class SafeOperationFactory(DjangoModelFactory):
     class Meta:
         model = models.SafeOperation
 
-    hash = factory.Sequence(lambda n: fast_keccak_text(f"safe-operation-{n}").hex())
+    hash = factory.Sequence(
+        lambda n: to_0x_hex_str(fast_keccak_text(f"safe-operation-{n}"))
+    )
     user_operation = factory.SubFactory(UserOperationFactory)
     valid_after = factory.LazyFunction(timezone.now)
     valid_until = factory.LazyFunction(timezone.now)
@@ -76,6 +81,6 @@ class SafeOperationConfirmationFactory(DjangoModelFactory):
     safe_operation = factory.SubFactory(SafeOperationFactory)
     owner = factory.LazyAttribute(lambda o: o.signing_owner.address)
     signature = factory.LazyAttribute(
-        lambda o: o.signing_owner.signHash(o.safe_operation.hash)["signature"]
+        lambda o: o.signing_owner.unsafe_sign_hash(o.safe_operation.hash)["signature"]
     )
     signature_type = SafeSignatureType.EOA.value

@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.models import EthereumTx
 
@@ -39,7 +40,7 @@ class Command(BaseCommand):
         self,
         addresses: Optional[Sequence[ChecksumAddress]],
     ) -> None:
-        topic = USER_OPERATION_EVENT_TOPIC.hex()
+        topic = to_0x_hex_str(USER_OPERATION_EVENT_TOPIC)
         aa_processor_service = get_aa_processor_service()
         processed_user_operations = 0
         for tx in EthereumTx.objects.account_abstraction_txs():

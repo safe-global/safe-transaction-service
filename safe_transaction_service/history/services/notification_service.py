@@ -6,6 +6,7 @@ from django.db.models import Model
 from django.utils import timezone
 
 from hexbytes import HexBytes
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.models import (
     ERC20Transfer,
@@ -51,9 +52,9 @@ def build_event_payload(
                 "address": instance.multisig_transaction.safe,  # This could make a db call
                 "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
-                "safeTxHash": HexBytes(
-                    instance.multisig_transaction.safe_tx_hash
-                ).hex(),
+                "safeTxHash": to_0x_hex_str(
+                    HexBytes(instance.multisig_transaction.safe_tx_hash)
+                ),
             }
         ]
     elif sender == MultisigTransaction and deleted:
@@ -61,16 +62,16 @@ def build_event_payload(
             {
                 "address": instance.safe,
                 "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
-                "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
+                "safeTxHash": to_0x_hex_str(HexBytes(instance.safe_tx_hash)),
             }
         ]
     elif sender == MultisigTransaction:
         payload = {
             "address": instance.safe,
             #  'type': None,  It will be assigned later
-            "safeTxHash": HexBytes(instance.safe_tx_hash).hex(),
+            "safeTxHash": to_0x_hex_str(HexBytes(instance.safe_tx_hash)),
             "to": instance.to,
-            "data": HexBytes(instance.data).hex() if instance.data else None,
+            "data": to_0x_hex_str(HexBytes(instance.data)) if instance.data else None,
         }
         if instance.executed:
             payload["type"] = (
@@ -79,7 +80,7 @@ def build_event_payload(
             payload["failed"] = json.dumps(
                 instance.failed
             )  # Firebase only accepts strings
-            payload["txHash"] = HexBytes(instance.ethereum_tx_id).hex()
+            payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
         else:
             payload["type"] = (
                 TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name
@@ -89,7 +90,7 @@ def build_event_payload(
         incoming_payload = {
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_ETHER.name,
-            "txHash": HexBytes(instance.ethereum_tx_id).hex(),
+            "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
             "value": str(instance.value),
         }
         outgoing_payload = dict(incoming_payload)
@@ -102,7 +103,7 @@ def build_event_payload(
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
-            "txHash": HexBytes(instance.ethereum_tx_id).hex(),
+            "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
         }
         if isinstance(instance, ERC20Transfer):
             incoming_payload["value"] = str(instance.value)
@@ -117,7 +118,7 @@ def build_event_payload(
             {
                 "address": instance.address,
                 "type": TransactionServiceEventType.SAFE_CREATED.name,
-                "txHash": HexBytes(instance.ethereum_tx_id).hex(),
+                "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
                 "blockNumber": instance.created_block_number,
             }
         ]
@@ -127,7 +128,7 @@ def build_event_payload(
                 "address": instance.safe,
                 "type": TransactionServiceEventType.MODULE_TRANSACTION.name,
                 "module": instance.module,
-                "txHash": HexBytes(instance.internal_tx.ethereum_tx_id).hex(),
+                "txHash": to_0x_hex_str(HexBytes(instance.internal_tx.ethereum_tx_id)),
             }
         ]
     elif sender == SafeMessage:
@@ -135,7 +136,7 @@ def build_event_payload(
             {
                 "address": instance.safe,
                 "type": TransactionServiceEventType.MESSAGE_CREATED.name,
-                "messageHash": HexBytes(instance.message_hash).hex(),
+                "messageHash": to_0x_hex_str(HexBytes(instance.message_hash)),
             }
         ]
     elif sender == SafeMessageConfirmation:
@@ -143,7 +144,9 @@ def build_event_payload(
             {
                 "address": instance.safe_message.safe,  # This could make a db call
                 "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
-                "messageHash": HexBytes(instance.safe_message.message_hash).hex(),
+                "messageHash": to_0x_hex_str(
+                    HexBytes(instance.safe_message.message_hash)
+                ),
             }
         ]
 

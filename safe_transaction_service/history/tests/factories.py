@@ -11,6 +11,7 @@ from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
+from safe_eth.util.util import to_0x_hex_str
 
 from ..models import (
     ERC20Transfer,
@@ -53,8 +54,12 @@ class EthereumBlockFactory(DjangoModelFactory):
     gas_limit = factory.fuzzy.FuzzyInteger(100000000, 200000000)
     gas_used = factory.fuzzy.FuzzyInteger(100000, 500000)
     timestamp = factory.LazyFunction(timezone.now)
-    block_hash = factory.Sequence(lambda n: fast_keccak_text(f"block-{n}").hex())
-    parent_hash = factory.Sequence(lambda n: fast_keccak_text(f"block{n - 1}").hex())
+    block_hash = factory.Sequence(
+        lambda n: to_0x_hex_str(fast_keccak_text(f"block-{n}"))
+    )
+    parent_hash = factory.Sequence(
+        lambda n: to_0x_hex_str(fast_keccak_text(f"block{n - 1}"))
+    )
 
 
 class EthereumTxFactory(DjangoModelFactory):
@@ -63,7 +68,7 @@ class EthereumTxFactory(DjangoModelFactory):
 
     block = factory.SubFactory(EthereumBlockFactory)
     tx_hash = factory.Sequence(
-        lambda n: fast_keccak_text(f"ethereum_tx_hash-{n}").hex()
+        lambda n: to_0x_hex_str(fast_keccak_text(f"ethereum_tx_hash-{n}"))
     )
     _from = factory.LazyFunction(lambda: Account.create().address)
     gas = factory.fuzzy.FuzzyInteger(1000, 5000)
@@ -274,7 +279,7 @@ class MultisigTransactionFactory(DjangoModelFactory):
         model = MultisigTransaction
 
     safe_tx_hash = factory.Sequence(
-        lambda n: fast_keccak_text(f"multisig-tx-{n}").hex()
+        lambda n: to_0x_hex_str(fast_keccak_text(f"multisig-tx-{n}"))
     )
     safe = factory.LazyFunction(lambda: Account.create().address)
     proposer = None
@@ -313,7 +318,7 @@ class MultisigConfirmationFactory(DjangoModelFactory):
     ethereum_tx = factory.SubFactory(EthereumTxFactory)
     multisig_transaction = factory.SubFactory(MultisigTransactionFactory)
     multisig_transaction_hash = factory.Sequence(
-        lambda n: fast_keccak_text(f"multisig-confirmation-tx-{n}").hex()
+        lambda n: to_0x_hex_str(fast_keccak_text(f"multisig-confirmation-tx-{n}"))
     )
     owner = factory.LazyFunction(lambda: Account.create().address)
     signature = None

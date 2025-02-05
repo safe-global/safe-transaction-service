@@ -24,6 +24,7 @@ from safe_eth.safe import CannotEstimateGas, Safe, SafeOperationEnum
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.account_abstraction.tests import factories as aa_factories
 from safe_transaction_service.contracts.models import ContractQuerySet
@@ -710,7 +711,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "module": module_transaction.module,
                 "to": module_transaction.to,
                 "value": str(module_transaction.value),
-                "data": module_transaction.data.hex(),
+                "data": to_0x_hex_str(module_transaction.data),
                 "operation": module_transaction.operation,
                 "dataDecoded": None,
                 "moduleTransactionId": module_transaction_id,
@@ -718,7 +719,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
     def test_get_multisig_confirmation(self):
-        random_safe_tx_hash = fast_keccak_text("enxebre").hex()
+        random_safe_tx_hash = to_0x_hex_str(fast_keccak_text("enxebre"))
         response = self.client.get(
             reverse(
                 "v1:history:multisig-transaction-confirmations",
@@ -744,11 +745,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 2)
 
     def test_post_multisig_confirmation(self):
-        random_safe_tx_hash = fast_keccak_text("enxebre").hex()
+        random_safe_tx_hash = to_0x_hex_str(fast_keccak_text("enxebre"))
         data = {
-            "signature": Account.create()
-            .signHash(random_safe_tx_hash)["signature"]
-            .hex()  # Not valid signature
+            "signature": to_0x_hex_str(
+                Account.create().unsafe_sign_hash(random_safe_tx_hash)["signature"]
+            )  # Not valid signature
         }
         response = self.client.post(
             reverse(
@@ -782,9 +783,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         random_account = Account.create()
         data = {
-            "signature": random_account.signHash(safe_tx_hash)[
-                "signature"
-            ].hex()  # Not valid signature
+            "signature": to_0x_hex_str(
+                random_account.unsafe_sign_hash(safe_tx_hash)["signature"]
+            )  # Not valid signature
         }
         # Transaction was executed, confirmations cannot be added
         response = self.client.post(
@@ -816,7 +817,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["signature"][0],
         )
 
-        data = {"signature": owner_account_1.signHash(safe_tx_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                owner_account_1.unsafe_sign_hash(safe_tx_hash)["signature"]
+            )
+        }
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
         response = self.client.post(
             reverse(
@@ -836,10 +841,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Add multiple signatures
         data = {
-            "signature": (
-                owner_account_1.signHash(safe_tx_hash)["signature"]
-                + owner_account_2.signHash(safe_tx_hash)["signature"]
-            ).hex()
+            "signature": to_0x_hex_str(
+                owner_account_1.unsafe_sign_hash(safe_tx_hash)["signature"]
+                + owner_account_2.unsafe_sign_hash(safe_tx_hash)["signature"]
+            )
         }
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
         response = self.client.post(
@@ -853,7 +858,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
     def test_get_multisig_transaction(self):
-        safe_tx_hash = fast_keccak_text("gnosis").hex()
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("gnosis"))
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
             format="json",
@@ -950,7 +955,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
     def test_delete_multisig_transaction(self):
         owner_account = Account.create()
-        safe_tx_hash = fast_keccak_text("random-tx").hex()
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("random-tx"))
         url = reverse("v1:history:multisig-transaction", args=(safe_tx_hash,))
         data = {"signature": "0x" + "1" * (130 * 2)}  # 2 signatures of 65 bytes
         response = self.client.delete(url, format="json", data=data)
@@ -1032,9 +1037,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_transaction.proposer = owner_account.address
         multisig_transaction.save(update_fields=["proposer"])
         data = {
-            "signature": owner_account.signHash(safe_tx_hash)[
-                "signature"
-            ].hex()  # Random signature
+            "signature": to_0x_hex_str(
+                owner_account.unsafe_sign_hash(safe_tx_hash)["signature"]
+            )  # Random signature
         }
         response = self.client.delete(url, format="json", data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -1069,7 +1074,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_transaction.proposer = owner_account.address
         multisig_transaction.proposed_by_delegate = safe_delegate.address
         multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
-        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                safe_delegate.unsafe_sign_hash(message_hash)["signature"]
+            )
+        }
         response = self.client.delete(url, format="json", data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertDictEqual(
@@ -1089,7 +1098,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_transaction.proposer = owner_account.address
         multisig_transaction.proposed_by_delegate = safe_delegate.address
         multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
-        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                safe_delegate.unsafe_sign_hash(message_hash)["signature"]
+            )
+        }
         response = self.client.delete(url, format="json", data=data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertDictEqual(
@@ -1113,7 +1126,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_transaction.proposer = owner_account.address
         multisig_transaction.proposed_by_delegate = safe_delegate.address
         multisig_transaction.save(update_fields=["proposer", "proposed_by_delegate"])
-        data = {"signature": safe_delegate.signHash(message_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                safe_delegate.unsafe_sign_hash(message_hash)["signature"]
+            )
+        }
         self.assertEqual(MultisigTransaction.objects.count(), 3)
         self.assertTrue(
             MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
@@ -1131,7 +1148,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         multisig_transaction.proposer = owner_account.address
         multisig_transaction.save(update_fields=["proposer"])
-        data = {"signature": owner_account.signHash(message_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                owner_account.unsafe_sign_hash(message_hash)["signature"]
+            )
+        }
         self.assertEqual(MultisigTransaction.objects.count(), 3)
         self.assertTrue(
             MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).exists()
@@ -1452,7 +1473,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1512,7 +1533,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1536,9 +1557,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["proposed_by_delegate"])
 
         # Test confirmation with signature
-        data["signature"] = safe_owner_1.signHash(safe_tx.safe_tx_hash)[
-            "signature"
-        ].hex()
+        data["signature"] = to_0x_hex_str(
+            safe_owner_1.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
+        )
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1567,9 +1588,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Sign with a different user that sender
         random_user_account = Account.create()
-        data["signature"] = random_user_account.signHash(safe_tx.safe_tx_hash)[
-            "signature"
-        ].hex()
+        data["signature"] = to_0x_hex_str(
+            random_user_account.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
+        )
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1633,7 +1654,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1677,7 +1698,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
         safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
-        safe_owner_signature = account.signHash(safe_owner_message_hash)["signature"]
+        safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
+            "signature"
+        ]
         signature_1271 = (
             signature_to_bytes(
                 0, int.from_bytes(HexBytes(safe_owner.address), byteorder="big"), 65
@@ -1685,8 +1708,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             + eth_abi.encode(["bytes"], [safe_owner_signature])[32:]
         )
 
-        data["contractTransactionHash"] = safe_tx_hash.hex()
-        data["signature"] = signature_1271.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+        data["signature"] = to_0x_hex_str(signature_1271)
 
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe.address,)),
@@ -1706,7 +1729,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(
             reverse(
                 "v1:history:multisig-transaction-confirmations",
-                args=(safe_tx_hash.hex(),),
+                args=(to_0x_hex_str(safe_tx_hash),),
             ),
             format="json",
             data=confirmation_data,
@@ -1744,7 +1767,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
 
         factory = APIRequestFactory()
         request = factory.post(
@@ -1827,7 +1850,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1872,7 +1895,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1899,7 +1922,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1949,7 +1972,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1981,7 +2004,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data["refundReceiver"],
             safe_nonce=data["nonce"],
         )
-        data["contractTransactionHash"] = safe_tx.safe_tx_hash.hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -2036,13 +2059,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         safe_tx_hash = safe_tx.safe_tx_hash
-        data["contractTransactionHash"] = safe_tx_hash.hex()
-        data["signature"] = b"".join(
-            [
-                safe_owner.signHash(safe_tx_hash)["signature"]
-                for safe_owner in safe_owners
-            ]
-        ).hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+        data["signature"] = to_0x_hex_str(
+            b"".join(
+                [
+                    safe_owner.unsafe_sign_hash(safe_tx_hash)["signature"]
+                    for safe_owner in safe_owners
+                ]
+            )
+        )
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -2107,8 +2132,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         safe_tx_hash = safe_tx.safe_tx_hash
-        data["contractTransactionHash"] = safe_tx_hash.hex()
-        data["signature"] = safe_delegate.signHash(safe_tx_hash)["signature"].hex()
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+        data["signature"] = to_0x_hex_str(
+            safe_delegate.unsafe_sign_hash(safe_tx_hash)["signature"]
+        )
 
         response = self.client.post(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
@@ -2303,7 +2330,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             # Create delegate
             self.assertEqual(SafeContractDelegate.objects.count(), 0)
             hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate.address)
-            data["signature"] = delegator.signHash(hash_to_sign)["signature"].hex()
+            data["signature"] = to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            )
             response = self.client.post(url, format="json", data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             safe_contract_delegate = SafeContractDelegate.objects.get()
@@ -2329,9 +2358,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "label": another_label,
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "signature": delegator.signHash(
-                DelegateSignatureHelper.calculate_hash(delegate.address, eth_sign=True)
-            )["signature"].hex(),
+            "signature": to_0x_hex_str(
+                delegator.unsafe_sign_hash(
+                    DelegateSignatureHelper.calculate_hash(
+                        delegate.address, eth_sign=True
+                    )
+                )["signature"]
+            ),
         }
         response = self.client.post(url, format="json", data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -2341,7 +2374,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         signature = signature_to_bytes(0, int(delegator.address, 16), 65) + HexBytes(
             "0" * 65
         )
-        data["signature"] = signature.hex()
+        data["signature"] = to_0x_hex_str(signature)
         response = self.client.post(url, format="json", data=data)
         self.assertIn(
             f"Signature of type=CONTRACT_SIGNATURE for delegator={delegator.address} is not valid",
@@ -2444,7 +2477,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     delegate=delegate.address,  # random delegator, should not be deleted
                 )
                 data = {
-                    "signature": signer.signHash(hash_to_sign)["signature"].hex(),
+                    "signature": to_0x_hex_str(
+                        signer.unsafe_sign_hash(hash_to_sign)["signature"]
+                    ),
                     "delegator": delegator.address,
                 }
                 self.assertEqual(SafeContractDelegate.objects.count(), 3)
@@ -2469,7 +2504,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         signer = Account.create()
         data = {
-            "signature": signer.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                signer.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
             "delegator": delegator.address,
         }
         self.assertEqual(SafeContractDelegate.objects.count(), 1)
@@ -2552,7 +2589,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         hash_to_sign = DelegateSignatureHelper.calculate_hash(
             delegate_address, eth_sign=True
         )
-        data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
+        data["signature"] = to_0x_hex_str(
+            owner_account.unsafe_sign_hash(hash_to_sign)["signature"]
+        )
         response = self.client.delete(
             reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
             format="json",
@@ -2567,7 +2606,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         hash_to_sign = DelegateSignatureHelper.calculate_hash(
             delegate_address, previous_totp=True
         )
-        data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
+        data["signature"] = to_0x_hex_str(
+            owner_account.unsafe_sign_hash(hash_to_sign)["signature"]
+        )
         response = self.client.delete(
             reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
             format="json",
@@ -2579,7 +2620,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_address)
-        data["signature"] = owner_account.signHash(hash_to_sign)["signature"].hex()
+        data["signature"] = to_0x_hex_str(
+            owner_account.unsafe_sign_hash(hash_to_sign)["signature"]
+        )
         response = self.client.delete(
             reverse("v1:history:safe-delegate", args=(safe_address, delegate_address)),
             format="json",
@@ -2612,7 +2655,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             safe_contract=safe_contract, delegate=delegate_account.address
         )
         hash_to_sign = DelegateSignatureHelper.calculate_hash(delegate_account.address)
-        data["signature"] = delegate_account.signHash(hash_to_sign)["signature"].hex()
+        data["signature"] = to_0x_hex_str(
+            delegate_account.unsafe_sign_hash(hash_to_sign)["signature"]
+        )
         response = self.client.delete(
             reverse(
                 "v1:history:safe-delegate",
@@ -3397,7 +3442,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ),
             "paymaster": safe_operation.user_operation.paymaster,
             "paymaster_data": "0x",
-            "signature": "0x" + safe_operation.user_operation.signature.hex(),
+            "signature": to_0x_hex_str(safe_operation.user_operation.signature),
             "entry_point": safe_operation.user_operation.entry_point,
             "safe_operation": {
                 "created": datetime_to_str(safe_operation.created),
@@ -3407,7 +3452,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "valid_until": datetime_to_str(safe_operation.valid_until),
                 "module_address": safe_operation.module_address,
                 "confirmations": [],
-                "prepared_signature": HexBytes(safe_operation.build_signature()).hex(),
+                "prepared_signature": to_0x_hex_str(
+                    HexBytes(safe_operation.build_signature())
+                ),
             },
         }
 
@@ -3745,7 +3792,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         response = self.client.post(
             reverse("v1:history:data-decoder"),
             format="json",
-            data={"data": add_owner_with_threshold_data.hex()},
+            data={"data": to_0x_hex_str(add_owner_with_threshold_data)},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

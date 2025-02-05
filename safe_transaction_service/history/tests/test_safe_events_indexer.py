@@ -7,6 +7,7 @@ from safe_eth.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
 from safe_eth.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
 from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 from web3.auto import w3
 from web3.datastructures import AttributeDict
@@ -139,7 +140,8 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
         # Dangling event topic is "supported"
         self.assertIn(
-            dangling_event["topics"][0].hex(), self.safe_events_indexer.events_to_listen
+            to_0x_hex_str(dangling_event["topics"][0]),
+            self.safe_events_indexer.events_to_listen,
         )
 
         # Dangling event cannot be decoded
@@ -147,7 +149,8 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
         # Valid event is supported
         self.assertIn(
-            valid_event["topics"][0].hex(), self.safe_events_indexer.events_to_listen
+            to_0x_hex_str(valid_event["topics"][0]),
+            self.safe_events_indexer.events_to_listen,
         )
 
         # Dangling event cannot be decoded, but valid event is
@@ -287,7 +290,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 1)
         self.assertEqual(
             MultisigTransaction.objects.get().safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 1)
 
@@ -323,7 +326,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 2)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
@@ -371,7 +374,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 3)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 4)
 
@@ -408,7 +411,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 4)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 5)
 
@@ -464,7 +467,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 5)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 6)
 
@@ -500,7 +503,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 6)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 7)
 
@@ -515,7 +518,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             }
         )
         tx = owner_account_1.sign_transaction(tx)
-        self.w3.eth.send_raw_transaction(tx["rawTransaction"])
+        self.w3.eth.send_raw_transaction(tx["raw_transaction"])
         # Process events: ApproveHash
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
@@ -524,7 +527,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         # Check a MultisigConfirmation was created
         self.assertTrue(
             MultisigConfirmation.objects.filter(
-                multisig_transaction_hash=random_hash.hex()
+                multisig_transaction_hash=to_0x_hex_str(random_hash)
             ).exists()
         )
         self.assertEqual(
@@ -559,7 +562,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(MultisigTransaction.objects.count(), 7)
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 9)
 
@@ -602,7 +605,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
         self.assertEqual(
             MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
-            multisig_tx.safe_tx_hash.hex(),
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
         )
         expected_multisig_transactions = 8
         expected_multisig_confirmations = 10
@@ -802,7 +805,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
         signed_tx = owner_account_1.sign_transaction(setup_call)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         # We remove the proxyCreation internaltx
         self.assertEqual(InternalTx.objects.count(), 1)
@@ -830,7 +833,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
         signed_tx = owner_account_1.sign_transaction(setup_call)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         self.assertEqual(self.safe_events_indexer.start(), (2, 2))
         # Proxy creation InternalTx must contain the Safe address
         self.assertEqual(

@@ -24,6 +24,7 @@ from safe_eth.eth.django.serializers import (
 from safe_eth.safe import Safe
 from safe_eth.safe.safe_signature import EthereumBytes, SafeSignature, SafeSignatureType
 from safe_eth.safe.serializers import SafeMultisigTxSerializer
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.account_abstraction import serializers as aa_serializers
 from safe_transaction_service.contracts.tx_decoder import (
@@ -125,7 +126,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
                 )
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
+                    f"Signature={to_0x_hex_str(safe_signature.signature)} for owner={owner} is not valid"
                 )
             if owner in signature_owners:
                 raise ValidationError(f"Signature for owner={owner} is duplicated")
@@ -203,8 +204,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         # Check safe tx hash matches
         if safe_tx_hash != attrs["contract_transaction_hash"]:
             raise ValidationError(
-                f"Contract-transaction-hash={safe_tx_hash.hex()} "
-                f'does not match provided contract-tx-hash={attrs["contract_transaction_hash"].hex()}'
+                f"Contract-transaction-hash={to_0x_hex_str(safe_tx_hash)} "
+                f'does not match provided contract-tx-hash={to_0x_hex_str(attrs["contract_transaction_hash"])}'
             )
 
         # Check there's not duplicated tx with same `nonce` or same `safeTxHash` for the same Safe.
@@ -214,9 +215,9 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         ).executed()
         if multisig_transactions:
             for multisig_transaction in multisig_transactions:
-                if multisig_transaction.safe_tx_hash == safe_tx_hash.hex():
+                if multisig_transaction.safe_tx_hash == to_0x_hex_str(safe_tx_hash):
                     raise ValidationError(
-                        f"Tx with safe-tx-hash={safe_tx_hash.hex()} "
+                        f"Tx with safe-tx-hash={to_0x_hex_str(safe_tx_hash)} "
                         f"for safe={safe_address} was already executed in "
                         f"tx-hash={multisig_transaction.ethereum_tx_id}"
                     )
@@ -252,7 +253,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             owner = safe_signature.owner
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
-                    f"Signature={safe_signature.signature.hex()} for owner={owner} is not valid"
+                    f"Signature={to_0x_hex_str(safe_signature.signature)} for owner={owner} is not valid"
                 )
 
             if owner in delegates and len(parsed_signatures) > 1:

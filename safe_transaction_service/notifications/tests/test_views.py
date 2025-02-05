@@ -9,6 +9,7 @@ from eth_account.messages import encode_defunct
 from rest_framework import status
 from rest_framework.test import APITestCase
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.tests.factories import (
     SafeContractDelegateFactory,
@@ -131,7 +132,9 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         hash_to_sign = calculate_device_registration_hash(
             timestamp, unique_id, cloud_messaging_token, safes
         )
-        signatures = [owner_account.signHash(hash_to_sign)["signature"].hex()]
+        signatures = [
+            to_0x_hex_str(owner_account.unsafe_sign_hash(hash_to_sign)["signature"])
+        ]
         data = {
             "uuid": unique_id,
             "safes": safes,
@@ -168,7 +171,11 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
             )
 
             # Add another signature
-            signatures.append(owner_account_2.signHash(hash_to_sign)["signature"].hex())
+            signatures.append(
+                to_0x_hex_str(
+                    owner_account_2.unsafe_sign_hash(hash_to_sign)["signature"]
+                )
+            )
             response = self.client.post(
                 reverse("v1:notifications:devices"), format="json", data=data
             )
@@ -215,7 +222,9 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
             timestamp, unique_id, cloud_messaging_token, safes
         )
         message_to_sign = encode_defunct(hash_to_sign)
-        signatures = [owner_account.sign_message(message_to_sign)["signature"].hex()]
+        signatures = [
+            to_0x_hex_str(owner_account.sign_message(message_to_sign)["signature"])
+        ]
         data = {
             "uuid": unique_id,
             "safes": safes,
@@ -256,7 +265,9 @@ class TestNotificationViews(SafeTestCaseMixin, APITestCase):
         hash_to_sign = calculate_device_registration_hash(
             timestamp, unique_id, cloud_messaging_token, safes
         )
-        signatures = [delegate.signHash(hash_to_sign)["signature"].hex()]
+        signatures = [
+            to_0x_hex_str(delegate.unsafe_sign_hash(hash_to_sign)["signature"])
+        ]
         data = {
             "uuid": unique_id,
             "safes": [safe_address],

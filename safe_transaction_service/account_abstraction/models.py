@@ -18,6 +18,7 @@ from safe_eth.eth.django.models import (
 )
 from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignatureType
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history import models as history_models
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
@@ -58,7 +59,7 @@ class UserOperation(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{HexBytes(self.hash).hex()} UserOperation for sender={self.sender} with nonce={self.nonce}"
+        return f"{to_0x_hex_str(HexBytes(self.hash))} UserOperation for sender={self.sender} with nonce={self.nonce}"
 
     @cached_property
     def paymaster_and_data(self) -> Optional[HexBytes]:
@@ -123,7 +124,7 @@ class UserOperationReceipt(models.Model):
     deposited = Uint256Field()
 
     def __str__(self) -> str:
-        return f"{HexBytes(self.user_operation_id).hex()} UserOperationReceipt"
+        return f"{to_0x_hex_str(HexBytes(self.user_operation_id))} UserOperationReceipt"
 
 
 class SafeOperationQuerySet(models.QuerySet):
@@ -151,7 +152,7 @@ class SafeOperation(TimeStampedModel):
     module_address = EthereumAddressBinaryField(db_index=True)
 
     def __str__(self) -> str:
-        return f"{HexBytes(self.hash).hex()} SafeOperation for user-operation={HexBytes(self.user_operation_id).hex()}"
+        return f"{to_0x_hex_str(HexBytes(self.hash))} SafeOperation for user-operation={to_0x_hex_str(HexBytes(self.user_operation_id))}"
 
     def build_signature_prefix(self) -> bytes:
         """
@@ -217,5 +218,5 @@ class SafeOperationConfirmation(TimeStampedModel):
     def __str__(self):
         return (
             f"Safe Operation Confirmation of owner={self.owner} for "
-            f"safe-operation={HexBytes(self.safe_operation_id).hex()}"
+            f"safe-operation={to_0x_hex_str(HexBytes(self.safe_operation_id))}"
         )

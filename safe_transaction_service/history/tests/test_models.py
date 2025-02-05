@@ -214,7 +214,7 @@ class TestMultisigTransaction(TestCase):
         self.assertEqual(multisig_transaction.owners, [])
 
         account = Account.create()
-        multisig_transaction.signatures = account.signHash(
+        multisig_transaction.signatures = account.unsafe_sign_hash(
             multisig_transaction.safe_tx_hash
         )["signature"]
         multisig_transaction.save()

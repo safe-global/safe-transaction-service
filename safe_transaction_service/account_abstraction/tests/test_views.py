@@ -28,6 +28,7 @@ from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClas
 from safe_eth.safe.proxy_factory import ProxyFactoryV141
 from safe_eth.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.utils.utils import datetime_to_str
 
@@ -94,7 +95,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "validUntil": datetime_to_str(safe_operation.valid_until),
             "moduleAddress": safe_operation.module_address,
             "confirmations": [],
-            "preparedSignature": "0x" + safe_operation.build_signature_prefix().hex(),
+            "preparedSignature": to_0x_hex_str(safe_operation.build_signature_prefix()),
         }
         self.assertDictEqual(
             response.json(),
@@ -111,19 +112,16 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = (
-            "0x"
-            + (
-                safe_operation.build_signature_prefix()
-                + safe_operation_confirmation.signature
-            ).hex()
+        expected["preparedSignature"] = to_0x_hex_str(
+            safe_operation.build_signature_prefix()
+            + safe_operation_confirmation.signature
         )
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
                 "modified": datetime_to_str(safe_operation_confirmation.modified),
                 "owner": safe_operation_confirmation.owner,
-                "signature": safe_operation_confirmation.signature.hex(),
+                "signature": to_0x_hex_str(safe_operation_confirmation.signature),
                 "signatureType": "EOA",
             }
         ]
@@ -180,7 +178,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             "validUntil": datetime_to_str(safe_operation.valid_until),
             "moduleAddress": safe_operation.module_address,
             "confirmations": [],
-            "preparedSignature": "0x" + safe_operation.build_signature_prefix().hex(),
+            "preparedSignature": to_0x_hex_str(safe_operation.build_signature_prefix()),
         }
         self.assertDictEqual(
             response.json(),
@@ -205,19 +203,16 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,))
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected["preparedSignature"] = (
-            "0x"
-            + (
-                safe_operation.build_signature_prefix()
-                + safe_operation_confirmation.signature
-            ).hex()
+        expected["preparedSignature"] = to_0x_hex_str(
+            safe_operation.build_signature_prefix()
+            + safe_operation_confirmation.signature
         )
         expected["confirmations"] = [
             {
                 "created": datetime_to_str(safe_operation_confirmation.created),
                 "modified": datetime_to_str(safe_operation_confirmation.modified),
                 "owner": safe_operation_confirmation.owner,
-                "signature": safe_operation_confirmation.signature.hex(),
+                "signature": to_0x_hex_str(safe_operation_confirmation.signature),
                 "signatureType": "EOA",
             }
         ]
@@ -286,7 +281,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         user_operation_hash = safe_4337_user_operation_hash_mock
 
         user_operation = UserOperationClass.from_bundler_response(
-            user_operation_hash.hex(), user_operation_mock["result"]
+            to_0x_hex_str(user_operation_hash), user_operation_mock["result"]
         )
 
         safe_operation = SafeOperationClass.from_user_operation(user_operation)
@@ -299,12 +294,14 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             ),
         )
 
-        signature = account.signHash(safe_operation_hash)["signature"].hex()
+        signature = to_0x_hex_str(
+            account.unsafe_sign_hash(safe_operation_hash)["signature"]
+        )
         get_owners_mock.return_value = []
         data = {
             "nonce": safe_operation.nonce,
-            "init_code": user_operation.init_code.hex(),
-            "call_data": user_operation.call_data.hex(),
+            "init_code": to_0x_hex_str(user_operation.init_code),
+            "call_data": to_0x_hex_str(user_operation.call_data),
             "call_gas_limit": user_operation.call_gas_limit,
             "verification_gas_limit": user_operation.verification_gas_limit,
             "pre_verification_gas": user_operation.pre_verification_gas,
@@ -341,7 +338,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string=f"Signer={account.address} is not an owner. Current owners=[]. Safe-operation-hash={safe_operation_hash.hex()}",
+                        string=f"Signer={account.address} is not an owner. Current owners=[]. Safe-operation-hash={to_0x_hex_str(safe_operation_hash)}",
                         code="invalid",
                     )
                 ]
@@ -447,10 +444,10 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         # Receipt will only be created when Operation is indexed
         self.assertEqual(models.UserOperationReceipt.objects.count(), 0)
         self.assertEqual(
-            models.UserOperation.objects.get().hash, user_operation_hash.hex()
+            models.UserOperation.objects.get().hash, to_0x_hex_str(user_operation_hash)
         )
         self.assertEqual(
-            models.SafeOperation.objects.get().hash, safe_operation_hash.hex()
+            models.SafeOperation.objects.get().hash, to_0x_hex_str(safe_operation_hash)
         )
 
         # Try to create the same transaction
@@ -465,7 +462,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string=f"SafeOperation with hash={safe_operation_hash.hex()} already exists",
+                        string=f"SafeOperation with hash={to_0x_hex_str(safe_operation_hash)} already exists",
                         code="invalid",
                     )
                 ]
@@ -519,7 +516,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         user_operation_hash = safe_4337_user_operation_hash_mock
 
         user_operation = UserOperationClass.from_bundler_response(
-            user_operation_hash.hex(), user_operation_mock["result"]
+            to_0x_hex_str(user_operation_hash), user_operation_mock["result"]
         )
 
         safe_operation = SafeOperationClass.from_user_operation(user_operation)
@@ -532,11 +529,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             ),
         )
 
-        signature = account.signHash(safe_operation_hash)["signature"].hex()
+        signature = to_0x_hex_str(
+            account.unsafe_sign_hash(safe_operation_hash)["signature"]
+        )
         data = {
             "nonce": safe_operation.nonce,
-            "init_code": user_operation.init_code.hex(),
-            "call_data": user_operation.call_data.hex(),
+            "init_code": to_0x_hex_str(user_operation.init_code),
+            "call_data": to_0x_hex_str(user_operation.call_data),
             "call_gas_limit": user_operation.call_gas_limit,
             "verification_gas_limit": user_operation.verification_gas_limit,
             "pre_verification_gas": user_operation.pre_verification_gas,
@@ -585,7 +584,9 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         safe_operation_hash = new_safe_operation.get_safe_operation_hash(
             safe_4337_chain_id_mock, safe_4337_module_address_mock
         )
-        data["signature"] = account.signHash(safe_operation_hash)["signature"].hex()
+        data["signature"] = to_0x_hex_str(
+            account.unsafe_sign_hash(safe_operation_hash)["signature"]
+        )
         response = self.client.post(
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
             format="json",
@@ -620,7 +621,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         paymaster_and_data = HexBytes(paymaster_address)
         user_operation = dataclasses.replace(
             UserOperationClass.from_bundler_response(
-                user_operation_hash.hex(), user_operation_mock["result"]
+                user_operation_hash, user_operation_mock["result"]
             ),
             paymaster_and_data=paymaster_and_data,
         )
@@ -630,11 +631,13 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             safe_4337_chain_id_mock, safe_4337_module_address_mock
         )
 
-        signature = account.signHash(safe_operation_hash)["signature"].hex()
+        signature = to_0x_hex_str(
+            account.unsafe_sign_hash(safe_operation_hash)["signature"]
+        )
         data = {
             "nonce": safe_operation.nonce,
-            "init_code": user_operation.init_code.hex(),
-            "call_data": user_operation.call_data.hex(),
+            "init_code": to_0x_hex_str(user_operation.init_code),
+            "call_data": to_0x_hex_str(user_operation.call_data),
             "call_gas_limit": user_operation.call_gas_limit,
             "verification_gas_limit": user_operation.verification_gas_limit,
             "pre_verification_gas": user_operation.pre_verification_gas,
@@ -675,7 +678,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         )
 
         # Set valid paymaster_and_data
-        data["paymaster_and_data"] = paymaster_and_data.hex()
+        data["paymaster_and_data"] = to_0x_hex_str(paymaster_and_data)
         response = self.client.post(
             reverse("v1:account_abstraction:safe-operations", args=(safe_address,)),
             format="json",
@@ -720,7 +723,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         response = self.client.get(
             reverse(
                 endpoint,
-                args=(random_hash.hex(),),
+                args=(to_0x_hex_str(random_hash),),
             )
         )
         expected_empty = {"count": 0, "next": None, "previous": None, "results": []}
@@ -768,7 +771,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                     "created": datetime_to_str(safe_operation_confirmation.created),
                     "modified": datetime_to_str(safe_operation_confirmation.modified),
                     "owner": safe_operation_confirmation.owner,
-                    "signature": safe_operation_confirmation.signature.hex(),
+                    "signature": to_0x_hex_str(safe_operation_confirmation.signature),
                     "signature_type": SafeSignatureType(
                         safe_operation_confirmation.signature_type
                     ).name,
@@ -788,11 +791,15 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         owner_2 = Account.create()
         get_owners_mock.return_value = [owner_1.address, owner_2.address]
 
-        data = {"signature": owner_1.signHash(random_hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                owner_1.unsafe_sign_hash(random_hash)["signature"]
+            )
+        }
         response = self.client.post(
             reverse(
                 endpoint,
-                args=(random_hash.hex(),),
+                args=(to_0x_hex_str(random_hash),),
             ),
             format="json",
             data=data,
@@ -803,7 +810,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "non_field_errors": [
                     ErrorDetail(
-                        string=f"SafeOperation with hash={random_hash.hex()} does not exist",
+                        string=f"SafeOperation with hash={to_0x_hex_str(random_hash)} does not exist",
                         code="invalid",
                     )
                 ]
@@ -815,7 +822,11 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         # Check no confirmation exists
         self.assertEqual(models.SafeOperationConfirmation.objects.all().count(), 0)
         # Add confirmation for owner_1
-        data = {"signature": owner_1.signHash(safe_operation.hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                owner_1.unsafe_sign_hash(safe_operation.hash)["signature"]
+            )
+        }
         response = self.client.post(
             reverse(
                 endpoint,
@@ -832,7 +843,11 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(safe_operation_confirmation_1.safe_operation, safe_operation)
 
         # Add confirmation for owner_2
-        data = {"signature": owner_2.signHash(safe_operation.hash)["signature"].hex()}
+        data = {
+            "signature": to_0x_hex_str(
+                owner_2.unsafe_sign_hash(safe_operation.hash)["signature"]
+            )
+        }
         response = self.client.post(
             reverse(
                 endpoint,
@@ -851,7 +866,9 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
         # Try to add confirmation for random owner
         random_owner = Account.create()
         data = {
-            "signature": random_owner.signHash(safe_operation.hash)["signature"].hex()
+            "signature": to_0x_hex_str(
+                random_owner.unsafe_sign_hash(safe_operation.hash)["signature"]
+            )
         }
         response = self.client.post(
             reverse(
@@ -930,8 +947,9 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "validUntil": datetime_to_str(safe_operation.valid_until),
                 "moduleAddress": safe_operation.module_address,
                 "confirmations": [],
-                "preparedSignature": "0x"
-                + safe_operation.build_signature_prefix().hex(),
+                "preparedSignature": to_0x_hex_str(
+                    safe_operation.build_signature_prefix()
+                ),
             },
         }
         self.assertDictEqual(
@@ -990,8 +1008,9 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 "validUntil": datetime_to_str(safe_operation.valid_until),
                 "moduleAddress": safe_operation.module_address,
                 "confirmations": [],
-                "preparedSignature": "0x"
-                + safe_operation.build_signature_prefix().hex(),
+                "preparedSignature": to_0x_hex_str(
+                    safe_operation.build_signature_prefix()
+                ),
             },
         }
         self.assertDictEqual(

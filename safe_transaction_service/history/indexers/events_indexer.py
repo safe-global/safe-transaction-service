@@ -11,6 +11,7 @@ from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
 from gevent import pool
 from hexbytes import HexBytes
+from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
 from web3.exceptions import LogTopicError
 from web3.types import EventData, FilterParams, LogReceipt
@@ -75,7 +76,7 @@ class EventsIndexer(EthereumIndexer):
         """
         events_to_listen = {}
         for event in self.contract_events:
-            key = HexStr(HexBytes(event_abi_to_log_topic(event.abi)).hex())
+            key = to_0x_hex_str(HexBytes(event_abi_to_log_topic(event.abi)))
             events_to_listen.setdefault(key, []).append(event)
         return events_to_listen
 
@@ -221,7 +222,7 @@ class EventsIndexer(EthereumIndexer):
             or `None` if decoding was not possible
         """
         for event_to_listen in self.events_to_listen[
-            HexStr(log_receipt["topics"][0].hex())
+            to_0x_hex_str(log_receipt["topics"][0])
         ]:
             # Try to decode using all the existing ABIs
             # One topic can have multiple matching ABIs due to `indexed` elements changing how to decode it

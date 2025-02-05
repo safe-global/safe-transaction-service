@@ -55,6 +55,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe import SafeOperationEnum
 from safe_eth.safe.safe import SafeInfo
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
+from safe_eth.util.util import to_0x_hex_str
 from web3.types import EventData
 
 from safe_transaction_service.account_abstraction.constants import (
@@ -250,8 +251,8 @@ class EthereumBlockManager(models.Manager):
                     timestamp=datetime.datetime.fromtimestamp(
                         block["timestamp"], datetime.timezone.utc
                     ),
-                    block_hash=block["hash"].hex(),
-                    parent_hash=block["parentHash"].hex(),
+                    block_hash=to_0x_hex_str(block["hash"]),
+                    parent_hash=to_0x_hex_str(block["parentHash"]),
                     confirmed=confirmed,
                 )
         except IntegrityError:
@@ -264,7 +265,7 @@ class EthereumBlockManager(models.Manager):
                 db_block.confirmed = False  # Will be taken care of by the reorg task
                 db_block.save(update_fields=["confirmed"])
                 raise IntegrityError(
-                    f"Error inserting block with hash={block['hash'].hex()}, "
+                    f"Error inserting block with hash={to_0x_hex_str(block['hash'])}, "
                     f"there is a block with the same number={block['number']} inserted. "
                     f"Marking block as not confirmed"
                 )
@@ -275,7 +276,8 @@ class EthereumBlockManager(models.Manager):
             return self.values("timestamp").get(block_hash=block_hash)["timestamp"]
         except self.model.DoesNotExist:
             logger.error(
-                "Block with hash=%s does not exist on database", block_hash.hex()
+                "Block with hash=%s does not exist on database",
+                to_0x_hex_str(block_hash),
             )
             raise
 
@@ -361,7 +363,7 @@ class EthereumTxManager(models.Manager):
 
         return super().create(
             block=ethereum_block,
-            tx_hash=HexBytes(tx["hash"]).hex(),
+            tx_hash=to_0x_hex_str(HexBytes(tx["hash"])),
             gas_used=tx_receipt and tx_receipt["gasUsed"],
             _from=tx["from"],
             gas=tx["gas"],
@@ -382,7 +384,7 @@ class EthereumTxManager(models.Manager):
         """
         :return: Transactions containing ERC4337 `UserOperation` event
         """
-        query = '{"topics": ["' + USER_OPERATION_EVENT_TOPIC.hex() + '"]}'
+        query = '{"topics": ["' + to_0x_hex_str(USER_OPERATION_EVENT_TOPIC) + '"]}'
 
         return self.raw(
             f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
@@ -568,7 +570,7 @@ class TokenTransfer(models.Model):
         expected_topic = HexBytes(ERC20_721_TRANSFER_TOPIC)
         if topic != expected_topic:
             raise ValueError(
-                f"Not supported EventData, topic {topic.hex()} does not match expected {expected_topic.hex()}"
+                f"Not supported EventData, topic {to_0x_hex_str(topic)} does not match expected {to_0x_hex_str(expected_topic)}"
             )
 
         try:
@@ -1059,11 +1061,11 @@ class InternalTx(models.Model):
     def __str__(self):
         if self.to:
             return "Internal tx hash={} from={} to={}".format(
-                HexBytes(self.ethereum_tx_id).hex(), self._from, self.to
+                to_0x_hex_str(HexBytes(self.ethereum_tx_id)), self._from, self.to
             )
         else:
             return "Internal tx hash={} from={}".format(
-                HexBytes(self.ethereum_tx_id).hex(), self._from
+                to_0x_hex_str(HexBytes(self.ethereum_tx_id)), self._from
             )
 
     @property
@@ -1603,7 +1605,7 @@ class ModuleTransaction(TimeStampedModel):
         if self.value:
             return f"{self.safe} - {self.to} - {self.value}"
         else:
-            return f"{self.safe} - {self.to} - 0x{bytes(self.data).hex()[:6]}"
+            return f"{self.safe} - {self.to} - {to_0x_hex_str(bytes(self.data))[:6]}"
 
     @property
     def unique_id(self):

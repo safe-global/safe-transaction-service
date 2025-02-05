@@ -6,6 +6,7 @@ from django.db import transaction
 
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.util.util import to_0x_hex_str
 
 from ..indexers import (
     Erc20EventsIndexerProvider,
@@ -123,15 +124,15 @@ class ReorgService:
                         logger.debug(
                             "Block with number=%d and hash=%s is matching blockchain one, setting as confirmed",
                             database_block.number,
-                            HexBytes(blockchain_block["hash"]).hex(),
+                            to_0x_hex_str(HexBytes(blockchain_block["hash"])),
                         )
                         database_block.set_confirmed()
                 else:
                     logger.warning(
                         "Block with number=%d and hash=%s is not matching blockchain hash=%s, reorg found",
                         database_block.number,
-                        HexBytes(database_block.block_hash).hex(),
-                        HexBytes(blockchain_block["hash"]).hex(),
+                        to_0x_hex_str(HexBytes(database_block.block_hash)),
+                        to_0x_hex_str(HexBytes(blockchain_block["hash"])),
                     )
                     return database_block.number
 

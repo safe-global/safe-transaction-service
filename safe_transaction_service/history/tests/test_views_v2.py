@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from ...tokens.models import Token
 from ...utils.utils import datetime_to_str
@@ -211,7 +212,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
                 delegate.address, chain_id, False
             )
-            data["signature"] = delegator.signHash(hash_to_sign)["signature"].hex()
+            data["signature"] = to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            )
             response = self.client.post(url, format="json", data=data)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             safe_contract_delegate = SafeContractDelegate.objects.get()
@@ -250,7 +253,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             "label": "Kim Wexler",
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
         }
         response = self.client.post(url, format="json", data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -260,7 +265,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         signature = signature_to_bytes(0, int(delegator.address, 16), 65) + HexBytes(
             "0" * 65
         )
-        data["signature"] = signature.hex()
+        data["signature"] = to_0x_hex_str(signature)
         response = self.client.post(url, format="json", data=data)
         self.assertIn(
             f"Signature of type=CONTRACT_SIGNATURE for signer={delegator.address} is not valid",
@@ -279,7 +284,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             "label": "Kim Wexler",
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
         }
 
         response = self.client.post(
@@ -302,7 +309,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             "safe": safe.address,
             "delegate": delegate.address,
             "delegator": delegator.address,
-            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
         }
 
         with mock.patch(
@@ -418,7 +427,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                 self.assertEqual(SafeContractDelegate.objects.count(), 3)
 
                 data = {
-                    "signature": signer.signHash(hash_to_sign)["signature"].hex(),
+                    "signature": to_0x_hex_str(
+                        signer.unsafe_sign_hash(hash_to_sign)["signature"]
+                    ),
                     "delegator": delegator.address,
                 }
                 response = self.client.delete(
@@ -452,7 +463,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             self.assertEqual(SafeContractDelegate.objects.count(), 2)
             data = {
                 "safe": safe_address,
-                "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+                "signature": to_0x_hex_str(
+                    delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+                ),
                 "delegator": delegator.address,
             }
             response = self.client.delete(
@@ -470,7 +483,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             get_safe_owners_mock.return_value = [delegator.address]
             data = {
                 "safe": safe_address,
-                "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+                "signature": to_0x_hex_str(
+                    delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+                ),
                 "delegator": delegator.address,
             }
             response = self.client.delete(
@@ -484,7 +499,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         # Try an invalid signer
         signer = Account.create()
         data = {
-            "signature": signer.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                signer.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
             "delegator": delegator.address,
         }
         response = self.client.delete(
@@ -497,7 +514,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(SafeContractDelegate.objects.count(), 1)
         data = {
-            "signature": delegator.signHash(hash_to_sign)["signature"].hex(),
+            "signature": to_0x_hex_str(
+                delegator.unsafe_sign_hash(hash_to_sign)["signature"]
+            ),
             "delegator": delegator.address,
         }
         response = self.client.delete(
