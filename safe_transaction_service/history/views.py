@@ -716,7 +716,6 @@ class SafeMultisigTransactionListView(ListAPIView):
         request=serializers.SafeMultisigTransactionSerializer,
         responses={
             201: OpenApiResponse(
-                response=serializers.SafeMultisigTransactionSerializer,
                 description="Created or signature updated",
             ),
             400: OpenApiResponse(description="Invalid data"),
