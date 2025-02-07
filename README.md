@@ -50,7 +50,7 @@ export ETHEREUM_4337_BUNDLER_URL="https://eth-sepolia.g.alchemy.com/v2/$API_KEY"
 
 ## Setup for development using docker
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker-compose --profile develop up
 ```
 
 ## Setup for production (event indexing)
