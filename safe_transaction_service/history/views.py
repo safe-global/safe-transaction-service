@@ -1251,7 +1251,9 @@ class SafeMultisigTransactionEstimateView(GenericAPIView):
     )
     def post(self, request, address, *args, **kwargs):
         """
-        Returns the estimated `safeTxGas` for a given Safe address and multi-signature transaction
+        Returns the estimated `safeTxGas` for a given Safe address and multi-signature transaction.
+        Estimation is disabled for L2 networks, as this is only required for Safes with version < 1.3.0
+        and those versions are not supported in L2 networks.
         """
         if not fast_is_checksum_address(address):
             return Response(
