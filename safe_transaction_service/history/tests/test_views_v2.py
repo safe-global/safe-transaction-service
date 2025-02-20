@@ -1,5 +1,6 @@
 from datetime import timedelta
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.urls import reverse
 from django.utils import timezone
@@ -9,17 +10,25 @@ from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.utils import fast_is_checksum_address
+from safe_eth.safe.enums import SafeOperationEnum
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from ...contracts.models import ContractQuerySet
+from ...contracts.tests.factories import ContractFactory
+from ...contracts.tx_decoder import DbTxDecoder
 from ...tokens.models import Token
 from ...utils.utils import datetime_to_str
 from ..helpers import DelegateSignatureHelperV2
-from ..models import SafeContractDelegate
+from ..models import MultisigTransaction, SafeContractDelegate
+from ..views_v2 import SafeMultisigTransactionListView
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
+    MultisigConfirmationFactory,
+    MultisigTransactionFactory,
     SafeContractDelegateFactory,
     SafeContractFactory,
 )
@@ -777,3 +786,267 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                     },
                 ],
             )
+
+    def test_get_multisig_transactions(self):
+        safe_address = Account.create().address
+        proposer = Account.create().address
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["count_unique_nonce"], 0)
+
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, proposer=proposer, trusted=True
+        )
+        # Not trusted multisig transaction should not be returned by default
+        MultisigTransactionFactory(safe=safe_address, proposer=proposer, trusted=False)
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["count_unique_nonce"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
+        self.assertTrue(
+            fast_is_checksum_address(response.data["results"][0]["executor"])
+        )
+        self.assertEqual(
+            response.data["results"][0]["transaction_hash"],
+            multisig_tx.ethereum_tx.tx_hash,
+        )
+        # Test camelCase
+        self.assertEqual(
+            response.json()["results"][0]["transactionHash"],
+            multisig_tx.ethereum_tx.tx_hash,
+        )
+        # Check Etag header
+        self.assertTrue(response["Etag"])
+        MultisigConfirmationFactory(multisig_transaction=multisig_tx)
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(len(response.data["results"][0]["confirmations"]), 1)
+        self.assertEqual(response.data["results"][0]["proposer"], proposer)
+        self.assertIsNone(response.data["results"][0]["proposed_by_delegate"])
+
+        # Check proposed_by_delegate
+        delegate = Account.create().address
+        multisig_tx.proposed_by_delegate = delegate
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["proposer"], proposer)
+        self.assertEqual(response.data["results"][0]["proposed_by_delegate"], delegate)
+
+        # Check not trusted
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?trusted=False",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+        MultisigTransactionFactory(
+            safe=safe_address, nonce=multisig_tx.nonce, trusted=True
+        )
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["count_unique_nonce"], 1)
+
+        #
+        # Mock get_queryset with empty queryset return value to get proper error in case of fail
+        with mock.patch.object(
+            SafeMultisigTransactionListView,
+            "get_queryset",
+            return_value=MultisigTransaction.objects.none(),
+        ) as patched_queryset:
+            response = self.client.get(
+                reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            # view shouldn't be called
+            patched_queryset.assert_not_called()
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 2)
+            self.assertEqual(response.data["count_unique_nonce"], 1)
+
+    def test_get_multisig_transactions_unique_nonce(self):
+        """
+        Unique nonce should follow the trusted filter
+        """
+
+        safe_address = Account.create().address
+        url = reverse("v2:history:multisig-transactions", args=(safe_address,))
+        response = self.client.get(
+            url,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["count_unique_nonce"], 0)
+
+        MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
+        MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
+
+        # Unique nonce ignores not trusted transactions by default
+        response = self.client.get(
+            url,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["count_unique_nonce"], 1)
+
+        response = self.client.get(
+            url + "?trusted=False",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["count_unique_nonce"], 2)
+
+    @mock.patch.object(
+        DbTxDecoder, "get_data_decoded", return_value={"param1": "value"}
+    )
+    def test_get_multisig_transactions_not_decoded(
+        self, get_data_decoded_mock: MagicMock
+    ):
+        try:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            multisig_transaction = MultisigTransactionFactory(
+                operation=SafeOperationEnum.CALL.value, data=b"abcd", trusted=True
+            )
+            safe_address = multisig_transaction.safe
+            response = self.client.get(
+                reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(
+                response.data["results"][0]["data_decoded"], {"param1": "value"}
+            )
+
+            multisig_transaction.operation = SafeOperationEnum.DELEGATE_CALL.value
+            multisig_transaction.save()
+            response = self.client.get(
+                reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertIsNone(response.data["results"][0]["data_decoded"])
+
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            ContractFactory(
+                address=multisig_transaction.to, trusted_for_delegate_call=True
+            )
+            # Force don't use cache because we are not cleaning the cache on contracts change
+            with mock.patch(
+                "safe_transaction_service.history.views.settings.CACHE_VIEW_DEFAULT_TIMEOUT",
+                0,
+            ):
+                response = self.client.get(
+                    reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response.data["results"][0]["data_decoded"], {"param1": "value"}
+                )
+        finally:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+
+    def test_get_multisig_transactions_filters(self):
+        safe_address = Account.create().address
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        multisig_transaction = MultisigTransactionFactory(
+            safe=safe_address, nonce=0, ethereum_tx=None, trusted=True
+        )
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?nonce=0",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?to=0x2a",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["to"][0], "Enter a valid checksummed Ethereum Address."
+        )
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + f"?to={multisig_transaction.to}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?nonce=1",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?executed=true",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?executed=false",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?has_confirmations=True",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 0)
+
+        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe_address,))
+            + "?has_confirmations=True",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)

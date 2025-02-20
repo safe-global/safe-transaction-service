@@ -6,15 +6,23 @@ from django.db.models import Q
 import django_filters
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from eth_typing import HexStr
 from rest_framework import status
-from rest_framework.generics import GenericAPIView, ListCreateAPIView
+from rest_framework.filters import OrderingFilter
+from rest_framework.generics import (
+    GenericAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveAPIView,
+)
 from rest_framework.response import Response
 from safe_eth.eth.utils import fast_is_checksum_address
 
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
 from . import filters, pagination, serializers
-from .models import SafeContract, SafeContractDelegate
+from .cache import CacheSafeTxsView, cache_txs_view_for_address
+from .models import MultisigTransaction, SafeContract, SafeContractDelegate
 from .services import BalanceServiceProvider
 from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -288,3 +296,144 @@ class SafeBalanceView(GenericAPIView):
             paginator.set_count(count)
             serializer = self.get_serializer(safe_balances, many=True)
             return paginator.get_paginated_response(serializer.data)
+
+
+class SafeMultisigTransactionDetailView(RetrieveAPIView):
+    """
+    Returns a multi-signature transaction given its Safe transaction hash
+    """
+
+    serializer_class = serializers.SafeMultisigTransactionResponseSerializerV2
+    lookup_field = "safe_tx_hash"
+    lookup_url_kwarg = "safe_tx_hash"
+
+    def get_queryset(self):
+        return (
+            MultisigTransaction.objects.with_confirmations_required()
+            .prefetch_related("confirmations")
+            .select_related("ethereum_tx__block")
+        )
+
+    def delete(self, request, safe_tx_hash: HexStr):
+        """
+        Removes the queued but not executed multi-signature transaction associated with the given Safe transaction hash.
+        Only the proposer or the delegate who proposed the transaction can delete it.
+        If the transaction was proposed by a delegate, it must still be a valid delegate for the transaction proposer.
+        An EOA is required to sign the following EIP-712 data:
+
+        ```python
+         {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"},
+                ],
+                "DeleteRequest": [
+                    {"name": "safeTxHash", "type": "bytes32"},
+                    {"name": "totp", "type": "uint256"},
+                ],
+            },
+            "primaryType": "DeleteRequest",
+            "domain": {
+                "name": "Safe Transaction Service",
+                "version": "1.0",
+                "chainId": chain_id,
+                "verifyingContract": safe_address,
+            },
+            "message": {
+                "safeTxHash": safe_tx_hash,
+                "totp": totp,
+            },
+        }
+        ```
+
+        `totp` parameter is calculated with `T0=0` and `Tx=3600`. `totp` is calculated by taking the
+        Unix UTC epoch time (no milliseconds) and dividing by 3600 (natural division, no decimals)
+        """
+        request.data["safe_tx_hash"] = safe_tx_hash
+        serializer = serializers.SafeMultisigTransactionDeleteSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SafeMultisigTransactionListView(ListAPIView):
+    filter_backends = (
+        django_filters.rest_framework.DjangoFilterBackend,
+        OrderingFilter,
+    )
+    filterset_class = filters.MultisigTransactionFilter
+    ordering_fields = ["nonce", "created", "modified"]
+    pagination_class = pagination.DefaultPagination
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            # Just for openApi doc purposes
+            return MultisigTransaction.objects.none()
+        return (
+            MultisigTransaction.objects.filter(safe=self.kwargs["address"])
+            .with_confirmations_required()
+            .prefetch_related("confirmations")
+            .select_related("ethereum_tx__block")
+            .order_by("-nonce", "-created")
+        )
+
+    def get_unique_nonce(self, address: str):
+        """
+        :param address:
+        :return: Number of Multisig Transactions with different nonce
+        """
+        only_trusted = parse_boolean_query_param(
+            self.request.query_params.get("trusted", True)
+        )
+        queryset = MultisigTransaction.objects.filter(safe=address)
+        if only_trusted:
+            queryset = queryset.filter(trusted=True)
+        return queryset.distinct("nonce").count()
+
+    def get_serializer_class(self):
+        """
+        Proxy returning a serializer class according to the request's verb.
+        """
+        if self.request.method == "GET":
+            return serializers.SafeMultisigTransactionResponseSerializerV2
+
+    @extend_schema(
+        tags=["transactions"],
+        responses={
+            200: OpenApiResponse(
+                response=serializers.SafeMultisigTransactionResponseSerializerV2
+            ),
+            400: OpenApiResponse(description="Invalid data"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid ethereum address",
+            ),
+        },
+    )
+    @cache_txs_view_for_address(
+        cache_tag=CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY
+    )
+    def get(self, request, *args, **kwargs):
+        """
+        Returns all the multi-signature transactions for a given Safe address.
+        By default, only ``trusted`` multisig transactions are returned.
+        """
+        address = kwargs["address"]
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        response = super().get(request, *args, **kwargs)
+        response.data["count_unique_nonce"] = self.get_unique_nonce(address)
+        return response

@@ -675,9 +675,6 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     value = serializers.CharField()
     is_executed = serializers.BooleanField(source="executed")
     is_successful = serializers.SerializerMethodField()
-    nonce = serializers.CharField()
-    base_gas = serializers.CharField()
-    safe_tx_gas = serializers.CharField()
     gas_price = serializers.CharField()
     eth_gas_price = serializers.SerializerMethodField()
     max_fee_per_gas = serializers.SerializerMethodField()
@@ -742,6 +739,14 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             return get_data_decoded_from_data(
                 obj.data if obj.data else b"", address=obj.to
             )
+
+
+class SafeMultisigTransactionResponseSerializerV2(
+    SafeMultisigTransactionResponseSerializer
+):
+    nonce = serializers.CharField()
+    base_gas = serializers.CharField()
+    safe_tx_gas = serializers.CharField()
 
 
 class IndexingStatusSerializer(serializers.Serializer):

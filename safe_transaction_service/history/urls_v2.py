@@ -21,4 +21,14 @@ urlpatterns = [
         views_v2.SafeBalanceView.as_view(),
         name="safe-balances",
     ),
+    path(
+        "safes/<str:address>/multisig-transactions/",
+        views_v2.SafeMultisigTransactionListView.as_view(),
+        name="multisig-transactions",
+    ),
+    path(
+        "multisig-transactions/<str:safe_tx_hash>/",
+        views_v2.SafeMultisigTransactionDetailView.as_view(),
+        name="multisig-transaction",
+    ),
 ]
