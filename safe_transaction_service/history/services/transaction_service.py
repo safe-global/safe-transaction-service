@@ -30,6 +30,7 @@ from ..serializers import (
     EthereumTxWithTransfersResponseSerializer,
     SafeModuleTransactionWithTransfersResponseSerializer,
     SafeMultisigTransactionWithTransfersResponseSerializer,
+    SafeMultisigTransactionWithTransfersResponseSerializerV2,
 )
 
 logger = logging.getLogger(__name__)
@@ -340,6 +341,28 @@ class TransactionService:
                 serializer = SafeModuleTransactionWithTransfersResponseSerializer
             elif model_type == MultisigTransaction:
                 serializer = SafeMultisigTransactionWithTransfersResponseSerializer
+            else:
+                raise ValueError(f"Type={model_type} not expected, cannot serialize")
+            serialized = serializer(model)
+            # serialized.is_valid(raise_exception=True)
+            results.append(serialized.data)
+
+        logger.debug("Serialized all transactions")
+        return results
+
+    def serialize_all_txs_v2(
+        self, models: List[AnySafeTransaction]
+    ) -> List[Dict[str, Any]]:
+        logger.debug("Serializing all transactions")
+        results = []
+        for model in models:
+            model_type = type(model)
+            if model_type == EthereumTx:
+                serializer = EthereumTxWithTransfersResponseSerializer
+            elif model_type == ModuleTransaction:
+                serializer = SafeModuleTransactionWithTransfersResponseSerializer
+            elif model_type == MultisigTransaction:
+                serializer = SafeMultisigTransactionWithTransfersResponseSerializerV2
             else:
                 raise ValueError(f"Type={model_type} not expected, cannot serialize")
             serialized = serializer(model)

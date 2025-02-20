@@ -1,12 +1,13 @@
+import hashlib
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from django.db.models import Q
 
 import django_filters
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
 from rest_framework import status
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import (
@@ -23,7 +24,8 @@ from safe_transaction_service.utils.utils import parse_boolean_query_param
 from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .models import MultisigTransaction, SafeContract, SafeContractDelegate
-from .services import BalanceServiceProvider
+from .pagination import DummyPagination
+from .services import BalanceServiceProvider, TransactionServiceProvider
 from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
 from .views import swagger_assets_parameters
@@ -135,6 +137,7 @@ class DelegateListView(ListCreateAPIView):
         return super().get(request, **kwargs)
 
     @extend_schema(
+        tags=["transactions"],
         request=serializers.DelegateSerializerV2,
         responses={
             202: OpenApiResponse(description="Accepted"),
@@ -298,6 +301,9 @@ class SafeBalanceView(GenericAPIView):
             return paginator.get_paginated_response(serializer.data)
 
 
+@extend_schema(
+    tags=["transactions"],
+)
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
     """
     Returns a multi-signature transaction given its Safe transaction hash
@@ -401,6 +407,8 @@ class SafeMultisigTransactionListView(ListAPIView):
         """
         if self.request.method == "GET":
             return serializers.SafeMultisigTransactionResponseSerializerV2
+        elif self.request.method == "POST":
+            return serializers.SafeMultisigTransactionSerializer
 
     @extend_schema(
         tags=["transactions"],
@@ -436,4 +444,187 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         response = super().get(request, *args, **kwargs)
         response.data["count_unique_nonce"] = self.get_unique_nonce(address)
+        return response
+
+    @extend_schema(
+        tags=["transactions"],
+        request=serializers.SafeMultisigTransactionSerializer,
+        responses={
+            201: OpenApiResponse(
+                description="Created or signature updated",
+            ),
+            400: OpenApiResponse(description="Invalid data"),
+            422: OpenApiResponse(
+                response=serializers.CodeErrorResponse,
+                description="Invalid ethereum address | User is not an owner | Invalid safeTxHash |"
+                "Invalid signature | Nonce already executed | Sender is not an owner",
+            ),
+        },
+    )
+    def post(self, request, address, format=None):
+        """
+        Creates a multi-signature transaction for a given Safe account with its confirmations and
+        retrieves all the information related.
+        """
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        request.data["safe"] = address
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors
+            )
+        else:
+            serializer.save()
+            return Response(status=status.HTTP_201_CREATED)
+
+
+class AllTransactionsListView(ListAPIView):
+    filter_backends = (
+        django_filters.rest_framework.DjangoFilterBackend,
+        OrderingFilter,
+    )
+    ordering_fields = ["timestamp"]
+    allowed_ordering_fields = ordering_fields + [
+        f"-{ordering_field}" for ordering_field in ordering_fields
+    ]
+    pagination_class = pagination.SmallPagination
+    serializer_class = (
+        serializers.AllTransactionsSchemaSerializerV2
+    )  # Just for docs, not used
+
+    def get_ordering_parameter(self) -> Optional[str]:
+        return self.request.query_params.get(OrderingFilter.ordering_param)
+
+    def get_page_tx_identifiers(
+        self,
+        safe: ChecksumAddress,
+        ordering: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> Optional[Response]:
+        """
+        This query will merge txs and events and will return the important
+        identifiers (``safeTxHash`` or ``txHash``) filtered
+
+        :param safe:
+        :param ordering:
+        :param limit:
+        :param offset:
+        :return: Return tx identifiers paginated
+        """
+        transaction_service = TransactionServiceProvider()
+
+        logger.debug(
+            "%s: Getting all tx identifiers for Safe=%s ordering=%s limit=%d offset=%d",
+            self.__class__.__name__,
+            safe,
+            ordering,
+            limit,
+            offset,
+        )
+        queryset = self.filter_queryset(
+            transaction_service.get_all_tx_identifiers(safe)
+        )
+        page = self.paginate_queryset(queryset)
+        logger.debug(
+            "%s: Got all tx identifiers for Safe=%s ordering=%s limit=%d offset=%d",
+            self.__class__.__name__,
+            safe,
+            ordering,
+            limit,
+            offset,
+        )
+
+        return page
+
+    def list(self, request, *args, **kwargs):
+        transaction_service = TransactionServiceProvider()
+        safe = self.kwargs["address"]
+        ordering = self.get_ordering_parameter()
+        # Trick to get limit and offset
+        list_pagination = DummyPagination(self.request)
+        limit, offset = list_pagination.limit, list_pagination.offset
+
+        tx_identifiers_page = self.get_page_tx_identifiers(
+            safe, ordering, limit, offset
+        )
+        if not tx_identifiers_page:
+            return self.get_paginated_response([])
+
+        all_tx_identifiers = [element.ethereum_tx_id for element in tx_identifiers_page]
+        all_txs = transaction_service.get_all_txs_from_identifiers(
+            safe, all_tx_identifiers
+        )
+        logger.debug(
+            "%s: Got all txs from identifiers for Safe=%s",
+            self.__class__.__name__,
+            safe,
+        )
+        all_txs_serialized = transaction_service.serialize_all_txs_v2(all_txs)
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s were serialized",
+            self.__class__.__name__,
+            safe,
+        )
+        paginated_response = self.get_paginated_response(all_txs_serialized)
+        logger.debug(
+            "%s: All txs from identifiers for Safe=%s: %s",
+            self.__class__.__name__,
+            safe,
+            paginated_response.data["results"],
+        )
+        return paginated_response
+
+    @extend_schema(tags=["transactions"])
+    def get(self, request, *args, **kwargs):
+        """
+        Returns all the *executed* transactions for a given Safe address.
+        The list has different structures depending on the transaction type:
+        - Multisig Transactions for a Safe. `tx_type=MULTISIG_TRANSACTION`.
+        - Module Transactions for a Safe. `tx_type=MODULE_TRANSACTION`
+        - Incoming Transfers of Ether/ERC20 Tokens/ERC721 Tokens. `tx_type=ETHEREUM_TRANSACTION`
+        Ordering_fields: ["timestamp"] eg: `-timestamp` (default one) or `timestamp`
+
+        Note: This endpoint has a bug that will be fixed in next versions of the endpoint. Pagination is done
+        using the `Transaction Hash`, and due to that the number of relevant transactions with the same
+        `Transaction Hash` cannot be known beforehand. So if there are only 2 transactions
+        with the same `Transaction Hash`, `count` of the endpoint will be 1
+        but there will be 2 transactions in the list.
+        """
+        address = kwargs["address"]
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+        ordering = self.get_ordering_parameter()
+        if ordering and ordering not in self.allowed_ordering_fields:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={
+                    "code": 1,
+                    "message": f"Ordering field is not valid, only f{self.allowed_ordering_fields} are allowed",
+                    "arguments": [ordering],
+                },
+            )
+
+        response = super().get(request, *args, **kwargs)
+        response.setdefault(
+            "ETag",
+            "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
+        )
         return response

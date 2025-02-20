@@ -369,6 +369,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 6)
         self.assertEqual(len(response.data["results"]), 3)
+        self.assertIsInstance(response.data["results"][0]["nonce"], int)
 
         response = self.client.get(
             reverse("v1:history:all-transactions", args=(safe_address,))

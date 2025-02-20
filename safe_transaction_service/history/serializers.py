@@ -968,6 +968,16 @@ class SafeMultisigTransactionWithTransfersResponseSerializer(
         return TxType.MULTISIG_TRANSACTION.name
 
 
+class SafeMultisigTransactionWithTransfersResponseSerializerV2(
+    SafeMultisigTransactionResponseSerializerV2
+):
+    transfers = TransferWithTokenInfoResponseSerializer(many=True)
+    tx_type = serializers.SerializerMethodField()
+
+    def get_tx_type(self, obj):
+        return TxType.MULTISIG_TRANSACTION.name
+
+
 class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
     class Meta:
         model = EthereumTx
@@ -1006,6 +1016,16 @@ class AllTransactionsSchemaSerializer(serializers.Serializer):
 
     tx_type_1 = SafeModuleTransactionWithTransfersResponseSerializer()
     tx_type_2 = SafeMultisigTransactionWithTransfersResponseSerializer()
+    tx_type_3 = EthereumTxWithTransfersResponseSerializer()
+
+
+class AllTransactionsSchemaSerializerV2(serializers.Serializer):
+    """
+    Just for the purpose of documenting, don't use it
+    """
+
+    tx_type_1 = SafeModuleTransactionWithTransfersResponseSerializer()
+    tx_type_2 = SafeMultisigTransactionWithTransfersResponseSerializerV2()
     tx_type_3 = EthereumTxWithTransfersResponseSerializer()
 
 

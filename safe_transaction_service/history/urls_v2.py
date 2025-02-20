@@ -31,4 +31,9 @@ urlpatterns = [
         views_v2.SafeMultisigTransactionDetailView.as_view(),
         name="multisig-transaction",
     ),
+    path(
+        "safes/<str:address>/all-transactions/",
+        views_v2.AllTransactionsListView.as_view(),
+        name="all-transactions",
+    ),
 ]
