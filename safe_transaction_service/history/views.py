@@ -271,6 +271,7 @@ class SafeDeploymentsView(ListAPIView):
         ),
     },
 )
+@extend_schema(deprecated=True)
 class AllTransactionsListView(ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
@@ -569,6 +570,9 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         },
     ),
 )
+@extend_schema(
+    deprecated=True,
+)
 class SafeMultisigTransactionDetailView(RetrieveAPIView):
     """
     Returns a multi-signature transaction given its Safe transaction hash
@@ -676,6 +680,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return serializers.SafeMultisigTransactionSerializer
 
     @extend_schema(
+        deprecated=True,
         tags=["transactions"],
         responses={
             200: OpenApiResponse(
@@ -712,6 +717,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         return response
 
     @extend_schema(
+        deprecated=True,
         tags=["transactions"],
         request=serializers.SafeMultisigTransactionSerializer,
         responses={
