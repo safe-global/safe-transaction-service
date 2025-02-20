@@ -889,6 +889,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["max_priority_fee_per_gas"])
         self.assertIsNone(response.data["proposer"])
         self.assertIsNone(response.data["proposed_by_delegate"])
+        self.assertIsInstance(response.data["nonce"], int)
 
         self.assertEqual(
             response.data["data_decoded"],
@@ -1200,6 +1201,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["results"][0]["transaction_hash"],
             multisig_tx.ethereum_tx.tx_hash,
         )
+        self.assertIsInstance(response.data["results"][0]["nonce"], int)
         # Test camelCase
         self.assertEqual(
             response.json()["results"][0]["transactionHash"],

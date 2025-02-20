@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest import mock
 from unittest.mock import MagicMock
@@ -10,7 +11,7 @@ from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 from safe_eth.eth.constants import NULL_ADDRESS
-from safe_eth.eth.utils import fast_is_checksum_address
+from safe_eth.eth.utils import fast_is_checksum_address, fast_keccak_text
 from safe_eth.safe.enums import SafeOperationEnum
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -812,6 +813,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count_unique_nonce"], 1)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(len(response.data["results"][0]["confirmations"]), 0)
+        self.assertIsInstance(response.data["results"][0]["nonce"], str)
         self.assertTrue(
             fast_is_checksum_address(response.data["results"][0]["executor"])
         )
@@ -1050,3 +1052,99 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
+
+    def test_get_multisig_transaction(self):
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text("gnosis"))
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        add_owner_with_threshold_data = HexBytes(
+            "0x0d582f130000000000000000000000001b9a0da11a5cace4e7035993cbb2e4"
+            "b1b3b164cf000000000000000000000000000000000000000000000000000000"
+            "0000000001"
+        )
+
+        multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
+        safe_tx_hash = multisig_tx.safe_tx_hash
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["confirmations"]), 0)
+        self.assertTrue(fast_is_checksum_address(response.data["executor"]))
+        self.assertEqual(
+            response.data["transaction_hash"], multisig_tx.ethereum_tx.tx_hash
+        )
+        self.assertEqual(response.data["origin"], multisig_tx.origin)
+        self.assertFalse(response.data["trusted"])
+        self.assertIsNone(response.data["max_fee_per_gas"])
+        self.assertIsNone(response.data["max_priority_fee_per_gas"])
+        self.assertIsNone(response.data["proposer"])
+        self.assertIsNone(response.data["proposed_by_delegate"])
+        self.assertIsInstance(response.data["nonce"], str)
+        self.assertEqual(
+            response.data["data_decoded"],
+            {
+                "method": "addOwnerWithThreshold",
+                "parameters": [
+                    {
+                        "name": "owner",
+                        "type": "address",
+                        "value": "0x1b9a0DA11a5caCE4e703599" "3Cbb2E4B1B3b164Cf",
+                    },
+                    {"name": "_threshold", "type": "uint256", "value": "1"},
+                ],
+            },
+        )
+
+        # Test camelCase
+        self.assertEqual(
+            response.json()["transactionHash"], multisig_tx.ethereum_tx.tx_hash
+        )
+        # Test empty origin object
+        multisig_tx.origin = {}
+        multisig_tx.save(update_fields=["origin"])
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["origin"], json.dumps({}))
+        self.assertEqual(json.loads(response.data["origin"]), {})
+
+        # Test origin object
+        origin = {"app": "Testing App", "name": "Testing"}
+        multisig_tx.origin = origin
+        multisig_tx.save(update_fields=["origin"])
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["origin"], json.dumps(origin))
+        self.assertEqual(json.loads(response.data["origin"]), origin)
+
+        # Test proposer
+        proposer = Account.create().address
+        multisig_tx.proposer = proposer
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.data["proposer"], proposer)
+
+        # Check proposed_by_delegate
+        delegate = Account.create().address
+        multisig_tx.proposed_by_delegate = delegate
+        multisig_tx.save()
+        response = self.client.get(
+            reverse("v2:history:multisig-transaction", args=(safe_tx_hash,)),
+            format="json",
+        )
+        self.assertEqual(response.data["proposer"], proposer)
+        self.assertEqual(response.data["proposed_by_delegate"], delegate)
