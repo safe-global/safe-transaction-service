@@ -11,7 +11,9 @@ from django_celery_beat.models import PeriodicTask
 from eth_account import Account
 from safe_eth.eth.account_abstraction import BundlerClient
 from safe_eth.eth.ethereum_client import EthereumClient, EthereumNetwork
+from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from safe_eth.util.util import to_0x_hex_str
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
 from ..models import (
@@ -24,6 +26,7 @@ from ..models import (
 from ..services import IndexServiceProvider
 from ..tasks import logger as task_logger
 from .factories import (
+    MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeContractFactory,
     SafeLastStatusFactory,
@@ -540,3 +543,90 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             )
             with self.assertRaises(SafeLastStatus.DoesNotExist):
                 SafeLastStatus.objects.get(address=safe.address)
+
+    def test_validate_tx_integrity(self):
+        command = "validate_tx_integrity"
+
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Found 0 transactions", buf.getvalue())
+
+        account = Account.create()
+        safe_last_status = SafeLastStatusFactory(nonce=0, address=account.address)
+        multisig_transaction = MultisigTransactionFactory(
+            ethereum_tx=None, nonce=0, safe=safe_last_status.address
+        )
+        multisig_confirmation = MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction
+        )
+
+        # Signatures are not valid by default
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        text = buf.getvalue()
+        self.assertIn("Found 1 transactions", text)
+        self.assertNotIn("should not have signatures as it is not executed", text)
+        self.assertIn(f"{multisig_transaction.safe_tx_hash} is not matching", text)
+        self.assertIn(
+            f"Confirmation for owner {multisig_confirmation.owner} is not valid for multisig transaction {multisig_transaction.safe_tx_hash}",
+            text,
+        )
+
+        # Fix confirmation signature
+        multisig_confirmation.owner = account.address
+        multisig_confirmation.signature = account.unsafe_sign_hash(
+            multisig_transaction.safe_tx_hash
+        )["signature"]
+        multisig_confirmation.save(update_fields=["owner", "signature"])
+
+        # Confirmation signature is now alright
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        text = buf.getvalue()
+        self.assertIn("Found 1 transactions", text)
+        self.assertNotIn("should not have signatures as it is not executed", text)
+        self.assertIn(f"{multisig_transaction.safe_tx_hash} is not matching", text)
+        self.assertNotIn("is not valid for multisig transaction", text)
+
+        # Fix safeTxHash too
+        safe = Safe(multisig_transaction.safe, self.ethereum_client)
+        safe_tx = safe.build_multisig_tx(
+            multisig_transaction.to,
+            multisig_transaction.value,
+            multisig_transaction.data,
+            multisig_transaction.operation,
+            multisig_transaction.safe_tx_gas,
+            multisig_transaction.base_gas,
+            multisig_transaction.gas_price,
+            multisig_transaction.gas_token,
+            multisig_transaction.refund_receiver,
+            safe_nonce=multisig_transaction.nonce,
+        )
+        multisig_transaction.delete()  # When replacing primary key, a new instance will be created
+        multisig_transaction.safe_tx_hash = to_0x_hex_str(safe_tx.safe_tx_hash)
+        multisig_transaction.save()
+
+        # SafeTxHash is good now
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        text = buf.getvalue()
+        self.assertIn("Found 1 transactions", text)
+        self.assertNotIn("should not have signatures as it is not executed", text)
+        self.assertNotIn("is not matching", text)
+        self.assertNotIn("is not valid for multisig transaction", text)
+
+        # Empty signatures
+        multisig_transaction.signatures = b"123456"
+        multisig_transaction.save(update_fields=["signatures"])
+
+        # Test signature not empty
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        text = buf.getvalue()
+        self.assertIn("Found 1 transactions", text)
+        self.assertIn(
+            f"{multisig_transaction.safe_tx_hash} should not have signatures as it is not executed",
+            text,
+        )
+        self.assertNotIn("is not matching", text)
+        self.assertNotIn("is not valid for multisig transaction", text)
