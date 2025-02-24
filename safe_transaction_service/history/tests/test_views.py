@@ -1369,7 +1369,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
 
         multisig_transaction = MultisigTransactionFactory(
-            safe=safe_address, nonce=0, ethereum_tx=None, trusted=True
+            safe=safe_address,
+            nonce=0,
+            ethereum_tx=None,
+            trusted=True,
+            enable_safe_tx_hash_calculation=True,
         )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))

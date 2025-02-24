@@ -332,7 +332,7 @@ class MultisigTransactionFactory(DjangoModelFactory):
                 self.refund_receiver,
                 safe_nonce=self.nonce,
             )
-
+            self.delete()
             self.safe_tx_hash = safe_tx.safe_tx_hash
             self.save()
 

@@ -812,7 +812,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             raise ValidationError(
                 "Transaction hash is required when providing signatures"
             )
-        return obj.signatures if obj.signatures is not None else None
+        return to_0x_hex_str(obj.signatures) if obj.signatures is not None else None
 
 
 class SafeMultisigTransactionResponseSerializerV2(
