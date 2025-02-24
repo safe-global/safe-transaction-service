@@ -707,23 +707,27 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         ethereum_client = get_auto_ethereum_client()
         safe_address = obj.safe
         safe_tx_hash = obj.safe_tx_hash
+        safe_owners = get_safe_owners(safe_address)
         serialized_confirmations = SafeMultisigConfirmationResponseSerializer(
             obj.confirmations, many=True
         ).data
         for multisig_confirmation in serialized_confirmations:
             owner = multisig_confirmation["owner"]
             signature = multisig_confirmation["signature"]
-
+            if owner not in safe_owners:
+                raise ValidationError(
+                    f"Signer={owner} is not an owner. Current owners={safe_owners}"
+                )
             parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
             if parsed_signatures != 1:
                 raise ValidationError(
                     f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
                 )
-            if not signature.is_valid(ethereum_client, safe_address):
-                raise ValidationError(
-                    f"Signature={to_0x_hex_str(signature.signature)} for owner={owner} is not valid"
-                )
             parsed_signature = parsed_signatures[0]
+            if not parsed_signature.is_valid(ethereum_client, safe_address):
+                raise ValidationError(
+                    f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
+                )
             if parsed_signature.owner != owner:
                 raise ValidationError(
                     f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
