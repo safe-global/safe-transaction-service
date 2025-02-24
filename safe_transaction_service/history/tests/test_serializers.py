@@ -113,6 +113,47 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         self.assertEqual(len(confirmations), 1)
         self.assertEqual(confirmations[0]["owner"], safe_owner.address)
 
+        # Multiple Owners
+        safe_owner_2 = Account.create()
+        safe_owner_3 = Account.create()
+        safe = self.deploy_test_safe(
+            owners=[safe_owner.address, safe_owner_2.address, safe_owner_3.address]
+        )
+        safe_address = safe.address
+
+        multisig_transaction = MultisigTransactionFactory(
+            safe=safe_address,
+            nonce=0,
+            ethereum_tx=None,
+            trusted=True,
+            enable_safe_tx_hash_calculation=True,
+        )
+        MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            force_sign_with_account=safe_owner,
+        )
+
+        MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            force_sign_with_account=safe_owner_2,
+        )
+
+        MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            force_sign_with_account=safe_owner_3,
+        )
+
+        serializer = SafeMultisigTransactionResponseSerializer(
+            instance=multisig_transaction
+        )
+        confirmations = serializer.get_confirmations(multisig_transaction)
+
+        self.assertIsNotNone(confirmations)
+        self.assertEqual(len(confirmations), 3)
+        self.assertEqual(confirmations[0]["owner"], safe_owner.address)
+        self.assertEqual(confirmations[1]["owner"], safe_owner_2.address)
+        self.assertEqual(confirmations[2]["owner"], safe_owner_3.address)
+
         # Test signatures without tx hash (Not executed)
         multisig_transaction_with_signatures_and_not_executed = (
             MultisigTransactionFactory(
