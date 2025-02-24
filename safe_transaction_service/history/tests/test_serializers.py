@@ -1,7 +1,6 @@
 from django.test import TestCase
 
 from eth_account import Account
-from rest_framework.exceptions import ValidationError
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ...history.serializers import SafeMultisigTransactionResponseSerializer
@@ -9,6 +8,7 @@ from ...history.tests.factories import (
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
 )
+from ..exceptions import InternalValidationError
 
 
 class TestSerializers(SafeTestCaseMixin, TestCase):
@@ -30,7 +30,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         serializer = SafeMultisigTransactionResponseSerializer(
             instance=multisig_transaction_invalid_tx_hash
         )
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction_invalid_tx_hash)
 
         multisig_transaction = MultisigTransactionFactory(
@@ -50,7 +50,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         serializer = SafeMultisigTransactionResponseSerializer(
             instance=multisig_transaction
         )
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction)
 
         # Signature of a different safe-tx-hash
@@ -70,7 +70,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         )
         multisig_confirmation_invalid_tx.save()
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction)
 
         # Signature of a different owner
@@ -88,7 +88,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         multisig_confirmation_invalid_owner.owner = Account.create().address
         multisig_confirmation_invalid_owner.save()
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction)
 
         # valid signature
@@ -168,7 +168,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         serializer = SafeMultisigTransactionResponseSerializer(
             instance=multisig_transaction_with_signatures_and_not_executed
         )
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(InternalValidationError):
             serializer.get_signatures(
                 multisig_transaction_with_signatures_and_not_executed
             )
