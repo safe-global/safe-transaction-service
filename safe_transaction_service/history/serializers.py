@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Optional
 from django.http import Http404
 from django.utils import timezone
 
+from drf_spectacular.utils import extend_schema_field
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -686,7 +688,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     confirmations_required = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     trusted = serializers.BooleanField()
-    signatures = HexadecimalField(allow_null=True, required=False)
+    signatures = serializers.SerializerMethodField()
 
     def get_block_number(self, obj: MultisigTransaction) -> Optional[int]:
         if obj.ethereum_tx_id:
@@ -698,9 +700,73 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        return SafeMultisigConfirmationResponseSerializer(
+        if obj.ethereum_tx_id:
+            return SafeMultisigConfirmationResponseSerializer(
+                obj.confirmations, many=True
+            ).data
+
+        signature_owners_addresses = []
+        safe_address = obj.safe
+        safe_tx_hash = obj.safe_tx_hash
+        safe_owners = get_safe_owners(safe_address)
+
+        ethereum_client = get_auto_ethereum_client()
+        safe = Safe(safe_address, ethereum_client)
+        safe_tx = safe.build_multisig_tx(
+            obj.to,
+            obj.value,
+            obj.data,
+            obj.operation,
+            obj.safe_tx_gas,
+            obj.base_gas,
+            obj.gas_price,
+            obj.gas_token,
+            obj.refund_receiver,
+            safe_nonce=obj.nonce,
+        )
+
+        # Check safe tx hash matches
+        safe_tx_hash_calculated = safe_tx.safe_tx_hash
+        if safe_tx_hash_calculated != HexBytes(safe_tx_hash):
+            raise ValidationError(
+                f"Contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)} "
+                f"does not match provided contract-tx-hash={safe_tx_hash}"
+            )
+
+        serialized_confirmations = SafeMultisigConfirmationResponseSerializer(
             obj.confirmations, many=True
         ).data
+        for multisig_confirmation in serialized_confirmations:
+            owner = multisig_confirmation["owner"]
+            signature = multisig_confirmation["signature"]
+            if owner not in safe_owners:
+                raise ValidationError(
+                    f"Signer={owner} is not an owner. Current owners={safe_owners}"
+                )
+            parsed_signatures = SafeSignature.parse_signature(
+                signature,
+                safe_tx_hash,
+                safe_hash_preimage=safe_tx.safe_tx_hash_preimage,
+            )
+            if len(parsed_signatures) != 1:
+                raise ValidationError(
+                    f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                )
+            parsed_signature = parsed_signatures[0]
+            if not parsed_signature.is_valid(ethereum_client, safe_address):
+                raise ValidationError(
+                    f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
+                )
+            if parsed_signature.owner != owner:
+                raise ValidationError(
+                    f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                )
+            if owner in signature_owners_addresses:
+                raise ValidationError(f"Signature for owner={owner} is duplicated")
+
+            signature_owners_addresses.append(owner)
+
+        return serialized_confirmations
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
@@ -739,6 +805,14 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             return get_data_decoded_from_data(
                 obj.data if obj.data else b"", address=obj.to
             )
+
+    @extend_schema_field(HexadecimalField(allow_null=True, required=False))
+    def get_signatures(self, obj: MultisigTransaction):
+        if obj.signatures and obj.ethereum_tx is None:
+            raise ValidationError(
+                "Transaction hash is required when providing signatures"
+            )
+        return to_0x_hex_str(obj.signatures) if obj.signatures is not None else None
 
 
 class SafeMultisigTransactionResponseSerializerV2(

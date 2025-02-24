@@ -1357,7 +1357,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 
     def test_get_multisig_transactions_filters(self):
-        safe_address = Account.create().address
+        safe_owner_1 = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
+
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1366,7 +1369,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
 
         multisig_transaction = MultisigTransactionFactory(
-            safe=safe_address, nonce=0, ethereum_tx=None, trusted=True
+            safe=safe_address,
+            nonce=0,
+            ethereum_tx=None,
+            trusted=True,
+            enable_safe_tx_hash_calculation=True,
         )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
@@ -1426,7 +1433,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
 
-        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            force_sign_with_account=safe_owner_1,
+        )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
             + "?has_confirmations=True",
@@ -1720,6 +1730,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Ensure right response is returned
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe.address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         multisig_transaction_db = MultisigTransaction.objects.get(
             safe_tx_hash=safe_tx_hash
         )
