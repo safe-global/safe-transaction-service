@@ -1,12 +1,23 @@
+*.egg-info
+*.pyc
 .cache
 .dockerignore
-.gitignore
-.git
-.github
 .env
+.git*
+.github
+.gitignore
 .pylintrc
+.pytest_cache
 __pycache__
-*.pyc
-*.egg-info
-.idea/
+
+# Docs
+*md
+docs
+
+# IDEs
+.idea
 .vscode
+
+# Other
+docker-compose.yml
+run_tests.sh
