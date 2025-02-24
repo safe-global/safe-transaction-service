@@ -698,9 +698,42 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        return SafeMultisigConfirmationResponseSerializer(
+        if obj.ethereum_tx_id:
+            return SafeMultisigConfirmationResponseSerializer(
+                obj.confirmations, many=True
+            ).data
+
+        signature_owners_addresses = []
+        ethereum_client = get_auto_ethereum_client()
+        safe_address = obj.safe
+        safe_tx_hash = obj.safe_tx_hash
+        serialized_confirmations = SafeMultisigConfirmationResponseSerializer(
             obj.confirmations, many=True
         ).data
+        for multisig_confirmation in serialized_confirmations:
+            owner = multisig_confirmation["owner"]
+            signature = multisig_confirmation["signature"]
+
+            parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
+            if parsed_signatures != 1:
+                raise ValidationError(
+                    f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                )
+            if not signature.is_valid(ethereum_client, safe_address):
+                raise ValidationError(
+                    f"Signature={to_0x_hex_str(signature.signature)} for owner={owner} is not valid"
+                )
+            parsed_signature = parsed_signatures[0]
+            if parsed_signature.owner != owner:
+                raise ValidationError(
+                    f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                )
+            if owner in signature_owners_addresses:
+                raise ValidationError(f"Signature for owner={owner} is duplicated")
+
+            signature_owners_addresses.append(owner)
+
+        return serialized_confirmations
 
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
