@@ -1,6 +1,7 @@
 import logging
 
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
@@ -37,3 +38,9 @@ def custom_exception_handler(exc, context):
 
 class NodeConnectionException(IOError):
     pass
+
+
+class InternalValidationError(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = "An internal validation error occurred."
+    default_code = "internal_validation_error"

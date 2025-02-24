@@ -39,7 +39,7 @@ from safe_transaction_service.utils.serializers import (
     get_safe_owners,
 )
 
-from .exceptions import NodeConnectionException
+from .exceptions import InternalValidationError, NodeConnectionException
 from .helpers import (
     DelegateSignatureHelper,
     DelegateSignatureHelperV2,
@@ -728,7 +728,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         # Check safe tx hash matches
         safe_tx_hash_calculated = safe_tx.safe_tx_hash
         if safe_tx_hash_calculated != HexBytes(safe_tx_hash):
-            raise ValidationError(
+            raise InternalValidationError(
                 f"Contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)} "
                 f"does not match provided contract-tx-hash={safe_tx_hash}"
             )
@@ -740,7 +740,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             owner = multisig_confirmation["owner"]
             signature = multisig_confirmation["signature"]
             if owner not in safe_owners:
-                raise ValidationError(
+                raise InternalValidationError(
                     f"Signer={owner} is not an owner. Current owners={safe_owners}"
                 )
             parsed_signatures = SafeSignature.parse_signature(
@@ -749,20 +749,22 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
                 safe_hash_preimage=safe_tx.safe_tx_hash_preimage,
             )
             if len(parsed_signatures) != 1:
-                raise ValidationError(
+                raise InternalValidationError(
                     f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
                 )
             parsed_signature = parsed_signatures[0]
             if not parsed_signature.is_valid(ethereum_client, safe_address):
-                raise ValidationError(
+                raise InternalValidationError(
                     f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
                 )
             if parsed_signature.owner != owner:
-                raise ValidationError(
+                raise InternalValidationError(
                     f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
                 )
             if owner in signature_owners_addresses:
-                raise ValidationError(f"Signature for owner={owner} is duplicated")
+                raise InternalValidationError(
+                    f"Signature for owner={owner} is duplicated"
+                )
 
             signature_owners_addresses.append(owner)
 
@@ -809,7 +811,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     @extend_schema_field(HexadecimalField(allow_null=True, required=False))
     def get_signatures(self, obj: MultisigTransaction):
         if obj.signatures and obj.ethereum_tx is None:
-            raise ValidationError(
+            raise InternalValidationError(
                 "Transaction hash is required when providing signatures"
             )
         return to_0x_hex_str(obj.signatures) if obj.signatures is not None else None
