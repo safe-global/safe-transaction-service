@@ -1726,6 +1726,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Ensure right response is returned
+        response = self.client.get(
+            reverse("v2:history:multisig-transactions", args=(safe.address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         multisig_transaction_db = MultisigTransaction.objects.get(
             safe_tx_hash=safe_tx_hash
         )

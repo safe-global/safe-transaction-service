@@ -8,8 +8,10 @@ from eth_account import Account
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
 from hexbytes import HexBytes
+from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.safe import Safe
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
@@ -310,6 +312,30 @@ class MultisigTransactionFactory(DjangoModelFactory):
             defaults={"timestamp": self.ethereum_tx.block.timestamp},
         )
 
+    @factory.post_generation
+    def enable_safe_tx_hash_calculation(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        if extracted:
+            ethereum_client = get_auto_ethereum_client()
+            safe = Safe(self.safe, ethereum_client)
+            safe_tx = safe.build_multisig_tx(
+                self.to,
+                self.value,
+                self.data,
+                self.operation,
+                self.safe_tx_gas,
+                self.base_gas,
+                self.gas_price,
+                self.gas_token,
+                self.refund_receiver,
+                safe_nonce=self.nonce,
+            )
+
+            self.safe_tx_hash = safe_tx.safe_tx_hash
+            self.save()
+
 
 class MultisigConfirmationFactory(DjangoModelFactory):
     class Meta:
@@ -335,9 +361,10 @@ class MultisigConfirmationFactory(DjangoModelFactory):
         if extracted:
             account = extracted
             self.owner = account.address
-            signature = account.unsafe_sign_hash(
-                self.multisig_transaction.safe_tx_hash
-            )["signature"]
+            self.multisig_transaction_hash = self.multisig_transaction.safe_tx_hash
+            signature = account.unsafe_sign_hash(self.multisig_transaction_hash)[
+                "signature"
+            ]
             self.signature = signature
             self.save()
 
