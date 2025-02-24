@@ -324,6 +324,23 @@ class MultisigConfirmationFactory(DjangoModelFactory):
     signature = None
     signature_type = SafeSignatureType.APPROVED_HASH.value
 
+    @factory.post_generation
+    def force_sign_with_account(self, create, extracted, **kwargs):
+        """
+        Calculates real signature for the given account
+        """
+        if not create:
+            return
+
+        if extracted:
+            account = extracted
+            self.owner = account.address
+            signature = account.unsafe_sign_hash(
+                self.multisig_transaction.safe_tx_hash
+            )["signature"]
+            self.signature = signature
+            self.save()
+
 
 class SafeContractFactory(DjangoModelFactory):
     class Meta:

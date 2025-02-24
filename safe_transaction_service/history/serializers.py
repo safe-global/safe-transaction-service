@@ -719,7 +719,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
                     f"Signer={owner} is not an owner. Current owners={safe_owners}"
                 )
             parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
-            if parsed_signatures != 1:
+            if len(parsed_signatures) != 1:
                 raise ValidationError(
                     f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
                 )

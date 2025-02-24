@@ -1357,7 +1357,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 
     def test_get_multisig_transactions_filters(self):
-        safe_address = Account.create().address
+        safe_owner_1 = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner_1.address])
+        safe_address = safe.address
+
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1426,7 +1429,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
 
-        MultisigConfirmationFactory(multisig_transaction=multisig_transaction)
+        MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            force_sign_with_account=safe_owner_1,
+        )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
             + "?has_confirmations=True",
