@@ -5,6 +5,11 @@ from django.http import HttpRequest
 
 from gunicorn import glogging
 
+from safe_transaction_service.loggers.custom_logger import (
+    HttpRequestLog,
+    HttpResponseLog,
+)
+
 
 def get_milliseconds_now():
     return int(time.time() * 1000)
@@ -46,19 +51,25 @@ class LoggingMiddleware:
         self.logger = logging.getLogger("LoggingMiddleware")
 
     def __call__(self, request: HttpRequest):
-        milliseconds = get_milliseconds_now()
+        start_time = get_milliseconds_now()
         response = self.get_response(request)
         if request.resolver_match:
             route = (
                 request.resolver_match.route if request.resolver_match else request.path
             )
-            delta = get_milliseconds_now() - milliseconds
+            end_time = get_milliseconds_now()
+            delta = end_time - start_time
+            http_request = HttpRequestLog(
+                url=str(route),
+                method=request.method,
+                startTime=start_time,
+            )
+            http_response = HttpResponseLog(response.status_code, end_time, delta)
             self.logger.info(
-                "MT::%s::%s::%s::%d::%s",
-                request.method,
-                route,
-                delta,
-                response.status_code,
-                request.path,
+                "Http request",
+                extra={
+                    "http_response": http_response,
+                    "http_request": http_request,
+                },
             )
         return response

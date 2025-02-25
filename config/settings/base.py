@@ -9,6 +9,7 @@ from corsheaders.defaults import default_headers as default_cors_headers
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 
 from safe_transaction_service import __version__
+from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter
 
 from ..gunicorn import (
     gunicorn_request_timeout,
@@ -385,6 +386,7 @@ LOGGING = {
             "format": "%(asctime)s [%(levelname)s] [%(task_id)s/%(task_name)s] %(message)s",
             # 'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
         },
+        "json": {"()": SafeJsonFormatter},
     },
     "handlers": {
         "mail_admins": {
@@ -399,7 +401,7 @@ LOGGING = {
         },
         "console_short": {
             "class": "logging.StreamHandler",
-            "formatter": "short",
+            "formatter": "json",
         },
         "celery_console": {
             "level": "DEBUG",
