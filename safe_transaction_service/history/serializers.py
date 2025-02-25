@@ -1,6 +1,7 @@
 import datetime
 import itertools
 import json
+import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -56,6 +57,8 @@ from .models import (
     TransferDict,
 )
 from .services.safe_service import SafeCreationInfo
+
+logger = logging.getLogger(__name__)
 
 
 def get_data_decoded_from_data(data: bytes, address: Optional[ChecksumAddress] = None):
@@ -740,8 +743,11 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             owner = multisig_confirmation["owner"]
             signature = multisig_confirmation["signature"]
             if owner not in safe_owners:
+                logger.error(
+                    f"[{safe_tx_hash}]: Signer={owner} is not an owner. Current owners={safe_owners}"
+                )
                 raise InternalValidationError(
-                    f"Signer={owner} is not an owner. Current owners={safe_owners}"
+                    f"[{safe_tx_hash}]: Signer={owner} is not an owner. Current owners={safe_owners}"
                 )
             parsed_signatures = SafeSignature.parse_signature(
                 signature,
@@ -749,21 +755,33 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
                 safe_hash_preimage=safe_tx.safe_tx_hash_preimage,
             )
             if len(parsed_signatures) != 1:
+                logger.error(
+                    f"[{safe_tx_hash}]: 1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                )
                 raise InternalValidationError(
-                    f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                    f"[{safe_tx_hash}]: 1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
                 )
             parsed_signature = parsed_signatures[0]
             if not parsed_signature.is_valid(ethereum_client, safe_address):
+                logger.error(
+                    f"[{safe_tx_hash}]: Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
+                )
                 raise InternalValidationError(
-                    f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
+                    f"[{safe_tx_hash}]: Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
                 )
             if parsed_signature.owner != owner:
+                logger.error(
+                    f"[{safe_tx_hash}]: Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                )
                 raise InternalValidationError(
-                    f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                    f"[{safe_tx_hash}]: Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
                 )
             if owner in signature_owners_addresses:
+                logger.error(
+                    f"[{safe_tx_hash}]: Signature for owner={owner} is duplicated"
+                )
                 raise InternalValidationError(
-                    f"Signature for owner={owner} is duplicated"
+                    f"[{safe_tx_hash}]: Signature for owner={owner} is duplicated"
                 )
 
             signature_owners_addresses.append(owner)
@@ -811,8 +829,12 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     @extend_schema_field(HexadecimalField(allow_null=True, required=False))
     def get_signatures(self, obj: MultisigTransaction):
         if obj.signatures and obj.ethereum_tx is None:
+            safe_tx_hash = obj.safe_tx_hash
+            logger.error(
+                f"[{safe_tx_hash}]: Transaction hash is required when providing signatures"
+            )
             raise InternalValidationError(
-                "Transaction hash is required when providing signatures"
+                f"[{safe_tx_hash}]: Transaction hash is required when providing signatures"
             )
         return to_0x_hex_str(obj.signatures) if obj.signatures is not None else None
 
