@@ -731,9 +731,11 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         # Check safe tx hash matches
         safe_tx_hash_calculated = safe_tx.safe_tx_hash
         if safe_tx_hash_calculated != HexBytes(safe_tx_hash):
+            logger.error(
+                f"[{safe_tx_hash}]: Wrong contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)}"
+            )
             raise InternalValidationError(
-                f"Contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)} "
-                f"does not match provided contract-tx-hash={safe_tx_hash}"
+                f"[{safe_tx_hash}]: Wrong contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)}"
             )
 
         serialized_confirmations = SafeMultisigConfirmationResponseSerializer(
