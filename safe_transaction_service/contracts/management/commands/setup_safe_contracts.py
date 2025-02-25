@@ -11,6 +11,7 @@ TRUSTED_FOR_DELEGATE_CALL = [
     "MultiSendCallOnly",
     "MultiSend",
     "SafeToL2Migration",
+    "SafeToL2Setup",
     "SignMessageLib",
     "SafeMigration",
 ]
