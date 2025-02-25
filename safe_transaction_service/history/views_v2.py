@@ -478,7 +478,7 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         request.data["safe"] = address
         serializer = self.get_serializer(data=request.data)
-
+        logger.info(f"POST MultisigTransaction: {request.data}")
         if not serializer.is_valid():
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors

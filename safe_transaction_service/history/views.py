@@ -555,6 +555,10 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         given Safe transaction hash. Multiple signatures can be submitted at once. This endpoint
         does not support the use of delegates to make transactions trusted.
         """
+        logger.info(
+            f"Add request confirmation for {self.kwargs["safe_tx_hash"]}"
+            f"signature={request.data.get('signature')}"
+        )
         return super().post(request, *args, **kwargs)
 
 
@@ -749,7 +753,7 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         request.data["safe"] = address
         serializer = self.get_serializer(data=request.data)
-
+        logger.info(f"POST MultisigTransaction: {request.data}")
         if not serializer.is_valid():
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors
