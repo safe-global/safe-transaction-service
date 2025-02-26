@@ -43,6 +43,22 @@ class SafeMessage(TimeStampedModel):
         message_hash = to_0x_hex_str(HexBytes(self.message_hash))
         return f"Safe Message {message_hash} - {message}"
 
+    def to_log(self, log_message: str) -> str:
+        """
+        :param log_message:
+        :return: SafeMessage ready to be printed in a log line
+        """
+        message_hash_str = to_0x_hex_str(HexBytes(self.message_hash))
+        return (
+            f"[SafeMessage {message_hash_str}] {log_message}. "
+            f"message_hash={message_hash_str} "
+            f"safe={self.safe} "
+            f"message={self.message} "
+            f"proposed_by={self.proposed_by} "
+            f"safe_app_id={self.safe_app_id} "
+            f"origin={self.origin} "
+        )
+
     def build_signature(self) -> bytes:
         return b"".join(
             [

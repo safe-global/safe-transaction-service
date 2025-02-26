@@ -40,7 +40,8 @@ from safe_transaction_service.utils.serializers import (
     get_safe_owners,
 )
 
-from .exceptions import InternalValidationError, NodeConnectionException
+from ..utils.exceptions import InternalValidationError
+from .exceptions import NodeConnectionException
 from .helpers import (
     DelegateSignatureHelper,
     DelegateSignatureHelperV2,

@@ -99,12 +99,25 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         )
 
     def test_safe_message_not_camel_case_view(self):
-        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        eip712_json_message_not_camel_case = {
+            "types": {
+                "EIP712Domain": [{"name": "name", "type": "string"}],
+                "Message": [{"name": "content", "type": "TestMessage"}],
+                "TestMessage": [{"name": "test_not_camel", "type": "uint256"}],
+            },
+            "domain": {
+                "name": "test_domain",
+            },
+            "primaryType": "Message",
+            "message": {"content": {"test_not_camel": 2}},
+        }
+        safe_message = SafeMessageFactory(
+            safe=self.deploy_test_safe().address,
+            message=eip712_json_message_not_camel_case,
+        )
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
         )
-        safe_message.message = {"test_not_camel": 2}
-        safe_message.save(update_fields=["message"])
 
         # Response message should not be camelcased
         response = self.client.get(
@@ -118,7 +131,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "modified": datetime_to_str(safe_message.modified),
                 "safe": safe_message.safe,
                 "messageHash": safe_message.message_hash,
-                "message": safe_message.message,
+                "message": eip712_json_message_not_camel_case,
                 "proposedBy": safe_message.proposed_by,
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
@@ -496,13 +509,35 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             },
         )
 
+        # Add an invalid confirmation
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message, owner=Account.create().address
+        )
+        response = self.client.get(
+            reverse("v1:safe_messages:safe-messages", args=(safe_message.safe,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def test_safe_messages_list_not_camel_case_view(self):
-        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        eip712_json_message_not_camel_case = {
+            "types": {
+                "EIP712Domain": [{"name": "name", "type": "string"}],
+                "Message": [{"name": "content", "type": "TestMessage"}],
+                "TestMessage": [{"name": "test_not_camel", "type": "uint256"}],
+            },
+            "domain": {
+                "name": "test_domain",
+            },
+            "primaryType": "Message",
+            "message": {"content": {"test_not_camel": 2}},
+        }
+        safe_message = SafeMessageFactory(
+            safe=self.deploy_test_safe().address,
+            message=eip712_json_message_not_camel_case,
+        )
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
         )
-        safe_message.message = {"test_not_camel": 2}
-        safe_message.save(update_fields=["message"])
 
         # Response message should not be camelcased
         response = self.client.get(
@@ -521,7 +556,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "modified": datetime_to_str(safe_message.modified),
                         "safe": safe_message.safe,
                         "messageHash": safe_message.message_hash,
-                        "message": safe_message.message,
+                        "message": eip712_json_message_not_camel_case,
                         "proposedBy": safe_message.proposed_by,
                         "safeAppId": safe_message.safe_app_id,
                         "origin": json.dumps(safe_message.origin),

@@ -8,7 +8,7 @@ from ...history.tests.factories import (
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
 )
-from ..exceptions import InternalValidationError
+from ...utils.exceptions import InternalValidationError
 
 
 class TestSerializers(SafeTestCaseMixin, TestCase):

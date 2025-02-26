@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import safe_eth.eth.django.serializers as eth_serializers
@@ -11,10 +12,13 @@ from safe_eth.eth.eip712 import eip712_encode_hash
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.utils.exceptions import InternalValidationError
 from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
 from .utils import get_hash_for_message, get_safe_message_hash_for_message
+
+logger = logging.getLogger(__name__)
 
 
 # Request serializers
@@ -207,9 +211,73 @@ class SafeMessageResponseSerializer(serializers.Serializer):
         :param obj: SafeMessage instance
         :return: Serialized queryset
         """
-        return SafeMessageConfirmationResponseSerializer(
+        signature_owners_addresses = []
+        safe_address = obj.safe
+        message_hash = get_hash_for_message(obj.message)
+        safe_message_hash_calculated = get_safe_message_hash_for_message(
+            safe_address, message_hash
+        )
+        safe_message_hash = obj.message_hash
+        if safe_message_hash_calculated != HexBytes(safe_message_hash):
+            logger.error(
+                obj.to_log(
+                    f"safe-message-hash={to_0x_hex_str(safe_message_hash_calculated)} does not match provided message-hash={safe_message_hash}"
+                )
+            )
+            raise InternalValidationError(
+                f"Message hash={to_0x_hex_str(safe_message_hash_calculated)} "
+                f"does not match provided message-hash={safe_message_hash}"
+            )
+
+        message_confirmations = SafeMessageConfirmationResponseSerializer(
             obj.confirmations, many=True
         ).data
+
+        for message_confirmation in message_confirmations:
+            owner = message_confirmation["owner"]
+            parsed_signatures = SafeSignature.parse_signature(
+                message_confirmation["signature"],
+                safe_message_hash,
+                safe_hash_preimage=message_hash,
+            )
+            if len(parsed_signatures) != 1:
+                logger.error(
+                    obj.to_log(
+                        f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                    )
+                )
+                raise InternalValidationError(
+                    f"[{obj.message_hash}]: 1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
+                )
+
+            ethereum_client = get_auto_ethereum_client()
+            parsed_signature = parsed_signatures[0]
+            if not parsed_signature.is_valid(ethereum_client, safe_address):
+                logger.error(
+                    obj.to_log(
+                        f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={parsed_signature.owner} is not valid"
+                    )
+                )
+                raise InternalValidationError(
+                    f"[{obj.message_hash}]: Signature={to_0x_hex_str(parsed_signature.signature)} for owner={parsed_signature.owner} is not valid"
+                )
+
+            if parsed_signature.owner != owner:
+                logger.error(
+                    obj.to_log(
+                        f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                    )
+                )
+                raise InternalValidationError(
+                    f"[{obj.message_hash}]: Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
+                )
+            if owner in signature_owners_addresses:
+                logger.error(obj.to_log(f"Signature for owner={owner} is duplicated"))
+                raise InternalValidationError(
+                    f"[{obj.message_hash}]: Signature for owner={owner} is duplicated"
+                )
+
+        return message_confirmations
 
     def get_prepared_signature(self, obj: SafeMessage) -> Optional[str]:
         """
