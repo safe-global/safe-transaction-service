@@ -1,3 +1,5 @@
+import logging
+
 from django.core.files import File
 from django.core.management import BaseCommand, CommandError
 
@@ -6,6 +8,8 @@ from safe_eth.safe.safe_deployments import safe_deployments
 
 from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
+
+logger = logging.getLogger(__name__)
 
 TRUSTED_FOR_DELEGATE_CALL = [
     "MultiSendCallOnly",
@@ -108,5 +112,8 @@ class Command(BaseCommand):
                             contract.display_name = display_name
                             contract.name = contract_name
 
-                    contract.logo.save(f"{contract.address}.png", logo_file)
-                    contract.save()
+                    try:
+                        contract.logo.save(f"{contract.address}.png", logo_file)
+                        contract.save()
+                    except OSError:
+                        logger.warning("Logo cannot be stored.")
