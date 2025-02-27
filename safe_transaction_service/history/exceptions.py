@@ -16,7 +16,7 @@ def _get_exception_trace(exception: Exception) -> str:
     return exception_trace
 
 
-def _generate_response_data(exception_trace, message):
+def _generate_response_data(exception_trace: str, message: str) -> dict:
     return {
         "exception": message,
         "trace": exception_trace,
