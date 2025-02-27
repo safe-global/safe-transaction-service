@@ -719,7 +719,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         """
         safe_address = obj.safe
         # Just get safe info for non executed transactions
-        if obj.ethereum_tx_id or obj.nonce < self.context.get("nonce", 0):
+        if obj.ethereum_tx_id or obj.nonce < self.context.get("current_nonce", 0):
             return SafeMultisigConfirmationResponseSerializer(
                 obj.confirmations, many=True
             ).data
@@ -727,7 +727,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         signature_owners_addresses = []
 
         safe_tx_hash = obj.safe_tx_hash
-        safe_owners = self.context.get("owners", [])
+        safe_owners = self.context.get("current_owners", [])
 
         ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)

@@ -662,13 +662,16 @@ class SafeMultisigTransactionListView(ListAPIView):
     pagination_class = pagination.DefaultPagination
 
     def get_serializer_context(self):
+        """
+        Add current_nonce and current_owners from blockchain to data serializer
+        """
         context = super().get_serializer_context()
         if self.request.method == "GET":
             safe_info = SafeServiceProvider().get_safe_info_from_blockchain(
                 self.kwargs["address"]
             )
-            context["nonce"] = safe_info.nonce
-            context["owners"] = safe_info.owners
+            context["current_nonce"] = safe_info.nonce
+            context["current_owners"] = safe_info.owners
 
         return context
 

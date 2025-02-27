@@ -29,7 +29,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         # Get serializer context
         nonce = safe.retrieve_nonce()
         owners = safe.retrieve_owners()
-        context = {"nonce": nonce, "owners": owners}
+        context = {"current_nonce": nonce, "current_owners": owners}
 
         serializer = SafeMultisigTransactionResponseSerializer(
             instance=multisig_transaction_invalid_tx_hash, context=context
@@ -127,7 +127,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         # Get serializer context
         nonce = safe.retrieve_nonce()
         owners = safe.retrieve_owners()
-        context = {"nonce": nonce, "owners": owners}
+        context = {"current_nonce": nonce, "current_owners": owners}
 
         multisig_transaction = MultisigTransactionFactory(
             safe=safe_address,
