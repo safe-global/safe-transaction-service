@@ -1,6 +1,8 @@
 import json
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
+from django.conf import settings
+
 import safe_eth.eth.django.serializers as eth_serializers
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
@@ -54,6 +56,11 @@ class SafeMessageSignatureParserMixin:
                 raise ValidationError(f"Signature for owner {owner} already exists")
 
         owners = get_safe_owners(safe_address)
+        if owner in settings.BANNED_EOAS:
+            raise ValidationError(
+                f"Signer={owner} is not authorized to interact with the service"
+            )
+
         if owner not in owners:
             raise ValidationError(f"{owner} is not an owner of the Safe")
 

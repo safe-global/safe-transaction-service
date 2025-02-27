@@ -236,6 +236,23 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                     )
 
                 get_owners_mock.return_value = [account.address]
+
+                with self.settings(BANNED_EOAS={account.address}):
+                    response = self.client.post(
+                        reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                        format="json",
+                        data=data,
+                    )
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                    self.assertEqual(
+                        response.json(),
+                        {
+                            "nonFieldErrors": [
+                                f"Signer={account.address} is not authorized to interact with the service"
+                            ]
+                        },
+                    )
+
                 response = self.client.post(
                     reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
                     format="json",
@@ -256,7 +273,8 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                     {
                         "non_field_errors": [
                             ErrorDetail(
-                                string=f"Message with hash {to_0x_hex_str(safe_message_hash)} for safe {safe_address} already exists in DB",
+                                string=f"Message with hash {to_0x_hex_str(safe_message_hash)} for safe {safe_address} "
+                                f"already exists in DB",
                                 code="invalid",
                             )
                         ]
