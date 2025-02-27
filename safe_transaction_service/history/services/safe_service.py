@@ -22,7 +22,11 @@ from web3.exceptions import Web3RPCError
 from safe_transaction_service.account_abstraction import models as aa_models
 from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
 
-from ..exceptions import NodeConnectionException
+from ..exceptions import (
+    CannotGetSafeInfoFromBlockchain,
+    CannotGetSafeInfoFromDB,
+    NodeConnectionException,
+)
 from ..models import (
     EthereumTx,
     InternalTx,
@@ -32,19 +36,6 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class SafeServiceException(Exception):
-    pass
-
-
-class CannotGetSafeInfoFromBlockchain(SafeServiceException):
-    pass
-
-
-class CannotGetSafeInfoFromDB(SafeServiceException):
-    pass
-
 
 EthereumAddress = str
 

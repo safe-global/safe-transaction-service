@@ -8,14 +8,9 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
+from ..exceptions import CannotGetSafeInfoFromBlockchain, CannotGetSafeInfoFromDB
 from ..models import InternalTxType, SafeMasterCopy
-from ..services.safe_service import (
-    CannotGetSafeInfoFromBlockchain,
-    CannotGetSafeInfoFromDB,
-    SafeCreationInfo,
-    SafeInfo,
-    SafeServiceProvider,
-)
+from ..services.safe_service import SafeCreationInfo, SafeInfo, SafeServiceProvider
 from ..services.safe_service import logger as safe_service_logger
 from ..utils import clean_receipt_log
 from .factories import (

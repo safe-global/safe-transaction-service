@@ -26,9 +26,13 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
             multisig_transaction=multisig_transaction_invalid_tx_hash,
             force_sign_with_account=safe_owner,
         )
+        # Get serializer context
+        nonce = safe.retrieve_nonce()
+        owners = safe.retrieve_owners()
+        context = {"current_nonce": nonce, "current_owners": owners}
 
         serializer = SafeMultisigTransactionResponseSerializer(
-            instance=multisig_transaction_invalid_tx_hash
+            instance=multisig_transaction_invalid_tx_hash, context=context
         )
         with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction_invalid_tx_hash)
@@ -48,7 +52,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         )
 
         serializer = SafeMultisigTransactionResponseSerializer(
-            instance=multisig_transaction
+            instance=multisig_transaction, context=context
         )
         with self.assertRaises(InternalValidationError):
             serializer.get_confirmations(multisig_transaction)
@@ -105,7 +109,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         )
 
         serializer = SafeMultisigTransactionResponseSerializer(
-            instance=multisig_transaction
+            instance=multisig_transaction, context=context
         )
         confirmations = serializer.get_confirmations(multisig_transaction)
 
@@ -120,6 +124,10 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
             owners=[safe_owner.address, safe_owner_2.address, safe_owner_3.address]
         )
         safe_address = safe.address
+        # Get serializer context
+        nonce = safe.retrieve_nonce()
+        owners = safe.retrieve_owners()
+        context = {"current_nonce": nonce, "current_owners": owners}
 
         multisig_transaction = MultisigTransactionFactory(
             safe=safe_address,
@@ -144,7 +152,7 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
         )
 
         serializer = SafeMultisigTransactionResponseSerializer(
-            instance=multisig_transaction
+            instance=multisig_transaction, context=context
         )
         confirmations = serializer.get_confirmations(multisig_transaction)
 
@@ -166,7 +174,8 @@ class TestSerializers(SafeTestCaseMixin, TestCase):
             )
         )
         serializer = SafeMultisigTransactionResponseSerializer(
-            instance=multisig_transaction_with_signatures_and_not_executed
+            instance=multisig_transaction_with_signatures_and_not_executed,
+            context=context,
         )
         with self.assertRaises(InternalValidationError):
             serializer.get_signatures(

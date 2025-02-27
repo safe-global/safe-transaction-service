@@ -896,6 +896,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
     def test_get_multisig_transaction(self):
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         safe_tx_hash = to_0x_hex_str(fast_keccak_text("gnosis"))
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
@@ -909,7 +911,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "0000000001"
         )
 
-        multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, data=add_owner_with_threshold_data
+        )
         safe_tx_hash = multisig_tx.safe_tx_hash
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
@@ -1208,8 +1212,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_get_multisig_transactions(self):
-        safe_address = Account.create().address
-        proposer = Account.create().address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
+        proposer = safe.retrieve_owners()[0]
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1313,7 +1318,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         Unique nonce should follow the trusted filter
         """
 
-        safe_address = Account.create().address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         url = reverse("v1:history:multisig-transactions", args=(safe_address,))
         response = self.client.get(
             url,
@@ -1350,11 +1356,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self, get_data_decoded_mock: MagicMock
     ):
         try:
+            safe = self.deploy_test_safe()
+            safe_address = safe.address
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             multisig_transaction = MultisigTransactionFactory(
-                operation=SafeOperationEnum.CALL.value, data=b"abcd", trusted=True
+                safe=safe_address,
+                operation=SafeOperationEnum.CALL.value,
+                data=b"abcd",
+                trusted=True,
             )
-            safe_address = multisig_transaction.safe
             response = self.client.get(
                 reverse("v1:history:multisig-transactions", args=(safe_address,)),
                 format="json",
@@ -1770,7 +1780,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Ensure right response is returned
         response = self.client.get(
-            reverse("v2:history:multisig-transactions", args=(safe.address,)),
+            reverse("v1:history:multisig-transactions", args=(safe.address,)),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -3977,3 +3987,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    def test_get_multisigtransaction_with_node_errors(self):
+        safe_address = Account.create().address
+        proposer = Account.create().address
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, proposer=proposer, trusted=True
+        )
+        response = self.client.get(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # NodeConnectionException
