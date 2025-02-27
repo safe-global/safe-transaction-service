@@ -858,6 +858,43 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
+    def test_post_multisig_confirmation_banned(self):
+        owner_account_1 = Account.create()
+        owner_account_2 = Account.create()
+        safe = self.deploy_test_safe(
+            owners=[owner_account_1.address, owner_account_2.address]
+        )
+        safe_address = safe.address
+        multisig_transaction = MultisigTransactionFactory(
+            safe=safe_address, trusted=True, ethereum_tx=None
+        )
+        safe_tx_hash = multisig_transaction.safe_tx_hash
+        data = {
+            "signature": to_0x_hex_str(
+                owner_account_1.unsafe_sign_hash(safe_tx_hash)["signature"]
+            )
+        }
+        self.assertEqual(MultisigConfirmation.objects.count(), 0)
+        with self.settings(BANNED_EOAS={owner_account_1.address}):
+            response = self.client.post(
+                reverse(
+                    "v1:history:multisig-transaction-confirmations",
+                    args=(safe_tx_hash,),
+                ),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(
+                response.json(),
+                {
+                    "signature": [
+                        f"Signer={owner_account_1.address} is not authorized to interact with the service"
+                    ]
+                },
+            )
+            self.assertEqual(MultisigConfirmation.objects.count(), 0)
+
     def test_get_multisig_transaction(self):
         safe_tx_hash = to_0x_hex_str(fast_keccak_text("gnosis"))
         response = self.client.get(
@@ -2220,6 +2257,66 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "Just one signature is expected if using delegates",
             response.data["non_field_errors"][0],
         )
+
+    def test_post_multisig_transactions_with_banned_signatures(self):
+        safe_owners = [Account.create() for _ in range(4)]
+        safe_owner_addresses = [s.address for s in safe_owners]
+        safe = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe.address
+
+        data = {
+            "to": Account.create().address,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            # "contractTransactionHash": "0x1c2c77b29086701ccdda7836c399112a9b715c6a153f6c8f75c84da4297f60d3",
+            "sender": safe_owners[0].address,
+            "origin": "Testing origin field",
+        }
+
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        safe_tx_hash = safe_tx.safe_tx_hash
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+        data["signature"] = to_0x_hex_str(
+            b"".join(
+                [
+                    safe_owner.unsafe_sign_hash(safe_tx_hash)["signature"]
+                    for safe_owner in safe_owners
+                ]
+            )
+        )
+        with self.settings(BANNED_EOAS={safe_owners[0].address}):
+            response = self.client.post(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
+            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(
+                response.json(),
+                {
+                    "nonFieldErrors": [
+                        f"Signer={safe_owners[0].address} is not authorized to interact with the service"
+                    ]
+                },
+            )
 
     def test_safe_balances_view(self):
         safe_address = Account.create().address

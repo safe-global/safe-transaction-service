@@ -5,6 +5,7 @@ import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
 from django.http import Http404
 from django.utils import timezone
 
@@ -125,6 +126,10 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         ethereum_client = get_auto_ethereum_client()
         for safe_signature in parsed_signatures:
             owner = safe_signature.owner
+            if owner in settings.BANNED_EOAS:
+                raise ValidationError(
+                    f"Signer={owner} is not authorized to interact with the service"
+                )
             if owner not in safe_owners:
                 raise ValidationError(
                     f"Signer={owner} is not an owner. Current owners={safe_owners}"
@@ -262,6 +267,11 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             if not safe_signature.is_valid(ethereum_client, safe_address):
                 raise ValidationError(
                     f"Signature={to_0x_hex_str(safe_signature.signature)} for owner={owner} is not valid"
+                )
+
+            if owner in settings.BANNED_EOAS:
+                raise ValidationError(
+                    f"Signer={owner} is not authorized to interact with the service"
                 )
 
             if owner in delegates and len(parsed_signatures) > 1:
@@ -713,9 +723,11 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
 
     def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
         """
-        Filters confirmations queryset
+        Validate and check integrity of confirmations queryset
+
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
+        :raises InternalValidationError: If any inconsistency is detected
         """
         if obj.ethereum_tx_id:
             return SafeMultisigConfirmationResponseSerializer(
