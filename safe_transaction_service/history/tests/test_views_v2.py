@@ -804,8 +804,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             )
 
     def test_get_multisig_transactions(self):
-        safe_address = Account.create().address
-        proposer = Account.create().address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
+        proposer = safe.retrieve_owners()[0]
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -909,7 +910,8 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         Unique nonce should follow the trusted filter
         """
 
-        safe_address = Account.create().address
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         url = reverse("v2:history:multisig-transactions", args=(safe_address,))
         response = self.client.get(
             url,
@@ -946,9 +948,14 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self, get_data_decoded_mock: MagicMock
     ):
         try:
+            safe = self.deploy_test_safe()
+            safe_address = safe.address
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             multisig_transaction = MultisigTransactionFactory(
-                operation=SafeOperationEnum.CALL.value, data=b"abcd", trusted=True
+                safe=safe_address,
+                operation=SafeOperationEnum.CALL.value,
+                data=b"abcd",
+                trusted=True,
             )
             safe_address = multisig_transaction.safe
             response = self.client.get(

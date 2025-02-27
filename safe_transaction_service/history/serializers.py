@@ -54,7 +54,6 @@ from .models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
-    SafeLastStatus,
     TransferDict,
 )
 from .services.safe_service import SafeCreationInfo
@@ -718,18 +717,17 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         :param obj: MultisigConfirmation instance
         :return: Serialized queryset
         """
-        if (
-            obj.ethereum_tx_id
-            or obj.nonce <= SafeLastStatus.objects.get(address=obj.safe).nonce
-        ):
+        safe_address = obj.safe
+        # Just get safe info for non executed transactions
+        if obj.ethereum_tx_id or obj.nonce < self.context.get("nonce", 0):
             return SafeMultisigConfirmationResponseSerializer(
                 obj.confirmations, many=True
             ).data
 
         signature_owners_addresses = []
-        safe_address = obj.safe
+
         safe_tx_hash = obj.safe_tx_hash
-        safe_owners = get_safe_owners(safe_address)
+        safe_owners = self.context.get("owners", [])
 
         ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)

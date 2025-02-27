@@ -25,7 +25,11 @@ from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .models import MultisigTransaction, SafeContract, SafeContractDelegate
 from .pagination import DummyPagination
-from .services import BalanceServiceProvider, TransactionServiceProvider
+from .services import (
+    BalanceServiceProvider,
+    SafeServiceProvider,
+    TransactionServiceProvider,
+)
 from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
 from .views import swagger_assets_parameters
@@ -375,6 +379,17 @@ class SafeMultisigTransactionListView(ListAPIView):
     filterset_class = filters.MultisigTransactionFilter
     ordering_fields = ["nonce", "created", "modified"]
     pagination_class = pagination.DefaultPagination
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.method == "GET":
+            safe_info = SafeServiceProvider().get_safe_info_from_blockchain(
+                self.kwargs["address"]
+            )
+            context["nonce"] = safe_info.nonce
+            context["owners"] = safe_info.owners
+
+        return context
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
