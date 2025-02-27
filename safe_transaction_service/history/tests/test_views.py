@@ -859,6 +859,8 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
 
     def test_get_multisig_transaction(self):
+        safe = self.deploy_test_safe()
+        safe_address = safe.address
         safe_tx_hash = to_0x_hex_str(fast_keccak_text("gnosis"))
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),
@@ -872,7 +874,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             "0000000001"
         )
 
-        multisig_tx = MultisigTransactionFactory(data=add_owner_with_threshold_data)
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, data=add_owner_with_threshold_data
+        )
         safe_tx_hash = multisig_tx.safe_tx_hash
         response = self.client.get(
             reverse("v1:history:multisig-transaction", args=(safe_tx_hash,)),

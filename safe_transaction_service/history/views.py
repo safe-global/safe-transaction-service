@@ -586,6 +586,18 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
     lookup_field = "safe_tx_hash"
     lookup_url_kwarg = "safe_tx_hash"
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.method == "GET":
+            multisig_transaction = self.get_object()
+            safe_info = SafeServiceProvider().get_safe_info_from_blockchain(
+                multisig_transaction.safe
+            )
+            context["nonce"] = safe_info.nonce
+            context["owners"] = safe_info.owners
+
+        return context
+
     def get_queryset(self):
         return (
             MultisigTransaction.objects.with_confirmations_required()
