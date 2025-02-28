@@ -2021,6 +2021,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                 self.assertEqual(multisig_transaction_db.operation, 1)
 
             # Disable creation with delegate call and trusted contract
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             ContractFactory(address=data["to"], trusted_for_delegate_call=True)
             with self.settings(
                 DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=True
@@ -2030,9 +2031,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                     format="json",
                     data=data,
                 )
-                self.assertEqual(
-                    response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY
-                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         finally:
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 

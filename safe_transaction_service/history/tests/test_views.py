@@ -1383,10 +1383,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertIsNone(response.data["results"][0]["data_decoded"])
 
-            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             ContractFactory(
                 address=multisig_transaction.to, trusted_for_delegate_call=True
             )
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             # Force don't use cache because we are not cleaning the cache on contracts change
             with mock.patch(
                 "safe_transaction_service.history.views.settings.CACHE_VIEW_DEFAULT_TIMEOUT",
@@ -2396,6 +2396,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
             # Disable creation with delegate call and trusted contract
             ContractFactory(address=data["to"], trusted_for_delegate_call=True)
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
             with self.settings(
                 DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=True
             ):
@@ -2404,9 +2405,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     format="json",
                     data=data,
                 )
-                self.assertEqual(
-                    response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY
-                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         finally:
             ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 
