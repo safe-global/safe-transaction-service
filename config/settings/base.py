@@ -778,7 +778,7 @@ BANNED_EOAS: set[ChecksumAddress] = {
     )
 }
 
-# Multisig Txs operations
+# Multisig Txs creation
 # ------------------------------------------------------------------------------
 DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
     "DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION", default=True

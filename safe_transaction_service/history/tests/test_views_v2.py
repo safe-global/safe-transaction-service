@@ -1959,7 +1959,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         safe_address = safe.address
 
         response = self.client.get(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
