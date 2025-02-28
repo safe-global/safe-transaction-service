@@ -590,6 +590,11 @@ ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`
 
+# ENABLE/DISABLE COLLECTIBLES DOWNLOAD METADATA, enable=True, disabled by default
+COLLECTIBLES_ENABLE_DOWNLOAD_METADATA = env.bool(
+    "COLLECTIBLES_ENABLE_DOWNLOAD_METADATA", default=False
+)
+
 # Events processing
 # ------------------------------------------------------------------------------
 PROCESSING_ENABLE_OUT_OF_ORDER_CHECK = env.bool(

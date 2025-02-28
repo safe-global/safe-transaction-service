@@ -425,3 +425,25 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         uri = "data:application/json;base64,eyJ0b2tlbiI6"
         with self.assertRaisesMessage(MetadataRetrievalException, uri):
             collectibles_service._retrieve_metadata_from_uri(uri)
+
+    @mock.patch(
+        "safe_transaction_service.history.services.collectibles_service.CollectiblesService._retrieve_metadata_from_uri"
+    )
+    def test_disabled_download_metadata(
+        self, retrieve_metadata_from_uri_mock: MagicMock
+    ):
+        collectibles_service = CollectiblesServiceProvider()
+        retrieve_metadata_from_uri_mock.return_value = dappcon_nft_metadata_mock
+        collectible = Collectible(
+            "GoldenSun",
+            "Djinn",
+            "http://random-address.org/logo.png",
+            Account.create().address,
+            28,
+            "http://random-address.org/info-28.json",
+        )
+        self.assertIsNone(collectibles_service.get_metadata(collectible))
+        retrieve_metadata_from_uri_mock.assert_not_called()
+        with self.settings(COLLECTIBLES_ENABLE_DOWNLOAD_METADATA=True):
+            self.assertIsNotNone(collectibles_service.get_metadata(collectible))
+            retrieve_metadata_from_uri_mock.assert_called_once()

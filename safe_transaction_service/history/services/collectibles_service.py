@@ -310,6 +310,9 @@ class CollectiblesService:
         Return metadata for a collectible
         :param collectible
         """
+        if not settings.COLLECTIBLES_ENABLE_DOWNLOAD_METADATA:
+            logger.warning("Downloading collectibles metadata is disabled")
+            return None
         if tld := ENS_CONTRACTS_WITH_TLD.get(
             collectible.address
         ):  # Special case for ENS
