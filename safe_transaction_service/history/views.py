@@ -587,14 +587,17 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
     lookup_url_kwarg = "safe_tx_hash"
 
     def get_serializer_context(self):
+        """
+        Add current_nonce and current_owners from blockchain to data serializer
+        """
         context = super().get_serializer_context()
         if self.request.method == "GET":
             multisig_transaction = self.get_object()
             safe_info = SafeServiceProvider().get_safe_info_from_blockchain(
                 multisig_transaction.safe
             )
-            context["nonce"] = safe_info.nonce
-            context["owners"] = safe_info.owners
+            context["current_nonce"] = safe_info.nonce
+            context["current_owners"] = safe_info.owners
 
         return context
 
