@@ -1958,61 +1958,82 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         safe = self.deploy_test_safe(owners=[safe_owner_1.address])
         safe_address = safe.address
 
-        response = self.client.get(
-            reverse("v2:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 0)
-
-        data = {
-            "to": Account.create().address,
-            "value": 0,
-            "data": "0x12121212",
-            "operation": 1,
-            "nonce": 0,
-            "safeTxGas": 0,
-            "baseGas": 0,
-            "gasPrice": 0,
-            "gasToken": "0x0000000000000000000000000000000000000000",
-            "refundReceiver": "0x0000000000000000000000000000000000000000",
-            "sender": safe_owner_1.address,
-        }
-        safe_tx = safe.build_multisig_tx(
-            data["to"],
-            data["value"],
-            data["data"],
-            data["operation"],
-            data["safeTxGas"],
-            data["baseGas"],
-            data["gasPrice"],
-            data["gasToken"],
-            data["refundReceiver"],
-            safe_nonce=data["nonce"],
-        )
-        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
-
-        with self.settings(
-            DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=True
-        ):
-            response = self.client.post(
+        try:
+            response = self.client.get(
                 reverse("v2:history:multisig-transactions", args=(safe_address,)),
                 format="json",
-                data=data,
             )
-            self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 0)
 
-        with self.settings(
-            DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=False
-        ):
-            response = self.client.post(
-                reverse("v2:history:multisig-transactions", args=(safe_address,)),
-                format="json",
-                data=data,
+            data = {
+                "to": Account.create().address,
+                "value": 0,
+                "data": "0x12121212",
+                "operation": SafeOperationEnum.DELEGATE_CALL.value,
+                "nonce": 0,
+                "safeTxGas": 0,
+                "baseGas": 0,
+                "gasPrice": 0,
+                "gasToken": "0x0000000000000000000000000000000000000000",
+                "refundReceiver": "0x0000000000000000000000000000000000000000",
+                "sender": safe_owner_1.address,
+            }
+            safe_tx = safe.build_multisig_tx(
+                data["to"],
+                data["value"],
+                data["data"],
+                data["operation"],
+                data["safeTxGas"],
+                data["baseGas"],
+                data["gasPrice"],
+                data["gasToken"],
+                data["refundReceiver"],
+                safe_nonce=data["nonce"],
             )
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            multisig_transaction_db = MultisigTransaction.objects.first()
-            self.assertEqual(multisig_transaction_db.operation, 1)
+            data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
+
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            # Disable creation with delegate call and not trusted contract
+            with self.settings(
+                DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=True
+            ):
+                response = self.client.post(
+                    reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+            # Enable creation with delegate call
+            with self.settings(
+                DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=False
+            ):
+                response = self.client.post(
+                    reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                multisig_transaction_db = MultisigTransaction.objects.first()
+                self.assertEqual(multisig_transaction_db.operation, 1)
+
+            # Disable creation with delegate call and trusted contract
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
+            ContractFactory(address=data["to"], trusted_for_delegate_call=True)
+            with self.settings(
+                DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION=True
+            ):
+                response = self.client.post(
+                    reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        finally:
+            ContractQuerySet.cache_trusted_addresses_for_delegate_call.clear()
 
     def test_delete_multisig_transaction(self):
         owner_account = Account.create()
