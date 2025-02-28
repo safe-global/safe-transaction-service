@@ -452,7 +452,7 @@ def retry_get_metadata_task(
     :param token_id: collectible id
     """
     if not settings.COLLECTIBLES_ENABLE_DOWNLOAD_METADATA:
-        logger.warning("Download collectibles metadata is disabled")
+        logger.warning("Downloading collectibles metadata is disabled")
         return None
 
     collectibles_service = CollectiblesServiceProvider()
