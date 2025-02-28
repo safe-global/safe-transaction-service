@@ -25,7 +25,7 @@ from safe_eth.eth.django.serializers import (
     HexadecimalField,
     Sha3HashField,
 )
-from safe_eth.safe import Safe
+from safe_eth.safe import Safe, SafeOperationEnum
 from safe_eth.safe.safe_signature import EthereumBytes, SafeSignature, SafeSignatureType
 from safe_eth.safe.serializers import SafeMultisigTxSerializer
 from safe_eth.util.util import to_0x_hex_str
@@ -192,6 +192,14 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             origin = {}
 
         return origin
+
+    def validate_operation(self, value):
+        if (
+            settings.DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION
+            and value == SafeOperationEnum.DELEGATE_CALL.value
+        ):
+            raise ValidationError("Operation DELEGATE_CALL is not allowed")
+        return super().validate_operation(value)
 
     def validate(self, attrs):
         super().validate(attrs)

@@ -777,3 +777,9 @@ BANNED_EOAS: set[ChecksumAddress] = {
         "0xD5b58Cf7813c1eDC412367b97876bD400ea5c489",
     )
 }
+
+# Multisig Txs operations
+# ------------------------------------------------------------------------------
+DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
+    "DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION", default=True
+)
