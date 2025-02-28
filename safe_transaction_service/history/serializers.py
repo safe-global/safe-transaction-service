@@ -41,6 +41,7 @@ from safe_transaction_service.utils.serializers import (
     get_safe_owners,
 )
 
+from ..contracts.models import Contract
 from .exceptions import InternalValidationError, NodeConnectionException
 from .helpers import (
     DelegateSignatureHelper,
@@ -193,26 +194,27 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
 
         return origin
 
-    def validate_operation(self, value):
-        if (
-            settings.DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION
-            and value == SafeOperationEnum.DELEGATE_CALL.value
-        ):
-            raise ValidationError("Operation DELEGATE_CALL is not allowed")
-        return super().validate_operation(value)
-
     def validate(self, attrs):
         super().validate(attrs)
+
+        tx_to = attrs["to"]
+        tx_operation = attrs["operation"]
+        if (
+            settings.DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION
+            and tx_operation == SafeOperationEnum.DELEGATE_CALL.value
+            and tx_to not in Contract.objects.trusted_addresses_for_delegate_call()
+        ):
+            raise ValidationError("Operation DELEGATE_CALL is not allowed")
 
         ethereum_client = get_auto_ethereum_client()
         safe_address = attrs["safe"]
 
         safe = Safe(safe_address, ethereum_client)
         safe_tx = safe.build_multisig_tx(
-            attrs["to"],
+            tx_to,
             attrs["value"],
             attrs["data"],
-            attrs["operation"],
+            tx_operation,
             attrs["safe_tx_gas"],
             attrs["base_gas"],
             attrs["gas_price"],
