@@ -200,7 +200,6 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Setting up {ethereum_network.name} safe addresses")
             )
-            self._setup_safe_master_copies(MASTER_COPIES[ethereum_network])
             self._setup_erc20_indexing()
         if ethereum_network in PROXY_FACTORIES:
             self.stdout.write(

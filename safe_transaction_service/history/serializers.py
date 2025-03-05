@@ -42,6 +42,7 @@ from safe_transaction_service.utils.serializers import (
 )
 
 from ..contracts.models import Contract
+from ..loggers.custom_logger import http_request_log
 from .exceptions import InternalValidationError, NodeConnectionException
 from .helpers import (
     DelegateSignatureHelper,
@@ -364,7 +365,11 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             multisig_transaction.save(update_fields=["origin", "trusted"])
 
         logger.info(
-            multisig_transaction.to_log(f"{"Created" if created else "Updated"}")
+            f"MultisigTransaction {"Created" if created else "Updated"}",
+            extra={
+                "http_request": http_request_log(request),
+                "extra_data": multisig_transaction.to_dict(),
+            },
         )
 
         for safe_signature in self.validated_data.get("parsed_signatures"):
@@ -381,9 +386,11 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
                     )
                 )
                 logger.info(
-                    multisig_confirmation.to_log(
-                        f"{'Created' if created else 'Updated'}"
-                    )
+                    f"MultisigConfirmation {'Created' if created else 'Updated'}",
+                    extra={
+                        "http_request": http_request_log(request),
+                        "extra_data": multisig_confirmation.to_dict(),
+                    },
                 )
         return multisig_transaction
 
@@ -786,7 +793,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             signature = multisig_confirmation["signature"]
             if owner not in safe_owners:
                 logger.error(
-                    obj.to_log(
+                    obj.to_dict(
                         f"Signer={owner} is not an owner. Current owners={safe_owners}"
                     )
                 )

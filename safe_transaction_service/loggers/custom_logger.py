@@ -1,14 +1,16 @@
 import json
 import logging
 import time
+import traceback
 from dataclasses import asdict, dataclass
 
 
 @dataclass()
 class HttpRequestLog:
     url: str
+    urlReplaced: str
     method: str
-    startTime: int
+    timestamp: int
     body: str | None = None
 
 
@@ -17,6 +19,7 @@ class HttpResponseLog:
     status: int
     endTime: int
     totalTime: int
+    errorMessage: dict | str | None = None
 
 
 @dataclass
@@ -41,6 +44,7 @@ class ContextMessageLog:
     httpResponse: HttpResponseLog | None = None
     errorInfo: ErrorInfo | None = None
     taskInfo: TaskInfo | None = None
+    extraData: dict | None = None
 
 
 @dataclass
@@ -49,10 +53,22 @@ class JsonLog:
     timestamp: int
     context: str
     message: str
+    lineno: int
     contextMessage: ContextMessageLog | None = None
 
+    def _remove_null_values_from_log(self, json_log: dict):
+        """
+        Delete keys with the value ``None`` in a dictionary, recursively.
+        """
+        for key, value in list(json_log.items()):
+            if value is None:
+                del json_log[key]
+            elif isinstance(value, dict):
+                self._remove_null_values_from_log(value)
+        return json_log
+
     def to_json(self):
-        return json.dumps(asdict(self))
+        return json.dumps(self._remove_null_values_from_log(asdict(self)))
 
 
 class SafeJsonFormatter(logging.Formatter):
@@ -69,11 +85,15 @@ class SafeJsonFormatter(logging.Formatter):
 
     def format(self, record):
         if record.levelname == "ERROR":
+            exc_type, exc_value, exc_tb = record.exc_info
             record.error_detail = ErrorInfo(
                 function=record.funcName,
                 line=record.lineno,
-                exceptionInfo=str(record.exc_info),
+                exceptionInfo="".join(
+                    traceback.format_exception(exc_type, exc_value, exc_tb)
+                ),
             )
+
         context_message = ContextMessageLog(
             session=record.session if hasattr(record, "session") else None,
             httpRequest=(
@@ -86,6 +106,7 @@ class SafeJsonFormatter(logging.Formatter):
                 record.error_detail if hasattr(record, "error_detail") else None
             ),
             taskInfo=record.task_detail if hasattr(record, "task_detail") else None,
+            extraData=record.extra_data if hasattr(record, "extra_data") else None,
         )
 
         json_log = JsonLog(
@@ -94,6 +115,23 @@ class SafeJsonFormatter(logging.Formatter):
             context=f"{record.module}.{record.funcName}",
             message=record.getMessage(),
             contextMessage=context_message,
+            lineno=record.lineno,
         )
 
         return json_log.to_json()
+
+
+def http_request_log(
+    request, timestamp: int | None = None, log_data: bool = False
+) -> HttpRequestLog:
+    """
+    Generate httpRequestLog from the providen request
+    """
+    route = request.resolver_match.route if request.resolver_match else request.path
+    return HttpRequestLog(
+        url=str(route),
+        urlReplaced=request.path,
+        method=request.method,
+        timestamp=timestamp or int(time.time() * 1000),
+        body=request.data if log_data else None,
+    )

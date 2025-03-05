@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 
@@ -6,8 +7,8 @@ from django.http import HttpRequest
 from gunicorn import glogging
 
 from safe_transaction_service.loggers.custom_logger import (
-    HttpRequestLog,
     HttpResponseLog,
+    http_request_log,
 )
 
 
@@ -59,12 +60,14 @@ class LoggingMiddleware:
             )
             end_time = get_milliseconds_now()
             delta = end_time - start_time
-            http_request = HttpRequestLog(
-                url=str(route),
-                method=request.method,
-                startTime=start_time,
+            http_request = http_request_log(request, start_time)
+            content: str | None = None
+            if 400 <= response.status_code < 500:
+                content = json.loads(response.content.decode("utf-8"))
+
+            http_response = HttpResponseLog(
+                response.status_code, end_time, delta, content
             )
-            http_response = HttpResponseLog(response.status_code, end_time, delta)
             self.logger.info(
                 "Http request",
                 extra={
