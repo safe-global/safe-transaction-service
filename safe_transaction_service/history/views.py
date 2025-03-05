@@ -38,6 +38,7 @@ from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
+from ..loggers.custom_logger import http_request_log
 from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .exceptions import CannotGetSafeInfoFromBlockchain
@@ -73,9 +74,10 @@ class AboutView(APIView):
     """
 
     renderer_classes = (JSONRenderer,)
+    logger = logging.getLogger("AboutView")
 
-    @method_decorator(cache_page(5 * 60))  # 5 minutes
     def get(self, request, format=None):
+        self.logger.info("From about")
         content = {
             "name": "Safe Transaction Service",
             "version": __version__,
@@ -102,6 +104,7 @@ class AboutView(APIView):
                 "TOKENS_LOGO_EXTENSION": settings.TOKENS_LOGO_EXTENSION,
             },
         }
+
         return Response(content)
 
 
@@ -752,7 +755,10 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         request.data["safe"] = address
         serializer = self.get_serializer(data=request.data)
-        logger.info(f"POST MultisigTransaction: {request.data}")
+        logger.info(
+            "Creating MultisigTransaction",
+            extra={"http_request": http_request_log(request, log_data=True)},
+        )
         if not serializer.is_valid():
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors
