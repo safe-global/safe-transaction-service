@@ -44,6 +44,7 @@ class ContractsView(ListAPIView):
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
     ]
+    filterset_fields = ["trusted_for_delegate_call"]
     ordering = ["address"]
     ordering_fields = ["address", "name"]
     pagination_class = pagination.DefaultPagination

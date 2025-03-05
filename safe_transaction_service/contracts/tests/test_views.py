@@ -103,3 +103,33 @@ class TestContractViews(APITestCase):
         response = self.client.get(reverse("v1:contracts:list"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
+
+    def test_contracts_filter_view(self):
+        contract = ContractFactory(trusted_for_delegate_call=True)
+        response = self.client.get(
+            reverse("v1:contracts:list") + "?trusted_for_delegate_call=True"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["results"],
+            [
+                {
+                    "address": contract.address,
+                    "name": contract.name,
+                    "display_name": contract.display_name,
+                    "logo_uri": self._build_full_file_url(contract.logo.url),
+                    "contract_abi": {
+                        "abi": contract.contract_abi.abi,
+                        "description": contract.contract_abi.description,
+                        "relevance": contract.contract_abi.relevance,
+                    },
+                    "trusted_for_delegate_call": contract.trusted_for_delegate_call,
+                }
+            ],
+        )
+
+        response = self.client.get(
+            reverse("v1:contracts:list") + "?trusted_for_delegate_call=False"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"], [])
