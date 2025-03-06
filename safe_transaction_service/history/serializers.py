@@ -777,9 +777,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         safe_tx_hash_calculated = safe_tx.safe_tx_hash
         if safe_tx_hash_calculated != HexBytes(safe_tx_hash):
             logger.error(
-                obj.to_log(
-                    f"Wrong contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)}"
-                )
+                f"Wrong contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)}",
+                extra={
+                    "extra_data": obj.to_dict(),
+                },
             )
             raise InternalValidationError(
                 f"[{safe_tx_hash}]: Wrong contract-transaction-hash={to_0x_hex_str(safe_tx_hash_calculated)}"
@@ -793,9 +794,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             signature = multisig_confirmation["signature"]
             if owner not in safe_owners:
                 logger.error(
-                    obj.to_dict(
-                        f"Signer={owner} is not an owner. Current owners={safe_owners}"
-                    )
+                    f"Signer={owner} is not an owner. Current owners={safe_owners}",
+                    extra={
+                        "extra_data": obj.to_dict(),
+                    },
                 )
                 raise InternalValidationError(
                     f"[{safe_tx_hash}]: Signer={owner} is not an owner. Current owners={safe_owners}"
@@ -808,9 +810,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             )
             if len(parsed_signatures) != 1:
                 logger.error(
-                    obj.to_log(
-                        f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
-                    )
+                    f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received",
+                    extra={
+                        "extra_data": obj.to_dict(),
+                    },
                 )
                 raise InternalValidationError(
                     f"1 owner signature was expected for owner {owner}, {len(parsed_signatures)} received"
@@ -822,9 +825,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
                 and not parsed_signature.is_valid(ethereum_client, safe_address)
             ):
                 logger.error(
-                    obj.to_log(
-                        f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
-                    )
+                    f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid",
+                    extra={
+                        "extra_data": obj.to_dict(),
+                    },
                 )
                 raise InternalValidationError(
                     f"Signature={to_0x_hex_str(parsed_signature.signature)} for owner={owner} is not valid"
@@ -832,9 +836,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
 
             if parsed_signature.owner != owner:
                 logger.error(
-                    obj.to_log(
-                        f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
-                    )
+                    f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}",
+                    extra={
+                        "extra_data": obj.to_dict(),
+                    },
                 )
                 raise InternalValidationError(
                     f"Signature owner {parsed_signature.owner} does not match confirmation owner={owner}"
@@ -842,9 +847,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
 
             if owner in signature_owners_addresses:
                 logger.error(
-                    obj.to_log(
-                        f"[{safe_tx_hash}]: Signature for owner={owner} is duplicated"
-                    )
+                    f"[{safe_tx_hash}]: Signature for owner={owner} is duplicated",
+                    extra={
+                        "extra_data": obj.to_dict(),
+                    },
                 )
                 raise InternalValidationError(
                     f"[{safe_tx_hash}]: Signature for owner={owner} is duplicated"
@@ -897,7 +903,10 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         if obj.signatures and obj.ethereum_tx is None:
             safe_tx_hash = obj.safe_tx_hash
             logger.error(
-                obj.to_log("Transaction hash is required when providing signatures")
+                "Transaction hash is required when providing signatures",
+                extra={
+                    "extra_data": obj.to_dict(),
+                },
             )
             raise InternalValidationError(
                 f"[{safe_tx_hash}]: Transaction hash is required when providing signatures"
