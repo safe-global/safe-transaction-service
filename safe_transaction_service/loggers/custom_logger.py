@@ -4,6 +4,12 @@ import time
 import traceback
 from dataclasses import asdict, dataclass
 
+from django.http import HttpRequest
+
+from celery._state import get_current_task
+from celery.app.log import TaskFormatter
+from gunicorn import glogging
+
 
 @dataclass()
 class HttpRequestLog:
@@ -71,6 +77,10 @@ class JsonLog:
         return json.dumps(self._remove_null_values_from_log(asdict(self)))
 
 
+def get_milliseconds_now():
+    return int(time.time() * 1000)
+
+
 class SafeJsonFormatter(logging.Formatter):
     """
     Json formatter with following schema
@@ -115,7 +125,7 @@ class SafeJsonFormatter(logging.Formatter):
 
         json_log = JsonLog(
             level=record.levelname,
-            timestamp=int(time.time() * 1000),
+            timestamp=get_milliseconds_now(),
             context=f"{record.module}.{record.funcName}",
             message=record.getMessage(),
             contextMessage=context_message,
@@ -136,6 +146,95 @@ def http_request_log(
         url=str(route),
         urlReplaced=request.path,
         method=request.method,
-        timestamp=timestamp or int(time.time() * 1000),
+        timestamp=timestamp or get_milliseconds_now(),
         body=request.data if log_data else None,
     )
+
+
+class LoggingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.logger = logging.getLogger("LoggingMiddleware")
+
+    def __call__(self, request: HttpRequest):
+        start_time = get_milliseconds_now()
+        response = self.get_response(request)
+        if request.resolver_match:
+            end_time = get_milliseconds_now()
+            delta = end_time - start_time
+            http_request = http_request_log(request, start_time)
+            content: str | None = None
+            if 400 <= response.status_code < 500:
+                print(response.data)
+                content = str(response.data)
+
+            http_response = HttpResponseLog(
+                response.status_code, end_time, delta, content
+            )
+            self.logger.info(
+                "Http request",
+                extra={
+                    "http_response": http_response,
+                    "http_request": http_request,
+                },
+            )
+        return response
+
+
+class CustomGunicornLogger(glogging.Logger):
+    def setup(self, cfg):
+        super().setup(cfg)
+
+        # Add filters to Gunicorn logger
+        logger = logging.getLogger("gunicorn.access")
+        logger.addFilter(IgnoreCheckUrl())
+
+
+class IgnoreSucceededNone(logging.Filter):
+    """
+    Ignore Celery messages like:
+    ```
+        Task safe_transaction_service.history.tasks.index_internal_txs_task[89ad3c46-aeb3-48a1-bd6f-2f3684323ca8]
+        succeeded in 1.0970600529108196s: None
+    ```
+    They are usually emitted when a redis lock is active
+    """
+
+    def filter(self, rec: logging.LogRecord):
+        message = rec.getMessage()
+        return not ("Task" in message and "succeeded" in message and "None" in message)
+
+
+class IgnoreCheckUrl(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not ("GET /check/" in message and "200" in message)
+
+
+class PatchedCeleryFormatter(SafeJsonFormatter):  # pragma: no cover
+
+    def format(self, record):
+        task = get_current_task()
+        if task and task.request:
+            # For gevent pool, task_id will be something like `7ab44cb4-aacf-444e-bc20-4cbaa2a7b082`. For logs
+            # is better to get it short
+            task_id = task.request.id[:8] if task.request.id else task.request.id
+            # Task name usually has all the package, better cut the first part for logging
+            task_name = task.name.split(".")[-1] if task.name else task.name
+            task_detail = TaskInfo(
+                id=task_id,
+                name=task_name,
+                args=task.request.args,
+                kwargs=task.request.kwargs,
+            )
+            record.__dict__.update(task_detail=task_detail)
+        return super().format(record)
+
+
+class PatchedCeleryFormatterOriginal(TaskFormatter):  # pragma: no cover
+    """
+    Patched to work as an standard logging formatter. Basic version
+    """
+
+    def __init__(self, fmt=None, datefmt=None, style="%"):
+        super().__init__(fmt=fmt, use_color=True)
