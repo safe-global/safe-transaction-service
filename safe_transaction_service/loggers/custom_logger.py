@@ -19,7 +19,7 @@ class HttpResponseLog:
     status: int
     endTime: int
     totalTime: int
-    errorMessage: dict | str | None = None
+    errorMessage: str | None = None
 
 
 @dataclass
