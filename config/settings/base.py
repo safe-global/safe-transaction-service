@@ -123,7 +123,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
-    "safe_transaction_service.utils.loggers.LoggingMiddleware",
+    "safe_transaction_service.loggers.custom_logger.LoggingMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -373,7 +373,7 @@ LOGGING = {
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
         "ignore_succeeded_none": {
-            "()": "safe_transaction_service.utils.loggers.IgnoreSucceededNone"
+            "()": "safe_transaction_service.loggers.custom_logger.IgnoreSucceededNone"
         },
     },
     "formatters": {
@@ -382,7 +382,7 @@ LOGGING = {
             "format": "%(asctime)s [%(levelname)s] [%(processName)s] %(message)s"
         },
         "celery_verbose": {
-            "class": "safe_transaction_service.utils.celery.PatchedCeleryFormatter",
+            "class": "safe_transaction_service.loggers.custom_logger.PatchedCeleryFormatter",
             "format": "%(message)s",
         },
         "json": {"()": SafeJsonFormatter},
