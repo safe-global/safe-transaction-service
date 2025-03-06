@@ -558,8 +558,8 @@ class SafeMultisigConfirmationsView(ListCreateAPIView):
         does not support the use of delegates to make transactions trusted.
         """
         logger.info(
-            f"Add request confirmation for {self.kwargs["safe_tx_hash"]}"
-            f"signature={request.data.get('signature')}"
+            "Creating MultisigConfirmation",
+            extra={"http_request": http_request_log(request, log_data=True)},
         )
         return super().post(request, *args, **kwargs)
 

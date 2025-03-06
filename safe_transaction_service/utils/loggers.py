@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 
@@ -55,15 +54,13 @@ class LoggingMiddleware:
         start_time = get_milliseconds_now()
         response = self.get_response(request)
         if request.resolver_match:
-            route = (
-                request.resolver_match.route if request.resolver_match else request.path
-            )
             end_time = get_milliseconds_now()
             delta = end_time - start_time
             http_request = http_request_log(request, start_time)
             content: str | None = None
             if 400 <= response.status_code < 500:
-                content = json.loads(response.content.decode("utf-8"))
+                print(response.data)
+                content = str(response.data)
 
             http_response = HttpResponseLog(
                 response.status_code, end_time, delta, content

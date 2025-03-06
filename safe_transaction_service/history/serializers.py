@@ -41,7 +41,6 @@ from safe_transaction_service.utils.serializers import (
 )
 
 from ..contracts.models import Contract
-from ..loggers.custom_logger import http_request_log
 from .exceptions import NodeConnectionException
 from .helpers import (
     DelegateSignatureHelper,
@@ -161,7 +160,8 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
                 },
             )
             logger.info(
-                multisig_confirmation.to_log(f"{'Created' if created else 'Updated'}")
+                f"Multisigconfirmation {'Created' if created else 'Updated'}",
+                extra={"extra_data": multisig_confirmation.to_dict()},
             )
             multisig_confirmations.append(multisig_confirmation)
 
@@ -366,7 +366,6 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         logger.info(
             f"MultisigTransaction {"Created" if created else "Updated"}",
             extra={
-                "http_request": http_request_log(request),
                 "extra_data": multisig_transaction.to_dict(),
             },
         )
@@ -387,7 +386,6 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
                 logger.info(
                     f"MultisigConfirmation {'Created' if created else 'Updated'}",
                     extra={
-                        "http_request": http_request_log(request),
                         "extra_data": multisig_confirmation.to_dict(),
                     },
                 )
