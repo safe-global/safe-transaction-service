@@ -383,8 +383,7 @@ LOGGING = {
         },
         "celery_verbose": {
             "class": "safe_transaction_service.utils.celery.PatchedCeleryFormatter",
-            "format": "%(asctime)s [%(levelname)s] [%(task_id)s/%(task_name)s] %(message)s",
-            # 'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
+            "format": "%(message)s",
         },
         "json": {"()": SafeJsonFormatter},
     },

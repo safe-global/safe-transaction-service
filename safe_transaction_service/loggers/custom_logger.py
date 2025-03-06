@@ -33,7 +33,7 @@ class ErrorInfo:
 class TaskInfo:
     name: str
     id: str
-    args: tuple
+    args: tuple | None = None
     kwargs: dict | None = None
 
 
@@ -85,13 +85,17 @@ class SafeJsonFormatter(logging.Formatter):
 
     def format(self, record):
         if record.levelname == "ERROR":
-            exc_type, exc_value, exc_tb = record.exc_info
+            exception_info: str | None = None
+            if record.exc_info:
+                exc_type, exc_value, exc_tb = record.exc_info
+                exception_info = "".join(
+                    traceback.format_exception(exc_type, exc_value, exc_tb)
+                )
+
             record.error_detail = ErrorInfo(
                 function=record.funcName,
                 line=record.lineno,
-                exceptionInfo="".join(
-                    traceback.format_exception(exc_type, exc_value, exc_tb)
-                ),
+                exceptionInfo=exception_info,
             )
 
         context_message = ContextMessageLog(
