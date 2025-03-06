@@ -1528,7 +1528,7 @@ class MultisigTransaction(TimeStampedModel):
 
     def to_dict(self) -> dict:
         """
-        :return: MultisigTransaction to dict ready to be printed in a log line
+        :return: MultisigTransaction as dict
         """
         safe_tx_hash_str = to_0x_hex_str(HexBytes(self.safe_tx_hash))
         return {
@@ -1715,7 +1715,7 @@ class MultisigConfirmation(TimeStampedModel):
 
     def to_dict(self) -> dict:
         """
-        :return: MultisigTransaction dict ready to be printed in a log line
+        :return: MultisigConfirmatiom as dict
         """
         multisig_transaction_hash_str = to_0x_hex_str(
             HexBytes(
