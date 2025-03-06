@@ -74,10 +74,9 @@ class AboutView(APIView):
     """
 
     renderer_classes = (JSONRenderer,)
-    logger = logging.getLogger("AboutView")
 
+    @method_decorator(cache_page(5 * 60))  # 5 minutes
     def get(self, request, format=None):
-        self.logger.info("From about")
         content = {
             "name": "Safe Transaction Service",
             "version": __version__,
