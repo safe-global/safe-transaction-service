@@ -81,6 +81,22 @@ def get_milliseconds_now():
     return int(time.time() * 1000)
 
 
+def http_request_log(
+    request, timestamp: int | None = None, log_data: bool = False
+) -> HttpRequestLog:
+    """
+    Generate httpRequestLog from provided request
+    """
+    route = request.resolver_match.route if request.resolver_match else request.path
+    return HttpRequestLog(
+        url=str(route),
+        urlReplaced=request.path,
+        method=request.method,
+        timestamp=timestamp or get_milliseconds_now(),
+        body=request.data if log_data else None,
+    )
+
+
 class SafeJsonFormatter(logging.Formatter):
     """
     Json formatter with following schema
@@ -93,9 +109,14 @@ class SafeJsonFormatter(logging.Formatter):
     }
     """
 
-    def format(self, record):
+    def format(self, record) -> str:
+        """
+        Format logging record as json string.
+        """
+
         if record.levelname == "ERROR":
             exception_info: str | None = None
+            # Check if the error contains exception data
             if record.exc_info:
                 exc_type, exc_value, exc_tb = record.exc_info
                 exception_info = "".join(
@@ -108,6 +129,7 @@ class SafeJsonFormatter(logging.Formatter):
                 exceptionInfo=exception_info,
             )
 
+        # Generate context_message
         context_message = ContextMessageLog(
             session=record.session if hasattr(record, "session") else None,
             httpRequest=(
@@ -135,23 +157,31 @@ class SafeJsonFormatter(logging.Formatter):
         return json_log.to_json()
 
 
-def http_request_log(
-    request, timestamp: int | None = None, log_data: bool = False
-) -> HttpRequestLog:
-    """
-    Generate httpRequestLog from the providen request
-    """
-    route = request.resolver_match.route if request.resolver_match else request.path
-    return HttpRequestLog(
-        url=str(route),
-        urlReplaced=request.path,
-        method=request.method,
-        timestamp=timestamp or get_milliseconds_now(),
-        body=request.data if log_data else None,
-    )
+class PatchedCeleryFormatter(SafeJsonFormatter):  # pragma: no cover
+
+    def format(self, record):
+        task = get_current_task()
+        if task and task.request:
+            # For gevent pool, task_id will be something like `7ab44cb4-aacf-444e-bc20-4cbaa2a7b082`. For logs
+            # is better to get it short
+            task_id = task.request.id[:8] if task.request.id else task.request.id
+            # Task name usually has all the package, better cut the first part for logging
+            task_name = task.name.split(".")[-1] if task.name else task.name
+            task_detail = TaskInfo(
+                id=task_id,
+                name=task_name,
+                args=task.request.args,
+                kwargs=task.request.kwargs,
+            )
+            record.__dict__.update(task_detail=task_detail)
+        return super().format(record)
 
 
 class LoggingMiddleware:
+    """
+    Http Middleware to generate request and response logs.
+    """
+
     def __init__(self, get_response):
         self.get_response = get_response
         self.logger = logging.getLogger("LoggingMiddleware")
@@ -209,26 +239,6 @@ class IgnoreCheckUrl(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
         return not ("GET /check/" in message and "200" in message)
-
-
-class PatchedCeleryFormatter(SafeJsonFormatter):  # pragma: no cover
-
-    def format(self, record):
-        task = get_current_task()
-        if task and task.request:
-            # For gevent pool, task_id will be something like `7ab44cb4-aacf-444e-bc20-4cbaa2a7b082`. For logs
-            # is better to get it short
-            task_id = task.request.id[:8] if task.request.id else task.request.id
-            # Task name usually has all the package, better cut the first part for logging
-            task_name = task.name.split(".")[-1] if task.name else task.name
-            task_detail = TaskInfo(
-                id=task_id,
-                name=task_name,
-                args=task.request.args,
-                kwargs=task.request.kwargs,
-            )
-            record.__dict__.update(task_detail=task_detail)
-        return super().format(record)
 
 
 class PatchedCeleryFormatterOriginal(TaskFormatter):  # pragma: no cover
