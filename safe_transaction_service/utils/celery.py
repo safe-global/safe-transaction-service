@@ -3,8 +3,10 @@ from typing import Optional
 
 from celery._state import get_current_task
 from celery.app.log import TaskFormatter
-from celery.utils.log import ColorFormatter, get_task_logger
+from celery.utils.log import get_task_logger
 from gevent import Timeout
+
+from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter, TaskInfo
 
 
 class TaskTimeoutException(Exception):
@@ -20,9 +22,7 @@ class PatchedCeleryFormatterOriginal(TaskFormatter):  # pragma: no cover
         super().__init__(fmt=fmt, use_color=True)
 
 
-class PatchedCeleryFormatter(ColorFormatter):  # pragma: no cover
-    def __init__(self, fmt=None, datefmt=None, style="%", use_color=False):
-        super().__init__(fmt=fmt, use_color=use_color)
+class PatchedCeleryFormatter(SafeJsonFormatter):  # pragma: no cover
 
     def format(self, record):
         task = get_current_task()
@@ -32,11 +32,13 @@ class PatchedCeleryFormatter(ColorFormatter):  # pragma: no cover
             task_id = task.request.id[:8] if task.request.id else task.request.id
             # Task name usually has all the package, better cut the first part for logging
             task_name = task.name.split(".")[-1] if task.name else task.name
-
-            record.__dict__.update(task_id=task_id, task_name=task_name)
-        else:
-            record.__dict__.setdefault("task_name", "???")
-            record.__dict__.setdefault("task_id", "???")
+            task_detail = TaskInfo(
+                id=task_id,
+                name=task_name,
+                args=task.request.args,
+                kwargs=task.request.kwargs,
+            )
+            record.__dict__.update(task_detail=task_detail)
         return super().format(record)
 
 
