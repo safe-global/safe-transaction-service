@@ -2,7 +2,7 @@ from logging import LogRecord
 
 from django.test import TestCase
 
-from ..loggers import IgnoreCheckUrl, IgnoreSucceededNone
+from ...loggers.custom_logger import IgnoreCheckUrl, IgnoreSucceededNone
 
 
 class TestLoggers(TestCase):
