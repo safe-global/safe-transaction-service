@@ -150,6 +150,15 @@ docker exec -it safe-transaction-service-web-1 python manage.py createsuperuser
 - [v1.3.0 L2](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe_l2.json)
 - [Other related contracts and previous Safe versions](https://github.com/safe-global/safe-deployments/blob/main/src/assets)
 
+### Load default Safe Contracts Metadata
+To load default Safe contracts information as description and logos, would be necessary set the following environment variable:
+```
+ENABLE_SAFE_SETUP_CONTRACTS=1
+```
+or run the following command:
+```
+python manage.py setup_safe_contracts --force-update-contracts
+```
 ## Service maintenance
 
 Service can run into some issues when running in production:
