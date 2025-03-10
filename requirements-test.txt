@@ -2,7 +2,7 @@
 coverage==7.6.12
 django-stubs==5.1.1
 django-test-migrations==1.4.0
-factory-boy==3.3.1
+factory-boy==3.3.3
 faker==35.0.0
 mypy==1.15.0
 pytest==8.3.4
