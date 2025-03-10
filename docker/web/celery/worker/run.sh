@@ -20,6 +20,11 @@ if [ ${RUN_MIGRATIONS:-0} = 1 ]; then
   python manage.py setup_service
 fi
 
+if [ ${ENABLE_SAFE_SETUP_CONTRACTS:-0} = 1 ]; then
+  echo "==> $(date +%H:%M:%S) ==> Setting contracts... "
+  python manage.py setup_safe_contracts --force-update-contracts
+fi
+
 echo "==> $(date +%H:%M:%S) ==> Check RPC connected matches previously used RPC... "
 python manage.py check_chainid_matches
 
