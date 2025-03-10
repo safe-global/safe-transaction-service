@@ -26,7 +26,7 @@ from ..models import (
     MultisigTransaction,
     TransactionServiceEventType,
 )
-from ..signals import build_event_payload, is_relevant_notification
+from ..signals import build_event_payload, is_relevant_event
 from .factories import (
     ERC20TransferFactory,
     InternalTxFactory,
@@ -131,44 +131,44 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
 
     @factory.django.mute_signals(post_save)
-    def test_is_relevant_notification_multisig_confirmation(self):
+    def test_is_relevant_event_multisig_confirmation(self):
         multisig_confirmation = MultisigConfirmationFactory()
         self.assertFalse(
-            is_relevant_notification(
+            is_relevant_event(
                 multisig_confirmation.__class__, multisig_confirmation, created=False
             )
         )
         self.assertTrue(
-            is_relevant_notification(
+            is_relevant_event(
                 multisig_confirmation.__class__, multisig_confirmation, created=True
             )
         )
         multisig_confirmation.created -= timedelta(minutes=75)
         self.assertFalse(
-            is_relevant_notification(
+            is_relevant_event(
                 multisig_confirmation.__class__, multisig_confirmation, created=True
             )
         )
 
     @factory.django.mute_signals(post_save)
-    def test_is_relevant_notification_multisig_transaction(self):
+    def test_is_relevant_event_multisig_transaction(self):
         multisig_tx = MultisigTransactionFactory(trusted=False)
         self.assertFalse(
-            is_relevant_notification(multisig_tx.__class__, multisig_tx, created=False)
+            is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
 
         multisig_tx.trusted = True
         self.assertTrue(
-            is_relevant_notification(multisig_tx.__class__, multisig_tx, created=False)
+            is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
 
         multisig_tx.created -= timedelta(minutes=75)
         self.assertTrue(
-            is_relevant_notification(multisig_tx.__class__, multisig_tx, created=False)
+            is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
         multisig_tx.modified -= timedelta(minutes=75)
         self.assertFalse(
-            is_relevant_notification(multisig_tx.__class__, multisig_tx, created=False)
+            is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
 
     @mock.patch.object(QueueService, "send_event")

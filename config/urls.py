@@ -51,12 +51,6 @@ urlpatterns_v1 = [
         include("safe_transaction_service.contracts.urls", namespace="contracts"),
     ),
     path(
-        "notifications/",
-        include(
-            "safe_transaction_service.notifications.urls", namespace="notifications"
-        ),
-    ),
-    path(
         "",
         include(
             "safe_transaction_service.safe_messages.urls", namespace="safe_messages"

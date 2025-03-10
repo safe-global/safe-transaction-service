@@ -112,7 +112,6 @@ LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.events.apps.EventsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
-    "safe_transaction_service.notifications.apps.NotificationsConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
 ]
@@ -272,16 +271,12 @@ CELERY_ROUTES = (
             {"queue": "tokens", "delivery_mode": "transient"},
         ),
         (
-            "safe_transaction_service.events.tasks.send_event_to_queue_task",
-            {"queue": "webhooks", "delivery_mode": "transient"},
-        ),
-        (
             "safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task",
-            {"queue": "indexing"},
+            {"queue": "indexing", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.history.tasks.reindex_erc20_erc721_last_hours_task",
-            {"queue": "indexing"},
+            {"queue": "indexing", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.history.tasks.process_decoded_internal_txs_for_safe_task",
@@ -298,10 +293,6 @@ CELERY_ROUTES = (
         (
             "safe_transaction_service.contracts.tasks.*",
             {"queue": "contracts", "delivery_mode": "transient"},
-        ),
-        (
-            "safe_transaction_service.notifications.tasks.*",
-            {"queue": "notifications", "delivery_mode": "transient"},
         ),
         (
             "safe_transaction_service.tokens.tasks.*",
@@ -623,26 +614,9 @@ ENS_SUBGRAPH_URL = env.str("ENS_SUBGRAPH_URL", default=None)
 ENS_SUBGRAPH_API_KEY = env.str("ENS_SUBGRAPH_API_KEY", default=None)
 ENS_SUBGRAPH_ID = env.str("ENS_SUBGRAPH_ID", default=None)
 
-# Notifications
+# Slack connection
 # ------------------------------------------------------------------------------
 SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
-
-# Notifications
-NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH = env(
-    "NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH", default=None
-)
-NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS = env.int(
-    "NOTIFICATIONS_DUPLICATED_EXPIRATION_TIME_SECONDS", default=60 * 60 * 2  # 2 hours
-)  # Don't allow the same notification to be sent during the expiration time due to reorgs and reindexing
-
-if NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH:
-    import json
-
-    NOTIFICATIONS_FIREBASE_AUTH_CREDENTIALS = json.load(
-        environ.Path(NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH).file(
-            "firebase-credentials.json"
-        )
-    )
 
 # Events
 # ------------------------------------------------------------------------------
@@ -652,11 +626,11 @@ EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT = env.int(
     "EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT", default=0
 )
 
-# Events and notifications
+# Events
 # ------------------------------------------------------------------------------
-DISABLE_NOTIFICATIONS_AND_EVENTS = env.bool(
-    "DISABLE_NOTIFICATIONS_AND_EVENTS", default=False
-)  # Increases indexing speed for initial sync by disabling sending notifications and events to the queue
+DISABLE_SERVICE_EVENTS = env.bool(
+    "DISABLE_SERVICE_EVENTS", default=False
+)  # Increases indexing speed for initial sync by disabling sending events to the queue
 
 # Cache
 CACHE_ALL_TXS_VIEW = env.int(

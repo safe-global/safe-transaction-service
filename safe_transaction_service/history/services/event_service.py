@@ -1,3 +1,7 @@
+"""
+Build event payloads for the queue
+"""
+
 import json
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Type, TypedDict, Union
@@ -157,7 +161,7 @@ def build_event_payload(
     return payloads
 
 
-def is_relevant_notification(
+def is_relevant_event(
     sender: Type[Model],
     instance: Union[
         TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
@@ -173,13 +177,13 @@ def is_relevant_notification(
     :param sender:
     :param instance:
     :param created:
-    :param minutes: Minutes to allow a old notification
+    :param minutes: Minutes to allow an old event
     :return: `True` if event is valid, `False` otherwise
     """
     if (
         sender == MultisigTransaction
     ):  # Different logic, as `MultisigTransaction` can change from Pending to Executed
-        # Don't send notifications for `not trusted` transactions
+        # Don't send events for `not trusted` transactions
         if (
             not instance.trusted
             or instance.modified + timedelta(minutes=minutes) < timezone.now()
