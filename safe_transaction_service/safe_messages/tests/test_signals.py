@@ -14,7 +14,7 @@ from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
 )
-from safe_transaction_service.safe_messages.signals import process_notification_event
+from safe_transaction_service.safe_messages.signals import process_event
 from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
     SafeMessageFactory,
@@ -26,11 +26,11 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(QueueService, "send_event")
     def test_process_webhook(
         self,
-        send_event_to_queue_task_mock: MagicMock,
+        send_event_mock: MagicMock,
     ):
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
-        process_notification_event(SafeMessage, safe_message, True)
+        process_event(SafeMessage, safe_message, True)
         message_created_payload = {
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CREATED.name,
@@ -38,7 +38,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
 
-        send_event_to_queue_task_mock.assert_called_with(message_created_payload)
+        send_event_mock.assert_called_with(message_created_payload)
 
         message_confirmation_payload = {
             "address": safe_address,
@@ -49,14 +49,12 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
         )
-        process_notification_event(
-            SafeMessageConfirmation, safe_message_confirmation, True
-        )
+        process_event(SafeMessageConfirmation, safe_message_confirmation, True)
 
     @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(self, send_event_mock: MagicMock):
         safe_address = self.deploy_test_safe().address
-        # Create a confirmation should fire a signal and webhooks should be sended
+        # Creating a message should fire a signal and an event should be sent
         safe_message = SafeMessageFactory(safe=safe_address)
         message_created_payload = {
             "address": safe_address,
@@ -66,12 +64,13 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         }
 
         send_event_mock.assert_called_with(message_created_payload)
+
+        # Creating a confirmation should fire a signal and an event should be sent
+        SafeMessageConfirmationFactory(safe_message=safe_message)
         message_confirmation_payload = {
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        # Create a confirmation should fire a signal and webhooks should be sended
-        SafeMessageConfirmationFactory(safe_message=safe_message)
         send_event_mock.assert_called_with(message_confirmation_payload)

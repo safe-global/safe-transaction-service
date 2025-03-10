@@ -81,11 +81,6 @@ services:
     environment:
       WORKER_QUEUES: "contracts,tokens"
 
-  notifications-webhooks-worker:
-    <<: *worker
-    environment:
-      WORKER_QUEUES: "notifications,webhooks"
-
   scheduler:
     <<: *worker
     command: docker/web/celery/scheduler/run.sh

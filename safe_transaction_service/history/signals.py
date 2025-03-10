@@ -7,8 +7,6 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from safe_transaction_service.notifications.tasks import send_notification_task
-
 from ..events.services.queue_service import get_queue_service
 from .cache import remove_cache_view_by_instance
 from .models import (
@@ -25,11 +23,11 @@ from .models import (
     SafeStatus,
     TokenTransfer,
 )
-from .services.notification_service import (
+from .services.event_service import (
     build_delete_delegate_payload,
     build_event_payload,
     build_save_delegate_payload,
-    is_relevant_notification,
+    is_relevant_event,
 )
 
 logger = getLogger(__name__)
@@ -119,7 +117,7 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
-def _process_notification_event(
+def _process_event(
     sender: Type[Model],
     instance: Union[
         TokenTransfer,
@@ -139,7 +137,7 @@ def _process_notification_event(
     :param deleted:
     :return:
     """
-    if settings.DISABLE_NOTIFICATIONS_AND_EVENTS:
+    if settings.DISABLE_SERVICE_EVENTS:
         return None
 
     assert not (
@@ -155,22 +153,19 @@ def _process_notification_event(
     )
     for payload in payloads:
         if address := payload.get("address"):
-            if is_relevant_notification(sender, instance, created):
+            if is_relevant_event(sender, instance, created):
                 logger.debug(
-                    "Triggering send_notification tasks for created=%s object=%s",
+                    "[%s] Triggering send_event tasks for created=%s object=%s",
+                    address,
                     created,
                     instance,
-                )
-                send_notification_task.apply_async(
-                    args=(address, payload),
-                    countdown=5,
-                    priority=2,  # Almost lowest priority
                 )
                 queue_service = get_queue_service()
                 queue_service.send_event(payload)
             else:
                 logger.debug(
-                    "Notification will not be sent for created=%s object=%s",
+                    "[%s] Event will not be sent for created=%s object=%s",
+                    address,
                     created,
                     instance,
                 )
@@ -179,37 +174,35 @@ def _process_notification_event(
 @receiver(
     post_save,
     sender=ModuleTransaction,
-    dispatch_uid="module_transaction.process_notification_event",
+    dispatch_uid="module_transaction.process_event",
 )
 @receiver(
     post_save,
     sender=MultisigConfirmation,
-    dispatch_uid="multisig_confirmation.process_notification_event",
+    dispatch_uid="multisig_confirmation.process_event",
 )
 @receiver(
     post_save,
     sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_notification_event",
+    dispatch_uid="multisig_transaction.process_event",
 )
 @receiver(
     post_save,
     sender=ERC20Transfer,
-    dispatch_uid="erc20_transfer.process_notification_event",
+    dispatch_uid="erc20_transfer.process_event",
 )
 @receiver(
     post_save,
     sender=ERC721Transfer,
-    dispatch_uid="erc721_transfer.process_notification_event",
+    dispatch_uid="erc721_transfer.process_event",
 )
-@receiver(
-    post_save, sender=InternalTx, dispatch_uid="internal_tx.process_notification_event"
-)
+@receiver(post_save, sender=InternalTx, dispatch_uid="internal_tx.process_event")
 @receiver(
     post_save,
     sender=SafeContract,
-    dispatch_uid="safe_contract.process_notification_event",
+    dispatch_uid="safe_contract.process_event",
 )
-def process_notification_event(
+def process_event(
     sender: Type[Model],
     instance: Union[
         TokenTransfer,
@@ -221,18 +214,18 @@ def process_notification_event(
     created: bool,
     **kwargs,
 ) -> None:
-    return _process_notification_event(sender, instance, created, False)
+    return _process_event(sender, instance, created, False)
 
 
 @receiver(
     post_delete,
     sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_delete_notification_event",
+    dispatch_uid="multisig_transaction.process_delete_multisig_transaction_event",
 )
-def process_delete_notification_event(
+def process_delete_multisig_transaction_event(
     sender: Type[Model], instance: MultisigTransaction, *args, **kwargs
 ):
-    return _process_notification_event(sender, instance, False, True)
+    return _process_event(sender, instance, False, True)
 
 
 @receiver(
