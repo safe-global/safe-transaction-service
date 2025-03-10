@@ -97,7 +97,6 @@ class AboutView(APIView):
                 "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT": settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT,
                 "ETH_L2_NETWORK": settings.ETH_L2_NETWORK,
                 "ETH_REORG_BLOCKS": settings.ETH_REORG_BLOCKS,
-                "NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH": settings.NOTIFICATIONS_FIREBASE_CREDENTIALS_PATH,
                 "SSO_ENABLED": settings.SSO_ENABLED,
                 "TOKENS_LOGO_BASE_URI": settings.TOKENS_LOGO_BASE_URI,
                 "TOKENS_LOGO_EXTENSION": settings.TOKENS_LOGO_EXTENSION,

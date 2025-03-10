@@ -46,7 +46,7 @@ from .services.collectibles_service import (
     CollectibleWithMetadata,
     MetadataRetrievalExceptionTimeout,
 )
-from .services.notification_service import build_reorg_payload
+from .services.event_service import build_reorg_payload
 
 logger = get_task_logger(__name__)
 
