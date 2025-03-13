@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 TRUSTED_FOR_DELEGATE_CALL = [
     "MultiSendCallOnly",
-    "MultiSend",
-    "SafeToL2Migration",
     "SignMessageLib",
     "SafeMigration",
 ]
