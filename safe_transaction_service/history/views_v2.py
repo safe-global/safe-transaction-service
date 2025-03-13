@@ -141,7 +141,7 @@ class DelegateListView(ListCreateAPIView):
         return super().get(request, **kwargs)
 
     @extend_schema(
-        tags=["transactions"],
+        tags=["delegates"],
         request=serializers.DelegateSerializerV2,
         responses={
             202: OpenApiResponse(description="Accepted"),
