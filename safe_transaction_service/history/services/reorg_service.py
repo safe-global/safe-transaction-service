@@ -14,7 +14,13 @@ from ..indexers import (
     ProxyFactoryIndexerProvider,
     SafeEventsIndexerProvider,
 )
-from ..models import EthereumBlock, IndexingStatus, ProxyFactory, SafeMasterCopy
+from ..models import (
+    EthereumBlock,
+    IndexingStatus,
+    MultisigTransaction,
+    ProxyFactory,
+    SafeMasterCopy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +177,14 @@ class ReorgService:
         number_deleted_blocks, _ = EthereumBlock.objects.filter(
             number__gte=reorg_block_number
         ).delete()
+
+        # Fix multisig transactions that had EthereumBlock removed
+        # `failed` must be `NULL` in the database if `ethereum_tx` is empty
+        # `ethereum_tx` and `failed` both have a database index
+        MultisigTransaction.objects.filter(ethereum_tx=None).exclude(
+            failed=None
+        ).delete()
+
         logger.warning(
             "Reorg of block-number=%d fixed, indexing was reset to safe block=%d, %d elements updated and %d blocks deleted",
             reorg_block_number,
