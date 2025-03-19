@@ -9,6 +9,7 @@ from ..models import (
     EthereumBlock,
     EthereumTx,
     IndexingStatus,
+    MultisigTransaction,
     ProxyFactory,
     SafeMasterCopy,
 )
@@ -16,6 +17,7 @@ from ..services import ReorgServiceProvider
 from .factories import (
     EthereumBlockFactory,
     EthereumTxFactory,
+    MultisigTransactionFactory,
     ProxyFactoryFactory,
     SafeMasterCopyFactory,
 )
@@ -87,9 +89,18 @@ class TestReorgService(TestCase):
             EthereumTxFactory(block=ethereum_block)
             for ethereum_block in ethereum_blocks
         ]
+        test_origin = {"name": "awesome Safe app"}
+        multisig_transactions = [
+            MultisigTransactionFactory(ethereum_tx=ethereum_tx, origin=test_origin)
+            for ethereum_tx in ethereum_txs
+        ]
+        safe_tx_hashes = [
+            multisig_transaction.safe_tx_hash
+            for multisig_transaction in multisig_transactions
+        ]
         safe_ethereum_tx = ethereum_txs[0]  # This tx will not be touched by the reorg
-
         self.assertEqual(EthereumTx.objects.count(), len(ethereum_blocks))
+        self.assertEqual(MultisigTransaction.objects.count(), len(ethereum_txs))
 
         proxy_factory = ProxyFactoryFactory(tx_block_number=reorg_block)
         indexing_status = IndexingStatus.objects.get_erc20_721_indexing_status()
@@ -114,3 +125,26 @@ class TestReorgService(TestCase):
         self.assertEqual(proxy_factory.tx_block_number, expected_rewind_block)
         self.assertEqual(indexing_status.block_number, expected_rewind_block)
         self.assertEqual(safe_master_copy.tx_block_number, expected_rewind_block)
+        after_reorg_multisigtransactions = MultisigTransaction.objects.filter(
+            safe_tx_hash__in=safe_tx_hashes
+        )
+        # Transactions of previous blocks remains unchanged
+        for (
+            previous_reorg_multisig_transaction,
+            after_reorg_multisig_transaction,
+        ) in zip(multisig_transactions[:2], after_reorg_multisigtransactions[:2]):
+            self.assertEqual(
+                previous_reorg_multisig_transaction.ethereum_tx,
+                after_reorg_multisig_transaction.ethereum_tx,
+            )
+            self.assertEqual(
+                previous_reorg_multisig_transaction.signatures,
+                after_reorg_multisig_transaction.signatures,
+            )
+            self.assertEqual(after_reorg_multisig_transaction.origin, test_origin)
+
+        # Transactions after reorg were updated correctly
+        for multisig_transaction in after_reorg_multisigtransactions[2:]:
+            self.assertIsNone(multisig_transaction.ethereum_tx)
+            self.assertIsNone(multisig_transaction.signatures)
+            self.assertEqual(multisig_transaction.origin, test_origin)
