@@ -179,11 +179,13 @@ class ReorgService:
         ).delete()
 
         # Fix multisig transactions that had EthereumBlock removed
+        # We will remove signature to don't remove not indexed data as origin.
+        # Index from reorg will fill signatures field again
         # `failed` must be `NULL` in the database if `ethereum_tx` is empty
         # `ethereum_tx` and `failed` both have a database index
         MultisigTransaction.objects.filter(ethereum_tx=None).exclude(
             failed=None
-        ).delete()
+        ).update(signatures=None)
 
         logger.warning(
             "Reorg of block-number=%d fixed, indexing was reset to safe block=%d, %d elements updated and %d blocks deleted",
