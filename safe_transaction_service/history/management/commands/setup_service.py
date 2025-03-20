@@ -6,10 +6,35 @@ from django.core.management.base import BaseCommand
 from django.db.models import Min
 
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
-from safe_eth.eth import get_auto_ethereum_client
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.addresses import MASTER_COPIES, PROXY_FACTORIES
 
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
+
+default_safe_singletons = [
+    (
+        fast_to_checksum_address("0x29fcB43b46531BcA003ddC8FCB67FFE91900C762"),
+        "1.4.1+L2",
+    ),
+    (fast_to_checksum_address("0x41675C099F32341bf84BFc5382aF534df5C7461a"), "1.4.1"),
+    (
+        fast_to_checksum_address("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA"),
+        "1.3.0+L2",
+    ),
+    (
+        fast_to_checksum_address("0x3E5c63644E683549055b9Be8653de26E0B4CD36E"),
+        "1.3.0+L2",
+    ),
+    (fast_to_checksum_address("0x69f4D1788e39c87893C980c06EdF4b7f686e2938"), "1.3.0"),
+    (fast_to_checksum_address("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"), "1.3.0"),
+]
+
+default_safe_proxy_factories = [
+    fast_to_checksum_address("0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"),  # 1.4.1
+    fast_to_checksum_address("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC"),  # 1.3.0
+    fast_to_checksum_address("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2"),  # 1.3.0
+]
 
 
 @dataclass
@@ -200,8 +225,12 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Setting up {ethereum_network.name} safe addresses")
             )
-            self._setup_safe_master_copies(MASTER_COPIES[ethereum_network])
+            self._setup_safe_singleton_addresses(MASTER_COPIES[ethereum_network])
             self._setup_erc20_indexing()
+        else:
+            self._setup_safe_singleton_addresses_from_chain(ethereum_client)
+            self._setup_erc20_indexing()
+
         if ethereum_network in PROXY_FACTORIES:
             self.stdout.write(
                 self.style.SUCCESS(
@@ -209,19 +238,21 @@ class Command(BaseCommand):
                 )
             )
             self._setup_safe_proxy_factories(PROXY_FACTORIES[ethereum_network])
+        else:
+            self._setup_safe_proxy_factories_from_chain(ethereum_client)
 
-        if not (
-            ethereum_network in MASTER_COPIES and ethereum_network in PROXY_FACTORIES
-        ):
+        if not (SafeMasterCopy.objects.count() and ProxyFactory.objects.count()):
             self.stdout.write(
-                self.style.WARNING("Cannot detect a valid ethereum-network")
+                self.style.WARNING(
+                    f"Cannot find any SafeMasterCopy and ProxyFactory for chain id {ethereum_client.get_chain_id()}"
+                )
             )
 
-    def _setup_safe_master_copies(
-        self, safe_master_copies: Sequence[Tuple[str, int, str]]
+    def _setup_safe_singleton_addresses(
+        self, safe_singleton_addresses: Sequence[Tuple[str, int, str]]
     ):
-        for address, initial_block_number, version in safe_master_copies:
-            safe_master_copy, _ = SafeMasterCopy.objects.get_or_create(
+        for address, initial_block_number, version in safe_singleton_addresses:
+            safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
                 address=address,
                 defaults={
                     "initial_block_number": initial_block_number,
@@ -231,12 +262,14 @@ class Command(BaseCommand):
                 },
             )
             if (
-                safe_master_copy.version != version
-                or safe_master_copy.initial_block_number != initial_block_number
+                safe_singleton_address.version != version
+                or safe_singleton_address.initial_block_number != initial_block_number
             ):
-                safe_master_copy.version = initial_block_number
-                safe_master_copy.version = version
-                safe_master_copy.save(update_fields=["initial_block_number", "version"])
+                safe_singleton_address.version = initial_block_number
+                safe_singleton_address.version = version
+                safe_singleton_address.save(
+                    update_fields=["initial_block_number", "version"]
+                )
 
     def _setup_safe_proxy_factories(
         self, safe_proxy_factories: Sequence[Tuple[str, int]]
@@ -281,3 +314,29 @@ class Command(BaseCommand):
             indexing_status.save(update_fields=["block_number"])
             return True
         return False
+
+    def _setup_safe_singleton_addresses_from_chain(
+        self, ethereum_client: EthereumClient
+    ):
+        for address, version in default_safe_singletons:
+            if ethereum_client.is_contract(address):
+                safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
+                    address=address,
+                    defaults={
+                        "initial_block_number": 0,
+                        "tx_block_number": 0,
+                        "version": version,
+                        "l2": version.endswith("+L2"),
+                    },
+                )
+
+    def _setup_safe_proxy_factories_from_chain(self, ethereum_client: EthereumClient):
+        for address in default_safe_proxy_factories:
+            if ethereum_client.is_contract(address):
+                ProxyFactory.objects.get_or_create(
+                    address=address,
+                    defaults={
+                        "initial_block_number": 0,
+                        "tx_block_number": 0,
+                    },
+                )
