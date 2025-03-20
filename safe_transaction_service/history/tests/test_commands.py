@@ -386,16 +386,39 @@ class TestCommands(SafeTestCaseMixin, TestCase):
     def test_setup_service_sepolia(self):
         self._test_setup_service(EthereumNetwork.SEPOLIA)
 
+    @mock.patch.object(EthereumClient, "is_contract", return_value=False)
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def test_setup_service_not_valid_network(
-        self, ethereum_client_get_network_mock: MagicMock
+        self, ethereum_client_get_network_mock: MagicMock, is_contract_mock: MagicMock
     ):
         command = "setup_service"
         for return_value in (EthereumNetwork.ROPSTEN, EthereumNetwork.UNKNOWN):
             ethereum_client_get_network_mock.return_value = return_value
             buf = StringIO()
             call_command(command, stdout=buf)
-            self.assertIn("Cannot detect a valid ethereum-network", buf.getvalue())
+            self.assertIn(
+                "Cannot find any SafeMasterCopy and ProxyFactory for chain id",
+                buf.getvalue(),
+            )
+
+    @mock.patch.object(EthereumClient, "get_network", autospec=True)
+    def test_setup_service_without_addresses(
+        self, ethereum_client_get_network_mock: MagicMock
+    ):
+        """
+        Test setup_service without any SafeSingleton and ProxyFactory added on safe-eth-py.
+        Setup service command should check if any of the default addresses is a contract on chain and add them.
+        """
+        command = "setup_service"
+        ethereum_client_get_network_mock.return_value = EthereumNetwork.ROPSTEN
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertNotIn(
+            "Cannot find any SafeMasterCopy and ProxyFactory for chain id",
+            buf.getvalue(),
+        )
+        self.assertEqual(SafeMasterCopy.objects.count(), 2)
+        self.assertEqual(ProxyFactory.objects.count(), 1)
 
     def test_export_multisig_tx_data(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
