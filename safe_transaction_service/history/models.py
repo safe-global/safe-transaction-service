@@ -1526,33 +1526,33 @@ class MultisigTransaction(TimeStampedModel):
     def __str__(self):
         return f"{self.safe} - {self.nonce} - {self.safe_tx_hash}"
 
-    def to_log(self, message: str) -> str:
+    def to_dict(self) -> dict:
         """
-        :param message:
-        :return: MultisigTransaction ready to be printed in a log line
+        :return: MultisigTransaction as dict
         """
         safe_tx_hash_str = to_0x_hex_str(HexBytes(self.safe_tx_hash))
-        return (
-            f"[MultisigTransaction {safe_tx_hash_str}] {message}. "
-            f"safe_tx_hash={safe_tx_hash_str} "
-            f"safe={self.safe} "
-            f"proposer={self.proposer} "
-            f"proposed_by_delegate={self.proposed_by_delegate} "
-            f"to={self.to} "
-            f"value={self.value} "
-            f"data={to_0x_hex_str(HexBytes(self.data)) if self.data else None} "
-            f"operation={self.operation} "
-            f"safe_tx_gas={self.safe_tx_gas} "
-            f"base_gas={self.base_gas} "
-            f"gas_price={self.gas_price} "
-            f"gas_token={self.gas_token} "
-            f"refund_receiver={self.refund_receiver} "
-            f"signatures={to_0x_hex_str(HexBytes(self.signatures)) if self.signatures else None} "
-            f"nonce={self.nonce} "
-            f"failed={self.failed} "
-            f"origin={self.origin} "
-            f"trusted={self.trusted} "
-        )
+        return {
+            "safe_tx_hash": safe_tx_hash_str,
+            "safe": self.safe,
+            "proposer": self.proposer,
+            "proposed_by_delegate": self.proposed_by_delegate,
+            "to": self.to,
+            "value": self.value,
+            "data": to_0x_hex_str(HexBytes(self.data)) if self.data else None,
+            "operation": self.operation,
+            "safe_tx_gas": self.safe_tx_gas,
+            "base_gas": self.base_gas,
+            "gas_price": self.gas_price,
+            "gas_token": self.gas_token,
+            "refund_receiver": self.refund_receiver,
+            "signatures": (
+                to_0x_hex_str(HexBytes(self.signatures)) if self.signatures else None
+            ),
+            "nonce": self.nonce,
+            "failed": self.failed,
+            "origin": self.origin,
+            "trusted": self.trusted,
+        }
 
     @property
     def execution_date(self) -> Optional[datetime.datetime]:
@@ -1713,10 +1713,9 @@ class MultisigConfirmation(TimeStampedModel):
         else:
             return f"Confirmation of owner={self.owner} for existing transaction={self.multisig_transaction_hash}"
 
-    def to_log(self, message: str) -> str:
+    def to_dict(self) -> dict:
         """
-        :param message:
-        :return: MultisigTransaction ready to be printed in a log line
+        :return: MultisigConfirmatiom as dict
         """
         multisig_transaction_hash_str = to_0x_hex_str(
             HexBytes(
@@ -1725,15 +1724,20 @@ class MultisigConfirmation(TimeStampedModel):
                 else self.multisig_transaction_id
             )
         )
-        return (
-            f"[MultisigConfirmation for {multisig_transaction_hash_str}] {message}. "
-            f"ethereum_tx={to_0x_hex_str(HexBytes(self.ethereum_tx_id)) if self.ethereum_tx else None} "
-            f"multisig_transaction={'SET' if self.multisig_transaction else 'UNSET'} "
-            f"multisig_transaction-hash={multisig_transaction_hash_str} "
-            f"owner={self.owner} "
-            f"signature={to_0x_hex_str(bytes(self.signature)) if self.signature else None} "
-            f"signature_type={SafeSignatureType(self.signature_type).name} "
-        )
+        return {
+            "ethereum_tx": (
+                to_0x_hex_str(HexBytes(self.ethereum_tx_id))
+                if self.ethereum_tx
+                else None
+            ),
+            "multisig_transaction": "SET" if self.multisig_transaction else "UNSET",
+            "multisig_transaction-hash": multisig_transaction_hash_str,
+            "owner": self.owner,
+            "signature": (
+                to_0x_hex_str(bytes(self.signature)) if self.signature else None
+            ),
+            "signature_type": SafeSignatureType(self.signature_type).name,
+        }
 
 
 class MonitoredAddress(models.Model):
