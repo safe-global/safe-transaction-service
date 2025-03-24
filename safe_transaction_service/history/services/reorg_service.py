@@ -185,7 +185,7 @@ class ReorgService:
         # `ethereum_tx` and `failed` both have a database index
         MultisigTransaction.objects.filter(ethereum_tx=None).exclude(
             failed=None
-        ).update(signatures=None)
+        ).update(signatures=None, failed=None)
 
         logger.warning(
             "Reorg of block-number=%d fixed, indexing was reset to safe block=%d, %d elements updated and %d blocks deleted",
