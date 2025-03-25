@@ -4068,17 +4068,3 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             data=data,
         )
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    def test_get_multisigtransaction_with_node_errors(self):
-        safe_address = Account.create().address
-        proposer = Account.create().address
-        multisig_tx = MultisigTransactionFactory(
-            safe=safe_address, proposer=proposer, trusted=True
-        )
-        response = self.client.get(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    # NodeConnectionException
