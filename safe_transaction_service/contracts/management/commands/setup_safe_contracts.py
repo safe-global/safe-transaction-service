@@ -93,9 +93,8 @@ class Command(BaseCommand):
             )
         ):
             # If the chain is not listed on safe_deployments, then Search on chain
-            self.stdout.write(
-                self.style.WARNING("Creating default Safe contracts from chain")
-            )
+            logger.warning("Creating default Safe contracts from chain")
+
             chain_deployments = self._get_default_deployments_by_version_on_chain(
                 versions, ethereum_client
             )
@@ -105,11 +104,7 @@ class Command(BaseCommand):
                 chain_deployments, queryset, force_update_contracts, logo_file
             )
         else:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"No deployment was found for the network {chain_id}"
-                )
-            )
+            logger.warning(f"No deployment was found for the network {chain_id}")
 
     @staticmethod
     def _get_deployments_by_chain_and_version(
