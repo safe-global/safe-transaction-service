@@ -410,15 +410,51 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         Setup service command should check if any of the default addresses is a contract on chain and add them.
         """
         command = "setup_service"
-        ethereum_client_get_network_mock.return_value = EthereumNetwork.ROPSTEN
+        ethereum_network = EthereumNetwork.GANACHE
+        ethereum_client_get_network_mock.return_value = ethereum_network
         buf = StringIO()
         call_command(command, stdout=buf)
         self.assertNotIn(
             "Cannot find any SafeMasterCopy and ProxyFactory for chain id",
             buf.getvalue(),
         )
+        self.assertIn(
+            f"Setting up {ethereum_network.name} default safe addresses from chain with unknown init block",
+            buf.getvalue(),
+        )
         self.assertEqual(SafeMasterCopy.objects.count(), 2)
         self.assertEqual(ProxyFactory.objects.count(), 1)
+
+    @mock.patch.object(EthereumClient, "get_network", autospec=True)
+    def test_setup_service_update_singletons(
+        self, ethereum_client_get_network_mock: MagicMock
+    ):
+        """
+        Test if version or initial block_number is being updated when safe_eth_py contains different version or
+        intial_block_number than the database values.
+        """
+        command = "setup_service"
+        ethereum_network = EthereumNetwork.GANACHE
+        ethereum_client_get_network_mock.return_value = ethereum_network
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertEqual(SafeMasterCopy.objects.count(), 2)
+        self.assertEqual(ProxyFactory.objects.count(), 1)
+        master_copy = SafeMasterCopy.objects.first()
+        self.assertEqual(master_copy.initial_block_number, 0)
+        mocked_addresses = {ethereum_network: [(master_copy.address, 111, "v1.1.1")]}
+
+        with mock.patch(
+            "safe_transaction_service.history.management.commands.setup_service.MASTER_COPIES",
+            new=mocked_addresses,
+        ):
+            buf = StringIO()
+            call_command(command, stdout=buf)
+            master_copy_updated = SafeMasterCopy.objects.get(
+                address=master_copy.address
+            )
+            self.assertEqual(master_copy_updated.initial_block_number, 111)
+            self.assertEqual(master_copy_updated.version, "v1.1.1")
 
     def test_export_multisig_tx_data(self):
         with tempfile.TemporaryDirectory() as tmpdirname:

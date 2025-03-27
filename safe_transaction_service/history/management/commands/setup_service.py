@@ -226,10 +226,16 @@ class Command(BaseCommand):
                 self.style.SUCCESS(f"Setting up {ethereum_network.name} safe addresses")
             )
             self._setup_safe_singleton_addresses(MASTER_COPIES[ethereum_network])
-            self._setup_erc20_indexing()
+
         else:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Setting up {ethereum_network.name} default safe addresses from chain with unknown init block"
+                )
+            )
             self._setup_safe_singleton_addresses_from_chain(ethereum_client)
-            self._setup_erc20_indexing()
+
+        self._setup_erc20_indexing()
 
         if ethereum_network in PROXY_FACTORIES:
             self.stdout.write(
@@ -239,6 +245,11 @@ class Command(BaseCommand):
             )
             self._setup_safe_proxy_factories(PROXY_FACTORIES[ethereum_network])
         else:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Setting up {ethereum_network.name} default proxy factory addresses from chain with unknown init block"
+                )
+            )
             self._setup_safe_proxy_factories_from_chain(ethereum_client)
 
         if not (SafeMasterCopy.objects.count() and ProxyFactory.objects.count()):
@@ -265,7 +276,7 @@ class Command(BaseCommand):
                 safe_singleton_address.version != version
                 or safe_singleton_address.initial_block_number != initial_block_number
             ):
-                safe_singleton_address.version = initial_block_number
+                safe_singleton_address.initial_block_number = initial_block_number
                 safe_singleton_address.version = version
                 safe_singleton_address.save(
                     update_fields=["initial_block_number", "version"]
