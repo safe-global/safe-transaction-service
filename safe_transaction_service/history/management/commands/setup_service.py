@@ -7,34 +7,15 @@ from django.db.models import Min
 
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
-from safe_eth.eth.utils import fast_to_checksum_address
-from safe_eth.safe.addresses import MASTER_COPIES, PROXY_FACTORIES
+from safe_eth.safe.addresses import (
+    MASTER_COPIES,
+    PROXY_FACTORIES,
+    get_default_addresses_with_version,
+    safe_proxy_factory_contract_names,
+    safe_singleton_contract_names,
+)
 
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
-
-default_safe_singletons = [
-    (
-        fast_to_checksum_address("0x29fcB43b46531BcA003ddC8FCB67FFE91900C762"),
-        "1.4.1+L2",
-    ),
-    (fast_to_checksum_address("0x41675C099F32341bf84BFc5382aF534df5C7461a"), "1.4.1"),
-    (
-        fast_to_checksum_address("0xfb1bffC9d739B8D520DaF37dF666da4C687191EA"),
-        "1.3.0+L2",
-    ),
-    (
-        fast_to_checksum_address("0x3E5c63644E683549055b9Be8653de26E0B4CD36E"),
-        "1.3.0+L2",
-    ),
-    (fast_to_checksum_address("0x69f4D1788e39c87893C980c06EdF4b7f686e2938"), "1.3.0"),
-    (fast_to_checksum_address("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"), "1.3.0"),
-]
-
-default_safe_proxy_factories = [
-    fast_to_checksum_address("0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"),  # 1.4.1
-    fast_to_checksum_address("0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC"),  # 1.3.0
-    fast_to_checksum_address("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2"),  # 1.3.0
-]
 
 
 @dataclass
@@ -326,10 +307,11 @@ class Command(BaseCommand):
             return True
         return False
 
-    def _setup_safe_singleton_addresses_from_chain(
-        self, ethereum_client: EthereumClient
-    ):
-        for address, version in default_safe_singletons:
+    @staticmethod
+    def _setup_safe_singleton_addresses_from_chain(ethereum_client: EthereumClient):
+        for address, version in get_default_addresses_with_version(
+            safe_singleton_contract_names
+        ):
             if ethereum_client.is_contract(address):
                 safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
                     address=address,
@@ -341,8 +323,12 @@ class Command(BaseCommand):
                     },
                 )
 
-    def _setup_safe_proxy_factories_from_chain(self, ethereum_client: EthereumClient):
-        for address in default_safe_proxy_factories:
+    @staticmethod
+    def _setup_safe_proxy_factories_from_chain(ethereum_client: EthereumClient):
+        # Don't need the version
+        for address, _ in get_default_addresses_with_version(
+            safe_proxy_factory_contract_names
+        ):
             if ethereum_client.is_contract(address):
                 ProxyFactory.objects.get_or_create(
                     address=address,
