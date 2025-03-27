@@ -100,7 +100,7 @@ class Command(BaseCommand):
             )
 
         if chain_deployments:
-            self._create_or_update_from_chain_deployments(
+            self._create_or_update_contracts_from_deployments(
                 chain_deployments, queryset, force_update_contracts, logo_file
             )
         else:
@@ -148,12 +148,15 @@ class Command(BaseCommand):
         return chain_deployments
 
     @staticmethod
-    def _create_or_update_from_chain_deployments(
+    def _create_or_update_contracts_from_deployments(
         deployments: List[Tuple[str, str, str]],
         queryset,
         force_update_contracts: bool,
         logo_file: File,
     ) -> None:
+        """
+        Create or update contracts from given deployments list.
+        """
         for version, contract_name, contract_address in deployments:
             display_name = generate_safe_contract_display_name(contract_name, version)
             contract, created = queryset(
