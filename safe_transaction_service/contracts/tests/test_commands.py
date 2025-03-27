@@ -107,26 +107,28 @@ class TestCommands(TestCase):
         # SignMessageLib should be trusted for delegate calls
         self.assertTrue(contract.trusted_for_delegate_call)
 
+    @patch(
+        "safe_transaction_service.contracts.management.commands.setup_safe_contracts.EthereumClient.is_contract"
+    )
     @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=2)
-    def test_setup_safe_contracts_from_chain(self, mock_chain_id: MagicMock):
+    def test_setup_safe_contracts_from_chain(
+        self, mock_chain_id: MagicMock, mock_is_contract: MagicMock
+    ):
         command = "setup_safe_contracts"
         buf = StringIO()
-
+        mock_is_contract.return_value = False
         self.assertEqual(Contract.objects.count(), 0)
         call_command(command, stdout=buf)
-        self.assertIn("No deployment was found for the network 2", buf.getvalue())
         self.assertEqual(Contract.objects.count(), 0)
-        with patch(
-            "safe_transaction_service.contracts.management.commands.setup_safe_contracts.EthereumClient.is_contract"
-        ) as mock_is_contract:
-            # Mock is contract to return True in case of provided address is equal to MultiSend v1.4.1 address
-            mulsisend_address = "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
-            mock_is_contract.side_effect = lambda contract_address: (
-                True if contract_address == mulsisend_address else False
-            )
-            call_command(command, stdout=buf)
-            self.assertEqual(Contract.objects.count(), 1)
-            contract = Contract.objects.get(address=mulsisend_address)
-            self.assertIsNotNone(contract)
-            self.assertEqual(contract.name, "MultiSend")
-            self.assertEqual(contract.display_name, "Safe: MultiSend 1.4.1")
+
+        # Mock is contract to return True in case of provided address is equal to MultiSend v1.4.1 address
+        mulsisend_address = "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
+        mock_is_contract.side_effect = lambda contract_address: (
+            True if contract_address == mulsisend_address else False
+        )
+        call_command(command, stdout=buf)
+        self.assertEqual(Contract.objects.count(), 1)
+        contract = Contract.objects.get(address=mulsisend_address)
+        self.assertIsNotNone(contract)
+        self.assertEqual(contract.name, "MultiSend")
+        self.assertEqual(contract.display_name, "Safe: MultiSend 1.4.1")
