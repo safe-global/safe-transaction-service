@@ -1,10 +1,11 @@
 import logging
+from typing import List, Tuple
 
 from django.core.files import File
 from django.core.management import BaseCommand, CommandError
 
-from safe_eth.eth import get_auto_ethereum_client
-from safe_eth.safe.safe_deployments import safe_deployments
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.safe.safe_deployments import default_safe_deployments, safe_deployments
 
 from config.settings.base import STATICFILES_DIRS
 from safe_transaction_service.contracts.models import Contract
@@ -86,32 +87,98 @@ class Command(BaseCommand):
             # only update the contracts with empty values
             queryset = Contract.objects.get_or_create
 
+        if not (
+            chain_deployments := self._get_deployments_by_chain_and_version(
+                versions, str(chain_id)
+            )
+        ):
+            # If the chain is not listed on safe_deployments, then Search on chain
+            logger.warning("Creating default Safe contracts from chain")
+
+            chain_deployments = self._get_default_deployments_by_version_on_chain(
+                versions, ethereum_client
+            )
+
+        if chain_deployments:
+            self._create_or_update_contracts_from_deployments(
+                chain_deployments, queryset, force_update_contracts, logo_file
+            )
+        else:
+            logger.warning(f"No deployment was found for the network {chain_id}")
+
+    @staticmethod
+    def _get_deployments_by_chain_and_version(
+        versions: List[str], chain_id: str
+    ) -> List[Tuple[str, str, str]]:
+        """
+        Get the list of contracts for the given versions and chain.
+
+        :param versions: list of versions
+        :param chain_id: chain id
+        :return: list of (version, contract_name, contract_address)
+        """
+        chain_deployments: List[Tuple[str, str, str]] = []
         for version in versions:
             for contract_name, addresses in safe_deployments[version].items():
-                for contract_address in addresses.get(str(chain_id), []):
-                    display_name = generate_safe_contract_display_name(
-                        contract_name, version
-                    )
-                    contract, created = queryset(
-                        address=contract_address,
-                        defaults={
-                            "name": contract_name,
-                            "display_name": display_name,
-                            "trusted_for_delegate_call": contract_name
-                            in TRUSTED_FOR_DELEGATE_CALL,
-                        },
-                    )
+                for contract_address in addresses.get(chain_id, []):
+                    chain_deployments.append((version, contract_name, contract_address))
 
-                    if not created:
-                        # Remove previous logo file
-                        contract.logo.delete(save=True)
-                        # update name only for contracts with empty names
-                        if not force_update_contracts and contract.name == "":
-                            contract.display_name = display_name
-                            contract.name = contract_name
+        return chain_deployments
 
-                    try:
-                        contract.logo.save(f"{contract.address}.png", logo_file)
-                        contract.save()
-                    except OSError:
-                        logger.warning("Logo cannot be stored.")
+    @staticmethod
+    def _get_default_deployments_by_version_on_chain(
+        versions: List[str], ethereum_client: EthereumClient
+    ) -> List[Tuple[str, str, str]]:
+        """
+        Get the default deployments by version actually deployed on chain.
+
+        :param versions: list of versions
+        :param ethereum_client: Ethereum client
+        :return: list of (version, contract_name, contract_address)
+        """
+        chain_deployments: List[Tuple[str, str, str]] = []
+        for version in versions:
+            for contract_name, addresses in default_safe_deployments[version].items():
+                for contract_address in addresses:
+                    if ethereum_client.is_contract(contract_address):
+                        chain_deployments.append(
+                            (version, contract_name, contract_address)
+                        )
+
+        return chain_deployments
+
+    @staticmethod
+    def _create_or_update_contracts_from_deployments(
+        deployments: List[Tuple[str, str, str]],
+        queryset,
+        force_update_contracts: bool,
+        logo_file: File,
+    ) -> None:
+        """
+        Create or update contracts from given deployments list.
+        """
+        for version, contract_name, contract_address in deployments:
+            display_name = generate_safe_contract_display_name(contract_name, version)
+            contract, created = queryset(
+                address=contract_address,
+                defaults={
+                    "name": contract_name,
+                    "display_name": display_name,
+                    "trusted_for_delegate_call": contract_name
+                    in TRUSTED_FOR_DELEGATE_CALL,
+                },
+            )
+
+            if not created:
+                # Remove previous logo file
+                contract.logo.delete(save=True)
+                # update name only for contracts with empty names
+                if not force_update_contracts and contract.name == "":
+                    contract.display_name = display_name
+                    contract.name = contract_name
+
+            try:
+                contract.logo.save(f"{contract.address}.png", logo_file)
+                contract.save()
+            except OSError:
+                logger.warning("Logo cannot be stored.")
