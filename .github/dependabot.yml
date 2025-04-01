@@ -6,7 +6,7 @@ updates:
       interval: weekly
       day: monday
     reviewers:
-      - "uxio0"
+      - "safe-global/core-api"
 
   - package-ecosystem: docker
     directory: "/docker/web"
@@ -14,7 +14,7 @@ updates:
       interval: weekly
       day: monday
     reviewers:
-      - "uxio0"
+      - "safe-global/core-api"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -22,4 +22,4 @@ updates:
       interval: weekly
       day: monday
     reviewers:
-      - "uxio0"
+      - "safe-global/core-api"
