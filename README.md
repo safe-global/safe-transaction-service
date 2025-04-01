@@ -94,7 +94,7 @@ cp .env.tracing.sample .env
 
 Configure the parameters needed on `.env`. These parameters **need to be changed**:
 - `DJANGO_SECRET_KEY`: Use a **strong key**.
-- `ETHEREUM_NODE_URL`: Http/s address of a ethereum node. It can be the same than `ETHEREUM_TRACING_NODE_URL`.
+- `ETHEREUM_NODE_URL`: Http/s address of an ethereum node. It can be the same as `ETHEREUM_TRACING_NODE_URL`.
 - `ETHEREUM_TRACING_NODE_URL`: Http/s address of an OpenEthereum node with
 [tracing enabled](https://openethereum.github.io/JSONRPC-trace-module).
 
@@ -216,7 +216,7 @@ For an ERC20 token to be indexed it needs to have `name`, `symbol`, `decimals` a
 
 ### Issues installing grpc on an Apple silicon system
 
-If you face issues installing the `grpc` dependency locally (required by this project) on a Apple silicon chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
+If you face issues installing the `grpc` dependency locally (required by this project) on an Apple silicon chip, set `GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1` and `GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1` and then try to install the dependency again.
 
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-transaction-service/graphs/contributors)
