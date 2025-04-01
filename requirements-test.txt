@@ -5,7 +5,7 @@ django-test-migrations==1.4.0
 factory-boy==3.3.3
 faker==35.0.0
 mypy==1.15.0
-pytest==8.3.4
+pytest==8.3.5
 pytest-celery==1.2.0
 pytest-django==4.9.0
 pytest-env==1.1.5
