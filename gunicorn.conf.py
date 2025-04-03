@@ -14,7 +14,7 @@ max_requests_jitter = (
 keep_alive = 2
 log_file = "-"
 log_level = "info"
-logger_class = "safe_transaction_service.utils.loggers.CustomGunicornLogger"
+logger_class = "safe_transaction_service.loggers.custom_logger.CustomGunicornLogger"
 preload_app = False  # Load application code before the worker processes are forked (problems with gevent patching)
 # For timeout to work with gevent, a custom GeventWorker needs to be used
 timeout = gunicorn_request_timeout

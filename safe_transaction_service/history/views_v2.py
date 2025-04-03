@@ -21,6 +21,7 @@ from safe_eth.eth.utils import fast_is_checksum_address
 
 from safe_transaction_service.utils.utils import parse_boolean_query_param
 
+from ..loggers.custom_logger import http_request_log
 from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .models import MultisigTransaction, SafeContract, SafeContractDelegate
@@ -478,7 +479,10 @@ class SafeMultisigTransactionListView(ListAPIView):
 
         request.data["safe"] = address
         serializer = self.get_serializer(data=request.data)
-        logger.info(f"POST MultisigTransaction: {request.data}")
+        logger.info(
+            "Creating MultisigTransaction",
+            extra={"http_request": http_request_log(request, log_data=True)},
+        )
         if not serializer.is_valid():
             return Response(
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY, data=serializer.errors
