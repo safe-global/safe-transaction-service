@@ -747,7 +747,6 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             obj.confirmations, many=True
         ).data
 
-
     def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
         if obj.ethereum_tx_id:
             return obj.ethereum_tx._from
@@ -789,6 +788,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     @extend_schema_field(HexadecimalField(allow_null=True, required=False))
     def get_signatures(self, obj: MultisigTransaction):
         return to_0x_hex_str(obj.signatures) if obj.signatures else None
+
 
 class SafeMultisigTransactionResponseSerializerV2(
     SafeMultisigTransactionResponseSerializer
