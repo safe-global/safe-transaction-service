@@ -7,7 +7,7 @@ faker==37.1.0
 mypy==1.15.0
 pytest==8.3.5
 pytest-celery==1.2.0
-pytest-django==4.10.0
+pytest-django==4.11.1
 pytest-env==1.1.5
 pytest-rerunfailures==15.0
 pytest-sugar==1.0.0
