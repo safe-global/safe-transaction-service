@@ -658,6 +658,61 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             InternalTxDecoded.objects.count(), expected_internal_txs_decoded
         )
 
+    def test_safe_events_indexer_zksync(self):
+        owner_account_1 = self.ethereum_test_account
+        owners = [owner_account_1.address]
+        threshold = 1
+        to = NULL_ADDRESS
+        data = b""
+        fallback_handler = NULL_ADDRESS
+        payment_token = NULL_ADDRESS
+        payment = 0
+        payment_receiver = NULL_ADDRESS
+        initializer = HexBytes(
+            self.safe_contract.functions.setup(
+                owners,
+                threshold,
+                to,
+                data,
+                fallback_handler,
+                payment_token,
+                payment,
+                payment_receiver,
+            ).build_transaction({"gas": 1, "gasPrice": 1})["data"]
+        )
+        initial_block_number = self.ethereum_client.current_block_number + 1
+        safe_l2_master_copy = SafeMasterCopyFactory(
+            address=self.safe_contract.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version=self.safe_contract_version,
+            l2=True,
+        )
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract.address,
+            initializer=initializer,
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        safe_contract = self.get_safe_contract(self.w3, safe_address)
+        self.assertEqual(
+            safe_contract.functions.VERSION().call(), self.safe_contract_version
+        )
+        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+
+        # Check SafeReceived (ether received) on Safe -----------------------------------------------------------------
+        value = 1256
+        self.ethereum_client.get_transaction_receipt(
+            self.send_ether(safe_address, value)
+        )
+        # Process events: SafeReceived
+        with self.settings(ETH_ZKSYNC_COMPATIBLE_NETWORK=True):
+            self.safe_events_indexer = SafeEventsIndexer(
+                self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
+            )
+        # No events are processed
+        self.assertEqual(self.safe_events_indexer.start(), (0, 1))
+
     def test_element_already_processed_checker(self):
         # SafeEventsIndexer does not use bulk saving into database,
         # so mark_as_processed is just a optimization but not critical

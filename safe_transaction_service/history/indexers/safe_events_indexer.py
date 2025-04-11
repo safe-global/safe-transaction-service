@@ -2,6 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import Any, Dict, List, Optional
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from eth_abi import decode as decode_abi
@@ -43,9 +44,10 @@ class SafeEventsIndexerProvider:
 
     @classmethod
     def get_new_instance(cls) -> "SafeEventsIndexer":
-        from django.conf import settings
-
-        return SafeEventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
+        return SafeEventsIndexer(
+            EthereumClient(settings.ETHEREUM_NODE_URL),
+            settings.ETH_ZKSYNC_COMPATIBLE_NETWORK,
+        )
 
     @classmethod
     def del_singleton(cls):
@@ -61,6 +63,13 @@ class SafeEventsIndexer(EventsIndexer):
     IGNORE_ADDRESSES_ON_LOG_FILTER = (
         True  # Search for logs in every address (like the ProxyFactory)
     )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault(
+            "eth_zksync_compatible_network", settings.ETH_ZKSYNC_COMPATIBLE_NETWORK
+        )
+        self.eth_zksync_compatible_network = kwargs["eth_zksync_compatible_network"]
+        super().__init__(*args, **kwargs)
 
     @cached_property
     def contract_events(self) -> List[ContractEvent]:
@@ -223,42 +232,51 @@ class SafeEventsIndexer(EventsIndexer):
         safe_l2_v1_4_1_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
         safe_l2_v1_3_0_contract = get_safe_V1_3_0_contract(self.ethereum_client.w3)
         safe_v1_1_1_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
+
         return [
-            safe_l2_v1_3_0_contract.events.SafeMultiSigTransaction(),
-            safe_l2_v1_3_0_contract.events.SafeModuleTransaction(),
-            safe_l2_v1_3_0_contract.events.SafeSetup(),
-            safe_l2_v1_3_0_contract.events.ApproveHash(),
-            safe_l2_v1_3_0_contract.events.SignMsg(),
-            safe_l2_v1_4_1_contract.events.ExecutionFailure(),
-            safe_l2_v1_3_0_contract.events.ExecutionFailure(),
-            safe_l2_v1_4_1_contract.events.ExecutionSuccess(),
-            safe_l2_v1_3_0_contract.events.ExecutionSuccess(),
-            # Modules
-            safe_l2_v1_4_1_contract.events.EnabledModule(),
-            safe_l2_v1_3_0_contract.events.EnabledModule(),
-            safe_l2_v1_4_1_contract.events.DisabledModule(),
-            safe_l2_v1_3_0_contract.events.DisabledModule(),
-            safe_l2_v1_3_0_contract.events.ExecutionFromModuleSuccess(),
-            safe_l2_v1_3_0_contract.events.ExecutionFromModuleFailure(),
-            # Owners
-            safe_l2_v1_4_1_contract.events.AddedOwner(),
-            safe_l2_v1_3_0_contract.events.AddedOwner(),
-            safe_l2_v1_4_1_contract.events.RemovedOwner(),
-            safe_l2_v1_3_0_contract.events.RemovedOwner(),
-            safe_l2_v1_3_0_contract.events.ChangedThreshold(),
-            # Incoming Ether
-            safe_l2_v1_3_0_contract.events.SafeReceived(),
-            # Changed FallbackHandler
-            safe_l2_v1_4_1_contract.events.ChangedFallbackHandler(),
-            safe_l2_v1_3_0_contract.events.ChangedFallbackHandler(),
-            # Changed Guard
-            safe_l2_v1_4_1_contract.events.ChangedGuard(),
-            safe_l2_v1_3_0_contract.events.ChangedGuard(),
-            # Change Master Copy
-            safe_v1_1_1_contract.events.ChangedMasterCopy(),
-            # Proxy creation
-            proxy_factory_v1_4_1_contract.events.ProxyCreation(),
-            proxy_factory_v1_3_0_contract.events.ProxyCreation(),
+            event
+            for event in (
+                safe_l2_v1_3_0_contract.events.SafeMultiSigTransaction(),
+                safe_l2_v1_3_0_contract.events.SafeModuleTransaction(),
+                safe_l2_v1_3_0_contract.events.SafeSetup(),
+                safe_l2_v1_3_0_contract.events.ApproveHash(),
+                safe_l2_v1_3_0_contract.events.SignMsg(),
+                safe_l2_v1_4_1_contract.events.ExecutionFailure(),
+                safe_l2_v1_3_0_contract.events.ExecutionFailure(),
+                safe_l2_v1_4_1_contract.events.ExecutionSuccess(),
+                safe_l2_v1_3_0_contract.events.ExecutionSuccess(),
+                # Modules
+                safe_l2_v1_4_1_contract.events.EnabledModule(),
+                safe_l2_v1_3_0_contract.events.EnabledModule(),
+                safe_l2_v1_4_1_contract.events.DisabledModule(),
+                safe_l2_v1_3_0_contract.events.DisabledModule(),
+                safe_l2_v1_3_0_contract.events.ExecutionFromModuleSuccess(),
+                safe_l2_v1_3_0_contract.events.ExecutionFromModuleFailure(),
+                # Owners
+                safe_l2_v1_4_1_contract.events.AddedOwner(),
+                safe_l2_v1_3_0_contract.events.AddedOwner(),
+                safe_l2_v1_4_1_contract.events.RemovedOwner(),
+                safe_l2_v1_3_0_contract.events.RemovedOwner(),
+                safe_l2_v1_3_0_contract.events.ChangedThreshold(),
+                # Incoming Ether
+                (
+                    safe_l2_v1_3_0_contract.events.SafeReceived()
+                    if not self.eth_zksync_compatible_network
+                    else None
+                ),  # zkSync networks deal with native transfers as ERC20, duplicating them during indexing
+                # Changed FallbackHandler
+                safe_l2_v1_4_1_contract.events.ChangedFallbackHandler(),
+                safe_l2_v1_3_0_contract.events.ChangedFallbackHandler(),
+                # Changed Guard
+                safe_l2_v1_4_1_contract.events.ChangedGuard(),
+                safe_l2_v1_3_0_contract.events.ChangedGuard(),
+                # Change Master Copy
+                safe_v1_1_1_contract.events.ChangedMasterCopy(),
+                # Proxy creation
+                proxy_factory_v1_4_1_contract.events.ProxyCreation(),
+                proxy_factory_v1_3_0_contract.events.ProxyCreation(),
+            )
+            if event
         ]
 
     @property

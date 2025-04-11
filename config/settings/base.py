@@ -553,6 +553,9 @@ ETH_INTERNAL_TX_DECODED_PROCESS_BATCH = env.int(
 ETH_L2_NETWORK = env.bool(
     "ETH_L2_NETWORK", default=not ETHEREUM_TRACING_NODE_URL
 )  # Use L2 event indexing
+ETH_ZKSYNC_COMPATIBLE_NETWORK = env.bool(
+    "ETH_ZKSYNC_COMPATIBLE_NETWORK", default=False
+)  # Fix some issues regarding zkSync compatible networks
 ETH_EVENTS_BLOCK_PROCESS_LIMIT = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT", default=50
 )  # Initial number of blocks to process together when searching for events. It will be auto increased. 0 == no limit.
