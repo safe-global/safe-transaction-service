@@ -1,7 +1,7 @@
 asgiref==3.7.2
 boto3==1.37.37
 cachetools==5.5.2
-celery==5.4.0
+celery==5.5.1
 django==5.0.13
 django-cache-memoize==0.2.1
 django-celery-beat==2.7.0
