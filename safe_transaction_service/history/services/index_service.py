@@ -10,7 +10,10 @@ from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.util.util import to_0x_hex_str
 
-from ..models import EthereumBlock, EthereumTx
+from ..models import (
+    EthereumBlock,
+    EthereumTx,
+)
 from ..models import IndexingStatus as IndexingStatusDb
 from ..models import (
     InternalTx,

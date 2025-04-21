@@ -5,7 +5,9 @@ from django.test import TestCase
 
 from eth_account import Account
 from safe_eth.eth import EthereumClient
-from safe_eth.eth.account_abstraction import BundlerClient
+from safe_eth.eth.account_abstraction import (
+    BundlerClient,
+)
 from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
 from safe_eth.eth.account_abstraction import (
     UserOperationReceipt as UserOperationReceiptClass,

@@ -138,7 +138,7 @@ class TokenManager(models.Manager):
             if isinstance(text, str):
                 text = text.encode()
             name_and_symbol.append(
-                text.decode("utf-8", errors="replace").replace("\x00", "\uFFFD")
+                text.decode("utf-8", errors="replace").replace("\x00", "\ufffd")
             )
 
         name, symbol = name_and_symbol
