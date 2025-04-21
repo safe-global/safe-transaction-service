@@ -158,7 +158,7 @@ def remove_cache_view_by_instance(
         MultisigConfirmation,
         MultisigTransaction,
         ModuleTransaction,
-    ]
+    ],
 ):
     """
     Remove the cache stored for instance view.
