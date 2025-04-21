@@ -44,10 +44,7 @@ class SafeEventsIndexerProvider:
 
     @classmethod
     def get_new_instance(cls) -> "SafeEventsIndexer":
-        return SafeEventsIndexer(
-            EthereumClient(settings.ETHEREUM_NODE_URL),
-            settings.ETH_ZKSYNC_COMPATIBLE_NETWORK,
-        )
+        return SafeEventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
     @classmethod
     def del_singleton(cls):
