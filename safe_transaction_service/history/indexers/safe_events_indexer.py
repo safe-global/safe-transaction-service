@@ -442,7 +442,10 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx_decoded.function_name = "setFallbackHandler"
         elif event_name == "ChangedGuard":
             internal_tx_decoded.function_name = "setGuard"
-        elif event_name == "SafeReceived":  # Received ether
+        elif (
+            event_name == "SafeReceived" and not self.eth_zksync_compatible_network
+        ):  # Received ether
+            # zkSync networks deal with native transfers as ERC20, duplicating them during indexing
             internal_tx.call_type = EthereumTxCallType.CALL.value
             internal_tx._from = args["sender"]
             internal_tx.to = safe_address
