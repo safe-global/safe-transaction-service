@@ -613,21 +613,18 @@ class DbTxDecoder(TxDecoder):
         :return: Abi function for data if it can be decoded, `None` if not found
         """
         selector = data[:4]
-        # Check first that selector is supported on our database
+
+        # First try to use specific ABI if address is provided
+        if address:
+            contract_selectors_with_abis = self.get_contract_abi(address)
+            if contract_selectors_with_abis and selector in contract_selectors_with_abis:
+                return contract_selectors_with_abis[selector]
+
+        # Then fall back to preloaded ABIs
         if selector in self.fn_selectors_with_abis:
-            # Try to use specific ABI if address provided
-            if address:
-                contract_selectors_with_abis = (
-                    self.get_contract_abi_selectors_with_functions(address)
-                )
-                if (
-                    contract_selectors_with_abis
-                    and selector in contract_selectors_with_abis
-                ):
-                    # If the selector is available in the abi specific for the address we will use that one
-                    # Otherwise we fall back to the general abi that matches the selector
-                    return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
+
+        return None
 
     def get_supported_abis(self) -> Iterable[Type[Contract]]:
         supported_abis = super().get_supported_abis()

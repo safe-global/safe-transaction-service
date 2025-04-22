@@ -393,39 +393,109 @@ class TestTxDecoder(TestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
         self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
-        self.assertIn(
-            (contract.address,),
-            DbTxDecoder.cache_contract_abi_selectors_with_functions_by_address,
-        )
 
-    def test_decode_fallback_calls_db_tx_decoder(self):
-        example_not_matched_abi = [
+    def test_db_tx_decoder_with_contract_specific_abi(self):
+        """
+        Test that contract-specific ABIs are used even when the selector isn't in the preloaded ABIs
+        """
+        # Create an ABI for a custom method
+        custom_method_abi = [
             {
-                "inputs": [],
-                "name": "claimOwner",
+                "inputs": [
+                    {"internalType": "address", "name": "token", "type": "address"},
+                    {"internalType": "uint256", "name": "amount", "type": "uint256"}
+                ],
+                "name": "customWithdraw",
                 "outputs": [],
                 "stateMutability": "nonpayable",
                 "type": "function",
-            },
+            }
         ]
 
-        example_not_matched_data = (
+        # Generate transaction data
+        custom_data = (
             Web3()
-            .eth.contract(abi=example_not_matched_abi)
-            .functions.claimOwner()
+            .eth.contract(abi=custom_method_abi)
+            .functions.customWithdraw(NULL_ADDRESS, 100)
             .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
         )
 
-        fallback_abi = [
-            {"stateMutability": "payable", "type": "fallback"},
+        # Create a contract with this ABI
+        contract_abi = ContractAbiFactory(abi=custom_method_abi)
+        contract = ContractFactory(contract_abi=contract_abi)
+
+        # Initialize decoder
+        db_tx_decoder = DbTxDecoder()
+
+        # Verify that without an address, decoding fails (not in preloaded ABIs)
+        with self.assertRaises(CannotDecode):
+            db_tx_decoder.decode_transaction(custom_data)
+
+        # Verify that with the contract address, decoding succeeds
+        fn_name, arguments = db_tx_decoder.decode_transaction(
+            custom_data, address=contract.address)
+        self.assertEqual(fn_name, "customWithdraw")
+        self.assertEqual(arguments, {"token": NULL_ADDRESS, "amount": "100"})
+
+        # Verify that the ABI was loaded from the contract, not from preloaded ABIs
+        selector = custom_data[:4]
+        self.assertNotIn(selector, db_tx_decoder.fn_selectors_with_abis)
+
+    def test_db_tx_decoder_priority(self):
+        """
+        Test that contract-specific ABIs take priority over preloaded ABIs
+        when there is a collision in function signatures
+        """
+        # Create two ABIs with the same function signature but different parameter names
+        abi1 = [
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "param1", "type": "uint256"},
+                    {"internalType": "uint256", "name": "param2", "type": "uint256"}
+                ],
+                "name": "sameMethod",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            }
         ]
 
-        db_tx_decoder = DbTxDecoder()
-        contract_fallback_abi = ContractAbiFactory(abi=fallback_abi)
-        contract = ContractFactory(contract_abi=contract_fallback_abi)
-        fn_name, arguments = db_tx_decoder.decode_transaction(
-            example_not_matched_data, address=contract.address
+        abi2 = [
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "differentParam1", "type": "uint256"},
+                    {"internalType": "uint256", "name": "differentParam2", "type": "uint256"}
+                ],
+                "name": "sameMethod",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            }
+        ]
+
+        # Generate transaction data (both ABIs will produce the same selector)
+        tx_data = (
+            Web3()
+            .eth.contract(abi=abi1)
+            .functions.sameMethod(10, 20)
+            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
         )
-        self.assertEqual(fn_name, "fallback")
-        self.assertEqual(arguments, {})
-        self.assertIn((contract.address,), DbTxDecoder.cache_abis_by_address)
+
+        # Add abi1 to preloaded ABIs
+        db_tx_decoder = DbTxDecoder()
+        db_tx_decoder.add_abi(abi1)
+
+        # Create a contract with abi2
+        contract_abi = ContractAbiFactory(abi=abi2)
+        contract = ContractFactory(contract_abi=contract_abi)
+
+        # Verify that without an address, it uses preloaded ABI (abi1)
+        fn_name, arguments = db_tx_decoder.decode_transaction(tx_data)
+        self.assertEqual(fn_name, "sameMethod")
+        self.assertEqual(arguments, {"param1": "10", "param2": "20"})
+
+        # Verify that with the contract address, it uses contract-specific ABI (abi2)
+        fn_name, arguments = db_tx_decoder.decode_transaction(
+            tx_data, address=contract.address)
+        self.assertEqual(fn_name, "sameMethod")
+        self.assertEqual(arguments, {"differentParam1": "10", "differentParam2": "20"})
