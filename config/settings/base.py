@@ -9,6 +9,7 @@ from corsheaders.defaults import default_headers as default_cors_headers
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 
 from safe_transaction_service import __version__
+from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter
 
 from ..gunicorn import (
     gunicorn_request_timeout,
@@ -122,7 +123,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
-    "safe_transaction_service.utils.loggers.LoggingMiddleware",
+    "safe_transaction_service.loggers.custom_logger.LoggingMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -372,7 +373,7 @@ LOGGING = {
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
         "ignore_succeeded_none": {
-            "()": "safe_transaction_service.utils.loggers.IgnoreSucceededNone"
+            "()": "safe_transaction_service.loggers.custom_logger.IgnoreSucceededNone"
         },
     },
     "formatters": {
@@ -381,10 +382,10 @@ LOGGING = {
             "format": "%(asctime)s [%(levelname)s] [%(processName)s] %(message)s"
         },
         "celery_verbose": {
-            "class": "safe_transaction_service.utils.celery.PatchedCeleryFormatter",
-            "format": "%(asctime)s [%(levelname)s] [%(task_id)s/%(task_name)s] %(message)s",
-            # 'format': '%(asctime)s [%(levelname)s] [%(processName)s] [%(task_id)s/%(task_name)s] %(message)s'
+            "class": "safe_transaction_service.loggers.custom_logger.PatchedCeleryFormatter",
+            "format": "%(message)s",
         },
+        "json": {"()": SafeJsonFormatter},
     },
     "handlers": {
         "mail_admins": {
@@ -393,13 +394,12 @@ LOGGING = {
             "class": "django.utils.log.AdminEmailHandler",
         },
         "console": {
-            "level": "DEBUG",
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": "json",
         },
         "console_short": {
             "class": "logging.StreamHandler",
-            "formatter": "short",
+            "formatter": "json",
         },
         "celery_console": {
             "level": "DEBUG",
