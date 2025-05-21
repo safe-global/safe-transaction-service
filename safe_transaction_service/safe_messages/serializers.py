@@ -16,7 +16,7 @@ from safe_eth.util.util import to_0x_hex_str
 from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
-from .utils import get_hash_for_message, get_safe_message_hash_for_message
+from .utils import get_hash_for_message, get_safe_message_hash_and_preimage_for_message
 
 
 # Request serializers
@@ -109,7 +109,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         signature = attrs["signature"]
         attrs["safe"] = safe_address
         message_hash = get_hash_for_message(message)
-        safe_message_hash = get_safe_message_hash_for_message(
+        safe_message_hash, safe_message_preimage = get_safe_message_hash_and_preimage_for_message(
             safe_address, message_hash
         )
         attrs["message_hash"] = safe_message_hash
@@ -120,7 +120,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
             )
 
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, safe_hash_preimage=message_hash
+            signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, None
