@@ -188,7 +188,7 @@ class LoggingMiddleware:
             delta = end_time - start_time
             http_request = http_request_log(request, start_time)
             content: str | None = None
-            if 400 <= response.status_code < 500:
+            if 400 <= response.status_code < 500 and hasattr(response, "data"):
                 content = str(response.data)
 
             http_response = HttpResponseLog(
