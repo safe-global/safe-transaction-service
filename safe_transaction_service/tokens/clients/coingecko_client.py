@@ -1,6 +1,6 @@
 import logging
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 from eth_typing import ChecksumAddress
@@ -45,7 +45,7 @@ class CoingeckoClient(BaseHTTPClient):
     def supports_network(cls, network: EthereumNetwork):
         return network in cls.ASSET_BY_NETWORK
 
-    def _do_request(self, url: str) -> Dict[str, Any]:
+    def _do_request(self, url: str) -> dict[str, Any]:
         try:
             response = self.http_session.get(url, timeout=self.request_timeout)
             if not response.ok:
@@ -62,7 +62,7 @@ class CoingeckoClient(BaseHTTPClient):
     @lru_cache(maxsize=128)
     def get_token_info(
         self, token_address: ChecksumAddress
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         token_address = token_address.lower()
         url = urljoin(
             self.base_url,

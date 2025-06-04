@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -114,7 +114,7 @@ class AboutEthereumRPCView(APIView):
 
     renderer_classes = (JSONRenderer,)
 
-    def _get_info(self, ethereum_client: EthereumClient) -> Dict[str, Any]:
+    def _get_info(self, ethereum_client: EthereumClient) -> dict[str, Any]:
         try:
             client_version = ethereum_client.w3.client_version
         except (IOError, ValueError):
@@ -796,7 +796,7 @@ class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
-    def get_parameters(self) -> Tuple[bool, bool]:
+    def get_parameters(self) -> tuple[bool, bool]:
         """
         Parse query parameters:
         :return: Tuple with only_trusted, exclude_spam

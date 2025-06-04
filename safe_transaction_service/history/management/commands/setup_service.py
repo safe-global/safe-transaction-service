@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence, Tuple
+from typing import Sequence
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -36,7 +36,7 @@ class CeleryTaskConfiguration:
     cron: CronDefinition = None
     enabled: bool = True
 
-    def create_task(self) -> Tuple[PeriodicTask, bool]:
+    def create_task(self) -> tuple[PeriodicTask, bool]:
         assert self.period or self.cron, "Task must define period or cron"
         if self.period:
             interval_schedule, _ = IntervalSchedule.objects.get_or_create(
@@ -241,7 +241,7 @@ class Command(BaseCommand):
             )
 
     def _setup_safe_singleton_addresses(
-        self, safe_singleton_addresses: Sequence[Tuple[str, int, str]]
+        self, safe_singleton_addresses: Sequence[tuple[str, int, str]]
     ):
         for address, initial_block_number, version in safe_singleton_addresses:
             safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
@@ -264,7 +264,7 @@ class Command(BaseCommand):
                 )
 
     def _setup_safe_proxy_factories(
-        self, safe_proxy_factories: Sequence[Tuple[str, int]]
+        self, safe_proxy_factories: Sequence[tuple[str, int]]
     ):
         for address, initial_block_number in safe_proxy_factories:
             ProxyFactory.objects.get_or_create(

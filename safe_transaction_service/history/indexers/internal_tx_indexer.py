@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from logging import getLogger
-from typing import Generator, Iterable, List, Optional, Sequence, Set
+from typing import Generator, Iterable, Optional, Sequence, Set
 
 from django.conf import settings
 from django.db import transaction
@@ -260,7 +260,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def trace_transactions(
         self, tx_hashes: Sequence[HexStr], batch_size: int
-    ) -> Iterable[List[FilterTrace]]:
+    ) -> Iterable[list[FilterTrace]]:
         batch_size = batch_size or len(tx_hashes)  # If `0`, don't use batches
         for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
             tx_hash_chunk = list(tx_hash_chunk)
@@ -294,7 +294,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def process_elements(
         self, tx_hash_with_traces: OrderedDict[bytes, Optional[FilterTrace]]
-    ) -> List[HexBytes]:
+    ) -> list[HexBytes]:
         """
         :param tx_hash_with_traces:
         :return: Inserted `InternalTx` objects

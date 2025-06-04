@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from django.db.models import Q
 
@@ -235,7 +235,7 @@ class DelegateDeleteView(GenericAPIView):
 class SafeBalanceView(GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
 
-    def get_parameters(self) -> Tuple[bool, bool]:
+    def get_parameters(self) -> tuple[bool, bool]:
         """
         Parse query parameters:
         :return: Tuple with only_trusted, exclude_spam
@@ -248,7 +248,7 @@ class SafeBalanceView(GenericAPIView):
         )
         return only_trusted, exclude_spam
 
-    def get_result(self, *args, **kwargs) -> Tuple[List[Balance], int]:
+    def get_result(self, *args, **kwargs) -> tuple[list[Balance], int]:
         return BalanceServiceProvider().get_balances(*args, **kwargs)
 
     @extend_schema(

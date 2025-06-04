@@ -1,6 +1,6 @@
 import re
 import time
-from typing import List, Optional
+from typing import Optional
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
@@ -192,7 +192,7 @@ class DelegateSignatureHelper(TemporarySignatureHelper):
             return keccak(text=message)
 
     @classmethod
-    def calculate_all_possible_hashes(cls, delegate: ChecksumAddress) -> List[bytes]:
+    def calculate_all_possible_hashes(cls, delegate: ChecksumAddress) -> list[bytes]:
         return [
             cls.calculate_hash(delegate),
             cls.calculate_hash(delegate, eth_sign=True),

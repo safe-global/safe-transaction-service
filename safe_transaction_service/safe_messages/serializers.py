@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Union
 
 from django.conf import settings
 
@@ -26,7 +26,7 @@ class SafeMessageSignatureParserMixin:
         safe_signatures: Sequence[SafeSignature],
         safe_address: ChecksumAddress,
         safe_message: Optional[SafeMessage],
-    ) -> Tuple[ChecksumAddress, SafeSignatureType]:
+    ) -> tuple[ChecksumAddress, SafeSignatureType]:
         """
         :param safe_signatures:
         :param safe_address:
@@ -87,7 +87,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
 
         return origin
 
-    def validate_message(self, value: Union[str, Dict[str, Any]]):
+    def validate_message(self, value: Union[str, dict[str, Any]]):
         if isinstance(value, str):
             return value
 
@@ -207,7 +207,7 @@ class SafeMessageResponseSerializer(serializers.Serializer):
     prepared_signature = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
 
-    def get_confirmations(self, obj: SafeMessage) -> Dict[str, Any]:
+    def get_confirmations(self, obj: SafeMessage) -> dict[str, Any]:
         """
         Filters confirmations queryset
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 
 from eth_typing import ChecksumAddress
 from rest_framework.exceptions import ValidationError
@@ -9,7 +8,7 @@ from safe_eth.safe import Safe
 from web3.exceptions import Web3Exception
 
 
-def get_safe_owners(safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+def get_safe_owners(safe_address: ChecksumAddress) -> list[ChecksumAddress]:
     """
     :param safe_address:
     :return: Current owners for a Safe

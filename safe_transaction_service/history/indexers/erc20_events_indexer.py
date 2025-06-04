@@ -1,7 +1,7 @@
 import datetime
 from collections import OrderedDict
 from logging import getLogger
-from typing import Iterator, List, NamedTuple, Optional, Sequence
+from typing import Iterator, NamedTuple, Optional, Sequence
 
 from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
@@ -73,7 +73,7 @@ class Erc20EventsIndexer(EventsIndexer):
         )
 
     @property
-    def contract_events(self) -> List[ContractEvent]:
+    def contract_events(self) -> list[ContractEvent]:
         """
         :return: Web3 ContractEvent to listen to
         """
@@ -92,7 +92,7 @@ class Erc20EventsIndexer(EventsIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-    ) -> List[LogReceipt]:
+    ) -> list[LogReceipt]:
         """
         Override function to call custom `get_total_transfer_history` function
 
@@ -173,7 +173,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
     def process_elements(
         self, log_receipts: Sequence[EventData]
-    ) -> List[TokenTransfer]:
+    ) -> list[TokenTransfer]:
         """
         Process all events found by `find_relevant_elements`
 

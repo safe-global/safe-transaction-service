@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from eth_account.messages import defunct_hash_message
 from eth_typing import ChecksumAddress, Hash32
@@ -7,7 +7,7 @@ from safe_eth.eth.eip712 import eip712_encode_hash
 from safe_eth.safe import Safe
 
 
-def get_hash_for_message(message: str | Dict[str, Any]) -> Hash32:
+def get_hash_for_message(message: str | dict[str, Any]) -> Hash32:
     return (
         defunct_hash_message(text=message)
         if isinstance(message, str)

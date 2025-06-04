@@ -4,7 +4,7 @@ Contains classes for processing indexed data and store Safe related models in da
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Iterator, List, Optional, Sequence, Union
+from typing import Iterator, Optional, Sequence, Union
 
 from django.db import transaction
 
@@ -99,7 +99,7 @@ class TxProcessor(ABC):
 
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
-    ) -> List[bool]:
+    ) -> list[bool]:
         return [
             self.process_decoded_transaction(decoded_transaction)
             for decoded_transaction in internal_txs_decoded
@@ -146,7 +146,7 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
         }
-        self.safe_last_status_cache: Dict[str, SafeLastStatus] = {}
+        self.safe_last_status_cache: dict[str, SafeLastStatus] = {}
         self.signature_breaking_versions = (  # Versions where signing changed
             Version("1.0.0"),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
             Version("1.3.0"),  # ChainId was included
@@ -377,7 +377,7 @@ class SafeTxProcessor(TxProcessor):
     @transaction.atomic
     def process_decoded_transactions(
         self, internal_txs_decoded: Iterator[InternalTxDecoded]
-    ) -> List[bool]:
+    ) -> list[bool]:
         """
         Optimize to process multiple transactions in a batch
         :param internal_txs_decoded:

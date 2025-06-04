@@ -4,7 +4,7 @@ import json
 import logging
 import operator
 import random
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -95,7 +95,7 @@ class CollectibleWithMetadata(Collectible):
     Collectible with metadata parsed if possible
     """
 
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     name: Optional[str] = dataclasses.field(init=False)
     description: Optional[str] = dataclasses.field(init=False)
     image_uri: Optional[str] = dataclasses.field(init=False)
@@ -207,7 +207,7 @@ class CollectiblesService:
     def get_metadata_cache_key(self, address: str, token_id: int):
         return f"metadata:{address}:{token_id}"
 
-    def _decode_base64_uri(self, uri: str) -> Optional[Dict[str, Any]]:
+    def _decode_base64_uri(self, uri: str) -> Optional[dict[str, Any]]:
         """
         Decodes data:application/json;base64 uris
 
@@ -333,7 +333,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[Collectible], int]:
+    ) -> tuple[list[Collectible], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -376,7 +376,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[Collectible], int]:
+    ) -> tuple[list[Collectible], int]:
         """
         :param safe_address:
         :param only_trusted: If True, return balance only for trusted tokens
@@ -426,7 +426,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[CollectibleWithMetadata], int]:
+    ) -> tuple[list[CollectibleWithMetadata], int]:
         """
         Get collectibles using the owner, addresses and the token_ids
 
@@ -441,7 +441,7 @@ class CollectiblesService:
         # Async retry for getting metadata if fetching fails
         from ..tasks import retry_get_metadata_task
 
-        collectibles_with_metadata: List[CollectibleWithMetadata] = []
+        collectibles_with_metadata: list[CollectibleWithMetadata] = []
         collectibles, count = self.get_collectibles(
             safe_address,
             only_trusted=only_trusted,
@@ -541,7 +541,7 @@ class CollectiblesService:
         exclude_spam: bool = False,
         limit: int = 10,
         offset: int = 0,
-    ) -> Tuple[List[CollectibleWithMetadata], int]:
+    ) -> tuple[list[CollectibleWithMetadata], int]:
         """
         Get collectibles paginated
 
@@ -573,8 +573,8 @@ class CollectiblesService:
                 return Erc721InfoWithLogo.from_token(token)
 
     def get_token_uris(
-        self, addresses_with_token_ids: Sequence[Tuple[ChecksumAddress, int]]
-    ) -> List[Optional[str]]:
+        self, addresses_with_token_ids: Sequence[tuple[ChecksumAddress, int]]
+    ) -> list[Optional[str]]:
         """
         Cache token_uris, as they shouldn't change
 
@@ -582,7 +582,7 @@ class CollectiblesService:
         :return: List of token_uris in the same other that `addresses_with_token_ids` were provided
         """
 
-        def get_redis_key(address_with_token_id: Tuple[ChecksumAddress, int]) -> str:
+        def get_redis_key(address_with_token_id: tuple[ChecksumAddress, int]) -> str:
             token_address, token_id = address_with_token_id
             return f"token-uri:{token_address}:{token_id}"
 
@@ -592,8 +592,8 @@ class CollectiblesService:
             for address_with_token_id in addresses_with_token_ids
         )
         # Redis does not allow `None`, so empty string is used for uris searched but not found
-        found_uris: Dict[Tuple[ChecksumAddress, int], Optional[str]] = {}
-        not_found_uris: List[Tuple[ChecksumAddress, int]] = []
+        found_uris: dict[tuple[ChecksumAddress, int], Optional[str]] = {}
+        not_found_uris: list[tuple[ChecksumAddress, int]] = []
 
         for address_with_token_id, token_uri in zip(
             addresses_with_token_ids, redis_token_uris

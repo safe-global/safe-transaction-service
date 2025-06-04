@@ -2,7 +2,7 @@ import json
 import operator
 import os
 from logging import getLogger
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -38,7 +38,7 @@ def get_file_storage():
         return default_storage
 
 
-def validate_abi(value: Dict[str, Any]):
+def validate_abi(value: dict[str, Any]):
     try:
         if not value:
             raise ValueError("Empty ABI not allowed")
@@ -66,7 +66,7 @@ class ContractAbi(models.Model):
     def __str__(self):
         return f"ContractABI {self.relevance} - {self.description}"
 
-    def abi_functions(self) -> List[str]:
+    def abi_functions(self) -> list[str]:
         return [x["name"] for x in self.abi if x["type"] == "function"]
 
     def save(self, *args, **kwargs) -> None:
