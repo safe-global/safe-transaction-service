@@ -1,7 +1,7 @@
 import logging
 import operator
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Sequence
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
@@ -90,7 +90,7 @@ class BalanceService:
         erc20_addresses: Sequence[ChecksumAddress],
         only_trusted: bool,
         exclude_spam: bool,
-    ) -> List[ChecksumAddress]:
+    ) -> list[ChecksumAddress]:
         """
         Filter the provided `erc20_addresses` list and tokens with `events_bugged=True` by spam or trusted.
 
@@ -137,7 +137,7 @@ class BalanceService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[Balance], int]:
+    ) -> tuple[list[Balance], int]:
         """
         Get a list of balances including native token balance.
         For ether, `token_address` is `None`.
@@ -186,7 +186,7 @@ class BalanceService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[ChecksumAddress], int]:
+    ) -> tuple[list[ChecksumAddress], int]:
         """
         :param safe_address:
         :param only_trusted:
@@ -228,7 +228,7 @@ class BalanceService:
         exclude_spam: bool = False,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> Tuple[List[Balance], int]:
+    ) -> tuple[list[Balance], int]:
         """
         Get a list of balances including native token balance.
         For ether, `token_address` is `None`.

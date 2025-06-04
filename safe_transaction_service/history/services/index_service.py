@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Collection, List, Optional, OrderedDict, Union
+from typing import Collection, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
 from django.db.models import Min, Q
@@ -252,7 +252,7 @@ class IndexService:
 
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
-    ) -> List["EthereumTx"]:
+    ) -> list["EthereumTx"]:
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
@@ -369,7 +369,7 @@ class IndexService:
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
-    def _reprocess(self, addresses: List[str]):
+    def _reprocess(self, addresses: list[str]):
         """
         Trigger processing of traces again. If addresses is empty, everything is reprocessed
 
@@ -484,7 +484,7 @@ class IndexService:
             )
         return total_processed_txs
 
-    def reprocess_addresses(self, addresses: List[ChecksumAddress]):
+    def reprocess_addresses(self, addresses: list[ChecksumAddress]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
         every `InternalTxDecoded` not processed to be processed again

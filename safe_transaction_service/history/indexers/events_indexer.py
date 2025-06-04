@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Dict, List, Optional, OrderedDict, Sequence
+from typing import Any, Optional, OrderedDict, Sequence
 
 from django.conf import settings
 
@@ -60,13 +60,13 @@ class EventsIndexer(EthereumIndexer):
 
     @property
     @abstractmethod
-    def contract_events(self) -> List[ContractEvent]:
+    def contract_events(self) -> list[ContractEvent]:
         """
         :return: List of Web3.py `ContractEvent` to listen to
         """
 
     @cached_property
-    def events_to_listen(self) -> Dict[HexStr, List[ContractEvent]]:
+    def events_to_listen(self) -> dict[HexStr, list[ContractEvent]]:
         """
         Build a dictionary with a `topic` and a list of ABIs to use for decoding. One single topic can have
         multiple ways of decoding as events with different `indexed` parameters must be decoded
@@ -85,7 +85,7 @@ class EventsIndexer(EthereumIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-    ) -> List[LogReceipt]:
+    ) -> list[LogReceipt]:
         """
         Perform query to the node
 
@@ -137,7 +137,7 @@ class EventsIndexer(EthereumIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-    ) -> List[LogReceipt]:
+    ) -> list[LogReceipt]:
         """
         It will get Safe events using all the Safe topics for filtering.
 
@@ -181,7 +181,7 @@ class EventsIndexer(EthereumIndexer):
         from_block_number: int,
         to_block_number: int,
         current_block_number: Optional[int] = None,
-    ) -> List[LogReceipt]:
+    ) -> list[LogReceipt]:
         """
         Search for log receipts for Safe events
 
@@ -237,7 +237,7 @@ class EventsIndexer(EthereumIndexer):
         )
         return None
 
-    def decode_elements(self, log_receipts: Sequence[LogReceipt]) -> List[EventData]:
+    def decode_elements(self, log_receipts: Sequence[LogReceipt]) -> list[EventData]:
         """
         :param log_receipts:
         :return: Decode `log_receipts` and return a list of `EventData`. If a `log_receipt` cannot be decoded
@@ -249,14 +249,14 @@ class EventsIndexer(EthereumIndexer):
                 decoded_elements.append(decoded_element)
         return decoded_elements
 
-    def _process_decoded_elements(self, decoded_elements: List[EventData]) -> List[Any]:
+    def _process_decoded_elements(self, decoded_elements: list[EventData]) -> list[Any]:
         processed_elements = []
         for decoded_element in decoded_elements:
             if processed_element := self._process_decoded_element(decoded_element):
                 processed_elements.append(processed_element)
         return processed_elements
 
-    def process_elements(self, log_receipts: Sequence[LogReceipt]) -> List[Any]:
+    def process_elements(self, log_receipts: Sequence[LogReceipt]) -> list[Any]:
         """
         Process all events found by `find_relevant_elements`
 
@@ -278,7 +278,7 @@ class EventsIndexer(EthereumIndexer):
             )
         ]
         logger.debug("Decoding `log_receipts` of the events")
-        decoded_elements: List[EventData] = self.decode_elements(
+        decoded_elements: list[EventData] = self.decode_elements(
             not_processed_log_receipts
         )
         logger.debug("Decoded `log_receipts` of the events")

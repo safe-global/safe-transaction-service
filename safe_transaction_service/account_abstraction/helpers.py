@@ -1,5 +1,4 @@
 import dataclasses
-from typing import List
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient
@@ -19,7 +18,7 @@ class DecodedInitCode:
     salt_nonce: int
     expected_address: ChecksumAddress  # Expected Safe deployment address
     # Safe creation data
-    owners: List[ChecksumAddress]
+    owners: list[ChecksumAddress]
     threshold: int
     to: ChecksumAddress
     data: bytes

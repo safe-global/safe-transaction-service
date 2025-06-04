@@ -3,7 +3,7 @@ import dataclasses
 import datetime
 import json
 import random
-from typing import Optional, Tuple
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
@@ -96,7 +96,7 @@ def check_sync_status_task() -> bool:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_erc20_events_task(self) -> Optional[Tuple[int, int]]:
+def index_erc20_events_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process ERC20/721 events for monitored addresses
 
@@ -182,7 +182,7 @@ def index_erc20_events_out_of_sync_task(
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_internal_txs_task(self) -> Optional[Tuple[int, int]]:
+def index_internal_txs_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process internal txs for monitored addresses
     :return: Tuple of number of addresses processed and number of blocks processed
@@ -209,7 +209,7 @@ def index_internal_txs_task(self) -> Optional[Tuple[int, int]]:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_new_proxies_task(self) -> Optional[Tuple[int, int]]:
+def index_new_proxies_task(self) -> Optional[tuple[int, int]]:
     """
     :return: Tuple of number of proxies created and number of blocks processed
     """
@@ -231,7 +231,7 @@ def index_new_proxies_task(self) -> Optional[Tuple[int, int]]:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_safe_events_task(self) -> Optional[Tuple[int, int]]:
+def index_safe_events_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process for monitored addresses
     :return: Tuple of number of addresses processed and number of blocks processed

@@ -1,7 +1,7 @@
 import json
 import logging
 from functools import cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 
@@ -75,9 +75,9 @@ def get_queue_service():
 
 class QueueService:
     def __init__(self):
-        self._connection_pool: List[BrokerConnection] = []
+        self._connection_pool: list[BrokerConnection] = []
         self._total_connections: int = 0
-        self.unsent_events: List = []
+        self.unsent_events: list[str] = []
 
     def get_connection(self) -> Optional[BrokerConnection]:
         """
@@ -114,13 +114,13 @@ class QueueService:
         if broker_connection:
             self._connection_pool.insert(0, broker_connection)
 
-    def send_event(self, payload: Dict[str, Any]) -> int:
+    def send_event(self, payload: dict[str, Any]) -> int:
         """
         Publish event using the `BrokerConnection`
 
         :param payload: Number of events published
         """
-        event = json.dumps(payload)
+        event: str = json.dumps(payload)
         if not (broker_connection := self.get_connection()):
             # No available connections in the pool, store event to send it later
             self.unsent_events.append(event)
@@ -176,5 +176,5 @@ class MockedQueueService:
     Mocked class to use in case that there is not rabbitMq queue to send events
     """
 
-    def send_event(self, event: Dict[str, Any]):
+    def send_event(self, event: dict[str, Any]):
         logger.debug("MockedQueueService: Not sending event with payload %s", event)

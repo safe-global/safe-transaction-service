@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.db import transaction
@@ -39,9 +39,9 @@ class SafeOperationSignatureValidatorMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ethereum_client = get_auto_ethereum_client()
-        self._deployment_owners: List[ChecksumAddress] = []
+        self._deployment_owners: list[ChecksumAddress] = []
 
-    def _get_owners(self, safe_address: ChecksumAddress) -> List[ChecksumAddress]:
+    def _get_owners(self, safe_address: ChecksumAddress) -> list[ChecksumAddress]:
         """
         :param safe_address:
         :return:  `init_code` decoded owners if Safe is not deployed or current blockchain owners if Safe is deployed
@@ -59,7 +59,7 @@ class SafeOperationSignatureValidatorMixin:
         safe_operation_hash: bytes,
         safe_operation_hash_preimage: bytes,
         signature: bytes,
-    ) -> List[SafeSignature]:
+    ) -> list[SafeSignature]:
         safe_owners = self._get_owners(safe_address)
         parsed_signatures = SafeSignature.parse_signature(
             signature,
@@ -375,7 +375,7 @@ class SafeOperationConfirmationSerializer(
     @transaction.atomic
     def save(self, **kwargs):
         safe_signatures = self.validated_data["safe_signatures"]
-        safe_operation_confirmations: List[SafeOperationConfirmation] = []
+        safe_operation_confirmations: list[SafeOperationConfirmation] = []
         for safe_signature in safe_signatures:
             safe_operation_confirmation, created = (
                 SafeOperationConfirmation.objects.get_or_create(
@@ -438,7 +438,7 @@ class SafeOperationResponseSerializer(serializers.Serializer):
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
 
-    def get_confirmations(self, obj: SafeOperationModel) -> Dict[str, Any]:
+    def get_confirmations(self, obj: SafeOperationModel) -> dict[str, Any]:
         """
         Filters confirmations queryset
 

@@ -1,5 +1,4 @@
 import logging
-from typing import List, Tuple
 
 from django.core.files import File
 from django.core.management import BaseCommand, CommandError
@@ -108,8 +107,8 @@ class Command(BaseCommand):
 
     @staticmethod
     def _get_deployments_by_chain_and_version(
-        versions: List[str], chain_id: str
-    ) -> List[Tuple[str, str, str]]:
+        versions: list[str], chain_id: str
+    ) -> list[tuple[str, str, str]]:
         """
         Get the list of contracts for the given versions and chain.
 
@@ -117,7 +116,7 @@ class Command(BaseCommand):
         :param chain_id: chain id
         :return: list of (version, contract_name, contract_address)
         """
-        chain_deployments: List[Tuple[str, str, str]] = []
+        chain_deployments: list[tuple[str, str, str]] = []
         for version in versions:
             for contract_name, addresses in safe_deployments[version].items():
                 for contract_address in addresses.get(chain_id, []):
@@ -127,8 +126,8 @@ class Command(BaseCommand):
 
     @staticmethod
     def _get_default_deployments_by_version_on_chain(
-        versions: List[str], ethereum_client: EthereumClient
-    ) -> List[Tuple[str, str, str]]:
+        versions: list[str], ethereum_client: EthereumClient
+    ) -> list[tuple[str, str, str]]:
         """
         Get the default deployments by version actually deployed on chain.
 
@@ -136,7 +135,7 @@ class Command(BaseCommand):
         :param ethereum_client: Ethereum client
         :return: list of (version, contract_name, contract_address)
         """
-        chain_deployments: List[Tuple[str, str, str]] = []
+        chain_deployments: list[tuple[str, str, str]] = []
         for version in versions:
             for contract_name, addresses in default_safe_deployments[version].items():
                 for contract_address in addresses:
@@ -149,7 +148,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _create_or_update_contracts_from_deployments(
-        deployments: List[Tuple[str, str, str]],
+        deployments: list[tuple[str, str, str]],
         queryset,
         force_update_contracts: bool,
         logo_file: File,

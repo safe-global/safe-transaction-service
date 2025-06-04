@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
@@ -69,7 +69,7 @@ class SafeEventsIndexer(EventsIndexer):
         super().__init__(*args, **kwargs)
 
     @cached_property
-    def contract_events(self) -> List[ContractEvent]:
+    def contract_events(self) -> list[ContractEvent]:
         """
         Safe v1.3.0 L2 Events
         ------------------
@@ -299,7 +299,7 @@ class SafeEventsIndexer(EventsIndexer):
         ).exists()
 
     @transaction.atomic
-    def decode_elements(self, *args) -> List[EventData]:
+    def decode_elements(self, *args) -> list[EventData]:
         return super().decode_elements(*args)
 
     def _get_internal_tx_from_decoded_event(
@@ -498,15 +498,15 @@ class SafeEventsIndexer(EventsIndexer):
         return internal_tx
 
     def _get_safe_creation_events(
-        self, decoded_elements: List[EventData]
-    ) -> Dict[ChecksumAddress, List[EventData]]:
+        self, decoded_elements: list[EventData]
+    ) -> dict[ChecksumAddress, list[EventData]]:
         """
         Get the creation events (ProxyCreation and SafeSetup) from decoded elements and generates a dictionary that groups these events by Safe address.
 
         :param decoded_elements:
         :return:
         """
-        safe_creation_events: Dict[ChecksumAddress, List[Dict]] = {}
+        safe_creation_events: dict[ChecksumAddress, list[dict]] = {}
         for decoded_element in decoded_elements:
             event_name = decoded_element["event"]
             if event_name == "SafeSetup":
@@ -524,8 +524,8 @@ class SafeEventsIndexer(EventsIndexer):
 
     def _process_safe_creation_events(
         self,
-        safe_addresses_with_creation_events: Dict[ChecksumAddress, List[EventData]],
-    ) -> List[InternalTx]:
+        safe_addresses_with_creation_events: dict[ChecksumAddress, list[EventData]],
+    ) -> list[InternalTx]:
         """
         Process creation events (ProxyCreation and SafeSetup).
 
@@ -618,7 +618,7 @@ class SafeEventsIndexer(EventsIndexer):
                     logger.error(f"Event is not a Safe creation event {event['event']}")
 
         # Store which internal txs where inserted into database
-        stored_internal_txs: List[InternalTx] = []
+        stored_internal_txs: list[InternalTx] = []
         with transaction.atomic():
             try:
                 InternalTx.objects.bulk_create(internal_txs)

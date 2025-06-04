@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import List, Optional, Sequence
+from typing import Optional, Sequence
 
 from safe_eth.eth import EthereumClient
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -40,7 +40,7 @@ class ProxyFactoryIndexerProvider:
 
 class ProxyFactoryIndexer(EventsIndexer):
     @cached_property
-    def contract_events(self) -> List[ContractEvent]:
+    def contract_events(self) -> list[ContractEvent]:
         proxy_factory_v1_1_1_contract = get_proxy_factory_V1_1_1_contract(
             self.ethereum_client.w3
         )
@@ -87,7 +87,7 @@ class ProxyFactoryIndexer(EventsIndexer):
 
     def process_elements(
         self, log_receipts: Sequence[LogReceipt]
-    ) -> List[SafeContract]:
+    ) -> list[SafeContract]:
         """
         Process all logs
 
