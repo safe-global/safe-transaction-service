@@ -423,7 +423,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             buf.getvalue(),
         )
         self.assertEqual(SafeMasterCopy.objects.count(), 2)
-        self.assertEqual(ProxyFactory.objects.count(), 1)
+        self.assertEqual(ProxyFactory.objects.count(), 2)
 
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def test_setup_service_update_singletons(
@@ -439,7 +439,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         buf = StringIO()
         call_command(command, stdout=buf)
         self.assertEqual(SafeMasterCopy.objects.count(), 2)
-        self.assertEqual(ProxyFactory.objects.count(), 1)
+        self.assertEqual(ProxyFactory.objects.count(), 2)
         master_copy = SafeMasterCopy.objects.first()
         self.assertEqual(master_copy.initial_block_number, 0)
         mocked_addresses = {ethereum_network: [(master_copy.address, 111, "v1.1.1")]}

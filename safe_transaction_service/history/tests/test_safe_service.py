@@ -187,7 +187,8 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_info.owners, safe.retrieve_owners())
         self.assertEqual(safe_info.threshold, safe.retrieve_threshold())
         self.assertEqual(
-            safe_info.fallback_handler, self.compatibility_fallback_handler.address
+            safe_info.fallback_handler,
+            self.compatibility_fallback_handler_V1_4_1.address,
         )
         self.assertEqual(safe_info.guard, NULL_ADDRESS)
         self.assertEqual(safe_info.version, None)  # No SafeMasterCopy
