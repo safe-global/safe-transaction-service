@@ -281,10 +281,10 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                     },
                 )
 
-    def test_safe_messages_create_using_1271_signature_view(self):
+    def _test_safe_messages_create_using_1271_signature_view(self, safe_deployment_fn):
         account = Account.create()
-        safe_owner = self.deploy_test_safe(owners=[account.address])
-        safe = self.deploy_test_safe(owners=[safe_owner.address])
+        safe_owner = safe_deployment_fn(owners=[account.address])
+        safe = safe_deployment_fn(owners=[safe_owner.address])
 
         safe_address = safe.address
         message = get_eip712_payload_mock()
@@ -316,6 +316,16 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(SafeMessage.objects.count(), 1)
         self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
+
+    def test_safe_messages_create_using_1271_signature_v1_3_0_view(self):
+        return self._test_safe_messages_create_using_1271_signature_view(
+            self.deploy_test_safe_v1_3_0
+        )
+
+    def test_safe_messages_create_using_1271_signature_v1_4_1_view(self):
+        return self._test_safe_messages_create_using_1271_signature_view(
+            self.deploy_test_safe_v1_4_1
+        )
 
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
