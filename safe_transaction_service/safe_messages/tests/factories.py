@@ -5,7 +5,7 @@ from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
 from ..models import SafeMessage, SafeMessageConfirmation
-from ..utils import get_hash_for_message, get_safe_message_hash_for_message
+from ..utils import get_message_encoded, get_safe_message_hash_for_message
 
 
 class SafeMessageFactory(DjangoModelFactory):
@@ -22,7 +22,7 @@ class SafeMessageFactory(DjangoModelFactory):
     def message_hash(self) -> str:
         return to_0x_hex_str(
             get_safe_message_hash_for_message(
-                self.safe, get_hash_for_message(self.message)
+                self.safe, get_message_encoded(self.message)
             )
         )
 

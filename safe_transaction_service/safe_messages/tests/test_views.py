@@ -7,12 +7,11 @@ from django.urls import reverse
 
 import eth_abi
 from eth_account import Account
-from eth_account.messages import defunct_hash_message
 from hexbytes import HexBytes
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
-from safe_eth.eth.eip712 import eip712_encode_hash
+from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.safe.safe_signature import SafeSignatureEOA
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -28,6 +27,7 @@ from safe_transaction_service.safe_messages.tests.factories import (
 )
 from safe_transaction_service.utils.utils import datetime_to_str
 
+from ..utils import encode_eip191_message, encode_eip712_message
 from .mocks import get_eip712_payload_mock
 
 logger = logging.getLogger(__name__)
@@ -144,12 +144,13 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         safe_address = safe.address
         messages = ["Text to sign message", get_eip712_payload_mock()]
         description = "Testing EIP191 message signing"
-        message_hashes = [
-            defunct_hash_message(text=messages[0]),
-            eip712_encode_hash(messages[1]),
+        messages_encoded = [
+            encode_eip191_message(messages[0]),
+            encode_eip712_message(messages[1]),
         ]
         safe_message_hashes = [
-            safe.get_message_hash(message_hash) for message_hash in message_hashes
+            safe.get_message_hash(message_encoded)
+            for message_encoded in messages_encoded
         ]
         signatures = [
             to_0x_hex_str(account.unsafe_sign_hash(safe_message_hash)["signature"])
@@ -158,15 +159,14 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
 
         sub_tests = ["create_eip191", "create_eip712"]
 
-        for sub_test, message, message_hash, safe_message_hash, signature in zip(
-            sub_tests, messages, message_hashes, safe_message_hashes, signatures
+        for sub_test, message, safe_message_hash, signature in zip(
+            sub_tests, messages, safe_message_hashes, signatures
         ):
             SafeMessage.objects.all().delete()
             get_owners_mock.return_value = []
             with self.subTest(
                 sub_test,
                 message=message,
-                message_hash=message_hash,
                 safe_message_hash=safe_message_hash,
                 signature=signature,
             ):
@@ -289,8 +289,8 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         safe_address = safe.address
         message = get_eip712_payload_mock()
         description = "Testing EIP712 message signing"
-        message_hash = eip712_encode_hash(message)
-        safe_owner_message_hash = safe_owner.get_message_hash(message_hash)
+        message_encoded = b"".join(eip712_encode(message))
+        safe_owner_message_hash = safe_owner.get_message_hash(message_encoded)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
