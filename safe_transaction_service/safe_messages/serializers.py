@@ -16,7 +16,10 @@ from safe_eth.util.util import to_0x_hex_str
 from safe_transaction_service.utils.serializers import get_safe_owners
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
-from .utils import get_hash_for_message, get_safe_message_hash_for_message
+from .utils import (
+    get_message_encoded,
+    get_safe_message_hash_for_message,
+)
 
 
 # Request serializers
@@ -105,12 +108,12 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
     def validate(self, attrs):
         attrs = super().validate(attrs)
         safe_address = self.context["safe_address"]
+        attrs["safe"] = safe_address
         message = attrs["message"]
         signature = attrs["signature"]
-        attrs["safe"] = safe_address
-        message_hash = get_hash_for_message(message)
+        message_encoded = get_message_encoded(message)
         safe_message_hash = get_safe_message_hash_for_message(
-            safe_address, message_hash
+            safe_address, message_encoded
         )
         attrs["message_hash"] = safe_message_hash
 
@@ -120,7 +123,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
             )
 
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, safe_hash_preimage=message_hash
+            signature, safe_message_hash, safe_hash_preimage=message_encoded
         )
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, None
@@ -158,11 +161,11 @@ class SafeMessageSignatureSerializer(
         attrs["safe_message"] = safe_message
         signature: HexStr = attrs["signature"]
         safe_address = safe_message.safe
-        message_hash = get_hash_for_message(safe_message.message)
+        message_encoded = get_message_encoded(safe_message.message)
         safe_message_hash = safe_message.message_hash
 
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, safe_hash_preimage=message_hash
+            signature, safe_message_hash, safe_hash_preimage=message_encoded
         )
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, safe_message
