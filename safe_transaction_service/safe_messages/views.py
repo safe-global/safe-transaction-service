@@ -53,6 +53,8 @@ class SafeMessageSignatureView(CreateAPIView):
     def post(self, request, *args, **kwargs):
         """
         Adds the signature of a message given its message hash
+
+        Note: Safe must be v1.4.1 for EIP-1271 signatures to work.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -122,6 +124,8 @@ class SafeMessagesView(ListCreateAPIView):
 
         Hash will be calculated from the provided ``message``. Sending a raw ``hash`` will not be accepted,
         service needs to derive it itself.
+
+        Note: Safe must be v1.4.1 for EIP-1271 signatures to work.
         """
         if not fast_is_checksum_address(address):
             return Response(
