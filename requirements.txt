@@ -14,7 +14,7 @@ django-extensions==4.1
 django-filter==25.1
 django-imagekit==5.0.0
 django-model-utils==5.0.0
-django-redis==5.4.0
+django-redis==6.0.0
 django-s3-storage==0.15.0
 django-timezone-field==7.1
 djangorestframework==3.16.0
