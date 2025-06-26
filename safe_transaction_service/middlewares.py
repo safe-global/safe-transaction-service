@@ -1,7 +1,8 @@
 import logging
 
-from loggers.custom_logger import (
-    HttpRequest,
+from django.http import HttpRequest
+
+from .loggers.custom_logger import (
     HttpResponseLog,
     get_milliseconds_now,
     http_request_log,
@@ -53,7 +54,7 @@ class ProxyPrefixMiddleware:
         self.get_response = get_response
         self.logger = logging.getLogger("ProxyPrefixMiddleware")
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest):
         prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
         self.logger.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
         if prefix:
