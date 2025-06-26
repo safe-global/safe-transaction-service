@@ -24,7 +24,7 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
             "0x40ef28feb993bf127265260d48ab1a427d5b852aa8b38f511fcd368bfc9cbfdf"
         )
 
-        result_hash = DelegateSignatureHelperV2.calculate_hash(
+        result_hash, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate_address, chain_id, False
         )
 
@@ -36,7 +36,7 @@ class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
             "0x37fe1c77d467e92109ef91637e30a4053bab963de2ea74f9d6c4ba1918ff32e6"
         )
 
-        result_hash = DelegateSignatureHelperV2.calculate_hash(
+        result_hash, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate_address, chain_id, True
         )
 

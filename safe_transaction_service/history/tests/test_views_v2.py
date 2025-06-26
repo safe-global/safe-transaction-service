@@ -232,7 +232,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             # Create delegate
             self.assertEqual(SafeContractDelegate.objects.count(), 0)
             chain_id = self.ethereum_client.get_chain_id()
-            hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+            hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
                 delegate.address, chain_id, False
             )
             data["signature"] = to_0x_hex_str(
@@ -271,7 +271,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             self.assertIsNone(safe_contract_delegate.expiry_date)
 
         # Create delegate without a Safe
-        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+        hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate.address, chain_id, False
         )
         data = {
@@ -302,7 +302,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         chain_id = None
         delegate = Account.create()
         delegator = Account.create()
-        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+        hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate.address, chain_id, False
         )
         data = {
@@ -326,7 +326,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         chain_id = None
         delegate = Account.create()
         delegator = Account.create()
-        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+        hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate.address, chain_id, False
         )
         data = {
@@ -432,7 +432,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         delegate = Account.create()
         delegator = Account.create()
         chain_id = self.ethereum_client.get_chain_id()
-        hash_to_sign = DelegateSignatureHelperV2.calculate_hash(
+        hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
             delegate.address, chain_id, False
         )
         # Test delete using delegate signature and then delegator signature
