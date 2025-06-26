@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from django.test import RequestFactory
 
-from ..middlewares import ProxyPrefixMiddleware
+from ..proxy_prefix_middleware import ProxyPrefixMiddleware
 
 
 class TestMiddlewares(unittest.TestCase):
