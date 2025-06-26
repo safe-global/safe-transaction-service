@@ -2,6 +2,13 @@ import logging
 
 
 class ProxyPrefixMiddleware:
+    """
+    Middleware that adds a prefix from the 'HTTP_X_FORWARDED_PREFIX' header
+    to the request's full path.
+    This helps when the app is behind a proxy that uses URL prefixes.
+    It modifies the request's get_full_path method to include the prefix.
+    """
+
     def __init__(self, get_response):
         self.get_response = get_response
 
