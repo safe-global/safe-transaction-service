@@ -2,7 +2,7 @@ import logging
 
 from django.http import HttpRequest
 
-from .loggers.custom_logger import (
+from safe_transaction_service.loggers.custom_logger import (
     HttpResponseLog,
     get_milliseconds_now,
     http_request_log,
