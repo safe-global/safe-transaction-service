@@ -293,7 +293,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         data["signature"] = to_0x_hex_str(signature)
         response = self.client.post(url, format="json", data=data)
         self.assertIn(
-            f"Signature of type=CONTRACT_SIGNATURE for signer={delegator.address} is not valid",
+            f"No valid signature found for signer={delegator.address}",
             response.data["non_field_errors"][0],
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -353,6 +353,79 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(safe_contract_delegate.delegate, delegate.address)
         self.assertEqual(safe_contract_delegate.delegator, delegator.address)
         self.assertEqual(safe_contract_delegate.safe_contract_id, safe.address)
+
+    def _test_add_delegate_using_1271_signature(self, safe_deployment_fn):
+        account_a = Account.create()
+        account_b = Account.create()
+        safe_owner = safe_deployment_fn(
+            owners=[account_a.address, account_b.address], threshold=2
+        )
+        SafeContractFactory(address=safe_owner.address)
+
+        nested_safe = safe_deployment_fn(owners=[safe_owner.address])
+        SafeContractFactory(address=nested_safe.address)
+
+        chain_id = self.ethereum_client.get_chain_id()
+        delegate = Account.create()
+
+        _, preimage_to_sign = DelegateSignatureHelperV2.calculate_hash_and_preimage(
+            delegate.address, chain_id, previous_totp=False
+        )
+
+        safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(
+            preimage_to_sign
+        )
+
+        safe_owner_account_a_signature = account_a.unsafe_sign_hash(
+            safe_owner_message_hash
+        )["signature"]
+        safe_owner_account_b_signature = account_b.unsafe_sign_hash(
+            safe_owner_message_hash
+        )["signature"]
+
+        # Build EIP1271 signature v=0 r=safe v=dynamic_part dynamic_part=size+owner_signature
+        signatures_with_addresses = [
+            (account_a.address.lower(), safe_owner_account_a_signature),
+            (account_b.address.lower(), safe_owner_account_b_signature),
+        ]
+        signatures_with_addresses.sort(key=lambda x: x[0])
+        ordered_signatures = b"".join(sig for _, sig in signatures_with_addresses)
+
+        signature_1271 = (
+            signature_to_bytes(
+                0, int.from_bytes(HexBytes(safe_owner.address), byteorder="big"), 65
+            )
+            + eth_abi.encode(["bytes"], [ordered_signatures])[32:]
+        )
+
+        data = {
+            "label": "Nested safe delegator",
+            "safe": nested_safe.address,
+            "delegate": delegate.address,
+            "delegator": safe_owner.address,
+            "signature": to_0x_hex_str(HexBytes(signature_1271)),
+        }
+        response = self.client.post(
+            reverse("v2:history:delegates"),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+        safe_contract_delegate = SafeContractDelegate.objects.get()
+        self.assertEqual(safe_contract_delegate.delegate, delegate.address)
+        self.assertEqual(safe_contract_delegate.delegator, safe_owner.address)
+        self.assertEqual(safe_contract_delegate.safe_contract_id, nested_safe.address)
+
+    def test_add_delegate_using_1271_signature_v1_3_0(self):
+        return self._test_add_delegate_using_1271_signature(
+            self.deploy_test_safe_v1_3_0
+        )
+
+    def test_add_delegate_using_1271_signature_v1_4_1(self):
+        return self._test_add_delegate_using_1271_signature(
+            self.deploy_test_safe_v1_4_1
+        )
 
     def test_delegates_get(self):
         url = reverse("v2:history:delegates")

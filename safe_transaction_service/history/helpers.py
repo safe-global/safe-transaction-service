@@ -93,7 +93,7 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
 
         :param delegate_address:
         :param chain_id:
-        :param previous_totp:
+        :param previous_totp: if true calculate previous totp interval
         :return: Hash for the EIP712 generated object from the provided parameters with the preimage
         """
         totp = cls.calculate_totp(previous=previous_totp)
