@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 
@@ -9,6 +10,31 @@ from drf_spectacular.settings import spectacular_settings
 
 
 class IgnoreVersionSchemaGenerator(SchemaGenerator):
+    def get_schema(self, request=None, public=False):
+        """
+        Generate the OpenAPI schema, adding a path prefix if present.
+
+        If the 'HTTP_X_FORWARDED_PREFIX' header is set (usually by a proxy),
+        it adds that prefix to all paths in the schema.
+
+        Args:
+            request (HttpRequest, optional): The incoming request.
+            public (bool, optional): Whether to generate a public schema.
+
+        Returns:
+            dict: The generated OpenAPI schema with updated paths if a prefix is found.
+        """
+        schema = super().get_schema(request=request, public=public)
+        prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
+        logging.info(f"prefix: {prefix}")
+
+        if prefix:
+            new_paths = {}
+            for path_endpoint, endpoint_info in schema["paths"].items():
+                new_paths[f"{prefix}{path_endpoint}"] = endpoint_info
+            schema["paths"] = new_paths
+
+        return schema
 
     def parse(self, input_request, public):
         """Iterate endpoints generating per method path operations."""

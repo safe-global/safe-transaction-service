@@ -47,7 +47,7 @@ class ProxyPrefixMiddleware:
     Middleware that adds a prefix from the 'HTTP_X_FORWARDED_PREFIX' header
     to the request's full path.
     This helps when the app is behind a proxy that uses URL prefixes.
-    It modifies the request's get_full_path method to include the prefix.
+    It modifies the request's build_absolute_uri method to include the prefix.
     """
 
     def __init__(self, get_response):
@@ -58,11 +58,12 @@ class ProxyPrefixMiddleware:
         prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
         self.logger.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
         if prefix:
-            original_get_full_path = request.get_full_path
+            original_build_absolute_uri = request.build_absolute_uri
 
-            def patched_get_full_path(force_append_slash=False):
-                return prefix + original_get_full_path(force_append_slash)
+            def patched_build_absolute_uri(location=None):
+                uri = original_build_absolute_uri(location)
+                return uri.replace(request.get_host(), request.get_host() + prefix, 1)
 
-            request.get_full_path = patched_get_full_path
+            request.build_absolute_uri = patched_build_absolute_uri
 
         return self.get_response(request)
