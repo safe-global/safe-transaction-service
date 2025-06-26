@@ -1,5 +1,7 @@
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class ProxyPrefixMiddleware:
     """
@@ -14,7 +16,7 @@ class ProxyPrefixMiddleware:
 
     def __call__(self, request):
         prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
-        logging.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
+        logger.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
         if prefix:
             original_get_full_path = request.get_full_path
 
