@@ -4,7 +4,8 @@ from typing import Optional
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
-from safe_eth.eth.eip712 import eip712_encode_hash
+from safe_eth.eth.eip712 import eip712_encode, eip712_encode_hash
+from safe_eth.eth.utils import fast_keccak
 
 from safe_transaction_service.history.models import TransferDict
 from safe_transaction_service.tokens.models import Token
@@ -81,19 +82,19 @@ class DeleteMultisigTxSignatureHelper(TemporarySignatureHelper):
 
 class DelegateSignatureHelperV2(TemporarySignatureHelper):
     @classmethod
-    def calculate_hash(
+    def calculate_hash_and_preimage(
         cls,
         delegate_address: ChecksumAddress,
         chain_id: Optional[int],
         previous_totp: bool = False,
-    ) -> Hash32:
+    ) -> tuple[Hash32, bytes]:
         """
         Builds a EIP712 object and calculates its hash
 
         :param delegate_address:
         :param chain_id:
         :param previous_totp:
-        :return: Hash for the EIP712 generated object from the provided parameters
+        :return: Hash for the EIP712 generated object from the provided parameters with the preimage
         """
         totp = cls.calculate_totp(previous=previous_totp)
 
@@ -125,7 +126,8 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
             )
             payload["domain"]["chainId"] = chain_id
 
-        return eip712_encode_hash(payload)
+        preimage = b"".join(eip712_encode(payload))
+        return fast_keccak(preimage), preimage
 
 
 def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:

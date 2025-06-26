@@ -456,10 +456,14 @@ class DelegateSerializerMixin:
         for previous_totp, chain_id in list(
             itertools.product((True, False), (chain_id, None))
         ):
-            message_hash = DelegateSignatureHelperV2.calculate_hash(
-                delegate, chain_id, previous_totp=previous_totp
+            message_hash, preimage = (
+                DelegateSignatureHelperV2.calculate_hash_and_preimage(
+                    delegate, chain_id, previous_totp=previous_totp
+                )
             )
-            safe_signatures = SafeSignature.parse_signature(signature, message_hash)
+            safe_signatures = SafeSignature.parse_signature(
+                signature, message_hash, safe_hash_preimage=preimage
+            )
             if not safe_signatures:
                 raise ValidationError("Signature is not valid")
 
