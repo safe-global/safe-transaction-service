@@ -452,14 +452,20 @@ class DelegateSerializerMixin:
     ) -> bool:
         ethereum_client = get_auto_ethereum_client()
         chain_id = ethereum_client.get_chain_id()
+        any_valid_signature_found = False
+
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp, chain_id in list(
             itertools.product((True, False), (chain_id, None))
         ):
-            message_hash = DelegateSignatureHelperV2.calculate_hash(
-                delegate, chain_id, previous_totp=previous_totp
+            message_hash, preimage = (
+                DelegateSignatureHelperV2.calculate_hash_and_preimage(
+                    delegate, chain_id, previous_totp=previous_totp
+                )
             )
-            safe_signatures = SafeSignature.parse_signature(signature, message_hash)
+            safe_signatures = SafeSignature.parse_signature(
+                signature, message_hash, safe_hash_preimage=preimage
+            )
             if not safe_signatures:
                 raise ValidationError("Signature is not valid")
 
@@ -469,13 +475,15 @@ class DelegateSerializerMixin:
                 )
             safe_signature = safe_signatures[0]
             owner = safe_signature.owner
-            if not safe_signature.is_valid(ethereum_client, owner):
-                raise ValidationError(
-                    f"Signature of type={safe_signature.signature_type.name} "
-                    f"for signer={signer} is not valid"
-                )
-            if owner == signer:
-                return True
+
+            if safe_signature.is_valid(ethereum_client, owner):
+                any_valid_signature_found = True
+                if owner == signer:
+                    return True
+
+        if not any_valid_signature_found:
+            raise ValidationError(f"No valid signature found for signer={signer}")
+
         return False
 
 
