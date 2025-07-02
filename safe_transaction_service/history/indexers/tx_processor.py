@@ -384,17 +384,13 @@ class SafeTxProcessor(TxProcessor):
         :return:
         """
         internal_tx_ids = []
-        results = []
+        results: list[bool] = []
         contract_addresses = set()
-
-        # Clear cache for the involved Safes
-        for internal_tx_decoded in internal_txs_decoded:
-            contract_address = internal_tx_decoded.internal_tx._from
-            contract_addresses.add(contract_address)
-            self.clear_cache(safe_address=contract_address)
 
         try:
             for internal_tx_decoded in internal_txs_decoded:
+                contract_address = internal_tx_decoded.internal_tx._from
+                contract_addresses.add(contract_address)
                 internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
                 results.append(self.__process_decoded_transaction(internal_tx_decoded))
 
@@ -402,10 +398,10 @@ class SafeTxProcessor(TxProcessor):
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
                 processed=True
             )
+            return results
         finally:
             for contract_address in contract_addresses:
                 self.clear_cache(safe_address=contract_address)
-        return results
 
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
