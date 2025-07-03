@@ -282,7 +282,7 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         self.assertEqual(InternalTxDecoded.objects.count(), 2)  # Setup and execute tx
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        internal_txs_decoded = list(InternalTxDecoded.objects.pending_for_safes())
         self.assertEqual(len(internal_txs_decoded), 2)
         self.assertEqual(MultisigTransaction.objects.count(), 0)
         number_processed = tx_processor.process_decoded_transactions(
@@ -307,12 +307,12 @@ class TestInternalTxIndexer(TestCase):
         self.assertEqual(SafeRelevantTransaction.objects.count(), 3)
 
         # Try to decode again without new traces, nothing should be decoded
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
+        internal_txs_decoded = list(InternalTxDecoded.objects.pending_for_safes())
         self.assertEqual(
             len(internal_txs_decoded), 0
         )  # Safe indexed, execute tx can be decoded now
         number_processed = tx_processor.process_decoded_transactions(
-            internal_txs_decoded
+            list(internal_txs_decoded)
         )
         self.assertEqual(len(number_processed), 0)  # Setup trace
 
@@ -325,7 +325,7 @@ class TestInternalTxIndexer(TestCase):
         self._test_internal_tx_indexer()
         tx_processor = SafeTxProcessorProvider()
         tx_processor.process_decoded_transactions(
-            InternalTxDecoded.objects.pending_for_safes()
+            list(InternalTxDecoded.objects.pending_for_safes())
         )
         self.assertEqual(
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 0
@@ -333,8 +333,8 @@ class TestInternalTxIndexer(TestCase):
 
         SafeStatus.objects.all().delete()
         InternalTxDecoded.objects.update(processed=False)
-        internal_txs_decoded = InternalTxDecoded.objects.pending_for_safes()
-        self.assertEqual(internal_txs_decoded.count(), 2)
+        internal_txs_decoded = list(InternalTxDecoded.objects.pending_for_safes())
+        self.assertEqual(len(internal_txs_decoded), 2)
         self.assertEqual(internal_txs_decoded[0].function_name, "setup")
         results = tx_processor.process_decoded_transactions(internal_txs_decoded)
         self.assertEqual(results, [True, True])
