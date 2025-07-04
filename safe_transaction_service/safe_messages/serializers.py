@@ -114,11 +114,9 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         signature = attrs["signature"]
         # Encode EIP-191 or EIP-712 original message as bytes
         # Use fast_keccak to maintain compatibility with the old version
-        message_encoded = fast_keccak(get_message_encoded(message))
+        message_hash = fast_keccak(get_message_encoded(message))
         safe_message_hash, safe_message_preimage = (
-            get_safe_message_hash_and_preimage_for_message(
-                safe_address, message_encoded
-            )
+            get_safe_message_hash_and_preimage_for_message(safe_address, message_hash)
         )
         attrs["message_hash"] = safe_message_hash
 
@@ -169,11 +167,9 @@ class SafeMessageSignatureSerializer(
         attrs["safe_message"] = safe_message
         signature: HexStr = attrs["signature"]
         safe_address = safe_message.safe
-        message_encoded = fast_keccak(get_message_encoded(safe_message.message))
+        message_hash = fast_keccak(get_message_encoded(safe_message.message))
         safe_message_hash, safe_message_preimage = (
-            get_safe_message_hash_and_preimage_for_message(
-                safe_address, message_encoded
-            )
+            get_safe_message_hash_and_preimage_for_message(safe_address, message_hash)
         )
         assert to_0x_hex_str(safe_message_hash) == safe_message.message_hash
 
