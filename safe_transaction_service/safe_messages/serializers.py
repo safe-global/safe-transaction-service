@@ -10,6 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.eip712 import eip712_encode
+from safe_eth.eth.utils import fast_keccak
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
@@ -112,7 +113,8 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         message = attrs["message"]
         signature = attrs["signature"]
         # Encode EIP-191 or EIP-712 original message as bytes
-        message_encoded = get_message_encoded(message)
+        # Use fast_keccak to maintain compatibility with the old version
+        message_encoded = fast_keccak(get_message_encoded(message))
         safe_message_hash, safe_message_preimage = (
             get_safe_message_hash_and_preimage_for_message(
                 safe_address, message_encoded
@@ -167,7 +169,7 @@ class SafeMessageSignatureSerializer(
         attrs["safe_message"] = safe_message
         signature: HexStr = attrs["signature"]
         safe_address = safe_message.safe
-        message_encoded = get_message_encoded(safe_message.message)
+        message_encoded = fast_keccak(get_message_encoded(safe_message.message))
         safe_message_hash, safe_message_preimage = (
             get_safe_message_hash_and_preimage_for_message(
                 safe_address, message_encoded
