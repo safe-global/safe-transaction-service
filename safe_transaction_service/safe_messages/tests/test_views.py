@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 from safe_eth.eth.eip712 import eip712_encode
+from safe_eth.eth.utils import fast_keccak
 from safe_eth.safe.safe_signature import SafeSignatureEOA
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
@@ -149,7 +150,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             encode_eip712_message(messages[1]),
         ]
         safe_message_hashes = [
-            safe.get_message_hash(message_encoded)
+            safe.get_message_hash(fast_keccak(message_encoded))
             for message_encoded in messages_encoded
         ]
         signatures = [
@@ -291,7 +292,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         description = "Testing EIP712 message signing"
         message_encoded = b"".join(eip712_encode(message))
         safe_message_hash, safe_message_preimage = safe.get_message_hash_and_preimage(
-            message_encoded
+            fast_keccak(message_encoded)
         )
         safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(
             safe_message_preimage

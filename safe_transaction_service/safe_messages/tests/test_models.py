@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from eth_account import Account
 from hexbytes import HexBytes
+from safe_eth.eth.utils import fast_keccak
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
@@ -22,15 +23,15 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         for input, expected in [
             (
                 "TestMessage",
-                "Safe Message 0x95a89792bad17115e101b4d8fbdcd517dd13d085e815287d7fe791078182bf9e - TestMessage",
+                "Safe Message 0xb04a24aa07a51d1d8c3913e9493b3b1f88ed6a8a75430a9a8eda3ed3ce1897bc - TestMessage",
             ),
             (
                 "TestMessageVeryLong",
-                "Safe Message 0xb7783fde9060e75b61298c14cbc2a987f0e0800d1bb08b4a2b24ce3544b9b144 - TestMessageVery...",
+                "Safe Message 0xe3db816540ce371e2703b8ec59bdd6fec32e0c6078f2e204a205fd6d81564f28 - TestMessageVery...",
             ),
             (
                 get_eip712_payload_mock(),
-                "Safe Message 0x632db20317ce8e467d17e941d209fc1173ff1cad83b0c072c008385a566ddd80 - {'types': {'EIP...",
+                "Safe Message 0xbabb22f5c02a24db447b8f0136d6e26bb58cd6d068ebe8ab25c2221cfdf53e18 - {'types': {'EIP...",
             ),
         ]:
             with self.subTest(input=input):
@@ -62,7 +63,7 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
             message_hash,
             to_0x_hex_str(
                 get_safe_message_hash_and_preimage_for_message(
-                    safe_message.safe, get_message_encoded(message)
+                    safe_message.safe, fast_keccak(get_message_encoded(message))
                 )[0]
             ),
         )
