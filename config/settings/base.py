@@ -265,6 +265,8 @@ CELERY_TASK_DEFAULT_PRIORITY = 5
 CELERY_TASK_QUEUE_MAX_PRIORITY = 10
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
 CELERY_BROKER_TRANSPORT_OPTIONS = {}
+# Used for some tasks that shouldn't have long live in the queue
+CELERY_TASK_EXPIRATION = env.int("CELERY_TASK_EXPIRATION", default=60)
 
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_routes
 CELERY_ROUTES = (

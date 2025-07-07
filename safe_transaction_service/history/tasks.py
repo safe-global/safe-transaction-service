@@ -13,6 +13,7 @@ from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from redis.exceptions import LockError
 
+from config import settings
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
@@ -244,11 +245,13 @@ def index_safe_events_task(self) -> Optional[tuple[int, int]]:
             logger.info("Find Safe events processed %d events", number)
             if number:
                 logger.info("Calling task to process decoded traces")
-                process_decoded_internal_txs_task.delay()
+                process_decoded_internal_txs_task.apply_async(
+                    expires=settings.CELERY_TASK_EXPIRATION
+                )
             return number, number_of_blocks_processed
 
 
-@app.shared_task(bind=True)
+@app.shared_task(bind=True, expires=settings.CELERY_TASK_EXPIRATION)
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     with contextlib.suppress(LockError):
@@ -271,8 +274,8 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                         safe_to_process
                     ).not_processed().update(processed=True)
                 else:
-                    process_decoded_internal_txs_for_safe_task.delay(
-                        safe_to_process, reindex_master_copies=True
+                    process_decoded_internal_txs_for_safe_task.apply_async(
+                        (safe_to_process, True), priority=10  # Highest priority
                     )
                     count += 1
 
