@@ -240,7 +240,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
         txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safes()
         self.assertEqual(SafeStatus.objects.count(), 0)
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         self.assertEqual(SafeStatus.objects.count(), 1)
         safe_status = SafeStatus.objects.get()
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
@@ -268,7 +270,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         # Process events: SafeMultiSigTransaction, AddedOwner, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.assertEqual(InternalTx.objects.count(), 5)
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one adding the owner
         self.assertEqual(SafeStatus.objects.count(), 3)
         safe_status = SafeStatus.objects.last_for_address(
@@ -306,7 +310,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one changing the threshold
         self.assertEqual(SafeStatus.objects.count(), 5)
         safe_status = SafeStatus.objects.last_for_address(
@@ -343,7 +349,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, RemovedOwner, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (4, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one removing the owner
         self.assertEqual(SafeStatus.objects.count(), 8)
         safe_status = SafeStatus.objects.last_for_address(
@@ -391,7 +399,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, EnabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one enabling the module
         self.assertEqual(SafeStatus.objects.count(), 10)
         safe_status = SafeStatus.objects.last_for_address(
@@ -422,7 +432,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         )
         # Process events: SafeReceived
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Check there's an ether transaction
         internal_tx_queryset = InternalTx.objects.filter(
             value=value,
@@ -445,7 +457,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ChangedFallbackHandler, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one changing the fallback handler
         self.assertEqual(SafeStatus.objects.count(), 12)
         safe_status = SafeStatus.objects.last_for_address(
@@ -483,7 +497,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, DisabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one disabling the module
         self.assertEqual(SafeStatus.objects.count(), 14)
         safe_status = SafeStatus.objects.last_for_address(
@@ -521,7 +537,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.w3.eth.send_raw_transaction(tx["raw_transaction"])
         # Process events: ApproveHash
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # No SafeStatus was added
         self.assertEqual(SafeStatus.objects.count(), 14)
         # Check a MultisigConfirmation was created
@@ -546,7 +564,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (2, 1))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce
         self.assertEqual(SafeStatus.objects.count(), 15)
         safe_status = SafeStatus.objects.last_for_address(
@@ -580,7 +600,9 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         # 2 blocks will be processed due to the guard deployment
         self.assertEqual(self.safe_events_indexer.start(), (3, 2))
-        self.safe_tx_processor.process_decoded_transactions(txs_decoded_queryset.all())
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
         # Add one SafeStatus increasing the nonce and another one changing the guard
         self.assertEqual(SafeStatus.objects.count(), 17)
         safe_status = SafeStatus.objects.last_for_address(
@@ -641,7 +663,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             len(
                 self.safe_tx_processor.process_decoded_transactions(
-                    txs_decoded_queryset.all()
+                    list(txs_decoded_queryset.all())
                 )
             ),
             expected_internal_txs_decoded,
