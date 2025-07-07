@@ -4,7 +4,7 @@ Contains classes for processing indexed data and store Safe related models in da
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 from django.db import transaction
 
@@ -376,23 +376,42 @@ class SafeTxProcessor(TxProcessor):
 
     @transaction.atomic
     def process_decoded_transactions(
-        self, internal_txs_decoded: Iterator[InternalTxDecoded]
+        self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
         """
         Optimize to process multiple transactions in a batch
+
         :param internal_txs_decoded:
-        :return:
+        :return: list of `True` if an element was processed correctly, `False` otherwise.
         """
-        internal_tx_ids = []
         results: list[bool] = []
-        contract_addresses = set()
+        if not internal_txs_decoded:
+            return results
+
+        internal_tx_ids = []
+        internal_txs_decoded_list = internal_txs_decoded
+        contract_addresses = {
+            internal_tx_decoded.internal_tx._from
+            for internal_tx_decoded in internal_txs_decoded_list
+        }
+        banned_addresses = set(
+            SafeContract.objects.get_banned_addresses(addresses=contract_addresses)
+        )
 
         try:
-            for internal_tx_decoded in internal_txs_decoded:
+            for internal_tx_decoded in internal_txs_decoded_list:
                 contract_address = internal_tx_decoded.internal_tx._from
-                contract_addresses.add(contract_address)
                 internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
-                results.append(self.__process_decoded_transaction(internal_tx_decoded))
+                if contract_address in banned_addresses:
+                    logger.info(
+                        "Ignoring decoded internal txs for banned safe %s",
+                        contract_address,
+                    )
+                    results.append(False)
+                else:
+                    results.append(
+                        self.__process_decoded_transaction(internal_tx_decoded)
+                    )
 
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(

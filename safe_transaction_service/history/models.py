@@ -1195,17 +1195,17 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.not_processed().order_by_processing_queue()
+        return (
+            self.not_processed()
+            .order_by_processing_queue()
+            .select_related("internal_tx", "internal_tx__ethereum_tx")
+        )
 
     def pending_for_safe(self, safe_address: ChecksumAddress):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return (
-            self.pending_for_safes()
-            .filter(internal_tx___from=safe_address)
-            .select_related("internal_tx", "internal_tx__ethereum_tx")
-        )
+        return self.pending_for_safes().filter(internal_tx___from=safe_address)
 
     def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:
         """
@@ -1814,12 +1814,28 @@ class SafeMasterCopy(MonitoredAddress):
 
 
 class SafeContractManager(models.Manager):
-    def get_banned_safes(self) -> QuerySet[ChecksumAddress]:
-        return self.filter(banned=True).values_list("address", flat=True)
+    def get_banned_addresses(
+        self, addresses: Optional[list[ChecksumAddress]] = None
+    ) -> QuerySet[ChecksumAddress]:
+        return self.banned(addresses=addresses).values_list("address", flat=True)
+
+
+class SafeContractQuerySet(models.QuerySet):
+    def banned(
+        self, addresses: Optional[list[ChecksumAddress]] = None
+    ) -> QuerySet["SafeContract"]:
+        """
+        :param addresses: If provided, only those `addresses` will be filtered.
+        :return: Banned addresses
+        """
+        queryset = self.filter(banned=True)
+        if addresses:
+            queryset = queryset.filter(address__in=addresses)
+        return queryset
 
 
 class SafeContract(models.Model):
-    objects = SafeContractManager()
+    objects = SafeContractManager.from_queryset(SafeContractQuerySet)()
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     address = EthereumAddressBinaryField(primary_key=True)
     ethereum_tx = models.ForeignKey(
