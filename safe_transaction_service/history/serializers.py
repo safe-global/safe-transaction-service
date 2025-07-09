@@ -257,7 +257,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             safe_address, safe_owners
         )
         allowed_senders = set(safe_owners) | delegates
-        if not attrs["sender"] in allowed_senders:
+        if attrs["sender"] not in allowed_senders:
             raise ValidationError(
                 f'Sender={attrs["sender"]} is not an owner or delegate. '
                 f"Current owners={safe_owners}. Delegates={delegates}"

@@ -61,6 +61,10 @@ class ModuleCannotBeDisabled(TxProcessorException):
     pass
 
 
+class CannotFindPreviousTrace(TxProcessorException):
+    pass
+
+
 class UserOperationFailed(TxProcessorException):
     pass
 
@@ -409,9 +413,21 @@ class SafeTxProcessor(TxProcessor):
                     )
                     results.append(False)
                 else:
-                    results.append(
-                        self.__process_decoded_transaction(internal_tx_decoded)
-                    )
+                    try:
+                        result = self.__process_decoded_transaction(internal_tx_decoded)
+                        results.append(result)
+                    except CannotFindPreviousTrace:
+                        logger.critical(
+                            "[%s] There's a problem with the RPC, it needs to be checked",
+                            contract_address,
+                        )
+                        raise
+                    except TxProcessorException:
+                        logger.error(
+                            "[%s] Problem processing internal txs for Safe, ignoring",
+                            contract_address,
+                        )
+                        results.append(False)
 
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
@@ -597,7 +613,7 @@ class SafeTxProcessor(TxProcessor):
                             f"and trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)
-                        raise ValueError(message)
+                        raise CannotFindPreviousTrace(message)
                     module_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
@@ -657,7 +673,7 @@ class SafeTxProcessor(TxProcessor):
                             f"trace-address={internal_tx.trace_address}"
                         )
                         logger.warning(message)
-                        raise ValueError(message)
+                        raise CannotFindPreviousTrace(message)
                     previous_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
