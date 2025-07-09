@@ -2536,3 +2536,107 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             {module_transaction_1.module, module_transaction_2.module},
             {module_tx["module"] for module_tx in response.data["results"]},
         )
+
+    def tearDown(self):
+        # Skip automatic cleanup to preserve data for debugging
+        pass
+
+    def test_safe_export_view(self):
+        """Test the export endpoint for CSV export functionality"""
+        safe_address = Account.create().address
+
+        # Test with non-existent safe
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Create safe contract
+        SafeContractFactory(address=safe_address)
+
+        # Test with no transactions
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+        self.assertIsNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+        # Create some test data
+        ethereum_tx = EthereumTxFactory()
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_address, ethereum_tx=ethereum_tx, trusted=True
+        )
+
+        # Create ERC20 transfer
+        token = TokenFactory(
+            address=Account.create().address, symbol="TEST", decimals=18
+        )
+        erc20_transfer = ERC20TransferFactory(
+            ethereum_tx=ethereum_tx,
+            address=token.address,
+            _from=Account.create().address,
+            to=safe_address,
+            value=1000000000000000000,  # 1 token with 18 decimals
+        )
+
+        # Test basic export
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], safe_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], "1000000000000000000")
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNotNone(result["safeTxHash"])
+
+        # Test pagination
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,))
+            + "?limit=1&offset=0",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNone(response.data["next"])  # No more pages
+        self.assertIsNone(response.data["previous"])
+
+        # Test date filtering
+        future_date = timezone.now() + datetime.timedelta(days=1)
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,))
+            + f"?execution_date__gte={future_date.isoformat()}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+
+        # Test invalid date format
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,))
+            + "?execution_date__gte=invalid-date",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Test limit validation
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(safe_address,)) + "?limit=2000",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Should default to 1000
+        self.assertEqual(len(response.data["results"]), 1)

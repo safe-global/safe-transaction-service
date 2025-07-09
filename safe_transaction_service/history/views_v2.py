@@ -1,8 +1,10 @@
 import hashlib
 import logging
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 from django.db.models import Q
+from django.utils import timezone
 
 import django_filters
 from drf_spectacular.types import OpenApiTypes
@@ -632,3 +634,170 @@ class AllTransactionsListView(ListAPIView):
             "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
         )
         return response
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            "execution_date__gte",
+            location="query",
+            type=OpenApiTypes.DATETIME,
+            description="Filter transactions executed after this date (ISO format)",
+        ),
+        OpenApiParameter(
+            "execution_date__lte",
+            location="query",
+            type=OpenApiTypes.DATETIME,
+            description="Filter transactions executed before this date (ISO format)",
+        ),
+        OpenApiParameter(
+            "limit",
+            location="query",
+            type=OpenApiTypes.INT,
+            description="Maximum number of transactions to return (max 1000)",
+        ),
+        OpenApiParameter(
+            "offset",
+            location="query",
+            type=OpenApiTypes.INT,
+            description="Number of transactions to skip",
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(
+            response=serializers.SafeExportTransactionSerializer(many=True)
+        ),
+        404: OpenApiResponse(description="Safe not found"),
+        422: OpenApiResponse(
+            description="Safe address checksum not valid",
+            response=serializers.CodeErrorResponse,
+        ),
+    },
+)
+class SafeExportView(GenericAPIView):
+    """
+    Export endpoint for CSV export feature - optimized for large datasets
+    """
+
+    serializer_class = serializers.SafeExportTransactionSerializer
+
+    def get(self, request, address):
+        """
+        Get transactions optimized for CSV export with transfer information.
+        The maximum limit allowed is 1000.
+        """
+
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        try:
+            SafeContract.objects.get(address=address)
+        except SafeContract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # Parse query parameters
+        execution_date_gte = request.query_params.get("execution_date__gte")
+        execution_date_lte = request.query_params.get("execution_date__lte")
+        limit = int(request.query_params.get("limit", 1000))
+        offset = int(request.query_params.get("offset", 0))
+
+        # Validate limit
+        if limit > 1000:
+            limit = 1000
+
+        # Parse dates if provided
+        parsed_execution_date_gte = None
+        parsed_execution_date_lte = None
+
+        if execution_date_gte:
+            try:
+                # Handle different ISO format variations
+                date_str = execution_date_gte.replace("Z", "+00:00")
+                # Fix format issue where timezone offset has space instead of +
+                if " " in date_str:  # e.g., '2025-07-08T19:22:21.558887 00:00'
+                    parts = date_str.rsplit(" ", 1)
+                    if (
+                        len(parts) == 2 and ":" in parts[1] and len(parts[1]) == 5
+                    ):  # timezone format like '00:00'
+                        date_str = parts[0] + "+" + parts[1]
+                parsed_execution_date_gte = datetime.fromisoformat(date_str)
+                # Ensure timezone-aware
+                if parsed_execution_date_gte.tzinfo is None:
+                    parsed_execution_date_gte = timezone.make_aware(
+                        parsed_execution_date_gte
+                    )
+            except ValueError:
+                return Response(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    data={
+                        "error": "Invalid execution_date__gte format. Use ISO format."
+                    },
+                )
+
+        if execution_date_lte:
+            try:
+                # Handle different ISO format variations
+                date_str = execution_date_lte.replace("Z", "+00:00")
+                # Fix format issue where timezone offset has space instead of +
+                if " " in date_str:  # e.g., '2025-07-08T19:22:21.558887 00:00'
+                    parts = date_str.rsplit(" ", 1)
+                    if (
+                        len(parts) == 2 and ":" in parts[1] and len(parts[1]) == 5
+                    ):  # timezone format like '00:00'
+                        date_str = parts[0] + "+" + parts[1]
+                parsed_execution_date_lte = datetime.fromisoformat(date_str)
+                # Ensure timezone-aware
+                if parsed_execution_date_lte.tzinfo is None:
+                    parsed_execution_date_lte = timezone.make_aware(
+                        parsed_execution_date_lte
+                    )
+            except ValueError:
+                return Response(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    data={
+                        "error": "Invalid execution_date__lte format. Use ISO format."
+                    },
+                )
+
+        # Get transactions from service
+        transaction_service = TransactionServiceProvider()
+        transactions, total_count = transaction_service.get_export_transactions(
+            address,
+            execution_date_gte=parsed_execution_date_gte,
+            execution_date_lte=parsed_execution_date_lte,
+            limit=limit,
+            offset=offset,
+        )
+
+        # Build pagination info
+        base_url = request.build_absolute_uri(request.path)
+        query_params = request.GET.copy()
+
+        next_url = None
+        if offset + limit < total_count:
+            query_params["offset"] = offset + limit
+            next_url = f"{base_url}?{query_params.urlencode()}"
+
+        previous_url = None
+        if offset > 0:
+            query_params["offset"] = max(0, offset - limit)
+            previous_url = f"{base_url}?{query_params.urlencode()}"
+
+        # Serialize the data
+        serializer = self.get_serializer(transactions, many=True)
+
+        return Response(
+            {
+                "count": total_count,
+                "next": next_url,
+                "previous": previous_url,
+                "results": serializer.data,
+            }
+        )

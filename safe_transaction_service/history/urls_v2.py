@@ -36,4 +36,9 @@ urlpatterns = [
         views_v2.AllTransactionsListView.as_view(),
         name="all-transactions",
     ),
+    path(
+        "safes/<str:address>/export/",
+        views_v2.SafeExportView.as_view(),
+        name="safe-export",
+    ),
 ]

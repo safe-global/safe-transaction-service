@@ -1335,6 +1335,31 @@ class SafeDeploymentSerializer(serializers.Serializer):
     contracts = SafeDeploymentContractSerializer(many=True)
 
 
+class SafeExportTransactionSerializer(serializers.Serializer):
+    """
+    Serializer for the export endpoint that returns transaction data optimized for CSV export
+    """
+
+    safe = EthereumAddressField()
+    from_ = EthereumAddressField(source="_from")
+    to = EthereumAddressField()
+    amount = serializers.CharField(source="_value")
+    assetType = serializers.CharField(source="asset_type")
+    assetAddress = EthereumAddressField(source="asset_address", allow_null=True)
+    assetSymbol = serializers.CharField(source="asset_symbol", allow_null=True)
+    assetDecimals = serializers.IntegerField(source="asset_decimals", allow_null=True)
+    proposerAddress = EthereumAddressField(source="proposer_address", allow_null=True)
+    proposedAt = serializers.DateTimeField(source="proposed_at", allow_null=True)
+    executorAddress = EthereumAddressField(source="executor_address", allow_null=True)
+    executedAt = serializers.DateTimeField(source="executed_at", allow_null=True)
+    note = serializers.CharField(allow_null=True)
+    transactionHash = Sha3HashField(source="transaction_hash")
+    safeTxHash = Sha3HashField(source="safe_tx_hash", allow_null=True)
+    method = serializers.CharField(allow_null=True)
+    contractAddress = EthereumAddressField(source="contract_address", allow_null=True)
+    isExecuted = serializers.BooleanField(source="is_executed")
+
+
 class CodeErrorResponse(serializers.Serializer):
     code = serializers.IntegerField()
     message = serializers.CharField()
