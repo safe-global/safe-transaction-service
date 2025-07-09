@@ -5,10 +5,11 @@ from django.test import TestCase
 
 from eth_account import Account
 from hexbytes import HexBytes
+from safe_eth.eth.utils import fast_keccak
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
-from ..utils import get_hash_for_message, get_safe_message_hash_for_message
+from ..utils import get_message_encoded, get_safe_message_hash_and_preimage_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
 from .mocks import get_eip712_payload_mock
 
@@ -61,9 +62,9 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             message_hash,
             to_0x_hex_str(
-                get_safe_message_hash_for_message(
-                    safe_message.safe, get_hash_for_message(message)
-                )
+                get_safe_message_hash_and_preimage_for_message(
+                    safe_message.safe, fast_keccak(get_message_encoded(message))
+                )[0]
             ),
         )
         recovered_owner = Account._recover_hash(

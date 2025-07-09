@@ -1,7 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import urljoin
 
 from safe_eth.eth.utils import fast_to_checksum_address
@@ -47,7 +47,7 @@ class CoinMarketCapClient(BaseHTTPClient):
                         f.write(chunk)
             return local_filename
 
-    def get_map(self) -> List[Dict[str, Any]]:
+    def get_map(self) -> list[dict[str, Any]]:
         """
         [
             {'id': 1659,
@@ -90,7 +90,7 @@ class CoinMarketCapClient(BaseHTTPClient):
             logger.warning("Problem getting tokens from coinmarketcap", exc_info=True)
             return []
 
-    def get_ethereum_tokens(self) -> List[CoinMarketCapToken]:
+    def get_ethereum_tokens(self) -> list[CoinMarketCapToken]:
         tokens = []
         for token in self.get_map():
             if (

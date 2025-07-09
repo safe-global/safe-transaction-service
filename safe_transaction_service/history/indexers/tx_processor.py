@@ -4,7 +4,7 @@ Contains classes for processing indexed data and store Safe related models in da
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Iterator, List, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 from django.db import transaction
 
@@ -99,7 +99,7 @@ class TxProcessor(ABC):
 
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
-    ) -> List[bool]:
+    ) -> list[bool]:
         return [
             self.process_decoded_transaction(decoded_transaction)
             for decoded_transaction in internal_txs_decoded
@@ -146,7 +146,7 @@ class SafeTxProcessor(TxProcessor):
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
         }
-        self.safe_last_status_cache: Dict[str, SafeLastStatus] = {}
+        self.safe_last_status_cache: dict[str, SafeLastStatus] = {}
         self.signature_breaking_versions = (  # Versions where signing changed
             Version("1.0.0"),  # Safes >= 1.0.0 Renamed `baseGas` to `dataGas`
             Version("1.3.0"),  # ChainId was included
@@ -376,36 +376,51 @@ class SafeTxProcessor(TxProcessor):
 
     @transaction.atomic
     def process_decoded_transactions(
-        self, internal_txs_decoded: Iterator[InternalTxDecoded]
-    ) -> List[bool]:
+        self, internal_txs_decoded: Sequence[InternalTxDecoded]
+    ) -> list[bool]:
         """
         Optimize to process multiple transactions in a batch
-        :param internal_txs_decoded:
-        :return:
-        """
-        internal_tx_ids = []
-        results = []
-        contract_addresses = set()
 
-        # Clear cache for the involved Safes
-        for internal_tx_decoded in internal_txs_decoded:
-            contract_address = internal_tx_decoded.internal_tx._from
-            contract_addresses.add(contract_address)
-            self.clear_cache(safe_address=contract_address)
+        :param internal_txs_decoded:
+        :return: list of `True` if an element was processed correctly, `False` otherwise.
+        """
+        results: list[bool] = []
+        if not internal_txs_decoded:
+            return results
+
+        internal_tx_ids = []
+        internal_txs_decoded_list = internal_txs_decoded
+        contract_addresses = {
+            internal_tx_decoded.internal_tx._from
+            for internal_tx_decoded in internal_txs_decoded_list
+        }
+        banned_addresses = set(
+            SafeContract.objects.get_banned_addresses(addresses=contract_addresses)
+        )
 
         try:
-            for internal_tx_decoded in internal_txs_decoded:
+            for internal_tx_decoded in internal_txs_decoded_list:
+                contract_address = internal_tx_decoded.internal_tx._from
                 internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
-                results.append(self.__process_decoded_transaction(internal_tx_decoded))
+                if contract_address in banned_addresses:
+                    logger.info(
+                        "Ignoring decoded internal txs for banned safe %s",
+                        contract_address,
+                    )
+                    results.append(False)
+                else:
+                    results.append(
+                        self.__process_decoded_transaction(internal_tx_decoded)
+                    )
 
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
                 processed=True
             )
+            return results
         finally:
             for contract_address in contract_addresses:
                 self.clear_cache(safe_address=contract_address)
-        return results
 
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded

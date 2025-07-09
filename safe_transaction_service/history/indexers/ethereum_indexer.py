@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from logging import getLogger
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence
 
 from django.db.models import Min
 
@@ -105,7 +105,7 @@ class EthereumIndexer(ABC):
         :return: Set of relevant elements
         """
 
-    def process_element(self, element: Any) -> List[Any]:
+    def process_element(self, element: Any) -> list[Any]:
         """
         Process provided `element` to retrieve relevant data (internal txs, events...)
 
@@ -131,7 +131,7 @@ class EthereumIndexer(ABC):
         self,
         addresses: set[ChecksumAddress],
         current_block_number: Optional[int] = None,
-    ) -> Optional[Tuple[int, int]]:
+    ) -> Optional[tuple[int, int]]:
         """
         :param addresses:
         :param current_block_number: To prevent fetching it again
@@ -379,7 +379,7 @@ class EthereumIndexer(ABC):
         self,
         addresses: set[ChecksumAddress],
         current_block_number: Optional[int] = None,
-    ) -> Tuple[Sequence[Any], Optional[int], int, bool]:
+    ) -> tuple[Sequence[Any], Optional[int], int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
 
@@ -432,7 +432,7 @@ class EthereumIndexer(ABC):
 
         return processed_elements, from_block_number, to_block_number, updated
 
-    def start(self) -> Tuple[int, int]:
+    def start(self) -> tuple[int, int]:
         """
         Find and process relevant data for existing database addresses
 

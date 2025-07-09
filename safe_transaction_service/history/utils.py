@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 from urllib.parse import urlparse
 
 from django import forms
@@ -40,7 +40,7 @@ class HexField(forms.CharField):
         return to_0x_hex_str(bytes(value)) if value else ""
 
 
-def clean_receipt_log(receipt_log: LogReceipt) -> Optional[Dict[str, Any]]:
+def clean_receipt_log(receipt_log: LogReceipt) -> Optional[dict[str, Any]]:
     """
     Clean receipt log and make them JSON compliant
 

@@ -3,7 +3,7 @@ import itertools
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.http import Http404
@@ -452,14 +452,20 @@ class DelegateSerializerMixin:
     ) -> bool:
         ethereum_client = get_auto_ethereum_client()
         chain_id = ethereum_client.get_chain_id()
+        any_valid_signature_found = False
+
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp, chain_id in list(
             itertools.product((True, False), (chain_id, None))
         ):
-            message_hash = DelegateSignatureHelperV2.calculate_hash(
-                delegate, chain_id, previous_totp=previous_totp
+            message_hash, preimage = (
+                DelegateSignatureHelperV2.calculate_hash_and_preimage(
+                    delegate, chain_id, previous_totp=previous_totp
+                )
             )
-            safe_signatures = SafeSignature.parse_signature(signature, message_hash)
+            safe_signatures = SafeSignature.parse_signature(
+                signature, message_hash, safe_hash_preimage=preimage
+            )
             if not safe_signatures:
                 raise ValidationError("Signature is not valid")
 
@@ -469,13 +475,15 @@ class DelegateSerializerMixin:
                 )
             safe_signature = safe_signatures[0]
             owner = safe_signature.owner
-            if not safe_signature.is_valid(ethereum_client, owner):
-                raise ValidationError(
-                    f"Signature of type={safe_signature.signature_type.name} "
-                    f"for signer={signer} is not valid"
-                )
-            if owner == signer:
-                return True
+
+            if safe_signature.is_valid(ethereum_client, owner):
+                any_valid_signature_found = True
+                if owner == signer:
+                    return True
+
+        if not any_valid_signature_found:
+            raise ValidationError(f"No valid signature found for signer={signer}")
+
         return False
 
 
@@ -673,7 +681,7 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
             "module_transaction_id",
         )
 
-    def get_data_decoded(self, obj: ModuleTransaction) -> Dict[str, Any]:
+    def get_data_decoded(self, obj: ModuleTransaction) -> dict[str, Any]:
         return get_data_decoded_from_data(obj.data if obj.data else b"", address=obj.to)
 
     def get_is_successful(self, obj: ModuleTransaction) -> bool:
@@ -735,7 +743,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         if obj.ethereum_tx_id:
             return obj.ethereum_tx.block_id
 
-    def get_confirmations(self, obj: MultisigTransaction) -> Dict[str, Any]:
+    def get_confirmations(self, obj: MultisigTransaction) -> dict[str, Any]:
         """
         Validate and check integrity of confirmations queryset
 
@@ -778,7 +786,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     def get_origin(self, obj: MultisigTransaction) -> str:
         return obj.origin if isinstance(obj.origin, str) else json.dumps(obj.origin)
 
-    def get_data_decoded(self, obj: MultisigTransaction) -> Dict[str, Any]:
+    def get_data_decoded(self, obj: MultisigTransaction) -> dict[str, Any]:
         # If delegate call contract must be whitelisted (security)
         if obj.data_should_be_decoded():
             return get_data_decoded_from_data(
@@ -859,7 +867,7 @@ class SafeCreationInfoResponseSerializer(serializers.Serializer):
         allow_null=True
     )
 
-    def get_data_decoded(self, obj: SafeCreationInfo) -> Dict[str, Any]:
+    def get_data_decoded(self, obj: SafeCreationInfo) -> dict[str, Any]:
         return get_data_decoded_from_data(obj.setup_data or b"")
 
 
@@ -1096,7 +1104,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         ethereum_client: EthereumClient,
         safe_address: ChecksumAddress,
         delegate: ChecksumAddress,
-    ) -> List[ChecksumAddress]:
+    ) -> list[ChecksumAddress]:
         """
         :param ethereum_client:
         :param safe_address:
@@ -1111,7 +1119,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         safe_address: ChecksumAddress,
         signature: bytes,
         operation_hash: bytes,
-        valid_delegators: List[ChecksumAddress],
+        valid_delegators: list[ChecksumAddress],
     ) -> Optional[ChecksumAddress]:
         """
         Checks signature and returns a valid owner if found, None otherwise

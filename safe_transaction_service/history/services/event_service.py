@@ -4,7 +4,7 @@ Build event payloads for the queue
 
 import json
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, Type, TypedDict, Union
+from typing import Any, Optional, Type, TypedDict, Union
 
 from django.db.models import Model
 from django.utils import timezone
@@ -42,14 +42,14 @@ def build_event_payload(
         SafeMessageConfirmation,
     ],
     deleted: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     :param sender: Sender type
     :param instance: Sender instance
     :param deleted: If the instance has been deleted
     :return: A list of messages generated from the instance provided
     """
-    payloads: List[Dict[str, Any]] = []
+    payloads: list[dict[str, Any]] = []
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
         payloads = [
             {

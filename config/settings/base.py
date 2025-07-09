@@ -123,7 +123,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
-    "safe_transaction_service.loggers.custom_logger.LoggingMiddleware",
+    "safe_transaction_service.middlewares.logging_middleware.LoggingMiddleware",
+    "safe_transaction_service.middlewares.proxy_prefix_middleware.ProxyPrefixMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -204,6 +205,7 @@ CORS_ALLOW_HEADERS = list(default_cors_headers) + [
     "if-none-match",
 ]
 CORS_EXPOSE_HEADERS = ["etag"]
+
 
 # FIXTURES
 # ------------------------------------------------------------------------------
@@ -545,7 +547,7 @@ ETH_INTERNAL_TRACE_TXS_BATCH_SIZE = env.int(
     "ETH_INTERNAL_TRACE_TXS_BATCH_SIZE", default=0
 )  # Number of `trace_transaction` calls allowed in the same RPC batch call, as results can be quite big
 ETH_INTERNAL_TX_DECODED_PROCESS_BATCH = env.int(
-    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=500
+    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=5000
 )  # Number of InternalTxDecoded to process together. Keep it low to be memory friendly
 
 # Event indexing configuration (L2 and ERC20/721)
@@ -594,6 +596,10 @@ COLLECTIBLES_ENABLE_DOWNLOAD_METADATA = env.bool(
 PROCESSING_ENABLE_OUT_OF_ORDER_CHECK = env.bool(
     "PROCESSING_ENABLE_OUT_OF_ORDER_CHECK", default=True
 )  # Enable out of order check, in case some transactions appear after a reindex so Safes don't get corrupt. Disabling it can speed up processing
+PROCESSING_ALL_SAFES_TOGETHER = env.bool(
+    "PROCESSING_ALL_SAFES_TOGETHER", default=True
+)  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
+
 
 # Tokens
 # ------------------------------------------------------------------------------

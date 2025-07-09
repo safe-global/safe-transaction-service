@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict
+from typing import Any
 
 from django.utils import timezone
 
@@ -202,7 +202,7 @@ class InternalTxDecodedFactory(DjangoModelFactory):
     processed = False
 
     @factory.lazy_attribute
-    def arguments(self) -> Dict[str, Any]:
+    def arguments(self) -> dict[str, Any]:
         if self.function_name == "addOwnerWithThreshold":
             return {"owner": self.owner, "_threshold": self.threshold}
         elif self.function_name == "approveHash":

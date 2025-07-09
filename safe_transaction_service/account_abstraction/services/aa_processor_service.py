@@ -1,6 +1,6 @@
 import logging
 from functools import cache
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Sequence
 
 from django.conf import settings
 from django.db import transaction
@@ -73,8 +73,8 @@ class AaProcessorService:
         self.supported_entry_points = supported_entry_points
 
     def get_user_operation_hashes_from_logs(
-        self, safe_address: ChecksumAddress, logs: [Sequence[LogReceipt]]
-    ) -> List[HexBytes]:
+        self, safe_address: ChecksumAddress, logs: Sequence[LogReceipt]
+    ) -> list[HexBytes]:
         """
         :param safe_address:
         :param logs:
@@ -109,7 +109,7 @@ class AaProcessorService:
         signature: bytes,
         safe_operation_model: SafeOperationModel,
         safe_operation: SafeOperation,
-    ) -> List[SafeOperationConfirmationModel]:
+    ) -> list[SafeOperationConfirmationModel]:
         """
         Creates missing ``SafeOperationConfirmations``
 
@@ -144,7 +144,7 @@ class AaProcessorService:
         user_operation_model: UserOperationModel,
         user_operation: UserOperation,
         user_operation_receipt: UserOperationReceipt,
-    ) -> Optional[Tuple[SafeOperationModel, SafeOperation]]:
+    ) -> Optional[tuple[SafeOperationModel, SafeOperation]]:
         """
         Creates or updates a Safe Operation
 
@@ -206,7 +206,7 @@ class AaProcessorService:
 
     def index_user_operation_receipt(
         self, user_operation_model: UserOperationModel
-    ) -> Tuple[UserOperationReceiptModel, UserOperationReceipt]:
+    ) -> tuple[UserOperationReceiptModel, UserOperationReceipt]:
         """
         Stores UserOperationReceipt. Can never be updated as if ``UserOperationReceipt`` is on database indexing
         ``UserOperation`` is not required
@@ -277,7 +277,7 @@ class AaProcessorService:
         safe_address: ChecksumAddress,
         user_operation_hash: HexBytes,
         ethereum_tx: history_models.EthereumTx,
-    ) -> Tuple[UserOperationModel, UserOperation]:
+    ) -> tuple[UserOperationModel, UserOperation] | None:
         """
         Index ``UserOperation``, ``SafeOperation`` and ``UserOperationReceipt`` for the given ``UserOperation`` log
 
@@ -294,72 +294,73 @@ class AaProcessorService:
                 safe_address,
                 user_operation_hash_hex,
             )
-        else:
+            return None
+
+        logger.debug(
+            "[%s] Retrieving UserOperation from Bundler with user-operation-hash=%s on tx-hash=%s",
+            safe_address,
+            user_operation_hash_hex,
+            ethereum_tx.tx_hash,
+        )
+        user_operation = self.bundler_client.get_user_operation_by_hash(
+            user_operation_hash_hex
+        )
+        if not user_operation:
+            self.bundler_client.get_user_operation_by_hash.cache_clear()
+            raise BundlerClientException(
+                f"user-operation={user_operation_hash_hex} returned `null`"
+            )
+        if isinstance(user_operation, UserOperationV07):
+            raise UserOperationNotSupportedException(
+                f"user-operation={user_operation_hash_hex} for EntryPoint v0.7.0 is not supported"
+            )
+
+        try:
+            user_operation_model = UserOperationModel.objects.get(
+                hash=user_operation_hash_hex
+            )
             logger.debug(
-                "[%s] Retrieving UserOperation from Bundler with user-operation-hash=%s on tx-hash=%s",
+                "[%s] Updating UserOperation with user-operation=%s on tx-hash=%s",
                 safe_address,
                 user_operation_hash_hex,
                 ethereum_tx.tx_hash,
             )
-            user_operation = self.bundler_client.get_user_operation_by_hash(
-                user_operation_hash_hex
+            user_operation_model.signature = user_operation.signature
+            user_operation_model.ethereum_tx = ethereum_tx
+            user_operation_model.save(update_fields=["signature", "ethereum_tx"])
+        except UserOperationModel.DoesNotExist:
+            logger.debug(
+                "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
+                safe_address,
+                user_operation_hash_hex,
+                ethereum_tx.tx_hash,
             )
-            if not user_operation:
-                self.bundler_client.get_user_operation_by_hash.cache_clear()
-                raise BundlerClientException(
-                    f"user-operation={user_operation_hash_hex} returned `null`"
-                )
-            if isinstance(user_operation, UserOperationV07):
-                raise UserOperationNotSupportedException(
-                    f"user-operation={user_operation_hash_hex} for EntryPoint v0.7.0 is not supported"
-                )
-
-            try:
-                user_operation_model = UserOperationModel.objects.get(
-                    hash=user_operation_hash_hex
-                )
-                logger.debug(
-                    "[%s] Updating UserOperation with user-operation=%s on tx-hash=%s",
-                    safe_address,
-                    user_operation_hash_hex,
-                    ethereum_tx.tx_hash,
-                )
-                user_operation_model.signature = user_operation.signature
-                user_operation_model.ethereum_tx = ethereum_tx
-                user_operation_model.save(update_fields=["signature", "ethereum_tx"])
-            except UserOperationModel.DoesNotExist:
-                logger.debug(
-                    "[%s] Storing UserOperation with user-operation=%s on tx-hash=%s",
-                    safe_address,
-                    user_operation_hash_hex,
-                    ethereum_tx.tx_hash,
-                )
-                user_operation_model = UserOperationModel.objects.create(
-                    ethereum_tx=ethereum_tx,
-                    hash=user_operation_hash_hex,
-                    sender=user_operation.sender,
-                    nonce=user_operation.nonce,
-                    init_code=user_operation.init_code,
-                    call_data=user_operation.call_data,
-                    call_gas_limit=user_operation.call_gas_limit,
-                    verification_gas_limit=user_operation.verification_gas_limit,
-                    pre_verification_gas=user_operation.pre_verification_gas,
-                    max_fee_per_gas=user_operation.max_fee_per_gas,
-                    max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
-                    paymaster=user_operation.paymaster,
-                    paymaster_data=user_operation.paymaster_data,
-                    signature=user_operation.signature,
-                    entry_point=user_operation.entry_point,
-                )
-
-            _, user_operation_receipt = self.index_user_operation_receipt(
-                user_operation_model
-            )
-            self.index_safe_operation(
-                user_operation_model, user_operation, user_operation_receipt
+            user_operation_model = UserOperationModel.objects.create(
+                ethereum_tx=ethereum_tx,
+                hash=user_operation_hash_hex,
+                sender=user_operation.sender,
+                nonce=user_operation.nonce,
+                init_code=user_operation.init_code,
+                call_data=user_operation.call_data,
+                call_gas_limit=user_operation.call_gas_limit,
+                verification_gas_limit=user_operation.verification_gas_limit,
+                pre_verification_gas=user_operation.pre_verification_gas,
+                max_fee_per_gas=user_operation.max_fee_per_gas,
+                max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
+                paymaster=user_operation.paymaster,
+                paymaster_data=user_operation.paymaster_data,
+                signature=user_operation.signature,
+                entry_point=user_operation.entry_point,
             )
 
-            return user_operation_model, user_operation
+        _, user_operation_receipt = self.index_user_operation_receipt(
+            user_operation_model
+        )
+        self.index_safe_operation(
+            user_operation_model, user_operation, user_operation_receipt
+        )
+
+        return user_operation_model, user_operation
 
     def process_aa_transaction(
         self, safe_address: ChecksumAddress, ethereum_tx: history_models.EthereumTx

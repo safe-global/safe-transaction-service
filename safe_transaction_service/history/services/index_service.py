@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Collection, List, Optional, OrderedDict, Union
+from typing import Collection, Optional, OrderedDict, Union
 
 from django.db import IntegrityError, transaction
 from django.db.models import Min, Q
@@ -252,7 +252,7 @@ class IndexService:
 
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
-    ) -> List["EthereumTx"]:
+    ) -> list["EthereumTx"]:
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
@@ -369,7 +369,7 @@ class IndexService:
         return list(ethereum_txs_dict.values())
 
     @transaction.atomic
-    def _reprocess(self, addresses: List[str]):
+    def _reprocess(self, addresses: list[str]):
         """
         Trigger processing of traces again. If addresses is empty, everything is reprocessed
 
@@ -450,7 +450,61 @@ class IndexService:
         SafeLastStatus.objects.filter(address=address).delete()
         logger.info("[%s] Ended fixing out of order", address)
 
-    def process_decoded_txs(self, safe_address: ChecksumAddress) -> int:
+    def process_all_decoded_txs(self) -> int:
+        """
+        Process all the pending `InternalTxDecoded` for every Safe
+
+        :return: Number of `InternalTxDecoded` processed
+        """
+        # Use chunks for memory issues
+        total_processed_txs = 0
+
+        # Don't check out of order multiple times for a Safe
+        checked_out_of_order: set[ChecksumAddress] = set()
+
+        while True:
+            internal_txs_decoded = list(
+                InternalTxDecoded.objects.pending_for_safes()[
+                    : self.eth_internal_tx_decoded_process_batch
+                ]
+            )
+            if not internal_txs_decoded:
+                break
+
+            # Check if a new decoded tx appeared before other already processed (due to a reindex)
+            if self.processing_enable_out_of_order_check:
+                safe_addresses_to_check = {
+                    internal_tx_decoded.internal_tx._from
+                    for internal_tx_decoded in internal_txs_decoded
+                    if internal_tx_decoded.internal_tx._from not in checked_out_of_order
+                }
+                logger.info(
+                    "Checking out of order transactions for %d Safes",
+                    len(safe_addresses_to_check),
+                )
+                for safe_address in safe_addresses_to_check:
+                    if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
+                        logger.error(
+                            "[%s] Found out of order transactions", safe_address
+                        )
+                        self.fix_out_of_order(
+                            safe_address,
+                            InternalTxDecoded.objects.pending_for_safe(safe_address)[
+                                0
+                            ].internal_tx,
+                        )
+                    checked_out_of_order.add(safe_address)
+                logger.info(
+                    "Checked out of order transactions for %d Safes",
+                    len(safe_addresses_to_check),
+                )
+
+            total_processed_txs += len(
+                self.tx_processor.process_decoded_transactions(internal_txs_decoded)
+            )
+        return total_processed_txs
+
+    def process_decoded_txs_for_safe(self, safe_address: ChecksumAddress) -> int:
         """
         Process all the pending `InternalTxDecoded` for a Safe
 
@@ -472,19 +526,19 @@ class IndexService:
         # Use chunks for memory issues
         total_processed_txs = 0
         while True:
-            internal_txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safe(
-                safe_address
-            )[: self.eth_internal_tx_decoded_process_batch]
-            if not internal_txs_decoded_queryset:
+            internal_txs_decoded = list(
+                InternalTxDecoded.objects.pending_for_safe(safe_address)[
+                    : self.eth_internal_tx_decoded_process_batch
+                ]
+            )
+            if not internal_txs_decoded:
                 break
             total_processed_txs += len(
-                self.tx_processor.process_decoded_transactions(
-                    internal_txs_decoded_queryset
-                )
+                self.tx_processor.process_decoded_transactions(internal_txs_decoded)
             )
         return total_processed_txs
 
-    def reprocess_addresses(self, addresses: List[ChecksumAddress]):
+    def reprocess_addresses(self, addresses: list[ChecksumAddress]):
         """
         Given a list of safe addresses it will delete all `SafeStatus`, conflicting `MultisigTxs` and will mark
         every `InternalTxDecoded` not processed to be processed again

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient
@@ -88,7 +88,7 @@ class ZerionTokenAdapterClient:
 
     def get_components(
         self, token_address: ChecksumAddress
-    ) -> Optional[List[UniswapComponent]]:
+    ) -> Optional[list[UniswapComponent]]:
         try:
             return [
                 UniswapComponent(*component)

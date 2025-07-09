@@ -69,7 +69,7 @@ class TransactionService:
 
     def get_txs_from_cache(
         self, safe_address: str, ids_to_search: Sequence[str]
-    ) -> List[AnySafeTransaction]:
+    ) -> list[AnySafeTransaction]:
         keys_to_search = [
             self.get_cache_key(safe_address, id_to_search)
             for id_to_search in ids_to_search
@@ -82,7 +82,7 @@ class TransactionService:
     def store_txs_in_cache(
         self,
         safe_address: str,
-        ids_with_txs: Tuple[str, List[AnySafeTransaction]],
+        ids_with_txs: tuple[str, list[AnySafeTransaction]],
     ):
         """
         Store executed transactions older than 10 minutes, using `ethereum_tx_hash` as key (for
@@ -137,7 +137,7 @@ class TransactionService:
 
     def get_all_txs_from_identifiers(
         self, safe_address: str, ids_to_search: Sequence[str]
-    ) -> List[AnySafeTransaction]:
+    ) -> list[AnySafeTransaction]:
         """
         Now that we know how to paginate, we retrieve the real transactions
 
@@ -172,7 +172,7 @@ class TransactionService:
             safe_address,
             len(ids_not_cached),
         )
-        ids_with_multisig_txs: Dict[HexStr, List[MultisigTransaction]] = {}
+        ids_with_multisig_txs: dict[HexStr, list[MultisigTransaction]] = {}
         number_multisig_txs = 0
         for multisig_tx in (
             MultisigTransaction.objects.filter(
@@ -193,7 +193,7 @@ class TransactionService:
             number_multisig_txs,
         )
 
-        ids_with_module_txs: Dict[HexStr, List[ModuleTransaction]] = {}
+        ids_with_module_txs: dict[HexStr, list[ModuleTransaction]] = {}
         number_module_txs = 0
         for module_tx in ModuleTransaction.objects.filter(
             safe=safe_address, internal_tx__ethereum_tx__in=ids_not_cached
@@ -208,7 +208,7 @@ class TransactionService:
             number_module_txs,
         )
 
-        ids_with_plain_ethereum_txs: Dict[HexStr, List[EthereumTx]] = {
+        ids_with_plain_ethereum_txs: dict[HexStr, list[EthereumTx]] = {
             ethereum_tx.tx_hash: [ethereum_tx]
             for ethereum_tx in EthereumTx.objects.filter(
                 tx_hash__in=ids_not_cached
@@ -244,7 +244,7 @@ class TransactionService:
 
         # Build dict of transfers for optimizing access
         transfer_dict = defaultdict(list)
-        transfers: List[TransferDict] = InternalTx.objects.union_ether_and_token_txs(
+        transfers: list[TransferDict] = InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
         )
         for transfer in transfers:
@@ -277,7 +277,7 @@ class TransactionService:
         # Build the list
         def get_the_transactions(
             transaction_id: str,
-        ) -> List[MultisigTransaction | ModuleTransaction | EthereumTx]:
+        ) -> list[MultisigTransaction | ModuleTransaction | EthereumTx]:
             """
             :param transaction_id: SafeTxHash (in case of a ``MultisigTransaction``) or Ethereum ``TxHash`` for the rest
             :return: Transactions for the transaction id, with transfers appended
@@ -331,8 +331,8 @@ class TransactionService:
         )  # Sorted already by execution_date
 
     def serialize_all_txs(
-        self, models: List[AnySafeTransaction]
-    ) -> List[Dict[str, Any]]:
+        self, models: list[AnySafeTransaction]
+    ) -> list[dict[str, Any]]:
         logger.debug("Serializing all transactions")
         results = []
         for model in models:
@@ -353,8 +353,8 @@ class TransactionService:
         return results
 
     def serialize_all_txs_v2(
-        self, models: List[AnySafeTransaction]
-    ) -> List[Dict[str, Any]]:
+        self, models: list[AnySafeTransaction]
+    ) -> list[dict[str, Any]]:
         logger.debug("Serializing all transactions")
         results = []
         for model in models:

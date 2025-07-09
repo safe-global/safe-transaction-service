@@ -2,7 +2,7 @@ import datetime
 import socket
 from functools import wraps
 from itertools import islice
-from typing import Any, Iterable, List, Union
+from typing import Any, Iterable, Union
 
 from django.core.signals import request_finished
 from django.db import connection
@@ -28,7 +28,7 @@ class FixedSizeDict(dict):
                 self.pop(next(iter(self)))
 
 
-def chunks(elements: List[Any], n: int) -> Iterable[Any]:
+def chunks(elements: list[Any], n: int) -> Iterable[Any]:
     """
     :param elements: List
     :param n: Number of elements per chunk

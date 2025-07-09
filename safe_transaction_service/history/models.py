@@ -6,14 +6,11 @@ from itertools import islice
 from logging import getLogger
 from typing import (
     Any,
-    Dict,
     Iterator,
-    List,
     Optional,
     Self,
     Sequence,
     Set,
-    Tuple,
     Type,
     TypedDict,
     Union,
@@ -227,14 +224,14 @@ class Chain(models.Model):
 
 
 class EthereumBlockManager(models.Manager):
-    def get_or_create_from_block(self, block: Dict[str, Any], confirmed: bool = False):
+    def get_or_create_from_block(self, block: dict[str, Any], confirmed: bool = False):
         try:
             return self.get(block_hash=block["hash"])
         except self.model.DoesNotExist:
             return self.create_from_block(block, confirmed=confirmed)
 
     def create_from_block(
-        self, block: Dict[str, Any], confirmed: bool = False
+        self, block: dict[str, Any], confirmed: bool = False
     ) -> "EthereumBlock":
         """
         :param block: Block Dict returned by Web3
@@ -345,8 +342,8 @@ class EthereumBlock(models.Model):
 class EthereumTxManager(models.Manager):
     def create_from_tx_dict(
         self,
-        tx: Dict[str, Any],
-        tx_receipt: Optional[Dict[str, Any]] = None,
+        tx: dict[str, Any],
+        tx_receipt: Optional[dict[str, Any]] = None,
         ethereum_block: Optional[EthereumBlock] = None,
     ) -> "EthereumTx":
         data = HexBytes(tx.get("data") or tx.get("input"))
@@ -435,7 +432,7 @@ class EthereumTx(TimeStampedModel):
             return self.status == 1
 
     def update_with_block_and_receipt(
-        self, ethereum_block: "EthereumBlock", tx_receipt: Dict[str, Any]
+        self, ethereum_block: "EthereumBlock", tx_receipt: dict[str, Any]
     ):
         if self.block is None:
             self.block = ethereum_block
@@ -565,7 +562,7 @@ class TokenTransfer(models.Model):
         return f"Token Transfer from={self._from} to={self.to}"
 
     @staticmethod
-    def _prepare_parameters_from_decoded_event(event_data: EventData) -> Dict[str, Any]:
+    def _prepare_parameters_from_decoded_event(event_data: EventData) -> dict[str, Any]:
         topic = HexBytes(event_data["topics"][0])
         expected_topic = HexBytes(ERC20_721_TRANSFER_TOPIC)
         if topic != expected_topic:
@@ -672,7 +669,7 @@ class ERC721TransferManager(TokenTransferManager):
         address: ChecksumAddress,
         only_trusted: Optional[bool] = None,
         exclude_spam: Optional[bool] = None,
-    ) -> List[Tuple[ChecksumAddress, int]]:
+    ) -> list[tuple[ChecksumAddress, int]]:
         """
         Returns erc721 owned by address, removing the ones sent
 
@@ -796,7 +793,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         return ",".join([str(address) for address in trace_address])
 
     def build_from_trace(
-        self, trace: Dict[str, Any], ethereum_tx: EthereumTx
+        self, trace: dict[str, Any], ethereum_tx: EthereumTx
     ) -> "InternalTx":
         """
         Build a InternalTx object from trace, but it doesn't insert it on database
@@ -829,8 +826,8 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         )
 
     def get_or_create_from_trace(
-        self, trace: Dict[str, Any], ethereum_tx: EthereumTx
-    ) -> Tuple["InternalTx", bool]:
+        self, trace: dict[str, Any], ethereum_tx: EthereumTx
+    ) -> tuple["InternalTx", bool]:
         tx_type = InternalTxType.parse(trace["type"])
         call_type = EthereumTxCallType.parse_call_type(trace["action"].get("callType"))
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
@@ -1114,7 +1111,7 @@ class InternalTx(models.Model):
         return self.can_be_decoded or self.is_ether_transfer or self.contract_address
 
     @property
-    def trace_address_as_list(self) -> List[int]:
+    def trace_address_as_list(self) -> list[int]:
         if not self.trace_address:
             return []
         else:
@@ -1198,17 +1195,17 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.not_processed().order_by_processing_queue()
+        return (
+            self.not_processed()
+            .order_by_processing_queue()
+            .select_related("internal_tx", "internal_tx__ethereum_tx")
+        )
 
     def pending_for_safe(self, safe_address: ChecksumAddress):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return (
-            self.pending_for_safes()
-            .filter(internal_tx___from=safe_address)
-            .select_related("internal_tx", "internal_tx__ethereum_tx")
-        )
+        return self.pending_for_safes().filter(internal_tx___from=safe_address)
 
     def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:
         """
@@ -1565,7 +1562,7 @@ class MultisigTransaction(TimeStampedModel):
         return bool(self.ethereum_tx_id and (self.ethereum_tx.block_id is not None))
 
     @property
-    def owners(self) -> Optional[List[str]]:
+    def owners(self) -> Optional[list[str]]:
         if not self.signatures:
             return []
         else:
@@ -1817,12 +1814,28 @@ class SafeMasterCopy(MonitoredAddress):
 
 
 class SafeContractManager(models.Manager):
-    def get_banned_safes(self) -> QuerySet[ChecksumAddress]:
-        return self.filter(banned=True).values_list("address", flat=True)
+    def get_banned_addresses(
+        self, addresses: Optional[list[ChecksumAddress]] = None
+    ) -> QuerySet[ChecksumAddress]:
+        return self.banned(addresses=addresses).values_list("address", flat=True)
+
+
+class SafeContractQuerySet(models.QuerySet):
+    def banned(
+        self, addresses: Optional[list[ChecksumAddress]] = None
+    ) -> QuerySet["SafeContract"]:
+        """
+        :param addresses: If provided, only those `addresses` will be filtered.
+        :return: Banned addresses
+        """
+        queryset = self.filter(banned=True)
+        if addresses:
+            queryset = queryset.filter(address__in=addresses)
+        return queryset
 
 
 class SafeContract(models.Model):
-    objects = SafeContractManager()
+    objects = SafeContractManager.from_queryset(SafeContractQuerySet)()
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     address = EthereumAddressBinaryField(primary_key=True)
     ethereum_tx = models.ForeignKey(
@@ -1969,7 +1982,7 @@ class SafeRelevantTransaction(models.Model):
     @classmethod
     def from_erc20_721_event(
         cls, event_data: EventData
-    ) -> List["SafeRelevantTransaction"]:
+    ) -> list["SafeRelevantTransaction"]:
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 

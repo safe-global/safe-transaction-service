@@ -3,7 +3,7 @@ import dataclasses
 import datetime
 import json
 import random
-from typing import Optional, Tuple
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
@@ -30,7 +30,6 @@ from .models import (
     EthereumBlock,
     InternalTxDecoded,
     MultisigTransaction,
-    SafeContract,
     SafeContractDelegate,
 )
 from .services import (
@@ -96,7 +95,7 @@ def check_sync_status_task() -> bool:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_erc20_events_task(self) -> Optional[Tuple[int, int]]:
+def index_erc20_events_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process ERC20/721 events for monitored addresses
 
@@ -182,7 +181,7 @@ def index_erc20_events_out_of_sync_task(
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_internal_txs_task(self) -> Optional[Tuple[int, int]]:
+def index_internal_txs_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process internal txs for monitored addresses
     :return: Tuple of number of addresses processed and number of blocks processed
@@ -209,7 +208,7 @@ def index_internal_txs_task(self) -> Optional[Tuple[int, int]]:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_new_proxies_task(self) -> Optional[Tuple[int, int]]:
+def index_new_proxies_task(self) -> Optional[tuple[int, int]]:
     """
     :return: Tuple of number of proxies created and number of blocks processed
     """
@@ -231,7 +230,7 @@ def index_new_proxies_task(self) -> Optional[Tuple[int, int]]:
     retry_kwargs={"max_retries": 3},
 )
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
-def index_safe_events_task(self) -> Optional[Tuple[int, int]]:
+def index_safe_events_task(self) -> Optional[tuple[int, int]]:
     """
     Find and process for monitored addresses
     :return: Tuple of number of addresses processed and number of blocks processed
@@ -253,35 +252,35 @@ def index_safe_events_task(self) -> Optional[Tuple[int, int]]:
 def process_decoded_internal_txs_task(self) -> Optional[int]:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
-            logger.info("Start process decoded internal txs")
-            count = 0
-            banned_safes = set(SafeContract.objects.get_banned_safes())
-            for (
-                safe_to_process
-            ) in InternalTxDecoded.objects.safes_pending_to_be_processed().iterator():
-                if safe_to_process in banned_safes:
-                    logger.info(
-                        "Ignoring decoded internal txs for banned safe %s",
-                        safe_to_process,
-                    )
-                    # Mark traces as processed so they are not reprocessed all the time
-                    # If not, `InternalTxDecoded` index with `decoded=True` can grow to
-                    # a point were `safes_pending_to_be_processed` takes minutes to complete
-                    InternalTxDecoded.objects.for_safe(
-                        safe_to_process
-                    ).not_processed().update(processed=True)
-                else:
+            if settings.PROCESSING_ALL_SAFES_TOGETHER:
+                # We can process all Safes together, big optimization
+                logger.info(
+                    "Start process decoded internal txs for every Safe together"
+                )
+                index_service = IndexServiceProvider()
+                return index_service.process_all_decoded_txs()
+            else:
+                # We need to process Safes individually
+                logger.info(
+                    "Start process decoded internal txs for every Safe in a different task"
+                )
+                count = 0
+                for (
+                    safe_to_process
+                ) in (
+                    InternalTxDecoded.objects.safes_pending_to_be_processed().iterator()
+                ):
                     process_decoded_internal_txs_for_safe_task.delay(
                         safe_to_process, reindex_master_copies=True
                     )
                     count += 1
 
-            if not count:
-                logger.info("No Safes to process")
-            else:
-                logger.info("%d Safes to process", count)
-
-            return count
+                (
+                    logger.info("%d Safes to process", count)
+                    if count
+                    else logger.info("No Safes to process")
+                )
+                return count
 
 
 @app.shared_task(bind=True)
@@ -301,7 +300,7 @@ def process_decoded_internal_txs_for_safe_task(
         with only_one_running_task(self, lock_name_suffix=safe_address):
             logger.info("[%s] Start processing decoded internal txs", safe_address)
             index_service: IndexService = IndexServiceProvider()
-            number_processed = index_service.process_decoded_txs(safe_address)
+            number_processed = index_service.process_decoded_txs_for_safe(safe_address)
             logger.info(
                 "[%s] Processed %d decoded transactions", safe_address, number_processed
             )

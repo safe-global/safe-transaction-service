@@ -1,6 +1,5 @@
 import json
 from functools import cache
-from typing import List
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -13,7 +12,7 @@ def get_analytics_service() -> "AnalyticsService":
 class AnalyticsService:
     REDIS_TRANSACTIONS_PER_SAFE_APP = "analytics_transactions_per_safe_app"
 
-    def get_safe_transactions_per_safe_app(self) -> List:
+    def get_safe_transactions_per_safe_app(self) -> list[dict]:
         redis = get_redis()
         analytic_result = redis.get(self.REDIS_TRANSACTIONS_PER_SAFE_APP)
         if analytic_result:

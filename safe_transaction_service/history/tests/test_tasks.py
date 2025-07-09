@@ -200,7 +200,7 @@ class TestTasks(TestCase):
         )
         self.assertFalse(reindex_erc20_erc721_last_hours_task())
 
-    def test_process_decoded_internal_txs_task(self):
+    def _test_process_decoded_internal_txs_task(self):
         owner = Account.create().address
         safe_address = Account.create().address
         fallback_handler = Account.create().address
@@ -222,6 +222,23 @@ class TestTasks(TestCase):
         self.assertEqual(safe_status.master_copy, master_copy)
         self.assertEqual(safe_status.owners, [owner])
         self.assertEqual(safe_status.threshold, threshold)
+
+    def test_process_decoded_internal_txs_task_together(self):
+        with self.assertLogs(logger=task_logger) as cm:
+            self._test_process_decoded_internal_txs_task()
+            self.assertIn(
+                "Start process decoded internal txs for every Safe together",
+                cm.output[0],
+            )
+
+    def test_process_decoded_internal_txs_task_different_tasks(self):
+        with self.settings(PROCESSING_ALL_SAFES_TOGETHER=False):
+            with self.assertLogs(logger=task_logger) as cm:
+                self._test_process_decoded_internal_txs_task()
+                self.assertIn(
+                    "Start process decoded internal txs for every Safe in a different task",
+                    cm.output[0],
+                )
 
     def test_process_decoded_internal_txs_for_banned_safe(self):
         owner = Account.create().address
@@ -251,7 +268,7 @@ class TestTasks(TestCase):
         SafeLastStatus.objects.update_or_create_from_safe_status(safe_status_0)
         with self.assertLogs(logger=task_logger) as cm:
             with patch.object(
-                IndexService, "process_decoded_txs", return_value=5
+                IndexService, "process_decoded_txs_for_safe", return_value=5
             ) as process_decoded_txs_mock:
                 process_decoded_internal_txs_for_safe_task.delay(safe_address)
                 process_decoded_txs_mock.assert_called_with(safe_address)

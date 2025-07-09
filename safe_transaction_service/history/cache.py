@@ -1,6 +1,6 @@
 import json
 from functools import cached_property, wraps
-from typing import List, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -190,7 +190,7 @@ def remove_cache_view_by_instance(
         remove_cache_view_for_addresses(cache_tag, addresses)
 
 
-def remove_cache_view_for_addresses(cache_tag: str, addresses: List[ChecksumAddress]):
+def remove_cache_view_for_addresses(cache_tag: str, addresses: list[ChecksumAddress]):
     """
     Remove several cache for the provided cache_tag and addresses
 
