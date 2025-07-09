@@ -2610,10 +2610,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             {module_tx["module"] for module_tx in response.data["results"]},
         )
 
-    def tearDown(self):
-        # Skip automatic cleanup to preserve data for debugging
-        pass
-
     def test_safe_export_view(self):
         """Test the export endpoint for CSV export functionality"""
         safe_address = Account.create().address
