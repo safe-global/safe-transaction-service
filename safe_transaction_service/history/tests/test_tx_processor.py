@@ -18,6 +18,7 @@ from safe_transaction_service.safe_messages.tests.factories import (
 )
 
 from ..indexers.tx_processor import (
+    CannotFindPreviousTrace,
     ModuleCannotBeDisabled,
     SafeTxProcessor,
     SafeTxProcessorProvider,
@@ -553,7 +554,9 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         )
 
         self.assertEqual(ModuleTransaction.objects.count(), 0)
-        with self.assertRaises(ValueError):  # trace_transaction not supported
+        with self.assertRaises(
+            CannotFindPreviousTrace
+        ):  # trace_transaction not supported
             safe_tx_processor.process_decoded_transaction(module_internal_tx_decoded)
             self.assertEqual(ModuleTransaction.objects.count(), 0)
 
