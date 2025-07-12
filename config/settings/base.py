@@ -533,7 +533,10 @@ ETHEREUM_4337_SUPPORTED_SAFE_MODULES = env.list(
 ETHEREUM_TRACING_NODE_URL = env("ETHEREUM_TRACING_NODE_URL", default=None)
 ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT = env.int(
     "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT", default=10_000
-)
+)  # Initial number of blocks for `trace_filter` or for the same `trace_block` batch
+ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT_MAX = env.int(
+    "ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT_MAX", default=0
+)  # Maximum number of blocks for `trace_filter` or for the same `trace_block` batch
 ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN = env.int(
     "ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN", default=1
 )
