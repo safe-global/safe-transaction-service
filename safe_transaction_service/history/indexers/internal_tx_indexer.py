@@ -61,6 +61,9 @@ class InternalTxIndexer(EthereumIndexer):
             "block_process_limit", settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
         )
         kwargs.setdefault(
+            "block_process_limit_max", settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT_MAX
+        )
+        kwargs.setdefault(
             "blocks_to_reindex_again", settings.ETH_INTERNAL_TXS_BLOCKS_TO_REINDEX_AGAIN
         )
         super().__init__(*args, **kwargs)
