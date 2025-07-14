@@ -1,4 +1,4 @@
-asgiref==3.7.2
+asgiref==3.9.1
 boto3==1.39.3
 cachetools==5.5.2
 celery==5.5.3
