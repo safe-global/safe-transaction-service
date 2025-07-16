@@ -417,7 +417,7 @@ class TransactionService:
         # Main query that unions all transaction types with their transfers
         main_query = f"""
         WITH export_data AS (
-            -- Multisig Transactions with ERC20 Transfers
+            -- ERC20 Transfers from multisigtransactions
             SELECT
                 encode(mt.safe, 'hex') as safe_address,
                 encode(erc20._from, 'hex') as from_address,
@@ -430,21 +430,61 @@ class TransactionService:
                 encode(mt.proposer, 'hex') as proposer_address,
                 mt.created as proposed_at,
                 encode(et._from, 'hex') as executor_address,
-                eb.timestamp as execution_date,
-                eb.timestamp as executed_at,
+                erc20.timestamp as execution_date,
+                erc20.timestamp as executed_at,
                 COALESCE(mt.origin->>'note', '') as note,
                 encode(mt.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL AND eb.number IS NOT NULL) as is_executed,
-                COALESCE(eb.timestamp, mt.created) as sort_date
+                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
+                COALESCE(erc20.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
             JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
             JOIN history_erc20transfer erc20 ON et.tx_hash = erc20.ethereum_tx_id
-            LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
             LEFT JOIN tokens_token t ON erc20.address = t.address
             WHERE mt.safe = %s
+
+            UNION ALL
+
+            -- ERC20 Transfers (standalone) incoming, or outgoing with token approval
+            SELECT
+                encode(CASE
+                    WHEN erc20.to = %s THEN erc20.to
+                    ELSE erc20._from
+                END, 'hex') as safe_address,
+                encode(erc20._from, 'hex') as from_address,
+                encode(erc20.to, 'hex') as to_address,
+                erc20.value::text as amount,
+                'erc20' as asset_type,
+                encode(erc20.address, 'hex') as asset_address,
+                t.symbol as asset_symbol,
+                t.decimals as asset_decimals,
+                null as proposer_address,
+                null as proposed_at,
+                encode(et._from, 'hex') as executor_address,
+                erc20.timestamp as execution_date,
+                erc20.timestamp as executed_at,
+                '' as note,
+                encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
+                null as safe_tx_hash,
+                null as method,
+                null as contract_address,
+                true as is_executed,
+                erc20.timestamp as sort_date
+            FROM history_erc20transfer erc20
+            JOIN history_ethereumtx et ON erc20.ethereum_tx_id = et.tx_hash
+            LEFT JOIN tokens_token t ON erc20.address = t.address
+            WHERE (erc20.to = %s OR erc20._from = %s)
+            AND NOT EXISTS (
+                SELECT 1 FROM history_multisigtransaction mt
+                WHERE mt.ethereum_tx_id = erc20.ethereum_tx_id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM history_moduletransaction modtx
+                JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
+                WHERE itx.ethereum_tx_id = erc20.ethereum_tx_id
+            )
 
             UNION ALL
 
@@ -543,7 +583,7 @@ class TransactionService:
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-            LEFT JOIN history_erc20transfer erc20 ON itx.ethereum_tx_id = erc20.ethereum_tx_id
+            JOIN history_erc20transfer erc20 ON itx.ethereum_tx_id = erc20.ethereum_tx_id
             LEFT JOIN tokens_token t ON erc20.address = t.address
             WHERE modtx.safe = %s
 
@@ -576,50 +616,9 @@ class TransactionService:
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-            LEFT JOIN history_erc721transfer erc721 ON itx.ethereum_tx_id = erc721.ethereum_tx_id
+            JOIN history_erc721transfer erc721 ON itx.ethereum_tx_id = erc721.ethereum_tx_id
             LEFT JOIN tokens_token t ON erc721.address = t.address
             WHERE modtx.safe = %s
-
-            UNION ALL
-
-            -- ERC20 Transfers (standalone)
-            SELECT
-                encode(CASE
-                    WHEN erc20.to = %s THEN erc20.to
-                    ELSE erc20._from
-                END, 'hex') as safe_address,
-                encode(erc20._from, 'hex') as from_address,
-                encode(erc20.to, 'hex') as to_address,
-                erc20.value::text as amount,
-                'erc20' as asset_type,
-                encode(erc20.address, 'hex') as asset_address,
-                t.symbol as asset_symbol,
-                t.decimals as asset_decimals,
-                null as proposer_address,
-                null as proposed_at,
-                encode(et._from, 'hex') as executor_address,
-                erc20.timestamp as execution_date,
-                erc20.timestamp as executed_at,
-                '' as note,
-                encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
-                null as safe_tx_hash,
-                null as method,
-                null as contract_address,
-                true as is_executed,
-                erc20.timestamp as sort_date
-            FROM history_erc20transfer erc20
-            JOIN history_ethereumtx et ON erc20.ethereum_tx_id = et.tx_hash
-            LEFT JOIN tokens_token t ON erc20.address = t.address
-            WHERE (erc20.to = %s OR erc20._from = %s)
-            AND NOT EXISTS (
-                SELECT 1 FROM history_multisigtransaction mt
-                WHERE mt.ethereum_tx_id = erc20.ethereum_tx_id
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM history_moduletransaction modtx
-                JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-                WHERE itx.ethereum_tx_id = erc20.ethereum_tx_id
-            )
 
             UNION ALL
 
