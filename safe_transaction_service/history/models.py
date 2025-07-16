@@ -319,9 +319,9 @@ class EthereumBlock(models.Model):
         indexes = [
             Index(
                 name="history_block_confirmed_idx",
-                fields=["confirmed"],
+                fields=["number"],
                 condition=Q(confirmed=False),
-            ),
+            ),  #
         ]
 
     def __str__(self):
