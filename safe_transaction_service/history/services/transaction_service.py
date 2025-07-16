@@ -501,19 +501,18 @@ class TransactionService:
                 encode(mt.proposer, 'hex') as proposer_address,
                 mt.created as proposed_at,
                 encode(et._from, 'hex') as executor_address,
-                eb.timestamp as execution_date,
-                eb.timestamp as executed_at,
+                erc721.timestamp as execution_date,
+                erc721.timestamp as executed_at,
                 COALESCE(mt.origin->>'note', '') as note,
                 encode(mt.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL AND eb.number IS NOT NULL) as is_executed,
-                COALESCE(eb.timestamp, mt.created) as sort_date
+                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
+                COALESCE(erc721.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
             JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
             JOIN history_erc721transfer erc721 ON et.tx_hash = erc721.ethereum_tx_id
-            LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
             LEFT JOIN tokens_token t ON erc721.address = t.address
             WHERE mt.safe = %s
 
@@ -522,7 +521,7 @@ class TransactionService:
             -- Multisig Transactions (standalone, without transfers)
             SELECT
                 encode(mt.safe, 'hex') as safe_address,
-                encode(mt.proposer, 'hex') as from_address,
+                encode(mt.safe, 'hex') as from_address,
                 encode(mt.to, 'hex') as to_address,
                 mt.value::text as amount,
                 'native' as asset_type,
@@ -619,6 +618,42 @@ class TransactionService:
             JOIN history_erc721transfer erc721 ON itx.ethereum_tx_id = erc721.ethereum_tx_id
             LEFT JOIN tokens_token t ON erc721.address = t.address
             WHERE modtx.safe = %s
+
+            UNION ALL
+
+            -- Module Transactions with ethereum Transfers
+            SELECT
+                encode(modtx.safe, 'hex') as safe_address,
+                encode(COALESCE(itx._from, modtx.module), 'hex') as from_address,
+                encode(COALESCE(itx.to, modtx.to), 'hex') as to_address,
+                modtx.value::text as amount,
+               'native' as asset_type,
+                null as asset_address,
+                'ETH' as asset_symbol,
+                18 as asset_decimals,
+                null as proposer_address,
+                null as proposed_at,
+                encode(modtx.module, 'hex') as executor_address,
+                itx.timestamp as execution_date,
+                itx.timestamp as executed_at,
+                '' as note,
+                encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
+                null as safe_tx_hash,
+                null as method,
+                encode(modtx.to, 'hex') as contract_address,
+                NOT modtx.failed as is_executed,
+                itx.timestamp as sort_date
+            FROM history_moduletransaction modtx
+            JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
+            WHERE itx.to = %s OR itx._from = %s
+            AND NOT EXISTS (
+                SELECT 1 FROM history_erc20transfer erc20
+                WHERE erc20.ethereum_tx_id = itx.ethereum_tx_id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM history_erc721transfer erc721
+                WHERE erc721.ethereum_tx_id = itx.ethereum_tx_id
+            )
 
             UNION ALL
 
@@ -836,7 +871,7 @@ class TransactionService:
         # Parameters for main query (safe_address repeated for each UNION)
         safe_address_bytes = bytes.fromhex(safe_address[2:])
         main_params = (
-            [safe_address_bytes] * 14  # 14 instances of safe address in the query
+            [safe_address_bytes] * 16  # 16 instances of safe address in the query
             + params  # date filters
             + [limit, offset]
         )
@@ -915,3 +950,7 @@ class TransactionService:
         )
 
         return results, total_count
+
+        """"
+
+"""
