@@ -48,17 +48,6 @@ from .factories import (
 
 class TestViewsV2(SafeTestCaseMixin, APITestCase):
 
-    def setUp(self):
-        self.token = TokenFactory(
-            address=Account.create().address, symbol="TEST", decimals=18
-        )
-        self.nft_token = TokenFactory(
-            address=Account.create().address, symbol="NFT", decimals=None
-        )
-        self.safe_address = Account.create().address
-        self.external_address = Account.create().address
-        SafeContractFactory(address=self.safe_address)
-
     def test_safe_collectibles_paginated(self):
         safe_address = Account.create().address
 
@@ -2721,14 +2710,26 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         # Should default to 1000
         self.assertEqual(len(response.data["results"]), 1)
 
-    def test_export_view_erc20_with_multisigtransactions(self):
-        # Test OUTGOING Ether from multisig transaction
-        ethereum_tx = EthereumTxFactory()
-        multisig_tx = MultisigTransactionFactory(
-            safe=self.safe_address, ethereum_tx=ethereum_tx, trusted=True
+    def _setup_export_tests(self):
+        self.token = TokenFactory(
+            address=Account.create().address, symbol="TEST", decimals=18
+        )
+        self.nft_token = TokenFactory(
+            address=Account.create().address, symbol="NFT", decimals=None
+        )
+        self.safe_address = Account.create().address
+        self.external_address = Account.create().address
+        SafeContractFactory(address=self.safe_address)
+
+    def test_export_view_erc20_transfers(self):
+        self._setup_export_tests()
+        # Test OUTGOING ERC20 from multisig transaction
+        ethereum_tx_multisig_out = EthereumTxFactory()
+        multisig_tx_out = MultisigTransactionFactory(
+            safe=self.safe_address, ethereum_tx=ethereum_tx_multisig_out, trusted=True
         )
         multisig_outgoing_erc20_transfer = ERC20TransferFactory(
-            ethereum_tx=ethereum_tx,
+            ethereum_tx=ethereum_tx_multisig_out,
             address=self.token.address,
             _from=self.safe_address,
             to=self.external_address,
@@ -2755,148 +2756,13 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
-        # TEST incoming ERC20 from multisigtransaction
-        ethereum_tx = EthereumTxFactory()
-        multisig_tx = MultisigTransactionFactory(
-            safe=self.safe_address, ethereum_tx=ethereum_tx, trusted=True
+        # Test INCOMING ERC20 from multisig transaction
+        ethereum_tx_multisig_in = EthereumTxFactory()
+        multisig_tx_in = MultisigTransactionFactory(
+            safe=self.safe_address, ethereum_tx=ethereum_tx_multisig_in, trusted=True
         )
-        multisig_o_erc20_transfer = ERC20TransferFactory(
-            ethereum_tx=ethereum_tx,
-            address=self.token.address,
-            _from=self.safe_address,
-            to=self.safe_address,
-            value=1000000000000000000,  # 1 token with 18 decimals
-        )
-
-        response = self.client.get(
-            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
-        self.assertEqual(len(response.data["results"]), 2)
-
-        # must be sorted by execution date
-        result = response.data["results"][0]
-        self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
-        self.assertEqual(result["to"], self.safe_address)
-        self.assertEqual(result["assetType"], "erc20")
-        self.assertEqual(result["assetAddress"], self.token.address)
-        self.assertEqual(result["assetSymbol"], "TEST")
-        self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(multisig_outgoing_erc20_transfer.value))
-        self.assertEqual(result["isExecuted"], True)
-        self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
-
-    def test_export_view_with_standalone_erc20_transfer(self):
-
-        # Test INCOMING ERC20 from external address
-        incoming_erc20_transfer = ERC20TransferFactory(
-            address=self.token.address,
-            _from=self.external_address,
-            to=self.safe_address,
-            value=1000000000000000000,  # 1 token with 18 decimals
-        )
-
-        response = self.client.get(
-            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(len(response.data["results"]), 1)
-        # must be sorted by execution date
-        result = response.data["results"][0]
-        self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
-        self.assertEqual(result["to"], self.safe_address)
-        self.assertEqual(result["assetType"], "erc20")
-        self.assertEqual(result["assetAddress"], self.token.address)
-        self.assertEqual(result["assetSymbol"], "TEST")
-        self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(incoming_erc20_transfer.value))
-        self.assertEqual(result["isExecuted"], True)
-        self.assertIsNone(result["safeTxHash"])
-
-        # Test OUTGOING ERC20 from approval token (no multisigtransaction or moduletransaction)
-        outgoing_erc20_transfer = ERC20TransferFactory(
-            address=self.token.address,
-            _from=self.safe_address,
-            to=self.external_address,
-            value=2000000000000000000,  # 2 token with 18 decimals
-        )
-
-        response = self.client.get(
-            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
-        self.assertEqual(len(response.data["results"]), 2)
-        # must be sorted by execution date
-        result = response.data["results"][0]
-        self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
-        self.assertEqual(result["to"], self.external_address)
-        self.assertEqual(result["assetType"], "erc20")
-        self.assertEqual(result["assetAddress"], self.token.address)
-        self.assertEqual(result["assetSymbol"], "TEST")
-        self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(outgoing_erc20_transfer.value))
-        self.assertEqual(result["isExecuted"], True)
-        self.assertIsNone(result["safeTxHash"])
-
-    def test_erc20_module_transactions(self):
-        module_contract_address = Account.create().address
-
-        # Test ERC20 OUTGOING from module transaction
-        ethereum_tx = EthereumTxFactory()
-        internal_tx = InternalTxFactory(
-            ethereum_tx=ethereum_tx, _from=self.safe_address, value=0
-        )
-        module_transaction = ModuleTransactionFactory(
-            internal_tx=internal_tx, safe=self.safe_address, to=module_contract_address
-        )
-        outgoing_erc20 = ERC20TransferFactory(
-            ethereum_tx=ethereum_tx,
-            address=self.token.address,
-            _from=self.safe_address,
-            to=self.external_address,
-            value=1000000000000000000,  # 1 token with 18 decimals
-        )
-
-        response = self.client.get(
-            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(len(response.data["results"]), 1)
-        result = response.data["results"][0]
-        self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
-        self.assertEqual(result["to"], self.external_address)
-        self.assertEqual(result["assetType"], "erc20")
-        self.assertEqual(result["assetAddress"], self.token.address)
-        self.assertEqual(result["assetSymbol"], "TEST")
-        self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(outgoing_erc20.value))
-        self.assertEqual(result["isExecuted"], True)
-        self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
-        self.assertEqual(result["contractAddress"], module_contract_address)
-
-        # Test ERC20 INCOMING from module transaction
-        ethereum_tx_incoming = EthereumTxFactory()
-        internal_tx_incoming = InternalTxFactory(
-            ethereum_tx=ethereum_tx_incoming, _from=self.safe_address, value=0
-        )
-        module_transaction_incoming = ModuleTransactionFactory(
-            internal_tx=internal_tx_incoming,
-            safe=self.safe_address,
-            to=module_contract_address,
-        )
-        incoming_erc20 = ERC20TransferFactory(
-            ethereum_tx=ethereum_tx_incoming,
+        multisig_incoming_erc20_transfer = ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_multisig_in,
             address=self.token.address,
             _from=self.external_address,
             to=self.safe_address,
@@ -2911,21 +2777,162 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 2)
 
         # Check the incoming transaction (should be first in results due to ordering)
-        incoming_result = response.data["results"][0]
-        self.assertEqual(incoming_result["safe"], self.safe_address)
-        self.assertEqual(incoming_result["from_"], self.external_address)
-        self.assertEqual(incoming_result["to"], self.safe_address)
-        self.assertEqual(incoming_result["assetType"], "erc20")
-        self.assertEqual(incoming_result["assetAddress"], self.token.address)
-        self.assertEqual(incoming_result["assetSymbol"], "TEST")
-        self.assertEqual(incoming_result["assetDecimals"], 18)
-        self.assertEqual(incoming_result["amount"], str(incoming_erc20.value))
-        self.assertEqual(incoming_result["isExecuted"], True)
-        self.assertIsNotNone(incoming_result["transactionHash"])
-        self.assertIsNone(incoming_result["safeTxHash"])
-        self.assertEqual(incoming_result["contractAddress"], module_contract_address)
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["to"], self.safe_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], self.token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], str(multisig_incoming_erc20_transfer.value))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNotNone(result["safeTxHash"])
 
-    def test_export_view_erc721_with_multisigtransactions(self):
+        # Test OUTGOING ERC20 from module transaction
+        ethereum_tx_module_out = EthereumTxFactory()
+        module_contract_address = Account.create().address
+        module_internal_tx_out = InternalTxFactory(
+            ethereum_tx=ethereum_tx_module_out, _from=self.safe_address, value=0
+        )
+        module_transaction_out = ModuleTransactionFactory(
+            internal_tx=module_internal_tx_out,
+            safe=self.safe_address,
+            to=module_contract_address,
+        )
+        module_outgoing_erc20 = ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_module_out,
+            address=self.token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=3000000000000000000,  # 3 tokens with 18 decimals
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 3)
+
+        # Check the module outgoing transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["to"], self.external_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], self.token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], str(module_outgoing_erc20.value))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertEqual(result["contractAddress"], module_contract_address)
+
+        # Test INCOMING ERC20 from module transaction
+        ethereum_tx_module_in = EthereumTxFactory()
+        module_internal_tx_in = InternalTxFactory(
+            ethereum_tx=ethereum_tx_module_in, _from=self.safe_address, value=0
+        )
+        module_transaction_in = ModuleTransactionFactory(
+            internal_tx=module_internal_tx_in,
+            safe=self.safe_address,
+            to=module_contract_address,
+        )
+        module_incoming_erc20 = ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_module_in,
+            address=self.token.address,
+            _from=self.external_address,
+            to=self.safe_address,
+            value=4000000000000000000,  # 4 tokens with 18 decimals
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 4)
+        self.assertEqual(len(response.data["results"]), 4)
+
+        # Check the module incoming transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["to"], self.safe_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], self.token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], str(module_incoming_erc20.value))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertEqual(result["contractAddress"], module_contract_address)
+
+        # Test INCOMING ERC20 from standalone transaction
+        standalone_incoming_erc20 = ERC20TransferFactory(
+            address=self.token.address,
+            _from=self.external_address,
+            to=self.safe_address,
+            value=5000000000000000000,  # 5 tokens with 18 decimals
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 5)
+        self.assertEqual(len(response.data["results"]), 5)
+
+        # Check the standalone incoming transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["to"], self.safe_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], self.token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], str(standalone_incoming_erc20.value))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertIsNone(result["contractAddress"])
+
+        # Test OUTGOING ERC20 from standalone transaction
+        standalone_outgoing_erc20 = ERC20TransferFactory(
+            address=self.token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=6000000000000000000,  # 6 tokens with 18 decimals
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 6)
+        self.assertEqual(len(response.data["results"]), 6)
+
+        # Check the standalone outgoing transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["to"], self.external_address)
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["assetAddress"], self.token.address)
+        self.assertEqual(result["assetSymbol"], "TEST")
+        self.assertEqual(result["assetDecimals"], 18)
+        self.assertEqual(result["amount"], str(standalone_outgoing_erc20.value))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertIsNone(result["contractAddress"])
+
+    def test_export_view_erc721_transfers(self):
+        self._setup_export_tests()
         # Test OUTGOING ERC721 from multisig transaction
         ethereum_tx = EthereumTxFactory()
         multisig_tx = MultisigTransactionFactory(
@@ -2998,7 +3005,149 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
+        # Test OUTGOING ERC721 from module transaction
+        ethereum_tx_module_out = EthereumTxFactory()
+        module_contract_address = Account.create().address
+        module_internal_tx_out = InternalTxFactory(
+            ethereum_tx=ethereum_tx_module_out, _from=self.safe_address, value=0
+        )
+        module_transaction_out = ModuleTransactionFactory(
+            internal_tx=module_internal_tx_out,
+            safe=self.safe_address,
+            to=module_contract_address,
+        )
+        module_outgoing_erc721 = ERC721TransferFactory(
+            ethereum_tx=ethereum_tx_module_out,
+            address=self.nft_token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            token_id=789,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 3)
+
+        # Check the module outgoing transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["to"], self.external_address)
+        self.assertEqual(result["assetType"], "erc721")
+        self.assertEqual(result["assetAddress"], self.nft_token.address)
+        self.assertEqual(result["assetSymbol"], "NFT")
+        self.assertIsNone(result["assetDecimals"])
+        self.assertEqual(result["amount"], str(module_outgoing_erc721.token_id))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertEqual(result["contractAddress"], module_contract_address)
+
+        # Test INCOMING ERC721 from module transaction
+        ethereum_tx_module_in = EthereumTxFactory()
+        module_internal_tx_in = InternalTxFactory(
+            ethereum_tx=ethereum_tx_module_in, _from=self.safe_address, value=0
+        )
+        module_transaction_in = ModuleTransactionFactory(
+            internal_tx=module_internal_tx_in,
+            safe=self.safe_address,
+            to=module_contract_address,
+        )
+        module_incoming_erc721 = ERC721TransferFactory(
+            ethereum_tx=ethereum_tx_module_in,
+            address=self.nft_token.address,
+            _from=self.external_address,
+            to=self.safe_address,
+            token_id=101112,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 4)
+        self.assertEqual(len(response.data["results"]), 4)
+
+        # Check the module incoming transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["to"], self.safe_address)
+        self.assertEqual(result["assetType"], "erc721")
+        self.assertEqual(result["assetAddress"], self.nft_token.address)
+        self.assertEqual(result["assetSymbol"], "NFT")
+        self.assertIsNone(result["assetDecimals"])
+        self.assertEqual(result["amount"], str(module_incoming_erc721.token_id))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertEqual(result["contractAddress"], module_contract_address)
+
+        # Test INCOMING ERC721 from standalone transaction
+        standalone_incoming_erc721 = ERC721TransferFactory(
+            address=self.nft_token.address,
+            _from=self.external_address,
+            to=self.safe_address,
+            token_id=131415,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 5)
+        self.assertEqual(len(response.data["results"]), 5)
+
+        # Check the standalone incoming transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["to"], self.safe_address)
+        self.assertEqual(result["assetType"], "erc721")
+        self.assertEqual(result["assetAddress"], self.nft_token.address)
+        self.assertEqual(result["assetSymbol"], "NFT")
+        self.assertIsNone(result["assetDecimals"])
+        self.assertEqual(result["amount"], str(standalone_incoming_erc721.token_id))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertIsNone(result["contractAddress"])
+
+        # Test OUTGOING ERC721 from standalone transaction
+        standalone_outgoing_erc721 = ERC721TransferFactory(
+            address=self.nft_token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            token_id=161718,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 6)
+        self.assertEqual(len(response.data["results"]), 6)
+
+        # Check the standalone outgoing transaction
+        result = response.data["results"][0]
+        self.assertEqual(result["safe"], self.safe_address)
+        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["to"], self.external_address)
+        self.assertEqual(result["assetType"], "erc721")
+        self.assertEqual(result["assetAddress"], self.nft_token.address)
+        self.assertEqual(result["assetSymbol"], "NFT")
+        self.assertIsNone(result["assetDecimals"])
+        self.assertEqual(result["amount"], str(standalone_outgoing_erc721.token_id))
+        self.assertEqual(result["isExecuted"], True)
+        self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["safeTxHash"])
+        self.assertIsNone(result["contractAddress"])
+
     def test_export_view_ether_transfers(self):
+        self._setup_export_tests()
         # Test OUTGOING Ether from multisig transaction
         ethereum_tx_multisig_out = EthereumTxFactory()
         value = 1000000000000000000  # 1 ETH
