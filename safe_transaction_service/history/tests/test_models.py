@@ -329,23 +329,9 @@ class TestEthereumTx(TestCase):
     def test_create_from_tx_dict(self):
         for tx_mock in (type_0_tx, type_2_tx):
             with self.subTest(tx_mock=tx_mock):
+                EthereumBlockFactory(number=tx_mock["tx"]["blockNumber"])
                 tx_dict = tx_mock["tx"]
-                ethereum_tx = EthereumTx.objects.create_from_tx_dict(tx_dict)
-                self.assertEqual(ethereum_tx.type, tx_dict["type"], 0)
-                self.assertEqual(ethereum_tx.gas_price, tx_dict["gasPrice"])
-                self.assertEqual(
-                    ethereum_tx.max_fee_per_gas, tx_dict.get("maxFeePerGas")
-                )
-                self.assertEqual(
-                    ethereum_tx.max_priority_fee_per_gas,
-                    tx_dict.get("maxPriorityFeePerGas"),
-                )
-                self.assertIsNone(ethereum_tx.gas_used)
-                self.assertIsNone(ethereum_tx.status)
-                self.assertIsNone(ethereum_tx.transaction_index)
-
                 tx_receipt = tx_mock["receipt"]
-                ethereum_tx.delete()
                 ethereum_tx = EthereumTx.objects.create_from_tx_dict(
                     tx_dict, tx_receipt=tx_receipt
                 )
@@ -1346,26 +1332,26 @@ class TestMultisigConfirmations(TestCase):
 
 
 class TestEthereumBlock(TestCase):
-    def test_get_or_create_from_block(self):
+    def test_get_or_create_from_block_dict(self):
         mock_block = block_result[0]
         self.assertEqual(EthereumBlock.objects.count(), 0)
-        db_block = EthereumBlock.objects.get_or_create_from_block(mock_block)
+        db_block = EthereumBlock.objects.get_or_create_from_block_dict(mock_block)
         db_block.set_confirmed()
         self.assertEqual(db_block.confirmed, True)
         self.assertEqual(EthereumBlock.objects.count(), 1)
         with mock.patch.object(
-            EthereumBlockManager, "create_from_block"
-        ) as create_from_block_mock:
+            EthereumBlockManager, "create_from_block_dict"
+        ) as create_from_block_dict_mock:
             # Block already exists
-            EthereumBlock.objects.get_or_create_from_block(mock_block)
-            create_from_block_mock.assert_not_called()
+            EthereumBlock.objects.get_or_create_from_block_dict(mock_block)
+            create_from_block_dict_mock.assert_not_called()
 
         # Test block with different block-hash but same block number
         mock_block_2 = dict(mock_block)
         mock_block_2["hash"] = fast_keccak_text("another-hash")
         self.assertNotEqual(mock_block["hash"], mock_block_2["hash"])
         with self.assertRaises(IntegrityError):
-            EthereumBlock.objects.get_or_create_from_block(mock_block_2)
+            EthereumBlock.objects.get_or_create_from_block_dict(mock_block_2)
             self.assertEqual(EthereumBlock.objects.count(), 1)
             db_block.refresh_from_db()
             self.assertEqual(db_block.confirmed, False)
