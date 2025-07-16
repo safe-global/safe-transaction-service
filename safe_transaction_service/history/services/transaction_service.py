@@ -10,10 +10,11 @@ from django.db import connection
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from eth_typing import HexStr
+from eth_typing import ChecksumAddress, HexStr
+from hexbytes import HexBytes
 from redis import Redis
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
-from web3 import Web3
+from safe_eth.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
@@ -376,7 +377,7 @@ class TransactionService:
 
     def get_export_transactions(
         self,
-        safe_address: str,
+        safe_address: ChecksumAddress,
         execution_date_gte: Optional[datetime] = None,
         execution_date_lte: Optional[datetime] = None,
         limit: int = 1000,
@@ -406,9 +407,11 @@ class TransactionService:
         params = []
 
         if execution_date_gte:
+            assert type(execution_date_gte) is datetime
             where_conditions.append("execution_date >= %s")
             params.append(execution_date_gte)
         if execution_date_lte:
+            assert type(execution_date_lte) is datetime
             where_conditions.append("execution_date <= %s")
             params.append(execution_date_lte)
 
@@ -869,7 +872,7 @@ class TransactionService:
         """
 
         # Parameters for main query (safe_address repeated for each UNION)
-        safe_address_bytes = bytes.fromhex(safe_address[2:])
+        safe_address_bytes = HexBytes(safe_address)
         main_params = (
             [safe_address_bytes] * 16  # 16 instances of safe address in the query
             + params  # date filters
@@ -892,52 +895,55 @@ class TransactionService:
             for row in cursor.fetchall():
                 row_dict = dict(zip(columns, row))
 
-                # Add '0x' prefix to hex strings and convert addresses to checksum format (except for null values)
-                if row_dict["safe_address"]:
-                    address = "0x" + row_dict["safe_address"]
-                    row_dict["safe_address"] = Web3.to_checksum_address(address)
-                if row_dict["from_address"]:
-                    address = "0x" + row_dict["from_address"]
-                    row_dict["from_address"] = Web3.to_checksum_address(address)
-                if row_dict["to_address"]:
-                    address = "0x" + row_dict["to_address"]
-                    row_dict["to_address"] = Web3.to_checksum_address(address)
-                if row_dict["asset_address"]:
-                    address = "0x" + row_dict["asset_address"]
-                    row_dict["asset_address"] = Web3.to_checksum_address(address)
-                if row_dict["proposer_address"]:
-                    address = "0x" + row_dict["proposer_address"]
-                    row_dict["proposer_address"] = Web3.to_checksum_address(address)
-                if row_dict["executor_address"]:
-                    address = "0x" + row_dict["executor_address"]
-                    row_dict["executor_address"] = Web3.to_checksum_address(address)
-                if row_dict["transaction_hash"]:
-                    row_dict["transaction_hash"] = "0x" + row_dict["transaction_hash"]
-                if row_dict["safe_tx_hash"]:
-                    row_dict["safe_tx_hash"] = "0x" + row_dict["safe_tx_hash"]
-                if row_dict["contract_address"]:
-                    address = "0x" + row_dict["contract_address"]
-                    row_dict["contract_address"] = Web3.to_checksum_address(address)
-
                 # Map to serializer field names
                 export_item = {
-                    "safe": row_dict["safe_address"],
-                    "_from": row_dict["from_address"],
-                    "to": row_dict["to_address"],
+                    "safe": fast_to_checksum_address(row_dict["safe_address"]),
+                    "_from": fast_to_checksum_address(row_dict["from_address"]),
+                    "to": fast_to_checksum_address(row_dict["to_address"]),
                     "_value": row_dict["amount"],
                     "asset_type": row_dict["asset_type"],
-                    "asset_address": row_dict["asset_address"],
-                    "asset_symbol": row_dict["asset_symbol"],
-                    "asset_decimals": row_dict["asset_decimals"],
-                    "proposer_address": row_dict["proposer_address"],
-                    "proposed_at": row_dict["proposed_at"],
-                    "executor_address": row_dict["executor_address"],
-                    "executed_at": row_dict["executed_at"],
-                    "note": row_dict["note"],
-                    "transaction_hash": row_dict["transaction_hash"],
-                    "safe_tx_hash": row_dict["safe_tx_hash"],
-                    "method": row_dict["method"],
-                    "contract_address": row_dict["contract_address"],
+                    "asset_address": (
+                        fast_to_checksum_address(row_dict["asset_address"])
+                        if row_dict["asset_address"]
+                        else None
+                    ),
+                    "asset_symbol": (
+                        row_dict["asset_symbol"] if row_dict["asset_symbol"] else None
+                    ),
+                    "asset_decimals": (
+                        row_dict["asset_decimals"]
+                        if row_dict["asset_decimals"]
+                        else None
+                    ),
+                    "proposer_address": (
+                        fast_to_checksum_address(row_dict["proposer_address"])
+                        if row_dict["proposer_address"]
+                        else None
+                    ),
+                    "proposed_at": (
+                        row_dict["proposed_at"] if row_dict["proposed_at"] else None
+                    ),
+                    "executor_address": (
+                        fast_to_checksum_address(row_dict["executor_address"])
+                        if row_dict["executor_address"]
+                        else None
+                    ),
+                    "executed_at": (
+                        row_dict["executed_at"] if row_dict["executed_at"] else None
+                    ),
+                    "note": row_dict["note"] if row_dict["note"] else None,
+                    "transaction_hash": "0x" + row_dict["transaction_hash"],
+                    "safe_tx_hash": (
+                        "0x" + row_dict["safe_tx_hash"]
+                        if row_dict["safe_tx_hash"]
+                        else None
+                    ),
+                    "method": row_dict["method"] if row_dict["method"] else None,
+                    "contract_address": (
+                        fast_to_checksum_address(row_dict["contract_address"])
+                        if row_dict["contract_address"]
+                        else None
+                    ),
                     "is_executed": row_dict["is_executed"],
                 }
                 results.append(export_item)
@@ -950,7 +956,3 @@ class TransactionService:
         )
 
         return results, total_count
-
-        """"
-
-"""
