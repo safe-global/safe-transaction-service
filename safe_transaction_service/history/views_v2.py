@@ -1,10 +1,8 @@
 import hashlib
 import logging
-from datetime import datetime
 from typing import Optional
 
 from django.db.models import Q
-from django.utils import timezone
 
 import django_filters
 from drf_spectacular.types import OpenApiTypes
@@ -28,6 +26,7 @@ from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
 from .models import MultisigTransaction, SafeContract, SafeContractDelegate
 from .pagination import DummyPagination
+from .serializers import SafeExportTransactionRequestParams
 from .services import BalanceServiceProvider, TransactionServiceProvider
 from .services.balance_service import Balance
 from .services.collectibles_service import CollectiblesServiceProvider
@@ -682,6 +681,17 @@ class SafeExportView(GenericAPIView):
     serializer_class = serializers.SafeExportTransactionSerializer
     pagination_class = pagination.ListPagination
 
+    def get_query_params(self):
+        serializer = SafeExportTransactionRequestParams(
+            data=self.request.query_params.dict()
+        )
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        parsed_execution_date_gte = validated_data.get("execution_date__gte")
+        parsed_execution_date_lte = validated_data.get("execution_date__lte")
+        return parsed_execution_date_gte, parsed_execution_date_lte
+
     def get(self, request, address):
         """
         Get transactions optimized for CSV export with transfer information.
@@ -703,66 +713,13 @@ class SafeExportView(GenericAPIView):
         except SafeContract.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        # Parse query parameters
-        execution_date_gte = request.query_params.get("execution_date__gte")
-        execution_date_lte = request.query_params.get("execution_date__lte")
+        # Get query params
+        parsed_execution_date_gte, parsed_execution_date_lte = self.get_query_params()
+
+        # Get pagination
         paginator = pagination.ListPagination(self.request, max_limit=1000)
         limit = paginator.get_limit(request)
         offset = paginator.get_offset(request)
-
-        # Parse dates if provided
-        parsed_execution_date_gte = None
-        parsed_execution_date_lte = None
-
-        if execution_date_gte:
-            try:
-                # Handle different ISO format variations
-                date_str = execution_date_gte.replace("Z", "+00:00")
-                # Fix format issue where timezone offset has space instead of +
-                if " " in date_str:  # e.g., '2025-07-08T19:22:21.558887 00:00'
-                    parts = date_str.rsplit(" ", 1)
-                    if (
-                        len(parts) == 2 and ":" in parts[1] and len(parts[1]) == 5
-                    ):  # timezone format like '00:00'
-                        date_str = parts[0] + "+" + parts[1]
-                parsed_execution_date_gte = datetime.fromisoformat(date_str)
-                # Ensure timezone-aware
-                if parsed_execution_date_gte.tzinfo is None:
-                    parsed_execution_date_gte = timezone.make_aware(
-                        parsed_execution_date_gte
-                    )
-            except ValueError:
-                return Response(
-                    status=status.HTTP_400_BAD_REQUEST,
-                    data={
-                        "error": "Invalid execution_date__gte format. Use ISO format."
-                    },
-                )
-
-        if execution_date_lte:
-            try:
-                # Handle different ISO format variations
-                date_str = execution_date_lte.replace("Z", "+00:00")
-                # Fix format issue where timezone offset has space instead of +
-                if " " in date_str:  # e.g., '2025-07-08T19:22:21.558887 00:00'
-                    parts = date_str.rsplit(" ", 1)
-                    if (
-                        len(parts) == 2 and ":" in parts[1] and len(parts[1]) == 5
-                    ):  # timezone format like '00:00'
-                        date_str = parts[0] + "+" + parts[1]
-                parsed_execution_date_lte = datetime.fromisoformat(date_str)
-                # Ensure timezone-aware
-                if parsed_execution_date_lte.tzinfo is None:
-                    parsed_execution_date_lte = timezone.make_aware(
-                        parsed_execution_date_lte
-                    )
-            except ValueError:
-                return Response(
-                    status=status.HTTP_400_BAD_REQUEST,
-                    data={
-                        "error": "Invalid execution_date__lte format. Use ISO format."
-                    },
-                )
 
         # Get transactions from service
         transaction_service = TransactionServiceProvider()

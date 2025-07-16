@@ -1343,6 +1343,11 @@ class SafeDeploymentSerializer(serializers.Serializer):
     contracts = SafeDeploymentContractSerializer(many=True)
 
 
+class SafeExportTransactionRequestParams(serializers.Serializer):
+    execution_date__gte = serializers.DateTimeField(required=False, allow_null=True)
+    execution_date__lte = serializers.DateTimeField(required=False, allow_null=True)
+
+
 class SafeExportTransactionSerializer(serializers.Serializer):
     """
     Serializer for the export endpoint that returns transaction data optimized for CSV export

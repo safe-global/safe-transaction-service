@@ -2,6 +2,7 @@ import datetime
 import json
 from unittest import mock
 from unittest.mock import MagicMock
+from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -2684,9 +2685,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
 
         # Test date filtering
         future_date = timezone.now() + datetime.timedelta(days=1)
+        params = urlencode({"execution_date__gte": future_date.isoformat()})
         response = self.client.get(
-            reverse("v2:history:safe-export", args=(safe_address,))
-            + f"?execution_date__gte={future_date.isoformat()}",
+            reverse("v2:history:safe-export", args=(safe_address,)) + f"?{params}",
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
