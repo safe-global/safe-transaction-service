@@ -680,6 +680,7 @@ class SafeExportView(GenericAPIView):
     """
 
     serializer_class = serializers.SafeExportTransactionSerializer
+    pagination_class = pagination.ListPagination
 
     def get(self, request, address):
         """
@@ -705,12 +706,9 @@ class SafeExportView(GenericAPIView):
         # Parse query parameters
         execution_date_gte = request.query_params.get("execution_date__gte")
         execution_date_lte = request.query_params.get("execution_date__lte")
-        limit = int(request.query_params.get("limit", 1000))
-        offset = int(request.query_params.get("offset", 0))
-
-        # Validate limit
-        if limit > 1000:
-            limit = 1000
+        paginator = pagination.ListPagination(self.request, max_limit=1000)
+        limit = paginator.get_limit(request)
+        offset = paginator.get_offset(request)
 
         # Parse dates if provided
         parsed_execution_date_gte = None
@@ -775,29 +773,9 @@ class SafeExportView(GenericAPIView):
             limit=limit,
             offset=offset,
         )
-
-        # Build pagination info
-        base_url = request.build_absolute_uri(request.path)
-        query_params = request.GET.copy()
-
-        next_url = None
-        if offset + limit < total_count:
-            query_params["offset"] = offset + limit
-            next_url = f"{base_url}?{query_params.urlencode()}"
-
-        previous_url = None
-        if offset > 0:
-            query_params["offset"] = max(0, offset - limit)
-            previous_url = f"{base_url}?{query_params.urlencode()}"
+        paginator.set_count(total_count)
 
         # Serialize the data
         serializer = self.get_serializer(transactions, many=True)
 
-        return Response(
-            {
-                "count": total_count,
-                "next": next_url,
-                "previous": previous_url,
-                "results": serializer.data,
-            }
-        )
+        return paginator.get_paginated_response(serializer.data)
