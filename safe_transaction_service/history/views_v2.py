@@ -679,7 +679,6 @@ class SafeExportView(GenericAPIView):
     """
 
     serializer_class = serializers.SafeExportTransactionSerializer
-    pagination_class = pagination.ListPagination
 
     def get_query_params(self):
         serializer = SafeExportTransactionRequestParams(
