@@ -53,7 +53,7 @@ from safe_eth.safe import SafeOperationEnum
 from safe_eth.safe.safe import SafeInfo
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
-from web3.types import EventData
+from web3.types import BlockData, EventData
 
 from safe_transaction_service.account_abstraction.constants import (
     USER_OPERATION_EVENT_TOPIC,
@@ -223,35 +223,44 @@ class Chain(models.Model):
         return f"ChainId {self.chain_id}"
 
 
-class EthereumBlockManager(models.Manager):
-    def get_or_create_from_block(self, block: dict[str, Any], confirmed: bool = False):
+class EthereumBlockManager(BulkCreateSignalMixin, models.Manager):
+    def get_or_create_from_block_dict(
+        self, block: dict[str, Any], confirmed: bool = False
+    ):
         try:
             return self.get(block_hash=block["hash"])
         except self.model.DoesNotExist:
-            return self.create_from_block(block, confirmed=confirmed)
+            return self.create_from_block_dict(block, confirmed=confirmed)
 
-    def create_from_block(
-        self, block: dict[str, Any], confirmed: bool = False
+    def from_block_dict(
+        self, block: BlockData, confirmed: bool = False
+    ) -> "EthereumBlock":
+        return EthereumBlock(
+            number=block["number"],
+            # Some networks like CELO don't provide gasLimit
+            gas_limit=block.get("gasLimit", 0),
+            gas_used=block["gasUsed"],
+            timestamp=datetime.datetime.fromtimestamp(
+                block["timestamp"], datetime.timezone.utc
+            ),
+            block_hash=to_0x_hex_str(block["hash"]),
+            parent_hash=to_0x_hex_str(block["parentHash"]),
+            confirmed=confirmed,
+        )
+
+    def create_from_block_dict(
+        self, block: BlockData, confirmed: bool = False
     ) -> "EthereumBlock":
         """
-        :param block: Block Dict returned by Web3
+        :param block: Block Dict returned by web3.py
         :param confirmed: If True we will not check for reorgs in the future
         :return: EthereumBlock model
         """
         try:
             with transaction.atomic():  # Needed for handling IntegrityError
-                return super().create(
-                    number=block["number"],
-                    # Some networks like CELO don't provide gasLimit
-                    gas_limit=block.get("gasLimit", 0),
-                    gas_used=block["gasUsed"],
-                    timestamp=datetime.datetime.fromtimestamp(
-                        block["timestamp"], datetime.timezone.utc
-                    ),
-                    block_hash=to_0x_hex_str(block["hash"]),
-                    parent_hash=to_0x_hex_str(block["parentHash"]),
-                    confirmed=confirmed,
-                )
+                ethereum_block = self.from_block_dict(block, confirmed=confirmed)
+                ethereum_block.save(force_insert=True)
+                return ethereum_block
         except IntegrityError:
             db_block = self.get(number=block["number"])
             if HexBytes(db_block.block_hash) == block["hash"]:  # pragma: no cover
@@ -319,9 +328,9 @@ class EthereumBlock(models.Model):
         indexes = [
             Index(
                 name="history_block_confirmed_idx",
-                fields=["confirmed"],
+                fields=["number"],
                 condition=Q(confirmed=False),
-            ),
+            ),  #
         ]
 
     def __str__(self):
@@ -339,13 +348,13 @@ class EthereumBlock(models.Model):
         return self._set_confirmed(False)
 
 
-class EthereumTxManager(models.Manager):
-    def create_from_tx_dict(
-        self,
-        tx: dict[str, Any],
-        tx_receipt: Optional[dict[str, Any]] = None,
-        ethereum_block: Optional[EthereumBlock] = None,
+class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
+    def from_tx_dict(
+        self, tx: dict[str, Any], tx_receipt: dict[str, Any]
     ) -> "EthereumTx":
+        if tx_receipt is None:
+            raise ValueError("tx_receipt cannot be empty")
+
         data = HexBytes(tx.get("data") or tx.get("input"))
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
@@ -358,24 +367,33 @@ class EthereumTxManager(models.Manager):
             or 0
         )
 
-        return super().create(
-            block=ethereum_block,
+        return EthereumTx(
+            block_id=tx["blockNumber"],
             tx_hash=to_0x_hex_str(HexBytes(tx["hash"])),
-            gas_used=tx_receipt and tx_receipt["gasUsed"],
+            gas_used=tx_receipt["gasUsed"],
             _from=tx["from"],
             gas=tx["gas"],
             gas_price=gas_price,
             max_fee_per_gas=tx.get("maxFeePerGas"),
             max_priority_fee_per_gas=tx.get("maxPriorityFeePerGas"),
             logs=logs,
-            status=tx_receipt and tx_receipt.get("status"),
-            transaction_index=tx_receipt and tx_receipt["transactionIndex"],
+            status=tx_receipt.get("status"),
+            transaction_index=tx_receipt["transactionIndex"],
             data=data if data else None,
             nonce=tx["nonce"],
             to=tx.get("to"),
             value=tx["value"],
             type=tx.get("type", 0),
         )
+
+    def create_from_tx_dict(
+        self,
+        tx: dict[str, Any],
+        tx_receipt: dict[str, Any],
+    ) -> "EthereumTx":
+        ethereum_tx = self.from_tx_dict(tx, tx_receipt)
+        ethereum_tx.save()
+        return ethereum_tx
 
     def account_abstraction_txs(self) -> RawQuerySet:
         """

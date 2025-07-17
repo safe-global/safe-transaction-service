@@ -2,10 +2,10 @@ import logging
 from dataclasses import dataclass
 from typing import Collection, Optional, OrderedDict, Union
 
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Min, Q
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, Hash32
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.util.util import to_0x_hex_str
@@ -106,21 +106,6 @@ class IndexService:
         from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
 
         self.tx_processor: SafeTxProcessor = SafeTxProcessorProvider()
-
-    def block_get_or_create_from_block_hash(self, block_hash: int):
-        try:
-            return EthereumBlock.objects.get(block_hash=block_hash)
-        except EthereumBlock.DoesNotExist:
-            current_block_number = (
-                self.ethereum_client.current_block_number
-            )  # For reorgs
-            block = self.ethereum_client.get_block(block_hash)
-            confirmed = (
-                current_block_number - block["number"]
-            ) >= self.eth_reorg_blocks
-            return EthereumBlock.objects.get_or_create_from_block(
-                block, confirmed=confirmed
-            )
 
     def get_erc20_721_current_indexing_block_number(self) -> int:
         return IndexingStatusDb.objects.get_erc20_721_indexing_status().block_number
@@ -229,40 +214,56 @@ class IndexService:
 
         return synced
 
-    def tx_create_or_update_from_tx_hash(self, tx_hash: str) -> "EthereumTx":
-        try:
-            ethereum_tx = EthereumTx.objects.get(tx_hash=tx_hash)
-            # For txs stored before being mined
-            if ethereum_tx.block is None:
-                tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-                ethereum_block = self.block_get_or_create_from_block_hash(
-                    tx_receipt["blockHash"]
+    def txs_create_or_update_from_block_hashes(
+        self, block_hashes: set[Hash32]
+    ) -> tuple[int, dict[Hash32, EthereumBlock]]:
+        block_hashes = list(block_hashes)  # Iterate in a defined order
+        blocks = self.ethereum_client.get_blocks(block_hashes)
+
+        # Validate blocks from RPC
+        for block_hash, block in zip(block_hashes, blocks):
+            if not block:
+                raise BlockNotFoundException(
+                    f"Block with hash={block_hash} was not found"
                 )
-                ethereum_tx.update_with_block_and_receipt(ethereum_block, tx_receipt)
-            return ethereum_tx
-        except EthereumTx.DoesNotExist:
-            tx_receipt = self.ethereum_client.get_transaction_receipt(tx_hash)
-            ethereum_block = self.block_get_or_create_from_block_hash(
-                tx_receipt["blockHash"]
+            assert block_hash == to_0x_hex_str(
+                block["hash"]
+            ), f"{block_hash} does not match retrieved block hash"
+
+        current_block_number = self.ethereum_client.current_block_number
+        ethereum_blocks_to_insert = [
+            EthereumBlock.objects.from_block_dict(
+                block,
+                confirmed=(current_block_number - block["number"])
+                >= self.eth_reorg_blocks,
             )
-            tx = self.ethereum_client.get_transaction(tx_hash)
-            return EthereumTx.objects.create_from_tx_dict(
-                tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block
-            )
+            for block in blocks
+        ]
+        inserted = EthereumBlock.objects.bulk_create_from_generator(
+            iter(ethereum_blocks_to_insert), ignore_conflicts=True
+        )
+        return inserted, {
+            HexBytes(ethereum_block.block_hash): ethereum_block
+            for ethereum_block in ethereum_blocks_to_insert
+        }
 
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[Union[str, bytes]]
     ) -> list["EthereumTx"]:
+        """
+        :param tx_hashes:
+        :return: List of EthereumTx in the same order that `tx_hashes` were provided
+        """
         logger.debug("Don't retrieve existing txs on DB. Find them first")
         # Search first in database
         ethereum_txs_dict = OrderedDict.fromkeys(
-            [to_0x_hex_str(HexBytes(tx_hash)) for tx_hash in tx_hashes]
+            [HexBytes(tx_hash) for tx_hash in tx_hashes]
         )
         db_ethereum_txs = EthereumTx.objects.filter(tx_hash__in=tx_hashes).exclude(
             block=None
         )
         for db_ethereum_tx in db_ethereum_txs:
-            ethereum_txs_dict[db_ethereum_tx.tx_hash] = db_ethereum_tx
+            ethereum_txs_dict[HexBytes(db_ethereum_tx.tx_hash)] = db_ethereum_tx
         logger.debug("Found %d existing txs on DB", len(db_ethereum_txs))
 
         # Retrieve from the node the txs missing from database
@@ -275,7 +276,7 @@ class IndexService:
         if not tx_hashes_not_in_db:
             return list(ethereum_txs_dict.values())
 
-        # Get receipts for hashes not in db
+        # Get receipts for hashes not in db. First get the receipts as they guarantee tx is mined and confirmed
         logger.debug("Get tx receipts for hashes not on db")
         tx_receipts = []
         for tx_hash, tx_receipt in zip(
@@ -320,50 +321,35 @@ class IndexService:
 
             block_hashes.add(to_0x_hex_str(tx["blockHash"]))
             txs.append(tx)
-        logger.debug("Got txs from RPC. Getting %d blocks", len(block_hashes))
-
-        blocks = self.ethereum_client.get_blocks(block_hashes)
-        block_dict = {}
-        for block_hash, block in zip(block_hashes, blocks):
-            block = block or self.ethereum_client.get_block(
-                block_hash
-            )  # Retry fetching if failed
-            if not block:
-                raise BlockNotFoundException(
-                    f"Block with hash={block_hash} was not found"
-                )
-            assert block_hash == to_0x_hex_str(block["hash"])
-            block_dict[block["hash"]] = block
 
         logger.debug(
-            "Got blocks from RPC. Inserting blocks. Creating txs or updating them if they have not receipt"
+            "Got txs from RPC. Getting and inserting %d blocks", len(block_hashes)
         )
+        number_inserted_blocks, blocks = self.txs_create_or_update_from_block_hashes(
+            block_hashes
+        )
+        logger.debug("Inserted %d blocks", number_inserted_blocks)
 
-        # Create new transactions or update them if they have no receipt
-        current_block_number = self.ethereum_client.current_block_number
-        for tx, tx_receipt in zip(txs, tx_receipts):
-            block = block_dict[tx["blockHash"]]
-            confirmed = (
-                current_block_number - block["number"]
-            ) >= self.eth_reorg_blocks
-            ethereum_block: EthereumBlock = (
-                EthereumBlock.objects.get_or_create_from_block(
-                    block, confirmed=confirmed
-                )
-            )
-            try:
-                with transaction.atomic():
-                    ethereum_tx = EthereumTx.objects.create_from_tx_dict(
-                        tx, tx_receipt=tx_receipt, ethereum_block=ethereum_block
-                    )
-                ethereum_txs_dict[to_0x_hex_str(HexBytes(ethereum_tx.tx_hash))] = (
-                    ethereum_tx
-                )
-            except IntegrityError:  # Tx exists
-                ethereum_tx = EthereumTx.objects.get(tx_hash=tx["hash"])
-                # For txs stored before being mined
-                ethereum_tx.update_with_block_and_receipt(ethereum_block, tx_receipt)
-                ethereum_txs_dict[ethereum_tx.tx_hash] = ethereum_tx
+        logger.debug("Inserting %d transactions", len(txs))
+        # Create new transactions or ignore if they already exist
+        ethereum_txs_to_insert = [
+            EthereumTx.objects.from_tx_dict(tx, tx_receipt)
+            for tx, tx_receipt in zip(txs, tx_receipts)
+        ]
+        number_inserted_txs = EthereumTx.objects.bulk_create_from_generator(
+            iter(ethereum_txs_to_insert), ignore_conflicts=True
+        )
+        for ethereum_tx, tx in zip(ethereum_txs_to_insert, txs):
+            # Trust they were inserted and add them to the txs dictionary
+            assert ethereum_tx.tx_hash == to_0x_hex_str(
+                tx["hash"]
+            ), f"{ethereum_tx.tx_hash} does not match retrieved tx hash"
+            ethereum_tx.block = blocks[tx["blockHash"]]
+            ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash)] = ethereum_tx
+            # Block info is required for traces
+
+        logger.debug("Inserted %d transactions", number_inserted_txs)
+
         logger.debug("Blocks, transactions and receipts were inserted")
 
         return list(ethereum_txs_dict.values())
