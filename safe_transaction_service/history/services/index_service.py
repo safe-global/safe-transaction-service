@@ -449,10 +449,15 @@ class IndexService:
         checked_out_of_order: set[ChecksumAddress] = set()
 
         while True:
+            logger.debug("Getting pending transactions to process for all Safes")
             internal_txs_decoded = list(
                 InternalTxDecoded.objects.pending_for_safes()[
                     : self.eth_internal_tx_decoded_process_batch
                 ]
+            )
+            logger.debug(
+                "Got %d pending transactions to process for all Safes",
+                len(internal_txs_decoded),
             )
             if not internal_txs_decoded:
                 break
@@ -485,6 +490,10 @@ class IndexService:
                     len(safe_addresses_to_check),
                 )
 
+            logger.info(
+                "Processing batch of %d decoded transactions",
+                len(internal_txs_decoded),
+            )
             total_processed_txs += len(
                 self.tx_processor.process_decoded_transactions(internal_txs_decoded)
             )

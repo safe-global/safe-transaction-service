@@ -393,17 +393,16 @@ class SafeTxProcessor(TxProcessor):
             return results
 
         internal_tx_ids = []
-        internal_txs_decoded_list = internal_txs_decoded
         contract_addresses = {
             internal_tx_decoded.internal_tx._from
-            for internal_tx_decoded in internal_txs_decoded_list
+            for internal_tx_decoded in internal_txs_decoded
         }
         banned_addresses = set(
             SafeContract.objects.get_banned_addresses(addresses=contract_addresses)
         )
 
         try:
-            for internal_tx_decoded in internal_txs_decoded_list:
+            for internal_tx_decoded in internal_txs_decoded:
                 contract_address = internal_tx_decoded.internal_tx._from
                 internal_tx_ids.append(internal_tx_decoded.internal_tx_id)
                 if contract_address in banned_addresses:
@@ -449,11 +448,13 @@ class SafeTxProcessor(TxProcessor):
         internal_tx = internal_tx_decoded.internal_tx
         ethereum_tx = internal_tx.ethereum_tx
         contract_address = internal_tx._from
+        function_name = internal_tx_decoded.function_name
 
         logger.debug(
-            "[%s] Start processing InternalTxDecoded in tx-hash=%s",
+            "[%s] Start processing InternalTxDecoded in tx-hash=%s function-name=%s",
             contract_address,
             to_0x_hex_str(HexBytes(internal_tx_decoded.internal_tx.ethereum_tx_id)),
+            function_name,
         )
 
         if internal_tx.gas_used < 1000:
@@ -461,12 +462,13 @@ class SafeTxProcessor(TxProcessor):
             # this kind of functions due to little gas used. Some of this transactions get decoded as they were
             # valid in old versions of the proxies, like changes to `setup`
             logger.debug(
-                "[%s] Calling a non existing function, will not process it",
+                "[%s] Calling a function using no much gas %d, probably a non existing function, "
+                "will not process it",
                 contract_address,
+                internal_tx.gas_used,
             )
             return False
 
-        function_name = internal_tx_decoded.function_name
         arguments = internal_tx_decoded.arguments
         master_copy = internal_tx.to
         processed_successfully = True
@@ -733,6 +735,12 @@ class SafeTxProcessor(TxProcessor):
                     chain_id=self.ethereum_client.get_chain_id(),
                 )
                 safe_tx_hash = safe_tx.safe_tx_hash
+                logger.debug(
+                    "[%s] Processing transaction execution. nonce=%d safe-tx-hash=%s",
+                    contract_address,
+                    nonce,
+                    to_0x_hex_str(safe_tx_hash),
+                )
 
                 failed = self.is_failed(ethereum_tx, safe_tx_hash)
                 multisig_tx, _ = MultisigTransaction.objects.get_or_create(

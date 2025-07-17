@@ -47,7 +47,7 @@ class EthereumIndexer(ABC):
         :param ethereum_client:
         :param confirmations: Don't index last `confirmations` blocks to prevent from reorgs
         :param block_process_limit: Number of blocks to scan at a time for relevant data. `0` == `No limit`
-        :param block_process_limit_max: Maximum bumber of blocks to scan at a time for relevant data. `0` == `No limit`
+        :param block_process_limit_max: Maximum number of blocks to scan at a time for relevant data. `0` == `No limit`
         :param blocks_to_reindex_again: Number of blocks to reindex every time the indexer runs, in case something
             was missed.
         :param updated_blocks_behind: Number of blocks scanned for an address that can be behind and
