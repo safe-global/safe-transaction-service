@@ -3231,12 +3231,12 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             ethereum_tx=ethereum_tx_module_out,
             _from=self.safe_address,
             to=self.external_address,
+            value=3000000000000000000,
         )
         module_transaction_out = ModuleTransactionFactory(
             internal_tx=module_internal_tx_out,
             safe=self.safe_address,
             to=module_contract_address,
-            value=3000000000000000000,  # 3 ETH
         )
 
         response = self.client.get(
@@ -3255,7 +3255,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetAddress"])
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(module_transaction_out.value))
+        self.assertEqual(result["amount"], str(module_internal_tx_out.value))
         self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
@@ -3267,12 +3267,12 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             ethereum_tx=ethereum_tx_module_in,
             _from=self.external_address,
             to=self.safe_address,
+            value=4000000000000000000,  # 4 ETH
         )
         module_transaction_in = ModuleTransactionFactory(
             internal_tx=module_internal_tx_in,
             safe=self.safe_address,
             to=module_contract_address,
-            value=4000000000000000000,  # 4 ETH
         )
 
         response = self.client.get(
@@ -3291,7 +3291,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetAddress"])
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
-        self.assertEqual(result["amount"], str(module_transaction_in.value))
+        self.assertEqual(result["amount"], str(module_internal_tx_in.value))
         self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
@@ -3354,3 +3354,48 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
+
+    def test_export_view_should_not_include_no_transfer_transactions(self):
+        self._setup_export_tests()
+
+        ethereum_tx_multisig = EthereumTxFactory()
+        multisig_tx_out = MultisigTransactionFactory(
+            safe=self.safe_address,
+            ethereum_tx=ethereum_tx_multisig,
+            trusted=True,
+            to=self.external_address,
+            value=0,
+        )
+        multisig_internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx_multisig,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=0,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(len(response.data["results"]), 0)
+
+        ethereum_tx_multisig = EthereumTxFactory()
+        internal_tx = InternalTxFactory(
+            ethereum_tx=ethereum_tx_multisig,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=0,
+        )
+        module_tx = ModuleTransactionFactory(
+            internal_tx=internal_tx,
+            safe=self.safe_address,
+            to=Account.create().address,
+        )
+
+        response = self.client.get(
+            reverse("v2:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(len(response.data["results"]), 0)
