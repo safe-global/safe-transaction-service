@@ -2660,14 +2660,13 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(len(response.data["results"]), 1)
 
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], safe_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], token.address)
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], "1000000000000000000")
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -2744,7 +2743,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(len(response.data["results"]), 1)
 
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -2753,7 +2752,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_outgoing_erc20_transfer.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -2778,7 +2776,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 2)
 
         # Check the incoming transaction (should be first in results due to ordering)
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -2787,7 +2785,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_incoming_erc20_transfer.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -2818,7 +2815,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 3)
 
         # Check the module outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -2827,7 +2824,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_outgoing_erc20.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -2858,7 +2854,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 4)
 
         # Check the module incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -2867,7 +2863,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_incoming_erc20.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -2888,7 +2883,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 5)
 
         # Check the standalone incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -2897,7 +2892,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_incoming_erc20.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
@@ -2918,7 +2912,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 6)
 
         # Check the standalone outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -2927,7 +2921,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "TEST")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_outgoing_erc20.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
@@ -2954,7 +2947,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(len(response.data["results"]), 1)
 
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -2965,7 +2958,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             result["amount"], str(multisig_outgoing_erc721_transfer.token_id)
         )
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -2991,7 +2983,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 2)
 
         # Check the incoming transaction (should be first in results due to ordering)
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3002,7 +2994,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             result["amount"], str(multisig_incoming_erc721_transfer.token_id)
         )
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -3033,7 +3024,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 3)
 
         # Check the module outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -3042,7 +3033,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], str(module_outgoing_erc721.token_id))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -3073,7 +3063,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 4)
 
         # Check the module incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3082,7 +3072,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], str(module_incoming_erc721.token_id))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -3103,7 +3092,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 5)
 
         # Check the standalone incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3112,7 +3101,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], str(standalone_incoming_erc721.token_id))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
@@ -3133,7 +3121,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 6)
 
         # Check the standalone outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -3142,7 +3130,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], str(standalone_outgoing_erc721.token_id))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
@@ -3173,7 +3160,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(len(response.data["results"]), 1)
 
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -3182,7 +3169,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_outgoing_internal_tx.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -3211,7 +3197,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 2)
 
         # Check the incoming transaction (should be first in results due to ordering)
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3220,7 +3206,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_incoming_internal_tx.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNotNone(result["safeTxHash"])
 
@@ -3247,7 +3232,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 3)
 
         # Check the module outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -3256,7 +3241,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_out.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -3283,7 +3267,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 4)
 
         # Check the module incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3292,7 +3276,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_in.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
@@ -3312,7 +3295,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 5)
 
         # Check the standalone outgoing transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
@@ -3321,7 +3304,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_outgoing_internal_tx.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
@@ -3341,7 +3323,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 6)
 
         # Check the standalone incoming transaction
-        result = response.data["results"][0]
+        result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
         self.assertEqual(result["from_"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
@@ -3350,7 +3332,6 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_incoming_internal_tx.value))
-        self.assertEqual(result["isExecuted"], True)
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])

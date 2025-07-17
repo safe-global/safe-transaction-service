@@ -441,7 +441,6 @@ class TransactionService:
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
                 COALESCE(erc20.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
             JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
@@ -474,7 +473,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 null as contract_address,
-                true as is_executed,
                 erc20.timestamp as sort_date
             FROM history_erc20transfer erc20
             JOIN history_ethereumtx et ON erc20.ethereum_tx_id = et.tx_hash
@@ -512,7 +510,6 @@ class TransactionService:
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
                 COALESCE(erc721.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
             JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
@@ -542,7 +539,6 @@ class TransactionService:
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
                 COALESCE(itx.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
             JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
@@ -584,7 +580,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 encode(modtx.to, 'hex') as contract_address,
-                NOT modtx.failed as is_executed,
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
@@ -617,7 +612,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 encode(modtx.to, 'hex') as contract_address,
-                NOT modtx.failed as is_executed,
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
@@ -647,7 +641,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 encode(modtx.to, 'hex') as contract_address,
-                NOT modtx.failed as is_executed,
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
@@ -686,7 +679,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 null as contract_address,
-                true as is_executed,
                 erc721.timestamp as sort_date
             FROM history_erc721transfer erc721
             JOIN history_ethereumtx et ON erc721.ethereum_tx_id = et.tx_hash
@@ -727,7 +719,6 @@ class TransactionService:
                 null as safe_tx_hash,
                 null as method,
                 null as contract_address,
-                true as is_executed,
                 itx.timestamp as sort_date
             FROM history_internaltx itx
             JOIN history_ethereumtx et ON itx.ethereum_tx_id = et.tx_hash
@@ -762,8 +753,7 @@ class TransactionService:
             transaction_hash,
             safe_tx_hash,
             method,
-            contract_address,
-            is_executed
+            contract_address
         FROM export_data
         WHERE {where_clause}
         ORDER BY execution_date DESC, transaction_hash
@@ -876,7 +866,6 @@ class TransactionService:
                         if row_dict["contract_address"]
                         else None
                     ),
-                    "is_executed": row_dict["is_executed"],
                 }
                 results.append(export_item)
 
