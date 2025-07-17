@@ -80,6 +80,11 @@ urlpatterns = [
         name="safe-balances",
     ),
     path(
+        "safes/<str:address>/export/",
+        views.SafeExportView.as_view(),
+        name="safe-export",
+    ),
+    path(
         "multisig-transactions/<str:safe_tx_hash>/",
         views.SafeMultisigTransactionDetailView.as_view(),
         name="multisig-transaction",
