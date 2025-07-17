@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from django.conf import settings
 from django.db import connection
-from django.db.models import QuerySet
+from django.db.models import F, QuerySet
+from django.db.models.expressions import RawSQL
 from django.utils import timezone
 
 from eth_typing import ChecksumAddress, HexStr
@@ -526,7 +527,7 @@ class TransactionService:
                 encode(mt.safe, 'hex') as safe_address,
                 encode(mt.safe, 'hex') as from_address,
                 encode(mt.to, 'hex') as to_address,
-                mt.value::text as amount,
+                itx.value::text as amount,
                 'native' as asset_type,
                 null as asset_address,
                 'ETH' as asset_symbol,
@@ -534,19 +535,21 @@ class TransactionService:
                 encode(mt.proposer, 'hex') as proposer_address,
                 mt.created as proposed_at,
                 encode(et._from, 'hex') as executor_address,
-                eb.timestamp as execution_date,
-                eb.timestamp as executed_at,
+                itx.timestamp as execution_date,
+                itx.timestamp as executed_at,
                 COALESCE(mt.origin->>'note', '') as note,
                 encode(mt.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(mt.to, 'hex') as contract_address,
-                (mt.ethereum_tx_id IS NOT NULL AND eb.number IS NOT NULL) as is_executed,
-                COALESCE(eb.timestamp, mt.created) as sort_date
+                (mt.ethereum_tx_id IS NOT NULL) as is_executed,
+                COALESCE(itx.timestamp, mt.created) as sort_date
             FROM history_multisigtransaction mt
-            LEFT JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
-            LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
+            JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
+            JOIN history_internaltx itx ON itx.ethereum_tx_id = et.tx_hash
             WHERE mt.safe = %s
+            AND itx.call_type = 0  -- CALL
+            AND itx.value > 0
             AND NOT EXISTS (
                 SELECT 1 FROM history_erc20transfer erc20
                 WHERE erc20.ethereum_tx_id = et.tx_hash
@@ -629,7 +632,7 @@ class TransactionService:
                 encode(modtx.safe, 'hex') as safe_address,
                 encode(COALESCE(itx._from, modtx.module), 'hex') as from_address,
                 encode(COALESCE(itx.to, modtx.to), 'hex') as to_address,
-                modtx.value::text as amount,
+                itx.value::text as amount,
                'native' as asset_type,
                 null as asset_address,
                 'ETH' as asset_symbol,
@@ -648,7 +651,7 @@ class TransactionService:
                 itx.timestamp as sort_date
             FROM history_moduletransaction modtx
             JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-            WHERE itx.to = %s OR itx._from = %s
+            WHERE itx.to = %s OR itx._from = %s and itx.value > 0
             AND NOT EXISTS (
                 SELECT 1 FROM history_erc20transfer erc20
                 WHERE erc20.ethereum_tx_id = itx.ethereum_tx_id
@@ -767,110 +770,6 @@ class TransactionService:
         LIMIT %s OFFSET %s
         """
 
-        # Count query
-        count_query = f"""
-        WITH export_data AS (
-            -- Same CTE as above but only selecting minimal fields for counting
-            SELECT execution_date, transaction_hash
-            FROM (
-                -- Multisig with ERC20 transfers
-                SELECT eb.timestamp as execution_date, mt.ethereum_tx_id as transaction_hash
-                FROM history_multisigtransaction mt
-                JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
-                JOIN history_erc20transfer erc20 ON et.tx_hash = erc20.ethereum_tx_id
-                LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
-                WHERE mt.safe = %s
-
-                UNION ALL
-
-                -- Multisig with ERC721 transfers
-                SELECT eb.timestamp as execution_date, mt.ethereum_tx_id as transaction_hash
-                FROM history_multisigtransaction mt
-                JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
-                JOIN history_erc721transfer erc721 ON et.tx_hash = erc721.ethereum_tx_id
-                LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
-                WHERE mt.safe = %s
-
-                UNION ALL
-
-                -- Multisig standalone (without transfers)
-                SELECT eb.timestamp as execution_date, mt.ethereum_tx_id as transaction_hash
-                FROM history_multisigtransaction mt
-                LEFT JOIN history_ethereumtx et ON mt.ethereum_tx_id = et.tx_hash
-                LEFT JOIN history_ethereumblock eb ON et.block_id = eb.number
-                WHERE mt.safe = %s
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_erc20transfer erc20
-                    WHERE erc20.ethereum_tx_id = et.tx_hash
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_erc721transfer erc721
-                    WHERE erc721.ethereum_tx_id = et.tx_hash
-                )
-
-                UNION ALL
-
-                -- Module transactions
-                SELECT itx.timestamp as execution_date, itx.ethereum_tx_id as transaction_hash
-                FROM history_moduletransaction modtx
-                JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-                WHERE modtx.safe = %s
-
-                UNION ALL
-
-                -- Standalone ERC20 transfers
-                SELECT erc20.timestamp as execution_date, erc20.ethereum_tx_id as transaction_hash
-                FROM history_erc20transfer erc20
-                WHERE (erc20.to = %s OR erc20._from = %s)
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_multisigtransaction mt
-                    WHERE mt.ethereum_tx_id = erc20.ethereum_tx_id
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_moduletransaction modtx
-                    JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-                    WHERE itx.ethereum_tx_id = erc20.ethereum_tx_id
-                )
-
-                UNION ALL
-
-                -- Standalone ERC721 transfers
-                SELECT erc721.timestamp as execution_date, erc721.ethereum_tx_id as transaction_hash
-                FROM history_erc721transfer erc721
-                WHERE (erc721.to = %s OR erc721._from = %s)
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_multisigtransaction mt
-                    WHERE mt.ethereum_tx_id = erc721.ethereum_tx_id
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_moduletransaction modtx
-                    JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-                    WHERE itx.ethereum_tx_id = erc721.ethereum_tx_id
-                )
-
-                UNION ALL
-
-                -- Standalone Ether transfers
-                SELECT itx.timestamp as execution_date, itx.ethereum_tx_id as transaction_hash
-                FROM history_internaltx itx
-                WHERE (itx.to = %s OR itx._from = %s)
-                AND itx.call_type = 0 AND itx.value > 0
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_multisigtransaction mt
-                    WHERE mt.ethereum_tx_id = itx.ethereum_tx_id
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM history_moduletransaction modtx
-                    JOIN history_internaltx itx2 ON modtx.internal_tx_id = itx2.id
-                    WHERE itx2.ethereum_tx_id = itx.ethereum_tx_id
-                )
-            ) combined
-        )
-        SELECT COUNT(DISTINCT (execution_date, transaction_hash))
-        FROM export_data
-        WHERE {where_clause}
-        """
-
         # Parameters for main query (safe_address repeated for each UNION)
         safe_address_bytes = HexBytes(safe_address)
         main_params = (
@@ -879,13 +778,46 @@ class TransactionService:
             + [limit, offset]
         )
 
-        # Parameters for count query
-        count_params = [safe_address_bytes] * 10 + params  # date filters
+        erc20_transfers = ERC20Transfer.objects.to_or_from(safe_address)
+        erc721_transfers = ERC721Transfer.objects.to_or_from(safe_address)
+        ether_transfers = InternalTx.objects.ether_txs_for_address(safe_address)
+
+        if execution_date_gte:
+            erc20_transfers = erc20_transfers.filter(timestamp__gte=execution_date_gte)
+            erc721_transfers = erc721_transfers.filter(
+                timestamp__gte=execution_date_gte
+            )
+            ether_transfers = ether_transfers.filter(timestamp__gte=execution_date_gte)
+        if execution_date_lte:
+            erc20_transfers = erc20_transfers.filter(timestamp__lte=execution_date_gte)
+            erc721_transfers = erc721_transfers.filter(
+                timestamp__lte=execution_date_gte
+            )
+            ether_transfers = ether_transfers.filter(timestamp__lte=execution_date_gte)
+
+        erc20_transfers = erc20_transfers.annotate(
+            transaction_hash=F("ethereum_tx_id"),
+            _log_index=F("log_index"),
+            _trace_address=RawSQL("NULL", ()),
+        ).values("transaction_hash", "_log_index", "_trace_address")
+        erc721_transfers = erc721_transfers.annotate(
+            transaction_hash=F("ethereum_tx_id"),
+            _log_index=F("log_index"),
+            _trace_address=RawSQL("NULL", ()),
+        ).values("transaction_hash", "_log_index", "_trace_address")
+        ether_transfers = ether_transfers.annotate(
+            transaction_hash=F("ethereum_tx_id"),
+            _log_index=RawSQL("NULL::numeric", ()),
+            _trace_address=F("trace_address"),
+        ).values("transaction_hash", "_log_index", "_trace_address")
+
+        total_count = (
+            ether_transfers.union(erc20_transfers, all=True)
+            .union(erc721_transfers, all=True)
+            .count()
+        )
 
         with connection.cursor() as cursor:
-            # Get total count
-            cursor.execute(count_query, count_params)
-            total_count = cursor.fetchone()[0]
 
             # Get the data
             cursor.execute(main_query, main_params)
