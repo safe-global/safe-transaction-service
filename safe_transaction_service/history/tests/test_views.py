@@ -4150,6 +4150,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["results"], [])
 
+        past_date = timezone.now() - datetime.timedelta(days=1)
+        params = urlencode({"execution_date__lte": past_date.isoformat()})
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(safe_address,)) + f"?{params}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+
         # Test invalid date format
         response = self.client.get(
             reverse("v1:history:safe-export", args=(safe_address,))

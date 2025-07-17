@@ -779,11 +779,11 @@ class TransactionService:
             )
             ether_transfers = ether_transfers.filter(timestamp__gte=execution_date_gte)
         if execution_date_lte:
-            erc20_transfers = erc20_transfers.filter(timestamp__lte=execution_date_gte)
+            erc20_transfers = erc20_transfers.filter(timestamp__lte=execution_date_lte)
             erc721_transfers = erc721_transfers.filter(
-                timestamp__lte=execution_date_gte
+                timestamp__lte=execution_date_lte
             )
-            ether_transfers = ether_transfers.filter(timestamp__lte=execution_date_gte)
+            ether_transfers = ether_transfers.filter(timestamp__lte=execution_date_lte)
 
         erc20_transfers = erc20_transfers.annotate(
             transaction_hash=F("ethereum_tx_id"),
