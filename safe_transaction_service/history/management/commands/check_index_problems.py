@@ -41,6 +41,13 @@ class Command(BaseCommand):
             default=100,
         )
         parser.add_argument(
+            "--from-last-processed",
+            type=int,
+            help="Last processed batch to start from",
+            default=0,
+        )
+
+        parser.add_argument(
             "--batch-size",
             type=int,
             help="Size of batch requests",
@@ -57,6 +64,7 @@ class Command(BaseCommand):
         reindex = not options["dont_reindex"]
         force_batch_call = options["force_batch_call"]
         block_process_limit = options["block_process_limit"]
+        from_last_processed = options["from_last_processed"]
         batch_size = options["batch_size"]
         queryset = SafeLastStatus.objects.all()
         if settings.ETH_L2_NETWORK:
@@ -70,7 +78,7 @@ class Command(BaseCommand):
             first_issue_block_number = ethereum_client.current_block_number
             all_problematic_addresses = set()
 
-            for i in range(0, count, batch_size):
+            for i in range(from_last_processed, count, batch_size):
                 self.stdout.write(self.style.SUCCESS(f"Processed {i}/{count}"))
                 safe_statuses = queryset[i : i + batch_size]
                 safe_statuses_list = list(
