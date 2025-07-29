@@ -292,7 +292,7 @@ class EthereumBlockQuerySet(models.QuerySet):
     def oldest_than(self, seconds: int):
         """
         :param seconds: Seconds
-        :return: Blocks oldest than second, ordered by timestamp descending
+        :return: Blocks older than second, ordered by timestamp descending
         """
         return self.filter(
             timestamp__lte=timezone.now() - datetime.timedelta(seconds=seconds)
@@ -300,8 +300,7 @@ class EthereumBlockQuerySet(models.QuerySet):
 
     def not_confirmed(self):
         """
-        :param to_block_number:
-        :return: Block not confirmed until ``to_block_number``, if provided
+        :return: Blocks not confirmed
         """
         queryset = self.filter(confirmed=False)
         return queryset
@@ -318,7 +317,7 @@ class EthereumBlock(models.Model):
     number = models.PositiveIntegerField(primary_key=True)
     gas_limit = Uint256Field()
     gas_used = Uint256Field()
-    timestamp = models.DateTimeField()
+    timestamp = models.DateTimeField(db_index=True)
     block_hash = Keccak256Field(unique=True)
     parent_hash = Keccak256Field(unique=True)
     # For reorgs, True if `current_block_number` - `number` >= MIN_CONFIRMATIONS
@@ -330,7 +329,7 @@ class EthereumBlock(models.Model):
                 name="history_block_confirmed_idx",
                 fields=["number"],
                 condition=Q(confirmed=False),
-            ),  #
+            ),
         ]
 
     def __str__(self):
@@ -546,9 +545,25 @@ class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
         :return: Optimized count using database indexes for the number of transfers for an address.
                  Transfers sent from an address to itself (not really common) will be counted twice
         """
-        q1 = self.filter(_from=address)
-        q2 = self.filter(to=address)
-        return q1.union(q2, all=True).count()
+        q1 = (
+            self.filter(_from=address)
+            .annotate(one=Value(1))
+            .values("one")  # Trick to prevent group by
+            .annotate(c=Count("*"))
+            .values("c")[:1]
+        )
+        q2 = (
+            self.filter(to=address)
+            .annotate(one=Value(1))
+            .values("one")
+            .annotate(c=Count("*"))
+            .values("c")[:1]
+        )
+        qs = self.annotate(
+            total=Subquery(q1, output_field=models.IntegerField())
+            + Subquery(q2, output_field=models.IntegerField())
+        ).values_list("total", flat=True)[:1]
+        return qs[0] if qs else 0
 
 
 class TokenTransfer(models.Model):

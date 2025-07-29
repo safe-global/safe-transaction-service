@@ -381,6 +381,8 @@ class TestTokenTransfer(TestCase):
     def test_fast_count(self):
         address = Account.create().address
 
+        self.assertEqual(ERC20Transfer.objects.fast_count(address), 0)
+
         ERC20TransferFactory(to=address)
         self.assertEqual(ERC20Transfer.objects.fast_count(address), 1)
 
@@ -389,6 +391,11 @@ class TestTokenTransfer(TestCase):
 
         # Optimization uses a UNION, so it counts transfers with `from=to` twice
         ERC20TransferFactory(_from=address, to=address)
+        self.assertEqual(ERC20Transfer.objects.fast_count(address), 4)
+
+        # Random transfers shouldn't increase the count for that address
+        for _ in range(10):
+            ERC20TransferFactory()
         self.assertEqual(ERC20Transfer.objects.fast_count(address), 4)
 
     def test_transfer_to_erc721(self):
