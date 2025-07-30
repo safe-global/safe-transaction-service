@@ -448,9 +448,19 @@ class TransactionService:
                   encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                   null as method,
                   encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                  COALESCE(erc20.timestamp, mt.created) as sort_date,
                   erc20.log_index as log_index,
-                  null as trace_address
+                  null::text as trace_address,
+
+                  ROW_NUMBER() OVER (
+                    PARTITION BY erc20.ethereum_tx_id, erc20.log_index
+                    ORDER BY
+                      CASE
+                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                        WHEN mt.safe IS NOT NULL THEN 2
+                        ELSE 3
+                      END,
+                      COALESCE(mt.created, erc20.timestamp)
+                  ) AS rn
 
             FROM history_erc20transfer erc20
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = erc20.ethereum_tx_id
@@ -488,10 +498,20 @@ class TransactionService:
               encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
               encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
               null as method,
-              encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-              COALESCE(erc721.timestamp, mt.created) as sort_date,
+              encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
               erc721.log_index as log_index,
-              null as trace_address
+              null::text as trace_address,
+
+              ROW_NUMBER() OVER (
+                    PARTITION BY erc721.ethereum_tx_id, erc721.log_index
+                    ORDER BY
+                      CASE
+                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                        WHEN mt.safe IS NOT NULL  THEN 2
+                        ELSE 3
+                      END,
+                      COALESCE(mt.created, erc721.timestamp)
+                  ) AS rn
 
             FROM history_erc721transfer erc721
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = erc721.ethereum_tx_id
@@ -506,7 +526,7 @@ class TransactionService:
 
             --Native transfers
             SELECT
-                encode(itx._from, 'hex') as safe_address,
+                encode(%s, 'hex') as safe_address,
                 encode(itx._from, 'hex') as from_address,
                 encode(itx.to, 'hex') as to_address,
                 itx.value::text as amount,
@@ -529,9 +549,19 @@ class TransactionService:
                 null as method,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
 
-                COALESCE(itx.timestamp, mt.created) as sort_date,
-                null as log_index,
-                itx.trace_address
+                null::integer as log_index,
+                itx.trace_address,
+
+                ROW_NUMBER() OVER (
+                    PARTITION BY itx.ethereum_tx_id, itx.trace_address
+                    ORDER BY
+                      CASE
+                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                        WHEN mt.safe is NOT NULL THEN 2
+                        ELSE 3
+                      END,
+                      COALESCE(mt.created, itx.timestamp)
+                  ) AS rn
 
             FROM history_internaltx itx
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = itx.ethereum_tx_id
@@ -539,12 +569,11 @@ class TransactionService:
             LEFT JOIN history_multisigtransaction mt ON itx.ethereum_tx_id = mt.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
 
-            WHERE(itx.to = %s OR itx._from = %s
+            WHERE(itx.to = %s OR itx._from = %s)
             AND itx.call_type = 0
-            AND itx.value > 0)
+            AND itx.value > 0
         )
         SELECT
-            DISTINCT ON (execution_date, transaction_hash, log_index, trace_address)
             safe_address,
             from_address,
             to_address,
@@ -564,7 +593,7 @@ class TransactionService:
             method,
             contract_address
         FROM export_data
-        WHERE {where_clause}
+        WHERE rn = 1 AND {where_clause}
         ORDER BY execution_date DESC, transaction_hash, log_index, trace_address
         LIMIT %s OFFSET %s
         """
@@ -572,7 +601,7 @@ class TransactionService:
         # Parameters for main query (safe_address repeated for each UNION)
         safe_address_bytes = HexBytes(safe_address)
         main_params = (
-            [safe_address_bytes] * 11  # 12 instances of safe address in the query
+            [safe_address_bytes] * 12  # 12 instances of safe address in the query
             + params  # date filters
             + [limit, offset]
         )
