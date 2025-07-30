@@ -462,7 +462,7 @@ class TransactionService:
             WHERE (erc20.to = %s OR erc20._from = %s)
 
             UNION ALL
-
+            -- ERC721 Transfers
             SELECT
               encode(CASE
                   WHEN erc721.to = %s THEN erc721.to
@@ -504,83 +504,44 @@ class TransactionService:
 
             UNION ALL
 
-            -- Module Transactions with ethereum Transfers
+            --Native transfers
             SELECT
-                encode(modtx.safe, 'hex') as safe_address,
-                encode(COALESCE(itx._from, modtx.module), 'hex') as from_address,
-                encode(COALESCE(itx.to, modtx.to), 'hex') as to_address,
-                itx.value::text as amount,
-               'native' as asset_type,
-                null as asset_address,
-                'ETH' as asset_symbol,
-                18 as asset_decimals,
-                null as proposer_address,
-                null as proposed_at,
-                encode(modtx.module, 'hex') as executor_address,
-                itx.timestamp as execution_date,
-                itx.timestamp as executed_at,
-                '' as note,
-                encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
-                null as safe_tx_hash,
-                null as method,
-                encode(modtx.to, 'hex') as contract_address,
-                itx.timestamp as sort_date,
-                null as log_index,
-                itx.trace_address as trace_address
-            FROM history_moduletransaction modtx
-            JOIN history_internaltx itx ON modtx.internal_tx_id = itx.id
-            WHERE itx.to = %s OR itx._from = %s and itx.value > 0
-            AND NOT EXISTS (
-                SELECT 1 FROM history_erc20transfer erc20
-                WHERE erc20.ethereum_tx_id = itx.ethereum_tx_id
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM history_erc721transfer erc721
-                WHERE erc721.ethereum_tx_id = itx.ethereum_tx_id
-            )
-
-            UNION ALL
-
-            -- Ether Transfers (InternalTx)
-            SELECT
-                encode(CASE
-                    WHEN itx.to = %s THEN itx.to
-                    ELSE itx._from
-                END, 'hex') as safe_address,
+                encode(itx._from, 'hex') as safe_address,
                 encode(itx._from, 'hex') as from_address,
                 encode(itx.to, 'hex') as to_address,
                 itx.value::text as amount,
+
                 'native' as asset_type,
                 null as asset_address,
                 'ETH' as asset_symbol,
                 18 as asset_decimals,
-                null as proposer_address,
-                null as proposed_at,
-                encode(et._from, 'hex') as executor_address,
+
+                encode(mt.proposer, 'hex') as proposer_address,
+                mt.created as proposed_at,
+                encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
+
                 itx.timestamp as execution_date,
                 itx.timestamp as executed_at,
-                '' as note,
+                COALESCE(mt.origin->> 'note', '') as note,
+
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
-                null as safe_tx_hash,
+                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
-                null as contract_address,
-                itx.timestamp as sort_date,
+                encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
+
+                COALESCE(itx.timestamp, mt.created) as sort_date,
                 null as log_index,
-                itx.trace_address as trace_address
+                itx.trace_address
+
             FROM history_internaltx itx
-            JOIN history_ethereumtx et ON itx.ethereum_tx_id = et.tx_hash
-            WHERE (itx.to = %s OR itx._from = %s)
-            AND itx.call_type = 0  -- CALL
-            AND itx.value > 0
-            AND NOT EXISTS (
-                SELECT 1 FROM history_multisigtransaction mt
-                WHERE mt.ethereum_tx_id = itx.ethereum_tx_id
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM history_moduletransaction modtx
-                JOIN history_internaltx itx2 ON modtx.internal_tx_id = itx2.id
-                WHERE itx2.ethereum_tx_id = itx.ethereum_tx_id
-            )
+            JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = itx.ethereum_tx_id
+            JOIN history_ethereumtx et ON rel.ethereum_tx_id = et.tx_hash
+            LEFT JOIN history_multisigtransaction mt ON itx.ethereum_tx_id = mt.ethereum_tx_id
+            LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
+
+            WHERE(itx.to = %s OR itx._from = %s
+            AND itx.call_type = 0
+            AND itx.value > 0)
         )
         SELECT
             DISTINCT ON (execution_date, transaction_hash, log_index, trace_address)
@@ -611,7 +572,7 @@ class TransactionService:
         # Parameters for main query (safe_address repeated for each UNION)
         safe_address_bytes = HexBytes(safe_address)
         main_params = (
-            [safe_address_bytes] * 13  # 13 instances of safe address in the query
+            [safe_address_bytes] * 11  # 12 instances of safe address in the query
             + params  # date filters
             + [limit, offset]
         )
