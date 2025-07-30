@@ -628,13 +628,9 @@ class TransactionService:
         ).values("transaction_hash", "_log_index", "_trace_address")
 
         total_count = (
-            ether_transfers.union(erc20_transfers, all=True)
-            .union(erc721_transfers, all=True)
-            .count()
+            ether_transfers.count() + erc20_transfers.count() + erc721_transfers.count()
         )
-
         with connection.cursor() as cursor:
-
             # Get the data
             cursor.execute(main_query, main_params)
             columns = [col[0] for col in cursor.description]
