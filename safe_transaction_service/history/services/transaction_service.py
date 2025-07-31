@@ -403,30 +403,41 @@ class TransactionService:
             offset,
         )
 
-        # Base WHERE conditions for the final SELECT
-        where_conditions = []
-        params = []
+        # Build timestamp conditions for each subquery
+        erc20_timestamp_conditions = ""
+        erc721_timestamp_conditions = ""
+        native_timestamp_conditions = ""
 
         if execution_date_gte:
             assert type(execution_date_gte) is datetime
-            where_conditions.append("execution_date >= %s")
-            params.append(execution_date_gte)
+            erc20_timestamp_conditions += (
+                f" AND erc20.timestamp >= '{execution_date_gte}'"
+            )
+            erc721_timestamp_conditions += (
+                f" AND erc721.timestamp >= '{execution_date_gte}'"
+            )
+            native_timestamp_conditions += (
+                f" AND itx.timestamp >= '{execution_date_gte}'"
+            )
+
         if execution_date_lte:
             assert type(execution_date_lte) is datetime
-            where_conditions.append("execution_date <= %s")
-            params.append(execution_date_lte)
-
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+            erc20_timestamp_conditions += (
+                f" AND erc20.timestamp <= '{execution_date_lte}'"
+            )
+            erc721_timestamp_conditions += (
+                f" AND erc721.timestamp <= '{execution_date_lte}'"
+            )
+            native_timestamp_conditions += (
+                f" AND itx.timestamp <= '{execution_date_lte}'"
+            )
 
         # Main query that unions all transaction types with their transfers
         main_query = f"""
         WITH export_data AS (
             -- ERC20 Transfers
             SELECT
-                  encode(CASE
-                    WHEN erc20.to = %s THEN erc20.to
-                    ELSE erc20._from
-                  END, 'hex') as safe_address,
+                  encode(%s, 'hex') as safe_address,
 
                   encode(COALESCE(erc20._from, modtx.module), 'hex') as from_address,
                   encode(COALESCE(erc20.to, modtx.to), 'hex') as to_address,
@@ -448,8 +459,6 @@ class TransactionService:
                   encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                   null as method,
                   encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                  erc20.log_index as log_index,
-                  null::text as trace_address,
 
                   ROW_NUMBER() OVER (
                     PARTITION BY erc20.ethereum_tx_id, erc20.log_index
@@ -469,15 +478,12 @@ class TransactionService:
             LEFT JOIN history_internaltx itx ON itx.ethereum_tx_id = erc20.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
             LEFT JOIN tokens_token t ON erc20.address = t.address
-            WHERE (erc20.to = %s OR erc20._from = %s)
+            WHERE (erc20.to = %s OR erc20._from = %s){erc20_timestamp_conditions}
 
             UNION ALL
             -- ERC721 Transfers
             SELECT
-              encode(CASE
-                  WHEN erc721.to = %s THEN erc721.to
-                  ELSE erc721._from
-              END, 'hex') as safe_address,
+              encode(%s, 'hex') as safe_address,
 
               encode(COALESCE(erc721._from, modtx.module), 'hex') as from_address,
               encode(COALESCE(erc721.to, modtx.to), 'hex') as to_address,
@@ -499,8 +505,6 @@ class TransactionService:
               encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
               null as method,
               encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
-              erc721.log_index as log_index,
-              null::text as trace_address,
 
               ROW_NUMBER() OVER (
                     PARTITION BY erc721.ethereum_tx_id, erc721.log_index
@@ -520,7 +524,7 @@ class TransactionService:
             LEFT JOIN history_internaltx itx ON itx.ethereum_tx_id = erc721.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
             LEFT JOIN tokens_token t ON erc721.address = t.address
-            WHERE (erc721.to = %s OR erc721._from = %s)
+            WHERE (erc721.to = %s OR erc721._from = %s){erc721_timestamp_conditions}
 
             UNION ALL
 
@@ -549,9 +553,6 @@ class TransactionService:
                 null as method,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
 
-                null::integer as log_index,
-                itx.trace_address,
-
                 ROW_NUMBER() OVER (
                     PARTITION BY itx.ethereum_tx_id, itx.trace_address
                     ORDER BY
@@ -571,7 +572,7 @@ class TransactionService:
 
             WHERE(itx.to = %s OR itx._from = %s)
             AND itx.call_type = 0
-            AND itx.value > 0
+            AND itx.value > 0{native_timestamp_conditions}
         )
         SELECT
             safe_address,
@@ -593,18 +594,18 @@ class TransactionService:
             method,
             contract_address
         FROM export_data
-        WHERE rn = 1 AND {where_clause}
-        ORDER BY execution_date DESC, transaction_hash, log_index, trace_address
+        WHERE rn = 1
+        ORDER BY execution_date DESC, transaction_hash
         LIMIT %s OFFSET %s
         """
-
         # Parameters for main query (safe_address repeated for each UNION)
         safe_address_bytes = HexBytes(safe_address)
-        main_params = (
-            [safe_address_bytes] * 12  # 12 instances of safe address in the query
-            + params  # date filters
-            + [limit, offset]
-        )
+        main_params = [
+            safe_address_bytes
+        ] * 12 + [  # 12 instances of safe address in the query
+            limit,
+            offset,
+        ]
 
         erc20_transfers = ERC20Transfer.objects.to_or_from(safe_address)
         erc721_transfers = ERC721Transfer.objects.to_or_from(safe_address)
