@@ -627,7 +627,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         # Increase nonce and store it
         safe_last_status.nonce = 5
         self.tx_processor.store_new_safe_status(
-            safe_last_status, safe_last_status.internal_tx
+            safe_last_status, safe_last_status.internal_tx, ["nonce"]
         )
         safe_last_status_db = SafeLastStatus.objects.get()
         self.assertEqual(safe_last_status_db.address, safe_address)
@@ -641,7 +641,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         new_safe_last_status.address = safe_address
 
         self.tx_processor.store_new_safe_status(
-            new_safe_last_status, new_safe_last_status.internal_tx
+            new_safe_last_status, new_safe_last_status.internal_tx, []
         )
         safe_last_status_db = SafeLastStatus.objects.get()
         self.assertEqual(safe_last_status_db.address, safe_address)
