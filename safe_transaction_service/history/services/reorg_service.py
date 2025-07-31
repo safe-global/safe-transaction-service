@@ -43,7 +43,6 @@ class ReorgServiceProvider:
             del cls.instance
 
 
-# TODO Test ReorgService
 class ReorgService:
     def __init__(
         self,
@@ -72,7 +71,9 @@ class ReorgService:
                 tx_block_number__gt=block_number
             ).update(tx_block_number=block_number),
             lambda block_number: int(
-                IndexingStatus.objects.set_erc20_721_indexing_status(block_number)
+                IndexingStatus.objects.set_erc20_721_indexing_status(
+                    block_number, from_block_number=block_number
+                )
             ),
         ]
 
