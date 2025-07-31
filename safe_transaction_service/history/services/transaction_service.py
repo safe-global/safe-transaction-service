@@ -437,40 +437,36 @@ class TransactionService:
         WITH export_data AS (
             -- ERC20 Transfers
             SELECT
-                  encode(%s, 'hex') as safe_address,
-
-                  encode(COALESCE(erc20._from, modtx.module), 'hex') as from_address,
-                  encode(COALESCE(erc20.to, modtx.to), 'hex') as to_address,
-                  COALESCE(erc20.value::text, modtx.value::text) as amount,
-
-                  'erc20' as asset_type,
-                  encode(erc20.address, 'hex') as asset_address,
-                  t.symbol as asset_symbol,
-                  t.decimals as asset_decimals,
-
-                  encode(mt.proposer, 'hex') as proposer_address,
-                  mt.created as proposed_at,
-                  encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
-
-                  erc20.timestamp as execution_date,
-                  erc20.timestamp as executed_at,
-                  COALESCE(mt.origin->> 'note', '') as note,
-                  encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
-                  encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
-                  null as method,
-                  encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-
-                  ROW_NUMBER() OVER (
+                encode(%s, 'hex') as safe_address,
+                encode(COALESCE(erc20._from, modtx.module), 'hex') as from_address,
+                encode(COALESCE(erc20.to, modtx.to), 'hex') as to_address,
+                COALESCE(erc20.value::text, modtx.value::text) as amount,
+                'erc20' as asset_type,
+                encode(erc20.address, 'hex') as asset_address,
+                t.symbol as asset_symbol,
+                t.decimals as asset_decimals,
+                encode(mt.proposer, 'hex') as proposer_address,
+                mt.created as proposed_at,
+                encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
+                erc20.timestamp as execution_date,
+                erc20.timestamp as executed_at,
+                COALESCE(mt.origin->> 'note', '') as note,
+                encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
+                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
+                null as method,
+                encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
+                -- Assigns a row number to each ERC20 transfer grouped by tx and log index.
+                -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
+                ROW_NUMBER() OVER (
                     PARTITION BY erc20.ethereum_tx_id, erc20.log_index
                     ORDER BY
-                      CASE
-                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                        CASE
+                            WHEN modtx.internal_tx_id IS NOT NULL THEN 1
                         WHEN mt.safe IS NOT NULL THEN 2
                         ELSE 3
-                      END,
-                      COALESCE(mt.created, erc20.timestamp)
-                  ) AS rn
-
+                        END,
+                    COALESCE(mt.created, erc20.timestamp)
+                ) AS rn
             FROM history_erc20transfer erc20
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = erc20.ethereum_tx_id
             JOIN history_ethereumtx et ON rel.ethereum_tx_id = et.tx_hash
@@ -483,40 +479,36 @@ class TransactionService:
             UNION ALL
             -- ERC721 Transfers
             SELECT
-              encode(%s, 'hex') as safe_address,
-
-              encode(COALESCE(erc721._from, modtx.module), 'hex') as from_address,
-              encode(COALESCE(erc721.to, modtx.to), 'hex') as to_address,
-              COALESCE(erc721.token_id::text, modtx.value::text) as amount,
-
-              'erc721' as asset_type,
-              encode(erc721.address, 'hex') as asset_address,
-              t.symbol as asset_symbol,
-              t.decimals as asset_decimals,
-
-              encode(mt.proposer, 'hex') as proposer_address,
-              mt.created as proposed_at,
-              encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
-
-              erc721.timestamp as execution_date,
-              erc721.timestamp as executed_at,
-              COALESCE(mt.origin->> 'note', '') as note,
-              encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
-              encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
-              null as method,
-              encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
-
-              ROW_NUMBER() OVER (
+                encode(%s, 'hex') as safe_address,
+                encode(COALESCE(erc721._from, modtx.module), 'hex') as from_address,
+                encode(COALESCE(erc721.to, modtx.to), 'hex') as to_address,
+                COALESCE(erc721.token_id::text, modtx.value::text) as amount,
+                'erc721' as asset_type,
+                encode(erc721.address, 'hex') as asset_address,
+                t.symbol as asset_symbol,
+                t.decimals as asset_decimals,
+                encode(mt.proposer, 'hex') as proposer_address,
+                mt.created as proposed_at,
+                encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
+                erc721.timestamp as execution_date,
+                erc721.timestamp as executed_at,
+                COALESCE(mt.origin->> 'note', '') as note,
+                encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
+                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
+                null as method,
+                encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
+                -- Assigns a row number to each ERC721 transfer grouped by tx and log index.
+                -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
+                ROW_NUMBER() OVER (
                     PARTITION BY erc721.ethereum_tx_id, erc721.log_index
                     ORDER BY
-                      CASE
-                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
-                        WHEN mt.safe IS NOT NULL  THEN 2
+                        CASE
+                            WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                            WHEN mt.safe IS NOT NULL  THEN 2
                         ELSE 3
-                      END,
-                      COALESCE(mt.created, erc721.timestamp)
-                  ) AS rn
-
+                        END,
+                    COALESCE(mt.created, erc721.timestamp)
+                ) AS rn
             FROM history_erc721transfer erc721
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = erc721.ethereum_tx_id
             JOIN history_ethereumtx et ON rel.ethereum_tx_id = et.tx_hash
@@ -534,42 +526,37 @@ class TransactionService:
                 encode(itx._from, 'hex') as from_address,
                 encode(itx.to, 'hex') as to_address,
                 itx.value::text as amount,
-
                 'native' as asset_type,
                 null as asset_address,
                 'ETH' as asset_symbol,
                 18 as asset_decimals,
-
                 encode(mt.proposer, 'hex') as proposer_address,
                 mt.created as proposed_at,
                 encode(COALESCE(et._from, modtx.module), 'hex') as executor_address,
-
                 itx.timestamp as execution_date,
                 itx.timestamp as executed_at,
                 COALESCE(mt.origin->> 'note', '') as note,
-
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
                 null as method,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-
+                -- Assigns a row number to each native transfer grouped by tx and log index.
+                -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
                     PARTITION BY itx.ethereum_tx_id, itx.trace_address
                     ORDER BY
-                      CASE
-                        WHEN modtx.internal_tx_id IS NOT NULL THEN 1
-                        WHEN mt.safe is NOT NULL THEN 2
-                        ELSE 3
-                      END,
-                      COALESCE(mt.created, itx.timestamp)
-                  ) AS rn
-
+                        CASE
+                            WHEN modtx.internal_tx_id IS NOT NULL THEN 1
+                            WHEN mt.safe is NOT NULL THEN 2
+                            ELSE 3
+                        END,
+                    COALESCE(mt.created, itx.timestamp)
+                ) AS rn
             FROM history_internaltx itx
             JOIN history_saferelevanttransaction rel ON rel.safe = %s AND rel.ethereum_tx_id = itx.ethereum_tx_id
             JOIN history_ethereumtx et ON rel.ethereum_tx_id = et.tx_hash
             LEFT JOIN history_multisigtransaction mt ON itx.ethereum_tx_id = mt.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
-
             WHERE(itx.to = %s OR itx._from = %s)
             AND itx.call_type = 0
             AND itx.value > 0{native_timestamp_conditions}
