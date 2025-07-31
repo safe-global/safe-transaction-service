@@ -1690,7 +1690,10 @@ class TestMultisigTransactions(TestCase):
         self.assertIsNone(
             MultisigTransaction.objects.last_valid_transaction(safe_address)
         )
-        SafeStatusFactory(address=safe_address, owners=[multisig_confirmation.owner])
+        SafeStatusFactory(
+            address=safe_address,
+            owners=[multisig_confirmation.owner, Account.create().address],
+        )
         self.assertEqual(
             MultisigTransaction.objects.last_valid_transaction(safe_address),
             multisig_transaction,

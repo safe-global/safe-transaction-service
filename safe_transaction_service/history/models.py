@@ -1325,20 +1325,17 @@ class MultisigTransactionManager(models.Manager):
         """
         # Build list of every owner known for that Safe (even if it was deleted/replaced). Changes of collision for
         # invalid recovered owners from signatures are almost impossible
-        owners_set = set()
-        for owners_list in (
+        owners = (
             SafeStatus.objects.filter(address=safe)
-            .values_list("owners", flat=True)
-            .distinct()
-            .iterator()
-        ):
-            owners_set.update(owners_list)
+            .annotate(owner=RawSQL("unnest(owners)", []))
+            .values("owner")
+        )
 
         return (
             self.executed()
             .filter(
                 safe=safe,
-                confirmations__owner__in=owners_set,
+                confirmations__owner__in=owners,
                 confirmations__signature_type__in=[
                     SafeSignatureType.EOA.value,
                     SafeSignatureType.ETH_SIGN.value,
@@ -1681,7 +1678,7 @@ class ModuleTransaction(TimeStampedModel):
 
 class MultisigConfirmationManager(models.Manager):
     def remove_unused_confirmations(
-        self, safe: str, current_safe_none: int, owner: str
+        self, safe: str, current_safe_nonce: int, owner: str
     ) -> int:
         """
         :return: Remove confirmations for not executed transactions with nonce higher or equal than
@@ -1691,7 +1688,7 @@ class MultisigConfirmationManager(models.Manager):
         return self.filter(
             multisig_transaction__ethereum_tx=None,  # Not executed
             multisig_transaction__safe=safe,
-            multisig_transaction__nonce__gte=current_safe_none,
+            multisig_transaction__nonce__gte=current_safe_nonce,
             owner=owner,
         ).delete()[0]
 
