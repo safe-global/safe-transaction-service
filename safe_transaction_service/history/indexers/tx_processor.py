@@ -349,17 +349,24 @@ class SafeTxProcessor(TxProcessor):
         safe_status.enabled_modules.remove(module)
 
     def store_new_safe_status(
-        self, safe_last_status: SafeLastStatus, internal_tx: InternalTx
+        self,
+        safe_last_status: SafeLastStatus,
+        internal_tx: InternalTx,
+        modified_fields: list[str],
     ) -> SafeLastStatus:
         """
         Updates `SafeLastStatus`. An entry to `SafeStatus` is added too via a Django signal.
 
         :param safe_last_status:
         :param internal_tx:
+        :param modified_fields: only update modified fields (db optimization)
         :return: Updated `SafeLastStatus`
         """
         safe_last_status.internal_tx = internal_tx
-        safe_last_status.save()
+        if modified_fields:
+            safe_last_status.save(update_fields=modified_fields + ["internal_tx"])
+        else:
+            safe_last_status.save()
         self.safe_last_status_cache[safe_last_status.address] = safe_last_status
         return safe_last_status
 
@@ -505,6 +512,7 @@ class SafeTxProcessor(TxProcessor):
                     fallback_handler=fallback_handler,
                 ),
                 internal_tx,
+                [],
             )
         else:
             safe_last_status = self.get_last_safe_status_for_address(contract_address)
@@ -532,17 +540,19 @@ class SafeTxProcessor(TxProcessor):
                     safe_last_status.owners.insert(0, owner)
                 else:  # removeOwner, removeOwnerWithThreshold
                     self.swap_owner(internal_tx, safe_last_status, owner, None)
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["owners", "threshold"]
+                )
             elif function_name == "swapOwner":
                 logger.debug("[%s] Processing owner swap", contract_address)
                 old_owner = arguments["oldOwner"]
                 new_owner = arguments["newOwner"]
                 self.swap_owner(internal_tx, safe_last_status, old_owner, new_owner)
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx, ["owners"])
             elif function_name == "changeThreshold":
                 logger.debug("[%s] Processing threshold change", contract_address)
                 safe_last_status.threshold = arguments["_threshold"]
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx, ["threshold"])
             elif function_name == "changeMasterCopy":
                 logger.debug("[%s] Processing master copy change", contract_address)
                 # TODO Ban address if it doesn't have a valid master copy
@@ -562,11 +572,15 @@ class SafeTxProcessor(TxProcessor):
                 ):
                     # Transactions queued not executed are not valid anymore
                     MultisigTransaction.objects.queued(contract_address).delete()
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["master_copy"]
+                )
             elif function_name == "setFallbackHandler":
                 logger.debug("[%s] Setting FallbackHandler", contract_address)
                 safe_last_status.fallback_handler = arguments["handler"]
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["fallback_handler"]
+                )
             elif function_name == "setGuard":
                 safe_last_status.guard = (
                     arguments["guard"] if arguments["guard"] != NULL_ADDRESS else None
@@ -575,15 +589,19 @@ class SafeTxProcessor(TxProcessor):
                     logger.debug("[%s] Setting Guard", contract_address)
                 else:
                     logger.debug("[%s] Unsetting Guard", contract_address)
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx, ["guard"])
             elif function_name == "enableModule":
                 logger.debug("[%s] Enabling Module", contract_address)
                 safe_last_status.enabled_modules.append(arguments["module"])
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["enabled_modules"]
+                )
             elif function_name == "disableModule":
                 logger.debug("[%s] Disabling Module", contract_address)
                 self.disable_module(internal_tx, safe_last_status, arguments["module"])
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["enabled_modules"]
+                )
             elif function_name in {
                 "execTransactionFromModule",
                 "execTransactionFromModuleReturnData",
@@ -809,7 +827,7 @@ class SafeTxProcessor(TxProcessor):
                         )
 
                 safe_last_status.nonce = nonce + 1
-                self.store_new_safe_status(safe_last_status, internal_tx)
+                self.store_new_safe_status(safe_last_status, internal_tx, ["nonce"])
             elif function_name == "execTransactionFromModule":
                 logger.debug(
                     "[%s] Not processing execTransactionFromModule", contract_address
