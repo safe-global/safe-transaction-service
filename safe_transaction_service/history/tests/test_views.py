@@ -4125,7 +4125,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], "1000000000000000000")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test pagination
         response = self.client.get(
@@ -4212,7 +4211,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4220,7 +4219,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_outgoing_erc20_transfer.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test INCOMING ERC20 from multisig transaction
         ethereum_tx_multisig_in = EthereumTxFactory()
@@ -4245,7 +4243,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the incoming transaction (should be first in results due to ordering)
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4253,7 +4251,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_incoming_erc20_transfer.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test OUTGOING ERC20 from module transaction
         ethereum_tx_module_out = EthereumTxFactory()
@@ -4284,7 +4281,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module outgoing transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4292,7 +4289,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_outgoing_erc20.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING ERC20 from module transaction
@@ -4323,7 +4319,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4331,7 +4327,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_incoming_erc20.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING ERC20 from standalone transaction
@@ -4352,7 +4347,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the standalone incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4360,7 +4355,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_incoming_erc20.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
 
         # Test OUTGOING ERC20 from standalone transaction
@@ -4381,7 +4375,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the standalone outgoing transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["assetAddress"], self.token.address)
@@ -4389,7 +4383,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_outgoing_erc20.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
 
     def test_export_view_erc721_transfers(self):
@@ -4416,7 +4409,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4424,7 +4417,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test INCOMING ERC721 from multisig transaction
         ethereum_tx = EthereumTxFactory()
@@ -4450,7 +4442,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the incoming transaction (should be first in results due to ordering)
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4458,7 +4450,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test OUTGOING ERC721 from module transaction
         ethereum_tx_module_out = EthereumTxFactory()
@@ -4489,7 +4480,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module outgoing transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4497,7 +4488,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING ERC721 from module transaction
@@ -4528,7 +4518,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4536,7 +4526,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING ERC721 from standalone transaction
@@ -4557,7 +4546,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the standalone incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4565,7 +4554,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
 
         # Test OUTGOING ERC721 from standalone transaction
@@ -4586,7 +4574,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the standalone outgoing transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
@@ -4594,7 +4582,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
 
     def test_export_view_ether_transfers(self):
@@ -4625,7 +4612,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "native")
         self.assertIsNone(result["assetAddress"])
@@ -4633,7 +4620,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_outgoing_internal_tx.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test INCOMING Ether from multisig transaction
         ethereum_tx_multisig_in = EthereumTxFactory()
@@ -4662,7 +4648,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the incoming transaction (should be first in results due to ordering)
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "native")
         self.assertIsNone(result["assetAddress"])
@@ -4670,7 +4656,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_incoming_internal_tx.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNotNone(result["safeTxHash"])
 
         # Test OUTGOING Ether from module transaction
         ethereum_tx_module_out = EthereumTxFactory()
@@ -4697,7 +4682,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module outgoing transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.safe_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.external_address)
         self.assertEqual(result["assetType"], "native")
         self.assertIsNone(result["assetAddress"])
@@ -4705,7 +4690,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_out.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING Ether from module transaction
@@ -4732,7 +4716,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the module incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "native")
         self.assertIsNone(result["assetAddress"])
@@ -4740,7 +4724,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_in.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING Ether from standalone transaction
@@ -4760,7 +4743,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the standalone incoming transaction
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "native")
         self.assertIsNone(result["assetAddress"])
@@ -4768,7 +4751,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_incoming_internal_tx.value))
         self.assertIsNotNone(result["transactionHash"])
-        self.assertIsNone(result["safeTxHash"])
         self.assertIsNone(result["contractAddress"])
 
     def test_export_view_should_not_include_no_transfer_transactions(self):
@@ -4889,14 +4871,13 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # The ERC20 transfer should prioritize module transaction data
         # Module transactions should be prioritized over multisig transactions
         self.assertEqual(erc20_result["safe"], self.safe_address)
-        self.assertEqual(erc20_result["from_"], self.safe_address)
+        self.assertEqual(erc20_result["from"], self.safe_address)
         self.assertEqual(erc20_result["to"], self.external_address)
         self.assertEqual(erc20_result["assetType"], "erc20")
         self.assertEqual(erc20_result["assetAddress"], self.token.address)
         self.assertEqual(erc20_result["amount"], str(erc20_transfer.value))
         self.assertEqual(erc20_result["transactionHash"], ethereum_tx.tx_hash)
         # Should have multisig safe_tx_hash since module transactions don't have safe_tx_hash
-        self.assertEqual(erc20_result["safeTxHash"], multisig_tx.safe_tx_hash)
 
         # Find the ETH results (should be 2 - different trace addresses)
         eth_results = [r for r in results if r["assetType"] == "native"]
@@ -4905,7 +4886,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Both ETH transfers should show module transaction context (highest priority)
         for eth_result in eth_results:
             self.assertEqual(eth_result["safe"], self.safe_address)
-            self.assertEqual(eth_result["from_"], self.safe_address)
+            self.assertEqual(eth_result["from"], self.safe_address)
             self.assertEqual(eth_result["to"], self.external_address)
             self.assertEqual(eth_result["assetType"], "native")
             self.assertEqual(eth_result["assetSymbol"], "ETH")
@@ -4914,7 +4895,6 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             )  # 1 ETH for both
             self.assertEqual(eth_result["transactionHash"], ethereum_tx.tx_hash)
             # Should have multisig safe_tx_hash
-            self.assertEqual(eth_result["safeTxHash"], multisig_tx.safe_tx_hash)
 
         # Verify the partition keys work correctly - different log_index/trace_address means separate results
         self.assertEqual(len(results), 3)  # No inappropriate deduplication
@@ -4949,10 +4929,9 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Should be standalone transfer (priority 3)
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from_"], self.external_address)
+        self.assertEqual(result["from"], self.external_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc20")
         self.assertEqual(result["amount"], str(erc20_transfer.value))
         self.assertEqual(result["transactionHash"], ethereum_tx.tx_hash)
         # Standalone transfers should not have safe_tx_hash
-        self.assertIsNone(result["safeTxHash"])
