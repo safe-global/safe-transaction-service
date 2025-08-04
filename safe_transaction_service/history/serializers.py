@@ -1354,7 +1354,7 @@ class SafeExportTransactionSerializer(serializers.Serializer):
     """
 
     safe = EthereumAddressField()
-    from_ = EthereumAddressField(source="_from")
+    _from = EthereumAddressField()
     to = EthereumAddressField()
     amount = serializers.CharField(source="_value")
     asset_type = serializers.CharField()
@@ -1367,9 +1367,13 @@ class SafeExportTransactionSerializer(serializers.Serializer):
     executed_at = serializers.DateTimeField(allow_null=True)
     note = serializers.CharField(allow_null=True)
     transaction_hash = Sha3HashField()
-    safe_tx_hash = Sha3HashField(allow_null=True)
-    method = serializers.CharField(allow_null=True)
     contract_address = EthereumAddressField(allow_null=True)
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # Rename `from_` to `from`
+        rep["from"] = rep.pop("_from")
+        return rep
 
 
 class CodeErrorResponse(serializers.Serializer):
