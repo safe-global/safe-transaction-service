@@ -452,8 +452,6 @@ class TransactionService:
                 erc20.timestamp as executed_at,
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
-                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
-                null as method,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
                 -- Assigns a row number to each ERC20 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
@@ -494,8 +492,6 @@ class TransactionService:
                 erc721.timestamp as executed_at,
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
-                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
-                null as method,
                 encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
                 -- Assigns a row number to each ERC721 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
@@ -537,8 +533,6 @@ class TransactionService:
                 itx.timestamp as executed_at,
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
-                encode(mt.safe_tx_hash, 'hex') as safe_tx_hash,
-                null as method,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
                 -- Assigns a row number to each native transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
@@ -577,8 +571,6 @@ class TransactionService:
             executed_at,
             note,
             transaction_hash,
-            safe_tx_hash,
-            method,
             contract_address
         FROM export_data
         WHERE rn = 1
@@ -677,12 +669,6 @@ class TransactionService:
                     ),
                     "note": row_dict["note"] if row_dict["note"] else None,
                     "transaction_hash": "0x" + row_dict["transaction_hash"],
-                    "safe_tx_hash": (
-                        "0x" + row_dict["safe_tx_hash"]
-                        if row_dict["safe_tx_hash"]
-                        else None
-                    ),
-                    "method": row_dict["method"] if row_dict["method"] else None,
                     "contract_address": (
                         fast_to_checksum_address(row_dict["contract_address"])
                         if row_dict["contract_address"]
