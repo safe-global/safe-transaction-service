@@ -600,7 +600,7 @@ PROCESSING_ENABLE_OUT_OF_ORDER_CHECK = env.bool(
     "PROCESSING_ENABLE_OUT_OF_ORDER_CHECK", default=True
 )  # Enable out of order check, in case some transactions appear after a reindex so Safes don't get corrupt. Disabling it can speed up processing
 PROCESSING_ALL_SAFES_TOGETHER = env.bool(
-    "PROCESSING_ALL_SAFES_TOGETHER", default=True
+    "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
 
 
