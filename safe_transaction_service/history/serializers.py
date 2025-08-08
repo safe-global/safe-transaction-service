@@ -681,6 +681,13 @@ class SafeModuleTransactionResponseSerializer(GnosisBaseModelSerializer):
             "module_transaction_id",
         )
 
+    @extend_schema_field(
+        {
+            "type": "string",
+            "deprecated": True,
+            "description": "This field is deprecated and will be removed in future versions. Refer to decoder service [documentation](https://docs.safe.global/core-api/safe-decoder-service-reference#Data-decoder) for decoding guidance.",
+        }
+    )
     def get_data_decoded(self, obj: ModuleTransaction) -> dict[str, Any]:
         return get_data_decoded_from_data(obj.data if obj.data else b"", address=obj.to)
 
@@ -786,6 +793,13 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     def get_origin(self, obj: MultisigTransaction) -> str:
         return obj.origin if isinstance(obj.origin, str) else json.dumps(obj.origin)
 
+    @extend_schema_field(
+        {
+            "type": "string",
+            "deprecated": True,
+            "description": "This field is deprecated and will be removed in future versions. Refer to decoder service [documentation](https://docs.safe.global/core-api/safe-decoder-service-reference#Data-decoder) for decoding guidance.",
+        }
+    )
     def get_data_decoded(self, obj: MultisigTransaction) -> dict[str, Any]:
         # If delegate call contract must be whitelisted (security)
         if obj.data_should_be_decoded():
