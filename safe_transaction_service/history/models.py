@@ -432,6 +432,13 @@ class EthereumTx(TimeStampedModel):
     value = Uint256Field()
     type = models.PositiveSmallIntegerField(default=0)
 
+    class Meta:
+        indexes = [
+            Index(
+                fields=["tx_hash", "transaction_index"]
+            ),  # For sorting not processed internal_tx_decoded
+        ]
+
     def __str__(self):
         return "{} status={} from={} to={}".format(
             self.tx_hash, self.status, self._from, self.to
@@ -1086,6 +1093,9 @@ class InternalTx(models.Model):
                 include=["ethereum_tx_id", "block_number"],
                 condition=Q(call_type=0) & Q(value__gt=0),
             ),
+            Index(
+                fields=["id", "block_number"]
+            ),  # For sorting not processed internal_tx_decoded
         ]
 
     def __str__(self):
@@ -1266,8 +1276,12 @@ class InternalTxDecoded(models.Model):
     class Meta:
         indexes = [
             models.Index(
+                Case(
+                    When(function_name="setup", then=Value(0)),
+                    default=Value(1),
+                ),
+                F("internal_tx_id"),
                 name="history_decoded_processed_idx",
-                fields=["processed"],
                 condition=Q(processed=False),
             )
         ]
