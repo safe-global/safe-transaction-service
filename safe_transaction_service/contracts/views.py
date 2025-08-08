@@ -1,6 +1,7 @@
 from django.core.cache import cache as django_cache
 
 import django_filters
+from drf_spectacular.utils import extend_schema
 from rest_framework.filters import OrderingFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 
@@ -9,6 +10,10 @@ from .models import Contract
 from .signals import get_contract_cache_key
 
 
+@extend_schema(
+    deprecated=True,
+    description="Please migrate to the new [safe-decoder-service](https://docs.safe.global/core-api/safe-decoder-service-overview)",
+)
 class ContractView(RetrieveAPIView):
     """
     Returns the relevant information of a known smart contract
@@ -35,6 +40,10 @@ class ContractView(RetrieveAPIView):
         return response
 
 
+@extend_schema(
+    deprecated=True,
+    description="Please migrate to the new [safe-decoder-service](https://docs.safe.global/core-api/safe-decoder-service-overview)",
+)
 class ContractsView(ListAPIView):
     """
     Returns the list of known smart contracts with their ABI’s

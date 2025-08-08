@@ -1198,6 +1198,10 @@ class OwnersView(GenericAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
+@extend_schema(
+    deprecated=True,
+    description="Please migrate to the new [safe-decoder-service](https://docs.safe.global/core-api/safe-decoder-service-overview)",
+)
 class DataDecoderView(GenericAPIView):
     serializer_class = serializers.DataDecoderSerializer
 
