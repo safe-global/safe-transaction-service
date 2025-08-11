@@ -664,7 +664,6 @@ AWS_CONFIGURED = bool(
     AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET_NAME
 )
 
-ETHERSCAN_API_KEY = env("ETHERSCAN_API_KEY", default=None)
 IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://ipfs.io/ipfs/")
 
 # Shell Plus

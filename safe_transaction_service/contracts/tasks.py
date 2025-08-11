@@ -8,7 +8,6 @@ from django.utils import timezone
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
-from safe_eth.eth.clients import EtherscanRateLimitError
 from safe_eth.safe.multi_send import MultiSend
 
 from safe_transaction_service.history.models import (
@@ -119,7 +118,6 @@ def reindex_contracts_without_metadata_task() -> int:
 
 
 @app.shared_task(
-    autoretry_for=(EtherscanRateLimitError,),
     retry_backoff=10,
     retry_kwargs={"max_retries": 5},
 )
