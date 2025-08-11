@@ -20,7 +20,7 @@ class TestContractAbi(TestCase):
         with mock.patch.object(
             EthereumClient, "get_network", return_value=EthereumNetwork.GNOSIS
         ):
-            # Setup service using Gnosis chain network so Sourcify, Etherscan and Blockscout clients are available
+            # Setup service using Gnosis chain network so Sourcify and Blockscout clients are available
             get_contract_metadata_service.cache_clear()
             self.contract_metadata_service = get_contract_metadata_service()
 

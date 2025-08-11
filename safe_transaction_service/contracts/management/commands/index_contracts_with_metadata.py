@@ -7,7 +7,7 @@ from ...tasks import (
 
 
 class Command(BaseCommand):
-    help = "Index contracts from etherscan/sourcify"
+    help = "Index contracts from sourcify/blockscout"
 
     def add_arguments(self, parser):
         parser.add_argument(
