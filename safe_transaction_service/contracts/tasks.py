@@ -117,10 +117,7 @@ def reindex_contracts_without_metadata_task() -> int:
     return total_addresses_reindexed
 
 
-@app.shared_task(
-    retry_backoff=10,
-    retry_kwargs={"max_retries": 5},
-)
+@app.shared_task()
 @close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def create_or_update_contract_with_metadata_task(
