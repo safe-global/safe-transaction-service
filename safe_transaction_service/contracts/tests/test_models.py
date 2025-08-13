@@ -14,7 +14,7 @@ from safe_eth.eth.tests.clients.mocks import sourcify_safe_metadata
 from ..models import Contract, ContractAbi, validate_abi
 from .factories import ContractAbiFactory, ContractFactory
 from .mocks.contract_metadata_mocks import (
-    etherscan_metadata_mock,
+    blockscout_metadata_mock,
     sourcify_metadata_mock,
 )
 
@@ -67,14 +67,14 @@ class TestContract(TestCase):
         with self.assertRaises(IntegrityError):
             with atomic():
                 Contract.objects.create_from_metadata(
-                    safe_contract_address, etherscan_metadata_mock
+                    safe_contract_address, blockscout_metadata_mock
                 )
 
         contract.delete()
         contract = Contract.objects.create_from_metadata(
-            safe_contract_address, etherscan_metadata_mock
+            safe_contract_address, blockscout_metadata_mock
         )
-        self.assertEqual(contract.name, "Etherscan Uxio Contract")
+        self.assertEqual(contract.name, "Blockscout Moises Contract")
         self.assertTrue(contract.contract_abi.abi)
         self.assertEqual(len(contract.contract_abi.abi_functions()), 2)
 
@@ -131,7 +131,7 @@ class TestContract(TestCase):
         )
         self.assertEqual(contract_abi.abi, sourcify_metadata_mock.abi)
 
-        self.assertTrue(contract.update_from_metadata(etherscan_metadata_mock))
+        self.assertTrue(contract.update_from_metadata(blockscout_metadata_mock))
         self.assertEqual(ContractAbi.objects.count(), 2)  # A new ABI was inserted
         self.assertNotEqual(
             contract.contract_abi, contract_abi
