@@ -889,6 +889,13 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
 
 class InternalTxQuerySet(models.QuerySet):
+    def for_safe(self, safe_address: ChecksumAddress):
+        """
+        :param safe_address:
+        :return: Queryset of all InternalTx for one Safe with `safe_address`
+        """
+        return self.filter(_from=safe_address)
+
     def ether_txs(self):
         return self.filter(
             call_type=EthereumTxCallType.CALL.value, value__gt=0
@@ -1071,7 +1078,9 @@ class InternalTx(models.Model):
                 fields=["value"],
                 condition=Q(value__gt=0),
             ),
-            Index(fields=["_from", "timestamp"]),
+            Index(
+                fields=["_from", "timestamp", "id"]
+            ),  # Very important for out of order
             Index(fields=["to", "timestamp"]),
             # Speed up getting ether transfers in all-transactions and ether transfer count
             Index(
@@ -1180,15 +1189,16 @@ class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
         :return: `True` if there are internal txs out of order (processed newer
             than no processed, e.g. due to a reindex), `False` otherwise
         """
-
         return (
             self.for_safe(safe_address)
             .not_processed()
             .filter(
-                internal_tx__block_number__lt=self.for_safe(safe_address)
-                .processed()
-                .order_by("-internal_tx__block_number")
-                .values("internal_tx__block_number")[:1]
+                internal_tx__timestamp__lt=InternalTx.objects.for_safe(safe_address)
+                .filter(decoded_tx__processed=True)
+                .annotate(dummy_group_by=Value(1))
+                .values("dummy_group_by")
+                .annotate(max_timestamp=Max("timestamp"))
+                .values("max_timestamp")
             )
             .exists()
         )
@@ -1267,9 +1277,14 @@ class InternalTxDecoded(models.Model):
         indexes = [
             models.Index(
                 name="history_decoded_processed_idx",
-                fields=["processed"],
+                fields=["internal_tx_id"],
                 condition=Q(processed=False),
-            )
+            ),
+            models.Index(
+                name="history_decoded_not_proc_idx",
+                fields=["internal_tx_id"],
+                condition=Q(processed=True),  # For finding out of order transactions
+            ),
         ]
         verbose_name_plural = "Internal txs decoded"
 
