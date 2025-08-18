@@ -269,7 +269,6 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 batch_size = settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH
                 redis = get_redis()
                 redis_key = f"process_decoded_internal_txs_task:{process_decoded_internal_txs_task.request.id}"
-                redis.expire(redis_key, LOCK_TIMEOUT)  # Timeout expiration
                 while True:
                     safe_addresses = list(
                         InternalTxDecoded.objects.safes_pending_to_be_processed_without_distinct()[
@@ -286,6 +285,8 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                                 safe_to_process, reindex_master_copies=True
                             )
                             redis.sadd(redis_key, safe_to_process)
+                            if count == 0:
+                                redis.expire(redis_key, LOCK_TIMEOUT)
                             count += 1
 
                     offset += batch_size
@@ -295,6 +296,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     if count
                     else logger.info("No Safes to process")
                 )
+                logger.info("Clean redis key: %s", redis_key)
                 redis.unlink(redis_key)
                 return count
 
