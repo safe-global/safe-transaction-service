@@ -1322,6 +1322,14 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             self.not_processed().values_list("internal_tx___from", flat=True).distinct()
         )
 
+    def safes_pending_to_be_processed_without_distinct(
+        self,
+    ) -> QuerySet[ChecksumAddress]:
+        """
+        :return: List of Safe addresses with repeated address that have transactions pending to be processed
+        """
+        return self.not_processed().values_list("internal_tx___from", flat=True)
+
 
 class InternalTxDecoded(models.Model):
     objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
