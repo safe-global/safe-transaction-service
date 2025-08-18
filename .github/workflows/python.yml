@@ -16,7 +16,7 @@ jobs:
         python-version: ["3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -67,7 +67,7 @@ jobs:
       run: |
         docker network create ganache
         docker run --detach --publish 8545:8545 --network ganache -e DOCKER=true trufflesuite/ganache:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --chain.chainId 1337 --chain.networkId 1337 -d
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
@@ -107,7 +107,7 @@ jobs:
       - test-app
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.event_name == 'release' && github.event.action == 'released')
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: docker/setup-qemu-action@v3
       with:
         platforms: arm64
@@ -163,7 +163,7 @@ jobs:
     needs: [docker-deploy]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Deploy Staging
       if: github.ref == 'refs/heads/main'
       run: bash scripts/autodeploy.sh
