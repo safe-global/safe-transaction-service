@@ -1,5 +1,5 @@
 # Less size than Debian
-FROM python:3.13-alpine
+FROM python:3.13.7-alpine
 
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
