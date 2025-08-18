@@ -285,8 +285,8 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                             process_decoded_internal_txs_for_safe_task.delay(
                                 safe_to_process, reindex_master_copies=True
                             )
-                            count += 1
                             redis.sadd(redis_key, safe_to_process)
+                            count += 1
 
                     offset += batch_size
 
