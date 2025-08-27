@@ -13,7 +13,6 @@ from .utils import close_gevent_db_connection
 logger = get_task_logger(__name__)
 
 LOCK_TIMEOUT = 60 * 15  # 15 minutes
-SOFT_TIMEOUT = 60 * 10  # 10 minutes
 ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
 WORKER_STOPPED = set()  # Worker status
 

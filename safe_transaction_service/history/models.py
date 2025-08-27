@@ -1255,9 +1255,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :return: List of Safe addresses that have transactions pending to be processed
         """
         return (
-            self.not_processed()
-            .values_list("internal_tx___from", flat=True)
-            .distinct("internal_tx___from")
+            self.not_processed().values_list("internal_tx___from", flat=True).distinct()
         )
 
 
