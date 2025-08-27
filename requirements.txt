@@ -31,5 +31,5 @@ psycogreen==1.0.2
 psycopg[binary]==3.2.9
 redis==6.2.0
 requests==2.32.4
-safe-eth-py[django]==7.9.0
+safe-eth-py[django]==7.10.0
 web3==7.12.1
