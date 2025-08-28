@@ -346,7 +346,7 @@ class SafeEventsIndexer(EventsIndexer):
             if hasattr(internal_tx, key):
                 setattr(internal_tx, key, value)
             else:
-                raise AttributeError(f"Invalid atribute {key} for InternalTx")
+                raise AttributeError(f"Invalid attribute {key} for InternalTx")
 
         return internal_tx
 
@@ -362,15 +362,32 @@ class SafeEventsIndexer(EventsIndexer):
         args = dict(decoded_element["args"])
         ethereum_tx_hash = HexBytes(decoded_element["transactionHash"])
         ethereum_tx_hash_hex = to_0x_hex_str(ethereum_tx_hash)
-        ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
-            decoded_element["blockHash"]
-        )
+
         logger.debug(
             "[%s] %s - tx-hash=%s - Processing event %s",
             safe_address,
             event_name,
             ethereum_tx_hash_hex,
             decoded_element,
+        )
+
+        logger.debug(
+            "[%s] %s - tx-hash=%s - Retrieving timestamp for block with hash %s",
+            safe_address,
+            event_name,
+            ethereum_tx_hash_hex,
+            to_0x_hex_str(decoded_element["blockHash"]),
+        )
+
+        ethereum_block_timestamp = EthereumBlock.objects.get_timestamp_by_hash(
+            decoded_element["blockHash"]
+        )
+
+        logger.debug(
+            "[%s] %s - tx-hash=%s - Retrieved timestamp for block",
+            safe_address,
+            event_name,
+            ethereum_tx_hash_hex,
         )
 
         internal_tx = self._get_internal_tx_from_decoded_event(
@@ -461,6 +478,12 @@ class SafeEventsIndexer(EventsIndexer):
             # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'
             internal_tx_decoded = None
 
+        logger.debug(
+            "[%s] %s - tx-hash=%s - Storing processed event in the DB",
+            safe_address,
+            event_name,
+            ethereum_tx_hash_hex,
+        )
         if internal_tx:
             with transaction.atomic():
                 try:
