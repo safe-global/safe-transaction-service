@@ -53,7 +53,11 @@ class TestTasks(TestCase):
 
         # Create a token in the list, it should be updated
         token = TokenFactory(
-            address="0x4A64515E5E1d1073e83f30cB97BEd20400b66E10", logo=None
+            address="0x4A64515E5E1d1073e83f30cB97BEd20400b66E10",
+            logo=None,
+            logo_uri="http://test-logo-uri.local/",
+            name="Old Name",
+            symbol="OLD",
         )
         self.assertFalse(token.trusted)
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
@@ -64,11 +68,21 @@ class TestTasks(TestCase):
             "https://cloudflare-ipfs.com/ipfs/QmYNLKHDEoG9FLJtbJ1r8HCyi7by9gksuacRkhkakxwEQ8",
         )
         self.assertEqual(token.get_full_logo_uri(), token.logo_uri)
+        self.assertEqual(token.name, "Wrapped ZEC")
+        self.assertEqual(token.symbol, "WZEC")
 
         # Create another token in the list, both should be updated
-        token_2 = TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+        token_2 = TokenFactory(
+            address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+            name="Old BTC",
+            symbol="OBTC",
+        )
         self.assertFalse(token_2.trusted)
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 2)
+        token_2.refresh_from_db()
+        self.assertTrue(token_2.trusted)
+        self.assertEqual(token_2.name, "Wrapped BTC")
+        self.assertEqual(token_2.symbol, "WBTC")
 
         # Test ENS
         get_tokens_mock.return_value.append(
@@ -92,3 +106,5 @@ class TestTasks(TestCase):
             self.assertEqual(update_token_info_from_token_list_task.delay().result, 3)
             token_ens.refresh_from_db()
             self.assertTrue(token_ens.trusted)
+            self.assertEqual(token_ens.name, "Safe Token")
+            self.assertEqual(token_ens.symbol, "SAFE")
