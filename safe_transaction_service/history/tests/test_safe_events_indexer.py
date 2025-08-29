@@ -563,7 +563,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.execute(self.ethereum_test_account.key)
         # Process events: SafeMultiSigTransaction, ExecutionSuccess
-        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+        self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
             list(txs_decoded_queryset.all())
         )
@@ -752,9 +752,11 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(len(processed_element_cache), 0)
         self.assertEqual(
-            len(self.safe_events_indexer.process_elements(safe_events_mock)), 28
+            len(self.safe_events_indexer.process_elements(safe_events_mock)), 29
         )
-        self.assertEqual(len(processed_element_cache), 28)
+        self.assertEqual(
+            len(processed_element_cache), 28
+        )  # Child internal txs (Ether transfers) don't count
 
         # Transactions are cached and will not be reprocessed
         self.assertEqual(
