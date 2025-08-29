@@ -703,7 +703,7 @@ class TestInternalTx(TestCase):
 
 class TestInternalTxDecoded(TestCase):
     def test_order_by_processing_queue(self):
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             InternalTxDecoded.objects.order_by_processing_queue(), []
         )
         ethereum_tx = EthereumTxFactory()
@@ -718,14 +718,14 @@ class TestInternalTxDecoded(TestCase):
             internal_tx__trace_address="15", internal_tx__ethereum_tx=ethereum_tx
         )
 
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             InternalTxDecoded.objects.order_by_processing_queue(),
             [internal_tx_decoded_0, internal_tx_decoded_1, internal_tx_decoded_15],
         )
 
         internal_tx_decoded_15.function_name = "setup"
         internal_tx_decoded_15.save()
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             InternalTxDecoded.objects.order_by_processing_queue(),
             [internal_tx_decoded_15, internal_tx_decoded_0, internal_tx_decoded_1],
         )
