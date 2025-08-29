@@ -3,7 +3,6 @@ from logging import getLogger
 from typing import Any, Optional
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
 
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
@@ -298,10 +297,6 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx__contract_address=None,
         ).exists()
 
-    @transaction.atomic
-    def decode_elements(self, *args) -> list[EventData]:
-        return super().decode_elements(*args)
-
     def _get_internal_tx_from_decoded_event(
         self, decoded_event: EventData, **kwargs
     ) -> InternalTx:
@@ -350,10 +345,9 @@ class SafeEventsIndexer(EventsIndexer):
 
         return internal_tx
 
-    @transaction.atomic
     def _process_decoded_element(
         self, decoded_element: EventData
-    ) -> Optional[InternalTx]:
+    ) -> list[InternalTx | InternalTxDecoded | SafeRelevantTransaction]:
         safe_address = decoded_element["address"]
         event_name = decoded_element["event"]
         # As log
@@ -406,7 +400,7 @@ class SafeEventsIndexer(EventsIndexer):
         if event_name == "ProxyCreation" or event_name == "SafeSetup":
             # Will ignore these events because were indexed in process_safe_creation_events
             internal_tx = None
-
+            internal_tx_decoded = None
         elif event_name == "SafeMultiSigTransaction":
             internal_tx_decoded.function_name = "execTransaction"
             data = HexBytes(args["data"])
@@ -478,38 +472,14 @@ class SafeEventsIndexer(EventsIndexer):
             # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'
             internal_tx_decoded = None
 
-        logger.debug(
-            "[%s] %s - tx-hash=%s - Storing processed event in the DB",
-            safe_address,
-            event_name,
-            ethereum_tx_hash_hex,
-        )
-        if internal_tx:
-            with transaction.atomic():
-                try:
-                    internal_tx.save()
-                    if internal_tx.is_ether_transfer:
-                        # Store Incoming Ether Transfers as relevant transactions for a Safe
-                        SafeRelevantTransaction.objects.get_or_create(
-                            ethereum_tx_id=ethereum_tx_hash,
-                            safe=safe_address,
-                            defaults={
-                                "timestamp": ethereum_block_timestamp,
-                            },
-                        )
-                    if child_internal_tx:
-                        child_internal_tx.save()
-                    if internal_tx_decoded:
-                        internal_tx_decoded.save()
-                except IntegrityError as exc:
-                    logger.info(
-                        "Ignoring already processed event %s for Safe %s on tx-hash=%s: %s",
-                        event_name,
-                        safe_address,
-                        to_0x_hex_str(decoded_element["transactionHash"]),
-                        exc,
-                    )
-                    return None
+        safe_relevant_tx: Optional[SafeRelevantTransaction] = None
+        if internal_tx and internal_tx.is_ether_transfer:
+            # Store Incoming Ether Transfers as relevant transactions for a Safe
+            safe_relevant_tx = SafeRelevantTransaction(
+                ethereum_tx_id=ethereum_tx_hash,
+                safe=safe_address,
+                timestamp=ethereum_block_timestamp,
+            )
 
         logger.debug(
             "[%s] %s - tx-hash=%s - Processed event",
@@ -518,18 +488,29 @@ class SafeEventsIndexer(EventsIndexer):
             ethereum_tx_hash_hex,
         )
 
-        return internal_tx
+        if not internal_tx:
+            return []
+        return [
+            element
+            for element in (
+                internal_tx,
+                internal_tx_decoded,
+                child_internal_tx,
+                safe_relevant_tx,
+            )
+        ]
 
     def _get_safe_creation_events(
         self, decoded_elements: list[EventData]
     ) -> dict[ChecksumAddress, list[EventData]]:
         """
-        Get the creation events (ProxyCreation and SafeSetup) from decoded elements and generates a dictionary that groups these events by Safe address.
+        Get the creation events (ProxyCreation and SafeSetup) from decoded elements and generates a dictionary
+        that groups these events by Safe address, so they are processed together
 
         :param decoded_elements:
-        :return:
+        :return: dictionary with creation events by Safe address
         """
-        safe_creation_events: dict[ChecksumAddress, list[dict]] = {}
+        safe_creation_events: dict[ChecksumAddress, list[EventData]] = {}
         for decoded_element in decoded_elements:
             event_name = decoded_element["event"]
             if event_name == "SafeSetup":
@@ -550,15 +531,22 @@ class SafeEventsIndexer(EventsIndexer):
         safe_addresses_with_creation_events: dict[ChecksumAddress, list[EventData]],
     ) -> list[InternalTx]:
         """
-        Process creation events (ProxyCreation and SafeSetup).
+        Process creation events (ProxyCreation and SafeSetup). They must be processed together
 
         :param safe_addresses_with_creation_events:
         :return:
         """
         internal_txs = []
-        internal_decoded_txs = []
-        # Check if were indexed
+        internal_txs_decoded = []
+
+        logger.debug("Processing Safe Creation events")
+
+        # Check if they were indexed
         safe_creation_events_addresses = set(safe_addresses_with_creation_events.keys())
+        logger.debug(
+            "Got %d addresses to index, checking if some are indexed",
+            len(safe_creation_events_addresses),
+        )
         indexed_addresses = InternalTxDecoded.objects.filter(
             internal_tx___from__in=safe_creation_events_addresses,
             function_name="setup",
@@ -566,7 +554,11 @@ class SafeEventsIndexer(EventsIndexer):
         ).values_list("internal_tx___from", flat=True)
         # Ignoring the already indexed contracts
         addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
+        logger.debug(
+            "Got %s addresses to index after the check", len(addresses_to_index)
+        )
 
+        logger.debug("Building InternalTx and InternalTxDecoded objects")
         for safe_address in addresses_to_index:
             events = safe_addresses_with_creation_events[safe_address]
             for event_position, event in enumerate(events):
@@ -586,13 +578,24 @@ class SafeEventsIndexer(EventsIndexer):
                         ):
                             # ProxyCreation first and SafeSetup later
                             proxy_creation_event = events[0]
+                        else:
+                            # This shouldn't happen, as there will be no proxy_creation event
+                            continue
                     else:
+                        logger.debug(
+                            "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
+                            safe_address,
+                        )
                         # Proxy was created in previous blocks.
                         proxy_creation_event = None
                         # Safe was created and configure it in the next transaction. Remove it if that's the case
                         InternalTx.objects.filter(
                             contract_address=safe_address
                         ).delete()
+                        logger.debug(
+                            "[%s] Proxy was created in previous blocks, old InternalTx deleted",
+                            safe_address,
+                        )
 
                     # Generate InternalTx and internalDecodedTx for SafeSetup event
                     setup_trace_address = (
@@ -626,7 +629,7 @@ class SafeEventsIndexer(EventsIndexer):
                         arguments=setup_args,
                     )
                     internal_txs.append(internal_tx)
-                    internal_decoded_txs.append(internal_tx_decoded)
+                    internal_txs_decoded.append(internal_tx_decoded)
                 elif event["event"] == "ProxyCreation":
                     proxy_creation_event = event
                     # Generate InternalTx for ProxyCreation
@@ -640,51 +643,10 @@ class SafeEventsIndexer(EventsIndexer):
                 else:
                     logger.error(f"Event is not a Safe creation event {event['event']}")
 
-        # Store which internal txs where inserted into database
-        stored_internal_txs: list[InternalTx] = []
-        with transaction.atomic():
-            try:
-                InternalTx.objects.bulk_create(internal_txs)
-                InternalTxDecoded.objects.bulk_create(internal_decoded_txs)
-                stored_internal_txs = internal_txs
-            except IntegrityError:
-                logger.info(
-                    "Cannot bulk create the provided Safe Creation Events, trying one by one"
-                )
-
-        if internal_txs and not stored_internal_txs:
-            # Fallback handler in case of integrity error
-            for internal_decoded_tx in internal_decoded_txs:
-                try:
-                    with transaction.atomic():
-                        # Insert first the internal_tx with internalDecodedTx relation
-                        InternalTx.save(internal_decoded_tx.internal_tx)
-                        InternalTxDecoded.save(internal_decoded_tx)
-                        # Remove inserted internal transactions from the list
-                        internal_txs.remove(internal_decoded_tx.internal_tx)
-                        stored_internal_txs.append(internal_tx)
-                except IntegrityError:
-                    logger.info(
-                        "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
-                        to_0x_hex_str(internal_decoded_tx.internal_tx.ethereum_tx_id),
-                        internal_decoded_tx.internal_tx.trace_address,
-                    )
-                    pass
-            # Insert the remaining InternalTxs
-            for internal_tx in internal_txs:
-                try:
-                    with transaction.atomic():
-                        InternalTx.save(internal_tx)
-                        stored_internal_txs.append(internal_tx)
-                except IntegrityError:
-                    logger.info(
-                        "Ignoring already processed InternalTx with tx-hash=%s and trace-address=%s",
-                        to_0x_hex_str(internal_tx.ethereum_tx_id),
-                        internal_tx.trace_address,
-                    )
-                    pass
-
-        return stored_internal_txs
+        logger.debug("InternalTx and InternalTxDecoded objects for creation were built")
+        return InternalTx.objects.store_internal_txs_and_decoded_in_db(
+            internal_txs, internal_txs_decoded
+        )
 
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> list[Any]:
         processed_elements = []
@@ -699,9 +661,31 @@ class SafeEventsIndexer(EventsIndexer):
             )
             processed_elements.extend(creation_events_processed)
 
-        # Process the rest of Safe events
+        # Store everything together in the database if possible
+        logger.debug("Building InternalTx and InternalTx for non creation events")
+        internal_txs_to_insert: list[InternalTx] = []
+        internal_txs_decoded_to_insert: list[InternalTxDecoded] = []
+        safe_relevant_txs: list[SafeRelevantTransaction] = []
+        # Process the rest of Safe events. Store all together
         for decoded_element in decoded_elements:
-            if processed_element := self._process_decoded_element(decoded_element):
-                processed_elements.append(processed_element)
+            elements_to_insert = self._process_decoded_element(decoded_element)
+            for element_to_insert in elements_to_insert:
+                if isinstance(element_to_insert, InternalTx):
+                    internal_txs_to_insert.append(element_to_insert)
+                elif isinstance(element_to_insert, InternalTxDecoded):
+                    internal_txs_decoded_to_insert.append(element_to_insert)
+                elif isinstance(element_to_insert, SafeRelevantTransaction):
+                    safe_relevant_txs.append(element_to_insert)
+        logger.debug("InternalTx and InternalTx for non creation events were built")
 
+        stored_internal_txs = InternalTx.objects.store_internal_txs_and_decoded_in_db(
+            internal_txs_to_insert, internal_txs_decoded_to_insert
+        )
+        logger.debug("Inserting %d SafeRelevantTransaction", len(safe_relevant_txs))
+        SafeRelevantTransaction.objects.bulk_create(
+            safe_relevant_txs, ignore_conflicts=True
+        )
+        logger.debug("Inserted SafeRelevantTransaction")
+
+        processed_elements.extend(stored_internal_txs)
         return processed_elements
