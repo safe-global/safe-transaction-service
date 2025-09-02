@@ -4416,9 +4416,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertEqual(result["nonce"], str(multisig_tx.nonce))
         self.assertIsNotNone(result["transactionHash"])
 
-        # Test INCOMING ERC721 from multisig transaction
+        # Test INCOMING ERC721 from the same Safe
         ethereum_tx = EthereumTxFactory()
         multisig_tx = MultisigTransactionFactory(
             safe=self.safe_address, ethereum_tx=ethereum_tx, trusted=True
@@ -4426,7 +4427,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_incoming_erc721_transfer = ERC721TransferFactory(
             ethereum_tx=ethereum_tx,
             address=self.nft_token.address,
-            _from=self.external_address,
+            _from=self.safe_address,
             to=self.safe_address,
             token_id=456,
         )
@@ -4442,13 +4443,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Check the incoming transaction (should be first in results due to ordering)
         result = response.json()["results"][0]
         self.assertEqual(result["safe"], self.safe_address)
-        self.assertEqual(result["from"], self.external_address)
+        self.assertEqual(result["from"], self.safe_address)
         self.assertEqual(result["to"], self.safe_address)
         self.assertEqual(result["assetType"], "erc721")
         self.assertEqual(result["assetAddress"], self.nft_token.address)
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertEqual(result["nonce"], str(multisig_tx.nonce))
         self.assertIsNotNone(result["transactionHash"])
 
         # Test OUTGOING ERC721 from module transaction
@@ -4487,6 +4489,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertIsNone(result["nonce"])
         self.assertIsNotNone(result["transactionHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
@@ -4525,6 +4528,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertIsNone(result["nonce"])
         self.assertIsNotNone(result["transactionHash"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
@@ -4553,6 +4557,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertIsNone(result["nonce"])
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["contractAddress"])
 
@@ -4581,6 +4586,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "NFT")
         self.assertIsNone(result["assetDecimals"])
         self.assertEqual(result["amount"], "1")
+        self.assertIsNone(result["nonce"])
         self.assertIsNotNone(result["transactionHash"])
         self.assertIsNone(result["contractAddress"])
 
