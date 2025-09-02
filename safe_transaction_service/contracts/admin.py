@@ -6,7 +6,6 @@ from safe_transaction_service.utils.admin import (
 )
 
 from .models import Contract, ContractAbi
-from .tasks import create_or_update_contract_with_metadata_task
 
 
 @admin.register(ContractAbi)
@@ -63,13 +62,6 @@ class ContractAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "contract_abi__abi",
         "contract_abi__description",
     ]
-
-    @admin.action(description="Find ABI if missing")
-    def find_abi(self, request, queryset):
-        for contract_address in queryset.without_metadata().values_list(
-            "address", flat=True
-        ):
-            create_or_update_contract_with_metadata_task.delay(contract_address)
 
     def abi_relevance(self, obj: Contract):
         if obj.contract_abi_id:
