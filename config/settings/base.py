@@ -342,7 +342,13 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-# INDEXER LOG LEVEL
+# CUSTOM LOGGERS LEVEL
+# ------------------------------------------------------------------------------
+# Django
+DJANGO_DB_BACKEND_LOG_LEVEL = (
+    env("DJANGO_DB_BACKEND_LOG_LEVEL", default="WARNING") if not DEBUG else "DEBUG"
+)
+# Indexer
 ERC20_721_INDEXER_LOG_LEVEL = (
     env("ERC20_INDEXER_LOG_LEVEL", default="INFO") if not DEBUG else "DEBUG"
 )
@@ -355,7 +361,7 @@ SAFE_EVENTS_INDEXER_LOG_LEVEL = (
 INTERNAL_TX_INDEXER_LOG_LEVEL = (
     env("INTERNAL_TX_INDEXER_LOG_LEVEL", default="INFO") if not DEBUG else "DEBUG"
 )
-# API LOG LEVEL
+# Api
 API_LOG_LEVEL = env("API_LOG_LEVEL", default="INFO") if not DEBUG else "DEBUG"
 BALANCES_API_LOG_LEVEL = (
     env("BALANCES_API_LOG_LEVEL", default="WARNING") if not DEBUG else "DEBUG"
@@ -370,12 +376,11 @@ COLLECTIBLES_API_LOG_LEVEL = (
     env("COLLECTIBLES_API_LOG_LEVEL", default="WARNING") if not DEBUG else "DEBUG"
 )
 
-
 # LOGGING
 # ------------------------------------------------------------------------------
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#logging
 # A sample logging configuration. The only tangible logging
-# performed by this configuration is to send an email to
+# performed by this configuration is to email
 # the site admins bon every HTTP 500 error when DEBUG=False.
 # See https://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
@@ -400,11 +405,6 @@ LOGGING = {
         "json": {"()": SafeJsonFormatter},
     },
     "handlers": {
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-        },
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "json",
@@ -414,7 +414,6 @@ LOGGING = {
             "formatter": "json",
         },
         "celery_console": {
-            "level": "DEBUG",
             "filters": [] if DEBUG else ["ignore_succeeded_none"],
             "class": "logging.StreamHandler",
             "formatter": "celery_verbose",
@@ -425,20 +424,52 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
         },
-        "web3.providers": {
-            "level": "DEBUG" if DEBUG else "WARNING",
+        "celery": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
         },
-        "psycopg.pool": {
+        "celery.worker.strategy": {  # All the "Received task..."
+            "handlers": ["console"],
+            "level": "INFO" if DEBUG else "WARNING",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": DJANGO_DB_BACKEND_LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security.DisallowedHost": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "pika": {
+            "propagate": True if DEBUG else False,
+        },
+        "psycopg.pool": {  # Database pool
+            "handlers": ["console"],
+            "level": DJANGO_DB_BACKEND_LOG_LEVEL,
+            "propagate": False,
+        },
+        "web3.providers": {
+            "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "WARNING",
+            "propagate": False,
         },
         "LoggingMiddleware": {
-            "handlers": ["console_short"],
             "level": "INFO",
+            "handlers": ["console_short"],
             "propagate": False,
         },
         "safe_transaction_service": {
-            "level": "DEBUG" if DEBUG else "INFO",
             "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
         # BALANCES LOG
@@ -465,7 +496,7 @@ LOGGING = {
         "safe_transaction_service.history.services.transaction_service": {
             "level": ALL_TRANSACTIONS_API_LOG_LEVEL,
         },
-        # MESSAGES_API_LOG_LEVEL: NO LOGS FOR NOW
+        # MESSAGES_API_LOG_LEVEL: No logs for now
         # ERC20_721_INDEXER_LOG_LEVEL
         "safe_transaction_service.history.indexers.erc20_events_indexer": {
             "level": ERC20_721_INDEXER_LOG_LEVEL,
@@ -493,29 +524,6 @@ LOGGING = {
         },
         "safe_transaction_service.history.tasks.index_internal_txs_task": {
             "level": INTERNAL_TX_INDEXER_LOG_LEVEL,
-        },
-        "celery": {
-            "handlers": ["console"],
-            "level": "DEBUG" if DEBUG else "INFO",
-            "propagate": False,  # If not it will be out for the root logger too
-        },
-        "celery.worker.strategy": {  # All the "Received task..."
-            "handlers": ["console"],
-            "level": "INFO" if DEBUG else "WARNING",
-            "propagate": False,  # If not it will be out for the root logger too
-        },
-        "django.request": {
-            "handlers": ["mail_admins"],
-            "level": "ERROR",
-            "propagate": True,
-        },
-        "django.security.DisallowedHost": {
-            "level": "ERROR",
-            "handlers": ["console", "mail_admins"],
-            "propagate": True,
-        },
-        "pika": {
-            "propagate": True if DEBUG else False,
         },
     },
 }
