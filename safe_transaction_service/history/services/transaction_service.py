@@ -453,6 +453,8 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
+                -- Just get the nonces from the provided Safe
+                CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 -- Assigns a row number to each ERC20 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -493,6 +495,8 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
+                -- Just get the nonces from the provided Safe
+                CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 -- Assigns a row number to each ERC721 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -534,6 +538,8 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
+                -- Just get the nonces from the provided Safe
+                CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 -- Assigns a row number to each native transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -571,7 +577,8 @@ class TransactionService:
             executed_at,
             note,
             transaction_hash,
-            contract_address
+            contract_address,
+            nonce
         FROM export_data
         WHERE rn = 1
         ORDER BY execution_date DESC, transaction_hash
@@ -581,7 +588,7 @@ class TransactionService:
         safe_address_bytes = HexBytes(safe_address)
         main_params = [
             safe_address_bytes
-        ] * 12 + [  # 12 instances of safe address in the query
+        ] * 15 + [  # 15 instances of safe address in the query
             limit,
             offset,
         ]
@@ -674,6 +681,7 @@ class TransactionService:
                         if row_dict["contract_address"]
                         else None
                     ),
+                    "nonce": row_dict["nonce"],
                 }
                 results.append(export_item)
 

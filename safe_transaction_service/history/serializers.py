@@ -1382,6 +1382,7 @@ class SafeExportTransactionSerializer(serializers.Serializer):
     note = serializers.CharField(allow_null=True)
     transaction_hash = Sha3HashField()
     contract_address = EthereumAddressField(allow_null=True)
+    nonce = serializers.CharField(allow_null=True)
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)

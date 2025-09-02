@@ -4619,13 +4619,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_outgoing_internal_tx.value))
+        self.assertEqual(result["nonce"], str(multisig_tx_out.nonce))
         self.assertIsNotNone(result["transactionHash"])
 
         # Test INCOMING Ether from multisig transaction
         ethereum_tx_multisig_in = EthereumTxFactory()
         value = 2000000000000000000
+        # Multisigtransaction from external Safe
         multisig_tx_in = MultisigTransactionFactory(
-            safe=self.safe_address,
+            safe=self.external_address,
             ethereum_tx=ethereum_tx_multisig_in,
             trusted=True,
             value=value,
@@ -4655,6 +4657,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetSymbol"], "ETH")
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(multisig_incoming_internal_tx.value))
+        self.assertIsNone(result["nonce"])
         self.assertIsNotNone(result["transactionHash"])
 
         # Test OUTGOING Ether from module transaction
@@ -4690,6 +4693,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_out.value))
         self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["nonce"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING Ether from module transaction
@@ -4724,6 +4728,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(module_internal_tx_in.value))
         self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["nonce"])
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING Ether from standalone transaction
@@ -4751,6 +4756,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["assetDecimals"], 18)
         self.assertEqual(result["amount"], str(standalone_incoming_internal_tx.value))
         self.assertIsNotNone(result["transactionHash"])
+        self.assertIsNone(result["nonce"])
         self.assertIsNone(result["contractAddress"])
 
     def test_export_view_should_not_include_no_transfer_transactions(self):
