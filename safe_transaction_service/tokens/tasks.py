@@ -13,7 +13,6 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from web3.exceptions import Web3Exception
 
 from safe_transaction_service.utils.ethereum import get_ethereum_network
-from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from ..utils.celery import task_timeout
 from .exceptions import TokenListRetrievalException
@@ -45,7 +44,6 @@ class EthValueWithTimestamp:
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def fix_pool_tokens_task() -> Optional[int]:
     """
@@ -77,7 +75,6 @@ def _parse_token_address_from_token_list(
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 def update_token_info_from_token_list_task() -> int:
     """
     If there's at least one valid token list with at least 1 token, every token in the DB is marked as `not trusted`

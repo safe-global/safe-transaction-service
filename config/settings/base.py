@@ -68,14 +68,18 @@ DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
-DATABASES["default"]["ENGINE"] = "django_db_geventpool.backends.postgresql_psycopg3"
+DATABASES["default"]["ENGINE"] = "django.db.backends.postgresql"
 DATABASES["default"]["CONN_MAX_AGE"] = 0
-DB_MAX_CONNS = env.int("DB_MAX_CONNS", default=50)
 DATABASES["default"]["OPTIONS"] = {
-    # https://github.com/jneight/django-db-geventpool#settings
-    "MAX_CONNS": DB_MAX_CONNS,
-    "REUSE_CONNS": env.int("DB_REUSE_CONNS", default=DB_MAX_CONNS),
     "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
+    "pool": {
+        # https://www.psycopg.org/psycopg3/docs/api/pool.html#psycopg_pool.ConnectionPool
+        "min_size": 4,
+        "max_size": env.int("DB_MAX_CONNS", default=50),
+        "timeout": 30,
+        "max_lifetime": 60 * 60,  # 1 hour
+        "max_idle": 60 * 10,  # 10 minutes
+    },
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -308,6 +312,12 @@ CELERY_ROUTES = (
     ],
 )
 
+# Custom Celery configuration
+# -----------------------------------------------------------------------
+# Lock timeout for tasks that require that only one task of the same type is running at the same time
+CELERY_TASK_LOCK_TIMEOUT = env.int(
+    "CELERY_TASK_LOCK_TIMEOUT", default=60 * 15
+)  # 15 minutes
 
 # Django REST Framework
 # ------------------------------------------------------------------------------
@@ -418,7 +428,7 @@ LOGGING = {
         "web3.providers": {
             "level": "DEBUG" if DEBUG else "WARNING",
         },
-        "django.geventpool": {
+        "psycopg.pool": {
             "level": "DEBUG" if DEBUG else "WARNING",
         },
         "LoggingMiddleware": {

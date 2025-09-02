@@ -14,7 +14,6 @@ from eth_typing import ChecksumAddress
 from redis.exceptions import LockError
 
 from safe_transaction_service.utils.redis import get_redis
-from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from ..events.services.queue_service import get_queue_service
 from ..utils.celery import task_timeout
@@ -115,7 +114,6 @@ def index_erc20_events_task(self) -> Optional[tuple[int, int]]:
 
 
 @app.shared_task
-@close_gevent_db_connection_decorator
 def index_erc20_events_out_of_sync_task(
     block_process_limit: Optional[int] = None,
     block_process_limit_max: Optional[int] = None,
@@ -394,8 +392,15 @@ def reindex_master_copies_task(
     addresses: Optional[ChecksumAddress] = None,
 ) -> None:
     """
-    Reindexes master copies
+    Reindex master copies
+
+    :param self:
+    :param from_block_number:
+    :param to_block_number:
+    :param addresses:
+    :return:
     """
+
     with contextlib.suppress(LockError):
         with only_one_running_task(
             self, lock_name_suffix=str(addresses) if addresses else None
@@ -421,7 +426,13 @@ def reindex_erc20_events_task(
     addresses: Optional[ChecksumAddress] = None,
 ) -> None:
     """
-    Reindexes master copies
+    Reindex erc20 events
+
+    :param self:
+    :param from_block_number:
+    :param to_block_number:
+    :param addresses:
+    :return:
     """
     with contextlib.suppress(LockError):
         with only_one_running_task(
@@ -521,7 +532,6 @@ def retry_get_metadata_task(
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 def remove_not_trusted_multisig_txs_task(
     time_delta: datetime.timedelta = datetime.timedelta(days=30),
 ) -> int:
@@ -535,7 +545,6 @@ def remove_not_trusted_multisig_txs_task(
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 def delete_expired_delegates_task():
     logger.info("Deleting expired Safe Delegates")
     now = timezone.now()

@@ -1,47 +1,32 @@
 import contextlib
 from typing import Optional, Set
 
+from django.conf import settings
+
 import gevent
 from celery.app.task import Task as CeleryTask
-from celery.signals import celeryd_init, worker_shutting_down
+from celery.signals import worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
 from .redis import get_redis
-from .utils import close_gevent_db_connection
 
 logger = get_task_logger(__name__)
 
-LOCK_TIMEOUT = 60 * 15  # 15 minutes
+LOCK_TIMEOUT = settings.CELERY_TASK_LOCK_TIMEOUT
 ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
 WORKER_STOPPED = set()  # Worker status
-
-
-@celeryd_init.connect
-def configure_workers(sender=None, conf=None, **kwargs):
-    def worker_patch_psycopg():
-        """
-        Patch postgresql to be friendly with gevent
-        """
-        try:
-            from psycogreen.gevent import patch_psycopg
-
-            logger.info("Patching Celery psycopg for gevent")
-            patch_psycopg()
-            logger.info("Patched Celery psycopg for gevent")
-        except ImportError:
-            pass
-
-    worker_patch_psycopg()
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning("Worker shutting down")
-    gevent.spawn(shutdown_worker)  # If not raises a `BlockingSwitchOutError`
+    gevent.spawn(
+        release_locks_on_worker_shutdown
+    )  # If not raises a `BlockingSwitchOutError`
 
 
-def shutdown_worker():
+def release_locks_on_worker_shutdown():
     WORKER_STOPPED.add(True)
     if ACTIVE_LOCKS:
         logger.warning("Force releasing of redis locks %s", ACTIVE_LOCKS)
@@ -63,7 +48,6 @@ def only_one_running_task(
     task: CeleryTask,
     lock_name_suffix: Optional[str] = None,
     lock_timeout: Optional[int] = LOCK_TIMEOUT,
-    gevent_enabled: bool = True,
 ):
     """
     Ensures one running task at the same, using `task` name as a unique key
@@ -73,7 +57,6 @@ def only_one_running_task(
     when it has different arguments
     :param lock_timeout: How long the lock will be stored, in case worker is halted so key is not stored forever
     in Redis
-    :param gevent_enabled: If `True`, `close_gevent_db_connection` will be called at the end
     :return: Instance of redis `Lock`
     :raises: LockError if lock cannot be acquired
     """
@@ -82,11 +65,6 @@ def only_one_running_task(
     redis = get_redis()
     lock_name = get_task_lock_name(task.name, lock_name_suffix=lock_name_suffix)
     with redis.lock(lock_name, blocking=False, timeout=lock_timeout) as lock:
-        try:
-            ACTIVE_LOCKS.add(lock_name)
-            yield lock
-            ACTIVE_LOCKS.remove(lock_name)
-        finally:
-            if gevent_enabled:
-                # Needed for django-db-geventpool
-                close_gevent_db_connection()
+        ACTIVE_LOCKS.add(lock_name)
+        yield lock
+        ACTIVE_LOCKS.remove(lock_name)
