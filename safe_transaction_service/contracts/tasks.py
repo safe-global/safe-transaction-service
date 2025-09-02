@@ -14,7 +14,6 @@ from safe_transaction_service.history.models import (
     ModuleTransaction,
     MultisigTransaction,
 )
-from safe_transaction_service.utils.utils import close_gevent_db_connection_decorator
 
 from ..utils.celery import task_timeout
 from .models import Contract
@@ -33,7 +32,6 @@ class ContractAction(Enum):
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def create_missing_contracts_with_metadata_task() -> int:
     """
@@ -57,7 +55,6 @@ def create_missing_contracts_with_metadata_task() -> int:
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def create_missing_multisend_contracts_with_metadata_task() -> int:
     """
@@ -90,7 +87,6 @@ def create_missing_multisend_contracts_with_metadata_task() -> int:
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def reindex_contracts_without_metadata_task() -> int:
     """
@@ -118,7 +114,6 @@ def reindex_contracts_without_metadata_task() -> int:
 
 
 @app.shared_task()
-@close_gevent_db_connection_decorator
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
 def create_or_update_contract_with_metadata_task(
     address: ChecksumAddress,

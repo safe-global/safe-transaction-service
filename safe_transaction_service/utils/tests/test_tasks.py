@@ -7,16 +7,12 @@ from redis.exceptions import LockError
 
 from ..tasks import (
     WORKER_STOPPED,
-    configure_workers,
     only_one_running_task,
     worker_shutting_down_handler,
 )
 
 
 class TestTasks(TestCase):
-    def test_configure_workers(self):
-        configure_workers()
-
     def test_worker_shutting_down_handler(self):
         worker_shutting_down_handler(None, None, None)
 

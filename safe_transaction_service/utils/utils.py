@@ -1,11 +1,7 @@
 import datetime
 import socket
-from functools import wraps
 from itertools import islice
 from typing import Any, Iterable, Union
-
-from django.core.signals import request_finished
-from django.db import connection
 
 import gevent.socket
 
@@ -56,27 +52,6 @@ def chunks_iterable(iterable: Iterable[Any], n: int) -> Iterable[Iterable[Any]]:
 
 def running_on_gevent() -> bool:
     return socket.socket is gevent.socket.socket
-
-
-def close_gevent_db_connection() -> None:
-    """
-    Clean gevent db connections. Check `atomic block` to prevent breaking the tests (Django `TestCase` wraps tests
-    inside an atomic block that rollbacks at the end of the test)
-    https://github.com/jneight/django-db-geventpool#using-orm-when-not-serving-requests
-    """
-    if not connection.in_atomic_block:
-        request_finished.send(sender="greenlet")
-
-
-def close_gevent_db_connection_decorator(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        finally:
-            close_gevent_db_connection()
-
-    return wrapper
 
 
 def parse_boolean_query_param(value: Union[bool, str, int]) -> bool:
