@@ -146,21 +146,6 @@ TASKS = [
         cron=CronDefinition(minute=0),  # Every hour at minute 0 - 0 * * * *
     ),
     CeleryTaskConfiguration(
-        name="safe_transaction_service.contracts.tasks.create_missing_contracts_with_metadata_task",
-        description="Index contract names and ABIs (every hour at minute 0)",
-        cron=CronDefinition(minute=0),  # Every hour at minute 0 - 0 * * * *
-    ),
-    CeleryTaskConfiguration(
-        name="safe_transaction_service.contracts.tasks.create_missing_multisend_contracts_with_metadata_task",
-        description="Index contract names and ABIs from MultiSend transactions (every 6 hours at minute 0)",
-        cron=CronDefinition(minute=0, hour="*/6"),  # Every 6 hours - 0 */6 * * *
-    ),
-    CeleryTaskConfiguration(
-        name="safe_transaction_service.contracts.tasks.reindex_contracts_without_metadata_task",
-        description="Reindex contracts with missing names or ABIs (every sunday at 00:00)",
-        cron=CronDefinition(minute=0, hour=0, day_of_week=0),  # Every sunday 0 0 * * 0
-    ),
-    CeleryTaskConfiguration(
         name="safe_transaction_service.tokens.tasks.fix_pool_tokens_task",
         description="Fix Pool Token Names (every hour at minute 0)",
         cron=CronDefinition(minute=0),  # Every hour at minute 0 - 0 * * * *

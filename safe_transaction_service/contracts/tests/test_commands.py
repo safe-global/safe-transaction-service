@@ -11,22 +11,6 @@ from safe_transaction_service.contracts.tests.factories import ContractFactory
 
 
 class TestCommands(TestCase):
-    def test_index_contracts_with_metadata(self):
-        command = "index_contracts_with_metadata"
-
-        buf = StringIO()
-        call_command(command, stdout=buf)
-        self.assertIn(
-            "Calling `create_missing_contracts_with_metadata_task` task", buf.getvalue()
-        )
-        self.assertIn("Task was sent", buf.getvalue())
-
-        buf = StringIO()
-        call_command(command, "--reindex", "--sync", stdout=buf)
-        self.assertIn(
-            "Calling `reindex_contracts_without_metadata_task` task", buf.getvalue()
-        )
-        self.assertIn("Processing finished", buf.getvalue())
 
     @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=137)
     def test_setup_safe_contracts(self, mock_chain_id: MagicMock):
