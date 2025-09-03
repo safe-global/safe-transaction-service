@@ -1,5 +1,5 @@
 boto3==1.40.16
-cachetools==5.5.2
+cachetools==6.2.0
 celery==5.5.3
 django==5.2.5
 django-cache-memoize==0.2.1
