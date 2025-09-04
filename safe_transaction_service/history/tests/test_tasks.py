@@ -412,3 +412,54 @@ class TestTasks(TestCase):
                 delegator=safe_contract_delegate_expected_to_be_deleted.delegator,
             ).exists()
         )
+
+    @patch(
+        "safe_transaction_service.history.tasks.process_decoded_internal_txs_for_safe_task.delay"
+    )
+    def test_process_decoded_internal_txs_task_with_batch(self, mock_process_safe_task):
+        """
+        Test that batch processing of decoded internal txs works correctly:
+        """
+        # Create 3 different Safes
+        safe_addresses = [Account.create().address for i in range(3)]
+
+        internal_decoded_txs = [
+            InternalTxDecodedFactory(internal_tx___from=address)
+            for address in safe_addresses
+        ]
+
+        internal_decoded_txs.append(
+            [
+                InternalTxDecodedFactory(
+                    internal_tx___from=safe_addresses[0],  # Duplicate for first address
+                ),
+                InternalTxDecodedFactory(
+                    internal_tx___from=safe_addresses[0],  # Duplicate for first address
+                ),
+            ]
+        )
+
+        with self.settings(
+            PROCESSING_ALL_SAFES_TOGETHER=False,
+            ETH_INTERNAL_TX_DECODED_PROCESS_BATCH=2,  # Smaller than number of Safes (3)
+        ):
+            with self.assertLogs(logger=task_logger) as cm:
+                result = process_decoded_internal_txs_task.delay().result
+                # Should process 3 unique Safes
+                self.assertEqual(result, 3)
+                self.assertIn(
+                    "Start process decoded internal txs for every Safe in a different task",
+                    cm.output[0],
+                )
+                self.assertIn("3 Safes to process", cm.output[1])
+
+                # Verify that process_decoded_internal_txs_for_safe_task was called exactly 3 times
+                self.assertEqual(mock_process_safe_task.call_count, 3)
+
+                # Verify each Safe was called exactly once
+                called_addresses = [
+                    call[0][0] for call in mock_process_safe_task.call_args_list
+                ]
+                self.assertEqual(called_addresses.count(safe_addresses[0]), 1)
+                self.assertEqual(called_addresses.count(safe_addresses[1]), 1)
+                self.assertEqual(called_addresses.count(safe_addresses[2]), 1)
