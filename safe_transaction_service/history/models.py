@@ -1112,10 +1112,8 @@ class InternalTx(models.Model):
         EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
     )
     timestamp = models.DateTimeField(db_index=True)
-    block_number = models.PositiveIntegerField(db_index=True)
-    _from = EthereumAddressBinaryField(
-        null=True, db_index=True
-    )  # For SELF-DESTRUCT it can be null
+    block_number = models.PositiveIntegerField()
+    _from = EthereumAddressBinaryField(null=True)  # For SELF-DESTRUCT it can be null
     gas = Uint256Field()
     data = models.BinaryField(null=True)  # `input` for Call, `init` for Create
     to = EthereumAddressBinaryField(
@@ -1126,16 +1124,13 @@ class InternalTx(models.Model):
     contract_address = EthereumAddressBinaryField(null=True, db_index=True)  # Create
     code = models.BinaryField(null=True)  # Create
     output = models.BinaryField(null=True)  # Call
-    refund_address = EthereumAddressBinaryField(
-        null=True, db_index=True
-    )  # For SELF-DESTRUCT
+    refund_address = EthereumAddressBinaryField(null=True)  # For SELF-DESTRUCT
     tx_type = models.PositiveSmallIntegerField(
-        choices=[(tag.value, tag.name) for tag in InternalTxType], db_index=True
+        choices=[(tag.value, tag.name) for tag in InternalTxType]
     )
     call_type = models.PositiveSmallIntegerField(
         null=True,
         choices=[(tag.value, tag.name) for tag in EthereumTxCallType],
-        db_index=True,
     )  # Call
     trace_address = models.CharField(max_length=600)  # Stringified traceAddress
     error = models.CharField(max_length=200, null=True)
@@ -1148,16 +1143,10 @@ class InternalTx(models.Model):
             )
         ]
         indexes = [
-            models.Index(
-                name="history_internaltx_value_idx",
-                fields=["value"],
-                condition=Q(value__gt=0),
-            ),
             Index(
                 fields=["_from", "timestamp", "id"]
             ),  # Very important for out of order
-            Index(fields=["to", "timestamp"]),
-            # Speed up getting ether transfers in all-transactions and ether transfer count
+            # Next 2 indexes speed up getting ether transfers in all-transactions and ether transfer count
             Index(
                 name="history_internal_transfer_idx",
                 fields=["to", "timestamp"],
@@ -1471,7 +1460,7 @@ class MultisigTransactionManager(models.Manager):
 
 class MultisigTransactionQuerySet(models.QuerySet):
     def ether_transfers(self):
-        return self.exclude(value=0)
+        return self.filter(value__gt=0)
 
     def executed(self):
         return self.exclude(ethereum_tx=None)

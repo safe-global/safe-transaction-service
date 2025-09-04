@@ -116,9 +116,10 @@ class SafeService:
                 InternalTx.objects.filter(
                     ethereum_tx__status=1,  # Ignore Internal Transactions for failed Transactions
                     tx_type=InternalTxType.CREATE.value,
+                    contract_address=safe_address,
                 )
                 .select_related("ethereum_tx__block")
-                .get(contract_address=safe_address)
+                .get()
             )
             creation_ethereum_tx = creation_internal_tx.ethereum_tx
 
