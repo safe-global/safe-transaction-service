@@ -290,7 +290,6 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     else logger.info("No Safes to process")
                 )
                 logger.info("Clean redis key: %s", redis_key)
-                redis.unlink(redis_key)
                 return count
 
 
