@@ -264,9 +264,9 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 )
                 count = 0
                 offset = 0
-                batch_size = settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH
+                batch_size = 100  # hardcoded for testing
                 redis = get_redis()
-                redis_key = f"process_decoded_internal_txs_task:{process_decoded_internal_txs_task.request.id}"
+                redis_key = "process_decoded_internal_txs_task"
                 while safe_addresses := list(
                     InternalTxDecoded.objects.safes_pending_to_be_processed_without_distinct()[
                         offset : offset + batch_size
