@@ -263,17 +263,16 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     "Start process decoded internal txs for every Safe in a different task"
                 )
                 count = 0
-                offset = 0
-                batch_size = 100  # hardcoded for testing
                 redis = get_redis()
                 redis_key = "process_decoded_internal_txs_task"
-                while safe_addresses := list(
-                    InternalTxDecoded.objects.safes_pending_to_be_processed_without_distinct()[
-                        offset : offset + batch_size
-                    ]
+                for safe_addresses in list(
+                    InternalTxDecoded.objects.safes_pending_to_be_processed_iterator(
+                        batch_size=1000
+                    )
                 ):
                     for safe_to_process in safe_addresses:
                         if not redis.sismember(redis_key, safe_to_process):
+                            logger.debug(f"Sending to process {safe_to_process}")
                             process_decoded_internal_txs_for_safe_task.delay(
                                 safe_to_process, reindex_master_copies=True
                             )
@@ -281,8 +280,6 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                             if count == 0:  # Configure TTL on processing start
                                 redis.expire(redis_key, LOCK_TIMEOUT)
                             count += 1
-
-                    offset += batch_size
 
                 (
                     logger.info("%d Safes to process", count)
