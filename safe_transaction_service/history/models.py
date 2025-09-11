@@ -1324,7 +1324,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
 
     def safes_pending_to_be_processed_iterator(
         self, batch_size: int = 1000, start_after_id: int = 0
-    ) -> Iterator[QuerySet[ChecksumAddress] :]:
+    ) -> Iterator[str]:
         """
         Generator that yields batches of `_from` addresses from unprocessed InternalTxDecoded entries.
 
@@ -1347,12 +1347,13 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             if not decoded_ids:
                 break  # No more results
 
-            # Fetch corresponding _from addresses
-            from_addresses = InternalTx.objects.filter(id__in=decoded_ids).values_list(
-                "_from", flat=True
-            )
-
-            yield from_addresses
+            # Fetch corresponding _from addresse
+            for _from in (
+                InternalTx.objects.filter(id__in=decoded_ids)
+                .values_list("_from", flat=True)
+                .iterator(chunk_size=100)
+            ):
+                yield _from
 
             # Update last_seen_id for keyset pagination
             last_seen_id = decoded_ids[-1]
