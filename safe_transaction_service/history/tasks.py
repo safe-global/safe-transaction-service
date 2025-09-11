@@ -264,7 +264,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                 )
                 count = 0
                 redis = get_redis()
-                redis_key = "safes_being_processed"
+                redis_key = f"safes_being_processed:{process_decoded_internal_txs_task.request.id}"
                 for (
                     safe_to_process
                 ) in InternalTxDecoded.objects.safes_pending_to_be_processed_iterator():
@@ -284,6 +284,7 @@ def process_decoded_internal_txs_task(self) -> Optional[int]:
                     else logger.info("No Safes to process")
                 )
                 logger.info("Clean redis key: %s", redis_key)
+                redis.unlink(redis_key)
                 return count
 
 
