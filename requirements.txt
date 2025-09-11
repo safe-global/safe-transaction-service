@@ -1,7 +1,7 @@
 boto3==1.40.16
 cachetools==6.2.0
 celery==5.5.3
-django==5.2.5
+django==5.2.6
 django-cache-memoize==0.2.1
 django-celery-beat==2.8.1
 django-cors-headers==4.7.0
@@ -28,5 +28,5 @@ pillow==11.3.0
 psycopg[binary,pool]==3.2.9
 redis==6.2.0
 requests==2.32.4
-safe-eth-py[django]==7.11.0
+safe-eth-py[django]==7.12.0
 web3==7.13.0
