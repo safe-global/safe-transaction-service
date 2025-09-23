@@ -119,9 +119,23 @@ def update_token_info_from_token_list_task() -> int:
                 update_fields["logo_uri"] = logo_uri
                 name = token.get("name")
                 if name:
+                    if len(name) > 60:
+                        # NameField has a limit of 60 chars
+                        logger.warning(
+                            "Token %s name exceeds 60 characters and was trimmed",
+                            token_address,
+                        )
+                        name = name[:60]
                     update_fields["name"] = name
                 symbol = token.get("symbol")
                 if symbol:
+                    if len(symbol) > 60:
+                        # SymbolField has a limit of 60 chars
+                        logger.warning(
+                            "Token %s symbol exceeds 60 characters and was trimmed",
+                            token_address,
+                        )
+                        symbol = symbol[:60]
                     update_fields["symbol"] = symbol
                 tokens_updated_count += Token.objects.filter(
                     address=token_address
