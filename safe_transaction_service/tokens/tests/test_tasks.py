@@ -108,3 +108,29 @@ class TestTasks(TestCase):
             self.assertTrue(token_ens.trusted)
             self.assertEqual(token_ens.name, "Safe Token")
             self.assertEqual(token_ens.symbol, "SAFE")
+
+        # Token with long name and symbol (exceeds 60 chars)
+        long_name = "L" * 100
+        long_symbol = "S" * 100
+        long_token_address = "0x2222222222222222222222222222222222222222"
+
+        get_tokens_mock.return_value.append(
+            {
+                "chainId": 1,
+                "address": long_token_address,
+                "symbol": long_symbol,
+                "name": long_name,
+                "decimals": 18,
+            }
+        )
+
+        long_token = TokenFactory(
+            address=long_token_address, name="placeholder", symbol="PH"
+        )
+        self.assertFalse(long_token.trusted)
+
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 3)
+        long_token.refresh_from_db()
+        self.assertTrue(long_token.trusted)
+        self.assertEqual(long_token.name, long_name[:60])
+        self.assertEqual(long_token.symbol, long_symbol[:60])
