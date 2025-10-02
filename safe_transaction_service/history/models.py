@@ -1322,6 +1322,42 @@ class InternalTxDecodedQuerySet(models.QuerySet):
             self.not_processed().values_list("internal_tx___from", flat=True).distinct()
         )
 
+    def safes_pending_to_be_processed_iterator(
+        self, batch_size: int = 1000, start_after_id: int = 0
+    ) -> Iterator[str]:
+        """
+        Generator that yields batches of `_from` addresses from unprocessed InternalTxDecoded entries.
+
+        :param batch_size: Number of rows to fetch per page
+        :param start_after_id: Start after this internal_tx_id
+        :return: Iterator over lists of `_from` addresses
+        """
+        last_seen_id = start_after_id
+
+        while True:
+            # Get next batch of internal_tx_ids from InternalTxDecoded
+            decoded_ids = list(
+                InternalTxDecoded.objects.filter(
+                    processed=False, internal_tx_id__gt=last_seen_id
+                )
+                .order_by("internal_tx_id")
+                .values_list("internal_tx_id", flat=True)[:batch_size]
+            )
+
+            if not decoded_ids:
+                break  # No more results
+
+            # Fetch corresponding _from addresse
+            for _from in (
+                InternalTx.objects.filter(id__in=decoded_ids)
+                .values_list("_from", flat=True)
+                .iterator(chunk_size=100)
+            ):
+                yield _from
+
+            # Update last_seen_id for keyset pagination
+            last_seen_id = decoded_ids[-1]
+
 
 class InternalTxDecoded(models.Model):
     objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
