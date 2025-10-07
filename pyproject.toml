@@ -1,0 +1,61 @@
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = [
+	".tox", ".git", "*/migrations/*", "*/static/CACHE/*",
+	"docs", "node_modules", "venv"
+]
+
+[tool.ruff.lint]
+extend-select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort.sections]
+django = ["django"]
+gnosis = ["py_eth_sig_utils", "gnosis"]
+
+[tool.ruff.lint.isort]
+default-section = "third-party"
+known-first-party = ["safe_transaction_service"]
+section-order = [
+  "future", "standard-library", "django",
+  "third-party", "gnosis", "first-party", "local-folder"
+]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = []
+
+[tool.coverage.run]
+include = ["safe_transaction_service/*"]
+omit = [
+    "*__init__.py*",
+    "*/migrations/*",
+	"test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  'if __name__ == "__main__":',
+  "if settings.DEBUG",
+  "^\\s*pass\\s*$",
+]
+
+[tool.pytest_env]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+DJANGO_DOT_ENV_FILE = ".env.test"
