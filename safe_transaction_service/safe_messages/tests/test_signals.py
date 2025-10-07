@@ -40,7 +40,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
 
         send_event_mock.assert_called_with(message_created_payload)
 
-        message_confirmation_payload = {
+        {
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,

@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Optional
 
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
@@ -45,18 +44,18 @@ class SafeCreationInfo:
     created: datetime
     creator: EthereumAddress
     factory_address: EthereumAddress
-    master_copy: Optional[EthereumAddress]
-    setup_data: Optional[bytes]
-    salt_nonce: Optional[int]
+    master_copy: EthereumAddress | None
+    setup_data: bytes | None
+    salt_nonce: int | None
     transaction_hash: str
-    user_operation: Optional[aa_models.UserOperation]
+    user_operation: aa_models.UserOperation | None
 
 
 @dataclass
 class ProxyCreationData:
     singleton: ChecksumAddress
     initializer: bytes
-    salt_nonce: Optional[int]
+    salt_nonce: int | None
 
 
 class SafeServiceProvider:
@@ -83,7 +82,7 @@ class SafeService:
     def __init__(
         self,
         ethereum_client: EthereumClient,
-        ethereum_tracing_client: Optional[EthereumClient],
+        ethereum_tracing_client: EthereumClient | None,
     ):
         """
         :param ethereum_client: Used for regular RPC calls
@@ -105,7 +104,7 @@ class SafeService:
 
     def get_safe_creation_info(
         self, safe_address: ChecksumAddress
-    ) -> Optional[SafeCreationInfo]:
+    ) -> SafeCreationInfo | None:
         """
         :param safe_address:
         :return: SafeCreation info for the provided ``safe_address``
@@ -132,9 +131,9 @@ class SafeService:
             creator = (parent_internal_tx or creation_ethereum_tx)._from
             proxy_factory = creation_internal_tx._from
 
-            singleton: Optional[str] = None
-            initializer: Optional[bytes] = None
-            salt_nonce: Optional[int] = None
+            singleton: str | None = None
+            initializer: bytes | None = None
+            salt_nonce: int | None = None
 
             # For L2s, as traces are "simulated", they don't hold `data` and creation ethereum_tx must be used
             data_tx = parent_internal_tx if parent_internal_tx else creation_ethereum_tx
@@ -161,7 +160,7 @@ class SafeService:
                     initializer = setup_internal_tx.data
         except InternalTx.DoesNotExist:
             return None
-        except IOError as exc:
+        except OSError as exc:
             raise NodeConnectionException from exc
 
         user_operation = (
@@ -218,7 +217,7 @@ class SafeService:
                     safe_info.master_copy
                 ),
             )
-        except IOError as exc:
+        except OSError as exc:
             raise NodeConnectionException from exc
         except CannotRetrieveSafeInfoException as exc:
             raise CannotGetSafeInfoFromBlockchain(safe_address) from exc
@@ -234,7 +233,7 @@ class SafeService:
         safe_address: ChecksumAddress,
         data: bytes,
         ethereum_tx: EthereumTx,
-    ) -> Optional[ProxyCreationData]:
+    ) -> ProxyCreationData | None:
         """
         Process creation data and return the proper one for the provided Safe, as for L2s multiple deployments
         can be present in the data, so we need to check the events and match them with the decoded data.
@@ -255,7 +254,7 @@ class SafeService:
         deployed_safes = ethereum_tx.get_deployed_proxies_from_logs()
         if len(deployed_safes) == len(proxy_creation_data_list):
             for deployed_safe, proxy_creation_data in zip(
-                deployed_safes, proxy_creation_data_list
+                deployed_safes, proxy_creation_data_list, strict=False
             ):
                 if safe_address == deployed_safe:
                     return proxy_creation_data
@@ -314,7 +313,7 @@ class SafeService:
         except ValueError:
             return data
 
-    def _decode_proxy_factory(self, data: bytes) -> Optional[ProxyCreationData]:
+    def _decode_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
         """
         Decode contract creation function for Safe ProxyFactory 1.3.0 and 1.4.1 deployments
 
@@ -350,7 +349,7 @@ class SafeService:
         logger.error("Problem decoding proxy factory, data_decoded=%s", data_decoded)
         return None
 
-    def _decode_cpk_proxy_factory(self, data: bytes) -> Optional[ProxyCreationData]:
+    def _decode_cpk_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
         """
         Decode contract creation function for Safe Contract Proxy Kit Safe deployments (function is different
         from the regular ProxyFactory)
@@ -373,7 +372,7 @@ class SafeService:
         except ValueError:
             return None
 
-    def _get_next_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
+    def _get_next_internal_tx(self, internal_tx: InternalTx) -> InternalTx | None:
         if child_trace := internal_tx.get_child(0):
             return child_trace
         if not self.ethereum_tracing_client:
@@ -390,7 +389,7 @@ class SafeService:
         except (ValueError, Web3RPCError):
             return None
 
-    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> Optional[InternalTx]:
+    def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx | None:
         if parent_trace := internal_tx.get_parent():
             return parent_trace
         if not self.ethereum_tracing_client:

@@ -43,9 +43,7 @@ class TestBalanceService(EthereumTestCaseMixin, TestCase):
         db_events_bugged_erc20_address = TokenFactory(
             events_bugged=True
         ).address  # This should be shown always
-        db_events_bugged_not_erc20 = TokenFactory(
-            decimals=None, events_bugged=True
-        ).address  # This should not be shown
+        TokenFactory(decimals=None, events_bugged=True)  # This should not be shown
         not_in_db_address = Account.create().address
 
         addresses = (

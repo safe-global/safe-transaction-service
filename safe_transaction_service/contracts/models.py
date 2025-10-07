@@ -2,7 +2,7 @@ import json
 import operator
 import os
 from logging import getLogger
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -90,7 +90,7 @@ class ContractAbi(models.Model):
 
 class ContractManager(models.Manager):
     def create_from_metadata(
-        self, address: str, metadata: Optional[ContractMetadata]
+        self, address: str, metadata: ContractMetadata | None
     ) -> "Contract":
         """
         Create contract from provided ``metadata``

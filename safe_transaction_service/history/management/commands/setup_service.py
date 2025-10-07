@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -177,11 +177,11 @@ class Command(BaseCommand):
             _, created = task.create_task()
             if created:
                 self.stdout.write(
-                    self.style.SUCCESS("Created Periodic Task %s" % task.name)
+                    self.style.SUCCESS(f"Created Periodic Task {task.name}")
                 )
             else:
                 self.stdout.write(
-                    self.style.SUCCESS("Task %s was already created" % task.name)
+                    self.style.SUCCESS(f"Task {task.name} was already created")
                 )
 
         self.stdout.write(self.style.SUCCESS("Setting up Safe Contract Addresses"))

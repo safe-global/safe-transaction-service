@@ -1,6 +1,5 @@
 import logging
 from functools import cache
-from typing import Optional
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -35,7 +34,7 @@ class ContractMetadataService:
             if client
         ]
 
-    def _get_blockscout_client(self) -> Optional[BlockscoutClient]:
+    def _get_blockscout_client(self) -> BlockscoutClient | None:
         try:
             return BlockscoutClient(self.ethereum_network)
         except BlockScoutConfigurationProblem:
@@ -45,7 +44,7 @@ class ContractMetadataService:
             )
             return None
 
-    def _get_sourcify_client(self) -> Optional[SourcifyClient]:
+    def _get_sourcify_client(self) -> SourcifyClient | None:
         try:
             return SourcifyClient(self.ethereum_network)
         except SourcifyClientConfigurationProblem:
@@ -57,7 +56,7 @@ class ContractMetadataService:
 
     def get_contract_metadata(
         self, contract_address: ChecksumAddress
-    ) -> Optional[ContractMetadata]:
+    ) -> ContractMetadata | None:
         """
         Get contract metadata from every enabled client
 
@@ -69,7 +68,7 @@ class ContractMetadataService:
                 contract_metadata = client.get_contract_metadata(contract_address)
                 if contract_metadata:
                     return contract_metadata
-            except IOError:
+            except OSError:
                 logger.debug(
                     "Cannot get metadata for contract=%s on network=%s using client=%s",
                     contract_address,

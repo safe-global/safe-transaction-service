@@ -11,7 +11,6 @@ from safe_transaction_service.contracts.tests.factories import ContractFactory
 
 
 class TestCommands(TestCase):
-
     @patch.object(EthereumClient, "get_chain_id", autospec=True, return_value=137)
     def test_setup_safe_contracts(self, mock_chain_id: MagicMock):
         command = "setup_safe_contracts"

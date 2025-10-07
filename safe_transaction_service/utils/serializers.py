@@ -23,10 +23,10 @@ def get_safe_owners(safe_address: ChecksumAddress) -> list[ChecksumAddress]:
             f"Could not get Safe {safe_address} owners from blockchain, check contract exists on network "
             f"{ethereum_client.get_network().name}"
         ) from e
-    except IOError:
+    except OSError as exc:
         raise ValidationError(
             "Problem connecting to the ethereum node, please try again later"
-        )
+        ) from exc
 
 
 class EpochDateTimeField(DateTimeField):

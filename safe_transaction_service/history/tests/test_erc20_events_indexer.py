@@ -84,9 +84,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
             EthereumTxFactory(tx_hash=tx_hash, block__block_hash=block_hash)
 
         # After the first processing transactions will be cached to prevent reprocessing
-        processed_element_cache = (
-            self.erc20_events_indexer.element_already_processed_checker._processed_element_cache
-        )
+        processed_element_cache = self.erc20_events_indexer.element_already_processed_checker._processed_element_cache
         self.assertEqual(len(processed_element_cache), 0)
         self.assertEqual(
             len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 1

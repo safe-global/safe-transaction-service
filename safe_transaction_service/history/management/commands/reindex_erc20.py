@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from eth_typing import ChecksumAddress
 
@@ -12,8 +12,8 @@ class Command(ReindexMasterCopiesCommand):
     def reindex(
         self,
         from_block_number: int,
-        block_process_limit: Optional[int],
-        addresses: Optional[Sequence[ChecksumAddress]],
+        block_process_limit: int | None,
+        addresses: Sequence[ChecksumAddress] | None,
     ) -> None:
         return IndexServiceProvider().reindex_erc20_events(
             from_block_number,

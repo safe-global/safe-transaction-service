@@ -702,7 +702,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             ).build_transaction({"gas": 1, "gasPrice": 1})["data"]
         )
         initial_block_number = self.ethereum_client.current_block_number + 1
-        safe_l2_master_copy = SafeMasterCopyFactory(
+        SafeMasterCopyFactory(
             address=self.safe_contract.address,
             initial_block_number=initial_block_number,
             tx_block_number=initial_block_number,
@@ -746,9 +746,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
                 EthereumTxFactory(tx_hash=tx_hash, block__block_hash=block_hash)
 
         # After the first processing transactions will be cached to prevent reprocessing
-        processed_element_cache = (
-            self.safe_events_indexer.element_already_processed_checker._processed_element_cache
-        )
+        processed_element_cache = self.safe_events_indexer.element_already_processed_checker._processed_element_cache
         self.assertEqual(len(processed_element_cache), 0)
         self.assertEqual(
             len(self.safe_events_indexer.process_elements(safe_events_mock)), 29
@@ -833,9 +831,8 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         )
 
     def test_proxy_creation_event_without_initializer(self):
-
         initial_block_number = self.ethereum_client.current_block_number + 1
-        safe_l2_master_copy = SafeMasterCopyFactory(
+        SafeMasterCopyFactory(
             address=self.safe_contract.address,
             initial_block_number=initial_block_number,
             tx_block_number=initial_block_number,
@@ -883,7 +880,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
         signed_tx = owner_account_1.sign_transaction(setup_call)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         # We remove the proxyCreation internaltx
         self.assertEqual(InternalTx.objects.count(), 1)
@@ -911,7 +908,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
         signed_tx = owner_account_1.sign_transaction(setup_call)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         self.assertEqual(self.safe_events_indexer.start(), (2, 2))
         # Proxy creation InternalTx must contain the Safe address
         self.assertEqual(

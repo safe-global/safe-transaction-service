@@ -1,5 +1,4 @@
 from logging import getLogger
-from typing import Optional
 
 from hexbytes import HexBytes
 from safe_eth.util.util import to_0x_hex_str
@@ -27,7 +26,7 @@ class ElementAlreadyProcessedChecker:
         return tx_hash + block_hash + index
 
     def is_processed(
-        self, tx_hash: HexBytes, block_hash: Optional[HexBytes], index: int = 0
+        self, tx_hash: HexBytes, block_hash: HexBytes | None, index: int = 0
     ) -> bool:
         """
         :param tx_hash:
@@ -39,7 +38,7 @@ class ElementAlreadyProcessedChecker:
         return tx_id in self._processed_element_cache
 
     def mark_as_processed(
-        self, tx_hash: HexBytes, block_hash: Optional[HexBytes], index: int = 0
+        self, tx_hash: HexBytes, block_hash: HexBytes | None, index: int = 0
     ) -> bool:
         """
         Mark element as processed if it is not already marked

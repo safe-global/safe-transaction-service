@@ -1,7 +1,9 @@
 from abc import abstractmethod
+from collections import OrderedDict
+from collections.abc import Sequence
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Optional, OrderedDict, Sequence
+from typing import Any
 
 from django.conf import settings
 
@@ -149,7 +151,7 @@ class EventsIndexer(EthereumIndexer):
 
         try:
             return self._do_node_query(addresses, from_block_number, to_block_number)
-        except IOError as e:
+        except OSError as e:
             raise FindRelevantElementsException(
                 f"Request error retrieving events "
                 f"from-block={from_block_number} to-block={to_block_number}"
@@ -180,7 +182,7 @@ class EventsIndexer(EthereumIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-        current_block_number: Optional[int] = None,
+        current_block_number: int | None = None,
     ) -> list[LogReceipt]:
         """
         Search for log receipts for Safe events
@@ -215,7 +217,7 @@ class EventsIndexer(EthereumIndexer):
         )
         return log_receipts
 
-    def decode_element(self, log_receipt: LogReceipt) -> Optional[EventData]:
+    def decode_element(self, log_receipt: LogReceipt) -> EventData | None:
         """
         :param log_receipt:
         :return: Decode `log_receipt` using all the possible ABIs for the topic. Returns `EventData` if successful,

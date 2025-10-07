@@ -1,16 +1,12 @@
 import itertools
 import operator
+from collections.abc import Iterable, Sequence
 from functools import cache, cached_property
 from logging import getLogger
 from threading import Lock
 from typing import (
     Any,
-    Iterable,
-    Optional,
-    Sequence,
-    Type,
     TypedDict,
-    Union,
     cast,
 )
 
@@ -112,8 +108,8 @@ class MultisendDecoded(TypedDict):
     operation: int
     to: ChecksumAddress
     value: str
-    data: Optional[HexStr]
-    data_decoded: Optional[DataDecoded]
+    data: HexStr | None
+    data_decoded: DataDecoded | None
 
 
 mutex = Lock()
@@ -176,8 +172,8 @@ class SafeTxDecoder:
         )
 
     def get_abi_function(
-        self, data: bytes, address: Optional[ChecksumAddress] = None
-    ) -> Optional[ABIFunction]:
+        self, data: bytes, address: ChecksumAddress | None = None
+    ) -> ABIFunction | None:
         """
         :param data: transaction data
         :param address: contract address in case of ABI colliding
@@ -189,7 +185,7 @@ class SafeTxDecoder:
             return None
 
     def _decode_data(
-        self, data: Union[bytes, str], address: Optional[ChecksumAddress] = None
+        self, data: bytes | str, address: ChecksumAddress | None = None
     ) -> tuple[str, list[tuple[str, str, Any]]]:
         """
         Decode tx data
@@ -223,7 +219,7 @@ class SafeTxDecoder:
             logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
-        return fn_abi["name"], list(zip(names, types, values))
+        return fn_abi["name"], list(zip(names, types, values, strict=False))
 
     def _generate_selectors_with_abis_from_abi(
         self, abi: Sequence[ABIFunction]
@@ -294,7 +290,7 @@ class SafeTxDecoder:
         return parameters
 
     def decode_transaction_with_types(
-        self, data: Union[bytes, str], address: Optional[ChecksumAddress] = None
+        self, data: bytes | str, address: ChecksumAddress | None = None
     ) -> tuple[str, list[ParameterDecoded]]:
         """
         Decode tx data and return a list of dictionaries
@@ -317,7 +313,7 @@ class SafeTxDecoder:
         return fn_name, nested_parameters
 
     def decode_transaction(
-        self, data: Union[bytes, str], address: Optional[ChecksumAddress] = None
+        self, data: bytes | str, address: ChecksumAddress | None = None
     ) -> tuple[str, dict[str, Any]]:
         """
         Decode tx data and return all the parameters in the same dictionary
@@ -350,8 +346,8 @@ class SafeTxDecoder:
         return safe_abis
 
     def get_data_decoded(
-        self, data: Union[str, bytes], address: Optional[ChecksumAddress] = None
-    ) -> Optional[DataDecoded]:
+        self, data: str | bytes, address: ChecksumAddress | None = None
+    ) -> DataDecoded | None:
         """
         Return data prepared for serializing
 
@@ -383,7 +379,7 @@ class TxDecoder(SafeTxDecoder):
     def multisend_fn_selectors_with_abis(self) -> dict[bytes, ABIFunction]:
         return self._generate_selectors_with_abis_from_abis(self.multisend_abis)
 
-    def decode_multisend_data(self, data: Union[bytes, str]) -> list[MultisendDecoded]:
+    def decode_multisend_data(self, data: bytes | str) -> list[MultisendDecoded]:
         """
         Decodes Multisend raw data to Multisend dictionary
 
@@ -422,11 +418,11 @@ class TxDecoder(SafeTxDecoder):
         :return:
         """
         value_decoded = super()._parse_decoded_arguments(value_decoded)
-        if isinstance(value_decoded, (int, float)):
+        if isinstance(value_decoded, int | float):
             value_decoded = str(
                 value_decoded
             )  # Return numbers as `str` for json compatibility
-        elif isinstance(value_decoded, (list, tuple, set)):
+        elif isinstance(value_decoded, list | tuple | set):
             value_decoded = [
                 self._parse_decoded_arguments(e) for e in value_decoded
             ]  # Recursive parsing inside sequences
@@ -558,7 +554,7 @@ class DbTxDecoder(TxDecoder):
     )  # 5 minutes of caching
 
     @cachedmethod(cache=operator.attrgetter("cache_abis_by_address"))
-    def get_contract_abi(self, address: ChecksumAddress) -> Optional[list[ABIFunction]]:
+    def get_contract_abi(self, address: ChecksumAddress) -> list[ABIFunction] | None:
         """
         Retrieves the ABI for the contract at the given address.
 
@@ -592,7 +588,7 @@ class DbTxDecoder(TxDecoder):
     )
     def get_contract_abi_selectors_with_functions(
         self, address: ChecksumAddress
-    ) -> Optional[dict[bytes, ABIFunction]]:
+    ) -> dict[bytes, ABIFunction] | None:
         """
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
@@ -602,8 +598,8 @@ class DbTxDecoder(TxDecoder):
             return self._generate_selectors_with_abis_from_abi(abi)
 
     def get_abi_function(
-        self, data: bytes, address: Optional[ChecksumAddress] = None
-    ) -> Optional[ABIFunction]:
+        self, data: bytes, address: ChecksumAddress | None = None
+    ) -> ABIFunction | None:
         """
         :param data: transaction data
         :param address: contract address in case of ABI colliding
@@ -626,7 +622,7 @@ class DbTxDecoder(TxDecoder):
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
 
-    def get_supported_abis(self) -> Iterable[Type[Contract]]:
+    def get_supported_abis(self) -> Iterable[type[Contract]]:
         supported_abis = super().get_supported_abis()
         db_abis = (
             ContractAbi.objects.all()

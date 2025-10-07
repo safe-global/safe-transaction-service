@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -117,12 +117,12 @@ class AboutEthereumRPCView(APIView):
     def _get_info(self, ethereum_client: EthereumClient) -> dict[str, Any]:
         try:
             client_version = ethereum_client.w3.client_version
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             client_version = "Error getting client version"
 
         try:
             syncing = ethereum_client.w3.eth.syncing
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             syncing = "Error getting syncing status"
 
         ethereum_chain_id = get_chain_id()
@@ -287,16 +287,16 @@ class AllTransactionsListView(ListAPIView):
         serializers.AllTransactionsSchemaSerializer
     )  # Just for docs, not used
 
-    def get_ordering_parameter(self) -> Optional[str]:
+    def get_ordering_parameter(self) -> str | None:
         return self.request.query_params.get(OrderingFilter.ordering_param)
 
     def get_page_tx_identifiers(
         self,
         safe: ChecksumAddress,
-        ordering: Optional[str],
+        ordering: str | None,
         limit: int,
         offset: int,
-    ) -> Optional[Response]:
+    ) -> Response | None:
         """
         This query will merge txs and events and will return the important
         identifiers (``safeTxHash`` or ``txHash``) filtered
@@ -1010,7 +1010,6 @@ class SafeTransferListView(ListAPIView):
 
 
 class SafeIncomingTransferListView(SafeTransferListView):
-
     @extend_schema(
         tags=["transactions"],
         responses={

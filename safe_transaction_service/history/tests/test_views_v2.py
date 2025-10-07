@@ -47,7 +47,6 @@ from .factories import (
 
 
 class TestViewsV2(SafeTestCaseMixin, APITestCase):
-
     def test_safe_collectibles_paginated(self):
         safe_address = Account.create().address
 
@@ -97,7 +96,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertIn(next, response.data["next"])
         self.assertEqual(response.data["previous"], None)
-        for result, erc721 in zip(response.data["results"], erc721_list[0:5]):
+        for result, erc721 in zip(
+            response.data["results"], erc721_list[0:5], strict=False
+        ):
             self.assertEqual(result["address"], erc721.address)
             self.assertEqual(int(result["id"]), erc721.token_id)
 
@@ -118,7 +119,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertIn(next, response.data["next"])
         self.assertIn(previous, response.data["previous"])
-        for result, erc721 in zip(response.data["results"], erc721_list[5:10]):
+        for result, erc721 in zip(
+            response.data["results"], erc721_list[5:10], strict=False
+        ):
             self.assertEqual(result["address"], erc721.address)
             self.assertEqual(int(result["id"]), erc721.token_id)
 
@@ -136,7 +139,9 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.data["next"], None)
         self.assertIn(previous, response.data["previous"])
-        for result, erc721 in zip(response.data["results"], erc721_list[10:]):
+        for result, erc721 in zip(
+            response.data["results"], erc721_list[10:], strict=False
+        ):
             self.assertEqual(result["address"], erc721.address)
             self.assertEqual(int(result["id"]), erc721.token_id)
 
@@ -1203,7 +1208,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
                     {
                         "name": "owner",
                         "type": "address",
-                        "value": "0x1b9a0DA11a5caCE4e703599" "3Cbb2E4B1B3b164Cf",
+                        "value": "0x1b9a0DA11a5caCE4e7035993Cbb2E4B1B3b164Cf",
                     },
                     {"name": "_threshold", "type": "uint256", "value": "1"},
                 ],
@@ -1701,7 +1706,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn(
-            f'Tx with safe-tx-hash={data["contractTransactionHash"]} '
+            f"Tx with safe-tx-hash={data['contractTransactionHash']} "
             f"for safe={safe.address} was already executed in "
             f"tx-hash={multisig_transaction.ethereum_tx_id}",
             response.data["non_field_errors"],
@@ -2336,16 +2341,12 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         # in the reverse order that they were created
         multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         module_transaction = ModuleTransactionFactory(safe=safe_address)
-        internal_tx_in = InternalTxFactory(to=safe_address, value=4)
-        internal_tx_out = InternalTxFactory(
-            _from=safe_address, value=5
-        )  # Should not appear
-        erc20_transfer_in = ERC20TransferFactory(to=safe_address)
+        InternalTxFactory(to=safe_address, value=4)
+        InternalTxFactory(_from=safe_address, value=5)  # Should not appear
+        ERC20TransferFactory(to=safe_address)
         erc20_transfer_out = ERC20TransferFactory(_from=safe_address)
-        another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
-        another_safe_multisig_transaction = (
-            MultisigTransactionFactory()
-        )  # Should not appear, it's for another Safe
+        MultisigTransactionFactory(safe=safe_address)
+        (MultisigTransactionFactory())  # Should not appear, it's for another Safe
 
         # Should not appear as they are not executed
         for _ in range(2):
@@ -2366,7 +2367,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             False,  # Multisig transaction
         ]
         for transfer_not_empty, transaction in zip(
-            transfers_not_empty, response.data["results"]
+            transfers_not_empty, response.data["results"], strict=False
         ):
             self.assertEqual(bool(transaction["transfers"]), transfer_not_empty)
             self.assertTrue(transaction["tx_type"])
@@ -2394,7 +2395,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         )
         # Add token info for that transfer
         token = TokenFactory(address=erc20_transfer_out.address)
-        internal_tx_in = InternalTxFactory(
+        InternalTxFactory(
             to=safe_address, value=8, ethereum_tx=multisig_transaction.ethereum_tx
         )
         response = self.client.get(
@@ -2424,7 +2425,7 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             True,  # Multisig transaction
         ]
         for transfer_not_empty, transaction in zip(
-            transfers_not_empty, response.data["results"]
+            transfers_not_empty, response.data["results"], strict=False
         ):
             self.assertEqual(bool(transaction["transfers"]), transfer_not_empty)
 

@@ -1,5 +1,4 @@
 import logging
-from typing import Type, Union
 
 from django.conf import settings
 from django.db.models import Model
@@ -27,11 +26,8 @@ logger = logging.getLogger(__name__)
     dispatch_uid="safe_message_confirmation.process_event",
 )
 def process_event(
-    sender: Type[Model],
-    instance: Union[
-        SafeMessage,
-        SafeMessageConfirmation,
-    ],
+    sender: type[Model],
+    instance: SafeMessage | SafeMessageConfirmation,
     created: bool,
     **kwargs,
 ) -> None:

@@ -1,6 +1,6 @@
+from collections.abc import Sequence
 from functools import cached_property
 from logging import getLogger
-from typing import Optional, Sequence
 
 from safe_eth.eth import EthereumClient
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -69,10 +69,10 @@ class ProxyFactoryIndexer(EventsIndexer):
 
     def _process_decoded_element(
         self, decoded_element: EventData
-    ) -> Optional[SafeContract]:
+    ) -> SafeContract | None:
         contract_address = decoded_element["args"]["proxy"]
         if contract_address != NULL_ADDRESS:
-            if (block_number := decoded_element["blockNumber"]) == 0:
+            if decoded_element["blockNumber"] == 0:
                 transaction_hash = to_0x_hex_str(decoded_element["transactionHash"])
                 log_msg = (
                     f"Events are reporting blockNumber=0 for tx-hash={transaction_hash}"

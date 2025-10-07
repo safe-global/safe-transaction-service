@@ -4,7 +4,7 @@ Contains classes for processing indexed data and store Safe related models in da
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Union
+from collections.abc import Sequence
 
 from django.db import transaction
 
@@ -118,7 +118,7 @@ class SafeTxProcessor(TxProcessor):
     def __init__(
         self,
         ethereum_client: EthereumClient,
-        ethereum_tracing_client: Optional[EthereumClient],
+        ethereum_tracing_client: EthereumClient | None,
         aa_processor_service: AaProcessorService,
     ):
         """
@@ -156,7 +156,7 @@ class SafeTxProcessor(TxProcessor):
             Version("1.3.0"),  # ChainId was included
         )
 
-    def clear_cache(self, safe_address: Optional[ChecksumAddress] = None) -> bool:
+    def clear_cache(self, safe_address: ChecksumAddress | None = None) -> bool:
         """
         :param safe_address:
         :return: `True` if anything was deleted from cache, `False` otherwise
@@ -169,9 +169,7 @@ class SafeTxProcessor(TxProcessor):
             self.safe_last_status_cache.clear()
             return True
 
-    def is_failed(
-        self, ethereum_tx: EthereumTx, safe_tx_hash: Union[HexStr, bytes]
-    ) -> bool:
+    def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: HexStr | bytes) -> bool:
         """
         Detects failure events on a Safe Multisig Tx
 
@@ -228,7 +226,7 @@ class SafeTxProcessor(TxProcessor):
 
     def get_safe_version_from_master_copy(
         self, master_copy: ChecksumAddress
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         :param master_copy:
         :return: Safe version for master copy address
@@ -237,7 +235,7 @@ class SafeTxProcessor(TxProcessor):
 
     def get_last_safe_status_for_address(
         self, address: ChecksumAddress
-    ) -> Optional[SafeLastStatus]:
+    ) -> SafeLastStatus | None:
         try:
             safe_status = self.safe_last_status_cache.get(
                 address
@@ -271,7 +269,7 @@ class SafeTxProcessor(TxProcessor):
         internal_tx: InternalTx,
         safe_status: SafeStatus,
         owner: ChecksumAddress,
-        new_owner: Optional[ChecksumAddress],
+        new_owner: ChecksumAddress | None,
     ) -> None:
         """
         :param internal_tx:

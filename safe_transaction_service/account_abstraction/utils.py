@@ -1,6 +1,5 @@
 import logging
 from functools import cache
-from typing import Optional
 
 from django.conf import settings
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @cache
-def get_bundler_client() -> Optional[BundlerClient]:
+def get_bundler_client() -> BundlerClient | None:
     """
     :return: Initialized `ERC4337 RPC Bundler Client` if configured, `None` otherwise
     """

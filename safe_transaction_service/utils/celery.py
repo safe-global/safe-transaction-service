@@ -1,5 +1,4 @@
 from functools import wraps
-from typing import Optional
 
 from celery.utils.log import get_task_logger
 from gevent import Timeout
@@ -9,7 +8,7 @@ class TaskTimeoutException(Exception):
     pass
 
 
-def task_timeout(timeout_seconds: int, raise_exception: Optional[bool] = False):
+def task_timeout(timeout_seconds: int, raise_exception: bool | None = False):
     """
     Catches Timeout exceptions and logs a clear, task-specific message.
     Ensures better tracking of hard limit errors and maintains consistent log formatting,
@@ -30,7 +29,9 @@ def task_timeout(timeout_seconds: int, raise_exception: Optional[bool] = False):
                 logger = get_task_logger(func.__name__)
                 logger.error("Task timeout exceeded: %i seconds", timeout_seconds)
                 if raise_exception:
-                    raise TaskTimeoutException()
+                    raise TaskTimeoutException(
+                        f"Task timeout exceeded: f{timeout_seconds} seconds"
+                    ) from None
                 return None
 
         return wrapper

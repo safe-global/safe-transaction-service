@@ -22,8 +22,7 @@ class Command(BaseCommand):
         count = queryset.count()
         self.stdout.write(
             self.style.SUCCESS(
-                f"Start exporting of {queryset.count()} "
-                f"multisig tx data to {file_name}"
+                f"Start exporting of {queryset.count()} multisig tx data to {file_name}"
             )
         )
         if count:

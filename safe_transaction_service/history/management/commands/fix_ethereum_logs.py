@@ -28,7 +28,9 @@ class Command(BaseCommand):
             tx_hashes = [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
             try:
                 tx_receipts = ethereum_client.get_transaction_receipts(tx_hashes)
-                for ethereum_tx, tx_receipt in zip(ethereum_txs, tx_receipts):
+                for ethereum_tx, tx_receipt in zip(
+                    ethereum_txs, tx_receipts, strict=False
+                ):
                     ethereum_tx.logs = [
                         clean_receipt_log(log) for log in tx_receipt["logs"]
                     ]
@@ -40,7 +42,7 @@ class Command(BaseCommand):
                         f"Fixed {processed} ethereum logs. {total} remaining to be fixed"
                     )
                 )
-            except IOError:
+            except OSError:
                 self.stdout.write(
                     self.style.WARNING(
                         "Node connection error when retrieving tx receipts"

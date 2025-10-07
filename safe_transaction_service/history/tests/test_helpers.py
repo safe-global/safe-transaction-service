@@ -9,7 +9,6 @@ from safe_transaction_service.history.helpers import DelegateSignatureHelperV2
 
 
 class TestDelegateSignatureHelperV2(SafeTestCaseMixin, TestCase):
-
     def test_calculate_hash(self):
         # Mock calculate_totp
         DelegateSignatureHelperV2.calculate_totp = MagicMock(

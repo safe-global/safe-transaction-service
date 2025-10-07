@@ -87,10 +87,10 @@ class TestContractAdmin(TestCase):
         )
 
     def test_get_contracts_abi_relevance(self) -> None:
-        expected_relevances = map(
-            lambda i: None if (i.contract_abi is None) else i.contract_abi.relevance,
-            self.contracts,
+        expected_relevances = (
+            None if (i.contract_abi is None) else i.contract_abi.relevance
+            for i in self.contracts
         )
 
-        relevances = map(lambda c: self.contract_admin.abi_relevance(c), self.contracts)
+        relevances = (self.contract_admin.abi_relevance(c) for c in self.contracts)
         self.assertEqual(set(expected_relevances), set(relevances))

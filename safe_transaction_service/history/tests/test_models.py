@@ -506,7 +506,7 @@ class TestTokenTransfer(TestCase):
             ERC721Transfer.objects.erc721_owned_by(address=random_address), []
         )
         erc721_transfer = ERC721TransferFactory(to=random_address)
-        erc721_transfer_2 = ERC721TransferFactory(to=random_address)
+        ERC721TransferFactory(to=random_address)
         token = TokenFactory(address=erc721_transfer.address, spam=True)
         self.assertEqual(
             len(ERC721Transfer.objects.erc721_owned_by(address=random_address)), 2
@@ -548,11 +548,11 @@ class TestInternalTx(TestCase):
         self.assertFalse(txs)
 
         ether_value = 5
-        internal_tx = InternalTxFactory(to=ethereum_address, value=ether_value)
+        InternalTxFactory(to=ethereum_address, value=ether_value)
         InternalTxFactory(value=ether_value)  # Create tx with a random address too
         txs = InternalTx.objects.ether_and_token_txs(ethereum_address)
         self.assertEqual(txs.count(), 1)
-        internal_tx = InternalTxFactory(_from=ethereum_address, value=ether_value)
+        InternalTxFactory(_from=ethereum_address, value=ether_value)
         self.assertEqual(txs.count(), 2)
 
         token_value = 10
@@ -563,12 +563,12 @@ class TestInternalTx(TestCase):
         ERC20TransferFactory(_from=ethereum_address, value=token_value)
         self.assertEqual(txs.count(), 4)
 
-        for i, tx in enumerate(txs):
+        self.assertEqual(len(txs), 4)
+        for tx in txs:
             if tx["token_address"]:
                 self.assertEqual(tx["_value"], token_value)
             else:
                 self.assertEqual(tx["_value"], ether_value)
-        self.assertEqual(i, 3)
 
         self.assertEqual(InternalTx.objects.ether_txs().count(), 3)
         self.assertEqual(InternalTx.objects.token_txs().count(), 3)
@@ -1286,7 +1286,7 @@ class TestMultisigConfirmations(TestCase):
     def test_remove_unused_confirmations(self):
         safe_address = Account.create().address
         owner_address = Account.create().address
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=0,
             multisig_transaction__ethereum_tx=None,
@@ -1301,7 +1301,7 @@ class TestMultisigConfirmations(TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
         # With an executed multisig transaction it shouldn't delete the confirmation
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=0,
             multisig_transaction__safe=safe_address,
@@ -1315,30 +1315,30 @@ class TestMultisigConfirmations(TestCase):
         self.assertEqual(MultisigConfirmation.objects.all().delete()[0], 1)
 
         # More testing
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=0,
             multisig_transaction__safe=safe_address,
         )
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=0,
             multisig_transaction__ethereum_tx=None,
             multisig_transaction__safe=safe_address,
         )
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=1,
             multisig_transaction__ethereum_tx=None,
             multisig_transaction__safe=safe_address,
         )
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=1,
             multisig_transaction__ethereum_tx=None,
             multisig_transaction__safe=safe_address,
         )
-        multisig_confirmation = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             owner=owner_address,
             multisig_transaction__nonce=1,
             multisig_transaction__ethereum_tx=None,
@@ -1446,9 +1446,7 @@ class TestMultisigTransactions(TestCase):
         safe_address_3 = Account.create().address
         MultisigTransactionFactory(safe=safe_address_1)
         MultisigTransactionFactory(safe=safe_address_1)
-        safes_with_number_of_transactions = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed()
-        )
+        (MultisigTransaction.objects.safes_with_number_of_transactions_executed())
         result = (
             MultisigTransaction.objects.safes_with_number_of_transactions_executed()
         )
@@ -1493,17 +1491,13 @@ class TestMultisigTransactions(TestCase):
         safe_address_3 = Account.create().address
         MultisigTransactionFactory(safe=safe_address_1)
         MultisigTransactionFactory(safe=safe_address_1)
-        result = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-        )
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
         self.assertEqual(len(result), 1)
         self.assertEqual(
             result[0], {"safe": safe_address_1, "transactions": 2, "master_copy": None}
         )
         MultisigTransactionFactory(safe=safe_address_2)
-        result = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-        )
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
         self.assertEqual(
             list(result),
             [
@@ -1514,9 +1508,7 @@ class TestMultisigTransactions(TestCase):
 
         safe_status_1 = SafeStatusFactory(address=safe_address_1)
         self.assertIsNotNone(safe_status_1.master_copy)
-        result = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-        )
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
         self.assertEqual(
             list(result),
             [
@@ -1530,9 +1522,7 @@ class TestMultisigTransactions(TestCase):
         )
 
         safe_status_2 = SafeStatusFactory(address=safe_address_2)
-        result = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-        )
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
         self.assertEqual(
             list(result),
             [
@@ -1550,9 +1540,7 @@ class TestMultisigTransactions(TestCase):
         )
 
         [MultisigTransactionFactory(safe=safe_address_3) for _ in range(4)]
-        result = (
-            MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
-        )
+        result = MultisigTransaction.objects.safes_with_number_of_transactions_executed_and_master_copy()
         self.assertEqual(
             list(result),
             [
@@ -1715,7 +1703,7 @@ class TestMultisigTransactions(TestCase):
         )
 
         multisig_transaction_2 = MultisigTransactionFactory(safe=safe_address, nonce=2)
-        multisig_confirmation_2 = MultisigConfirmationFactory(
+        MultisigConfirmationFactory(
             multisig_transaction=multisig_transaction_2,
             signature_type=SafeSignatureType.EOA.value,
             owner=multisig_confirmation.owner,

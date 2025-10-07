@@ -86,7 +86,7 @@ class Command(BaseCommand):
 
                 addresses_to_reindex = set()
                 for safe_status, blockchain_nonce in zip(
-                    safe_statuses_list, blockchain_nonces
+                    safe_statuses_list, blockchain_nonces, strict=False
                 ):
                     address = safe_status.address
                     nonce = safe_status.nonce
@@ -113,8 +113,11 @@ class Command(BaseCommand):
                                 f"different from blockchain-nonce={blockchain_nonce}"
                             )
                         )
-                        if last_valid_transaction := MultisigTransaction.objects.last_valid_transaction(
-                            address
+                        if (
+                            last_valid_transaction
+                            := MultisigTransaction.objects.last_valid_transaction(
+                                address
+                            )
                         ):
                             self.stdout.write(
                                 self.style.WARNING(

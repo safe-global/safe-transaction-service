@@ -144,7 +144,7 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
                 self.index_service.process_decoded_txs_for_safe(safe_address), 0
             )
 
-            setup_internal_tx = InternalTxDecodedFactory(
+            InternalTxDecodedFactory(
                 function_name="setup",
                 internal_tx___from=safe_address,
             )
@@ -229,10 +229,10 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
 
         safe_status = SafeStatusFactory()
         safe_address = safe_status.address
-        safe_status_2 = SafeStatusFactory(address=safe_address)
+        SafeStatusFactory(address=safe_address)
         safe_status_3 = SafeStatusFactory(address=safe_address)
-        safe_status_4 = SafeStatusFactory(address=safe_address)
-        random_safe_status = SafeStatusFactory()  # It should not be removed
+        SafeStatusFactory(address=safe_address)
+        SafeStatusFactory()  # It should not be removed
         SafeLastStatus.objects.get_or_generate(safe_address)
         MultisigTransactionFactory()  # It shouldn't be deleted (safe not matching)
         MultisigTransactionFactory(

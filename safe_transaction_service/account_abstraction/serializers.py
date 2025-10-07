@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
@@ -108,7 +108,7 @@ class SafeOperationSerializer(
     valid_until = serializers.DateTimeField(allow_null=True)  # Epoch uint48
     module_address = eth_serializers.EthereumAddressField()
 
-    def validate_init_code(self, init_code: Optional[HexBytes]) -> Optional[HexBytes]:
+    def validate_init_code(self, init_code: HexBytes | None) -> HexBytes | None:
         """
         Check `init_code` is not provided for already initialized contracts
 
@@ -125,8 +125,8 @@ class SafeOperationSerializer(
 
             try:
                 decoded_init_code = decode_init_code(init_code, self.ethereum_client)
-            except ValueError:
-                raise ValidationError("Cannot decode data")
+            except ValueError as exc:
+                raise ValidationError("Cannot decode data") from exc
             if not self.ethereum_client.is_contract(decoded_init_code.factory_address):
                 raise ValidationError(
                     f"`init_code` factory-address={decoded_init_code.factory_address} is not initialized"
@@ -173,8 +173,8 @@ class SafeOperationSerializer(
         return nonce
 
     def validate_paymaster_and_data(
-        self, paymaster_and_data: Optional[HexBytes]
-    ) -> Optional[HexBytes]:
+        self, paymaster_and_data: HexBytes | None
+    ) -> HexBytes | None:
         if paymaster_and_data:
             if len(paymaster_and_data) < 20:
                 raise ValidationError(
@@ -190,8 +190,8 @@ class SafeOperationSerializer(
         return paymaster_and_data
 
     def validate_valid_until(
-        self, valid_until: Optional[datetime.datetime]
-    ) -> Optional[datetime.datetime]:
+        self, valid_until: datetime.datetime | None
+    ) -> datetime.datetime | None:
         """
         Make sure ``valid_until`` is not previous to the current timestamp
 
@@ -350,7 +350,7 @@ class SafeOperationConfirmationSerializer(
         except UserOperationModel.DoesNotExist:
             raise ValidationError(
                 f"SafeOperation with hash={safe_operation_hash_hex} does not exist"
-            )
+            ) from None
 
         # Parse valid owners from init code
         if user_operation_model.init_code:

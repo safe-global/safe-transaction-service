@@ -1,7 +1,7 @@
 import datetime
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 
@@ -67,7 +67,7 @@ class SafeEventsIndexer(EventsIndexer):
         )
         self.eth_zksync_compatible_network = kwargs["eth_zksync_compatible_network"]
         # Cache timestamp for block hashes
-        self.block_hashes_with_timestamp: dict[bytes, datetime.datetime] = dict()
+        self.block_hashes_with_timestamp: dict[bytes, datetime.datetime] = {}
         super().__init__(*args, **kwargs)
 
     @cached_property
@@ -370,7 +370,7 @@ class SafeEventsIndexer(EventsIndexer):
             to=NULL_ADDRESS,
             value=0,
         )
-        child_internal_tx: Optional[InternalTx] = None  # For Ether transfers
+        child_internal_tx: InternalTx | None = None  # For Ether transfers
         internal_tx_decoded = InternalTxDecoded(
             internal_tx=internal_tx,
             function_name="",
@@ -452,7 +452,7 @@ class SafeEventsIndexer(EventsIndexer):
             # 'ExecutionFromModuleSuccess', 'ExecutionFromModuleFailure'
             internal_tx_decoded = None
 
-        safe_relevant_tx: Optional[SafeRelevantTransaction] = None
+        safe_relevant_tx: SafeRelevantTransaction | None = None
         if internal_tx and internal_tx.is_ether_transfer:
             # Store Incoming Ether Transfers as relevant transactions for a Safe
             safe_relevant_tx = SafeRelevantTransaction(
@@ -471,13 +471,10 @@ class SafeEventsIndexer(EventsIndexer):
         if not internal_tx:
             return []
         return [
-            element
-            for element in (
-                internal_tx,
-                internal_tx_decoded,
-                child_internal_tx,
-                safe_relevant_tx,
-            )
+            internal_tx,
+            internal_tx_decoded,
+            child_internal_tx,
+            safe_relevant_tx,
         ]
 
     def _get_safe_creation_events(

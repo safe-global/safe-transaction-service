@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 from django.core.management.base import BaseCommand
 
@@ -19,7 +19,7 @@ class Command(BaseCommand):
             txs = self.ethereum_client.get_transactions(
                 [ethereum_tx.tx_hash for ethereum_tx in ethereum_txs]
             )
-            for tx, ethereum_tx in zip(txs, ethereum_txs):
+            for tx, ethereum_tx in zip(txs, ethereum_txs, strict=False):
                 if tx and "maxFeePerGas" in tx:
                     self.stdout.write(
                         self.style.SUCCESS(

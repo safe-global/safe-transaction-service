@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def _get_exception_trace(exception: Exception) -> str:
     if str(exception):
-        exception_trace = "{}: {}".format(exception.__class__.__name__, exception)
+        exception_trace = f"{exception.__class__.__name__}: {exception}"
     else:
         exception_trace = exception.__class__.__name__
     return exception_trace

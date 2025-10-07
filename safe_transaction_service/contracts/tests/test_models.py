@@ -8,7 +8,6 @@ from django.db.transaction import atomic
 from django.test import TestCase
 
 from eth_account import Account
-from safe_eth.eth.ethereum_client import EthereumNetwork
 from safe_eth.eth.tests.clients.mocks import sourcify_safe_metadata
 
 from ..models import Contract, ContractAbi, validate_abi
@@ -114,7 +113,6 @@ class TestContract(TestCase):
             name=contract_name,
             contract_abi=None,
         )
-        network = EthereumNetwork.MAINNET
         self.assertIsNone(contract.contract_abi)
         self.assertEqual(ContractAbi.objects.count(), 0)
         self.assertTrue(contract.update_from_metadata(sourcify_metadata_mock))

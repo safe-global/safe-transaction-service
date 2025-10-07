@@ -43,13 +43,13 @@ class AdvancedAdminSearchMixin:
 
         def construct_search(field_name):
             if field_name.startswith("^"):
-                return "%s__istartswith" % field_name[1:]
+                return f"{field_name[1:]}__istartswith"
             elif field_name.startswith("=="):
-                return "%s__exact" % field_name[2:]
+                return f"{field_name[2:]}__exact"
             elif field_name.startswith("="):
-                return "%s__iexact" % field_name[1:]
+                return f"{field_name[1:]}__iexact"
             elif field_name.startswith("@"):
-                return "%s__search" % field_name[1:]
+                return f"{field_name[1:]}__search"
             # Use field_name if it includes a lookup.
             opts = queryset.model._meta
             lookup_fields = field_name.split(LOOKUP_SEP)
@@ -70,7 +70,7 @@ class AdvancedAdminSearchMixin:
                         # Update opts to follow the relation.
                         opts = field.path_infos[-1].to_opts
             # Otherwise, use the field with icontains.
-            return "%s__icontains" % field_name
+            return f"{field_name}__icontains"
 
         may_have_duplicates = False
         search_fields = self.get_search_fields(request)
@@ -93,7 +93,7 @@ class AdvancedAdminSearchMixin:
                     except (ValueError, ValidationError):
                         pass
                 or_queries = models.Q.create(
-                    [valid_query for valid_query in valid_queries],
+                    list(valid_queries),
                     connector=models.Q.OR,
                 )
                 term_queries.append(or_queries)

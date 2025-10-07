@@ -148,7 +148,11 @@ class TestReorgService(TestCase):
         for (
             previous_reorg_multisig_transaction,
             after_reorg_multisig_transaction,
-        ) in zip(multisig_transactions[:2], after_reorg_multisigtransactions[:2]):
+        ) in zip(
+            multisig_transactions[:2],
+            after_reorg_multisigtransactions[:2],
+            strict=False,
+        ):
             self.assertEqual(
                 previous_reorg_multisig_transaction.safe_tx_hash,
                 after_reorg_multisig_transaction.safe_tx_hash,
