@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from django.db import transaction
 from django.utils import timezone
@@ -45,7 +44,7 @@ class EthValueWithTimestamp:
 
 @app.shared_task()
 @task_timeout(timeout_seconds=TASK_TIME_LIMIT)
-def fix_pool_tokens_task() -> Optional[int]:
+def fix_pool_tokens_task() -> int | None:
     """
     Fix names for generic pool tokens, like Balancer or Uniswap
 
@@ -60,7 +59,7 @@ def fix_pool_tokens_task() -> Optional[int]:
 
 def _parse_token_address_from_token_list(
     token_address: str,
-) -> Optional[ChecksumAddress]:
+) -> ChecksumAddress | None:
     if token_address.startswith("0x"):  # Ignore ENS names
         return fast_to_checksum_address(token_address)
     else:

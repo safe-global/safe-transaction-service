@@ -1,6 +1,5 @@
 import json
 from functools import cached_property, wraps
-from typing import Optional, Union
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -53,7 +52,7 @@ class CacheSafeTxsView:
         """
         return bool(settings.CACHE_VIEW_DEFAULT_TIMEOUT)
 
-    def get_cache_data(self, cache_path: str) -> Optional[str]:
+    def get_cache_data(self, cache_path: str) -> str | None:
         """
         Return the cache for the provided cache_path
 
@@ -118,7 +117,7 @@ def cache_txs_view_for_address(
             cache_path = urlencode(query_params)
             # Calculate cache_name
             address = request.kwargs.get(parameter_key)
-            cache_txs_view: Optional[CacheSafeTxsView] = None
+            cache_txs_view: CacheSafeTxsView | None = None
             if address:
                 cache_txs_view = CacheSafeTxsView(cache_tag, address)
             else:
@@ -152,13 +151,11 @@ def cache_txs_view_for_address(
 
 
 def remove_cache_view_by_instance(
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-        ModuleTransaction,
-    ],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | ModuleTransaction,
 ):
     """
     Remove the cache stored for instance view.
@@ -166,7 +163,7 @@ def remove_cache_view_by_instance(
     :param instance:
     """
     addresses = []
-    cache_tag: Optional[str] = None
+    cache_tag: str | None = None
     if isinstance(instance, TokenTransfer):
         cache_tag = CacheSafeTxsView.LIST_TRANSFERS_VIEW_CACHE_KEY
         addresses.append(instance.to)

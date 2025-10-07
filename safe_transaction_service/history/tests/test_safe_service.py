@@ -281,6 +281,6 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             )
 
             self.assertIn(
-                f'[{random_safe_address}] Proxy creation data is not matching the proxies deployed {multiple_safes_same_tx_creation_mock["proxies_deployed"]}',
+                f"[{random_safe_address}] Proxy creation data is not matching the proxies deployed {multiple_safes_same_tx_creation_mock['proxies_deployed']}",
                 cm.output[0],
             )

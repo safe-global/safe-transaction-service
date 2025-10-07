@@ -1,6 +1,5 @@
 import logging
 from functools import cached_property
-from typing import Optional
 
 from django.db import models
 from django.db.models import Index
@@ -62,7 +61,7 @@ class UserOperation(models.Model):
         return f"{to_0x_hex_str(HexBytes(self.hash))} UserOperation for sender={self.sender} with nonce={self.nonce}"
 
     @cached_property
-    def paymaster_and_data(self) -> Optional[HexBytes]:
+    def paymaster_and_data(self) -> HexBytes | None:
         if self.paymaster and self.paymaster_data:
             return HexBytes(HexBytes(self.paymaster) + HexBytes(self.paymaster_data))
 

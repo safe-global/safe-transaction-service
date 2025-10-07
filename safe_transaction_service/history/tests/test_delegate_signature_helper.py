@@ -24,7 +24,6 @@ class TestDelegateSignatureHelper(TestCase):
         totp = DelegateSignatureHelper.calculate_totp()
         address = Account.create().address
         message = address + str(totp)
-        Account.sign_message
         signable_hash = defunct_hash_message(text=message)
 
         self.assertEqual(

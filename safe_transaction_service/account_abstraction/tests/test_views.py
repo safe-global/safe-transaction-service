@@ -359,7 +359,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
                 {
                     "non_field_errors": [
                         ErrorDetail(
-                            string=f'Signature={data["signature"]} for owner={account.address} is not valid',
+                            string=f"Signature={data['signature']} for owner={account.address} is not valid",
                             code="invalid",
                         )
                     ]
@@ -485,7 +485,7 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             {
                 "nonce": [
                     ErrorDetail(
-                        string=f'Nonce={data["nonce"]} too low for safe=0xB0B5c0578Aa134b0496a6C0e51A7aae47C522861',
+                        string=f"Nonce={data['nonce']} too low for safe=0xB0B5c0578Aa134b0496a6C0e51A7aae47C522861",
                         code="invalid",
                     )
                 ]

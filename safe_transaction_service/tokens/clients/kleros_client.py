@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient

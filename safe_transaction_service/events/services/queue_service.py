@@ -1,7 +1,7 @@
 import json
 import logging
 from functools import cache
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 
@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 class BrokerConnection:
     def __init__(self):
         self.exchange_name: str = settings.EVENTS_QUEUE_EXCHANGE_NAME
-        self.channel: Optional[Channel] = None
+        self.channel: Channel | None = None
         self.connection_parameters = URLParameters(settings.EVENTS_QUEUE_URL)
-        self.connection: Optional[BlockingConnection] = self.connect()
+        self.connection: BlockingConnection | None = self.connect()
 
-    def connect(self) -> Optional[BlockingConnection]:
+    def connect(self) -> BlockingConnection | None:
         """
         This method connects to RabbitMq using BlockingConnection.
 
@@ -43,7 +43,7 @@ class BrokerConnection:
             logger.error("Cannot open connection to RabbitMQ")
             return None
 
-    def publish(self, message: str, retry: Optional[bool] = True) -> bool:
+    def publish(self, message: str, retry: bool | None = True) -> bool:
         """
         :param message:
         :param retry:
@@ -79,7 +79,7 @@ class QueueService:
         self._total_connections: int = 0
         self.unsent_events: list[str] = []
 
-    def get_connection(self) -> Optional[BrokerConnection]:
+    def get_connection(self) -> BrokerConnection | None:
         """
         :return: A `BrokerConnection` from the connection pool if there is one available, otherwise
             returns a new BrokerConnection
@@ -102,7 +102,7 @@ class QueueService:
         self._total_connections += 1
         return broker_connection
 
-    def release_connection(self, broker_connection: Optional[BrokerConnection]):
+    def release_connection(self, broker_connection: BrokerConnection | None):
         """
         Return the `BrokerConnection` to the pool
 

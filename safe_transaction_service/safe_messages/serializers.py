@@ -1,5 +1,6 @@
 import json
-from typing import Any, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 from django.conf import settings
 
@@ -29,7 +30,7 @@ class SafeMessageSignatureParserMixin:
         self,
         safe_signatures: Sequence[SafeSignature],
         safe_address: ChecksumAddress,
-        safe_message: Optional[SafeMessage],
+        safe_message: SafeMessage | None,
     ) -> tuple[ChecksumAddress, SafeSignatureType]:
         """
         :param safe_signatures:
@@ -91,7 +92,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
 
         return origin
 
-    def validate_message(self, value: Union[str, dict[str, Any]]):
+    def validate_message(self, value: str | dict[str, Any]):
         if isinstance(value, str):
             return value
 
@@ -230,7 +231,7 @@ class SafeMessageResponseSerializer(serializers.Serializer):
             obj.confirmations, many=True
         ).data
 
-    def get_prepared_signature(self, obj: SafeMessage) -> Optional[str]:
+    def get_prepared_signature(self, obj: SafeMessage) -> str | None:
         """
         Prepared signature sorted
 

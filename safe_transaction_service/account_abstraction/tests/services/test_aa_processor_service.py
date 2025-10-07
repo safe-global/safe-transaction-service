@@ -46,7 +46,6 @@ from ..mocks import (
 
 
 class TestAaProcessorService(TestCase):
-
     def setUp(self):
         super().setUp()
         get_bundler_client.cache_clear()

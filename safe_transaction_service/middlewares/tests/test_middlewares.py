@@ -7,7 +7,6 @@ from ..proxy_prefix_middleware import ProxyPrefixMiddleware
 
 
 class TestMiddlewares(unittest.TestCase):
-
     def test_proxy_prefix_middleware(self):
         request_factory = RequestFactory()
         get_response = MagicMock(return_value="middleware_response")

@@ -1,6 +1,6 @@
 import logging
+from collections.abc import Sequence
 from functools import cache
-from typing import Optional, Sequence
 
 from django.conf import settings
 from django.db import transaction
@@ -65,7 +65,7 @@ class AaProcessorService:
     def __init__(
         self,
         ethereum_client: EthereumClient,
-        bundler_client: Optional[BundlerClient],
+        bundler_client: BundlerClient | None,
         supported_entry_points: Sequence[ChecksumAddress],
     ):
         self.ethereum_client = ethereum_client
@@ -144,7 +144,7 @@ class AaProcessorService:
         user_operation_model: UserOperationModel,
         user_operation: UserOperation,
         user_operation_receipt: UserOperationReceipt,
-    ) -> Optional[tuple[SafeOperationModel, SafeOperation]]:
+    ) -> tuple[SafeOperationModel, SafeOperation] | None:
         """
         Creates or updates a Safe Operation
 

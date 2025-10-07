@@ -178,8 +178,7 @@ class TestTxDecoder(TestCase):
             "0x7de7edef00000000000000000000000034cfac646f301356faa8b21e94227e3583fe3f5f"
         )
         change_fallback_manager_data = HexBytes(
-            "0xf08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cd"
-            "bdf44"
+            "0xf08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf44"
         )
         tx_decoder = get_tx_decoder()
         expected = [

@@ -1,7 +1,7 @@
 import logging
 import operator
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
@@ -34,7 +34,7 @@ class Erc20InfoWithLogo:
     name: str
     symbol: str
     decimals: int
-    copy_price: Optional[ChecksumAddress]
+    copy_price: ChecksumAddress | None
     logo_uri: str
 
     @classmethod
@@ -51,8 +51,8 @@ class Erc20InfoWithLogo:
 
 @dataclass
 class Balance:
-    token_address: Optional[ChecksumAddress]  # For ether, `token_address` is `None`
-    token: Optional[Erc20InfoWithLogo]
+    token_address: ChecksumAddress | None  # For ether, `token_address` is `None`
+    token: Erc20InfoWithLogo | None
     balance: int
 
     def get_price_address(self) -> ChecksumAddress:
@@ -135,7 +135,7 @@ class BalanceService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Balance], int]:
         """
@@ -184,7 +184,7 @@ class BalanceService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[ChecksumAddress], int]:
         """
@@ -226,7 +226,7 @@ class BalanceService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Balance], int]:
         """
@@ -241,9 +241,9 @@ class BalanceService:
         :param offset:
         :return: a list of `{'token_address': str, 'balance': int}` and the number of different tokens for the providen Safe.
         """
-        assert fast_is_checksum_address(
-            safe_address
-        ), f"Not valid address {safe_address} for getting balances"
+        assert fast_is_checksum_address(safe_address), (
+            f"Not valid address {safe_address} for getting balances"
+        )
 
         erc20_addresses_page, erc20_count = self._get_page_erc20_balances(
             safe_address, only_trusted, exclude_spam, limit, offset
@@ -265,7 +265,7 @@ class BalanceService:
             # Return ether balance if there are no tokens
             if not erc20_addresses_page:
                 raw_balances = self.ethereum_client.erc20.get_balances(safe_address, [])
-        except (IOError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             raise NodeConnectionException from exc
 
         balances = []
@@ -292,7 +292,7 @@ class BalanceService:
     @cache_memoize(60 * 60, prefix="balances-get_token_info")  # 1 hour
     def get_token_info(
         self, token_address: ChecksumAddress
-    ) -> Optional[Erc20InfoWithLogo]:
+    ) -> Erc20InfoWithLogo | None:
         try:
             token = Token.objects.get(address=token_address)
             return Erc20InfoWithLogo.from_token(token)

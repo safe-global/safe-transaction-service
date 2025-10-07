@@ -150,7 +150,6 @@ class SafeJsonFormatter(logging.Formatter):
 
 
 class PatchedCeleryFormatter(SafeJsonFormatter):  # pragma: no cover
-
     def format(self, record):
         task = get_current_task()
         if task and task.request:

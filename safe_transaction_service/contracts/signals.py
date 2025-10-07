@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence, Type
+from collections.abc import Sequence
 
 from django.core.cache import cache as django_cache
 from django.db.models import Model
@@ -25,7 +25,7 @@ def clear_contracts_cache(addresses: Sequence[ChecksumAddress]) -> None:
 
 @receiver(post_save, sender=Contract, dispatch_uid="contract.clear_cache")
 def clear_contract_cache(
-    sender: Type[Model], instance: Contract, created: bool, **kwargs
+    sender: type[Model], instance: Contract, created: bool, **kwargs
 ) -> None:
     """
     Clear Contract cache when a contract is updated
@@ -43,7 +43,7 @@ def clear_contract_cache(
     post_save, sender=ContractAbi, dispatch_uid="contract_abi.add_abi_to_tx_decoder"
 )
 def add_abi_in_tx_decoder(
-    sender: Type[Model], instance: ContractAbi, created: bool, **kwargs
+    sender: type[Model], instance: ContractAbi, created: bool, **kwargs
 ) -> None:
     """
     When a `ContractAbi` is saved, TxDecoder must be updated and caches must be flushed

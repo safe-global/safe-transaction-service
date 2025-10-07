@@ -27,7 +27,7 @@ def just_test_if_mainnet_node() -> str:
                 },
             ).ok:
                 pytest.skip("Cannot connect to mainnet node", allow_module_level=True)
-        except IOError:
+        except OSError:
             pytest.skip(
                 "Problem connecting to the mainnet node", allow_module_level=True
             )

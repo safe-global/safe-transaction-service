@@ -3,7 +3,7 @@ import itertools
 import json
 import logging
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.http import Http404
@@ -62,7 +62,7 @@ from .services.safe_service import SafeCreationInfo
 logger = logging.getLogger(__name__)
 
 
-def get_data_decoded_from_data(data: bytes, address: Optional[ChecksumAddress] = None):
+def get_data_decoded_from_data(data: bytes, address: ChecksumAddress | None = None):
     tx_decoder = get_db_tx_decoder()
     try:
         return tx_decoder.get_data_decoded(data, address=address)
@@ -228,7 +228,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         if safe_tx_hash != attrs["contract_transaction_hash"]:
             raise ValidationError(
                 f"Contract-transaction-hash={to_0x_hex_str(safe_tx_hash)} "
-                f'does not match provided contract-tx-hash={to_0x_hex_str(attrs["contract_transaction_hash"])}'
+                f"does not match provided contract-tx-hash={to_0x_hex_str(attrs['contract_transaction_hash'])}"
             )
 
         # Check there's not duplicated tx with same `nonce` or same `safeTxHash` for the same Safe.
@@ -259,7 +259,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         allowed_senders = set(safe_owners) | delegates
         if attrs["sender"] not in allowed_senders:
             raise ValidationError(
-                f'Sender={attrs["sender"]} is not an owner or delegate. '
+                f"Sender={attrs['sender']} is not an owner or delegate. "
                 f"Current owners={safe_owners}. Delegates={delegates}"
             )
 
@@ -301,7 +301,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         # TODO Make signature mandatory. len(signature_owners) must be >= 1
         if signature_owners and attrs["sender"] not in signature_owners:
             raise ValidationError(
-                f'Signature does not match sender={attrs["sender"]}. '
+                f"Signature does not match sender={attrs['sender']}. "
                 f"Calculated owners={signature_owners}"
             )
 
@@ -364,7 +364,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             multisig_transaction.save(update_fields=["origin", "trusted"])
 
         logger.info(
-            f"MultisigTransaction {"Created" if created else "Updated"}",
+            f"MultisigTransaction {'Created' if created else 'Updated'}",
             extra={
                 "extra_data": multisig_transaction.to_dict(),
             },
@@ -413,7 +413,7 @@ class SafeMultisigTransactionEstimateSerializer(serializers.Serializer):
                     self.validated_data["operation"],
                 )
                 return {"safe_tx_gas": safe_tx_gas}
-            except (IOError, ValueError) as _exc:
+            except (OSError, ValueError) as _exc:
                 exc = _exc
         raise NodeConnectionException(
             f"Node connection error when estimating gas for Safe {safe_address}"
@@ -451,12 +451,12 @@ class DelegateSerializerMixin:
         signer: ChecksumAddress,
     ) -> bool:
         ethereum_client = get_auto_ethereum_client()
-        chain_id = ethereum_client.get_chain_id()
+        current_chain_id = ethereum_client.get_chain_id()
         any_valid_signature_found = False
 
         # Accept a message with the current topt and the previous totp (to prevent replay attacks)
         for previous_totp, chain_id in list(
-            itertools.product((True, False), (chain_id, None))
+            itertools.product((True, False), (current_chain_id, None))
         ):
             message_hash, preimage = (
                 DelegateSignatureHelperV2.calculate_hash_and_preimage(
@@ -498,8 +498,8 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
     )
 
     def validate_expiry_date(
-        self, expiry_date: Optional[datetime.datetime]
-    ) -> Optional[datetime.datetime]:
+        self, expiry_date: datetime.datetime | None
+    ) -> datetime.datetime | None:
         """
         Make sure ``expiry_date`` is not previous to the current timestamp
 
@@ -514,7 +514,7 @@ class DelegateSerializerV2(DelegateSerializerMixin, serializers.Serializer):
 
     def validate(self, attrs):
         super().validate(attrs)
-        safe_address: Optional[ChecksumAddress] = attrs.get("safe")
+        safe_address: ChecksumAddress | None = attrs.get("safe")
         signature = attrs["signature"]
         delegate = attrs["delegate"]
         delegator = attrs["delegator"]
@@ -552,7 +552,7 @@ class DelegateDeleteSerializerV2(DelegateSerializerMixin, serializers.Serializer
 
     def validate(self, attrs):
         super().validate(attrs)
-        safe_address: Optional[ChecksumAddress] = attrs.get("safe")
+        safe_address: ChecksumAddress | None = attrs.get("safe")
         signature = attrs["signature"]
         delegate = self.context["request"].parser_context["kwargs"]["delegate_address"]
         delegator = attrs["delegator"]
@@ -581,7 +581,7 @@ class SafeMultisigTransactionDeleteSerializer(serializers.Serializer):
                 safe_tx_hash=safe_tx_hash
             )
         except MultisigTransaction.DoesNotExist:
-            raise Http404("Multisig transaction not found")
+            raise Http404("Multisig transaction not found") from None
 
         if multisig_tx.executed:
             raise ValidationError("Executed transactions cannot be deleted")
@@ -746,7 +746,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     trusted = serializers.BooleanField()
     signatures = serializers.SerializerMethodField()
 
-    def get_block_number(self, obj: MultisigTransaction) -> Optional[int]:
+    def get_block_number(self, obj: MultisigTransaction) -> int | None:
         if obj.ethereum_tx_id:
             return obj.ethereum_tx.block_id
 
@@ -762,32 +762,32 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
             obj.confirmations, many=True
         ).data
 
-    def get_executor(self, obj: MultisigTransaction) -> Optional[str]:
+    def get_executor(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx_id:
             return obj.ethereum_tx._from
 
-    def get_fee(self, obj: MultisigTransaction) -> Optional[int]:
+    def get_fee(self, obj: MultisigTransaction) -> int | None:
         if obj.ethereum_tx:
             if obj.ethereum_tx.gas_used and obj.ethereum_tx.gas_price:
                 return str(obj.ethereum_tx.gas_used * obj.ethereum_tx.gas_price)
 
-    def get_eth_gas_price(self, obj: MultisigTransaction) -> Optional[str]:
+    def get_eth_gas_price(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx and obj.ethereum_tx.gas_price:
             return str(obj.ethereum_tx.gas_price)
 
-    def get_max_fee_per_gas(self, obj: MultisigTransaction) -> Optional[str]:
+    def get_max_fee_per_gas(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx and obj.ethereum_tx.max_fee_per_gas:
             return str(obj.ethereum_tx.max_fee_per_gas)
 
-    def get_max_priority_fee_per_gas(self, obj: MultisigTransaction) -> Optional[str]:
+    def get_max_priority_fee_per_gas(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx and obj.ethereum_tx.max_priority_fee_per_gas:
             return str(obj.ethereum_tx.max_priority_fee_per_gas)
 
-    def get_gas_used(self, obj: MultisigTransaction) -> Optional[int]:
+    def get_gas_used(self, obj: MultisigTransaction) -> int | None:
         if obj.ethereum_tx and obj.ethereum_tx.gas_used:
             return obj.ethereum_tx.gas_used
 
-    def get_is_successful(self, obj: MultisigTransaction) -> Optional[bool]:
+    def get_is_successful(self, obj: MultisigTransaction) -> bool | None:
         return None if obj.failed is None else not obj.failed
 
     def get_origin(self, obj: MultisigTransaction) -> str:
@@ -1075,7 +1075,7 @@ class EthereumTxWithTransfersResponseSerializer(serializers.Serializer):
         result["from"] = _from
         return result
 
-    def get_block_number(self, obj: EthereumTx) -> Optional[int]:
+    def get_block_number(self, obj: EthereumTx) -> int | None:
         if obj.block_id:
             return obj.block_id
 
@@ -1134,7 +1134,7 @@ class SafeDelegateDeleteSerializer(serializers.Serializer):
         signature: bytes,
         operation_hash: bytes,
         valid_delegators: list[ChecksumAddress],
-    ) -> Optional[ChecksumAddress]:
+    ) -> ChecksumAddress | None:
         """
         Checks signature and returns a valid owner if found, None otherwise
 
@@ -1261,7 +1261,7 @@ class DelegateSerializer(DelegateSignatureCheckerMixin, serializers.Serializer):
     def validate(self, attrs):
         super().validate(attrs)
 
-        safe_address: Optional[ChecksumAddress] = attrs.get("safe")
+        safe_address: ChecksumAddress | None = attrs.get("safe")
         if (
             safe_address
             and not SafeContract.objects.filter(address=safe_address).exists()

@@ -1,7 +1,8 @@
 import datetime
 from collections import OrderedDict
+from collections.abc import Iterator, Sequence
 from logging import getLogger
-from typing import Iterator, NamedTuple, Optional, Sequence
+from typing import NamedTuple
 
 from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
@@ -27,7 +28,7 @@ logger = getLogger(__name__)
 
 class AddressesCache(NamedTuple):
     addresses: set[ChecksumAddress]
-    last_checked: Optional[datetime.datetime]
+    last_checked: datetime.datetime | None
 
 
 class Erc20EventsIndexerProvider:
@@ -67,7 +68,7 @@ class Erc20EventsIndexer(EventsIndexer):
         super().__init__(*args, **kwargs)
 
         self._processed_element_cache = FixedSizeDict(maxlen=40_000)  # Around 3MiB
-        self.addresses_cache: Optional[AddressesCache] = None
+        self.addresses_cache: AddressesCache | None = None
         self.eth_erc20_load_addresses_chunk_size = kwargs.get(
             "eth_erc20_load_addresses_chunk_size", 500_000
         )
@@ -245,7 +246,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
         logger.debug("%s: Retrieving monitored addresses", self.__class__.__name__)
 
-        last_checked: Optional[datetime.datetime]
+        last_checked: datetime.datetime | None
         if self.addresses_cache:
             # Only search for the new addresses
             query = self.database_queryset.filter(
@@ -278,7 +279,7 @@ class Erc20EventsIndexer(EventsIndexer):
 
         500k sounds like a good compromise memory/speed wise
         """
-        created: Optional[datetime.datetime] = None
+        created: datetime.datetime | None = None
         for i, (created, address) in enumerate(
             query.values_list("created", "address")
             .order_by("created")
@@ -308,8 +309,8 @@ class Erc20EventsIndexer(EventsIndexer):
         return self.database_queryset.none()
 
     def get_from_block_number(
-        self, addresses: Optional[set[ChecksumAddress]] = None
-    ) -> Optional[int]:
+        self, addresses: set[ChecksumAddress] | None = None
+    ) -> int | None:
         """
         :param addresses:
         :return: `block_number` to resume indexing from using `IndexingStatus` table

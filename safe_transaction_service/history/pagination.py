@@ -14,7 +14,6 @@ class SmallPagination(LimitOffsetPagination):
 
 
 class ListPagination(LimitOffsetPagination):
-
     def __init__(
         self,
         request: HttpRequest,

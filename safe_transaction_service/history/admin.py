@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from django import forms
 from django.contrib import admin
@@ -310,7 +310,7 @@ class MultisigConfirmationAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     ]
 
     @admin.display()
-    def block_number(self, obj: MultisigConfirmation) -> Optional[int]:
+    def block_number(self, obj: MultisigConfirmation) -> int | None:
         if obj.ethereum_tx:
             return obj.ethereum_tx.block_id
 

@@ -328,16 +328,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # in the reverse order that they were created
         multisig_transaction = MultisigTransactionFactory(safe=safe_address)
         module_transaction = ModuleTransactionFactory(safe=safe_address)
-        internal_tx_in = InternalTxFactory(to=safe_address, value=4)
-        internal_tx_out = InternalTxFactory(
-            _from=safe_address, value=5
-        )  # Should not appear
-        erc20_transfer_in = ERC20TransferFactory(to=safe_address)
+        InternalTxFactory(to=safe_address, value=4)
+        InternalTxFactory(_from=safe_address, value=5)  # Should not appear
+        ERC20TransferFactory(to=safe_address)
         erc20_transfer_out = ERC20TransferFactory(_from=safe_address)
-        another_multisig_transaction = MultisigTransactionFactory(safe=safe_address)
-        another_safe_multisig_transaction = (
-            MultisigTransactionFactory()
-        )  # Should not appear, it's for another Safe
+        MultisigTransactionFactory(safe=safe_address)
+        (MultisigTransactionFactory())  # Should not appear, it's for another Safe
 
         # Should not appear as they are not executed
         for _ in range(2):
@@ -358,7 +354,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             False,  # Multisig transaction
         ]
         for transfer_not_empty, transaction in zip(
-            transfers_not_empty, response.data["results"]
+            transfers_not_empty, response.data["results"], strict=False
         ):
             self.assertEqual(bool(transaction["transfers"]), transfer_not_empty)
             self.assertTrue(transaction["tx_type"])
@@ -386,7 +382,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         # Add token info for that transfer
         token = TokenFactory(address=erc20_transfer_out.address)
-        internal_tx_in = InternalTxFactory(
+        InternalTxFactory(
             to=safe_address, value=8, ethereum_tx=multisig_transaction.ethereum_tx
         )
         response = self.client.get(
@@ -416,7 +412,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             True,  # Multisig transaction
         ]
         for transfer_not_empty, transaction in zip(
-            transfers_not_empty, response.data["results"]
+            transfers_not_empty, response.data["results"], strict=False
         ):
             self.assertEqual(bool(transaction["transfers"]), transfer_not_empty)
 
@@ -942,7 +938,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                     {
                         "name": "owner",
                         "type": "address",
-                        "value": "0x1b9a0DA11a5caCE4e703599" "3Cbb2E4B1B3b164Cf",
+                        "value": "0x1b9a0DA11a5caCE4e7035993Cbb2E4B1B3b164Cf",
                     },
                     {"name": "_threshold", "type": "uint256", "value": "1"},
                 ],
@@ -1944,7 +1940,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn(
-            f'Tx with safe-tx-hash={data["contractTransactionHash"]} '
+            f"Tx with safe-tx-hash={data['contractTransactionHash']} "
             f"for safe={safe.address} was already executed in "
             f"tx-hash={multisig_transaction.ethereum_tx_id}",
             response.data["non_field_errors"],
@@ -2598,7 +2594,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(len(queryset), 2)
         self.assertCountEqual(
-            set(safe_contract_delegate.delegate for safe_contract_delegate in queryset),
+            {safe_contract_delegate.delegate for safe_contract_delegate in queryset},
             {delegate.address},
         )
 
@@ -3744,7 +3740,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             },
         )
 
-        safe_last_status = SafeLastStatusFactory(address=safe_address, nonce=0)
+        SafeLastStatusFactory(address=safe_address, nonce=0)
         # For nonce=0, try to get info from blockchain
         response = self.client.get(
             reverse("v1:history:safe-info", args=(safe_address,)), format="json"
@@ -4093,7 +4089,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
 
         # Create some test data
         ethereum_tx = EthereumTxFactory()
-        multisig_tx = MultisigTransactionFactory(
+        MultisigTransactionFactory(
             safe=safe_address, ethereum_tx=ethereum_tx, trusted=True
         )
 
@@ -4101,7 +4097,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         token = TokenFactory(
             address=Account.create().address, symbol="TEST", decimals=18
         )
-        erc20_transfer = ERC20TransferFactory(
+        ERC20TransferFactory(
             ethereum_tx=ethereum_tx,
             address=token.address,
             _from=Account.create().address,
@@ -4224,7 +4220,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         # Test INCOMING ERC20 from multisig transaction
         ethereum_tx_multisig_in = EthereumTxFactory()
         # Multisigtransaction from external Safe
-        multisig_tx_in = MultisigTransactionFactory(
+        MultisigTransactionFactory(
             safe=self.external_address,
             ethereum_tx=ethereum_tx_multisig_in,
             trusted=True,
@@ -4263,7 +4259,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         module_internal_tx_out = InternalTxFactory(
             ethereum_tx=ethereum_tx_module_out, _from=self.safe_address, value=0
         )
-        module_transaction_out = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_out,
             safe=self.safe_address,
             to=module_contract_address,
@@ -4302,7 +4298,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         module_internal_tx_in = InternalTxFactory(
             ethereum_tx=ethereum_tx_module_in, _from=self.safe_address, value=0
         )
-        module_transaction_in = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_in,
             safe=self.safe_address,
             to=module_contract_address,
@@ -4401,7 +4397,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_tx = MultisigTransactionFactory(
             safe=self.safe_address, ethereum_tx=ethereum_tx, trusted=True
         )
-        multisig_outgoing_erc721_transfer = ERC721TransferFactory(
+        ERC721TransferFactory(
             ethereum_tx=ethereum_tx,
             address=self.nft_token.address,
             _from=self.safe_address,
@@ -4433,7 +4429,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         multisig_tx = MultisigTransactionFactory(
             safe=self.safe_address, ethereum_tx=ethereum_tx, trusted=True
         )
-        multisig_incoming_erc721_transfer = ERC721TransferFactory(
+        ERC721TransferFactory(
             ethereum_tx=ethereum_tx,
             address=self.nft_token.address,
             _from=self.safe_address,
@@ -4468,12 +4464,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         module_internal_tx_out = InternalTxFactory(
             ethereum_tx=ethereum_tx_module_out, _from=self.safe_address, value=0
         )
-        module_transaction_out = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_out,
             safe=self.safe_address,
             to=module_contract_address,
         )
-        module_outgoing_erc721 = ERC721TransferFactory(
+        ERC721TransferFactory(
             ethereum_tx=ethereum_tx_module_out,
             address=self.nft_token.address,
             _from=self.safe_address,
@@ -4507,12 +4503,12 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         module_internal_tx_in = InternalTxFactory(
             ethereum_tx=ethereum_tx_module_in, _from=self.safe_address, value=0
         )
-        module_transaction_in = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_in,
             safe=self.safe_address,
             to=module_contract_address,
         )
-        module_incoming_erc721 = ERC721TransferFactory(
+        ERC721TransferFactory(
             ethereum_tx=ethereum_tx_module_in,
             address=self.nft_token.address,
             _from=self.external_address,
@@ -4542,7 +4538,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["contractAddress"], module_contract_address)
 
         # Test INCOMING ERC721 from standalone transaction
-        standalone_incoming_erc721 = ERC721TransferFactory(
+        ERC721TransferFactory(
             address=self.nft_token.address,
             _from=self.external_address,
             to=self.safe_address,
@@ -4571,7 +4567,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(result["contractAddress"])
 
         # Test OUTGOING ERC721 from standalone transaction
-        standalone_outgoing_erc721 = ERC721TransferFactory(
+        ERC721TransferFactory(
             address=self.nft_token.address,
             _from=self.safe_address,
             to=self.external_address,
@@ -4641,7 +4637,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         ethereum_tx_multisig_in = EthereumTxFactory()
         value = 2000000000000000000
         # Multisigtransaction from external Safe
-        multisig_tx_in = MultisigTransactionFactory(
+        MultisigTransactionFactory(
             safe=self.external_address,
             ethereum_tx=ethereum_tx_multisig_in,
             trusted=True,
@@ -4684,7 +4680,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             to=self.external_address,
             value=3000000000000000000,
         )
-        module_transaction_out = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_out,
             safe=self.safe_address,
             to=module_contract_address,
@@ -4719,7 +4715,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             to=self.safe_address,
             value=4000000000000000000,  # 4 ETH
         )
-        module_transaction_in = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx_in,
             safe=self.safe_address,
             to=module_contract_address,
@@ -4778,14 +4774,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self._setup_export_tests()
 
         ethereum_tx_multisig = EthereumTxFactory()
-        multisig_tx_out = MultisigTransactionFactory(
+        MultisigTransactionFactory(
             safe=self.safe_address,
             ethereum_tx=ethereum_tx_multisig,
             trusted=True,
             to=self.external_address,
             value=0,
         )
-        multisig_internal_tx = InternalTxFactory(
+        InternalTxFactory(
             ethereum_tx=ethereum_tx_multisig,
             _from=self.safe_address,
             to=self.external_address,
@@ -4806,7 +4802,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             to=self.external_address,
             value=0,
         )
-        module_tx = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=internal_tx,
             safe=self.safe_address,
             to=Account.create().address,
@@ -4835,7 +4831,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         ethereum_tx = EthereumTxFactory()
 
         # Create multisig transaction
-        multisig_tx = MultisigTransactionFactory(
+        MultisigTransactionFactory(
             safe=self.safe_address,
             ethereum_tx=ethereum_tx,
             trusted=True,
@@ -4851,7 +4847,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             value=1000000000000000000,  # 1 ETH
             trace_address="0",  # Root trace
         )
-        module_tx = ModuleTransactionFactory(
+        ModuleTransactionFactory(
             internal_tx=module_internal_tx,
             safe=self.safe_address,
             to=self.external_address,
@@ -4867,7 +4863,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
 
         # Create ETH internal transfer
-        internal_tx = InternalTxFactory(
+        InternalTxFactory(
             ethereum_tx=ethereum_tx,
             _from=self.safe_address,
             to=self.external_address,

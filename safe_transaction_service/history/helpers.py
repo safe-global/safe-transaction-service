@@ -1,6 +1,5 @@
 import re
 import time
-from typing import Optional
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
@@ -85,7 +84,7 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
     def calculate_hash_and_preimage(
         cls,
         delegate_address: ChecksumAddress,
-        chain_id: Optional[int],
+        chain_id: int | None,
         previous_totp: bool = False,
     ) -> tuple[Hash32, bytes]:
         """

@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union
+from typing import Any
 from urllib.parse import urlparse
 
 from django import forms
@@ -17,7 +17,7 @@ class HexField(forms.CharField):
         "invalid": _("Enter a valid hexadecimal."),
     }
 
-    def to_python(self, value: Union[str, bytes, memoryview]) -> HexBytes:
+    def to_python(self, value: str | bytes | memoryview) -> HexBytes:
         if isinstance(value, bytes):
             return value
         if isinstance(value, memoryview):
@@ -40,7 +40,7 @@ class HexField(forms.CharField):
         return to_0x_hex_str(bytes(value)) if value else ""
 
 
-def clean_receipt_log(receipt_log: LogReceipt) -> Optional[dict[str, Any]]:
+def clean_receipt_log(receipt_log: LogReceipt) -> dict[str, Any] | None:
     """
     Clean receipt log and make them JSON compliant
 

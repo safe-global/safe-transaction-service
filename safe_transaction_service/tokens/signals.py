@@ -1,5 +1,4 @@
 import logging
-from typing import Type
 
 from django.db.models import Model
 from django.db.models.signals import post_save
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Token, dispatch_uid="tokens.clear_cache")
-def clear_cache(sender: Type[Model], instance: Token, created: bool, **kwargs) -> None:
+def clear_cache(sender: type[Model], instance: Token, created: bool, **kwargs) -> None:
     """
     Clear local Token caches when a token is manually updated
 

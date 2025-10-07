@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from django.core.management.base import BaseCommand
 
@@ -38,7 +38,7 @@ class Command(BaseCommand):
 
     def reindex(
         self,
-        addresses: Optional[Sequence[ChecksumAddress]],
+        addresses: Sequence[ChecksumAddress] | None,
     ) -> None:
         topic = to_0x_hex_str(USER_OPERATION_EVENT_TOPIC)
         aa_processor_service = get_aa_processor_service()

@@ -2,8 +2,9 @@ import logging
 import pickle
 import zlib
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any
 
 from django.conf import settings
 from django.db import connection
@@ -156,6 +157,7 @@ class TransactionService:
             for id_to_search, cached_txs in zip(
                 ids_to_search,
                 self.get_txs_from_cache(safe_address, ids_to_search),
+                strict=False,
             )
             if cached_txs
         }
@@ -287,7 +289,7 @@ class TransactionService:
             if result := ids_with_cached_txs.get(transaction_id):
                 return result
 
-            result: Optional[Union[MultisigTransaction, ModuleTransaction, EthereumTx]]
+            result: MultisigTransaction | ModuleTransaction | EthereumTx | None
             if result := ids_with_multisig_txs.get(transaction_id):
                 for multisig_tx in result:
                     # Populate transfers
@@ -379,11 +381,11 @@ class TransactionService:
     def get_export_transactions(
         self,
         safe_address: ChecksumAddress,
-        execution_date_gte: Optional[datetime] = None,
-        execution_date_lte: Optional[datetime] = None,
+        execution_date_gte: datetime | None = None,
+        execution_date_lte: datetime | None = None,
         limit: int = 1000,
         offset: int = 0,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         Get transactions optimized for CSV export using raw SQL queries
 
@@ -636,7 +638,7 @@ class TransactionService:
             results = []
 
             for row in cursor.fetchall():
-                row_dict = dict(zip(columns, row))
+                row_dict = dict(zip(columns, row, strict=False))
 
                 # Map to serializer field names
                 export_item = {

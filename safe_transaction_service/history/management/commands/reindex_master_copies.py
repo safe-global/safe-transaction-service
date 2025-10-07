@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from django.core.management.base import BaseCommand
 
@@ -44,8 +44,8 @@ class Command(BaseCommand):
     def reindex(
         self,
         from_block_number: int,
-        block_process_limit: Optional[int],
-        addresses: Optional[Sequence[ChecksumAddress]],
+        block_process_limit: int | None,
+        addresses: Sequence[ChecksumAddress] | None,
     ) -> None:
         return IndexServiceProvider().reindex_master_copies(
             from_block_number,

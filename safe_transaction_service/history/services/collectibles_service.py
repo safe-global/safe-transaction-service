@@ -4,7 +4,8 @@ import json
 import logging
 import operator
 import random
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -45,7 +46,7 @@ class MetadataRetrievalExceptionTimeout(CollectiblesServiceException):
     pass
 
 
-def ipfs_to_http(uri: Optional[str]) -> Optional[str]:
+def ipfs_to_http(uri: str | None) -> str | None:
     if uri and uri.startswith("ipfs://"):
         uri = uri.replace("ipfs://ipfs/", "ipfs://")
         return urljoin(
@@ -96,23 +97,23 @@ class CollectibleWithMetadata(Collectible):
     """
 
     metadata: dict[str, Any]
-    name: Optional[str] = dataclasses.field(init=False)
-    description: Optional[str] = dataclasses.field(init=False)
-    image_uri: Optional[str] = dataclasses.field(init=False)
+    name: str | None = dataclasses.field(init=False)
+    description: str | None = dataclasses.field(init=False)
+    image_uri: str | None = dataclasses.field(init=False)
 
-    def get_name(self) -> Optional[str]:
+    def get_name(self) -> str | None:
         if self.metadata:
             for key in ("name",):
                 if key in self.metadata:
                     return self.metadata[key]
 
-    def get_description(self) -> Optional[str]:
+    def get_description(self) -> str | None:
         if self.metadata:
             for key in ("description",):
                 if key in self.metadata:
                     return self.metadata[key]
 
-    def get_metadata_image(self) -> Optional[str]:
+    def get_metadata_image(self) -> str | None:
         if not self.metadata:
             return None
 
@@ -207,7 +208,7 @@ class CollectiblesService:
     def get_metadata_cache_key(self, address: str, token_id: int):
         return f"metadata:{address}:{token_id}"
 
-    def _decode_base64_uri(self, uri: str) -> Optional[dict[str, Any]]:
+    def _decode_base64_uri(self, uri: str) -> dict[str, Any] | None:
         """
         Decodes data:application/json;base64 uris
 
@@ -272,15 +273,15 @@ class CollectiblesService:
                     )
 
                 return response.json()
-        except (IOError, ValueError) as e:
+        except (OSError, ValueError) as e:
             raise MetadataRetrievalExceptionTimeout(uri) from e
 
     def build_collectible(
         self,
-        token_info: Optional[Erc721InfoWithLogo],
+        token_info: Erc721InfoWithLogo | None,
         token_address: ChecksumAddress,
         token_id: int,
-        token_metadata_uri: Optional[str],
+        token_metadata_uri: str | None,
     ) -> Collectible:
         """
         Build a collectible from the input parameters
@@ -331,7 +332,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Collectible], int]:
         """
@@ -374,7 +375,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Collectible], int]:
         """
@@ -409,7 +410,7 @@ class CollectiblesService:
         logger.debug("Got token_uris for %s", addresses_with_token_ids)
         collectibles = []
         for (token_address, token_id), token_uri in zip(
-            addresses_with_token_ids, token_uris
+            addresses_with_token_ids, token_uris, strict=False
         ):
             token_info = self.get_token_info(token_address)
             collectible = self.build_collectible(
@@ -424,7 +425,7 @@ class CollectiblesService:
         safe_address: ChecksumAddress,
         only_trusted: bool = False,
         exclude_spam: bool = False,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[CollectibleWithMetadata], int]:
         """
@@ -457,7 +458,7 @@ class CollectiblesService:
 
         collectibles_not_cached = []
         jobs = []
-        for cached, collectible in zip(cached_results, collectibles):
+        for cached, collectible in zip(cached_results, collectibles, strict=False):
             if cached:
                 collectible_cache = json.loads(cached)
                 collectibles_with_metadata.append(
@@ -479,7 +480,7 @@ class CollectiblesService:
         _ = gevent.joinall(jobs)
         collectibles_with_metadata_not_cached = []
         redis_pipe = self.redis.pipeline()
-        for collectible, job in zip(collectibles_not_cached, jobs):
+        for collectible, job in zip(collectibles_not_cached, jobs, strict=False):
             try:
                 metadata = job.get()
                 if not isinstance(metadata, dict):
@@ -560,7 +561,7 @@ class CollectiblesService:
     @cache_memoize(TOKEN_EXPIRATION, prefix="collectibles-get_token_info")  # 1 hour
     def get_token_info(
         self, token_address: ChecksumAddress
-    ) -> Optional[Erc721InfoWithLogo]:
+    ) -> Erc721InfoWithLogo | None:
         """
         :param token_address:
         :return: Erc721 name and symbol. If it cannot be found, `name=''` and `symbol=''`
@@ -574,7 +575,7 @@ class CollectiblesService:
 
     def get_token_uris(
         self, addresses_with_token_ids: Sequence[tuple[ChecksumAddress, int]]
-    ) -> list[Optional[str]]:
+    ) -> list[str | None]:
         """
         Cache token_uris, as they shouldn't change
 
@@ -592,11 +593,11 @@ class CollectiblesService:
             for address_with_token_id in addresses_with_token_ids
         )
         # Redis does not allow `None`, so empty string is used for uris searched but not found
-        found_uris: dict[tuple[ChecksumAddress, int], Optional[str]] = {}
+        found_uris: dict[tuple[ChecksumAddress, int], str | None] = {}
         not_found_uris: list[tuple[ChecksumAddress, int]] = []
 
         for address_with_token_id, token_uri in zip(
-            addresses_with_token_ids, redis_token_uris
+            addresses_with_token_ids, redis_token_uris, strict=False
         ):
             if token_uri is None:
                 not_found_uris.append(address_with_token_id)
@@ -616,10 +617,11 @@ class CollectiblesService:
                 for address_with_token_id, token_uri in zip(
                     not_found_uris,
                     self.ethereum_client.erc721.get_token_uris(not_found_uris),
+                    strict=False,
                 )
             }
             logger.debug("Got token uris from blockchain")
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             logger.warning(
                 "Problem when getting token uris from blockchain, trying individually",
                 exc_info=True,
@@ -640,7 +642,7 @@ class CollectiblesService:
                         not_found_uri,
                         exc_info=True,
                     )
-                except IOError as exc:
+                except OSError as exc:
                     raise NodeConnectionException from exc
 
         if blockchain_token_uris:

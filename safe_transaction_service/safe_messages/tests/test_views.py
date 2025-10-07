@@ -161,7 +161,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         sub_tests = ["create_eip191", "create_eip712"]
 
         for sub_test, message, safe_message_hash, signature in zip(
-            sub_tests, messages, safe_message_hashes, signatures
+            sub_tests, messages, safe_message_hashes, signatures, strict=False
         ):
             SafeMessage.objects.all().delete()
             get_owners_mock.return_value = []
@@ -229,7 +229,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         {
                             "non_field_errors": [
                                 ErrorDetail(
-                                    string=f'Signature={data["signature"]} for owner={account.address} is not valid',
+                                    string=f"Signature={data['signature']} for owner={account.address} is not valid",
                                     code="invalid",
                                 )
                             ]

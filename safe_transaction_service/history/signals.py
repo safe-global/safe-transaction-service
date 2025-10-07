@@ -1,5 +1,4 @@
 from logging import getLogger
-from typing import Type, Union
 
 from django.conf import settings
 from django.db.models import Model
@@ -44,8 +43,8 @@ logger = getLogger(__name__)
     dispatch_uid="multisig_transaction.bind_confirmation",
 )
 def bind_confirmation(
-    sender: Type[Model],
-    instance: Union[MultisigConfirmation, MultisigTransaction],
+    sender: type[Model],
+    instance: MultisigConfirmation | MultisigTransaction,
     created: bool,
     **kwargs,
 ) -> None:
@@ -100,8 +99,8 @@ def bind_confirmation(
     dispatch_uid="safe_master_copy.clear_version_cache",
 )
 def safe_master_copy_clear_cache(
-    sender: Type[Model],
-    instance: Union[MultisigConfirmation, MultisigTransaction],
+    sender: type[Model],
+    instance: MultisigConfirmation | MultisigTransaction,
     created: bool,
     **kwargs,
 ) -> None:
@@ -118,14 +117,12 @@ def safe_master_copy_clear_cache(
 
 
 def _process_event(
-    sender: Type[Model],
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-        SafeContract,
-    ],
+    sender: type[Model],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | SafeContract,
     created: bool,
     deleted: bool,
 ) -> None:
@@ -140,9 +137,9 @@ def _process_event(
     if settings.DISABLE_SERVICE_EVENTS:
         return None
 
-    assert not (
-        created and deleted
-    ), "An instance cannot be created and deleted at the same time"
+    assert not (created and deleted), (
+        "An instance cannot be created and deleted at the same time"
+    )
 
     logger.debug("Removing cache for object=%s", instance)
     remove_cache_view_by_instance(instance)
@@ -203,14 +200,12 @@ def _process_event(
     dispatch_uid="safe_contract.process_event",
 )
 def process_event(
-    sender: Type[Model],
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-        SafeContract,
-    ],
+    sender: type[Model],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | SafeContract,
     created: bool,
     **kwargs,
 ) -> None:
@@ -223,7 +218,7 @@ def process_event(
     dispatch_uid="multisig_transaction.process_delete_multisig_transaction_event",
 )
 def process_delete_multisig_transaction_event(
-    sender: Type[Model], instance: MultisigTransaction, *args, **kwargs
+    sender: type[Model], instance: MultisigTransaction, *args, **kwargs
 ):
     return _process_event(sender, instance, False, True)
 
@@ -234,7 +229,7 @@ def process_delete_multisig_transaction_event(
     dispatch_uid="safe_last_status.add_to_historical_table",
 )
 def add_to_historical_table(
-    sender: Type[Model],
+    sender: type[Model],
     instance: SafeLastStatus,
     created: bool,
     **kwargs,
@@ -264,7 +259,7 @@ def add_to_historical_table(
     dispatch_uid="safe_contract_delegate.process_save_delegate_user_event",
 )
 def process_save_delegate_user_event(
-    sender: Type[Model],
+    sender: type[Model],
     instance: SafeContractDelegate,
     created: bool,
     **kwargs,
@@ -280,7 +275,7 @@ def process_save_delegate_user_event(
     dispatch_uid="safe_contract_delegate.process_delete_delegate_user_event",
 )
 def process_delete_delegate_user_event(
-    sender: Type[Model], instance: SafeContractDelegate, *args, **kwargs
+    sender: type[Model], instance: SafeContractDelegate, *args, **kwargs
 ):
     payload_event = build_delete_delegate_payload(instance)
     queue_service = get_queue_service()

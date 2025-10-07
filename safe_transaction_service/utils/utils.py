@@ -1,7 +1,8 @@
 import datetime
 import socket
+from collections.abc import Iterable
 from itertools import islice
-from typing import Any, Iterable, Union
+from typing import Any
 
 import gevent.socket
 
@@ -54,7 +55,7 @@ def running_on_gevent() -> bool:
     return socket.socket is gevent.socket.socket
 
 
-def parse_boolean_query_param(value: Union[bool, str, int]) -> bool:
+def parse_boolean_query_param(value: bool | str | int) -> bool:
     return value in (True, "True", "true", "1", 1)
 
 

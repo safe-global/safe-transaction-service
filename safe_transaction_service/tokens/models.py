@@ -358,13 +358,13 @@ class TokenList(models.Model):
                 raise TokenListRetrievalException(
                     f"{response.status_code} when retrieving token list {self.url}"
                 )
-        except IOError:
+        except OSError as exc:
             logger.error("Problem retrieving token list %s", self.url)
             raise TokenListRetrievalException(
                 f"Problem retrieving token list {self.url}"
-            )
-        except JSONDecodeError:
+            ) from exc
+        except JSONDecodeError as exc:
             logger.error("Invalid JSON from token list %s", self.url)
             raise TokenListRetrievalException(
                 f"Invalid JSON from token list {self.url}"
-            )
+            ) from exc

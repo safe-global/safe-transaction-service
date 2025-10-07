@@ -1,5 +1,4 @@
 import contextlib
-from typing import Optional, Set
 
 from django.conf import settings
 
@@ -14,7 +13,7 @@ from .redis import get_redis
 logger = get_task_logger(__name__)
 
 LOCK_TIMEOUT = settings.CELERY_TASK_LOCK_TIMEOUT
-ACTIVE_LOCKS: Set[str] = set()  # Active redis locks, release them when worker stops
+ACTIVE_LOCKS: set[str] = set()  # Active redis locks, release them when worker stops
 WORKER_STOPPED = set()  # Worker status
 
 
@@ -36,7 +35,7 @@ def release_locks_on_worker_shutdown():
         logger.warning("No redis locks to release")
 
 
-def get_task_lock_name(task_name: str, lock_name_suffix: Optional[str] = None) -> str:
+def get_task_lock_name(task_name: str, lock_name_suffix: str | None = None) -> str:
     lock_name = f"locks:tasks:{task_name}"
     if lock_name_suffix:
         lock_name += f":{lock_name_suffix}"
@@ -46,8 +45,8 @@ def get_task_lock_name(task_name: str, lock_name_suffix: Optional[str] = None) -
 @contextlib.contextmanager
 def only_one_running_task(
     task: CeleryTask,
-    lock_name_suffix: Optional[str] = None,
-    lock_timeout: Optional[int] = LOCK_TIMEOUT,
+    lock_name_suffix: str | None = None,
+    lock_timeout: int | None = LOCK_TIMEOUT,
 ):
     """
     Ensures one running task at the same, using `task` name as a unique key

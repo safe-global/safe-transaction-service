@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -49,7 +49,7 @@ class ReorgService:
         ethereum_client: EthereumClient,
         eth_reorg_blocks: int,
         eth_reorg_blocks_batch: int,
-        eth_reorg_rewind_blocks: Optional[int] = 10,
+        eth_reorg_rewind_blocks: int | None = 10,
     ):
         """
         :param ethereum_client:
@@ -85,7 +85,7 @@ class ReorgService:
             SafeEventsIndexerProvider,
         ]
 
-    def check_reorgs(self) -> Optional[int]:
+    def check_reorgs(self) -> int | None:
         """
         :return: Number of the oldest block with reorg detected. `None` if not reorg found
         """
@@ -114,7 +114,7 @@ class ReorgService:
             )
 
             for database_block, blockchain_block in zip(
-                database_blocks, blockchain_blocks
+                database_blocks, blockchain_blocks, strict=False
             ):
                 if not blockchain_block:
                     logger.error(

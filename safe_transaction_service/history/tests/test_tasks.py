@@ -41,9 +41,6 @@ from ..tasks import (
     index_internal_txs_task,
     index_new_proxies_task,
     index_safe_events_task,
-)
-from ..tasks import logger as task_logger
-from ..tasks import (
     process_decoded_internal_txs_for_safe_task,
     process_decoded_internal_txs_task,
     reindex_erc20_erc721_last_hours_task,
@@ -51,6 +48,7 @@ from ..tasks import (
     remove_not_trusted_multisig_txs_task,
     retry_get_metadata_task,
 )
+from ..tasks import logger as task_logger
 from .factories import (
     EthereumBlockFactory,
     InternalTxDecodedFactory,
@@ -149,9 +147,9 @@ class TestTasks(TestCase):
         self.assertFalse(reindex_mastercopies_last_hours_task())
         reindex_master_copies_mock.assert_not_called()
 
-        ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
+        EthereumBlockFactory(timestamp=one_week_ago)
         ethereum_block_1 = EthereumBlockFactory(timestamp=one_day_ago)
-        ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
+        EthereumBlockFactory(timestamp=one_hour_ago)
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
         self.assertTrue(reindex_mastercopies_last_hours_task())
@@ -183,9 +181,9 @@ class TestTasks(TestCase):
         self.assertFalse(reindex_erc20_erc721_last_hours_task())
         reindex_erc20_events_mock.assert_not_called()
 
-        ethereum_block_0 = EthereumBlockFactory(timestamp=one_week_ago)
+        EthereumBlockFactory(timestamp=one_week_ago)
         ethereum_block_1 = EthereumBlockFactory(timestamp=one_day_ago)
-        ethereum_block_2 = EthereumBlockFactory(timestamp=one_hour_ago)
+        EthereumBlockFactory(timestamp=one_hour_ago)
         ethereum_block_3 = EthereumBlockFactory(timestamp=now)
 
         self.assertTrue(reindex_erc20_erc721_last_hours_task())

@@ -33,9 +33,7 @@ class ContractView(RetrieveAPIView):
                         cache_key, response, timeout=60 * 60
                     ),  # Cache 1 hour:
                     r,
-                )[
-                    1
-                ]  # Return r, if not redis has issues
+                )[1]  # Return r, if not redis has issues
             )
         return response
 

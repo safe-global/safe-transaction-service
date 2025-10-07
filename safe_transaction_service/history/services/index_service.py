@@ -1,6 +1,7 @@
 import logging
+from collections import OrderedDict
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection, Optional, OrderedDict, Union
 
 from django.db import transaction
 from django.db.models import Min, Q
@@ -13,9 +14,6 @@ from safe_eth.util.util import to_0x_hex_str
 from ..models import (
     EthereumBlock,
     EthereumTx,
-)
-from ..models import IndexingStatus as IndexingStatusDb
-from ..models import (
     InternalTx,
     InternalTxDecoded,
     ModuleTransaction,
@@ -25,6 +23,7 @@ from ..models import (
     SafeMasterCopy,
     SafeStatus,
 )
+from ..models import IndexingStatus as IndexingStatusDb
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +109,7 @@ class IndexService:
     def get_erc20_721_current_indexing_block_number(self) -> int:
         return IndexingStatusDb.objects.get_erc20_721_indexing_status().block_number
 
-    def get_master_copies_current_indexing_block_number(self) -> Optional[int]:
+    def get_master_copies_current_indexing_block_number(self) -> int | None:
         return SafeMasterCopy.objects.relevant().aggregate(
             min_master_copies_block_number=Min("tx_block_number")
         )["min_master_copies_block_number"]
@@ -133,7 +132,8 @@ class IndexService:
         self, current_block_number: int
     ) -> SpecificIndexingStatus:
         if (
-            master_copies_current_indexing_block_number := self.get_master_copies_current_indexing_block_number()
+            master_copies_current_indexing_block_number
+            := self.get_master_copies_current_indexing_block_number()
         ) is None:
             master_copies_block_number = current_block_number
         else:
@@ -195,7 +195,7 @@ class IndexService:
 
         try:
             current_block_number = self.ethereum_client.current_block_number
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             # If there's an error connecting to the node or invalid response we consider the service as out of sync
             return False
 
@@ -221,14 +221,14 @@ class IndexService:
         blocks = self.ethereum_client.get_blocks(block_hashes)
 
         # Validate blocks from RPC
-        for block_hash, block in zip(block_hashes, blocks):
+        for block_hash, block in zip(block_hashes, blocks, strict=False):
             if not block:
                 raise BlockNotFoundException(
                     f"Block with hash={block_hash} was not found"
                 )
-            assert block_hash == to_0x_hex_str(
-                block["hash"]
-            ), f"{block_hash} does not match retrieved block hash"
+            assert block_hash == to_0x_hex_str(block["hash"]), (
+                f"{block_hash} does not match retrieved block hash"
+            )
 
         current_block_number = self.ethereum_client.current_block_number
         ethereum_blocks_to_insert = [
@@ -248,7 +248,7 @@ class IndexService:
         }
 
     def txs_create_or_update_from_tx_hashes(
-        self, tx_hashes: Collection[Union[str, bytes]]
+        self, tx_hashes: Collection[str | bytes]
     ) -> list["EthereumTx"]:
         """
         :param tx_hashes:
@@ -282,6 +282,7 @@ class IndexService:
         for tx_hash, tx_receipt in zip(
             tx_hashes_not_in_db,
             self.ethereum_client.get_transaction_receipts(tx_hashes_not_in_db),
+            strict=False,
         ):
             tx_receipt = tx_receipt or self.ethereum_client.get_transaction_receipt(
                 tx_hash
@@ -304,7 +305,7 @@ class IndexService:
         fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
         block_hashes = set()
         txs = []
-        for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs):
+        for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs, strict=False):
             tx = tx or self.ethereum_client.get_transaction(
                 tx_hash
             )  # Retry fetching if failed
@@ -334,16 +335,16 @@ class IndexService:
         # Create new transactions or ignore if they already exist
         ethereum_txs_to_insert = [
             EthereumTx.objects.from_tx_dict(tx, tx_receipt)
-            for tx, tx_receipt in zip(txs, tx_receipts)
+            for tx, tx_receipt in zip(txs, tx_receipts, strict=False)
         ]
         number_inserted_txs = EthereumTx.objects.bulk_create_from_generator(
             iter(ethereum_txs_to_insert), ignore_conflicts=True
         )
-        for ethereum_tx, tx in zip(ethereum_txs_to_insert, txs):
+        for ethereum_tx, tx in zip(ethereum_txs_to_insert, txs, strict=False):
             # Trust they were inserted and add them to the txs dictionary
-            assert ethereum_tx.tx_hash == to_0x_hex_str(
-                tx["hash"]
-            ), f"{ethereum_tx.tx_hash} does not match retrieved tx hash"
+            assert ethereum_tx.tx_hash == to_0x_hex_str(tx["hash"]), (
+                f"{ethereum_tx.tx_hash} does not match retrieved tx hash"
+            )
             ethereum_tx.block = blocks[tx["blockHash"]]
             ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash)] = ethereum_tx
             # Block info is required for traces
@@ -553,9 +554,9 @@ class IndexService:
         self,
         indexer: "EthereumIndexer",  # noqa F821
         from_block_number: int,
-        to_block_number: Optional[int] = None,
+        to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: Optional[ChecksumAddress] = None,
+        addresses: ChecksumAddress | None = None,
     ) -> int:
         """
         :param indexer: A new instance must be provider, providing the singleton one can break indexing
@@ -615,9 +616,9 @@ class IndexService:
     def reindex_master_copies(
         self,
         from_block_number: int,
-        to_block_number: Optional[int] = None,
+        to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: Optional[ChecksumAddress] = None,
+        addresses: ChecksumAddress | None = None,
     ) -> int:
         """
         Reindex master copies in parallel with the current running indexer, so service will have no missing txs
@@ -650,9 +651,9 @@ class IndexService:
     def reindex_erc20_events(
         self,
         from_block_number: int,
-        to_block_number: Optional[int] = None,
+        to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: Optional[ChecksumAddress] = None,
+        addresses: ChecksumAddress | None = None,
     ) -> int:
         """
         Reindex erc20/721 events parallel with the current running indexer, so service will have no missing

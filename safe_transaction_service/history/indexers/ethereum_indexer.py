@@ -1,8 +1,9 @@
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from contextlib import contextmanager
 from logging import getLogger
-from typing import Any, Optional, Sequence
+from typing import Any
 
 from django.db.models import Min
 
@@ -39,7 +40,7 @@ class EthereumIndexer(ABC):
         block_process_limit_max: int = 0,
         blocks_to_reindex_again: int = 0,
         updated_blocks_behind: int = 20,
-        query_chunk_size: Optional[int] = 1_000,
+        query_chunk_size: int | None = 1_000,
         block_auto_process_limit: bool = True,
         **kwargs,
     ):
@@ -93,7 +94,7 @@ class EthereumIndexer(ABC):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-        current_block_number: Optional[int] = None,
+        current_block_number: int | None = None,
     ) -> Sequence[Any]:
         """
         Find blockchain relevant elements for the `addresses`
@@ -130,8 +131,8 @@ class EthereumIndexer(ABC):
     def get_block_numbers_for_search(
         self,
         addresses: set[ChecksumAddress],
-        current_block_number: Optional[int] = None,
-    ) -> Optional[tuple[int, int]]:
+        current_block_number: int | None = None,
+    ) -> tuple[int, int] | None:
         """
         :param addresses:
         :param current_block_number: To prevent fetching it again
@@ -181,8 +182,8 @@ class EthereumIndexer(ABC):
         )
 
     def get_from_block_number(
-        self, addresses: Optional[set[ChecksumAddress]] = None
-    ) -> Optional[int]:
+        self, addresses: set[ChecksumAddress] | None = None
+    ) -> int | None:
         """
         :param addresses:
         :return: Minimum block number for all the `addresses` provided. If not provided, return
@@ -255,8 +256,7 @@ class EthereumIndexer(ABC):
         not_updated_addresses = set(
             self.database_queryset.filter(
                 **{
-                    self.database_field
-                    + "__lte": current_block_number
+                    self.database_field + "__lte": current_block_number
                     - self.confirmations
                 }
             ).values_list("address", flat=True)
@@ -378,8 +378,8 @@ class EthereumIndexer(ABC):
     def process_addresses(
         self,
         addresses: set[ChecksumAddress],
-        current_block_number: Optional[int] = None,
-    ) -> tuple[Sequence[Any], Optional[int], int, bool]:
+        current_block_number: int | None = None,
+    ) -> tuple[Sequence[Any], int | None, int, bool]:
         """
         Find and process relevant data for `addresses`, then store and return it
 
@@ -445,9 +445,9 @@ class EthereumIndexer(ABC):
             current_block_number,
         )
         total_number_processed_elements = 0
-        start_block: Optional[int] = None
-        last_block: Optional[int] = None
-        to_block_number: Optional[int] = None
+        start_block: int | None = None
+        last_block: int | None = None
+        to_block_number: int | None = None
 
         # First process addresses that are almost updated (usually close to the `current_block_number`)
         if almost_updated_addresses := self.get_almost_updated_addresses(

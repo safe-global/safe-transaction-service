@@ -46,7 +46,7 @@ class IgnoreVersionSchemaGenerator(SchemaGenerator):
             # estimate common path prefix if none was given. only use it if we encountered more
             # than one view to prevent emission of erroneous and unnecessary fallback names.
             non_trivial_prefix = (
-                len(set([view.__class__ for _, _, _, view in endpoints])) > 1
+                len({view.__class__ for _, _, _, view in endpoints}) > 1
             )
             if non_trivial_prefix:
                 path_prefix = os.path.commonpath([path for path, _, _, _ in endpoints])

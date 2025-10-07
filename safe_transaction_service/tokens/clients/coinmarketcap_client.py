@@ -86,7 +86,7 @@ class CoinMarketCapClient(BaseHTTPClient):
                 .json()
                 .get("data", [])
             )
-        except IOError:
+        except OSError:
             logger.warning("Problem getting tokens from coinmarketcap", exc_info=True)
             return []
 
@@ -109,7 +109,7 @@ class CoinMarketCapClient(BaseHTTPClient):
                             token["name"],
                             token["symbol"],
                             checksummed_address,
-                            urljoin(self.base_logo_uri, f'{token["id"]}.png'),
+                            urljoin(self.base_logo_uri, f"{token['id']}.png"),
                         )
                     )
                 except ValueError:

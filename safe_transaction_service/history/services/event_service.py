@@ -4,7 +4,7 @@ Build event payloads for the queue
 
 import json
 from datetime import timedelta
-from typing import Any, Optional, Type, TypedDict, Union
+from typing import Any, Literal, TypedDict
 
 from django.db.models import Model
 from django.utils import timezone
@@ -32,15 +32,13 @@ from safe_transaction_service.utils.ethereum import get_chain_id
 
 
 def build_event_payload(
-    sender: Type[Model],
-    instance: Union[
-        TokenTransfer,
-        InternalTx,
-        MultisigConfirmation,
-        MultisigTransaction,
-        SafeMessage,
-        SafeMessageConfirmation,
-    ],
+    sender: type[Model],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | SafeMessage
+    | SafeMessageConfirmation,
     deleted: bool = False,
 ) -> list[dict[str, Any]]:
     """
@@ -162,10 +160,8 @@ def build_event_payload(
 
 
 def is_relevant_event(
-    sender: Type[Model],
-    instance: Union[
-        TokenTransfer, InternalTx, MultisigConfirmation, MultisigTransaction
-    ],
+    sender: type[Model],
+    instance: TokenTransfer | InternalTx | MultisigConfirmation | MultisigTransaction,
     created: bool,
     minutes: int = 60,
 ) -> bool:
@@ -218,16 +214,16 @@ def build_reorg_payload(block_number: int) -> ReorgPayload:
 
 class DelegatePayload(TypedDict):
     type: str
-    address: Optional[str]
+    address: str | None
     delegate: str
     delegator: str
     label: str
-    expiryDateSeconds: Optional[int]
+    expiryDateSeconds: int | None
     chainId: str
 
 
 def _build_delegate_payload(
-    event_type: Union[
+    event_type: Literal[
         TransactionServiceEventType.NEW_DELEGATE,
         TransactionServiceEventType.UPDATED_DELEGATE,
         TransactionServiceEventType.DELETED_DELEGATE,

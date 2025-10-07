@@ -18,7 +18,7 @@ class DelegateListFilter(filters.FilterSet):
 
     def filter_queryset(self, queryset):
         # Check at least one value is present
-        for name, value in self.form.cleaned_data.items():
+        for _name, value in self.form.cleaned_data.items():
             if value:
                 return super().filter_queryset(queryset)
         raise ValidationError("At least one query param must be provided")

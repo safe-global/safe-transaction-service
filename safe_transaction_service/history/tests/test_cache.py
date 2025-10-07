@@ -6,7 +6,6 @@ from safe_transaction_service.history.cache import CacheSafeTxsView
 
 
 class TestCacheSafeTxsView(TestCase):
-
     def test_cache_name(self):
         safe_address = "0x5af394e41D387d507DA9a07D33d47Cf9D8Da656d"
         cache_tag = "testtag"

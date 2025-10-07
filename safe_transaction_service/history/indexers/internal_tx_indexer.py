@@ -1,6 +1,6 @@
 from collections import OrderedDict
+from collections.abc import Generator, Iterable, Sequence
 from logging import getLogger
-from typing import Generator, Iterable, Optional, Sequence, Set
 
 from django.conf import settings
 from django.db import transaction
@@ -86,7 +86,7 @@ class InternalTxIndexer(EthereumIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-        current_block_number: Optional[int] = None,
+        current_block_number: int | None = None,
     ) -> OrderedDict[bytes, None | list[BlockTrace]]:
         current_block_number = (
             current_block_number or self.ethereum_client.current_block_number
@@ -139,8 +139,10 @@ class InternalTxIndexer(EthereumIndexer):
                     block_numbers
                 )
             traces: OrderedDict[bytes, list[BlockTrace]] = OrderedDict()
-            relevant_tx_hashes: Set[bytes] = set()
-            for block_number, block_traces in zip(block_numbers, all_blocks_traces):
+            relevant_tx_hashes: set[bytes] = set()
+            for block_number, block_traces in zip(
+                block_numbers, all_blocks_traces, strict=False
+            ):
                 if not block_traces:
                     logger.warning("Empty `trace_block` for block=%d", block_number)
 
@@ -161,7 +163,7 @@ class InternalTxIndexer(EthereumIndexer):
                     del traces[tx_hash]
 
             return traces
-        except IOError as e:
+        except OSError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_block`"
             ) from e
@@ -194,7 +196,7 @@ class InternalTxIndexer(EthereumIndexer):
                     to_block=to_block_number,
                     to_address=list(addresses),
                 )
-        except IOError as e:
+        except OSError as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_filter`"
             ) from e
@@ -234,7 +236,7 @@ class InternalTxIndexer(EthereumIndexer):
 
     def _get_internal_txs_to_decode(
         self, tx_hashes: Sequence[str]
-    ) -> Generator[InternalTxDecoded, None, None]:
+    ) -> Generator[InternalTxDecoded]:
         """
         Retrieve relevant `InternalTxs` and if possible decode them to return `InternalTxsDecoded`
 
@@ -271,7 +273,7 @@ class InternalTxIndexer(EthereumIndexer):
                 yield from self.ethereum_client.tracing.trace_transactions(
                     tx_hash_chunk
                 )
-            except IOError:
+            except OSError:
                 logger.error(
                     "Problem calling `trace_transactions` with %d txs. "
                     "Try lowering ETH_INTERNAL_TRACE_TXS_BATCH_SIZE",
@@ -281,8 +283,8 @@ class InternalTxIndexer(EthereumIndexer):
                 raise
 
     def filter_relevant_txs(
-        self, internal_txs: Generator[InternalTx, None, None]
-    ) -> Generator[InternalTx, None, None]:
+        self, internal_txs: Generator[InternalTx]
+    ) -> Generator[InternalTx]:
         for internal_tx in internal_txs:
             if internal_tx.is_relevant:
                 if internal_tx.is_ether_transfer:
@@ -296,7 +298,7 @@ class InternalTxIndexer(EthereumIndexer):
                 yield internal_tx
 
     def process_elements(
-        self, tx_hash_with_traces: OrderedDict[bytes, Optional[FilterTrace]]
+        self, tx_hash_with_traces: OrderedDict[bytes, FilterTrace | None]
     ) -> list[HexBytes]:
         """
         :param tx_hash_with_traces:
@@ -342,7 +344,7 @@ class InternalTxIndexer(EthereumIndexer):
             tx_hashes_missing_traces, batch_size=self.trace_txs_batch_size
         )
         for tx_hash_missing_traces, missing_traces in zip(
-            tx_hashes_missing_traces, missing_traces_lists
+            tx_hashes_missing_traces, missing_traces_lists, strict=False
         ):
             tx_hash_with_traces[tx_hash_missing_traces] = missing_traces
 
@@ -411,7 +413,7 @@ class InternalTxIndexerWithTraceBlock(InternalTxIndexer):
         addresses: set[ChecksumAddress],
         from_block_number: int,
         to_block_number: int,
-        current_block_number: Optional[int] = None,
+        current_block_number: int | None = None,
     ) -> OrderedDict[bytes, FilterTrace]:
         return self._find_relevant_elements_using_trace_block(
             addresses, from_block_number, to_block_number

@@ -75,5 +75,5 @@ def decode_init_code(
                 "payment",
                 "paymentReceiver",
             ]
-        )
+        ),
     )

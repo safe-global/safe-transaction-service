@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -361,7 +361,7 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
 
         def get_token_uris_fn(
             self, token_addresses_with_token_ids: Sequence[tuple[str, int]]
-        ) -> list[Optional[str]]:
+        ) -> list[str | None]:
             if (
                 "0x9807559b75D5fcCEcf1bbe074FD0890EdDC1bf79",
                 8,
