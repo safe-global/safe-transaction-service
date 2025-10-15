@@ -1204,7 +1204,9 @@ class InternalTx(models.Model):
 
     @property
     def is_relevant(self):
-        return self.can_be_decoded or self.is_ether_transfer or self.contract_address
+        return (
+            self.can_be_decoded or self.is_ether_transfer or self.contract_address
+        ) and self.ethereum_tx.success
 
     @property
     def trace_address_as_list(self) -> list[int]:
