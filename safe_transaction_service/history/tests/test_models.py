@@ -30,6 +30,7 @@ from ..models import (
     InternalTxDecoded,
     MultisigConfirmation,
     MultisigTransaction,
+    SafeContract,
     SafeContractDelegate,
     SafeLastStatus,
     SafeMasterCopy,
@@ -1047,6 +1048,45 @@ class TestSafeStatus(TestCase):
         safe_status_2 = SafeStatusFactory(nonce=2, address=safe_status_5.address)
         self.assertIsNone(safe_status_2.previous())
         self.assertEqual(safe_status_5.previous(), safe_status_2)
+
+
+class TestSafeContract(TestCase):
+    def test_get_minimum_creation_block_number(self):
+        address_1 = Account.create().address
+        address_2 = Account.create().address
+        self.assertIsNone(
+            SafeContract.objects.get_minimum_creation_block_number(
+                [address_1, address_2]
+            )
+        )
+
+        block_number_1 = 15
+        block_number_2 = 16
+        SafeContractFactory(
+            address=address_1, ethereum_tx__block__number=block_number_1
+        )
+        SafeContractFactory(
+            address=address_2, ethereum_tx__block__number=block_number_2
+        )
+
+        self.assertEqual(
+            SafeContract.objects.get_minimum_creation_block_number(
+                [address_1, address_2]
+            ),
+            block_number_1,
+        )
+
+        address_3 = Account.create().address
+        block_number_3 = 8
+        SafeContractFactory(
+            address=address_3, ethereum_tx__block__number=block_number_3
+        )
+        self.assertEqual(
+            SafeContract.objects.get_minimum_creation_block_number(
+                [address_1, address_2, address_3]
+            ),
+            block_number_3,
+        )
 
 
 class TestSafeContractDelegate(TestCase):
