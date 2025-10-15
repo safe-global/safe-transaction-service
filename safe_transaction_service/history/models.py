@@ -18,7 +18,17 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import Case, Count, Exists, Index, JSONField, Max, Q, QuerySet
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    Index,
+    JSONField,
+    Max,
+    Min,
+    Q,
+    QuerySet,
+)
 from django.db.models.expressions import (
     F,
     Func,
@@ -1915,6 +1925,17 @@ class SafeContractManager(models.Manager):
         self, addresses: list[ChecksumAddress] | None = None
     ) -> QuerySet[ChecksumAddress]:
         return self.banned(addresses=addresses).values_list("address", flat=True)
+
+    def get_minimum_creation_block_number(
+        self, addresses: list[ChecksumAddress]
+    ) -> int | None:
+        """
+        :return: minimum creation block for all the addresses provided,
+            `None` if addresses do not exist on the database
+        """
+        return self.filter(address__in=addresses).aggregate(
+            Min("ethereum_tx__block_id")
+        )["ethereum_tx__block_id__min"]
 
 
 class SafeContractQuerySet(models.QuerySet):

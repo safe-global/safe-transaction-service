@@ -164,7 +164,8 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         command = "reindex_master_copies"
 
         with self.assertRaisesMessage(
-            CommandError, "the following arguments are required: --from-block-number"
+            CommandError,
+            "--from-block-number must be set if --addresses are not provided",
         ):
             call_command(command)
 
@@ -222,7 +223,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             buf = StringIO()
             with self.assertLogs(logger_name, level="WARNING") as cm:
                 call_command(command, "--from-block-number=71", stdout=buf)
-            self.assertIn("No addresses to process", cm.output[0])
+                self.assertIn("No addresses to process", cm.output[0])
 
             with self.assertLogs(logger_name, level="INFO") as cm:
                 with mock.patch.object(
@@ -259,6 +260,53 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                         current_block_number_mock.return_value,
                     )
                     self.assertEqual(find_relevant_elements_mock.call_count, 2)
+
+        # Test without --from-block-number
+        with self.settings(ETH_L2_NETWORK=True):
+            IndexServiceProvider.del_singleton()
+            with self.assertLogs(logger_name, level="INFO") as cm:
+                with mock.patch.object(
+                    SafeEventsIndexer, "find_relevant_elements", return_value=[]
+                ) as find_relevant_elements_mock:
+                    safe_l2_master_copy = SafeMasterCopyFactory(l2=True)
+                    buf = StringIO()
+                    from_block_number = 200
+                    block_process_limit = 500
+
+                    safe_address_1 = Account.create().address
+                    safe_address_2 = Account.create().address
+                    # Safes do not exist, so from_block_number cannot be retrieved
+                    with self.assertRaisesMessage(
+                        CommandError,
+                        "Cannot get from-block-number, please set --from-block-number yourself",
+                    ):
+                        call_command(
+                            command,
+                            addresses=[safe_address_1, safe_address_2],
+                            block_process_limit=block_process_limit,
+                            stdout=buf,
+                        )
+
+                    # Create Safes on the database and try again
+                    buf = StringIO()
+                    SafeContractFactory(
+                        address=safe_address_1, ethereum_tx__block__number=4
+                    )
+                    SafeContractFactory(
+                        address=safe_address_2, ethereum_tx__block__number=8
+                    )
+                    call_command(
+                        command,
+                        addresses=[safe_address_1, safe_address_2],
+                        block_process_limit=block_process_limit,
+                        stdout=buf,
+                    )
+                    self.assertIn(
+                        f"Start reindexing addresses ['{safe_address_1}', '{safe_address_2}']",
+                        cm.output[0],
+                    )
+                    self.assertIn("Setting from-block-number to 4", buf.getvalue())
+
         IndexServiceProvider.del_singleton()
 
     @mock.patch.object(
@@ -270,7 +318,8 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         command = "reindex_erc20"
 
         with self.assertRaisesMessage(
-            CommandError, "the following arguments are required: --from-block-number"
+            CommandError,
+            "--from-block-number must be set if --addresses are not provided",
         ):
             call_command(command)
 
