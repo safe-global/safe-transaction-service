@@ -125,10 +125,9 @@ class EventsIndexer(EthereumIndexer):
             ]
 
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                # Check how long the first job takes
-                gevent.joinall(jobs[:1])
+                # Check how long all the jobs take
+                gevent.joinall(jobs, raise_error=True)
 
-            gevent.joinall(jobs)
             return [log_receipt for job in jobs for log_receipt in job.get()]
         else:
             with self.auto_adjust_block_limit(from_block_number, to_block_number):
