@@ -3426,7 +3426,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # Test getting ether incomming transfer
+        # Test getting ether incoming transfer
         transfer_id = (
             "i4f6754000f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590"
         )
