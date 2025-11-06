@@ -208,6 +208,8 @@ class TokenQuerySet(models.QuerySet):
 
 
 class Token(models.Model):
+    """Stores metadata about ERC-20 and ERC-721 tokens handled by the service."""
+
     objects = TokenManager.from_queryset(TokenQuerySet)()
     pool_tokens = PoolTokenManager()
     address = EthereumAddressBinaryField(primary_key=True)
@@ -334,6 +336,8 @@ class TokenListToken(TypedDict):
 
 
 class TokenList(models.Model):
+    """References an external token list that should be ingested into the service."""
+
     url = models.URLField(unique=True)
     description = models.CharField(max_length=200)
 
