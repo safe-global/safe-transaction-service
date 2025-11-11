@@ -26,7 +26,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--from-block-number",
             type=int,
-            help="Which block to start reindexing from. If not provided, minimun creation block for provided addresses will be used, 0 otherwise",
+            help="Which block to start reindexing from. If not provided, minimum creation block for provided addresses will be used, 0 otherwise",
             required=False,
         )
 
