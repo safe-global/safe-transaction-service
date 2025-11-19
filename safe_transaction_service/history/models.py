@@ -206,6 +206,8 @@ class IndexingStatusManager(models.Manager):
 
 
 class IndexingStatus(models.Model):
+    """Records the latest processed block for each indexing pipeline."""
+
     objects = IndexingStatusManager()
     indexing_type = models.PositiveSmallIntegerField(
         primary_key=True,
@@ -318,6 +320,8 @@ class EthereumBlockQuerySet(models.QuerySet):
 
 
 class EthereumBlock(models.Model):
+    """Ethereum block header and metadata used for indexing and reorg handling."""
+
     objects = EthereumBlockManager.from_queryset(EthereumBlockQuerySet)()
     number = models.PositiveIntegerField(primary_key=True)
     gas_limit = Uint256Field()
@@ -411,6 +415,8 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
 
 
 class EthereumTx(TimeStampedModel):
+    """Ethereum transaction enriched with receipt data and indexer bookkeeping."""
+
     objects = EthereumTxManager()
     block = models.ForeignKey(
         EthereumBlock,
@@ -571,6 +577,8 @@ class TokenTransferManager(BulkCreateSignalMixin, models.Manager):
 
 
 class TokenTransfer(models.Model):
+    """Abstract base model normalizing token transfer events across standards."""
+
     objects = TokenTransferManager.from_queryset(TokenTransferQuerySet)()
     ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(db_index=True)
@@ -651,6 +659,8 @@ class ERC20TransferQuerySet(TokenTransferQuerySet):
 
 
 class ERC20Transfer(TokenTransfer):
+    """ERC-20 `Transfer` event captured for a tracked Safe-related transaction."""
+
     objects = TokenTransferManager.from_queryset(ERC20TransferQuerySet)()
     value = Uint256Field()
 
@@ -767,6 +777,8 @@ class ERC721TransferQuerySet(TokenTransferQuerySet):
 
 
 class ERC721Transfer(TokenTransfer):
+    """ERC-721 `Transfer` event including the non-fungible token identifier."""
+
     objects = ERC721TransferManager.from_queryset(ERC721TransferQuerySet)()
     token_id = Uint256Field()
 
@@ -1111,6 +1123,11 @@ class InternalTxQuerySet(models.QuerySet):
 
 
 class InternalTx(models.Model):
+    """
+    Represents an internal call trace produced while executing a Safe-related transaction.
+    For L2 networks, as traces are not available, they are "simulated" from events.
+    """
+
     objects = InternalTxManager.from_queryset(InternalTxQuerySet)()
     ethereum_tx = models.ForeignKey(
         EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
@@ -1326,6 +1343,8 @@ class InternalTxDecodedQuerySet(models.QuerySet):
 
 
 class InternalTxDecoded(models.Model):
+    """Holds decoded Safe contract call data for an internal transaction."""
+
     objects = InternalTxDecodedManager.from_queryset(InternalTxDecodedQuerySet)()
     internal_tx = models.OneToOneField(
         InternalTx,
@@ -1586,6 +1605,8 @@ class MultisigTransactionQuerySet(models.QuerySet):
 
 
 class MultisigTransaction(TimeStampedModel):
+    """Safe multisig transaction with execution status, gas parameters, and signatures."""
+
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Keccak256Field(primary_key=True)
     safe = EthereumAddressBinaryField(db_index=True)
@@ -1707,6 +1728,8 @@ class ModuleTransactionManager(models.Manager):
 
 
 class ModuleTransaction(TimeStampedModel):
+    """Safe module execution derived from an internal transaction trace."""
+
     objects = ModuleTransactionManager()
     internal_tx = models.OneToOneField(
         InternalTx, on_delete=models.CASCADE, related_name="module_tx", primary_key=True
@@ -1781,6 +1804,8 @@ class MultisigConfirmationQuerySet(models.QuerySet):
 
 
 class MultisigConfirmation(TimeStampedModel):
+    """Owner confirmation or signature associated with a multisig transaction."""
+
     objects = MultisigConfirmationManager.from_queryset(MultisigConfirmationQuerySet)()
     ethereum_tx = models.ForeignKey(
         EthereumTx,
@@ -1847,6 +1872,8 @@ class MultisigConfirmation(TimeStampedModel):
 
 
 class MonitoredAddress(models.Model):
+    """Abstract base storing indexing progress for addresses we continuously monitor."""
+
     address = EthereumAddressBinaryField(primary_key=True)
     initial_block_number = models.IntegerField(
         default=0
@@ -1867,6 +1894,8 @@ class MonitoredAddress(models.Model):
 
 
 class ProxyFactory(MonitoredAddress):
+    """Safe Proxy Factory contract whose emitted events are tracked for deployments."""
+
     class Meta:
         verbose_name_plural = "Proxy factories"
         ordering = ["tx_block_number"]
@@ -1912,6 +1941,8 @@ class SafeMasterCopyQueryset(models.QuerySet):
 
 
 class SafeMasterCopy(MonitoredAddress):
+    """Indexed Safe master copy contract including version and deployment metadata."""
+
     objects = SafeMasterCopyManager.from_queryset(SafeMasterCopyQueryset)()
     version = models.CharField(max_length=20, validators=[validate_version])
     deployer = models.CharField(max_length=50, default="Safe")
@@ -1955,6 +1986,8 @@ class SafeContractQuerySet(models.QuerySet):
 
 
 class SafeContract(models.Model):
+    """Represents a deployed Safe smart contract and its creation transaction."""
+
     objects = SafeContractManager.from_queryset(SafeContractQuerySet)()
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     address = EthereumAddressBinaryField(primary_key=True)
@@ -2135,6 +2168,8 @@ class SafeRelevantTransaction(models.Model):
 
 
 class SafeStatusBase(models.Model):
+    """Shared Safe state representation produced after processing an internal transaction."""
+
     internal_tx = models.OneToOneField(
         InternalTx,
         on_delete=models.CASCADE,
@@ -2255,6 +2290,8 @@ class SafeLastStatusManager(models.Manager):
 
 
 class SafeLastStatus(SafeStatusBase):
+    """Latest known Safe state cached for quick access."""
+
     objects = SafeLastStatusManager()
 
     class Meta:
@@ -2330,6 +2367,8 @@ class SafeStatusQuerySet(models.QuerySet):
 
 
 class SafeStatus(SafeStatusBase):
+    """Historical Safe state snapshot for each processed configuration change."""
+
     objects = SafeStatusManager.from_queryset(SafeStatusQuerySet)()
     internal_tx = models.OneToOneField(
         InternalTx,

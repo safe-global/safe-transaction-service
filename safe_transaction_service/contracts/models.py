@@ -149,7 +149,9 @@ class ContractQuerySet(models.QuerySet):
         return self.trusted_for_delegate_call().values_list("address", flat=True)
 
 
-class Contract(models.Model):  # Known contract addresses by the service
+class Contract(models.Model):
+    """Tracks known contract addresses with optional ABI and branding metadata."""
+
     objects = ContractManager.from_queryset(ContractQuerySet)()
     address = EthereumAddressBinaryField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default="")
