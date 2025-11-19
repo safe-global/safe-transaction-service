@@ -500,7 +500,7 @@ class CollectiblesService:
             except MetadataRetrievalExceptionTimeout:
                 metadata = {}
                 logger.warning(
-                    "Timeout retrieving metadata on token-uri=%s for token-address=%s, retrying asyncronous ",
+                    "Timeout retrieving metadata on token-uri=%s for token-address=%s, retrying asynchronous ",
                     collectible.uri,
                     collectible.address,
                 )
