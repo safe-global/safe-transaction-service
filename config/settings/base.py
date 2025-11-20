@@ -529,6 +529,9 @@ LOGGING = {
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+REDIS_TIMEOUT_SECONDS = env("REDIS_TIMEOUT_SECONDS", default=5)
+REDIS_CONNECTION_TIMEOUT_SECONDS = env("REDIS_CONNECTION_TIMEOUT_SECONDS", default=5)
+REDIS_POOL_MAX_CONNECTIONS = env("REDIS_POOL_MAX_CONNECTIONS", default=300)
 
 # Ethereum RPC
 # ------------------------------------------------------------------------------
