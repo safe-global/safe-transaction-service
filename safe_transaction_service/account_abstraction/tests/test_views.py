@@ -24,12 +24,14 @@ from safe_eth.eth.tests.mocks.mock_bundler import (
     user_operation_mock,
 )
 from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
-from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.proxy_factory import ProxyFactoryV141
 from safe_eth.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.account_abstraction.SafeOperation import (
+    SafeOperation as SafeOperationClass,
+)
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from .. import models
