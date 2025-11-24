@@ -1533,9 +1533,8 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         safe_tx_hash = safe_tx.safe_tx_hash
-        safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]

@@ -8,6 +8,7 @@ from safe_eth.eth.contracts import (
     get_proxy_factory_V1_1_1_contract,
     get_proxy_factory_V1_3_0_contract,
     get_proxy_factory_V1_4_1_contract,
+    get_proxy_factory_V1_5_0_contract,
 )
 from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
@@ -50,6 +51,9 @@ class ProxyFactoryIndexer(EventsIndexer):
         proxy_factory_v_1_4_1_contract = get_proxy_factory_V1_4_1_contract(
             self.ethereum_client.w3
         )
+        proxy_factory_v_1_5_0_contract = get_proxy_factory_V1_5_0_contract(
+            self.ethereum_client.w3
+        )
         return [
             # event ProxyCreation(Proxy proxy)
             proxy_factory_v1_1_1_contract.events.ProxyCreation(),
@@ -57,6 +61,8 @@ class ProxyFactoryIndexer(EventsIndexer):
             proxy_factory_v1_3_0_contract.events.ProxyCreation(),
             # event ProxyCreation(SafeProxy indexed proxy, address singleton)
             proxy_factory_v_1_4_1_contract.events.ProxyCreation(),
+            # event ProxyCreation(SafeProxy indexed proxy, address singleton)
+            proxy_factory_v_1_5_0_contract.events.ProxyCreation(),
         ]
 
     @property
