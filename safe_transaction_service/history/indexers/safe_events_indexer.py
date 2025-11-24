@@ -14,9 +14,11 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.contracts import (
     get_proxy_factory_V1_3_0_contract,
     get_proxy_factory_V1_4_1_contract,
+    get_proxy_factory_V1_5_0_contract,
     get_safe_V1_1_1_contract,
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
+    get_safe_V1_5_0_contract,
 )
 from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
@@ -54,7 +56,7 @@ class SafeEventsIndexerProvider:
 
 class SafeEventsIndexer(EventsIndexer):
     """
-    Indexes Gnosis Safe L2 events
+    Indexes Safe L2 events
     """
 
     IGNORE_ADDRESSES_ON_LOG_FILTER = (
@@ -220,14 +222,22 @@ class SafeEventsIndexer(EventsIndexer):
         # ProxyFactory
         event ProxyCreation(GnosisSafeProxy indexed proxy, address singleton);
 
+        Safe v1.5.0 L2 Events
+        ------------------
+        TODO: Add Safe v1.5.0 events
+
         :return: List of supported `ContractEvent`
         """
+        proxy_factory_v1_5_0_contract = get_proxy_factory_V1_5_0_contract(
+            self.ethereum_client.w3
+        )
         proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(
             self.ethereum_client.w3
         )
         proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(
             self.ethereum_client.w3
         )
+        safe_l2_v1_5_0_contract = get_safe_V1_5_0_contract(self.ethereum_client.w3)
         safe_l2_v1_4_1_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
         safe_l2_v1_3_0_contract = get_safe_V1_3_0_contract(self.ethereum_client.w3)
         safe_v1_1_1_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
@@ -269,9 +279,12 @@ class SafeEventsIndexer(EventsIndexer):
                 # Changed Guard
                 safe_l2_v1_4_1_contract.events.ChangedGuard(),
                 safe_l2_v1_3_0_contract.events.ChangedGuard(),
+                # Change Module Guard
+                safe_l2_v1_5_0_contract.events.ChangedModuleGuard(),
                 # Change Master Copy
                 safe_v1_1_1_contract.events.ChangedMasterCopy(),
                 # Proxy creation
+                proxy_factory_v1_5_0_contract.events.ProxyCreation(),
                 proxy_factory_v1_4_1_contract.events.ProxyCreation(),
                 proxy_factory_v1_3_0_contract.events.ProxyCreation(),
             )

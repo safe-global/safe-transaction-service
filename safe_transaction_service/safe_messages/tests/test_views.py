@@ -337,6 +337,11 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             self.deploy_test_safe_v1_4_1
         )
 
+    def test_safe_messages_create_using_1271_signature_v1_5_0_view(self):
+        return self._test_safe_messages_create_using_1271_signature_view(
+            self.deploy_test_safe_v1_5_0
+        )
+
     @mock.patch(
         "safe_transaction_service.safe_messages.serializers.get_safe_owners",
         return_value=[],
