@@ -471,7 +471,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             f"Setting up {ethereum_network.name} default safe addresses from chain with unknown init block",
             buf.getvalue(),
         )
-        self.assertEqual(SafeMasterCopy.objects.count(), 2)
+        self.assertEqual(SafeMasterCopy.objects.count(), 3)
         self.assertEqual(ProxyFactory.objects.count(), 1)
 
     @mock.patch.object(EthereumClient, "get_network", autospec=True)

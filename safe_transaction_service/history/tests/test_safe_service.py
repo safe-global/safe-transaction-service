@@ -188,11 +188,11 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_info.threshold, safe.retrieve_threshold())
         self.assertEqual(
             safe_info.fallback_handler,
-            self.compatibility_fallback_handler_V1_4_1.address,
+            self.compatibility_fallback_handler_V1_5_0.address,
         )
         self.assertEqual(safe_info.guard, NULL_ADDRESS)
         self.assertEqual(
-            safe_info.version, "1.4.1"
+            safe_info.version, "1.5.0"
         )  # No SafeMasterCopy, so fallback to blockchain version
         self.assertIsNone(
             SafeMasterCopy.objects.get_version_for_address(safe_info.master_copy)

@@ -38,6 +38,7 @@ from safe_transaction_service.tokens.serializers import TokenInfoResponseSeriali
 from safe_transaction_service.utils.serializers import (
     EpochDateTimeField,
     get_safe_owners,
+    select_preimage_by_safe_version,
 )
 
 from ..contracts.models import Contract
@@ -119,8 +120,11 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         )
 
         safe_owners = get_safe_owners(safe_address)
+        safe_hash_preimage = select_preimage_by_safe_version(
+            safe.get_version(), safe_tx.safe_tx_hash_preimage
+        )
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
+            signature, safe_tx_hash, safe_hash_preimage=safe_hash_preimage
         )
         signature_owners = []
         ethereum_client = get_auto_ethereum_client()
@@ -266,8 +270,14 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         signature_owners = []
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
+        # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
+        safe_signature_hash = (
+            safe_tx_hash
+            if safe.get_version() == "1.5.0"
+            else safe.safe_tx_hash_preimage
+        )
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
+            signature, safe_tx_hash, safe_hash_preimage=safe_signature_hash
         )
         attrs["parsed_signatures"] = parsed_signatures
         # If there's at least one signature, transaction is trusted (until signatures are mandatory)
