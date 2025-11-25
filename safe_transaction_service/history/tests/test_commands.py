@@ -487,7 +487,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         ethereum_client_get_network_mock.return_value = ethereum_network
         buf = StringIO()
         call_command(command, stdout=buf)
-        self.assertEqual(SafeMasterCopy.objects.count(), 2)
+        self.assertEqual(SafeMasterCopy.objects.count(), 3)
         self.assertEqual(ProxyFactory.objects.count(), 1)
         master_copy = SafeMasterCopy.objects.first()
         self.assertEqual(master_copy.initial_block_number, 0)
