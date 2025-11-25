@@ -12,10 +12,14 @@ from rest_framework.exceptions import ValidationError
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.eth.utils import fast_keccak
+from safe_eth.safe.safe import Safe
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.utils.serializers import get_safe_owners
+from safe_transaction_service.utils.serializers import (
+    get_safe_owners,
+    select_preimage_by_safe_version,
+)
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
 from .utils import (
@@ -129,6 +133,13 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         # Preimage is encoded for the Safe. But if an EIP-1271 signature is used, owner's Safe will be called
         # the preimage will be encoded again for the owner Safe. That's what needs to be signed by the user
         # So original data -> EIP-191 or EIP-712 encoded -> Safe encoded data -> Owner encoded data
+        # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
+        # not the Safe-encoded hash
+        ethereum_client = get_auto_ethereum_client()
+        safe = Safe(safe_address, ethereum_client)
+        safe_message_preimage = select_preimage_by_safe_version(
+            safe.get_version(), safe_message_preimage
+        )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )
@@ -174,6 +185,10 @@ class SafeMessageSignatureSerializer(
         )
         assert to_0x_hex_str(safe_message_hash) == safe_message.message_hash
 
+        safe = Safe(safe_address, get_auto_ethereum_client())
+        safe_message_preimage = select_preimage_by_safe_version(
+            safe.get_version(), safe_message_preimage
+        )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )

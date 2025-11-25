@@ -28,7 +28,11 @@ from safe_transaction_service.safe_messages.tests.factories import (
 )
 from safe_transaction_service.utils.utils import datetime_to_str
 
-from ..utils import encode_eip191_message, encode_eip712_message
+from ..utils import (
+    encode_eip191_message,
+    encode_eip712_message,
+    select_hash_by_safe_version,
+)
 from .mocks import get_eip712_payload_mock
 
 logger = logging.getLogger(__name__)
@@ -294,9 +298,12 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         safe_message_hash, safe_message_preimage = safe.get_message_hash_and_preimage(
             fast_keccak(message_encoded)
         )
-        safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(
-            safe_message_preimage
+
+        data = select_hash_by_safe_version(
+            safe.get_version(), safe_message_hash, safe_message_preimage
         )
+
+        safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(data)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
