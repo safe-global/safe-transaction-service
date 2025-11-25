@@ -74,6 +74,9 @@ from .mocks.deployments_mock import (
     mainnet_deployments_1_4_1,
     mainnet_deployments_1_4_1_multisend,
     mainnet_deployments_1_4_1_safe,
+    mainnet_deployments_1_5_0,
+    mainnet_deployments_1_5_0_multisend,
+    mainnet_deployments_1_5_0_safe,
 )
 from .mocks.mocks_safe_creation import (
     create_cpk_test_data,
@@ -294,6 +297,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json(), [mainnet_deployments_1_4_1])
 
+        response = self.client.get(url + "?version=1.5.0", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), [mainnet_deployments_1_5_0])
+
         response = self.client.get(
             url + "?version=1.4.1&contract=MultiSend", format="json"
         )
@@ -301,6 +308,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.json(),
             [{"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_multisend]}],
+        )
+
+        response = self.client.get(
+            url + "?version=1.5.0&contract=MultiSend", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [{"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_multisend]}],
         )
 
         response = self.client.get(url + "?contract=Safe", format="json")
@@ -313,6 +329,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 {"version": "1.2.0", "contracts": []},
                 {"version": "1.3.0", "contracts": []},
                 {"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_safe]},
+                {"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_safe]},
             ],
         )
 
