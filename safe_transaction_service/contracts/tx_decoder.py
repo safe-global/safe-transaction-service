@@ -575,11 +575,7 @@ class DbTxDecoder(TxDecoder):
         abi = self.get_contract_abi(address)
         if not abi:
             return False
-        return bool(
-            dict(fn_abi, name="fallback")
-            for fn_abi in abi
-            if fn_abi.get("type") == "fallback"
-        )
+        return any(fn_abi.get("type") == "fallback" for fn_abi in abi)
 
     @cachedmethod(
         cache=operator.attrgetter(

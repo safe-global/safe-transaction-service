@@ -83,7 +83,7 @@ class BalanceService:
         self.redis = redis
         self.cache_token_info = TTLCache(
             maxsize=4096, ttl=60 * 30
-        )  # 2 hours of caching
+        )  # 30 minutes of caching
 
     def _filter_tokens(
         self,

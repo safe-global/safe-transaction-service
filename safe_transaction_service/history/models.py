@@ -750,7 +750,7 @@ class ERC721TransferManager(TokenTransferManager):
             owned_by_query += " AND Q1.address NOT IN (SELECT address FROM tokens_token WHERE spam = TRUE)"
 
         # Sort by token `address`, then by `token_id` to be stable
-        owned_by_query += " ORDER BY Q1.address, Q2.token_id"
+        owned_by_query += " ORDER BY Q1.address, Q1.token_id"
 
         with connection.cursor() as cursor:
             hex_address = HexBytes(address)
