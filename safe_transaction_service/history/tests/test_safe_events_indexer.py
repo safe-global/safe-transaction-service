@@ -4,7 +4,11 @@ from eth_account import Account
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
-from safe_eth.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
+from safe_eth.eth.contracts import (
+    get_safe_V1_3_0_contract,
+    get_safe_V1_4_1_contract,
+    get_safe_V1_5_0_contract,
+)
 from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
@@ -34,7 +38,7 @@ from .mocks.mocks_safe_events_indexer import (
 )
 
 
-class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
+class TestSafeEventsIndexerV1_5_0(SafeTestCaseMixin, TestCase):
     def setUp(self) -> None:
         self.safe_events_indexer = SafeEventsIndexer(
             self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
@@ -46,20 +50,20 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
 
     @property
     def safe_contract_version(self) -> str:
-        return "1.4.1"
+        return "1.5.0"
 
     @property
     def safe_contract(self):
         """
         :return: Last Safe Contract available
         """
-        return self.safe_contract_V1_4_1
+        return self.safe_contract_V1_5_0
 
     def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
         """
         :return: Last Safe Contract available
         """
-        return get_safe_V1_4_1_contract(w3, address=address)
+        return get_safe_V1_5_0_contract(w3, address=address)
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
@@ -1007,7 +1011,26 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
 
 
-class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
+class TestSafeEventsIndexerV1_4_1(TestSafeEventsIndexerV1_5_0):
+    @property
+    def safe_contract_version(self) -> str:
+        return "1.4.1"
+
+    @property
+    def safe_contract(self):
+        """
+        :return: Last Safe Contract available
+        """
+        return self.safe_contract_V1_4_1
+
+    def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
+        """
+        :return: Last Safe Contract available
+        """
+        return get_safe_V1_4_1_contract(w3, address=address)
+
+
+class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_5_0):
     @property
     def safe_contract_version(self) -> str:
         return "1.3.0"
