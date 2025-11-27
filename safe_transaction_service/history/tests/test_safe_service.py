@@ -190,7 +190,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             safe_info.fallback_handler,
             self.compatibility_fallback_handler_V1_5_0.address,
         )
-        self.assertEqual(safe_info.guard, NULL_ADDRESS)
+        self.assertEqual(safe_info.transaction_guard, NULL_ADDRESS)
         self.assertEqual(
             safe_info.version, "1.5.0"
         )  # No SafeMasterCopy, so fallback to blockchain version
@@ -215,7 +215,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
 
         safe_info = self.safe_service.get_safe_info_from_db(safe_address)
         self.assertIsInstance(safe_info, SafeInfo)
-        self.assertEqual(safe_info.guard, NULL_ADDRESS)
+        self.assertEqual(safe_info.transaction_guard, NULL_ADDRESS)
         self.assertEqual(safe_info.version, None)
 
     def test_decode_creation_data(self):
