@@ -2358,13 +2358,13 @@ class SafeLastStatus(SafeStatusBase):
             self.address,
             self.fallback_handler,
             self.transaction_guard or NULL_ADDRESS,
-            self.module_guard or NULL_ADDRESS,
             self.master_copy,
             self.enabled_modules,
             self.nonce,
             self.owners,
             self.threshold,
             master_copy_version,
+            self.module_guard or NULL_ADDRESS,
         )
 
 

@@ -218,7 +218,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         safe_info = self.safe_service.get_safe_info_from_db(safe_address)
         self.assertIsInstance(safe_info, SafeInfo)
         self.assertEqual(safe_info.transaction_guard, NULL_ADDRESS)
-        self.assertEqual(safe_info.module_guard, None)
+        self.assertEqual(safe_info.module_guard, NULL_ADDRESS)
         self.assertEqual(safe_info.version, None)
 
     def test_decode_creation_data(self):
