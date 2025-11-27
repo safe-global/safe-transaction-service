@@ -590,6 +590,19 @@ class SafeTxProcessor(TxProcessor):
                 else:
                     logger.debug("[%s] Unsetting Guard", contract_address)
                 self.store_new_safe_status(safe_last_status, internal_tx, ["guard"])
+            elif function_name == "setModuleGuard":
+                safe_last_status.module_guard = (
+                    arguments["moduleGuard"]
+                    if arguments["moduleGuard"] != NULL_ADDRESS
+                    else None
+                )
+                if safe_last_status.module_guard:
+                    logger.debug("[%s] Setting ModuleGuard", contract_address)
+                else:
+                    logger.debug("[%s] Unsetting ModuleGuard", contract_address)
+                self.store_new_safe_status(
+                    safe_last_status, internal_tx, ["module_guard"]
+                )
             elif function_name == "enableModule":
                 logger.debug("[%s] Enabling Module", contract_address)
                 safe_last_status.enabled_modules.append(arguments["module"])
