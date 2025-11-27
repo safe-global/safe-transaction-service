@@ -599,14 +599,16 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "nonce",
         "master_copy",
         "fallback_handler",
-        "guard",
+        "transaction_guard",
+        "module_guard",
         "enabled_modules",
     )
     list_filter = (
         "threshold",
         "master_copy",
         "fallback_handler",
-        "guard",
+        "transaction_guard",
+        "module_guard",
         SafeStatusModulesListFilter,
     )
     list_select_related = ("internal_tx__ethereum_tx", "internal_tx__decoded_tx")
