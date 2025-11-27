@@ -447,6 +447,8 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx_decoded.function_name = "setFallbackHandler"
         elif event_name == "ChangedGuard":
             internal_tx_decoded.function_name = "setGuard"
+        elif event_name == "ChangedModuleGuard":
+            internal_tx_decoded.function_name = "setModuleGuard"
         elif (
             event_name == "SafeReceived" and not self.eth_zksync_compatible_network
         ):  # Received ether
