@@ -431,7 +431,8 @@ class SafeLastStatusFactory(DjangoModelFactory):
     nonce = factory.Sequence(lambda n: n)
     master_copy = factory.LazyFunction(lambda: Account.create().address)
     fallback_handler = NULL_ADDRESS
-    guard = NULL_ADDRESS
+    transaction_guard = NULL_ADDRESS
+    module_guard = NULL_ADDRESS
     enabled_modules = []
 
 

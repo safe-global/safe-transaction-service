@@ -210,12 +210,15 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         with self.assertRaises(CannotGetSafeInfoFromDB):
             self.safe_service.get_safe_info_from_db(safe_address)
 
-        safe_last_status = SafeLastStatusFactory(address=safe_address, guard=None)
-        self.assertIsNone(safe_last_status.guard)
+        safe_last_status = SafeLastStatusFactory(
+            address=safe_address, transaction_guard=None, module_guard=None
+        )
+        self.assertIsNone(safe_last_status.transaction_guard)
 
         safe_info = self.safe_service.get_safe_info_from_db(safe_address)
         self.assertIsInstance(safe_info, SafeInfo)
         self.assertEqual(safe_info.transaction_guard, NULL_ADDRESS)
+        self.assertEqual(safe_info.module_guard, None)
         self.assertEqual(safe_info.version, None)
 
     def test_decode_creation_data(self):

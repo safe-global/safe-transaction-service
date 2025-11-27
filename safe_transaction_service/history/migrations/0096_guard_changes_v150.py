@@ -21,4 +21,14 @@ class Migration(migrations.Migration):
             name='module_guard',
             field=safe_eth.eth.django.models.EthereumAddressBinaryField(default=None, null=True),
         ),
+        migrations.RenameField(
+            model_name='safelaststatus',
+            old_name='guard',
+            new_name='transaction_guard',
+        ),
+        migrations.RenameField(
+            model_name='safestatus',
+            old_name='guard',
+            new_name='transaction_guard',
+        ),
     ]
