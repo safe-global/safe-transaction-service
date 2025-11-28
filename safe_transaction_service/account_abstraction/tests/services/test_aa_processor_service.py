@@ -16,8 +16,12 @@ from safe_eth.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
     user_operation_receipt_mock,
-    user_operation_v07_hash,
-    user_operation_v07_mock,
+)
+from safe_eth.eth.tests.mocks.mock_bundler import (
+    user_operation_v07_hash_1 as user_operation_v07_hash,
+)
+from safe_eth.eth.tests.mocks.mock_bundler import (
+    user_operation_v07_mock_1 as user_operation_v07_mock,
 )
 from safe_eth.util.util import to_0x_hex_str
 

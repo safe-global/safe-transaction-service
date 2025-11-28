@@ -4,7 +4,11 @@ from eth_account import Account
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS, SENTINEL_ADDRESS
-from safe_eth.eth.contracts import get_safe_V1_3_0_contract, get_safe_V1_4_1_contract
+from safe_eth.eth.contracts import (
+    get_safe_V1_3_0_contract,
+    get_safe_V1_4_1_contract,
+    get_safe_V1_5_0_contract,
+)
 from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
@@ -34,7 +38,9 @@ from .mocks.mocks_safe_events_indexer import (
 )
 
 
-class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
+class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
+    __test__ = False
+
     def setUp(self) -> None:
         self.safe_events_indexer = SafeEventsIndexer(
             self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
@@ -45,21 +51,17 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         SafeEventsIndexerProvider.del_singleton()
 
     @property
-    def safe_contract_version(self) -> str:
-        return "1.4.1"
-
-    @property
     def safe_contract(self):
         """
         :return: Last Safe Contract available
         """
-        return self.safe_contract_V1_4_1
+        return self.safe_contract_V1_5_0
 
     def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
         """
         :return: Last Safe Contract available
         """
-        return get_safe_V1_4_1_contract(w3, address=address)
+        return get_safe_V1_5_0_contract(w3, address=address)
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
@@ -252,7 +254,7 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_status.threshold, threshold)
         self.assertEqual(safe_status.nonce, 0)
         self.assertEqual(safe_status.enabled_modules, [])
-        self.assertIsNone(safe_status.guard)
+        self.assertIsNone(safe_status.transaction_guard)
         self.assertEqual(MultisigTransaction.objects.count(), 0)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
@@ -586,8 +588,8 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(MultisigConfirmation.objects.count(), 9)
 
-        # Set guard (nonce: 7) ---------------------------------
-        guard_address = self.deploy_example_guard()
+        # Set transaction guard (nonce: 7) ---------------------------------
+        guard_address = self.deploy_example_transaction_guard()
         data = HexBytes(
             self.safe_contract.functions.setGuard(guard_address).build_transaction(
                 {"gas": 1, "gasPrice": 1}
@@ -611,13 +613,13 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 8)
-        self.assertEqual(safe_status.guard, guard_address)
+        self.assertEqual(safe_status.transaction_guard, guard_address)
 
         safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 8)
-        self.assertIsNone(safe_status.guard)
+        self.assertIsNone(safe_status.transaction_guard)
 
         # Check master copy did not change during the execution
         self.assertEqual(
@@ -1007,7 +1009,170 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
 
 
-class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerV1_4_1):
+class TestSafeEventsIndexerV1_5_0(TestSafeEventsIndexerBase):
+    __test__ = True
+
+    @property
+    def safe_contract_version(self) -> str:
+        return "1.5.0"
+
+    def test_safe_module_guard_events(self):
+        owner_account_1 = self.ethereum_test_account
+        owners = [owner_account_1.address]
+        threshold = 1
+        to = NULL_ADDRESS
+        data = b""
+        fallback_handler = NULL_ADDRESS
+        payment_token = NULL_ADDRESS
+        payment = 0
+        payment_receiver = NULL_ADDRESS
+        initializer = HexBytes(
+            self.safe_contract.functions.setup(
+                owners,
+                threshold,
+                to,
+                data,
+                fallback_handler,
+                payment_token,
+                payment,
+                payment_receiver,
+            ).build_transaction({"gas": 1, "gasPrice": 1})["data"]
+        )
+        initial_block_number = self.ethereum_client.current_block_number + 1
+        safe_l2_master_copy = SafeMasterCopyFactory(
+            address=self.safe_contract.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version=self.safe_contract_version,
+            l2=True,
+        )
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract.address,
+            initializer=initializer,
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        safe = Safe(safe_address, self.ethereum_client)
+        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+
+        # Set transaction guard (nonce: 0) ---------------------------------
+        module_guard_address = self.deploy_example_module_guard()
+        data = HexBytes(
+            self.safe_contract.functions.setModuleGuard(
+                module_guard_address
+            ).build_transaction({"gas": 1, "gasPrice": 1})["data"]
+        )
+
+        multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
+        multisig_tx.sign(owner_account_1.key)
+        multisig_tx.execute(self.ethereum_test_account.key)
+        # Process events: SafeMultiSigTransaction, ChangedModuleGuard, ExecutionSuccess
+        # 2 blocks will be processed due to the module guard deployment
+        self.assertEqual(self.safe_events_indexer.start(), (3, 2))
+        txs_decoded_queryset = InternalTxDecoded.objects.pending_for_safes()
+        self.safe_tx_processor.process_decoded_transactions(
+            list(txs_decoded_queryset.all())
+        )
+        # Add one SafeStatus from setup, one increasing the nonce, and one changing the module guard
+        self.assertEqual(SafeStatus.objects.count(), 3)
+        safe_status = SafeStatus.objects.last_for_address(
+            safe_address
+        )  # Processed execTransaction and setModuleGuard
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
+        self.assertEqual(safe_status.nonce, 1)
+        self.assertEqual(safe_status.module_guard, module_guard_address)
+
+        safe_status = SafeStatus.objects.sorted_by_mined()[
+            1
+        ]  # Just processed execTransaction
+        self.assertEqual(safe_status.nonce, 1)
+        self.assertIsNone(safe_status.module_guard)
+
+        # Check master copy did not change during the execution
+        self.assertEqual(
+            SafeStatus.objects.last_for_address(safe_address).master_copy,
+            self.safe_contract.address,
+        )
+
+        self.assertEqual(
+            MultisigTransaction.objects.order_by("-nonce")[0].safe_tx_hash,
+            to_0x_hex_str(multisig_tx.safe_tx_hash),
+        )
+        expected_multisig_transactions = 1
+        expected_multisig_confirmations = 1
+        expected_internal_txs = 5
+        expected_internal_txs_decoded = 3
+        expected_safe_statuses = 3
+        self.assertEqual(
+            MultisigTransaction.objects.count(), expected_multisig_transactions
+        )
+        self.assertEqual(
+            MultisigConfirmation.objects.count(), expected_multisig_confirmations
+        )
+        self.assertEqual(InternalTx.objects.count(), expected_internal_txs)
+        self.assertEqual(
+            InternalTxDecoded.objects.count(), expected_internal_txs_decoded
+        )
+
+        # Event processing should be idempotent, so no changes must be done if everything is processed again
+        safe_l2_master_copy.tx_block_number = initial_block_number
+        safe_l2_master_copy.save(update_fields=["tx_block_number"])
+        blocks_processed = (
+            self.safe_events_indexer.ethereum_client.current_block_number
+            - initial_block_number
+            + 1
+        )
+        self.assertEqual(
+            self.safe_events_indexer.start(), (0, blocks_processed)
+        )  # No new events are processed when reindexing
+        InternalTxDecoded.objects.update(processed=False)
+        SafeStatus.objects.all().delete()
+        self.assertEqual(
+            len(
+                self.safe_tx_processor.process_decoded_transactions(
+                    list(txs_decoded_queryset.all())
+                )
+            ),
+            expected_internal_txs_decoded,
+        )
+        self.assertEqual(
+            MultisigTransaction.objects.count(), expected_multisig_transactions
+        )
+        self.assertEqual(
+            MultisigConfirmation.objects.count(), expected_multisig_confirmations
+        )
+        self.assertEqual(SafeStatus.objects.count(), expected_safe_statuses)
+        self.assertEqual(InternalTx.objects.count(), expected_internal_txs)
+        self.assertEqual(
+            InternalTxDecoded.objects.count(), expected_internal_txs_decoded
+        )
+
+
+class TestSafeEventsIndexerV1_4_1(TestSafeEventsIndexerBase):
+    __test__ = True
+
+    @property
+    def safe_contract_version(self) -> str:
+        return "1.4.1"
+
+    @property
+    def safe_contract(self):
+        """
+        :return: Last Safe Contract available
+        """
+        return self.safe_contract_V1_4_1
+
+    def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
+        """
+        :return: Last Safe Contract available
+        """
+        return get_safe_V1_4_1_contract(w3, address=address)
+
+
+class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerBase):
+    __test__ = True
+
     @property
     def safe_contract_version(self) -> str:
         return "1.3.0"
