@@ -397,7 +397,7 @@ class IndexService:
         logger.info("Mark all internal txs decoded as not processed")
         queryset = InternalTxDecoded.objects.all()
         if addresses:
-            queryset = queryset.filter(internal_tx___from__in=addresses)
+            queryset = queryset.filter(safe_address__in=addresses)
         queryset.update(processed=False)
 
     @transaction.atomic
@@ -427,7 +427,7 @@ class IndexService:
             address,
         )
         InternalTxDecoded.objects.filter(
-            internal_tx___from=address, internal_tx__timestamp__gte=timestamp
+            safe_address=address, internal_tx__timestamp__gte=timestamp
         ).update(processed=False)
         logger.info("[%s] Removing SafeStatus newer than timestamp", address)
         SafeStatus.objects.filter(

@@ -375,6 +375,7 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx=internal_tx,
             function_name="",
             arguments=args,
+            safe_address=internal_tx._from,  # Denormalized for efficient querying
         )
 
         if event_name == "ProxyCreation" or event_name == "SafeSetup":
@@ -525,10 +526,10 @@ class SafeEventsIndexer(EventsIndexer):
             len(safe_creation_events_addresses),
         )
         indexed_addresses = InternalTxDecoded.objects.filter(
-            internal_tx___from__in=safe_creation_events_addresses,
+            safe_address__in=safe_creation_events_addresses,
             function_name="setup",
             internal_tx__contract_address=None,
-        ).values_list("internal_tx___from", flat=True)
+        ).values_list("safe_address", flat=True)
         # Ignoring the already indexed contracts
         addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
         logger.debug(
@@ -606,6 +607,7 @@ class SafeEventsIndexer(EventsIndexer):
                         internal_tx=internal_tx,
                         function_name="setup",
                         arguments=setup_args,
+                        safe_address=internal_tx._from,  # Denormalized for efficient querying
                     )
                     internal_txs.append(internal_tx)
                     internal_txs_decoded.append(internal_tx_decoded)

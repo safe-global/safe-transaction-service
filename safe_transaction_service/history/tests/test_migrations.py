@@ -5,8 +5,10 @@ from django.utils import timezone
 
 from django_test_migrations.migrator import Migrator
 from eth_account import Account
+from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_keccak, fast_keccak_text
 from safe_eth.util.util import to_0x_hex_str
+from web3.constants import ADDRESS_ZERO
 
 
 class TestMigrations(TestCase):
@@ -364,3 +366,126 @@ class TestMigrations(TestCase):
         self.assertEqual(
             safe_contract.created, safe_contract.ethereum_tx.block.timestamp
         )
+
+    def _build_internal_tx_decoded_test_data(self, old_state):
+        """
+        Helper to create test data for InternalTxDecoded migration tests.
+        Returns (safe_address_1, safe_address_2, internal_tx_1, internal_tx_2)
+        """
+
+        EthereumBlock = old_state.apps.get_model("history", "EthereumBlock")
+        EthereumTx = old_state.apps.get_model("history", "EthereumTx")
+        InternalTx = old_state.apps.get_model("history", "InternalTx")
+        InternalTxDecoded = old_state.apps.get_model("history", "InternalTxDecoded")
+
+        ethereum_tx = self.build_ethereum_tx(EthereumBlock, EthereumTx)
+
+        # Create test data - InternalTx with _from addresses
+        safe_address_1 = Account.create().address
+        safe_address_2 = Account.create().address
+
+        internal_tx_1 = InternalTx.objects.create(
+            ethereum_tx=ethereum_tx,
+            timestamp=timezone.now(),
+            block_number=1,
+            _from=safe_address_1,
+            gas=21000,
+            to=Account.create().address,
+            value=0,
+            gas_used=21000,
+            tx_type=0,
+            call_type=1,  # DELEGATE_CALL
+            trace_address="0",
+        )
+
+        internal_tx_2 = InternalTx.objects.create(
+            ethereum_tx=ethereum_tx,
+            timestamp=timezone.now(),
+            block_number=1,
+            _from=safe_address_2,
+            gas=21000,
+            to=Account.create().address,
+            value=0,
+            gas_used=21000,
+            tx_type=0,
+            call_type=1,  # DELEGATE_CALL
+            trace_address="1",
+        )
+
+        # Create NOT processed record (will be updated in migration 0096)
+        InternalTxDecoded.objects.create(
+            internal_tx=internal_tx_1,
+            function_name="setup",
+            arguments={},
+            processed=False,
+        )
+
+        # Create processed record (will be updated in migration 0097)
+        InternalTxDecoded.objects.create(
+            internal_tx=internal_tx_2,
+            function_name="execTransaction",
+            arguments={},
+            processed=True,
+        )
+
+        return safe_address_1, safe_address_2, internal_tx_1, internal_tx_2
+
+    def test_migration_0096_internaltxdecoded_safe_address(self):
+        """
+        Test that safe_address is populated only for NOT processed records.
+        Processed records should still have ADDRESS_ZERO after this migration.
+        """
+        old_state = self.migrator.apply_initial_migration(
+            ("history", "0095_remove_internaltx_history_internaltx_value_idx_and_more"),
+        )
+
+        (
+            safe_address_1,
+            safe_address_2,
+            internal_tx_1,
+            internal_tx_2,
+        ) = self._build_internal_tx_decoded_test_data(old_state)
+
+        # Apply migration 0096
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0096_internaltxdecoded_safe_address"),
+        )
+
+        InternalTxDecodedNew = new_state.apps.get_model("history", "InternalTxDecoded")
+
+        decoded_1 = InternalTxDecodedNew.objects.get(internal_tx_id=internal_tx_1.id)
+        decoded_2 = InternalTxDecodedNew.objects.get(internal_tx_id=internal_tx_2.id)
+
+        # NOT processed record should have safe_address populated
+        self.assertEqual(HexBytes(decoded_1.safe_address), HexBytes(safe_address_1))
+        # Processed record should still have placeholder (ADDRESS_ZERO)
+        self.assertEqual(HexBytes(decoded_2.safe_address), HexBytes(ADDRESS_ZERO))
+
+    def test_migration_0097_internaltxdecoded_safe_address_processed(self):
+        """
+        Test that safe_address is populated for processed records in migration 0097.
+        """
+        old_state = self.migrator.apply_initial_migration(
+            ("history", "0095_remove_internaltx_history_internaltx_value_idx_and_more"),
+        )
+
+        (
+            safe_address_1,
+            safe_address_2,
+            internal_tx_1,
+            internal_tx_2,
+        ) = self._build_internal_tx_decoded_test_data(old_state)
+
+        # Apply migration 0097 (which depends on 0096)
+        new_state = self.migrator.apply_tested_migration(
+            ("history", "0097_internaltxdecoded_safe_address_processed"),
+        )
+
+        InternalTxDecodedNew = new_state.apps.get_model("history", "InternalTxDecoded")
+
+        decoded_1 = InternalTxDecodedNew.objects.get(internal_tx_id=internal_tx_1.id)
+        decoded_2 = InternalTxDecodedNew.objects.get(internal_tx_id=internal_tx_2.id)
+
+        # Both records should now have safe_address populated
+        self.assertEqual(HexBytes(decoded_1.safe_address), HexBytes(safe_address_1))
+        self.assertEqual(HexBytes(decoded_2.safe_address), HexBytes(safe_address_2))
