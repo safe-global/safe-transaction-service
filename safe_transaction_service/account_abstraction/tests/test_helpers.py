@@ -1,13 +1,35 @@
 from django.test import TestCase
 
 from hexbytes import HexBytes
+from safe_eth.eth.contracts import get_proxy_factory_contract
 from safe_eth.eth.tests.mocks.mock_bundler import user_operation_mock
+from safe_eth.safe.proxy_factory import ProxyFactoryV141
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..helpers import DecodedInitCode, decode_init_code
 
 
 class TestAccountAbstractionHelpers(SafeTestCaseMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        # Deploy v1.4.1 proxy factory if not already deployed
+        if "proxy_factory_V1_4_1" not in cls.contract_addresses:
+            cls.contract_addresses["proxy_factory_V1_4_1"] = (
+                ProxyFactoryV141.deploy_contract(
+                    cls.ethereum_client, cls.ethereum_test_account
+                ).contract_address
+            )
+
+        # Create proxy factory v1.4.1 instance
+        cls.proxy_factory_contract_V1_4_1 = get_proxy_factory_contract(
+            cls.w3, cls.contract_addresses["proxy_factory_V1_4_1"]
+        )
+        cls.proxy_factory_V1_4_1 = ProxyFactoryV141(
+            cls.proxy_factory_contract_V1_4_1.address, cls.ethereum_client
+        )
+
     def test_decode_init_code(self):
         with self.assertRaises(ValueError):
             decode_init_code(b"", self.ethereum_client)

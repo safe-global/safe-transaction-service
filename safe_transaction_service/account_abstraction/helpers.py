@@ -2,9 +2,10 @@ import dataclasses
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient
-from safe_eth.eth.contracts import get_safe_V1_5_0_contract
+from safe_eth.eth.contracts import get_safe_V1_4_1_contract, get_safe_V1_5_0_contract
 from safe_eth.eth.utils import fast_to_checksum_address
-from safe_eth.safe.proxy_factory import ProxyFactoryV150
+from safe_eth.safe.proxy_factory import ProxyFactoryV141, ProxyFactoryV150
+from safe_eth.safe.safe_deployments import default_safe_deployments
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -41,12 +42,15 @@ def decode_init_code(
         - The ``ProxyFactory`` then deploys a ``Safe Proxy`` and calls ``setup`` with all the configuration parameters.
     :param ethereum_client:
     :return: Decoded Init Code dataclass
-    :raises ValueError: Problem decoding
+    :raises ValueError: Problem decoding or unknown factory address
     """
     factory_address = fast_to_checksum_address(init_code[:20])
     factory_data = init_code[20:]
-    proxy_factory = ProxyFactoryV150(factory_address, ethereum_client)
-    safe_contract = get_safe_V1_5_0_contract(ethereum_client.w3)
+
+    proxy_factory, safe_contract = get_contract_instances(
+        factory_address, ethereum_client
+    )
+
     _, data = proxy_factory.contract.decode_function_input(factory_data)
     initializer = data.pop("initializer")
     _, safe_deployment_data = safe_contract.decode_function_input(initializer)
@@ -76,4 +80,36 @@ def decode_init_code(
                 "paymentReceiver",
             ]
         ),
+    )
+
+
+def get_contract_instances(
+    factory_address: ChecksumAddress, ethereum_client: EthereumClient
+):
+    """
+    Find the appropriate proxy factory and safe contract instances for a given factory address.
+
+    :param factory_address: The address of the ProxyFactory contract
+    :param ethereum_client: Ethereum client instance
+    :return: Tuple of (proxy_factory, safe_contract)
+    :raises ValueError: If factory address is not found in safe_deployments
+    """
+    # Map versions to their factory and contract classes
+    version_configs = {
+        "1.4.1": (ProxyFactoryV141, get_safe_V1_4_1_contract),
+        "1.5.0": (ProxyFactoryV150, get_safe_V1_5_0_contract),
+    }
+
+    # Find which version the factory address belongs to
+    for version, (factory_class, safe_contract_fn) in version_configs.items():
+        factory_addresses = default_safe_deployments[version]["SafeProxyFactory"]
+        if any(factory_address == address for address in factory_addresses):
+            return (
+                factory_class(factory_address, ethereum_client),
+                safe_contract_fn(ethereum_client.w3),
+            )
+
+    raise ValueError(
+        f"Unknown ProxyFactory address: {factory_address}. "
+        "Factory address is not registered in safe_deployments."
     )
