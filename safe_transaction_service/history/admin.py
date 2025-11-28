@@ -207,6 +207,7 @@ class InternalTxAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "-ethereum_tx__transaction_index",
         "-pk",
     ]
+    readonly_fields = ("timestamp", "block_number")
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
         "==block_number",
@@ -256,6 +257,7 @@ class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "-internal_tx_id",
     ]
     raw_id_fields = ("internal_tx",)
+    readonly_fields = ("safe_address",)
     search_fields = [
         "==function_name",
         "==internal_tx__to",
