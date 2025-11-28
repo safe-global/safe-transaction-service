@@ -22,8 +22,8 @@ if [ ${RUN_MIGRATIONS:-0} = 1 ]; then
   SECONDS=0
   (
     echo "Starting migration 0097 for denormalization" &&
-    DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput
-    echo "Migration 0097 for denormalization was successful in ${SECONDS} seconds" &&
+    DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput &&
+    echo "Migration 0097 for denormalization was successful in ${SECONDS} seconds"
   ) &
 
   echo "==> $(date +%H:%M:%S) ==> Setting up service... "
