@@ -1293,7 +1293,8 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :param safe_address:
         :return: Queryset of all InternalTxDecoded for one Safe with `safe_address`
         """
-        return self.filter(internal_tx___from=safe_address)
+        # Use denormalized safe_address field for efficient filtering (avoids JOIN)
+        return self.filter(safe_address=safe_address)
 
     def processed(self):
         return self.filter(processed=True)
@@ -1304,6 +1305,10 @@ class InternalTxDecodedQuerySet(models.QuerySet):
     def order_by_processing_queue(self):
         """
         :return: Transactions ordered to be processed. First `setup` and then older transactions
+
+        Note: We avoid joining with EthereumTx (which was used for transaction_index ordering)
+        because that 3-table JOIN is very expensive. Using internal_tx_id is sufficient for
+        deterministic ordering within a block since it's auto-incrementing.
         """
         return self.alias(
             is_setup=Case(
@@ -1313,7 +1318,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         ).order_by(
             "is_setup",
             "internal_tx__block_number",
-            "internal_tx__ethereum_tx__transaction_index",
+            # "internal_tx__ethereum_tx__transaction_index", # Removed to avoid 3-table JOIN
             "internal_tx_id",
         )
 
@@ -1331,15 +1336,15 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         """
         :return: Pending `InternalTxDecoded` sorted by block number and then transaction index inside the block
         """
-        return self.pending_for_safes().filter(internal_tx___from=safe_address)
+        # Use denormalized safe_address field for efficient filtering (uses partial index)
+        return self.pending_for_safes().filter(safe_address=safe_address)
 
     def safes_pending_to_be_processed(self) -> QuerySet[ChecksumAddress]:
         """
         :return: List of Safe addresses that have transactions pending to be processed
         """
-        return (
-            self.not_processed().values_list("internal_tx___from", flat=True).distinct()
-        )
+        # Use denormalized safe_address field (avoids JOIN with internal_tx)
+        return self.not_processed().values_list("safe_address", flat=True).distinct()
 
 
 class InternalTxDecoded(models.Model):
@@ -1355,6 +1360,9 @@ class InternalTxDecoded(models.Model):
     function_name = models.CharField(max_length=256, db_index=True)
     arguments = JSONField()
     processed = models.BooleanField(default=False)
+    # Denormalized from internal_tx._from for efficient querying
+    # Allows partial index on (safe_address) WHERE processed=False
+    safe_address = EthereumAddressBinaryField()
 
     class Meta:
         indexes = [
@@ -1367,6 +1375,13 @@ class InternalTxDecoded(models.Model):
                 name="history_decoded_not_proc_idx",
                 fields=["internal_tx_id"],
                 condition=Q(processed=True),  # For finding out of order transactions
+            ),
+            # Optimized partial index for pending_for_safe query
+            # Filters by safe_address for unprocessed records only
+            models.Index(
+                name="history_decoded_safe_pending_idx",
+                fields=["safe_address"],
+                condition=Q(processed=False),
             ),
         ]
         verbose_name_plural = "Internal txs decoded"

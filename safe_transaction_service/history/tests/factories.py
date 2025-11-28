@@ -202,6 +202,11 @@ class InternalTxDecodedFactory(DjangoModelFactory):
     processed = False
 
     @factory.lazy_attribute
+    def safe_address(self):
+        """Denormalized field from internal_tx._from for efficient querying"""
+        return self.internal_tx._from
+
+    @factory.lazy_attribute
     def arguments(self) -> dict[str, Any]:
         if self.function_name == "addOwnerWithThreshold":
             return {"owner": self.owner, "_threshold": self.threshold}

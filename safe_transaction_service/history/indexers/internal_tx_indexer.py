@@ -255,6 +255,7 @@ class InternalTxIndexer(EthereumIndexer):
                     function_name=function_name,
                     arguments=arguments,
                     processed=False,
+                    safe_address=internal_tx._from,  # Denormalized for efficient querying
                 )
             except CannotDecode as exc:
                 logger.debug("Cannot decode %s: %s", to_0x_hex_str(data), exc)
