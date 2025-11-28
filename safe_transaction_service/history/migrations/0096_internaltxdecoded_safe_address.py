@@ -1,4 +1,9 @@
-# Generated manually for pending_for_safe query optimization
+"""
+Generated manually for pending_for_safe query optimization
+
+Only update not processed records, as processed should not be critical and will make migration way faster
+"""
+
 
 from django.db import migrations, models
 from django.db.models import Q
@@ -9,7 +14,7 @@ from web3.constants import ADDRESS_ZERO
 PLACEHOLDER_ADDRESS = ADDRESS_ZERO
 
 
-def populate_safe_address(apps, schema_editor):
+def populate_safe_address_not_processed(apps, schema_editor):
     """
     Populate safe_address from internal_tx._from for existing records.
     Uses a single efficient UPDATE query.
@@ -22,6 +27,7 @@ def populate_safe_address(apps, schema_editor):
             SET safe_address = history_internaltx._from
             FROM history_internaltx 
             WHERE history_internaltxdecoded.internal_tx_id = history_internaltx.id
+            AND history_internaltxdecoded.processed = FALSE
             AND history_internaltxdecoded.safe_address = %s
         """, [bytes.fromhex(PLACEHOLDER_ADDRESS[2:])])
 
@@ -42,7 +48,7 @@ class Migration(migrations.Migration):
         ),
         # Populate existing records from internal_tx._from
         migrations.RunPython(
-            populate_safe_address,
+            populate_safe_address_not_processed,
             reverse_code=migrations.RunPython.noop,
         ),
         # Add optimized partial index for pending_for_safe query
@@ -52,7 +58,7 @@ class Migration(migrations.Migration):
             index=models.Index(
                 condition=Q(processed=False),
                 fields=["safe_address"],
-                name="history_decoded_safe_pending_idx",
+                name="history_decoded_pending_idx",
             ),
         ),
     ]

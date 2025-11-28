@@ -1375,7 +1375,7 @@ class InternalTxDecoded(models.Model):
             # Optimized partial index for pending_for_safe query
             # Filters by safe_address for unprocessed records only
             models.Index(
-                name="history_decoded_safe_pending_idx",
+                name="history_decoded_pending_idx",
                 fields=["safe_address"],
                 condition=Q(processed=False),
             ),
