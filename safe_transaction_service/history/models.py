@@ -1305,10 +1305,6 @@ class InternalTxDecodedQuerySet(models.QuerySet):
     def order_by_processing_queue(self):
         """
         :return: Transactions ordered to be processed. First `setup` and then older transactions
-
-        Note: We avoid joining with EthereumTx (which was used for transaction_index ordering)
-        because that 3-table JOIN is very expensive. Using internal_tx_id is sufficient for
-        deterministic ordering within a block since it's auto-incrementing.
         """
         return self.alias(
             is_setup=Case(
@@ -1318,7 +1314,7 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         ).order_by(
             "is_setup",
             "internal_tx__block_number",
-            # "internal_tx__ethereum_tx__transaction_index", # Removed to avoid 3-table JOIN
+            "internal_tx__ethereum_tx__transaction_index",
             "internal_tx_id",
         )
 

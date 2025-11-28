@@ -6,7 +6,7 @@ from safe_eth.eth.django.models import EthereumAddressBinaryField
 from web3.constants import ADDRESS_ZERO
 
 # Placeholder address used as default before backfill
-PLACEHOLDER_ADDRESS = bytes.fromhex(ADDRESS_ZERO[2:])
+PLACEHOLDER_ADDRESS = ADDRESS_ZERO
 
 
 def populate_safe_address(apps, schema_editor):
@@ -22,7 +22,8 @@ def populate_safe_address(apps, schema_editor):
             SET safe_address = history_internaltx._from
             FROM history_internaltx 
             WHERE history_internaltxdecoded.internal_tx_id = history_internaltx.id
-        """)
+            AND history_internaltxdecoded.safe_address = %s
+        """, [bytes.fromhex(PLACEHOLDER_ADDRESS[2:])])
 
 
 class Migration(migrations.Migration):
