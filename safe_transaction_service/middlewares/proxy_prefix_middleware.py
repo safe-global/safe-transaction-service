@@ -19,6 +19,12 @@ class ProxyPrefixMiddleware:
         prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
         self.logger.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
         if prefix:
+            # Set SCRIPT_NAME so Django generates all URLs with the prefix
+            request.META["SCRIPT_NAME"] = prefix
+            # Remove prefix from path_info so Django can match URL patterns
+            if request.path_info.startswith(prefix):
+                request.path_info = request.path_info[len(prefix) :]
+
             original_build_absolute_uri = request.build_absolute_uri
 
             def patched_build_absolute_uri(location=None):
