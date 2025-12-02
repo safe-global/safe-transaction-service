@@ -2265,6 +2265,73 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
 
+    def test_post_multisig_transactions_with_owner_who_is_also_delegate(self):
+        """
+        Test that an owner who is also registered as a delegate can still sign
+        transactions with multiple signatures. The delegate restriction should
+        only apply to pure delegates (non-owners).
+        """
+        safe_owners = [Account.create() for _ in range(4)]
+        safe_owner_addresses = [s.address for s in safe_owners]
+        safe = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe.address
+
+        self.assertEqual(MultisigTransaction.objects.count(), 0)
+
+        to = Account.create().address
+        data = {
+            "to": to,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            "sender": safe_owners[0].address,
+            "origin": "Testing owner who is also delegate",
+        }
+
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        safe_tx_hash = safe_tx.safe_tx_hash
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+
+        # Register safe_owners[0] as a delegate (even though they're already an owner)
+        SafeContractDelegateFactory(
+            safe_contract__address=safe_address,
+            delegate=safe_owners[0].address,
+            delegator=safe_owners[1].address,
+        )
+
+        # Sign with multiple owners - this should work because safe_owners[0] is an owner,
+        # even though they're also registered as a delegate
+        signatures = b""
+        for owner in safe_owners[:3]:  # Sign with 3 owners to meet threshold
+            signatures += owner.unsafe_sign_hash(safe_tx_hash)["signature"]
+        data["signature"] = to_0x_hex_str(signatures)
+
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        # Should succeed - owner status takes precedence over delegate status
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+
     def test_post_multisig_transactions_with_banned_signatures(self):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
