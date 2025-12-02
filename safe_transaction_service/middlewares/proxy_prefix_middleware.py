@@ -25,8 +25,8 @@ class ProxyPrefixMiddleware:
 
             original_get_full_path = request.get_full_path
 
-            def patched_get_full_path():
-                path = original_get_full_path()
+            def patched_get_full_path(force_append_slash=False):
+                path = original_get_full_path(force_append_slash)
                 if path.startswith(prefix):
                     return path
                 return prefix + path
