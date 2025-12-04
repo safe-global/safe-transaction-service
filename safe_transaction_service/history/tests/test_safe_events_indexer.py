@@ -1161,6 +1161,64 @@ class TestSafeEventsIndexerV1_5_0(SafeEventsIndexerBaseAbstractTestBase):
             InternalTxDecoded.objects.count(), expected_internal_txs_decoded
         )
 
+    def test_proxy_creation_l2_event(self):
+        initial_block_number = self.ethereum_client.current_block_number + 1
+        SafeMasterCopyFactory(
+            address=self.safe_contract.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version=self.safe_contract_version,
+            l2=True,
+        )
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract.address,
+            initializer=b"",
+            chain_specific=False,
+            is_l2=True,
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        self.assertEqual(InternalTx.objects.count(), 0)
+        self.assertEqual(InternalTxDecoded.objects.count(), 0)
+        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+        self.assertEqual(
+            InternalTxDecoded.objects.count(), 0
+        )  # Just created without setup
+        self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory
+        # Proxy creation InternalTx must contain the Safe address
+        self.assertEqual(
+            InternalTx.objects.filter(contract_address=safe_address).count(), 2
+        )
+
+    def test_chain_specific_proxy_creation_l2_event(self):
+        initial_block_number = self.ethereum_client.current_block_number + 1
+        SafeMasterCopyFactory(
+            address=self.safe_contract.address,
+            initial_block_number=initial_block_number,
+            tx_block_number=initial_block_number,
+            version=self.safe_contract_version,
+            l2=True,
+        )
+        ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
+            self.ethereum_test_account,
+            self.safe_contract.address,
+            initializer=b"",
+            chain_specific=True,
+            is_l2=True,
+        )
+        safe_address = ethereum_tx_sent.contract_address
+        self.assertEqual(InternalTx.objects.count(), 0)
+        self.assertEqual(InternalTxDecoded.objects.count(), 0)
+        self.assertEqual(self.safe_events_indexer.start(), (2, 1))
+        self.assertEqual(
+            InternalTxDecoded.objects.count(), 0
+        )  # Just created without setup
+        self.assertEqual(InternalTx.objects.count(), 2)  # Proxy factory
+        # Proxy creation InternalTx must contain the Safe address
+        self.assertEqual(
+            InternalTx.objects.filter(contract_address=safe_address).count(), 2
+        )
+
 
 class TestSafeEventsIndexerV1_4_1(SafeEventsIndexerBaseAbstractTestBase):
     @property
