@@ -40,7 +40,7 @@ def select_preimage_by_safe_version(
     :param safe_message_preimage: Safe-encoded message hash.
     :return: Hash to be used for signature validation.
     """
-    if safe_version == "1.5.0":
+    if safe_version == "1.5.0" or safe_version == "1.5.0+L2":
         return None
     return safe_message_preimage
 
