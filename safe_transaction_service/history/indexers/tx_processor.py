@@ -516,7 +516,6 @@ class SafeTxProcessor(TxProcessor):
             safe_last_status = self.get_last_safe_status_for_address(contract_address)
             if not safe_last_status:
                 # Usually this happens from Safes coming from a not supported Master Copy
-                # TODO When archive node is available, build SafeStatus from blockchain status
                 logger.debug(
                     "[%s] Cannot process trace as `SafeLastStatus` is not found",
                     contract_address,

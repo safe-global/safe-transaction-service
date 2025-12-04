@@ -510,6 +510,7 @@ class IndexService:
 
         # Check if a new decoded tx appeared before other already processed (due to a reindex)
         if self.processing_enable_out_of_order_check:
+            logger.debug("[%s] Checking for out of order transactions", safe_address)
             if InternalTxDecoded.objects.out_of_order_for_safe(safe_address):
                 logger.error("[%s] Found out of order transactions", safe_address)
                 self.fix_out_of_order(
@@ -518,20 +519,37 @@ class IndexService:
                         0
                     ].internal_tx,
                 )
+            logger.debug(
+                "[%s] End checking for out of order transactions", safe_address
+            )
 
         # Use chunks for memory issues
         total_processed_txs = 0
         while True:
+            logger.debug("[%s] Fetching batch of transactions to process", safe_address)
             internal_txs_decoded = list(
                 InternalTxDecoded.objects.pending_for_safe(safe_address)[
                     : self.eth_internal_tx_decoded_process_batch
                 ]
             )
+            logger.debug(
+                "[%s] Fetched %d of transactions to process",
+                safe_address,
+                len(internal_txs_decoded),
+            )
             if not internal_txs_decoded:
                 break
-            total_processed_txs += len(
+            logger.debug("[%s] Processing batch of transactions", safe_address)
+            number_processed_txs = len(
                 self.tx_processor.process_decoded_transactions(internal_txs_decoded)
             )
+            logger.debug(
+                "[%s] Processed %d transactions", safe_address, number_processed_txs
+            )
+            total_processed_txs += number_processed_txs
+        logger.debug(
+            "[%s] Processed %d transactions in total", safe_address, total_processed_txs
+        )
         return total_processed_txs
 
     def reprocess_addresses(self, addresses: list[ChecksumAddress]):
