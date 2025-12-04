@@ -61,8 +61,10 @@ class ProxyFactoryIndexer(EventsIndexer):
             proxy_factory_v1_3_0_contract.events.ProxyCreation(),
             # event ProxyCreation(SafeProxy indexed proxy, address singleton)
             proxy_factory_v_1_4_1_contract.events.ProxyCreation(),
-            # event ProxyCreation(SafeProxy indexed proxy, address singleton)
-            proxy_factory_v_1_5_0_contract.events.ProxyCreation(),
+            # event ProxyCreationL2(SafeProxy indexed proxy, address singleton, bytes initializer, uint256 saltNonce)
+            proxy_factory_v_1_5_0_contract.events.ProxyCreationL2(),
+            # event ChainSpecificProxyCreationL2(SafeProxy indexed proxy, address singleton, bytes initializer, uint256 saltNonce, uint256 chainId)
+            proxy_factory_v_1_5_0_contract.events.ChainSpecificProxyCreationL2(),
         ]
 
     @property
