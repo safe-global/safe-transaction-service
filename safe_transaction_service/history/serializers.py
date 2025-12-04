@@ -274,7 +274,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         safe_signature_hash = (
             safe_tx_hash
             if safe.get_version() == "1.5.0"
-            else safe.safe_tx_hash_preimage
+            else safe_tx.safe_tx_hash_preimage
         )
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_tx_hash, safe_hash_preimage=safe_signature_hash
