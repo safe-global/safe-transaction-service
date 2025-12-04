@@ -224,7 +224,14 @@ class SafeEventsIndexer(EventsIndexer):
 
         Safe v1.5.0 L2 Events
         ------------------
-        TODO: Add Safe v1.5.0 events
+
+        Note: This only includes the new events added in v1.5.0, the rest are same as from v1.4.1. No events removed in v1.5.0.
+
+        event ChangedModuleGuard(address indexed moduleGuard);
+
+        # ProxyFactory
+        event ProxyCreationL2(SafeProxy indexed proxy, address singleton, bytes initializer, uint256 saltNonce);
+        event ChainSpecificProxyCreationL2(SafeProxy indexed proxy, address singleton, bytes initializer, uint256 saltNonce, uint256 chainId);
 
         :return: List of supported `ContractEvent`
         """
@@ -284,7 +291,8 @@ class SafeEventsIndexer(EventsIndexer):
                 # Change Master Copy
                 safe_v1_1_1_contract.events.ChangedMasterCopy(),
                 # Proxy creation
-                proxy_factory_v1_5_0_contract.events.ProxyCreation(),
+                proxy_factory_v1_5_0_contract.events.ProxyCreationL2(),
+                proxy_factory_v1_5_0_contract.events.ChainSpecificProxyCreationL2(),
                 proxy_factory_v1_4_1_contract.events.ProxyCreation(),
                 proxy_factory_v1_3_0_contract.events.ProxyCreation(),
             )
@@ -391,7 +399,12 @@ class SafeEventsIndexer(EventsIndexer):
             safe_address=internal_tx._from,  # Denormalized for efficient querying
         )
 
-        if event_name == "ProxyCreation" or event_name == "SafeSetup":
+        if (
+            event_name == "ProxyCreation"
+            or event_name == "SafeSetup"
+            or event_name == "ProxyCreationL2"
+            or event_name == "ChainSpecificProxyCreationL2"
+        ):
             # Will ignore these events because were indexed in process_safe_creation_events
             internal_tx = None
             internal_tx_decoded = None
@@ -517,6 +530,16 @@ class SafeEventsIndexer(EventsIndexer):
                 safe_creation_events.setdefault(safe_address, []).append(
                     decoded_element
                 )
+            elif event_name == "ProxyCreationL2":
+                safe_address = decoded_element["args"].get("proxy")
+                safe_creation_events.setdefault(safe_address, []).append(
+                    decoded_element
+                )
+            elif event_name == "ChainSpecificProxyCreationL2":
+                safe_address = decoded_element["args"].get("proxy")
+                safe_creation_events.setdefault(safe_address, []).append(
+                    decoded_element
+                )
 
         return safe_creation_events
 
@@ -525,11 +548,13 @@ class SafeEventsIndexer(EventsIndexer):
         safe_addresses_with_creation_events: dict[ChecksumAddress, list[EventData]],
     ) -> list[InternalTx]:
         """
-        Process creation events (ProxyCreation and SafeSetup). They must be processed together.
+        Process creation events (ProxyCreation, ProxyCreationL2, ChainSpecificProxyCreationL2, and SafeSetup). They must be processed together.
 
         Usual order is:
         - SafeSetup
         - ProxyCreation
+        - ProxyCreationL2
+        - ChainSpecificProxyCreationL2
 
         :param safe_addresses_with_creation_events:
         :return: Generated InternalTxs for safe creation
@@ -571,6 +596,34 @@ class SafeEventsIndexer(EventsIndexer):
                     setup_event = event
                 elif event["event"] == "ProxyCreation":
                     proxy_creation_event = event
+                    # Generate InternalTx for ProxyCreation
+                    internal_tx = self._get_internal_tx_from_decoded_element(
+                        proxy_creation_event,
+                        contract_address=proxy_creation_event["args"].get("proxy"),
+                        tx_type=InternalTxType.CREATE.value,
+                        call_type=None,
+                    )
+                    internal_txs.append(internal_tx)
+                elif event["event"] == "ProxyCreationL2":
+                    proxy_creation_event_l2 = event
+                    internal_tx = self._get_internal_tx_from_decoded_element(
+                        proxy_creation_event_l2,
+                        contract_address=proxy_creation_event_l2["args"].get("proxy"),
+                        tx_type=InternalTxType.CREATE.value,
+                        call_type=None,
+                    )
+                    internal_txs.append(internal_tx)
+                elif event["event"] == "ChainSpecificProxyCreationL2":
+                    chain_specific_proxy_creation_event_l2 = event
+                    internal_tx = self._get_internal_tx_from_decoded_element(
+                        chain_specific_proxy_creation_event_l2,
+                        contract_address=chain_specific_proxy_creation_event_l2[
+                            "args"
+                        ].get("proxy"),
+                        tx_type=InternalTxType.CREATE.value,
+                        call_type=None,
+                    )
+                    internal_txs.append(internal_tx)
                 else:
                     logger.error("Unexpected event type: %s", event["event"])
 
