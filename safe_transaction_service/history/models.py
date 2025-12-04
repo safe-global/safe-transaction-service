@@ -1379,6 +1379,13 @@ class InternalTxDecoded(models.Model):
                 fields=["safe_address"],
                 condition=Q(processed=False),
             ),
+            # For checking if a Safe has already been indexed (has setup InternalTxDecoded)
+            # Small index since function_name='setup' is rare (one per Safe creation)
+            models.Index(
+                name="history_decoded_setup_idx",
+                fields=["safe_address"],
+                condition=Q(function_name="setup"),
+            ),
         ]
         verbose_name_plural = "Internal txs decoded"
 
