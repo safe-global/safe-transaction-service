@@ -2193,7 +2193,8 @@ class SafeStatusBase(models.Model):
     nonce = Uint256Field(default=0)
     master_copy = EthereumAddressBinaryField()
     fallback_handler = EthereumAddressBinaryField()
-    guard = EthereumAddressBinaryField(default=None, null=True)
+    transaction_guard = EthereumAddressBinaryField(default=None, null=True)
+    module_guard = EthereumAddressBinaryField(default=None, null=True)
     enabled_modules = ArrayField(EthereumAddressBinaryField(), default=list, blank=True)
 
     class Meta:
@@ -2240,7 +2241,8 @@ class SafeStatusBase(models.Model):
             nonce=safe_status_base.nonce,
             master_copy=safe_status_base.master_copy,
             fallback_handler=safe_status_base.fallback_handler,
-            guard=safe_status_base.guard,
+            transaction_guard=safe_status_base.transaction_guard,
+            module_guard=safe_status_base.module_guard,
             enabled_modules=safe_status_base.enabled_modules,
         )
 
@@ -2273,7 +2275,8 @@ class SafeLastStatusManager(models.Manager):
                 "nonce": safe_status.nonce,
                 "master_copy": safe_status.master_copy,
                 "fallback_handler": safe_status.fallback_handler,
-                "guard": safe_status.guard,
+                "transaction_guard": safe_status.transaction_guard,
+                "module_guard": safe_status.module_guard,
                 "enabled_modules": safe_status.enabled_modules,
             },
         )
@@ -2326,13 +2329,14 @@ class SafeLastStatus(SafeStatusBase):
         return SafeInfo(
             self.address,
             self.fallback_handler,
-            self.guard or NULL_ADDRESS,
+            self.transaction_guard or NULL_ADDRESS,
             self.master_copy,
             self.enabled_modules,
             self.nonce,
             self.owners,
             self.threshold,
             master_copy_version,
+            self.module_guard or NULL_ADDRESS,
         )
 
 
