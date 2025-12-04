@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from django.test import TestCase
 
 from eth_account import Account
@@ -38,9 +40,7 @@ from .mocks.mocks_safe_events_indexer import (
 )
 
 
-class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
-    __test__ = False
-
+class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
     def setUp(self) -> None:
         self.safe_events_indexer = SafeEventsIndexer(
             self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
@@ -51,17 +51,19 @@ class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
         SafeEventsIndexerProvider.del_singleton()
 
     @property
-    def safe_contract(self):
-        """
-        :return: Last Safe Contract available
-        """
-        return self.safe_contract_V1_5_0
+    @abstractmethod
+    def safe_contract_version(self) -> str:
+        pass
 
+    @property
+    @abstractmethod
+    def safe_contract(self):
+        pass
+
+    @property
+    @abstractmethod
     def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
-        """
-        :return: Last Safe Contract available
-        """
-        return get_safe_V1_5_0_contract(w3, address=address)
+        pass
 
     def test_safe_events_indexer_provider(self):
         safe_events_indexer = SafeEventsIndexerProvider()
@@ -868,7 +870,7 @@ class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
         payment_token = NULL_ADDRESS
         payment = 0
         payment_receiver = NULL_ADDRESS
-        deployed_safe_contract = get_safe_V1_4_1_contract(self.w3, safe_address)
+        deployed_safe_contract = self.get_safe_contract(self.w3, safe_address)
         setup_call = deployed_safe_contract.functions.setup(
             owners,
             threshold,
@@ -892,11 +894,11 @@ class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
         # ProxyCreation first and SafeSetup later indexed together
         ethereum_tx_sent = self.proxy_factory.deploy_proxy_contract_with_nonce(
             self.ethereum_test_account,
-            self.safe_contract_V1_3_0.address,
+            self.safe_contract.address,
             initializer=b"",
         )
         safe_address = ethereum_tx_sent.contract_address
-        deployed_safe_contract = get_safe_V1_4_1_contract(self.w3, safe_address)
+        deployed_safe_contract = self.get_safe_contract(self.w3, safe_address)
         setup_call = deployed_safe_contract.functions.setup(
             owners,
             threshold,
@@ -918,7 +920,7 @@ class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(
             InternalTx.objects.filter(
-                contract_address=None, to=self.safe_contract_V1_3_0.address
+                contract_address=None, to=self.safe_contract.address
             ).count(),
             1,
         )
@@ -1009,12 +1011,23 @@ class TestSafeEventsIndexerBase(SafeTestCaseMixin, TestCase):
         self.assertEqual(InternalTxDecoded.objects.count(), 1)
 
 
-class TestSafeEventsIndexerV1_5_0(TestSafeEventsIndexerBase):
-    __test__ = True
-
+class TestSafeEventsIndexerV1_5_0(SafeEventsIndexerBaseAbstractTestBase):
     @property
     def safe_contract_version(self) -> str:
         return "1.5.0"
+
+    @property
+    def safe_contract(self):
+        """
+        :return: Last Safe Contract available
+        """
+        return self.safe_contract_V1_5_0
+
+    def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
+        """
+        :return: Last Safe Contract available
+        """
+        return get_safe_V1_5_0_contract(w3, address=address)
 
     def test_safe_module_guard_events(self):
         owner_account_1 = self.ethereum_test_account
@@ -1149,9 +1162,7 @@ class TestSafeEventsIndexerV1_5_0(TestSafeEventsIndexerBase):
         )
 
 
-class TestSafeEventsIndexerV1_4_1(TestSafeEventsIndexerBase):
-    __test__ = True
-
+class TestSafeEventsIndexerV1_4_1(SafeEventsIndexerBaseAbstractTestBase):
     @property
     def safe_contract_version(self) -> str:
         return "1.4.1"
@@ -1170,9 +1181,7 @@ class TestSafeEventsIndexerV1_4_1(TestSafeEventsIndexerBase):
         return get_safe_V1_4_1_contract(w3, address=address)
 
 
-class TestSafeEventsIndexerV1_3_0(TestSafeEventsIndexerBase):
-    __test__ = True
-
+class TestSafeEventsIndexerV1_3_0(SafeEventsIndexerBaseAbstractTestBase):
     @property
     def safe_contract_version(self) -> str:
         return "1.3.0"
