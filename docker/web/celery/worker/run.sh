@@ -14,17 +14,7 @@ fi
 
 if [ ${RUN_MIGRATIONS:-0} = 1 ]; then
   echo "==> $(date +%H:%M:%S) ==> Migrating Django models... "
-  # DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput
-  # Check migration 0097 is not applied, so we don't rollback to 0096
-  if python manage.py showmigrations history | grep -q '\[ \] 0097'; then
-    DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput history 0096
-  fi
-  SECONDS=0
-  (
-    echo "Starting migration 0097 for denormalization" &&
-    DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput &&
-    echo "Migration 0097 for denormalization was successful in ${SECONDS} seconds"
-  ) &
+  DB_STATEMENT_TIMEOUT=0 python manage.py migrate --noinput
 
   echo "==> $(date +%H:%M:%S) ==> Setting up service... "
   python manage.py setup_service
