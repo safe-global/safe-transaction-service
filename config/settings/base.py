@@ -571,7 +571,7 @@ ETH_INTERNAL_TRACE_TXS_BATCH_SIZE = env.int(
     "ETH_INTERNAL_TRACE_TXS_BATCH_SIZE", default=0
 )  # Number of `trace_transaction` calls allowed in the same RPC batch call, as results can be quite big
 ETH_INTERNAL_TX_DECODED_PROCESS_BATCH = env.int(
-    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=5000
+    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=500
 )  # Number of InternalTxDecoded to process together. Keep it low to be memory friendly
 
 # Event indexing configuration (L2 and ERC20/721)
