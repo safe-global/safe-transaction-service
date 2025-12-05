@@ -1325,7 +1325,14 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         return (
             self.not_processed()
             .order_by_processing_queue()
-            .select_related("internal_tx", "internal_tx__ethereum_tx")
+            .select_related("internal_tx__ethereum_tx")
+            # Defer large blob fields not used during processing to reduce memory usage
+            .defer(
+                "internal_tx__data",
+                "internal_tx__code",
+                "internal_tx__output",
+                "internal_tx__ethereum_tx__data",
+            )
         )
 
     def pending_for_safe(self, safe_address: ChecksumAddress):
