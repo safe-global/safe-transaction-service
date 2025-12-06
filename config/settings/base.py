@@ -78,11 +78,11 @@ DATABASES["default"]["OPTIONS"] = {
     "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
     "pool": {
         # https://www.psycopg.org/psycopg3/docs/api/pool.html#psycopg_pool.ConnectionPool
-        "min_size": 4,
-        "max_size": env.int("DB_MAX_CONNS", default=50),
-        "timeout": 30,
-        "max_lifetime": 60 * 60,  # 1 hour
-        "max_idle": 60 * 10,  # 10 minutes
+        "min_size": env.int("DB_MIN_CONNS", default=4),
+        "max_size": env.int("DB_MAX_CONNS", default=100),
+        "timeout": env.int("DB_POOL_TIMEOUT", default=10),
+        "max_lifetime": env.int("DB_POOL_MAX_LIFETIME", default=60 * 60),  # 1 hour
+        "max_idle": env.int("DB_POOL_MAX_IDLE", default=60 * 10),  # 10 minutes
     },
 }
 
@@ -533,6 +533,9 @@ LOGGING = {
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+REDIS_TIMEOUT_SECONDS = env("REDIS_TIMEOUT_SECONDS", default=5)
+REDIS_CONNECTION_TIMEOUT_SECONDS = env("REDIS_CONNECTION_TIMEOUT_SECONDS", default=5)
+REDIS_POOL_MAX_CONNECTIONS = env("REDIS_POOL_MAX_CONNECTIONS", default=300)
 
 # Ethereum RPC
 # ------------------------------------------------------------------------------
@@ -578,7 +581,7 @@ ETH_INTERNAL_TRACE_TXS_BATCH_SIZE = env.int(
     "ETH_INTERNAL_TRACE_TXS_BATCH_SIZE", default=0
 )  # Number of `trace_transaction` calls allowed in the same RPC batch call, as results can be quite big
 ETH_INTERNAL_TX_DECODED_PROCESS_BATCH = env.int(
-    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=5000
+    "ETH_INTERNAL_TX_DECODED_PROCESS_BATCH", default=500
 )  # Number of InternalTxDecoded to process together. Keep it low to be memory friendly
 
 # Event indexing configuration (L2 and ERC20/721)

@@ -50,6 +50,9 @@ class BrokerConnection:
         :return: `True` if message was published, `False` otherwise
         """
         try:
+            if not self.channel:
+                raise pika.exceptions.AMQPError("Channel is not available")
+
             self.channel.basic_publish(
                 exchange=self.exchange_name, routing_key="", body=message
             )
@@ -68,7 +71,7 @@ def get_queue_service():
     if settings.EVENTS_QUEUE_URL:
         return QueueService()
     else:
-        # Mock send_event to not configured host us is not mandatory configure a queue for events
+        # It's not mandatory to configure a queue, so send_event will be mocked
         logger.warning("MockedQueueService is used")
         return MockedQueueService()
 
@@ -99,8 +102,12 @@ class QueueService:
         else:
             broker_connection = BrokerConnection()
 
-        self._total_connections += 1
-        return broker_connection
+        if broker_connection.channel:
+            self._total_connections += 1
+            return broker_connection
+
+        logger.warning("RabbitMQ channel is not available")
+        return None
 
     def release_connection(self, broker_connection: BrokerConnection | None):
         """

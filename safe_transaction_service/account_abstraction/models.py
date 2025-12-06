@@ -189,6 +189,8 @@ class UserOperation(models.Model):
 
 
 class UserOperationReceipt(models.Model):
+    """Stores the on-chain receipt metadata produced when a user operation executes."""
+
     user_operation = models.OneToOneField(
         UserOperation, on_delete=models.CASCADE, related_name="receipt"
     )
@@ -217,6 +219,8 @@ class SafeOperationQuerySet(models.QuerySet):
 
 
 class SafeOperation(TimeStampedModel):
+    """Represents a Safe account-abstraction operation built from a user operation."""
+
     objects = SafeOperationQuerySet.as_manager()
     hash = Keccak256Field(primary_key=True)  # safeOperationHash
     user_operation = models.OneToOneField(
@@ -270,6 +274,8 @@ class SafeOperation(TimeStampedModel):
 
 
 class SafeOperationConfirmation(TimeStampedModel):
+    """Signature provided by a Safe owner to authorize a Safe operation."""
+
     safe_operation = models.ForeignKey(
         SafeOperation,
         on_delete=models.CASCADE,

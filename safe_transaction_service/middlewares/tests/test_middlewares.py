@@ -18,6 +18,7 @@ class TestMiddlewares(unittest.TestCase):
         get_response.assert_called_once_with(request)
         self.assertEqual(response, "middleware_response")
         self.assertEqual(request.build_absolute_uri(), "http://testserver/test/path")
+        self.assertEqual(request.get_full_path(), "/test/path")
 
         get_response.reset_mock()
         prefix = "/prefix"
@@ -33,3 +34,4 @@ class TestMiddlewares(unittest.TestCase):
         self.assertEqual(
             request.build_absolute_uri(), "http://testserver/prefix/test/path"
         )
+        self.assertEqual(request.get_full_path(), "/prefix/test/path")

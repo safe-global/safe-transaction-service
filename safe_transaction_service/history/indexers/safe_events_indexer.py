@@ -375,6 +375,7 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx=internal_tx,
             function_name="",
             arguments=args,
+            safe_address=internal_tx._from,  # Denormalized for efficient querying
         )
 
         if event_name == "ProxyCreation" or event_name == "SafeSetup":
@@ -481,8 +482,8 @@ class SafeEventsIndexer(EventsIndexer):
         self, decoded_elements: list[EventData]
     ) -> dict[ChecksumAddress, list[EventData]]:
         """
-        Get the creation events (ProxyCreation and SafeSetup) from decoded elements and generates a dictionary
-        that groups these events by Safe address, so they are processed together
+        Get the creation events (SafeSetup and ProxyCreation) from decoded elements and generates a dictionary
+        that groups these events by Safe address, so they are processed together.
 
         :param decoded_elements:
         :return: dictionary with creation events by Safe address
@@ -492,6 +493,7 @@ class SafeEventsIndexer(EventsIndexer):
             event_name = decoded_element["event"]
             if event_name == "SafeSetup":
                 safe_address = decoded_element["address"]
+                # Always insert SafeSetup event at the beginning of the list
                 safe_creation_events.setdefault(safe_address, []).append(
                     decoded_element
                 )
@@ -508,13 +510,17 @@ class SafeEventsIndexer(EventsIndexer):
         safe_addresses_with_creation_events: dict[ChecksumAddress, list[EventData]],
     ) -> list[InternalTx]:
         """
-        Process creation events (ProxyCreation and SafeSetup). They must be processed together
+        Process creation events (ProxyCreation and SafeSetup). They must be processed together.
+
+        Usual order is:
+        - SafeSetup
+        - ProxyCreation
 
         :param safe_addresses_with_creation_events:
-        :return:
+        :return: Generated InternalTxs for safe creation
         """
-        internal_txs = []
-        internal_txs_decoded = []
+        internal_txs: list[InternalTx] = []
+        internal_txs_decoded: list[InternalTxDecoded] = []
 
         logger.debug("Processing Safe Creation events")
 
@@ -524,11 +530,12 @@ class SafeEventsIndexer(EventsIndexer):
             "Got %d addresses to index, checking if some are indexed",
             len(safe_creation_events_addresses),
         )
+        # Check if SafeSetup event was indexed. ProxyCreation must not come after SafeSetup, so we consider
+        # indexed a Safe with a SafeSetup event processed (InternalTxDecoded with `function_name="setup"`).
         indexed_addresses = InternalTxDecoded.objects.filter(
-            internal_tx___from__in=safe_creation_events_addresses,
+            safe_address__in=safe_creation_events_addresses,
             function_name="setup",
-            internal_tx__contract_address=None,
-        ).values_list("internal_tx___from", flat=True)
+        ).values_list("safe_address", flat=True)
         # Ignoring the already indexed contracts
         addresses_to_index = safe_creation_events_addresses - set(indexed_addresses)
         logger.debug(
@@ -540,87 +547,75 @@ class SafeEventsIndexer(EventsIndexer):
         )
         for safe_address in addresses_to_index:
             events = safe_addresses_with_creation_events[safe_address]
-            for event_position, event in enumerate(events):
+
+            # Find events by type (each Safe should have at most one of each)
+            setup_event: EventData | None = None
+            proxy_creation_event: EventData | None = None
+            for event in events:
                 if event["event"] == "SafeSetup":
                     setup_event = event
-                    # If we have both events we should extract Singleton and trace_address from ProxyCreation event
-                    if len(events) > 1:
-                        if (
-                            event_position == 0
-                            and events[1]["event"] == "ProxyCreation"
-                        ):
-                            # Usually SafeSetup is the first event and next is ProxyCreation when ProxyFactory is called with initializer.
-                            proxy_creation_event = events[1]
-                        elif (
-                            event_position == 1
-                            and events[0]["event"] == "ProxyCreation"
-                        ):
-                            # ProxyCreation first and SafeSetup later
-                            proxy_creation_event = events[0]
-                        else:
-                            # This shouldn't happen, as there will be no proxy_creation event
-                            continue
-                    else:
-                        logger.debug(
-                            "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
-                            safe_address,
-                        )
-                        # Proxy was created in previous blocks.
-                        proxy_creation_event = None
-                        # Safe was created and configure it in the next transaction. Remove it if that's the case
-                        InternalTx.objects.filter(
-                            contract_address=safe_address
-                        ).delete()
-                        logger.debug(
-                            "[%s] Proxy was created in previous blocks, old InternalTx deleted",
-                            safe_address,
-                        )
-
-                    # Generate InternalTx and internalDecodedTx for SafeSetup event
-                    setup_trace_address = (
-                        f"{proxy_creation_event['logIndex']},0"
-                        if proxy_creation_event
-                        else str(setup_event["logIndex"])
-                    )
-                    singleton = (
-                        proxy_creation_event["args"].get("singleton")
-                        if proxy_creation_event
-                        else NULL_ADDRESS
-                    )
-                    # Keep previous implementation
-                    contract_address = None if proxy_creation_event else safe_address
-                    internal_tx = self._get_internal_tx_from_decoded_element(
-                        setup_event,
-                        contract_address=contract_address,
-                        to=singleton,
-                        trace_address=setup_trace_address,
-                        call_type=EthereumTxCallType.DELEGATE_CALL.value,
-                    )
-                    # Generate InternalDecodedTx for SafeSetup event
-                    setup_args = dict(event["args"])
-                    setup_args["payment"] = 0
-                    setup_args["paymentReceiver"] = NULL_ADDRESS
-                    setup_args["_threshold"] = setup_args.pop("threshold")
-                    setup_args["_owners"] = setup_args.pop("owners")
-                    internal_tx_decoded = InternalTxDecoded(
-                        internal_tx=internal_tx,
-                        function_name="setup",
-                        arguments=setup_args,
-                    )
-                    internal_txs.append(internal_tx)
-                    internal_txs_decoded.append(internal_tx_decoded)
                 elif event["event"] == "ProxyCreation":
                     proxy_creation_event = event
-                    # Generate InternalTx for ProxyCreation
-                    internal_tx = self._get_internal_tx_from_decoded_element(
-                        proxy_creation_event,
-                        contract_address=proxy_creation_event["args"].get("proxy"),
-                        tx_type=InternalTxType.CREATE.value,
-                        call_type=None,
-                    )
-                    internal_txs.append(internal_tx)
                 else:
-                    logger.error(f"Event is not a Safe creation event {event['event']}")
+                    logger.error("Unexpected event type: %s", event["event"])
+
+            # Process ProxyCreation - creates the proxy contract
+            if proxy_creation_event:
+                internal_tx = self._get_internal_tx_from_decoded_element(
+                    proxy_creation_event,
+                    contract_address=proxy_creation_event["args"].get("proxy"),
+                    tx_type=InternalTxType.CREATE.value,
+                    call_type=None,
+                )
+                internal_txs.append(internal_tx)
+
+            # Process SafeSetup - initializes the Safe
+            if setup_event:
+                if not proxy_creation_event:
+                    # SafeSetup without ProxyCreation means proxy was created in a previous block
+                    logger.debug(
+                        "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
+                        safe_address,
+                    )
+                    InternalTx.objects.filter(contract_address=safe_address).delete()
+                    logger.debug(
+                        "[%s] Proxy was created in previous blocks, old InternalTx deleted",
+                        safe_address,
+                    )
+
+                # Determine trace_address and singleton based on whether ProxyCreation exists
+                if proxy_creation_event:
+                    setup_trace_address = f"{proxy_creation_event['logIndex']},0"
+                    singleton = proxy_creation_event["args"].get("singleton")
+                    # contract_address=None signals this came via event indexer with ProxyCreation
+                    contract_address = None
+                else:
+                    setup_trace_address = str(setup_event["logIndex"])
+                    singleton = NULL_ADDRESS
+                    contract_address = safe_address
+
+                internal_tx = self._get_internal_tx_from_decoded_element(
+                    setup_event,
+                    contract_address=contract_address,
+                    to=singleton,
+                    trace_address=setup_trace_address,
+                    call_type=EthereumTxCallType.DELEGATE_CALL.value,
+                )
+
+                # Generate InternalDecodedTx for SafeSetup event
+                setup_args = dict(setup_event["args"])
+                setup_args["payment"] = 0
+                setup_args["paymentReceiver"] = NULL_ADDRESS
+                setup_args["_threshold"] = setup_args.pop("threshold")
+                setup_args["_owners"] = setup_args.pop("owners")
+                internal_tx_decoded = InternalTxDecoded(
+                    internal_tx=internal_tx,
+                    function_name="setup",
+                    arguments=setup_args,
+                    safe_address=internal_tx._from,  # Denormalized for efficient querying
+                )
+                internal_txs.append(internal_tx)
+                internal_txs_decoded.append(internal_tx_decoded)
 
         logger.debug("InternalTx and InternalTxDecoded objects for creation were built")
         return InternalTx.objects.store_internal_txs_and_decoded_in_db(

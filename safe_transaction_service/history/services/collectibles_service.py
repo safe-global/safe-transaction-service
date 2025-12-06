@@ -351,7 +351,10 @@ class CollectiblesService:
             # No need for further DB/Cache calls
             return [], 0
 
-        cache_key = f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}{offset}:{number_erc721_events}"
+        cache_key = (
+            f"collectibles:{safe_address}:{only_trusted}:{exclude_spam}:{limit}:{offset}:"
+            f"{number_erc721_events}"
+        )
         cache_key_count = (
             f"collectibles_count:{safe_address}:{only_trusted}:{exclude_spam}"
         )
@@ -500,7 +503,7 @@ class CollectiblesService:
             except MetadataRetrievalExceptionTimeout:
                 metadata = {}
                 logger.warning(
-                    "Timeout retrieving metadata on token-uri=%s for token-address=%s, retrying asyncronous ",
+                    "Timeout retrieving metadata on token-uri=%s for token-address=%s, retrying asynchronous ",
                     collectible.uri,
                     collectible.address,
                 )

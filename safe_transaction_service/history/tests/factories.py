@@ -200,6 +200,7 @@ class InternalTxDecodedFactory(DjangoModelFactory):
     internal_tx = factory.SubFactory(InternalTxFactory)
     function_name = factory.fuzzy.FuzzyText(prefix="safe-", suffix="fn")
     processed = False
+    safe_address = factory.SelfAttribute("internal_tx._from")
 
     @factory.lazy_attribute
     def arguments(self) -> dict[str, Any]:

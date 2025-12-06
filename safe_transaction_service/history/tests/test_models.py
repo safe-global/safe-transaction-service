@@ -659,7 +659,10 @@ class TestInternalTx(TestCase):
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 1)
 
         InternalTxDecoded.objects.create(
-            function_name="alo", arguments={}, internal_tx=internal_tx
+            function_name="alo",
+            arguments={},
+            internal_tx=internal_tx,
+            safe_address=internal_tx._from,
         )
         self.assertEqual(InternalTx.objects.can_be_decoded().count(), 0)
 

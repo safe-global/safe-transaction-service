@@ -191,7 +191,12 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             self.compatibility_fallback_handler_V1_4_1.address,
         )
         self.assertEqual(safe_info.guard, NULL_ADDRESS)
-        self.assertEqual(safe_info.version, None)  # No SafeMasterCopy
+        self.assertEqual(
+            safe_info.version, "1.4.1"
+        )  # No SafeMasterCopy, so fallback to blockchain version
+        self.assertIsNone(
+            SafeMasterCopy.objects.get_version_for_address(safe_info.master_copy)
+        )
 
         version = "4.8.15162342"
         SafeMasterCopyFactory(address=safe_info.master_copy, version=version)

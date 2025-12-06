@@ -215,7 +215,7 @@ class SafeTxDecoder:
             decoded = decode_abi(types, cast(HexBytes, params))
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
-        except (ValueError, DecodingError) as exc:
+        except (ValueError, DecodingError, ArithmeticError) as exc:
             logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
@@ -575,11 +575,7 @@ class DbTxDecoder(TxDecoder):
         abi = self.get_contract_abi(address)
         if not abi:
             return False
-        return bool(
-            dict(fn_abi, name="fallback")
-            for fn_abi in abi
-            if fn_abi.get("type") == "fallback"
-        )
+        return any(fn_abi.get("type") == "fallback" for fn_abi in abi)
 
     @cachedmethod(
         cache=operator.attrgetter(

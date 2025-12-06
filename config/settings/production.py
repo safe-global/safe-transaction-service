@@ -1,5 +1,11 @@
 from .base import *  # noqa
 from .base import env
+from .base import (
+    REDIS_URL,
+    REDIS_CONNECTION_TIMEOUT_SECONDS,
+    REDIS_TIMEOUT_SECONDS,
+    REDIS_POOL_MAX_CONNECTIONS,
+)
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -13,17 +19,19 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 # DATABASES['default'] = env.db('DATABASE_URL')  # noqa F405
 DATABASES["default"]["ATOMIC_REQUESTS"] = False  # noqa F405
 
-REDIS_URL = env.str("REDIS_URL")
-
 # CACHES
 # ------------------------------------------------------------------------------
+# https://docs.djangoproject.com/en/dev/ref/settings/#caches
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            # Mimicing memcache behavior.
+            "SOCKET_CONNECT_TIMEOUT": REDIS_CONNECTION_TIMEOUT_SECONDS,
+            "SOCKET_TIMEOUT": REDIS_TIMEOUT_SECONDS,
+            "CONNECTION_POOL_KWARGS": {"max_connections": REDIS_POOL_MAX_CONNECTIONS},
+            # Mimicking memcache behavior.
             # http://niwinz.github.io/django-redis/latest/#_memcached_exceptions_behavior
             "IGNORE_EXCEPTIONS": True,
         },
@@ -33,6 +41,9 @@ CACHES = {
         "LOCATION": "local_mem",
     },
 }
+
+# Log redis exceptions ignored
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 # SECURITY
 # ------------------------------------------------------------------------------

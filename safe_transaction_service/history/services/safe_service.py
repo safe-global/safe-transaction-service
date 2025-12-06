@@ -211,12 +211,16 @@ class SafeService:
             safe = Safe(safe_address, self.ethereum_client)
             safe_info = safe.retrieve_all_info()
             # Return same master copy information than the db method
-            return replace(
-                safe_info,
-                version=SafeMasterCopy.objects.get_version_for_address(
-                    safe_info.master_copy
-                ),
+            db_version = SafeMasterCopy.objects.get_version_for_address(
+                safe_info.master_copy
             )
+            if db_version:
+                return replace(
+                    safe_info,
+                    version=db_version,
+                )
+            else:
+                return safe_info
         except OSError as exc:
             raise NodeConnectionException from exc
         except CannotRetrieveSafeInfoException as exc:

@@ -207,6 +207,7 @@ class InternalTxAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "-ethereum_tx__transaction_index",
         "-pk",
     ]
+    readonly_fields = ("timestamp", "block_number")
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
         "==block_number",
@@ -229,9 +230,7 @@ class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
             return queryset.filter(
                 Q(
                     Exists(
-                        SafeContract.objects.filter(
-                            address=OuterRef("internal_tx___from")
-                        )
+                        SafeContract.objects.filter(address=OuterRef("safe_address"))
                     )
                 )  # Just Safes indexed
                 | Q(function_name="setup")  # Safes pending to be indexed
@@ -258,10 +257,11 @@ class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "-internal_tx_id",
     ]
     raw_id_fields = ("internal_tx",)
+    readonly_fields = ("safe_address",)
     search_fields = [
         "==function_name",
         "==internal_tx__to",
-        "==internal_tx___from",
+        "==safe_address",
         "==internal_tx__ethereum_tx__tx_hash",
         "==internal_tx__block_number",
     ]
