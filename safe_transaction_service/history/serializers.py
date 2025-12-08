@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema_field
 from eth_typing import ChecksumAddress
+from packaging.version import Version
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -273,7 +274,7 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
         safe_signature_hash = (
             safe_tx_hash
-            if safe.get_version() == "1.5.0"
+            if Version(safe.get_version()) >= Version("1.5.0")
             else safe_tx.safe_tx_hash_preimage
         )
         parsed_signatures = SafeSignature.parse_signature(
