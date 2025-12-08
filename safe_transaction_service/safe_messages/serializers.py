@@ -18,13 +18,13 @@ from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.utils.serializers import (
     get_safe_owners,
-    select_preimage_by_safe_version,
 )
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
 from .utils import (
     get_message_encoded,
     get_safe_message_hash_and_preimage_for_message,
+    select_hash_by_safe_version,
 )
 
 
@@ -137,8 +137,8 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         # not the Safe-encoded hash
         ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)
-        safe_message_preimage = select_preimage_by_safe_version(
-            safe.get_version(), safe_message_preimage
+        safe_message_preimage = select_hash_by_safe_version(
+            safe.get_version(), safe_message_hash, safe_message_preimage
         )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
@@ -186,8 +186,8 @@ class SafeMessageSignatureSerializer(
         assert to_0x_hex_str(safe_message_hash) == safe_message.message_hash
 
         safe = Safe(safe_address, get_auto_ethereum_client())
-        safe_message_preimage = select_preimage_by_safe_version(
-            safe.get_version(), safe_message_preimage
+        safe_message_preimage = select_hash_by_safe_version(
+            safe.get_version(), safe_message_hash, safe_message_preimage
         )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage

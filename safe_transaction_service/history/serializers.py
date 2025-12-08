@@ -11,7 +11,6 @@ from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema_field
 from eth_typing import ChecksumAddress
-from packaging.version import Version
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -35,11 +34,11 @@ from safe_transaction_service.contracts.tx_decoder import (
     TxDecoderException,
     get_db_tx_decoder,
 )
+from safe_transaction_service.safe_messages.utils import select_hash_by_safe_version
 from safe_transaction_service.tokens.serializers import TokenInfoResponseSerializer
 from safe_transaction_service.utils.serializers import (
     EpochDateTimeField,
     get_safe_owners,
-    select_preimage_by_safe_version,
 )
 
 from ..contracts.models import Contract
@@ -121,8 +120,8 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         )
 
         safe_owners = get_safe_owners(safe_address)
-        safe_hash_preimage = select_preimage_by_safe_version(
-            safe.get_version(), safe_tx.safe_tx_hash_preimage
+        safe_hash_preimage = select_hash_by_safe_version(
+            safe.get_version(), safe_tx.safe_tx_hash, safe_tx.safe_tx_hash_preimage
         )
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_tx_hash, safe_hash_preimage=safe_hash_preimage
@@ -272,10 +271,8 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
         # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
-        safe_signature_hash = (
-            safe_tx_hash
-            if Version(safe.get_version()) >= Version("1.5.0")
-            else safe_tx.safe_tx_hash_preimage
+        safe_signature_hash = select_hash_by_safe_version(
+            safe.get_version(), safe_tx.safe_tx_hash, safe_tx.safe_tx_hash_preimage
         )
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_tx_hash, safe_hash_preimage=safe_signature_hash

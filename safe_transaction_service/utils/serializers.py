@@ -29,22 +29,6 @@ def get_safe_owners(safe_address: ChecksumAddress) -> list[ChecksumAddress]:
         ) from exc
 
 
-def select_preimage_by_safe_version(
-    safe_version: str, safe_message_preimage: bytes
-) -> bytes | None:
-    """
-    Returns None for v1.5.0+ Safes, otherwise returns the provided preimage.
-
-    :param safe_version: Version of the Safe contract.
-    :param message_hash: Original message hash (EIP-191 or EIP-712).
-    :param safe_message_preimage: Safe-encoded message hash.
-    :return: Hash to be used for signature validation.
-    """
-    if safe_version == "1.5.0" or safe_version == "1.5.0+L2":
-        return None
-    return safe_message_preimage
-
-
 class EpochDateTimeField(DateTimeField):
     """
     Custom DateTimeField that accepts an integer epoch and converts it to a datetime.

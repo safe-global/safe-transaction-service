@@ -93,7 +93,7 @@ from .mocks.traces import call_trace
 logger = logging.getLogger(__name__)
 
 
-class TestViews(SafeTestCaseMixin, APITestCase):
+class TestViewsV150(SafeTestCaseMixin, APITestCase):
     def setUp(self):
         get_redis().flushall()
 
@@ -5007,3 +5007,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["amount"], str(erc20_transfer.value))
         self.assertEqual(result["transactionHash"], ethereum_tx.tx_hash)
         # Standalone transfers should not have safe_tx_hash
+
+
+class TestViewsV141(TestViewsV150):
+    """
+    Test views v2 with Safe v1.4.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_4_1(*args, **kwargs)

@@ -53,7 +53,7 @@ from .factories import (
 )
 
 
-class TestViewsV2(SafeTestCaseMixin, APITestCase):
+class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
     def test_safe_collectibles_paginated(self):
         safe_address = Account.create().address
 
@@ -429,14 +429,11 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(safe_contract_delegate.delegator, safe_owner.address)
         self.assertEqual(safe_contract_delegate.safe_contract_id, nested_safe.address)
 
+    # TODO: Now that we have TestViewsV2V141 and TestViewsV2V150, should be create TestViewsV2V130?
+    # Downside: This will increase the number of tests.
     def test_add_delegate_using_1271_signature_v1_3_0(self):
         return self._test_add_delegate_using_1271_signature(
             self.deploy_test_safe_v1_3_0
-        )
-
-    def test_add_delegate_using_1271_signature_v1_4_1(self):
-        return self._test_add_delegate_using_1271_signature(
-            self.deploy_test_safe_v1_4_1
         )
 
     def test_delegates_get(self):
@@ -2803,3 +2800,16 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             .address,
             addresses,
         )
+
+class TestViewsV2V141(TestViewsV2V150):
+    """
+    Test views v2 with Safe v1.4.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_4_1(*args, **kwargs)
