@@ -60,7 +60,6 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
     def safe_contract(self):
         pass
 
-    @property
     @abstractmethod
     def get_safe_contract(self, w3: Web3, address: ChecksumAddress):
         pass
