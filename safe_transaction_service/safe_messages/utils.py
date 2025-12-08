@@ -2,6 +2,7 @@ from typing import Any
 
 from eth_account.messages import encode_defunct
 from eth_typing import ChecksumAddress, Hash32
+from packaging.version import Version
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.safe import Safe
@@ -46,6 +47,6 @@ def select_hash_by_safe_version(
     :param safe_message_preimage: Safe-encoded message hash.
     :return: Hash to be used for signature validation.
     """
-    if safe_version == "1.5.0":
+    if Version(safe_version) >= Version("1.5.0"):
         return safe_message_hash
     return safe_message_preimage
