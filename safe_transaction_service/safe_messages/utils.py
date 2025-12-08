@@ -37,7 +37,7 @@ def get_safe_message_hash_and_preimage_for_message(
     return safe.get_message_hash_and_preimage(message)
 
 
-def select_hash_by_safe_version(
+def select_safe_encoded_message_hash_by_safe_version(
     safe_version: str, safe_message_hash: bytes, safe_message_preimage: bytes
 ) -> bytes:
     """
