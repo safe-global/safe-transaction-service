@@ -26,6 +26,9 @@ from safe_eth.util.util import to_0x_hex_str
 from ...contracts.models import ContractQuerySet
 from ...contracts.tests.factories import ContractFactory
 from ...contracts.tx_decoder import DbTxDecoder
+from ...safe_messages.utils import (
+    select_safe_encoded_message_hash_by_safe_version,
+)
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
 from ...utils.utils import datetime_to_str
@@ -1530,8 +1533,13 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         safe_tx_hash = safe_tx.safe_tx_hash
+        safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash)
+        selected_hash = select_safe_encoded_message_hash_by_safe_version(
+            safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
+        )
+
+        safe_owner_message_hash = safe_owner.get_message_hash(selected_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
