@@ -31,7 +31,9 @@ from safe_transaction_service.account_abstraction.tests import factories as aa_f
 from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
-from safe_transaction_service.safe_messages.utils import select_hash_by_safe_version
+from safe_transaction_service.safe_messages.utils import (
+    select_safe_encoded_message_hash_by_safe_version,
+)
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
@@ -1772,7 +1774,7 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        selected_hash = select_hash_by_safe_version(
+        selected_hash = select_safe_encoded_message_hash_by_safe_version(
             safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
         )
 

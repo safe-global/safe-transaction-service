@@ -31,7 +31,7 @@ from safe_transaction_service.utils.utils import datetime_to_str
 from ..utils import (
     encode_eip191_message,
     encode_eip712_message,
-    select_hash_by_safe_version,
+    select_safe_encoded_message_hash_by_safe_version,
 )
 from .mocks import get_eip712_payload_mock
 
@@ -299,7 +299,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             fast_keccak(message_encoded)
         )
 
-        data = select_hash_by_safe_version(
+        data = select_safe_encoded_message_hash_by_safe_version(
             safe.get_version(), safe_message_hash, safe_message_preimage
         )
 
