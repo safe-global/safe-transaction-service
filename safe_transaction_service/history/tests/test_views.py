@@ -3839,7 +3839,7 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
                 "master_copy": blockchain_safe.retrieve_master_copy_address(),
                 "modules": [],
                 "fallback_handler": blockchain_safe.retrieve_fallback_handler(),
-                "transaction_guard": NULL_ADDRESS,
+                "guard": NULL_ADDRESS,
                 "module_guard": NULL_ADDRESS,
                 "version": "1.25.0",
             },

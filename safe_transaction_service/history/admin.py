@@ -599,7 +599,7 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "nonce",
         "master_copy",
         "fallback_handler",
-        "transaction_guard",
+        "guard",
         "module_guard",
         "enabled_modules",
     )
@@ -607,7 +607,7 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "threshold",
         "master_copy",
         "fallback_handler",
-        "transaction_guard",
+        "guard",
         "module_guard",
         SafeStatusModulesListFilter,
     )

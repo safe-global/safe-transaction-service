@@ -255,7 +255,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         self.assertEqual(safe_status.threshold, threshold)
         self.assertEqual(safe_status.nonce, 0)
         self.assertEqual(safe_status.enabled_modules, [])
-        self.assertIsNone(safe_status.transaction_guard)
+        self.assertIsNone(safe_status.guard)
         self.assertEqual(MultisigTransaction.objects.count(), 0)
         self.assertEqual(MultisigConfirmation.objects.count(), 0)
 
@@ -614,13 +614,13 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_status, SafeStatus.from_status_instance(safe_last_status))
         self.assertEqual(safe_status.nonce, 8)
-        self.assertEqual(safe_status.transaction_guard, guard_address)
+        self.assertEqual(safe_status.guard, guard_address)
 
         safe_status = SafeStatus.objects.sorted_by_mined()[
             1
         ]  # Just processed execTransaction
         self.assertEqual(safe_status.nonce, 8)
-        self.assertIsNone(safe_status.transaction_guard)
+        self.assertIsNone(safe_status.guard)
 
         # Check master copy did not change during the execution
         self.assertEqual(

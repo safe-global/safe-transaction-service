@@ -903,7 +903,7 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     master_copy = EthereumAddressField()
     modules = serializers.ListField(child=EthereumAddressField())
     fallback_handler = EthereumAddressField()
-    transaction_guard = EthereumAddressField()
+    guard = EthereumAddressField()
     module_guard = EthereumAddressField()
     version = serializers.CharField(allow_null=True)
 

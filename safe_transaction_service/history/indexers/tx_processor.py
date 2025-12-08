@@ -582,16 +582,14 @@ class SafeTxProcessor(TxProcessor):
                     safe_last_status, internal_tx, ["fallback_handler"]
                 )
             elif function_name == "setGuard":
-                safe_last_status.transaction_guard = (
+                safe_last_status.guard = (
                     arguments["guard"] if arguments["guard"] != NULL_ADDRESS else None
                 )
-                if safe_last_status.transaction_guard:
+                if safe_last_status.guard:
                     logger.debug("[%s] Setting TransactionGuard", contract_address)
                 else:
                     logger.debug("[%s] Unsetting TransactionGuard", contract_address)
-                self.store_new_safe_status(
-                    safe_last_status, internal_tx, ["transaction_guard"]
-                )
+                self.store_new_safe_status(safe_last_status, internal_tx, ["guard"])
             elif function_name == "setModuleGuard":
                 safe_last_status.module_guard = (
                     arguments["moduleGuard"]

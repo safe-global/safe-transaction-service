@@ -853,9 +853,7 @@ class TestLastSafeStatus(TestCase):
         self.assertEqual(
             safe_status.fallback_handler, safe_last_status.fallback_handler
         )
-        self.assertEqual(
-            safe_status.transaction_guard, safe_last_status.transaction_guard
-        )
+        self.assertEqual(safe_status.guard, safe_last_status.guard)
         self.assertEqual(safe_status.enabled_modules, safe_last_status.enabled_modules)
 
         # Update SafeLastStatus
