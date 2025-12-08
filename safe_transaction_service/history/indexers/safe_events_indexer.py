@@ -591,39 +591,17 @@ class SafeEventsIndexer(EventsIndexer):
             # Find events by type (each Safe should have at most one of each)
             setup_event: EventData | None = None
             proxy_creation_event: EventData | None = None
+            proxy_creation_event_l2: EventData | None = None
+            chain_specific_proxy_creation_event_l2: EventData | None = None
             for event in events:
                 if event["event"] == "SafeSetup":
                     setup_event = event
                 elif event["event"] == "ProxyCreation":
                     proxy_creation_event = event
-                    # Generate InternalTx for ProxyCreation
-                    internal_tx = self._get_internal_tx_from_decoded_element(
-                        proxy_creation_event,
-                        contract_address=proxy_creation_event["args"].get("proxy"),
-                        tx_type=InternalTxType.CREATE.value,
-                        call_type=None,
-                    )
-                    internal_txs.append(internal_tx)
                 elif event["event"] == "ProxyCreationL2":
                     proxy_creation_event_l2 = event
-                    internal_tx = self._get_internal_tx_from_decoded_element(
-                        proxy_creation_event_l2,
-                        contract_address=proxy_creation_event_l2["args"].get("proxy"),
-                        tx_type=InternalTxType.CREATE.value,
-                        call_type=None,
-                    )
-                    internal_txs.append(internal_tx)
                 elif event["event"] == "ChainSpecificProxyCreationL2":
                     chain_specific_proxy_creation_event_l2 = event
-                    internal_tx = self._get_internal_tx_from_decoded_element(
-                        chain_specific_proxy_creation_event_l2,
-                        contract_address=chain_specific_proxy_creation_event_l2[
-                            "args"
-                        ].get("proxy"),
-                        tx_type=InternalTxType.CREATE.value,
-                        call_type=None,
-                    )
-                    internal_txs.append(internal_tx)
                 else:
                     logger.error("Unexpected event type: %s", event["event"])
 
@@ -636,11 +614,32 @@ class SafeEventsIndexer(EventsIndexer):
                     call_type=None,
                 )
                 internal_txs.append(internal_tx)
+            if proxy_creation_event_l2:
+                internal_tx = self._get_internal_tx_from_decoded_element(
+                    proxy_creation_event_l2,
+                    contract_address=proxy_creation_event_l2["args"].get("proxy"),
+                    tx_type=InternalTxType.CREATE.value,
+                    call_type=None,
+                )
+                internal_txs.append(internal_tx)
+            if chain_specific_proxy_creation_event_l2:
+                internal_tx = self._get_internal_tx_from_decoded_element(
+                    chain_specific_proxy_creation_event_l2,
+                    contract_address=chain_specific_proxy_creation_event_l2["args"].get(
+                        "proxy"
+                    ),
+                    tx_type=InternalTxType.CREATE.value,
+                    call_type=None,
+                )
+                internal_txs.append(internal_tx)
 
             # Process SafeSetup - initializes the Safe
             if setup_event:
                 if not proxy_creation_event:
                     # SafeSetup without ProxyCreation means proxy was created in a previous block
+                    # ProxyCreationL2 or ChainSpecificProxyCreationL2 (only available v1.5.0 onwards) are not considered here because tracking ProxyCreation is enough.
+                    # ProxyCreation is also emmited when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emmited.
+                    # See: https://github.com/safe-fndn/safe-smart-account/blob/release/v1.5.0/contracts/proxies/SafeProxyFactory.sol
                     logger.debug(
                         "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
                         safe_address,

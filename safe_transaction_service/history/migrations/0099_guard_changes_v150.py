@@ -7,7 +7,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('history', '0097_internaltxdecoded_safe_address_processed'),
+        ('history', '0098_internaltxdecoded_setup_idx'),
     ]
 
     operations = [
