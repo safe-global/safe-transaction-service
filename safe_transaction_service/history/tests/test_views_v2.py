@@ -30,7 +30,12 @@ from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
 from ...utils.utils import datetime_to_str
 from ..helpers import DelegateSignatureHelperV2, DeleteMultisigTxSignatureHelper
-from ..models import MultisigConfirmation, MultisigTransaction, SafeContractDelegate
+from ..models import (
+    MultisigConfirmation,
+    MultisigTransaction,
+    SafeContractDelegate,
+    SafeLastStatus,
+)
 from ..serializers import TransferType
 from ..views_v2 import SafeMultisigTransactionListView
 from .factories import (
@@ -43,6 +48,8 @@ from .factories import (
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
     SafeContractFactory,
+    SafeLastStatusFactory,
+    SafeStatusFactory,
 )
 
 
@@ -2609,4 +2616,191 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             {module_transaction_1.module, module_transaction_2.module},
             {module_tx["module"] for module_tx in response.data["results"]},
+        )
+
+    def test_owners_view_v2(self):
+        """Test OwnersViewV2 with pagination and all SafeLastStatus fields"""
+        invalid_address = "0x2A"
+        response = self.client.get(
+            reverse("v2:history:owners", args=(invalid_address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["code"], 1)
+        self.assertEqual(response.data["message"], "Checksum address validation failed")
+
+        owner_address = Account.create().address
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+
+        # Create SafeLastStatus with the owner
+        safe_last_status = SafeLastStatusFactory(owners=[owner_address])
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        # Verify all SafeLastStatus fields are present
+        result = response.data["results"][0]
+        self.assertEqual(result["address"], safe_last_status.address)
+        self.assertCountEqual(result["owners"], safe_last_status.owners)
+        self.assertEqual(result["threshold"], safe_last_status.threshold)
+        self.assertEqual(result["nonce"], safe_last_status.nonce)
+        self.assertEqual(result["master_copy"], safe_last_status.master_copy)
+        self.assertEqual(result["fallback_handler"], safe_last_status.fallback_handler)
+        self.assertEqual(result["guard"], safe_last_status.guard)
+        self.assertCountEqual(
+            result["enabled_modules"], safe_last_status.enabled_modules
+        )
+
+        # Test with multiple safes
+        safe_status_2 = SafeLastStatusFactory(owners=[owner_address])
+        SafeStatusFactory()  # Test that other SafeStatus don't appear
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+        addresses = [result["address"] for result in response.data["results"]]
+        self.assertCountEqual(
+            addresses, [safe_last_status.address, safe_status_2.address]
+        )
+
+        # Test pagination
+        _safe_status_3 = SafeLastStatusFactory(owners=[owner_address])
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)) + "?limit=2&offset=0",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertIsNotNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+        # Test next page
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)) + "?limit=2&offset=2",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNone(response.data["next"])
+        self.assertIsNotNone(response.data["previous"])
+
+        # Test that safes without the owner don't appear
+        other_owner = Account.create().address
+        SafeLastStatusFactory(owners=[other_owner])
+        response = self.client.get(
+            reverse("v2:history:owners", args=(owner_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        addresses = [result["address"] for result in response.data["results"]]
+        self.assertNotIn(
+            SafeLastStatus.objects.filter(owners__contains=[other_owner])
+            .first()
+            .address,
+            addresses,
+        )
+
+    def test_modules_view_v2(self):
+        """Test ModulesViewV2 with pagination and all SafeLastStatus fields"""
+        invalid_address = "0x2A"
+        response = self.client.get(
+            reverse("v2:history:modules", args=(invalid_address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["code"], 1)
+        self.assertEqual(response.data["message"], "Checksum address validation failed")
+
+        module_address = Account.create().address
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+
+        # Create SafeLastStatus with the module
+        safe_last_status = SafeLastStatusFactory(enabled_modules=[module_address])
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+
+        # Verify all SafeLastStatus fields are present
+        result = response.data["results"][0]
+        self.assertEqual(result["address"], safe_last_status.address)
+        self.assertCountEqual(result["owners"], safe_last_status.owners)
+        self.assertEqual(result["threshold"], safe_last_status.threshold)
+        self.assertEqual(result["nonce"], safe_last_status.nonce)
+        self.assertEqual(result["master_copy"], safe_last_status.master_copy)
+        self.assertEqual(result["fallback_handler"], safe_last_status.fallback_handler)
+        self.assertEqual(result["guard"], safe_last_status.guard)
+        self.assertCountEqual(
+            result["enabled_modules"], safe_last_status.enabled_modules
+        )
+        self.assertIn(module_address, result["enabled_modules"])
+
+        # Test with multiple safes
+        safe_status_2 = SafeLastStatusFactory(enabled_modules=[module_address])
+        SafeStatusFactory()  # Test that other SafeStatus don't appear
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+        addresses = [result["address"] for result in response.data["results"]]
+        self.assertCountEqual(
+            addresses, [safe_last_status.address, safe_status_2.address]
+        )
+
+        # Test pagination
+        _safe_status_3 = SafeLastStatusFactory(enabled_modules=[module_address])
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)) + "?limit=2&offset=0",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 2)
+        self.assertIsNotNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+        # Test next page
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)) + "?limit=2&offset=2",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNone(response.data["next"])
+        self.assertIsNotNone(response.data["previous"])
+
+        # Test that safes without the module don't appear
+        other_module = Account.create().address
+        SafeLastStatusFactory(enabled_modules=[other_module])
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 3)
+        addresses = [result["address"] for result in response.data["results"]]
+        self.assertNotIn(
+            SafeLastStatus.objects.filter(enabled_modules__contains=[other_module])
+            .first()
+            .address,
+            addresses,
         )
