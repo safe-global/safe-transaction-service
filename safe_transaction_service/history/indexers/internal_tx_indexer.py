@@ -286,17 +286,24 @@ class InternalTxIndexer(EthereumIndexer):
     def filter_relevant_txs(
         self, internal_txs: Generator[InternalTx]
     ) -> Generator[InternalTx]:
+        relevant_txs_to_create = []
         for internal_tx in internal_txs:
             if internal_tx.is_relevant:
                 if internal_tx.is_ether_transfer:
-                    SafeRelevantTransaction.objects.get_or_create(
-                        ethereum_tx_id=internal_tx.ethereum_tx_id,
-                        safe=internal_tx.to,
-                        defaults={
-                            "timestamp": internal_tx.timestamp,
-                        },
+                    relevant_txs_to_create.append(
+                        SafeRelevantTransaction(
+                            ethereum_tx_id=internal_tx.ethereum_tx_id,
+                            safe=internal_tx.to,
+                            timestamp=internal_tx.timestamp,
+                        )
                     )
                 yield internal_tx
+
+        # Batch create SafeRelevantTransaction records
+        if relevant_txs_to_create:
+            SafeRelevantTransaction.objects.bulk_create(
+                relevant_txs_to_create, ignore_conflicts=True
+            )
 
     def process_elements(
         self, tx_hash_with_traces: OrderedDict[bytes, FilterTrace | None]
