@@ -350,20 +350,26 @@ class TestEthereumTx(TestCase):
                     ethereum_tx.transaction_index, tx_receipt["transactionIndex"]
                 )
 
-    def test_account_abstraction_tx_hashes(self):
+    def test_account_abstraction_txs(self):
         self.assertEqual(len(EthereumTx.objects.account_abstraction_txs()), 0)
 
         # Insert random transaction
         EthereumTxFactory()
         self.assertEqual(len(EthereumTx.objects.account_abstraction_txs()), 0)
 
+        # Insert a non 4337 transaction
+        _ethereum_tx = EthereumTxFactory(
+            logs=[clean_receipt_log(log) for log in type_0_tx["receipt"]["logs"]]
+        )
+        self.assertEqual(len(EthereumTx.objects.account_abstraction_txs()), 0)
+
         # Insert a 4337 transaction
-        ethereum_tx = EthereumTxFactory(
+        aa_ethereum_tx = EthereumTxFactory(
             logs=[clean_receipt_log(log) for log in aa_tx_receipt_mock["logs"]]
         )
         ethereum_txs = EthereumTx.objects.account_abstraction_txs()
         self.assertEqual(len(ethereum_txs), 1)
-        self.assertEqual(ethereum_txs[0], ethereum_tx)
+        self.assertEqual(ethereum_txs[0], aa_ethereum_tx)
 
     def test_get_deployed_proxies_from_logs(self):
         ethereum_tx = EthereumTxFactory(
