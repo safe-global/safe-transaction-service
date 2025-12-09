@@ -2809,6 +2809,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             addresses,
         )
 
+
 class TestViewsV2V141(TestViewsV2V150):
     """
     Test views v2 with Safe v1.4.1 contracts.
