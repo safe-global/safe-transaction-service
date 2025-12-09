@@ -23,7 +23,12 @@ from safe_transaction_service.utils.utils import parse_boolean_query_param
 from ..loggers.custom_logger import http_request_log
 from . import filters, pagination, serializers
 from .cache import CacheSafeTxsView, cache_txs_view_for_address
-from .models import MultisigTransaction, SafeContract, SafeContractDelegate
+from .models import (
+    MultisigTransaction,
+    SafeContract,
+    SafeContractDelegate,
+    SafeLastStatus,
+)
 from .pagination import DummyPagination
 from .services import BalanceServiceProvider, TransactionServiceProvider
 from .services.balance_service import Balance
@@ -631,3 +636,89 @@ class AllTransactionsListView(ListAPIView):
             "W/" + hashlib.md5(str(response.data["results"]).encode()).hexdigest(),
         )
         return response
+
+
+@extend_schema(
+    responses={
+        200: OpenApiResponse(
+            response=serializers.SafeLastStatusSerializer(many=True),
+            description="Paginated list of Safe accounts that have the given address as their owner",
+        ),
+        422: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Owner address checksum not valid",
+        ),
+    },
+)
+class OwnersViewV2(ListAPIView):
+    """
+    Returns a paginated list of Safe accounts that have the given address as their owner.
+    Returns all SafeLastStatus attributes for each Safe.
+    """
+
+    serializer_class = serializers.SafeLastStatusSerializer
+    pagination_class = pagination.DefaultPagination
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SafeLastStatus.objects.none()
+        return SafeLastStatus.objects.safes_for_owner(self.kwargs["address"])
+
+    def get(self, request, address, *args, **kwargs):
+        """
+        Returns a paginated list of Safe accounts that have the given address as their owner.
+        """
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        return super().get(request, address, *args, **kwargs)
+
+
+@extend_schema(
+    responses={
+        200: OpenApiResponse(
+            response=serializers.SafeLastStatusSerializer(many=True),
+            description="Paginated list of Safe accounts that have the provided module enabled",
+        ),
+        422: OpenApiResponse(
+            response=serializers.CodeErrorResponse,
+            description="Module address checksum not valid",
+        ),
+    },
+)
+class ModulesViewV2(ListAPIView):
+    """
+    Returns a paginated list of Safe accounts that have the provided module enabled.
+    Returns all SafeLastStatus attributes for each Safe.
+    """
+
+    serializer_class = serializers.SafeLastStatusSerializer
+    pagination_class = pagination.DefaultPagination
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SafeLastStatus.objects.none()
+        return SafeLastStatus.objects.safes_for_module(self.kwargs["address"])
+
+    def get(self, request, address, *args, **kwargs):
+        """
+        Returns a paginated list of Safe accounts that have the provided module enabled.
+        """
+        if not fast_is_checksum_address(address):
+            return Response(
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                data={
+                    "code": 1,
+                    "message": "Checksum address validation failed",
+                    "arguments": [address],
+                },
+            )
+
+        return super().get(request, address, *args, **kwargs)

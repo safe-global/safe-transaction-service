@@ -2313,6 +2313,20 @@ class SafeLastStatusManager(models.Manager):
             "address", flat=True
         )
 
+    def safes_for_owner(self, owner_address: str) -> QuerySet["SafeLastStatus"]:
+        """
+        :param owner_address:
+        :return: SafeLastStatus queryset where the provided `owner_address` is an owner
+        """
+        return self.filter(owners__contains=[owner_address])
+
+    def safes_for_module(self, module_address: str) -> QuerySet["SafeLastStatus"]:
+        """
+        :param module_address:
+        :return: SafeLastStatus queryset where the provided `module_address` is enabled
+        """
+        return self.filter(enabled_modules__contains=[module_address])
+
 
 class SafeLastStatus(SafeStatusBase):
     """Latest known Safe state cached for quick access."""

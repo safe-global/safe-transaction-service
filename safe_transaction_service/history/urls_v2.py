@@ -36,4 +36,14 @@ urlpatterns = [
         views_v2.AllTransactionsListView.as_view(),
         name="all-transactions",
     ),
+    path(
+        "owners/<str:address>/safes/",
+        views_v2.OwnersViewV2.as_view(),
+        name="owners",
+    ),
+    path(
+        "modules/<str:address>/safes/",
+        views_v2.ModulesViewV2.as_view(),
+        name="modules",
+    ),
 ]
