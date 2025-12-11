@@ -948,13 +948,15 @@ class SafeTransferListView(ListAPIView):
 
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.to_or_from(address).token_txs()
+            ERC20Transfer.objects.to_or_from(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.to_or_from(address).token_txs()
+            ERC721Transfer.objects.to_or_from(address)
+            .token_txs()
+            .order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_txs_for_address(address)
+            InternalTx.objects.ether_txs_for_address(address).order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         return InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
@@ -1029,13 +1031,15 @@ class SafeIncomingTransferListView(SafeTransferListView):
 
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.incoming(address).token_txs()
+            ERC20Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.incoming(address).token_txs()
+            ERC721Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_incoming_txs_for_address(address)
+            InternalTx.objects.ether_incoming_txs_for_address(address).order_by(
+                "-timestamp"
+            )
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
 
         return InternalTx.objects.union_ether_and_token_txs(
