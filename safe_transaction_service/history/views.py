@@ -1134,13 +1134,14 @@ class ModulesView(GenericAPIView):
     pagination_class = None  # Don't show limit/offset in swagger
 
     @extend_schema(
+        deprecated=True,
         responses={
             200: serializers.ModulesResponseSerializer(),
             422: OpenApiResponse(
                 response=serializers.CodeErrorResponse,
                 description="Module address checksum not valid",
             ),
-        }
+        },
     )
     @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):
@@ -1168,13 +1169,14 @@ class OwnersView(GenericAPIView):
     pagination_class = None  # Don't show limit/offset in swagger
 
     @extend_schema(
+        deprecated=True,
         responses={
             200: serializers.OwnerResponseSerializer(),
             422: OpenApiResponse(
                 response=serializers.CodeErrorResponse,
                 description="Owner address checksum not valid",
             ),
-        }
+        },
     )
     @method_decorator(cache_page(15))  # 15 seconds
     def get(self, request, address, *args, **kwargs):

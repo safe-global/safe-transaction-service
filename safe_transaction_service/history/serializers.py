@@ -914,6 +914,17 @@ class OwnerResponseSerializer(serializers.Serializer):
     safes = serializers.ListField(child=EthereumAddressField())
 
 
+class SafeLastStatusSerializer(serializers.Serializer):
+    address = EthereumAddressField()
+    owners = serializers.ListField(child=EthereumAddressField())
+    threshold = serializers.IntegerField()
+    nonce = serializers.IntegerField()
+    master_copy = EthereumAddressField()
+    fallback_handler = EthereumAddressField()
+    guard = EthereumAddressField(allow_null=True)
+    enabled_modules = serializers.ListField(child=EthereumAddressField())
+
+
 class TransferType(Enum):
     ETHER_TRANSFER = 0
     ERC20_TRANSFER = 1
