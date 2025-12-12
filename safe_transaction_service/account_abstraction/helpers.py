@@ -47,7 +47,6 @@ def decode_init_code(
     factory_data = init_code[20:]
 
     proxy_factory = ProxyFactory.from_address(factory_address, ethereum_client)
-    # TODO: This call detects the version again, we could optimize to avoid this double call. First call is in ProxyFactory.from_address. Should we optimize here?
     version = ProxyFactory.detect_version_from_address(factory_address=factory_address)
     safe_contract = get_safe_contract_by_version(version=version, w3=ethereum_client.w3)
 
