@@ -1197,7 +1197,9 @@ class OwnersView(GenericAPIView):
                 },
             )
 
-        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)
+        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)[
+            : pagination.DefaultPagination.max_limit
+        ]
         serializer = self.get_serializer(data={"safes": safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
