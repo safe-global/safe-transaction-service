@@ -130,7 +130,7 @@ class UserOperation(models.Model):
         if not self.signature:
             raise ValueError("Signature should not be empty")
         signature = HexBytes(self.signature)
-        if self.entry_point.lower() == settings.ENTRYPOINT_V6.lower():
+        if self.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V6.lower():
             return UserOperationV6(
                 HexBytes(self.hash),
                 self.sender,
@@ -147,7 +147,7 @@ class UserOperation(models.Model):
                 self.entry_point,
                 user_operation_metadata,
             )
-        elif self.entry_point.lower() == settings.ENTRYPOINT_V7.lower():
+        elif self.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower():
             return UserOperationV7(
                 HexBytes(self.hash),
                 self.sender,
