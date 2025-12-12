@@ -26,6 +26,9 @@ from safe_eth.util.util import to_0x_hex_str
 from ...contracts.models import ContractQuerySet
 from ...contracts.tests.factories import ContractFactory
 from ...contracts.tx_decoder import DbTxDecoder
+from ...safe_messages.utils import (
+    select_safe_encoded_message_hash_by_safe_version,
+)
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
 from ...utils.utils import datetime_to_str
@@ -53,7 +56,7 @@ from .factories import (
 )
 
 
-class TestViewsV2(SafeTestCaseMixin, APITestCase):
+class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
     def test_safe_collectibles_paginated(self):
         safe_address = Account.create().address
 
@@ -429,14 +432,11 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         self.assertEqual(safe_contract_delegate.delegator, safe_owner.address)
         self.assertEqual(safe_contract_delegate.safe_contract_id, nested_safe.address)
 
+    # TODO: Now that we have TestViewsV2V141 and TestViewsV2V150, should be create TestViewsV2V130?
+    # Downside: This will increase the number of tests.
     def test_add_delegate_using_1271_signature_v1_3_0(self):
         return self._test_add_delegate_using_1271_signature(
             self.deploy_test_safe_v1_3_0
-        )
-
-    def test_add_delegate_using_1271_signature_v1_4_1(self):
-        return self._test_add_delegate_using_1271_signature(
-            self.deploy_test_safe_v1_4_1
         )
 
     def test_delegates_get(self):
@@ -1535,7 +1535,11 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        selected_hash = select_safe_encoded_message_hash_by_safe_version(
+            safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
+        )
+
+        safe_owner_message_hash = safe_owner.get_message_hash(selected_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -2804,3 +2808,17 @@ class TestViewsV2(SafeTestCaseMixin, APITestCase):
             .address,
             addresses,
         )
+
+
+class TestViewsV2V141(TestViewsV2V150):
+    """
+    Test views v2 with Safe v1.4.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_4_1(*args, **kwargs)

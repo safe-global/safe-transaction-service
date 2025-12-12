@@ -31,6 +31,9 @@ from safe_transaction_service.account_abstraction.tests import factories as aa_f
 from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
+from safe_transaction_service.safe_messages.utils import (
+    select_safe_encoded_message_hash_by_safe_version,
+)
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
@@ -73,6 +76,9 @@ from .mocks.deployments_mock import (
     mainnet_deployments_1_4_1,
     mainnet_deployments_1_4_1_multisend,
     mainnet_deployments_1_4_1_safe,
+    mainnet_deployments_1_5_0,
+    mainnet_deployments_1_5_0_multisend,
+    mainnet_deployments_1_5_0_safe,
 )
 from .mocks.mocks_safe_creation import (
     create_cpk_test_data,
@@ -89,7 +95,7 @@ from .mocks.traces import call_trace
 logger = logging.getLogger(__name__)
 
 
-class TestViews(SafeTestCaseMixin, APITestCase):
+class TestViewsV150(SafeTestCaseMixin, APITestCase):
     def setUp(self):
         get_redis().flushall()
 
@@ -293,6 +299,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json(), [mainnet_deployments_1_4_1])
 
+        response = self.client.get(url + "?version=1.5.0", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), [mainnet_deployments_1_5_0])
+
         response = self.client.get(
             url + "?version=1.4.1&contract=MultiSend", format="json"
         )
@@ -300,6 +310,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.json(),
             [{"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_multisend]}],
+        )
+
+        response = self.client.get(
+            url + "?version=1.5.0&contract=MultiSend", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [{"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_multisend]}],
         )
 
         response = self.client.get(url + "?contract=Safe", format="json")
@@ -312,6 +331,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 {"version": "1.2.0", "contracts": []},
                 {"version": "1.3.0", "contracts": []},
                 {"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_safe]},
+                {"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_safe]},
             ],
         )
 
@@ -1754,7 +1774,11 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        selected_hash = select_safe_encoded_message_hash_by_safe_version(
+            safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
+        )
+
+        safe_owner_message_hash = safe_owner.get_message_hash(selected_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -3816,6 +3840,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "modules": [],
                 "fallback_handler": blockchain_safe.retrieve_fallback_handler(),
                 "guard": NULL_ADDRESS,
+                "module_guard": NULL_ADDRESS,
                 "version": "1.25.0",
             },
         )
@@ -4984,3 +5009,17 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["amount"], str(erc20_transfer.value))
         self.assertEqual(result["transactionHash"], ethereum_tx.tx_hash)
         # Standalone transfers should not have safe_tx_hash
+
+
+class TestViewsV141(TestViewsV150):
+    """
+    Test views v2 with Safe v1.4.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_4_1(*args, **kwargs)
