@@ -3072,6 +3072,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
+        # Validate ordering by timestamp (descending - newest first)
+        self.assertGreater(
+            ethereum_erc_721_event.timestamp,
+            ethereum_erc_20_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event.timestamp,
+            internal_tx.timestamp,
+        )
+
     def test_transfers_view(self):
         safe_address = Account.create().address
         response = self.client.get(
@@ -3363,6 +3373,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertGreater(len(response.data["results"]), 0)
         for result in response.data["results"]:
             self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
+
+        # Validate ordering by timestamp (descending - newest first)
+        self.assertGreater(
+            ethereum_erc_721_event_2.timestamp,
+            ethereum_erc_721_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_721_event.timestamp,
+            ethereum_erc_20_event_2.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event_2.timestamp,
+            ethereum_erc_20_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event.timestamp,
+            internal_tx_2.timestamp,
+        )
+        self.assertGreater(
+            internal_tx_2.timestamp,
+            internal_tx.timestamp,
+        )
 
         # Test that the result should be cached
         # Mock get_queryset with empty queryset return value to get proper error in case of fail
