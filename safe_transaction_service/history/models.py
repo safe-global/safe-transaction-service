@@ -1,4 +1,5 @@
 import datetime
+import json
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from enum import Enum
@@ -407,10 +408,12 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
         """
         :return: Transactions containing ERC4337 `UserOperation` event
         """
-        query = '{"topics": ["' + to_0x_hex_str(USER_OPERATION_EVENT_TOPIC) + '"]}'
+        # Use json.dumps to safely construct the JSON query string
+        query_json = json.dumps({"topics": [to_0x_hex_str(USER_OPERATION_EVENT_TOPIC)]})
 
         return self.raw(
-            f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
+            "SELECT * FROM history_ethereumtx WHERE %s::jsonb <@ ANY (logs)",
+            [query_json],
         )
 
 
