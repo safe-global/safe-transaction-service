@@ -7,11 +7,9 @@ from safe_eth.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
 )
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.account_abstraction.SafeOperation import (
-    SafeOperation as SafeOperationClass,
-)
 from safe_transaction_service.history.tests import factories as history_factories
 
 from ..models import SafeOperation as SafeOperationModel

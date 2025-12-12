@@ -12,13 +12,12 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.account_abstraction import UserOperation as UserOperationV6
+from safe_eth.eth.account_abstraction import UserOperationV07 as UserOperationV7
 from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.account_abstraction.SafeOperation import (
-    SafeOperation as SafeOperationClass,
-)
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
 
@@ -27,7 +26,6 @@ from .helpers import decode_init_code
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
 from .models import UserOperation as UserOperationModel
-from .UserOperationV7 import UserOperationV7
 
 
 # ================================================ #

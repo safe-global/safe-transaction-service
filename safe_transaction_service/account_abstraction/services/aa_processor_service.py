@@ -13,13 +13,14 @@ from safe_eth.eth.account_abstraction import (
     BundlerClientException,
     UserOperation,
     UserOperationReceipt,
+    UserOperationV07,
 )
 from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation
 from safe_eth.safe.safe_signature import SafeSignature
 from safe_eth.util.util import to_0x_hex_str
 from web3.types import LogReceipt
 
-from safe_transaction_service.account_abstraction.UserOperationV7 import UserOperationV7
 from safe_transaction_service.history import models as history_models
 
 from ..constants import USER_OPERATION_EVENT_TOPIC, USER_OPERATION_NUMBER_TOPICS
@@ -27,7 +28,6 @@ from ..models import SafeOperation as SafeOperationModel
 from ..models import SafeOperationConfirmation as SafeOperationConfirmationModel
 from ..models import UserOperation as UserOperationModel
 from ..models import UserOperationReceipt as UserOperationReceiptModel
-from ..SafeOperation import SafeOperation
 from ..utils import get_bundler_client
 
 logger = logging.getLogger(__name__)
@@ -350,7 +350,7 @@ class AaProcessorService:
                 "entry_point": user_operation.entry_point,
             }
 
-            if isinstance(user_operation, UserOperationV7):
+            if isinstance(user_operation, UserOperationV07):
                 user_operation_kwargs.update(
                     {
                         "factory": user_operation.factory,

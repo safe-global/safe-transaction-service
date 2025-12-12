@@ -10,6 +10,7 @@ from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
 from safe_eth.eth.account_abstraction import UserOperation as UserOperationV6
 from safe_eth.eth.account_abstraction import UserOperationMetadata
+from safe_eth.eth.account_abstraction import UserOperationV07 as UserOperationV7
 from safe_eth.eth.django.models import (
     EthereumAddressBinaryField,
     HexV2Field,
@@ -17,13 +18,10 @@ from safe_eth.eth.django.models import (
     Uint256Field,
 )
 from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.account_abstraction.SafeOperation import (
-    SafeOperation as SafeOperationClass,
-)
-from safe_transaction_service.account_abstraction.UserOperationV7 import UserOperationV7
 from safe_transaction_service.history import models as history_models
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 
