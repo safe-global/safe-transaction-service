@@ -23,7 +23,6 @@ from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 from ..utils.serializers import get_safe_owners
-from .constants import ENTRYPOINT_V7
 from .helpers import decode_init_code
 from .models import SafeOperation as SafeOperationModel
 from .models import SafeOperationConfirmation
@@ -226,15 +225,17 @@ class SafeOperationSerializer(
 
         entry_point = attrs["entry_point"]
         module_address = attrs["module_address"]
-        is_v7 = entry_point.lower() == ENTRYPOINT_V7.lower()
+        is_v7 = entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
 
         # Validate module address is compatible with entrypoint version
         if (
             is_v7
-            and module_address.lower() != settings.SAFE_4337_MODULE_ADDRESS_V07.lower()
+            and module_address.lower()
+            != settings.ETHEREUM_4337_SAFE_MODULE_ADDRESS_V07.lower()
         ) or (
             not is_v7
-            and module_address.lower() != settings.SAFE_4337_MODULE_ADDRESS_V06.lower()
+            and module_address.lower()
+            != settings.ETHEREUM_4337_SAFE_MODULE_ADDRESS_V06.lower()
         ):
             raise ValidationError(f"Invalid Module address {module_address}")
 
@@ -314,7 +315,7 @@ class SafeOperationSerializer(
     @transaction.atomic
     def save(self, **kwargs):
         entry_point = self.validated_data["entry_point"]
-        is_v7 = entry_point.lower() == ENTRYPOINT_V7.lower()
+        is_v7 = entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
 
         if is_v7:
             user_operation: UserOperationV7 | UserOperationV6 = UserOperationV7(
@@ -540,7 +541,9 @@ class UserOperationResponseSerializer(serializers.Serializer):
         # Remove version-specific fields based on entrypoint
         data = super().to_representation(instance)
 
-        is_v7 = instance.entry_point.lower() == ENTRYPOINT_V7.lower()
+        is_v7 = (
+            instance.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
+        )
 
         if is_v7:
             data.pop("init_code", None)

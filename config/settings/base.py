@@ -9,10 +9,6 @@ from corsheaders.defaults import default_headers as default_cors_headers
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 
 from safe_transaction_service import __version__
-from safe_transaction_service.account_abstraction.constants import (
-    ENTRYPOINT_V6,
-    ENTRYPOINT_V7,
-)
 from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter
 
 from ..gunicorn import (
@@ -544,18 +540,20 @@ ETHEREUM_NODE_URL = env("ETHEREUM_NODE_URL", default=None)
 # Ethereum 4337 Bundler RPC
 # ------------------------------------------------------------------------------
 ETHEREUM_4337_BUNDLER_URL = env("ETHEREUM_4337_BUNDLER_URL", default=None)
+ETHEREUM_4337_ENTRYPOINT_V6 = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+ETHEREUM_4337_ENTRYPOINT_V7 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 ETHEREUM_4337_SUPPORTED_ENTRY_POINTS = env.list(
     "ETHEREUM_4337_SUPPORTED_ENTRY_POINTS",
-    default=[ENTRYPOINT_V6, ENTRYPOINT_V7],
+    default=[ETHEREUM_4337_ENTRYPOINT_V6, ETHEREUM_4337_ENTRYPOINT_V7],
 )
 # Module addresses
-SAFE_4337_MODULE_ADDRESS_V06 = "0xa581c4A4DB7175302464fF3C06380BC3270b4037"
-SAFE_4337_MODULE_ADDRESS_V07 = "0x75cf11467937ce3F2f357CE24ffc3DBF8fD5c226"
+ETHEREUM_4337_SAFE_MODULE_ADDRESS_V06 = "0xa581c4A4DB7175302464fF3C06380BC3270b4037"
+ETHEREUM_4337_SAFE_MODULE_ADDRESS_V07 = "0x75cf11467937ce3F2f357CE24ffc3DBF8fD5c226"
 ETHEREUM_4337_SUPPORTED_SAFE_MODULES = env.list(
     "ETHEREUM_4337_SUPPORTED_SAFE_MODULES",
     default=[
-        SAFE_4337_MODULE_ADDRESS_V06,  # v0.6 Safe4337Module
-        SAFE_4337_MODULE_ADDRESS_V07,  # v0.7 Safe4337Module
+        ETHEREUM_4337_SAFE_MODULE_ADDRESS_V06,  # v0.6 Safe4337Module
+        ETHEREUM_4337_SAFE_MODULE_ADDRESS_V07,  # v0.7 Safe4337Module
     ],
 )
 

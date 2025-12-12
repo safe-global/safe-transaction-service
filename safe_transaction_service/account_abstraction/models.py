@@ -1,6 +1,7 @@
 import logging
 from functools import cached_property
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Index
 
@@ -19,10 +20,6 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.account_abstraction.constants import (
-    ENTRYPOINT_V6,
-    ENTRYPOINT_V7,
-)
 from safe_transaction_service.account_abstraction.SafeOperation import (
     SafeOperation as SafeOperationClass,
 )
@@ -135,7 +132,7 @@ class UserOperation(models.Model):
         if not self.signature:
             raise ValueError("Signature should not be empty")
         signature = HexBytes(self.signature)
-        if self.entry_point.lower() == ENTRYPOINT_V6.lower():
+        if self.entry_point.lower() == settings.ENTRYPOINT_V6.lower():
             return UserOperationV6(
                 HexBytes(self.hash),
                 self.sender,
@@ -152,7 +149,7 @@ class UserOperation(models.Model):
                 self.entry_point,
                 user_operation_metadata,
             )
-        elif self.entry_point.lower() == ENTRYPOINT_V7.lower():
+        elif self.entry_point.lower() == settings.ENTRYPOINT_V7.lower():
             return UserOperationV7(
                 HexBytes(self.hash),
                 self.sender,
