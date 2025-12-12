@@ -55,7 +55,7 @@ class UserOperation(models.Model):
     signature = models.BinaryField(null=True, blank=True, editable=True)
     entry_point = EthereumAddressBinaryField(db_index=True)
 
-    # useroperation v7 specific fields
+    # UserOperation v7 specific fields, filled as `None` for <= v6
     factory = EthereumAddressBinaryField(
         db_index=True, null=True, blank=True, editable=True
     )
