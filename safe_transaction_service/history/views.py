@@ -150,11 +150,12 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
         """
         Get information about the Ethereum Tracing RPC node used by the service (if any configured)
         """
-        if not settings.ETHEREUM_TRACING_NODE_URL:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        safe_service = SafeServiceProvider()
+        ethereum_tracing_client = safe_service.ethereum_tracing_client
+        if ethereum_tracing_client:
+            return Response(self._get_info(ethereum_tracing_client))
         else:
-            ethereum_client = EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
-            return Response(self._get_info(ethereum_client))
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema(responses={200: serializers.IndexingStatusSerializer})
