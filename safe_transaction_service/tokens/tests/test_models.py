@@ -282,6 +282,7 @@ class TestTokenListModel(TestCase):
         token_list = TokenListFactory(
             url="https://example.com/tokens.json",
             auth_type="bearer",
+            auth_key="Authorization",
             auth_value="my-secret-token",
         )
 
