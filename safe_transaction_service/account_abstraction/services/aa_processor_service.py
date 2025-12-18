@@ -310,10 +310,8 @@ class AaProcessorService:
             raise BundlerClientException(
                 f"user-operation={user_operation_hash_hex} returned `null`"
             )
-        if isinstance(user_operation, UserOperationV07):
-            raise UserOperationNotSupportedException(
-                f"user-operation={user_operation_hash_hex} for EntryPoint v0.7.0 is not supported"
-            )
+        if user_operation.entry_point not in self.supported_entry_points:
+            raise UserOperationNotSupportedException("Entrypoint is not supported")
 
         try:
             user_operation_model = UserOperationModel.objects.get(
@@ -335,22 +333,37 @@ class AaProcessorService:
                 user_operation_hash_hex,
                 ethereum_tx.tx_hash,
             )
+            user_operation_kwargs = {
+                "ethereum_tx": ethereum_tx,
+                "hash": user_operation_hash_hex,
+                "sender": user_operation.sender,
+                "nonce": user_operation.nonce,
+                "call_data": user_operation.call_data,
+                "call_gas_limit": user_operation.call_gas_limit,
+                "verification_gas_limit": user_operation.verification_gas_limit,
+                "pre_verification_gas": user_operation.pre_verification_gas,
+                "max_fee_per_gas": user_operation.max_fee_per_gas,
+                "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
+                "paymaster": user_operation.paymaster,
+                "paymaster_data": user_operation.paymaster_data,
+                "signature": user_operation.signature,
+                "entry_point": user_operation.entry_point,
+            }
+
+            if isinstance(user_operation, UserOperationV07):
+                user_operation_kwargs.update(
+                    {
+                        "factory": user_operation.factory,
+                        "factory_data": user_operation.factory_data,
+                        "paymaster_verification_gas_limit": user_operation.paymaster_verification_gas_limit,
+                        "paymaster_post_op_gas_limit": user_operation.paymaster_post_op_gas_limit,
+                    }
+                )
+            else:
+                user_operation_kwargs["init_code"] = user_operation.init_code
+
             user_operation_model = UserOperationModel.objects.create(
-                ethereum_tx=ethereum_tx,
-                hash=user_operation_hash_hex,
-                sender=user_operation.sender,
-                nonce=user_operation.nonce,
-                init_code=user_operation.init_code,
-                call_data=user_operation.call_data,
-                call_gas_limit=user_operation.call_gas_limit,
-                verification_gas_limit=user_operation.verification_gas_limit,
-                pre_verification_gas=user_operation.pre_verification_gas,
-                max_fee_per_gas=user_operation.max_fee_per_gas,
-                max_priority_fee_per_gas=user_operation.max_priority_fee_per_gas,
-                paymaster=user_operation.paymaster,
-                paymaster_data=user_operation.paymaster_data,
-                signature=user_operation.signature,
-                entry_point=user_operation.entry_point,
+                **user_operation_kwargs
             )
 
         _, user_operation_receipt = self.index_user_operation_receipt(
