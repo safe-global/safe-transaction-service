@@ -417,8 +417,7 @@ class TokenList(models.Model):
         headers: dict[str, str] = {}
 
         if self.auth_type == "bearer":
-            header_name = self.auth_key if self.auth_key else "Authorization"
-            headers[header_name] = f"Bearer {self.auth_value}"
+            headers[self.auth_key] = f"Bearer {self.auth_value}"
 
         elif self.auth_type == "api_key":
             headers[self.auth_key] = self.auth_value
