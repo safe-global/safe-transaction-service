@@ -259,3 +259,102 @@ class TestTokenListModel(TestCase):
 
         requests_get.return_value.json.return_value = token_list_mock
         self.assertEqual(len(token_list.get_tokens()), 35)
+
+    @mock.patch("requests.get")
+    def test_get_tokens_with_auth_none(self, requests_get: MagicMock):
+        token_list = TokenListFactory(
+            url="https://example.com/tokens.json",
+            auth_type="none",
+        )
+
+        requests_get.return_value.ok = True
+        requests_get.return_value.json.return_value = token_list_mock
+
+        tokens = token_list.get_tokens()
+
+        self.assertEqual(len(tokens), 35)
+        requests_get.assert_called_once_with(
+            "https://example.com/tokens.json", headers={}, timeout=5
+        )
+
+    @mock.patch("requests.get")
+    def test_get_tokens_with_auth_bearer(self, requests_get: MagicMock):
+        token_list = TokenListFactory(
+            url="https://example.com/tokens.json",
+            auth_type="bearer",
+            auth_value="my-secret-token",
+        )
+
+        requests_get.return_value.ok = True
+        requests_get.return_value.json.return_value = token_list_mock
+
+        tokens = token_list.get_tokens()
+
+        self.assertEqual(len(tokens), 35)
+        requests_get.assert_called_once_with(
+            "https://example.com/tokens.json",
+            headers={"Authorization": "Bearer my-secret-token"},
+            timeout=5,
+        )
+
+    @mock.patch("requests.get")
+    def test_get_tokens_with_auth_api_key(self, requests_get: MagicMock):
+        token_list = TokenListFactory(
+            url="https://example.com/tokens.json",
+            auth_type="api_key",
+            auth_key="X-API-Key",
+            auth_value="my-api-key-value",
+        )
+
+        requests_get.return_value.ok = True
+        requests_get.return_value.json.return_value = token_list_mock
+
+        tokens = token_list.get_tokens()
+
+        self.assertEqual(len(tokens), 35)
+        requests_get.assert_called_once_with(
+            "https://example.com/tokens.json",
+            headers={"X-API-Key": "my-api-key-value"},
+            timeout=5,
+        )
+
+    @mock.patch("requests.get")
+    def test_get_tokens_with_auth_basic(self, requests_get: MagicMock):
+        token_list = TokenListFactory(
+            url="https://example.com/tokens.json",
+            auth_type="basic",
+            auth_value="Basic dXNlcm5hbWU6cGFzc3dvcmQ=",
+        )
+
+        requests_get.return_value.ok = True
+        requests_get.return_value.json.return_value = token_list_mock
+
+        tokens = token_list.get_tokens()
+
+        self.assertEqual(len(tokens), 35)
+        requests_get.assert_called_once_with(
+            "https://example.com/tokens.json",
+            headers={"Authorization": "Basic dXNlcm5hbWU6cGFzc3dvcmQ="},
+            timeout=5,
+        )
+
+    @mock.patch("requests.get")
+    def test_get_tokens_with_auth_query(self, requests_get: MagicMock):
+        token_list = TokenListFactory(
+            url="https://example.com/tokens.json",
+            auth_type="query",
+            auth_key="api_key",
+            auth_value="my-query-param-key",
+        )
+
+        requests_get.return_value.ok = True
+        requests_get.return_value.json.return_value = token_list_mock
+
+        tokens = token_list.get_tokens()
+
+        self.assertEqual(len(tokens), 35)
+        requests_get.assert_called_once_with(
+            "https://example.com/tokens.json?api_key=my-query-param-key",
+            headers={},
+            timeout=5,
+        )

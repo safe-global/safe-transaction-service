@@ -2,7 +2,7 @@ import logging
 import os
 from json import JSONDecodeError
 from typing import Optional, TypedDict
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -341,12 +341,104 @@ class TokenList(models.Model):
     url = models.URLField(unique=True)
     description = models.CharField(max_length=200)
 
+    auth_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("none", "None"),
+            ("api_key", "API Key (Header)"),
+            ("bearer", "Bearer Token"),
+            ("basic", "Basic Auth"),
+            ("query", "Query Param"),
+        ],
+        default="none",
+    )
+
+    auth_key = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=(
+            "Authentication key name. Usage depends on auth_type: "
+            "For 'api_key': header name (e.g., 'x-api-key'). "
+            "For 'bearer': header name (e.g., 'Authorization'). "
+            "For 'query': query parameter name (e.g., 'api_key'). "
+            "For 'basic': leave empty. "
+            "For 'none': leave empty."
+        ),
+    )
+
+    auth_value = models.TextField(
+        blank=True,
+        help_text=(
+            "Authentication credentials. Usage depends on auth_type: "
+            "For 'api_key': the API key value. "
+            "For 'bearer': the bearer token value (without 'Bearer ' prefix). "
+            "For 'basic': the full 'Basic <base64>' value (e.g., 'Basic dXNlcjpwYXNz'). "
+            "For 'query': the query parameter value. "
+            "For 'none': leave empty."
+        ),
+    )
+
     def __str__(self):
         return f"{self.description} token list"
 
+    def clean(self):
+        super().clean()
+
+        if self.auth_type == "none":
+            if self.auth_key or self.auth_value:
+                raise ValidationError(
+                    "auth_key and auth_value must be empty when auth_type is 'none'"
+                )
+
+        elif self.auth_type in {"bearer", "api_key", "query"}:
+            if not self.auth_key:
+                raise ValidationError(
+                    {"auth_key": "auth_key is required for this auth_type"}
+                )
+            if not self.auth_value:
+                raise ValidationError(
+                    {"auth_value": "auth_value is required for this auth_type"}
+                )
+
+        elif self.auth_type == "basic":
+            if not self.auth_value:
+                raise ValidationError(
+                    {"auth_value": "auth_value is required for basic auth"}
+                )
+
+    def _build_authenticated_request(self) -> tuple[str, dict]:
+        """
+        Builds the URL and headers with authentication based on the configured auth_type.
+        Supports bearer tokens, API keys (header-based), basic auth, and query parameters.
+
+        :return: Tuple of (authenticated_url, headers_dict)
+        """
+        url = self.url
+        headers: dict[str, str] = {}
+
+        if self.auth_type == "bearer":
+            header_name = self.auth_key if self.auth_key else "Authorization"
+            headers[header_name] = f"Bearer {self.auth_value}"
+
+        elif self.auth_type == "api_key":
+            headers[self.auth_key] = self.auth_value
+
+        elif self.auth_type == "basic":
+            headers["Authorization"] = self.auth_value
+
+        elif self.auth_type == "query":
+            parsed = urlparse(url)
+            query = dict(parse_qsl(parsed.query))
+            query[self.auth_key] = self.auth_value
+
+            url = urlunparse(parsed._replace(query=urlencode(query)))
+
+        return url, headers
+
     def get_tokens(self) -> list[TokenListToken]:
         try:
-            response = requests.get(self.url, timeout=5)
+            url, headers = self._build_authenticated_request()
+            response = requests.get(url, headers=headers, timeout=5)
             if response.ok:
                 tokens = response.json().get("tokens", [])
                 if not tokens:
