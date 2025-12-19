@@ -16,8 +16,8 @@ from safe_eth.eth.tests.mocks.mock_bundler import (
     safe_4337_user_operation_hash_mock,
     user_operation_mock,
     user_operation_receipt_mock,
-    user_operation_v07_hash,
-    user_operation_v07_mock,
+    user_operation_v07_hash_1,
+    user_operation_v07_mock_1,
 )
 from safe_eth.util.util import to_0x_hex_str
 
@@ -131,8 +131,8 @@ class TestAaProcessorService(TestCase):
         "get_user_operation_by_hash",
         autospec=True,
         return_value=UserOperationClass.from_bundler_response(
-            to_0x_hex_str(user_operation_v07_hash),
-            user_operation_v07_mock["result"],
+            to_0x_hex_str(user_operation_v07_hash_1),
+            user_operation_v07_mock_1["result"],
         ),
     )
     @mock.patch.object(
@@ -158,7 +158,7 @@ class TestAaProcessorService(TestCase):
         ):
             self.aa_processor_service.index_user_operation(
                 Account.create().address,  # Not relevant
-                user_operation_v07_hash,
+                user_operation_v07_hash_1,
                 ethereum_tx,
             )
 
