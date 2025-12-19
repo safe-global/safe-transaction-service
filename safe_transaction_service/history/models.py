@@ -1998,6 +1998,18 @@ class SafeContractManager(models.Manager):
             Min("ethereum_tx__block_id")
         )["ethereum_tx__block_id__min"]
 
+    def get_existing_addresses(
+        self, addresses: Sequence[ChecksumAddress]
+    ) -> set[ChecksumAddress]:
+        """
+        Get addresses that exist in SafeContract table.
+        Used for conditional indexing to filter events for known Safes.
+
+        :param addresses: List of addresses to check
+        :return: Set of addresses that exist in SafeContract table
+        """
+        return set(self.filter(address__in=addresses).values_list("address", flat=True))
+
 
 class SafeContractQuerySet(models.QuerySet):
     def banned(
