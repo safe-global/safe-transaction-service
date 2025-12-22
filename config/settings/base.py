@@ -49,6 +49,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/ref/settings/#force-script-name
 FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default=None)
 
+# SETUP SERVICE COMMAND
+FORCE_SETUP_SAFE_CONTRACTS = env("FORCE_SETUP_SAFE_CONTRACTS", default=True)
+
 # SSO
 SSO_ENABLED = False
 
@@ -658,9 +661,6 @@ EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fano
 EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT = env.int(
     "EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT", default=0
 )
-
-# Events
-# ------------------------------------------------------------------------------
 DISABLE_SERVICE_EVENTS = env.bool(
     "DISABLE_SERVICE_EVENTS", default=False
 )  # Increases indexing speed for initial sync by disabling sending events to the queue

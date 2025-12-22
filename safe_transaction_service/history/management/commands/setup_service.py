@@ -183,7 +183,9 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(f"Task {task.name} was already created")
                 )
+        self._setup_safe_contracts()
 
+    def _setup_safe_contracts(self):
         self.stdout.write(self.style.SUCCESS("Setting up Safe Contract Addresses"))
         ethereum_client = get_auto_ethereum_client()
         ethereum_network = ethereum_client.get_network()
@@ -191,7 +193,9 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Setting up {ethereum_network.name} safe addresses")
             )
-            self._setup_safe_singleton_addresses(MASTER_COPIES[ethereum_network])
+            self._setup_safe_singleton_addresses(
+                MASTER_COPIES[ethereum_network], settings.FORCE_SETUP_SAFE_CONTRACTS
+            )
 
         else:
             self.stdout.write(
@@ -226,7 +230,9 @@ class Command(BaseCommand):
             )
 
     def _setup_safe_singleton_addresses(
-        self, safe_singleton_addresses: Sequence[tuple[str, int, str]]
+        self,
+        safe_singleton_addresses: Sequence[tuple[str, int, str]],
+        force_setup_safe_contracts: bool = True,
     ):
         for address, initial_block_number, version in safe_singleton_addresses:
             safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
@@ -238,7 +244,7 @@ class Command(BaseCommand):
                     "l2": version.endswith("+L2"),
                 },
             )
-            if (
+            if force_setup_safe_contracts and (
                 safe_singleton_address.version != version
                 or safe_singleton_address.initial_block_number != initial_block_number
             ):
