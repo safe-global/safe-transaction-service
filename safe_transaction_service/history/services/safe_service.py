@@ -111,6 +111,7 @@ class SafeService:
         """
         try:
             # Get first the actual creation transaction for the safe
+            # With v1.5.0 more internal tx are indexed due to ProxyCreation events, so we use first()
             creation_internal_tx = (
                 InternalTx.objects.filter(
                     ethereum_tx__status=1,  # Ignore Internal Transactions for failed Transactions
@@ -118,8 +119,11 @@ class SafeService:
                     contract_address=safe_address,
                 )
                 .select_related("ethereum_tx__block")
-                .get()
+                .first()
             )
+            # Does not exist
+            if not creation_internal_tx:
+                return None
             creation_ethereum_tx = creation_internal_tx.ethereum_tx
 
             created_time = creation_ethereum_tx.block.timestamp
@@ -158,8 +162,6 @@ class SafeService:
                 ):
                     singleton = setup_internal_tx.to
                     initializer = setup_internal_tx.data
-        except InternalTx.DoesNotExist:
-            return None
         except OSError as exc:
             raise NodeConnectionException from exc
 

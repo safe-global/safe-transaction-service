@@ -3657,6 +3657,21 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             }
             self.assertDictEqual(response.data, expected)
 
+            # V1.5.0 inserts more than one internaltx on creation
+            first_internal_tx = internal_tx  # Keep reference to the first one
+            InternalTxFactory(
+                contract_address=safe_address,
+                trace_address="0,1",
+                ethereum_tx=first_internal_tx.ethereum_tx,  # Same ethereum_tx
+                tx_type=InternalTxType.CREATE.value,
+            )
+            response = self.client.get(
+                reverse("v1:history:safe-creation", args=(safe_address,)),
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertDictEqual(response.data, expected)
+
         # Next children internal_tx should not alter the result
         another_trace = dict(call_trace)
         another_trace["traceAddress"] = [0, 0, 0]
