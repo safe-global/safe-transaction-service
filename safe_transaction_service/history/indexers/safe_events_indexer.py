@@ -605,33 +605,20 @@ class SafeEventsIndexer(EventsIndexer):
                 else:
                     logger.error("Unexpected event type: %s", event["event"])
 
-            # Process ProxyCreation - creates the proxy contract
-            if proxy_creation_event:
-                internal_tx = self._get_internal_tx_from_decoded_element(
-                    proxy_creation_event,
-                    contract_address=proxy_creation_event["args"].get("proxy"),
-                    tx_type=InternalTxType.CREATE.value,
-                    call_type=None,
-                )
-                internal_txs.append(internal_tx)
-            if proxy_creation_event_l2:
-                internal_tx = self._get_internal_tx_from_decoded_element(
-                    proxy_creation_event_l2,
-                    contract_address=proxy_creation_event_l2["args"].get("proxy"),
-                    tx_type=InternalTxType.CREATE.value,
-                    call_type=None,
-                )
-                internal_txs.append(internal_tx)
-            if chain_specific_proxy_creation_event_l2:
-                internal_tx = self._get_internal_tx_from_decoded_element(
-                    chain_specific_proxy_creation_event_l2,
-                    contract_address=chain_specific_proxy_creation_event_l2["args"].get(
-                        "proxy"
-                    ),
-                    tx_type=InternalTxType.CREATE.value,
-                    call_type=None,
-                )
-                internal_txs.append(internal_tx)
+            # Insert internal_tx for Proxy creation events
+            for event in [
+                proxy_creation_event,
+                proxy_creation_event_l2,
+                chain_specific_proxy_creation_event_l2,
+            ]:
+                if event:
+                    internal_tx = self._get_internal_tx_from_decoded_element(
+                        event,
+                        contract_address=event["args"].get("proxy"),
+                        tx_type=InternalTxType.CREATE.value,
+                        call_type=None,
+                    )
+                    internal_txs.append(internal_tx)
 
             # Process SafeSetup - initializes the Safe
             if setup_event:
