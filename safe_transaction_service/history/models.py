@@ -431,18 +431,18 @@ class EthereumTx(TimeStampedModel):
     tx_hash = Keccak256Field(primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
     status = models.IntegerField(
-        null=True, default=None, db_index=True
+        null=True, default=None
     )  # If mined. Old txs don't have `status`
     logs = ArrayField(JSONField(), null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
-    _from = EthereumAddressBinaryField(null=True, db_index=True)
+    _from = EthereumAddressBinaryField(null=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
     max_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
     max_priority_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
     data = models.BinaryField(null=True)
     nonce = Uint256Field()
-    to = EthereumAddressBinaryField(null=True, db_index=True)
+    to = EthereumAddressBinaryField(null=True)
     value = Uint256Field()
     type = models.PositiveSmallIntegerField(default=0)
 
@@ -1363,7 +1363,7 @@ class InternalTxDecoded(models.Model):
         related_name="decoded_tx",
         primary_key=True,
     )
-    function_name = models.CharField(max_length=256, db_index=True)
+    function_name = models.CharField(max_length=256)
     arguments = JSONField()
     processed = models.BooleanField(default=False)
     # Denormalized from internal_tx._from for efficient querying
@@ -1373,12 +1373,12 @@ class InternalTxDecoded(models.Model):
     class Meta:
         indexes = [
             models.Index(
-                name="history_decoded_processed_idx",
+                name="history_decoded_not_proc_idx",
                 fields=["internal_tx_id"],
                 condition=Q(processed=False),
             ),
             models.Index(
-                name="history_decoded_not_proc_idx",
+                name="history_decoded_processed_idx",
                 fields=["internal_tx_id"],
                 condition=Q(processed=True),  # For finding out of order transactions
             ),
