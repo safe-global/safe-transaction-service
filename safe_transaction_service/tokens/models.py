@@ -427,10 +427,10 @@ class TokenList(models.Model):
 
         elif self.auth_type == "query":
             parsed = urlparse(url)
-            query = dict(parse_qsl(parsed.query))
-            query[self.auth_key] = self.auth_value
+            query_params = parse_qsl(parsed.query, keep_blank_values=True)
+            query_params.append((self.auth_key, self.auth_value))
 
-            url = urlunparse(parsed._replace(query=urlencode(query)))
+            url = urlunparse(parsed._replace(query=urlencode(query_params)))
 
         return url, headers
 
