@@ -2,9 +2,9 @@ import dataclasses
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumClient
-from safe_eth.eth.contracts import get_safe_V1_4_1_contract
+from safe_eth.eth.contracts import get_safe_contract_by_version
 from safe_eth.eth.utils import fast_to_checksum_address
-from safe_eth.safe.proxy_factory import ProxyFactoryV141
+from safe_eth.safe.proxy_factory import ProxyFactory
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -41,12 +41,15 @@ def decode_init_code(
         - The ``ProxyFactory`` then deploys a ``Safe Proxy`` and calls ``setup`` with all the configuration parameters.
     :param ethereum_client:
     :return: Decoded Init Code dataclass
-    :raises ValueError: Problem decoding
+    :raises ValueError: Problem decoding or unknown factory address
     """
     factory_address = fast_to_checksum_address(init_code[:20])
     factory_data = init_code[20:]
-    proxy_factory = ProxyFactoryV141(factory_address, ethereum_client)
-    safe_contract = get_safe_V1_4_1_contract(ethereum_client.w3)
+
+    proxy_factory = ProxyFactory.from_address(factory_address, ethereum_client)
+    version = ProxyFactory.detect_version_from_address(factory_address=factory_address)
+    safe_contract = get_safe_contract_by_version(version=version, w3=ethereum_client.w3)
+
     _, data = proxy_factory.contract.decode_function_input(factory_data)
     initializer = data.pop("initializer")
     _, safe_deployment_data = safe_contract.decode_function_input(initializer)

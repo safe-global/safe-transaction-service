@@ -34,6 +34,9 @@ from safe_transaction_service.contracts.tx_decoder import (
     TxDecoderException,
     get_db_tx_decoder,
 )
+from safe_transaction_service.safe_messages.utils import (
+    select_safe_encoded_message_hash_by_safe_version,
+)
 from safe_transaction_service.tokens.serializers import TokenInfoResponseSerializer
 from safe_transaction_service.utils.serializers import (
     EpochDateTimeField,
@@ -119,8 +122,11 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         )
 
         safe_owners = get_safe_owners(safe_address)
+        safe_hash_preimage = select_safe_encoded_message_hash_by_safe_version(
+            safe.get_version(), safe_tx.safe_tx_hash, safe_tx.safe_tx_hash_preimage
+        )
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
+            signature, safe_tx_hash, safe_hash_preimage=safe_hash_preimage
         )
         signature_owners = []
         ethereum_client = get_auto_ethereum_client()
@@ -266,8 +272,12 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         signature_owners = []
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
+        # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
+        safe_signature_hash = select_safe_encoded_message_hash_by_safe_version(
+            safe.get_version(), safe_tx.safe_tx_hash, safe_tx.safe_tx_hash_preimage
+        )
         parsed_signatures = SafeSignature.parse_signature(
-            signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
+            signature, safe_tx_hash, safe_hash_preimage=safe_signature_hash
         )
         attrs["parsed_signatures"] = parsed_signatures
         # If there's at least one signature, transaction is trusted (until signatures are mandatory)
@@ -894,6 +904,7 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     modules = serializers.ListField(child=EthereumAddressField())
     fallback_handler = EthereumAddressField()
     guard = EthereumAddressField()
+    module_guard = EthereumAddressField()
     version = serializers.CharField(allow_null=True)
 
 

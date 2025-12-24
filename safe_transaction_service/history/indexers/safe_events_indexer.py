@@ -17,6 +17,7 @@ from safe_eth.eth.contracts import (
     get_safe_V1_1_1_contract,
     get_safe_V1_3_0_contract,
     get_safe_V1_4_1_contract,
+    get_safe_V1_5_0_contract,
 )
 from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
@@ -54,7 +55,7 @@ class SafeEventsIndexerProvider:
 
 class SafeEventsIndexer(EventsIndexer):
     """
-    Indexes Gnosis Safe L2 events
+    Indexes Safe L2 events
     """
 
     IGNORE_ADDRESSES_ON_LOG_FILTER = (
@@ -220,6 +221,11 @@ class SafeEventsIndexer(EventsIndexer):
         # ProxyFactory
         event ProxyCreation(GnosisSafeProxy indexed proxy, address singleton);
 
+        Safe v1.5.0 L2 Events
+        ProxyCreationL2 or ChainSpecificProxyCreationL2 are not considered here because tracking ProxyCreation is enough.
+        ------------------
+        event ChangedModuleGuard(address indexed moduleGuard);
+
         :return: List of supported `ContractEvent`
         """
         proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(
@@ -228,6 +234,7 @@ class SafeEventsIndexer(EventsIndexer):
         proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(
             self.ethereum_client.w3
         )
+        safe_l2_v1_5_0_contract = get_safe_V1_5_0_contract(self.ethereum_client.w3)
         safe_l2_v1_4_1_contract = get_safe_V1_4_1_contract(self.ethereum_client.w3)
         safe_l2_v1_3_0_contract = get_safe_V1_3_0_contract(self.ethereum_client.w3)
         safe_v1_1_1_contract = get_safe_V1_1_1_contract(self.ethereum_client.w3)
@@ -269,6 +276,8 @@ class SafeEventsIndexer(EventsIndexer):
                 # Changed Guard
                 safe_l2_v1_4_1_contract.events.ChangedGuard(),
                 safe_l2_v1_3_0_contract.events.ChangedGuard(),
+                # Change Module Guard
+                safe_l2_v1_5_0_contract.events.ChangedModuleGuard(),
                 # Change Master Copy
                 safe_v1_1_1_contract.events.ChangedMasterCopy(),
                 # Proxy creation
@@ -434,6 +443,8 @@ class SafeEventsIndexer(EventsIndexer):
             internal_tx_decoded.function_name = "setFallbackHandler"
         elif event_name == "ChangedGuard":
             internal_tx_decoded.function_name = "setGuard"
+        elif event_name == "ChangedModuleGuard":
+            internal_tx_decoded.function_name = "setModuleGuard"
         elif (
             event_name == "SafeReceived" and not self.eth_zksync_compatible_network
         ):  # Received ether
@@ -511,7 +522,6 @@ class SafeEventsIndexer(EventsIndexer):
     ) -> list[InternalTx]:
         """
         Process creation events (ProxyCreation and SafeSetup). They must be processed together.
-
         Usual order is:
         - SafeSetup
         - ProxyCreation
@@ -573,6 +583,7 @@ class SafeEventsIndexer(EventsIndexer):
             if setup_event:
                 if not proxy_creation_event:
                     # SafeSetup without ProxyCreation means proxy was created in a previous block
+                    # ProxyCreation is also emitted when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emmited on v1.5.0.
                     logger.debug(
                         "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
                         safe_address,
