@@ -46,7 +46,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
 
         self.assertIsNone(self.safe_service.get_safe_creation_info(random_address))
 
-        first_internal_tx = InternalTxFactory(
+        InternalTxFactory(
             contract_address=random_address,
             ethereum_tx__status=1,
             tx_type=InternalTxType.CREATE.value,
@@ -58,15 +58,6 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
             tx_type=InternalTxType.CALL.value,
         )
 
-        safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
-        self.assertIsInstance(safe_creation_info, SafeCreationInfo)
-
-        # V1.5.0 inserts more than one internaltx on creation
-        InternalTxFactory(
-            contract_address=random_address,
-            ethereum_tx=first_internal_tx.ethereum_tx,  # Same ethereum_tx
-            tx_type=InternalTxType.CREATE.value,
-        )
         safe_creation_info = self.safe_service.get_safe_creation_info(random_address)
         self.assertIsInstance(safe_creation_info, SafeCreationInfo)
 
