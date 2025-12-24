@@ -522,7 +522,6 @@ class SafeEventsIndexer(EventsIndexer):
     ) -> list[InternalTx]:
         """
         Process creation events (ProxyCreation and SafeSetup). They must be processed together.
-        ProxyCreationL2 or ChainSpecificProxyCreationL2 (only available v1.5.0 onwards) are not considered here because tracking ProxyCreation is enough.
         Usual order is:
         - SafeSetup
         - ProxyCreation
@@ -584,9 +583,7 @@ class SafeEventsIndexer(EventsIndexer):
             if setup_event:
                 if not proxy_creation_event:
                     # SafeSetup without ProxyCreation means proxy was created in a previous block
-                    # ProxyCreationL2 or ChainSpecificProxyCreationL2 (only available v1.5.0 onwards) are not considered here because tracking ProxyCreation is enough.
-                    # ProxyCreation is also emmited when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emmited.
-                    # See: https://github.com/safe-fndn/safe-smart-account/blob/release/v1.5.0/contracts/proxies/SafeProxyFactory.sol
+                    # ProxyCreation is also emitted when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emmited on v1.5.0.
                     logger.debug(
                         "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
                         safe_address,
