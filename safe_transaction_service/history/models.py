@@ -1350,7 +1350,14 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :return: List of Safe addresses that have transactions pending to be processed
         """
         # Use denormalized safe_address field (avoids JOIN with internal_tx)
-        return self.not_processed().values_list("safe_address", flat=True).distinct()
+        return (
+            self.not_processed()
+            .filter(
+                safe_address__in=SafeContract.objects.values_list("address", flat=True)
+            )
+            .values_list("safe_address", flat=True)
+            .distinct()
+        )
 
 
 class InternalTxDecoded(models.Model):

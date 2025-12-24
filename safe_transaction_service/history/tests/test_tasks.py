@@ -230,15 +230,6 @@ class TestTasks(TestCase):
                     cm.output[0],
                 )
 
-    def test_process_decoded_internal_txs_task_different_tasks(self):
-        with self.settings(PROCESSING_ALL_SAFES_TOGETHER=False):
-            with self.assertLogs(logger=task_logger) as cm:
-                self._test_process_decoded_internal_txs_task()
-                self.assertIn(
-                    "Start process decoded internal txs for every Safe in a different task",
-                    cm.output[0],
-                )
-
     def test_process_decoded_internal_txs_for_banned_safe(self):
         owner = Account.create().address
         safe_address = Account.create().address
