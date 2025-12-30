@@ -125,6 +125,9 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
                 f"Message with hash {to_0x_hex_str(safe_message_hash)} for safe {safe_address} already exists in DB"
             )
 
+        # Preimage is encoded for the Safe. But if an EIP-1271 signature is used, owner's Safe will be called
+        # the preimage will be encoded again for the owner Safe. That's what needs to be signed by the user
+        # So original data -> EIP-191 or EIP-712 encoded -> Safe encoded data -> Owner encoded data
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )
