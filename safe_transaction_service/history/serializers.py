@@ -925,7 +925,7 @@ class SafeLastStatusSerializer(serializers.Serializer):
     master_copy = EthereumAddressField()
     fallback_handler = EthereumAddressField()
     guard = EthereumAddressField(allow_null=True)
-    module_guard = EthereumAddressField()
+    module_guard = EthereumAddressField(allow_null=True)
     enabled_modules = serializers.ListField(child=EthereumAddressField())
 
 
