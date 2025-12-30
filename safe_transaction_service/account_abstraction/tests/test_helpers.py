@@ -1,16 +1,14 @@
 from django.test import TestCase
 
 from hexbytes import HexBytes
-from safe_eth.eth.tests.mocks.mock_bundler import (
-    user_operation_mock,
-)
+from safe_eth.eth.tests.mocks.mock_bundler import user_operation_mock
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 
 from ..helpers import DecodedInitCode, decode_init_code
 
 
 class TestAccountAbstractionHelpers(SafeTestCaseMixin, TestCase):
-    def test_decode_init_code_v141(self):
+    def test_decode_init_code(self):
         with self.assertRaises(ValueError):
             decode_init_code(b"", self.ethereum_client)
 

@@ -14,6 +14,7 @@ import eth_abi
 from eth_account import Account
 from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
+from packaging.version import Version
 from requests import ReadTimeout
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
@@ -31,9 +32,6 @@ from safe_transaction_service.account_abstraction.tests import factories as aa_f
 from safe_transaction_service.contracts.models import ContractQuerySet
 from safe_transaction_service.contracts.tests.factories import ContractFactory
 from safe_transaction_service.contracts.tx_decoder import DbTxDecoder
-from safe_transaction_service.safe_messages.utils import (
-    select_safe_encoded_message_hash_by_safe_version,
-)
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
 from safe_transaction_service.utils.utils import datetime_to_str
@@ -1773,12 +1771,14 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
-
-        selected_hash = select_safe_encoded_message_hash_by_safe_version(
-            safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
+        # >= v1.3.0: supports isValidSignature(bytes32, bytes) and isValidSignature(bytes, bytes)
+        # < v1.3.0: only isValidSignature(bytes, bytes) with the preimage
+        # < v1.5.0: test isValidSignature(bytes, bytes) for backward compatibility
+        safe_owner_message_hash = safe_owner.get_message_hash(
+            safe_tx_hash
+            if Version(safe.get_version()) >= Version("1.5.0")
+            else safe_tx_hash_preimage
         )
-
-        safe_owner_message_hash = safe_owner.get_message_hash(selected_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -5013,7 +5013,7 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
 
 class TestViewsV141(TestViewsV150):
     """
-    Test views v2 with Safe v1.4.1 contracts.
+    Test views with Safe v1.4.1 contracts.
     """
 
     def deploy_test_safe(self, *args, **kwargs) -> Safe:
@@ -5023,3 +5023,31 @@ class TestViewsV141(TestViewsV150):
         :return: Deploy last available Safe
         """
         return self.deploy_test_safe_v1_4_1(*args, **kwargs)
+
+
+class TestViewsV130(TestViewsV150):
+    """
+    Test views with Safe v1.3.0 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_3_0(*args, **kwargs)
+
+
+class TestViewsV111(TestViewsV150):
+    """
+    Test views with Safe v1.1.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_1_1(*args, **kwargs)

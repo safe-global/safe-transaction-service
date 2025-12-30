@@ -12,7 +12,6 @@ from rest_framework.exceptions import ValidationError
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.eth.utils import fast_keccak
-from safe_eth.safe.safe import Safe
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
@@ -21,11 +20,7 @@ from safe_transaction_service.utils.serializers import (
 )
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
-from .utils import (
-    get_message_encoded,
-    get_safe_message_hash_and_preimage_for_message,
-    select_safe_encoded_message_hash_by_safe_version,
-)
+from .utils import get_message_encoded, get_safe_message_hash_and_preimage_for_message
 
 
 # Request serializers
@@ -130,19 +125,10 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
                 f"Message with hash {to_0x_hex_str(safe_message_hash)} for safe {safe_address} already exists in DB"
             )
 
-        # Preimage is encoded for the Safe. But if an EIP-1271 signature is used, owner's Safe will be called
-        # the preimage will be encoded again for the owner Safe. That's what needs to be signed by the user
-        # So original data -> EIP-191 or EIP-712 encoded -> Safe encoded data -> Owner encoded data
-        # For v1.5.0+, the isValidSignature(bytes32,bytes) expects the original message_hash (bytes32),
-        # not the Safe-encoded hash
-        ethereum_client = get_auto_ethereum_client()
-        safe = Safe(safe_address, ethereum_client)
-        safe_message_preimage = select_safe_encoded_message_hash_by_safe_version(
-            safe.get_version(), safe_message_hash, safe_message_preimage
-        )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )
+
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, None
         )
@@ -185,10 +171,6 @@ class SafeMessageSignatureSerializer(
         )
         assert to_0x_hex_str(safe_message_hash) == safe_message.message_hash
 
-        safe = Safe(safe_address, get_auto_ethereum_client())
-        safe_message_preimage = select_safe_encoded_message_hash_by_safe_version(
-            safe.get_version(), safe_message_hash, safe_message_preimage
-        )
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )

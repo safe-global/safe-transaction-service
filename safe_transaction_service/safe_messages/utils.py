@@ -2,7 +2,6 @@ from typing import Any
 
 from eth_account.messages import encode_defunct
 from eth_typing import ChecksumAddress, Hash32
-from packaging.version import Version
 from safe_eth.eth import get_auto_ethereum_client
 from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.safe import Safe
@@ -35,18 +34,3 @@ def get_safe_message_hash_and_preimage_for_message(
 ) -> tuple[Hash32, bytes]:
     safe = Safe(safe_address, get_auto_ethereum_client())
     return safe.get_message_hash_and_preimage(message)
-
-
-def select_safe_encoded_message_hash_by_safe_version(
-    safe_version: str, safe_message_hash: bytes, safe_message_preimage: bytes
-) -> bytes:
-    """
-    Returns the Safe-encoded message hash for v1.5.0+ Safes, otherwise returns the provided preimage.
-
-    :param safe_version: Version of the Safe contract.
-    :param safe_message_preimage: Safe-encoded message hash.
-    :return: Hash to be used for signature validation.
-    """
-    if Version(safe_version) >= Version("1.5.0"):
-        return safe_message_hash
-    return safe_message_preimage

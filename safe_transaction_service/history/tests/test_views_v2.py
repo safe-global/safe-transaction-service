@@ -11,6 +11,7 @@ from django.utils import timezone
 import eth_abi
 from eth_account import Account
 from hexbytes import HexBytes
+from packaging.version import Version
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
@@ -26,9 +27,6 @@ from safe_eth.util.util import to_0x_hex_str
 from ...contracts.models import ContractQuerySet
 from ...contracts.tests.factories import ContractFactory
 from ...contracts.tx_decoder import DbTxDecoder
-from ...safe_messages.utils import (
-    select_safe_encoded_message_hash_by_safe_version,
-)
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
 from ...utils.utils import datetime_to_str
@@ -1535,11 +1533,14 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
 
-        selected_hash = select_safe_encoded_message_hash_by_safe_version(
-            safe.get_version(), safe_tx_hash, safe_tx_hash_preimage
+        # >= v1.3.0: supports isValidSignature(bytes32, bytes) and isValidSignature(bytes, bytes)
+        # < v1.3.0: only isValidSignature(bytes, bytes) with the preimage
+        # < v1.5.0: test isValidSignature(bytes, bytes) for backward compatibility
+        safe_owner_message_hash = safe_owner.get_message_hash(
+            safe_tx_hash
+            if Version(safe.get_version()) >= Version("1.5.0")
+            else safe_tx_hash_preimage
         )
-
-        safe_owner_message_hash = safe_owner.get_message_hash(selected_hash)
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -2822,3 +2823,17 @@ class TestViewsV2V141(TestViewsV2V150):
         :return: Deploy last available Safe
         """
         return self.deploy_test_safe_v1_4_1(*args, **kwargs)
+
+
+class TestViewsV2V130(TestViewsV2V150):
+    """
+    Test views v2 with Safe v1.3.0 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_3_0(*args, **kwargs)
