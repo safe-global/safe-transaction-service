@@ -2659,6 +2659,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["master_copy"], safe_last_status.master_copy)
         self.assertEqual(result["fallback_handler"], safe_last_status.fallback_handler)
         self.assertEqual(result["guard"], safe_last_status.guard)
+        self.assertEqual(result["module_guard"], safe_last_status.module_guard)
         self.assertCountEqual(
             result["enabled_modules"], safe_last_status.enabled_modules
         )
@@ -2752,6 +2753,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["master_copy"], safe_last_status.master_copy)
         self.assertEqual(result["fallback_handler"], safe_last_status.fallback_handler)
         self.assertEqual(result["guard"], safe_last_status.guard)
+        self.assertEqual(result["module_guard"], safe_last_status.module_guard)
         self.assertCountEqual(
             result["enabled_modules"], safe_last_status.enabled_modules
         )
