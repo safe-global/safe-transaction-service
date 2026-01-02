@@ -8,6 +8,7 @@ from django.urls import reverse
 import eth_abi
 from eth_account import Account
 from hexbytes import HexBytes
+from packaging.version import Version
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
@@ -294,9 +295,16 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         safe_message_hash, safe_message_preimage = safe.get_message_hash_and_preimage(
             fast_keccak(message_encoded)
         )
-        safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(
-            safe_message_preimage
+
+        # >= v1.3.0: supports isValidSignature(bytes32, bytes) and isValidSignature(bytes, bytes)
+        # < v1.3.0: only isValidSignature(bytes, bytes) with the preimage
+        # < v1.5.0: test isValidSignature(bytes, bytes) for backward compatibility
+        safe_owner_message_hash = safe_owner.get_message_hash(
+            safe_message_hash
+            if Version(safe.get_version()) >= Version("1.5.0")
+            else safe_message_preimage
         )
+
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -327,6 +335,11 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
             SafeMessageConfirmation.objects.get().owner, safe_owner.address
         )
 
+    def test_safe_messages_create_using_1271_signature_v1_1_1_view(self):
+        return self._test_safe_messages_create_using_1271_signature_view(
+            self.deploy_test_safe_v1_1_1
+        )
+
     def test_safe_messages_create_using_1271_signature_v1_3_0_view(self):
         return self._test_safe_messages_create_using_1271_signature_view(
             self.deploy_test_safe_v1_3_0
@@ -335,6 +348,11 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
     def test_safe_messages_create_using_1271_signature_v1_4_1_view(self):
         return self._test_safe_messages_create_using_1271_signature_view(
             self.deploy_test_safe_v1_4_1
+        )
+
+    def test_safe_messages_create_using_1271_signature_v1_5_0_view(self):
+        return self._test_safe_messages_create_using_1271_signature_view(
+            self.deploy_test_safe_v1_5_0
         )
 
     @mock.patch(
