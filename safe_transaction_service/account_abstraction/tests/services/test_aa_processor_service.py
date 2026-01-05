@@ -152,22 +152,32 @@ class TestAaProcessorService(TestCase):
         get_user_operation_receipt_mock: MagicMock,
     ):
         """
-        Entrypoint v0.7.0 endpoints should be ignored
+        Entrypoint v0.7.0 endpoints should be ignored when not in supported list
         """
-        ethereum_tx = history_factories.EthereumTxFactory(
-            logs=[clean_receipt_log(log) for log in aa_tx_receipt_mock["logs"]]
-        )
-        with self.assertRaisesMessage(
-            UserOperationNotSupportedException, "for EntryPoint v0.7.0 is not supported"
+        # Override settings to only support v0.6
+        with self.settings(
+            ETHEREUM_4337_SUPPORTED_ENTRY_POINTS=[
+                "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+            ]
         ):
-            self.aa_processor_service.index_user_operation(
-                Account.create().address,  # Not relevant
-                user_operation_v07_hash,
-                ethereum_tx,
-            )
+            # Reinitialize service with new settings
+            get_aa_processor_service.cache_clear()
+            aa_processor_service = get_aa_processor_service()
 
-        self.aa_processor_service.process_aa_transaction(aa_safe_address, ethereum_tx)
-        self.assertEqual(UserOperationModel.objects.count(), 0)
-        self.assertEqual(SafeOperationModel.objects.count(), 0)
-        self.assertEqual(UserOperationReceiptModel.objects.count(), 0)
-        self.assertEqual(SafeOperationConfirmationModel.objects.count(), 0)
+            ethereum_tx = history_factories.EthereumTxFactory(
+                logs=[clean_receipt_log(log) for log in aa_tx_receipt_mock["logs"]]
+            )
+            with self.assertRaisesMessage(
+                UserOperationNotSupportedException, "Entrypoint is not supported"
+            ):
+                aa_processor_service.index_user_operation(
+                    Account.create().address,  # Not relevant
+                    user_operation_v07_hash,
+                    ethereum_tx,
+                )
+
+            aa_processor_service.process_aa_transaction(aa_safe_address, ethereum_tx)
+            self.assertEqual(UserOperationModel.objects.count(), 0)
+            self.assertEqual(SafeOperationModel.objects.count(), 0)
+            self.assertEqual(UserOperationReceiptModel.objects.count(), 0)
+            self.assertEqual(SafeOperationConfirmationModel.objects.count(), 0)
