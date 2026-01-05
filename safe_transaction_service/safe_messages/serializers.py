@@ -15,13 +15,12 @@ from safe_eth.eth.utils import fast_keccak
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
-from safe_transaction_service.utils.serializers import get_safe_owners
+from safe_transaction_service.utils.serializers import (
+    get_safe_owners,
+)
 
 from .models import SIGNATURE_LENGTH, SafeMessage, SafeMessageConfirmation
-from .utils import (
-    get_message_encoded,
-    get_safe_message_hash_and_preimage_for_message,
-)
+from .utils import get_message_encoded, get_safe_message_hash_and_preimage_for_message
 
 
 # Request serializers
@@ -132,6 +131,7 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         safe_signatures = SafeSignature.parse_signature(
             signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
         )
+
         owner, signature_type = self.get_valid_owner_from_signatures(
             safe_signatures, safe_address, None
         )

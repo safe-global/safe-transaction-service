@@ -600,6 +600,7 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "master_copy",
         "fallback_handler",
         "guard",
+        "module_guard",
         "enabled_modules",
     )
     list_filter = (
@@ -607,6 +608,7 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "master_copy",
         "fallback_handler",
         "guard",
+        "module_guard",
         SafeStatusModulesListFilter,
     )
     list_select_related = ("internal_tx__ethereum_tx", "internal_tx__decoded_tx")

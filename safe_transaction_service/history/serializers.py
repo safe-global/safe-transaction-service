@@ -266,9 +266,11 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
         signature_owners = []
         # TODO Make signature mandatory
         signature = attrs.get("signature", b"")
+
         parsed_signatures = SafeSignature.parse_signature(
             signature, safe_tx_hash, safe_hash_preimage=safe_tx.safe_tx_hash_preimage
         )
+
         attrs["parsed_signatures"] = parsed_signatures
         # If there's at least one signature, transaction is trusted (until signatures are mandatory)
         attrs["trusted"] = bool(parsed_signatures)
@@ -894,6 +896,7 @@ class SafeInfoResponseSerializer(serializers.Serializer):
     modules = serializers.ListField(child=EthereumAddressField())
     fallback_handler = EthereumAddressField()
     guard = EthereumAddressField()
+    module_guard = EthereumAddressField()
     version = serializers.CharField(allow_null=True)
 
 
@@ -922,6 +925,7 @@ class SafeLastStatusSerializer(serializers.Serializer):
     master_copy = EthereumAddressField()
     fallback_handler = EthereumAddressField()
     guard = EthereumAddressField(allow_null=True)
+    module_guard = EthereumAddressField(allow_null=True)
     enabled_modules = serializers.ListField(child=EthereumAddressField())
 
 
