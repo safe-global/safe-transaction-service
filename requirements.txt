@@ -1,5 +1,5 @@
 boto3==1.42.4
-cachetools==6.2.2
+cachetools==6.2.3
 celery==5.5.3
 django==5.2.9
 django-cache-memoize==0.2.1
@@ -14,7 +14,7 @@ django-imagekit==6.0.0
 django-model-utils==5.0.0
 django-redis==6.0.0
 django-s3-storage==0.15.0
-django-timezone-field==7.1
+django-timezone-field==7.2.1
 djangorestframework==3.16.1
 djangorestframework-camel-case==1.4.2
 docutils==0.22.3
@@ -27,5 +27,5 @@ pillow==11.3.0
 psycopg[binary,pool]==3.2.13
 redis[hiredis]==7.1.0
 requests==2.32.5
-safe-eth-py[django]==7.17.0
+safe-eth-py[django]==7.17.1
 web3==7.14.0

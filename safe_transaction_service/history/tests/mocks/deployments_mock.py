@@ -1,3 +1,66 @@
+mainnet_deployments_1_5_0_safe = {
+    "contractName": "Safe",
+    "address": "0xFf51A5898e281Db6DfC7855790607438dF2ca44b",
+}
+
+mainnet_deployments_1_5_0_multisend = {
+    "contractName": "MultiSend",
+    "address": "0x218543288004CD07832472D464648173c77D7eB7",
+}
+
+mainnet_deployments_1_5_0 = {
+    "version": "1.5.0",
+    "contracts": [
+        {
+            "contractName": "CompatibilityFallbackHandler",
+            "address": "0x3EfCBb83A4A7AfcB4F68D501E2c2203a38be77f4",
+        },
+        {
+            "contractName": "CreateCall",
+            "address": "0x2Ef5ECfbea521449E4De05EDB1ce63B75eDA90B4",
+        },
+        {
+            "contractName": "ExtensibleFallbackHandler",
+            "address": "0x85a8ca358D388530ad0fB95D0cb89Dd44Fc242c3",
+        },
+        mainnet_deployments_1_5_0_multisend,
+        {
+            "contractName": "MultiSendCallOnly",
+            "address": "0xA83c336B20401Af773B6219BA5027174338D1836",
+        },
+        mainnet_deployments_1_5_0_safe,
+        {
+            "contractName": "SafeL2",
+            "address": "0xEdd160fEBBD92E350D4D398fb636302fccd67C7e",
+        },
+        {
+            "contractName": "SafeMigration",
+            "address": "0x6439e7ABD8Bb915A5263094784C5CF561c4172AC",
+        },
+        {
+            "contractName": "SafeProxyFactory",
+            "address": "0x14F2982D601c9458F93bd70B218933A6f8165e7b",
+        },
+        {
+            "contractName": "SafeToL2Setup",
+            "address": "0x900C7589200010D6C6eCaaE5B06EBe653bc2D82a",
+        },
+        {
+            "contractName": "SignMessageLib",
+            "address": "0x4FfeF8222648872B3dE295Ba1e49110E61f5b5aa",
+        },
+        {
+            "contractName": "SimulateTxAccessor",
+            "address": "0x07EfA797c55B5DdE3698d876b277aBb6B893654C",
+        },
+        {
+            "contractName": "TokenCallbackHandler",
+            "address": "0x54e86d004d71a8D2112ec75FaCE57D730b0433F3",
+        },
+    ],
+}
+
+
 mainnet_deployments_1_4_1_multisend = {
     "contractName": "MultiSend",
     "address": "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526",
@@ -194,4 +257,5 @@ mainnet_deployments = [
     mainnet_deployments_1_2_0,
     mainnet_deployments_1_3_0,
     mainnet_deployments_1_4_1,
+    mainnet_deployments_1_5_0,
 ]

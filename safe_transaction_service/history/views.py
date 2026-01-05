@@ -150,11 +150,12 @@ class AboutEthereumTracingRPCView(AboutEthereumRPCView):
         """
         Get information about the Ethereum Tracing RPC node used by the service (if any configured)
         """
-        if not settings.ETHEREUM_TRACING_NODE_URL:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        safe_service = SafeServiceProvider()
+        ethereum_tracing_client = safe_service.ethereum_tracing_client
+        if ethereum_tracing_client:
+            return Response(self._get_info(ethereum_tracing_client))
         else:
-            ethereum_client = EthereumClient(settings.ETHEREUM_TRACING_NODE_URL)
-            return Response(self._get_info(ethereum_client))
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema(responses={200: serializers.IndexingStatusSerializer})
@@ -948,13 +949,15 @@ class SafeTransferListView(ListAPIView):
 
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.to_or_from(address).token_txs()
+            ERC20Transfer.objects.to_or_from(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.to_or_from(address).token_txs()
+            ERC721Transfer.objects.to_or_from(address)
+            .token_txs()
+            .order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_txs_for_address(address)
+            InternalTx.objects.ether_txs_for_address(address).order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         return InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
@@ -1029,13 +1032,15 @@ class SafeIncomingTransferListView(SafeTransferListView):
 
     def get_transfers(self, address: str):
         erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.incoming(address).token_txs()
+            ERC20Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.incoming(address).token_txs()
+            ERC721Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_incoming_txs_for_address(address)
+            InternalTx.objects.ether_incoming_txs_for_address(address).order_by(
+                "-timestamp"
+            )
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
 
         return InternalTx.objects.union_ether_and_token_txs(
@@ -1158,7 +1163,9 @@ class ModulesView(GenericAPIView):
                 },
             )
 
-        safes_for_module = SafeLastStatus.objects.addresses_for_module(address)
+        safes_for_module = SafeLastStatus.objects.addresses_for_module(address)[
+            : pagination.DefaultPagination.max_limit
+        ]
         serializer = self.get_serializer(data={"safes": safes_for_module})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)
@@ -1193,7 +1200,9 @@ class OwnersView(GenericAPIView):
                 },
             )
 
-        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)
+        safes_for_owner = SafeLastStatus.objects.addresses_for_owner(address)[
+            : pagination.DefaultPagination.max_limit
+        ]
         serializer = self.get_serializer(data={"safes": safes_for_owner})
         assert serializer.is_valid()
         return Response(status=status.HTTP_200_OK, data=serializer.data)

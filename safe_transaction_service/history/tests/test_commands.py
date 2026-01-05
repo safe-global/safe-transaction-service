@@ -471,8 +471,8 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             f"Setting up {ethereum_network.name} default safe addresses from chain with unknown init block",
             buf.getvalue(),
         )
-        self.assertEqual(SafeMasterCopy.objects.count(), 2)
-        self.assertEqual(ProxyFactory.objects.count(), 1)
+        self.assertEqual(SafeMasterCopy.objects.count(), 3)
+        self.assertEqual(ProxyFactory.objects.count(), 2)
 
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def test_setup_service_update_singletons(
@@ -487,8 +487,11 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         ethereum_client_get_network_mock.return_value = ethereum_network
         buf = StringIO()
         call_command(command, stdout=buf)
-        self.assertEqual(SafeMasterCopy.objects.count(), 2)
-        self.assertEqual(ProxyFactory.objects.count(), 1)
+        self.assertEqual(SafeMasterCopy.objects.count(), 3)
+        # Both v1.5.0 and v1.4.1 proxy factories exist in test environment
+        # v1.5.0: 0x14F2982D601c9458F93bd70B218933A6f8165e7b (deployed by SafeTestCaseMixin)
+        # v1.4.1: 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67 (deployed via Singleton Factory)
+        self.assertEqual(ProxyFactory.objects.count(), 2)
         master_copy = SafeMasterCopy.objects.first()
         self.assertEqual(master_copy.initial_block_number, 0)
         mocked_addresses = {ethereum_network: [(master_copy.address, 111, "v1.1.1")]}

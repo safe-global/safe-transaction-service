@@ -14,6 +14,7 @@ import eth_abi
 from eth_account import Account
 from factory.fuzzy import FuzzyText
 from hexbytes import HexBytes
+from packaging.version import Version
 from requests import ReadTimeout
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
@@ -73,6 +74,9 @@ from .mocks.deployments_mock import (
     mainnet_deployments_1_4_1,
     mainnet_deployments_1_4_1_multisend,
     mainnet_deployments_1_4_1_safe,
+    mainnet_deployments_1_5_0,
+    mainnet_deployments_1_5_0_multisend,
+    mainnet_deployments_1_5_0_safe,
 )
 from .mocks.mocks_safe_creation import (
     create_cpk_test_data,
@@ -89,7 +93,7 @@ from .mocks.traces import call_trace
 logger = logging.getLogger(__name__)
 
 
-class TestViews(SafeTestCaseMixin, APITestCase):
+class TestViewsV150(SafeTestCaseMixin, APITestCase):
     def setUp(self):
         get_redis().flushall()
 
@@ -293,6 +297,10 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json(), [mainnet_deployments_1_4_1])
 
+        response = self.client.get(url + "?version=1.5.0", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), [mainnet_deployments_1_5_0])
+
         response = self.client.get(
             url + "?version=1.4.1&contract=MultiSend", format="json"
         )
@@ -300,6 +308,15 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.json(),
             [{"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_multisend]}],
+        )
+
+        response = self.client.get(
+            url + "?version=1.5.0&contract=MultiSend", format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [{"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_multisend]}],
         )
 
         response = self.client.get(url + "?contract=Safe", format="json")
@@ -312,6 +329,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 {"version": "1.2.0", "contracts": []},
                 {"version": "1.3.0", "contracts": []},
                 {"version": "1.4.1", "contracts": [mainnet_deployments_1_4_1_safe]},
+                {"version": "1.5.0", "contracts": [mainnet_deployments_1_5_0_safe]},
             ],
         )
 
@@ -1753,8 +1771,14 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         )
         safe_tx_hash = safe_tx.safe_tx_hash
         safe_tx_hash_preimage = safe_tx.safe_tx_hash_preimage
-
-        safe_owner_message_hash = safe_owner.get_message_hash(safe_tx_hash_preimage)
+        # >= v1.3.0: supports isValidSignature(bytes32, bytes) and isValidSignature(bytes, bytes)
+        # < v1.3.0: only isValidSignature(bytes, bytes) with the preimage
+        # < v1.5.0: test isValidSignature(bytes, bytes) for backward compatibility
+        safe_owner_message_hash = safe_owner.get_message_hash(
+            safe_tx_hash
+            if Version(safe.get_version()) >= Version("1.5.0")
+            else safe_tx_hash_preimage
+        )
         safe_owner_signature = account.unsafe_sign_hash(safe_owner_message_hash)[
             "signature"
         ]
@@ -3072,6 +3096,16 @@ class TestViews(SafeTestCaseMixin, APITestCase):
             ],
         )
 
+        # Validate ordering by timestamp (descending - newest first)
+        self.assertGreater(
+            ethereum_erc_721_event.timestamp,
+            ethereum_erc_20_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event.timestamp,
+            internal_tx.timestamp,
+        )
+
     def test_transfers_view(self):
         safe_address = Account.create().address
         response = self.client.get(
@@ -3363,6 +3397,28 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertGreater(len(response.data["results"]), 0)
         for result in response.data["results"]:
             self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
+
+        # Validate ordering by timestamp (descending - newest first)
+        self.assertGreater(
+            ethereum_erc_721_event_2.timestamp,
+            ethereum_erc_721_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_721_event.timestamp,
+            ethereum_erc_20_event_2.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event_2.timestamp,
+            ethereum_erc_20_event.timestamp,
+        )
+        self.assertGreater(
+            ethereum_erc_20_event.timestamp,
+            internal_tx_2.timestamp,
+        )
+        self.assertGreater(
+            internal_tx_2.timestamp,
+            internal_tx.timestamp,
+        )
 
         # Test that the result should be cached
         # Mock get_queryset with empty queryset return value to get proper error in case of fail
@@ -3784,6 +3840,7 @@ class TestViews(SafeTestCaseMixin, APITestCase):
                 "modules": [],
                 "fallback_handler": blockchain_safe.retrieve_fallback_handler(),
                 "guard": NULL_ADDRESS,
+                "module_guard": NULL_ADDRESS,
                 "version": "1.25.0",
             },
         )
@@ -4952,3 +5009,45 @@ class TestViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["amount"], str(erc20_transfer.value))
         self.assertEqual(result["transactionHash"], ethereum_tx.tx_hash)
         # Standalone transfers should not have safe_tx_hash
+
+
+class TestViewsV141(TestViewsV150):
+    """
+    Test views with Safe v1.4.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_4_1(*args, **kwargs)
+
+
+class TestViewsV130(TestViewsV150):
+    """
+    Test views with Safe v1.3.0 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_3_0(*args, **kwargs)
+
+
+class TestViewsV111(TestViewsV150):
+    """
+    Test views with Safe v1.1.1 contracts.
+    """
+
+    def deploy_test_safe(self, *args, **kwargs) -> Safe:
+        """
+        :param args:
+        :param kwargs:
+        :return: Deploy last available Safe
+        """
+        return self.deploy_test_safe_v1_1_1(*args, **kwargs)

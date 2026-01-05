@@ -1,4 +1,5 @@
 import datetime
+import json
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from enum import Enum
@@ -407,10 +408,12 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
         """
         :return: Transactions containing ERC4337 `UserOperation` event
         """
-        query = '{"topics": ["' + to_0x_hex_str(USER_OPERATION_EVENT_TOPIC) + '"]}'
+        # Use json.dumps to safely construct the JSON query string
+        query_json = json.dumps({"topics": [to_0x_hex_str(USER_OPERATION_EVENT_TOPIC)]})
 
         return self.raw(
-            f"SELECT * FROM history_ethereumtx WHERE '{query}'::jsonb <@ ANY (logs)"
+            "SELECT * FROM history_ethereumtx WHERE %s::jsonb <@ ANY (logs)",
+            [query_json],
         )
 
 
@@ -428,18 +431,18 @@ class EthereumTx(TimeStampedModel):
     tx_hash = Keccak256Field(primary_key=True)
     gas_used = Uint256Field(null=True, default=None)  # If mined
     status = models.IntegerField(
-        null=True, default=None, db_index=True
+        null=True, default=None
     )  # If mined. Old txs don't have `status`
     logs = ArrayField(JSONField(), null=True, default=None)  # If mined
     transaction_index = models.PositiveIntegerField(null=True, default=None)  # If mined
-    _from = EthereumAddressBinaryField(null=True, db_index=True)
+    _from = EthereumAddressBinaryField(null=True)
     gas = Uint256Field()
     gas_price = Uint256Field()
     max_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
     max_priority_fee_per_gas = Uint256Field(null=True, blank=True, default=None)
     data = models.BinaryField(null=True)
     nonce = Uint256Field()
-    to = EthereumAddressBinaryField(null=True, db_index=True)
+    to = EthereumAddressBinaryField(null=True)
     value = Uint256Field()
     type = models.PositiveSmallIntegerField(default=0)
 
@@ -1360,7 +1363,7 @@ class InternalTxDecoded(models.Model):
         related_name="decoded_tx",
         primary_key=True,
     )
-    function_name = models.CharField(max_length=256, db_index=True)
+    function_name = models.CharField(max_length=256)
     arguments = JSONField()
     processed = models.BooleanField(default=False)
     # Denormalized from internal_tx._from for efficient querying
@@ -1370,12 +1373,12 @@ class InternalTxDecoded(models.Model):
     class Meta:
         indexes = [
             models.Index(
-                name="history_decoded_processed_idx",
+                name="history_decoded_not_proc_idx",
                 fields=["internal_tx_id"],
                 condition=Q(processed=False),
             ),
             models.Index(
-                name="history_decoded_not_proc_idx",
+                name="history_decoded_processed_idx",
                 fields=["internal_tx_id"],
                 condition=Q(processed=True),  # For finding out of order transactions
             ),
@@ -2208,6 +2211,7 @@ class SafeStatusBase(models.Model):
     master_copy = EthereumAddressBinaryField()
     fallback_handler = EthereumAddressBinaryField()
     guard = EthereumAddressBinaryField(default=None, null=True)
+    module_guard = EthereumAddressBinaryField(default=None, null=True)
     enabled_modules = ArrayField(EthereumAddressBinaryField(), default=list, blank=True)
 
     class Meta:
@@ -2255,6 +2259,7 @@ class SafeStatusBase(models.Model):
             master_copy=safe_status_base.master_copy,
             fallback_handler=safe_status_base.fallback_handler,
             guard=safe_status_base.guard,
+            module_guard=safe_status_base.module_guard,
             enabled_modules=safe_status_base.enabled_modules,
         )
 
@@ -2288,6 +2293,7 @@ class SafeLastStatusManager(models.Manager):
                 "master_copy": safe_status.master_copy,
                 "fallback_handler": safe_status.fallback_handler,
                 "guard": safe_status.guard,
+                "module_guard": safe_status.module_guard,
                 "enabled_modules": safe_status.enabled_modules,
             },
         )
@@ -2361,6 +2367,7 @@ class SafeLastStatus(SafeStatusBase):
             self.owners,
             self.threshold,
             master_copy_version,
+            self.module_guard or NULL_ADDRESS,
         )
 
 
