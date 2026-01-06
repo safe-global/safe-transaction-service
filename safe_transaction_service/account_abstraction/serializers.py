@@ -333,7 +333,7 @@ class SafeOperationSerializer(
                 self.validated_data["paymaster_verification_gas_limit"],
                 self.validated_data["paymaster_post_op_gas_limit"],
                 self.validated_data["paymaster"],
-                self.validated_data.get["paymaster_data"] or b"",
+                self.validated_data.get("paymaster_data") or b"",
             )
         else:
             user_operation = UserOperationV6(
