@@ -106,6 +106,8 @@ class SafeOperationSerializer(
     # v7 fields
     factory = eth_serializers.EthereumAddressField(allow_null=True, required=False)
     factory_data = eth_serializers.HexadecimalField(allow_null=True, required=False)
+    paymaster = eth_serializers.EthereumAddressField(allow_null=True, required=False)
+    paymaster_data = eth_serializers.HexadecimalField(allow_null=True, required=False)
     paymaster_verification_gas_limit = serializers.IntegerField(
         min_value=0, allow_null=True, required=False
     )
@@ -252,11 +254,14 @@ class SafeOperationSerializer(
                 raise ValidationError(
                     "`factory` fields are only supported for EntryPoint v0.7"
                 )
-            if attrs.get("paymaster_verification_gas_limit") or attrs.get(
-                "paymaster_post_op_gas_limit"
+            if (
+                attrs.get("paymaster")
+                or attrs.get("paymaster_data")
+                or attrs.get("paymaster_verification_gas_limit")
+                or attrs.get("paymaster_post_op_gas_limit")
             ):
                 raise ValidationError(
-                    "Paymaster gas limit fields are only supported for EntryPoint v0.7"
+                    "Paymaster, paymaster_verification_gas_limit, paymaster_post_op_gas_limit and paymaster_data fields are only supported for EntryPoint v0.7"
                 )
 
         valid_after, valid_until = [
