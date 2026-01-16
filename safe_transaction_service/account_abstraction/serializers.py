@@ -249,6 +249,12 @@ class SafeOperationSerializer(
                 raise ValidationError(
                     "`paymaster_and_data` is not supported for EntryPoint v0.7, use paymaster fields instead"
                 )
+            # Validate paymaster_data requires paymaster
+            if attrs.get("paymaster_data") and not attrs.get("paymaster"):
+                raise ValidationError("`paymaster_data` requires `paymaster` to be set")
+            # Validate factory_data requires factory
+            if attrs.get("factory_data") and not attrs.get("factory"):
+                raise ValidationError("`factory_data` requires `factory` to be set")
         else:
             if attrs.get("factory") or attrs.get("factory_data"):
                 raise ValidationError(
@@ -275,14 +281,14 @@ class SafeOperationSerializer(
         safe_operation = SafeOperationClass(
             safe_address,
             attrs["nonce"],
-            fast_keccak(attrs["init_code"] or b""),
+            fast_keccak(attrs.get("init_code") or b""),
             fast_keccak(attrs["call_data"] or b""),
             attrs["call_gas_limit"],
             attrs["verification_gas_limit"],
             attrs["pre_verification_gas"],
             attrs["max_fee_per_gas"],
             attrs["max_priority_fee_per_gas"],
-            fast_keccak(attrs["paymaster_and_data"] or b""),
+            fast_keccak(attrs.get("paymaster_and_data") or b""),
             valid_after,
             valid_until,
             attrs["entry_point"],
@@ -321,6 +327,12 @@ class SafeOperationSerializer(
         is_v7 = entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
 
         if is_v7:
+            factory = self.validated_data["factory"]
+            factory_data = self.validated_data["factory_data"] if factory else None
+            paymaster = self.validated_data["paymaster"]
+            paymaster_data = (
+                self.validated_data.get("paymaster_data") if paymaster else None
+            )
             user_operation: UserOperationV7 | UserOperationV6 = UserOperationV7(
                 b"",  # Hash will be calculated later
                 self.context["safe_address"],
@@ -333,12 +345,12 @@ class SafeOperationSerializer(
                 self.validated_data["max_fee_per_gas"],
                 self.validated_data["signature"],
                 self.validated_data["entry_point"],
-                self.validated_data["factory"],
-                self.validated_data["factory_data"] or b"",
+                factory,
+                factory_data or b"",
                 self.validated_data["paymaster_verification_gas_limit"],
                 self.validated_data["paymaster_post_op_gas_limit"],
-                self.validated_data["paymaster"],
-                self.validated_data.get("paymaster_data") or b"",
+                paymaster,
+                paymaster_data or b"",
             )
         else:
             user_operation = UserOperationV6(
@@ -379,12 +391,19 @@ class SafeOperationSerializer(
 
         if is_v7:
             # v7 specific fields
+            # Ensure factory_data and paymaster_data are None when factory/paymaster is None
+            # to satisfy database constraints
             defaults.update(
                 {
                     "factory": user_operation.factory,
-                    "factory_data": user_operation.factory_data,
+                    "factory_data": user_operation.factory_data
+                    if user_operation.factory
+                    else None,
                     "paymaster_verification_gas_limit": user_operation.paymaster_verification_gas_limit,
                     "paymaster_post_op_gas_limit": user_operation.paymaster_post_op_gas_limit,
+                    "paymaster_data": user_operation.paymaster_data
+                    if user_operation.paymaster
+                    else None,
                 }
             )
         else:
