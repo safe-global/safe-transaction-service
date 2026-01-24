@@ -129,7 +129,10 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
         # the preimage will be encoded again for the owner Safe. That's what needs to be signed by the user
         # So original data -> EIP-191 or EIP-712 encoded -> Safe encoded data -> Owner encoded data
         safe_signatures = SafeSignature.parse_signature(
-            signature, safe_message_hash, safe_hash_preimage=safe_message_preimage
+            signature,
+            safe_message_hash,
+            safe_hash_preimage=safe_message_preimage,
+            message=message.encode(),
         )
 
         owner, signature_type = self.get_valid_owner_from_signatures(
