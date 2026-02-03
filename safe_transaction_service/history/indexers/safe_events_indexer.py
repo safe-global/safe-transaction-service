@@ -106,7 +106,7 @@ class SafeEventsIndexer(EventsIndexer):
         not_processed_log_receipts: list[LogReceipt] = []
         not_processed_tx_hashes_by_index: list[bytes] = []
         for log_receipt in log_receipts:
-            if self.element_already_processed_checker.is_processed(
+            if self._is_processed(
                 log_receipt["transactionHash"],
                 log_receipt["blockHash"],
                 log_receipt["logIndex"],
@@ -241,7 +241,7 @@ class SafeEventsIndexer(EventsIndexer):
 
         # 13. Mark ALL original receipts as processed (so we don't re-fetch blocked ones)
         for log_receipt in not_processed_log_receipts:
-            self.element_already_processed_checker.mark_as_processed(
+            self._mark_processed(
                 log_receipt["transactionHash"],
                 log_receipt["blockHash"],
                 log_receipt["logIndex"],

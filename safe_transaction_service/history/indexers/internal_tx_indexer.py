@@ -26,7 +26,6 @@ from ..models import (
     SafeMasterCopy,
     SafeRelevantTransaction,
 )
-from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -73,7 +72,6 @@ class InternalTxIndexer(EthereumIndexer):
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
-        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
 
     @property
     def database_field(self):
@@ -302,6 +300,7 @@ class InternalTxIndexer(EthereumIndexer):
         """
         safe_relevant_txs: list[SafeRelevantTransaction] = []
         for internal_tx in internal_txs:
+            # Caller is expected to pass only relevant internal txs.
             if internal_tx.is_ether_transfer:
                 safe_relevant_txs.append(
                     SafeRelevantTransaction(
@@ -336,9 +335,7 @@ class InternalTxIndexer(EthereumIndexer):
                 if tx_hash_with_traces[tx_hash]
                 else None
             )
-            if not self.element_already_processed_checker.is_processed(
-                tx_hash, block_hash
-            ):
+            if not self._is_processed(tx_hash, block_hash):
                 tx_hashes.append(tx_hash)
                 # Traces can be already populated if using `trace_block`, but with `trace_filter`
                 # some traces will be missing and `trace_transaction` needs to be called
@@ -376,9 +373,7 @@ class InternalTxIndexer(EthereumIndexer):
 
         tx_hashes = list(filtered_traces_by_tx_hash.keys())
 
-        logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
-        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.debug("End prefetching and storing of ethereum txs")
+        ethereum_txs = self._prefetch_ethereum_txs(tx_hashes)
 
         internal_txs = [
             InternalTx.objects.build_from_trace(trace, ethereum_tx)
@@ -389,9 +384,14 @@ class InternalTxIndexer(EthereumIndexer):
 
         with transaction.atomic():
             logger.debug("Storing traces")
-            safe_relevant_txs = self.build_safe_relevant_txs(iter(internal_txs))
+            relevant_internal_txs = [
+                internal_tx for internal_tx in internal_txs if internal_tx.is_relevant
+            ]
+            safe_relevant_txs = self.build_safe_relevant_txs(
+                iter(relevant_internal_txs)
+            )
             traces_stored = InternalTx.objects.bulk_create_from_generator(
-                iter(internal_txs), ignore_conflicts=True
+                iter(relevant_internal_txs), ignore_conflicts=True
             )
             logger.debug("Stored %d traces", traces_stored)
 
@@ -418,9 +418,7 @@ class InternalTxIndexer(EthereumIndexer):
                 if tx_hash_with_traces[tx_hash]
                 else None
             )
-            self.element_already_processed_checker.mark_as_processed(
-                tx_hash, block_hash
-            )
+            self._mark_processed(tx_hash, block_hash)
         return tx_hashes
 
     @staticmethod

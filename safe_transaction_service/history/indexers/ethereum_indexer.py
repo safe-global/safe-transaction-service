@@ -8,12 +8,13 @@ from typing import Any
 from django.db.models import Min
 
 from celery.exceptions import SoftTimeLimitExceeded
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexStr
 from requests import Timeout
 from safe_eth.eth import EthereumClient
 from web3.exceptions import Web3RPCError
 
 from ..services import IndexingException, IndexService, IndexServiceProvider
+from .element_already_processed_checker import ElementAlreadyProcessedChecker
 
 logger = getLogger(__name__)
 
@@ -73,6 +74,38 @@ class EthereumIndexer(ABC):
         self.updated_blocks_behind = updated_blocks_behind
         self.query_chunk_size = query_chunk_size
         self.block_auto_process_limit = block_auto_process_limit
+        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
+
+    def _is_processed(
+        self, tx_hash: HexStr | bytes, block_hash: HexStr | bytes | None, index: int = 0
+    ) -> bool:
+        """
+        Helper to check if an element was already processed.
+        """
+        return self.element_already_processed_checker.is_processed(
+            tx_hash, block_hash, index
+        )
+
+    def _mark_processed(
+        self, tx_hash: HexStr | bytes, block_hash: HexStr | bytes | None, index: int = 0
+    ) -> bool:
+        """
+        Helper to mark an element as processed.
+        """
+        return self.element_already_processed_checker.mark_as_processed(
+            tx_hash, block_hash, index
+        )
+
+    def _prefetch_ethereum_txs(self, tx_hashes: Sequence[HexStr | bytes]):
+        """
+        Prefetch and store EthereumTxs for the provided hashes.
+        """
+        if not tx_hashes:
+            return []
+        logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
+        ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+        logger.debug("End prefetching and storing of ethereum txs")
+        return ethereum_txs
 
     @property
     @abstractmethod
@@ -117,12 +150,13 @@ class EthereumIndexer(ABC):
 
     def process_elements(self, elements: Sequence[Any]) -> Sequence[Any]:
         processed_objects = []
+        total_elements = len(elements)
         for i, element in enumerate(elements):
             logger.info(
                 "%s: Processing element %d/%d",
                 i + 1,
                 self.__class__.__name__,
-                len(list(elements)),
+                total_elements,
             )
             processed_objects.append(self.process_element(element))
         # processed_objects = [self.process_element(element) for element in elements]
