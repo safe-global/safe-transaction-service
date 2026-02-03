@@ -181,8 +181,20 @@ class Erc20EventsIndexer(EventsIndexer):
         :param log_receipts: Events to store in database
         :return: List of `TokenTransfer` already stored in database
         """
+        not_processed_log_receipts = [
+            log_receipt
+            for log_receipt in log_receipts
+            if not self.element_already_processed_checker.is_processed(
+                log_receipt["transactionHash"],
+                log_receipt["blockHash"],
+                log_receipt["logIndex"],
+            )
+        ]
         tx_hashes = OrderedDict.fromkeys(
-            [log_receipt["transactionHash"] for log_receipt in log_receipts]
+            [
+                log_receipt["transactionHash"]
+                for log_receipt in not_processed_log_receipts
+            ]
         ).keys()
         if not tx_hashes:
             return []
@@ -192,15 +204,6 @@ class Erc20EventsIndexer(EventsIndexer):
             logger.debug("End prefetching and storing of ethereum txs")
 
             logger.debug("Storing TokenTransfer objects")
-            not_processed_log_receipts = [
-                log_receipt
-                for log_receipt in log_receipts
-                if not self.element_already_processed_checker.is_processed(
-                    log_receipt["transactionHash"],
-                    log_receipt["blockHash"],
-                    log_receipt["logIndex"],
-                )
-            ]
             logger.debug("Storing Transfer Events")
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
                 self.events_to_erc20_transfer(not_processed_log_receipts),

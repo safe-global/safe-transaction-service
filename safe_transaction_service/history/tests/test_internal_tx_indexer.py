@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, PropertyMock
 from django.test import TestCase
 
 from eth_typing import HexStr
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.util.util import to_0x_hex_str
@@ -58,6 +59,31 @@ class TestInternalTxIndexer(TestCase):
                 internal_tx_indexer,
                 (InternalTxIndexer, InternalTxIndexerWithTraceBlock),
             )
+
+    def test_is_relevant_trace(self):
+        indexer = self.internal_tx_indexer
+
+        delegate_call_trace = {
+            "type": "call",
+            "action": {"callType": "delegatecall", "input": HexBytes("0x1234")},
+        }
+        ether_transfer_trace = {
+            "type": "call",
+            "action": {"callType": "call", "value": 1},
+        }
+        create_trace = {
+            "type": "create",
+            "action": {"init": HexBytes("0x1234")},
+        }
+        not_relevant_trace = {
+            "type": "call",
+            "action": {"callType": "call", "value": 0, "input": HexBytes("0x")},
+        }
+
+        self.assertTrue(indexer.is_relevant_trace(delegate_call_trace))
+        self.assertTrue(indexer.is_relevant_trace(ether_transfer_trace))
+        self.assertTrue(indexer.is_relevant_trace(create_trace))
+        self.assertFalse(indexer.is_relevant_trace(not_relevant_trace))
 
     def return_sorted_blocks(self, hashes: HexStr):
         """
