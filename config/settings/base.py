@@ -611,6 +611,15 @@ ETH_REORG_BLOCKS = env.int(
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`
+ETH_EVENTS_IGNORED_INITIATORS: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("ETH_EVENTS_IGNORED_INITIATORS", default=[])
+}  # Initiator addresses whose created Safes should be ignored during L2 indexing
+ETH_EVENTS_IGNORED_TO: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("ETH_EVENTS_IGNORED_TO", default=[])
+}  # Transaction 'to' addresses to ignore during L2 indexing
+
 
 # ENABLE/DISABLE COLLECTIBLES DOWNLOAD METADATA, enable=True, disabled by default
 COLLECTIBLES_ENABLE_DOWNLOAD_METADATA = env.bool(
