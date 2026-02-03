@@ -181,26 +181,52 @@ class SafeEventsIndexer(EventsIndexer):
             len(tx_hashes),
         )
 
-        # 6. Fetch receipts only for allowed txs and store them
-        if allowed_fetched_txs:
-            number_allowed_txs_inserted = self._fetch_receipts_and_store(
-                allowed_fetched_txs
-            )
-            logger.debug(
-                "Conditional indexing: %d allowed txs inserted",
-                number_allowed_txs_inserted,
-            )
-
-        # 7. Filter log_receipts to only allowed txs
+        # 6. Filter log_receipts to only allowed txs
         filtered_log_receipts = [
             log_receipt
             for log_receipt in not_processed_log_receipts
             if HexBytes(log_receipt["transactionHash"]) in allowed_tx_hashes
         ]
 
-        # 8. Decode and process
+        # 7. Decode elements BEFORE creating EthereumTx
         decoded_elements = self.decode_elements(filtered_log_receipts)
-        processed_elements = self._process_decoded_elements(decoded_elements)
+
+        # 8. Filter to only events that will be processed
+        processable_events = self._get_processable_events(decoded_elements)
+
+        # 9. Get tx_hashes only from processable events
+        tx_hashes_to_create = list(
+            OrderedDict.fromkeys(
+                HexBytes(event["transactionHash"]) for event in processable_events
+            ).keys()
+        )
+
+        logger.debug(
+            "Conditional indexing: %d/%d txs have processable events",
+            len(tx_hashes_to_create),
+            len(allowed_tx_hashes),
+        )
+
+        # 10. Filter allowed_fetched_txs to only those with processable events
+        allowed_fetched_txs_filtered = [
+            tx
+            for tx in allowed_fetched_txs
+            if HexBytes(tx["hash"]) in tx_hashes_to_create
+        ]
+
+        # 11. Fetch receipts and store ONLY for txs with processable events
+        if allowed_fetched_txs_filtered:
+            number_allowed_txs_inserted = self._fetch_receipts_and_store(
+                allowed_fetched_txs_filtered
+            )
+            logger.debug(
+                "Conditional indexing: %d txs with processable events inserted",
+                number_allowed_txs_inserted,
+            )
+
+        # 12. Process only the processable events
+        # (filtering already done by _get_processable_events)
+        processed_elements = self._process_decoded_elements(processable_events)
 
         # 9. Mark ALL original receipts as processed (so we don't re-fetch blocked ones)
         for log_receipt in not_processed_log_receipts:
@@ -211,6 +237,53 @@ class SafeEventsIndexer(EventsIndexer):
             )
 
         return processed_elements
+
+    def _get_processable_events(
+        self, decoded_elements: list[EventData]
+    ) -> list[EventData]:
+        """
+        Filter decoded elements to only those that will be processed.
+        When conditional indexing is enabled, non-creation events are only
+        processed if their Safe exists in SafeContract table.
+
+        :param decoded_elements: All decoded events
+        :return: Filtered list of events that will actually be processed
+        """
+        if not self.conditional_indexing_enabled:
+            return decoded_elements
+
+        # Single iteration: separate creation/non-creation events and collect addresses
+        creation_events = []
+        non_creation_events = []
+        non_creation_addresses = set()
+
+        for element in decoded_elements:
+            if element["event"] in ("SafeSetup", "ProxyCreation"):
+                creation_events.append(element)
+            else:
+                non_creation_events.append(element)
+                non_creation_addresses.add(element["address"])
+
+        # Filter non-creation events by SafeContract existence
+        if non_creation_addresses:
+            existing_addresses = SafeContract.objects.get_existing_addresses(
+                non_creation_addresses
+            )
+            logger.debug(
+                "Conditional indexing: %d/%d Safes found in database for event filtering",
+                len(existing_addresses),
+                len(non_creation_addresses),
+            )
+            filtered_non_creation = [
+                element
+                for element in non_creation_events
+                if element["address"] in existing_addresses
+            ]
+        else:
+            filtered_non_creation = []
+
+        # Return: all creation events + filtered non-creation events
+        return creation_events + filtered_non_creation
 
     @cached_property
     def contract_events(self) -> list[ContractEvent]:
@@ -919,37 +992,15 @@ class SafeEventsIndexer(EventsIndexer):
             )
             processed_elements.extend(creation_events_processed)
 
+        # Filter out creation events (SafeSetup, ProxyCreation)
+        # Note: When conditional indexing is enabled, decoded_elements are already
+        # filtered by _get_processable_events() in process_elements() to only include
+        # events that will be processed (SafeContract existence check already done)
         elements_to_process = [
             element
             for element in decoded_elements
             if element["event"] not in ("SafeSetup", "ProxyCreation")
         ]
-
-        # When conditional indexing is enabled, only process events for Safes
-        # that exist in SafeContract table
-        if self.conditional_indexing_enabled:
-            # Get all unique Safe addresses from non-creation events
-            non_creation_addresses = {
-                element["address"] for element in elements_to_process
-            }
-            if non_creation_addresses:
-                # Check which addresses exist in SafeContract
-                existing_addresses = SafeContract.objects.get_existing_addresses(
-                    non_creation_addresses
-                )
-                len_non_creation_addresses = len(non_creation_addresses)
-                len_existing_addresses = len(existing_addresses)
-                logger.debug(
-                    "Conditional indexing: %d/%d Safes will be processed",
-                    len_existing_addresses,
-                    len_non_creation_addresses,
-                )
-                # Filter elements to only those with existing SafeContract
-                elements_to_process = [
-                    element
-                    for element in elements_to_process
-                    if element["address"] in existing_addresses
-                ]
 
         # Store everything together in the database if possible
         logger.debug("InternalTx and InternalTx for non creation events will be built")
