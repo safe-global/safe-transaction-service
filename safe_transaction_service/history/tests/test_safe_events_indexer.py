@@ -1234,14 +1234,12 @@ class TestSafeEventsIndexerV1_4_1(SafeTestCaseMixin, TestCase):
         )
 
         # Non-creation events should also be processed (AddedOwner, etc.)
-        # The mock has events in blocks 77-86 which are non-creation events
-        # If SafeContract wasn't created during creation processing, these would be filtered
-        non_creation_internal_txs = InternalTx.objects.exclude(
-            trace_address__in=["0,0", "1"]  # Exclude creation events
-        )
-        self.assertGreater(
-            non_creation_internal_txs.count(),
-            0,
+        # The mock has multiple SafeMultiSigTransaction events in blocks 77-86.
+        # If SafeContract wasn't created during creation processing, these would be filtered.
+        self.assertTrue(
+            InternalTxDecoded.objects.filter(
+                safe_address=safe_address, function_name="execTransaction"
+            ).exists(),
             "Non-creation events should be processed because SafeContract "
             "was created during creation event processing",
         )

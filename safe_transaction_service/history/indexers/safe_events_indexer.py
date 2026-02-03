@@ -244,7 +244,8 @@ class SafeEventsIndexer(EventsIndexer):
         """
         Filter decoded elements to only those that will be processed.
         When conditional indexing is enabled, non-creation events are only
-        processed if their Safe exists in SafeContract table.
+        processed if their Safe exists in SafeContract table or is created
+        in the same batch.
 
         :param decoded_elements: All decoded events
         :return: Filtered list of events that will actually be processed
@@ -256,10 +257,17 @@ class SafeEventsIndexer(EventsIndexer):
         creation_events = []
         non_creation_events = []
         non_creation_addresses = set()
+        creation_addresses = set()
 
         for element in decoded_elements:
             if element["event"] in ("SafeSetup", "ProxyCreation"):
                 creation_events.append(element)
+                if element["event"] == "SafeSetup":
+                    creation_addresses.add(element["address"])
+                else:
+                    proxy_address = element["args"].get("proxy")
+                    if proxy_address:
+                        creation_addresses.add(proxy_address)
             else:
                 non_creation_events.append(element)
                 non_creation_addresses.add(element["address"])
@@ -269,15 +277,18 @@ class SafeEventsIndexer(EventsIndexer):
             existing_addresses = SafeContract.objects.get_existing_addresses(
                 non_creation_addresses
             )
+            allowed_addresses = set(existing_addresses) | creation_addresses
             logger.debug(
-                "Conditional indexing: %d/%d Safes found in database for event filtering",
+                "Conditional indexing: %d/%d Safes found in database for event filtering "
+                "(%d created in batch)",
                 len(existing_addresses),
                 len(non_creation_addresses),
+                len(creation_addresses),
             )
             filtered_non_creation = [
                 element
                 for element in non_creation_events
-                if element["address"] in existing_addresses
+                if element["address"] in allowed_addresses
             ]
         else:
             filtered_non_creation = []
