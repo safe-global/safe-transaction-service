@@ -93,29 +93,34 @@ class SafeEventsIndexer(EventsIndexer):
             # No blocklist configured, use standard flow
             return super().process_elements(log_receipts)
 
+        return self._process_elements_with_conditional_indexing(log_receipts)
+
+    def _process_elements_with_conditional_indexing(
+        self, log_receipts: Sequence[LogReceipt]
+    ) -> list[InternalTx]:
         # --- Conditional indexing enabled ---
         logger.debug("Conditional indexing: filtering events by tx._from and tx.to")
 
-        # 1. Filter already processed log receipts
-        not_processed_log_receipts = [
-            log_receipt
-            for log_receipt in log_receipts
-            if not self.element_already_processed_checker.is_processed(
+        # 1. Filter already processed log receipts and normalize tx hashes once
+        not_processed_log_receipts: list[LogReceipt] = []
+        not_processed_tx_hashes_by_index: list[bytes] = []
+        for log_receipt in log_receipts:
+            if self.element_already_processed_checker.is_processed(
                 log_receipt["transactionHash"],
                 log_receipt["blockHash"],
                 log_receipt["logIndex"],
+            ):
+                continue
+            not_processed_log_receipts.append(log_receipt)
+            not_processed_tx_hashes_by_index.append(
+                HexBytes(log_receipt["transactionHash"])
             )
-        ]
 
         if not not_processed_log_receipts:
             return []
 
         # 2. Get unique tx_hashes preserving order
-        tx_hashes = list(
-            OrderedDict.fromkeys(
-                HexBytes(r["transactionHash"]) for r in not_processed_log_receipts
-            ).keys()
-        )
+        tx_hashes = list(OrderedDict.fromkeys(not_processed_tx_hashes_by_index).keys())
 
         # 3. Check DB for existing txs
         db_txs: dict[bytes, EthereumTx] = {
@@ -157,23 +162,24 @@ class SafeEventsIndexer(EventsIndexer):
         # Check fetched txs, filter allowed ones
         allowed_fetched_txs: list[TxData] = []
         for tx in fetched_txs:
+            tx_hash = HexBytes(tx["hash"])
             tx_from = tx.get("from")
             tx_to = tx.get("to")
             if tx_from in self.ignored_initiators:
                 logger.debug(
                     "Conditional indexing: filtering tx %s from blocklisted initiator %s",
-                    to_0x_hex_str(tx["hash"]),
+                    to_0x_hex_str(tx_hash),
                     tx_from,
                 )
             elif tx_to in self.ignored_to:
                 logger.debug(
                     "Conditional indexing: filtering tx %s to blocklisted address %s",
-                    to_0x_hex_str(tx["hash"]),
+                    to_0x_hex_str(tx_hash),
                     tx_to,
                 )
             else:
                 allowed_fetched_txs.append(tx)
-                allowed_tx_hashes.add(HexBytes(tx["hash"]))
+                allowed_tx_hashes.add(tx_hash)
 
         logger.debug(
             "Conditional indexing: %d/%d txs allowed after filtering",
@@ -184,8 +190,12 @@ class SafeEventsIndexer(EventsIndexer):
         # 6. Filter log_receipts to only allowed txs
         filtered_log_receipts = [
             log_receipt
-            for log_receipt in not_processed_log_receipts
-            if HexBytes(log_receipt["transactionHash"]) in allowed_tx_hashes
+            for log_receipt, tx_hash in zip(
+                not_processed_log_receipts,
+                not_processed_tx_hashes_by_index,
+                strict=False,
+            )
+            if tx_hash in allowed_tx_hashes
         ]
 
         # 7. Decode elements BEFORE creating EthereumTx
@@ -228,7 +238,7 @@ class SafeEventsIndexer(EventsIndexer):
         # (filtering already done by _get_processable_events)
         processed_elements = self._process_decoded_elements(processable_events)
 
-        # 9. Mark ALL original receipts as processed (so we don't re-fetch blocked ones)
+        # 13. Mark ALL original receipts as processed (so we don't re-fetch blocked ones)
         for log_receipt in not_processed_log_receipts:
             self.element_already_processed_checker.mark_as_processed(
                 log_receipt["transactionHash"],
@@ -719,7 +729,6 @@ class SafeEventsIndexer(EventsIndexer):
             event_name = decoded_element["event"]
             if event_name == "SafeSetup":
                 safe_address = decoded_element["address"]
-                # Always insert SafeSetup event at the beginning of the list
                 safe_creation_events.setdefault(safe_address, []).append(
                     decoded_element
                 )
