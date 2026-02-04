@@ -20,7 +20,6 @@ from web3.types import EventData, FilterParams, LogReceipt
 
 from safe_transaction_service.utils.utils import chunks
 
-from .element_already_processed_checker import ElementAlreadyProcessedChecker
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -56,7 +55,6 @@ class EventsIndexer(EthereumIndexer):
 
         # Number of concurrent requests to `getLogs`
         self.get_logs_concurrency = settings.ETH_EVENTS_GET_LOGS_CONCURRENCY
-        self.element_already_processed_checker = ElementAlreadyProcessedChecker()
 
         super().__init__(*args, **kwargs)
 
@@ -250,6 +248,33 @@ class EventsIndexer(EthereumIndexer):
                 decoded_elements.append(decoded_element)
         return decoded_elements
 
+    def _filter_not_processed_log_receipts(
+        self, log_receipts: Sequence[LogReceipt]
+    ) -> list[LogReceipt]:
+        """
+        Return only log receipts that haven't been processed yet.
+        """
+        return [
+            log_receipt
+            for log_receipt in log_receipts
+            if not self._is_processed(
+                log_receipt["transactionHash"],
+                log_receipt["blockHash"],
+                log_receipt["logIndex"],
+            )
+        ]
+
+    def _mark_log_receipts_processed(self, log_receipts: Sequence[LogReceipt]) -> None:
+        """
+        Mark provided log receipts as processed.
+        """
+        for log_receipt in log_receipts:
+            self._mark_processed(
+                log_receipt["transactionHash"],
+                log_receipt["blockHash"],
+                log_receipt["logIndex"],
+            )
+
     def _process_decoded_elements(self, decoded_elements: list[EventData]) -> list[Any]:
         processed_elements = []
         for decoded_element in decoded_elements:
@@ -269,15 +294,9 @@ class EventsIndexer(EthereumIndexer):
 
         logger.debug("Excluding events processed recently")
         # Ignore already processed events
-        not_processed_log_receipts = [
-            log_receipt
-            for log_receipt in log_receipts
-            if not self.element_already_processed_checker.is_processed(
-                log_receipt["transactionHash"],
-                log_receipt["blockHash"],
-                log_receipt["logIndex"],
-            )
-        ]
+        not_processed_log_receipts = self._filter_not_processed_log_receipts(
+            log_receipts
+        )
         logger.debug("Decoding `log_receipts` of the events")
         decoded_elements: list[EventData] = self.decode_elements(
             not_processed_log_receipts
@@ -286,20 +305,13 @@ class EventsIndexer(EthereumIndexer):
         tx_hashes = OrderedDict.fromkeys(
             [event["transactionHash"] for event in not_processed_log_receipts]
         ).keys()
-        logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
-        self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-        logger.debug("End prefetching and storing of ethereum txs")
+        self._prefetch_ethereum_txs(tx_hashes)
         logger.debug("Processing %d decoded events", len(decoded_elements))
         processed_elements = self._process_decoded_elements(decoded_elements)
         logger.debug("End processing %d decoded events", len(decoded_elements))
 
         logger.debug("Marking events as processed")
-        for log_receipt in not_processed_log_receipts:
-            self.element_already_processed_checker.mark_as_processed(
-                log_receipt["transactionHash"],
-                log_receipt["blockHash"],
-                log_receipt["logIndex"],
-            )
+        self._mark_log_receipts_processed(not_processed_log_receipts)
         logger.debug("Marked events as processed")
 
         return processed_elements

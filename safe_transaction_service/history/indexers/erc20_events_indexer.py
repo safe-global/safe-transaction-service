@@ -181,26 +181,21 @@ class Erc20EventsIndexer(EventsIndexer):
         :param log_receipts: Events to store in database
         :return: List of `TokenTransfer` already stored in database
         """
+        not_processed_log_receipts = self._filter_not_processed_log_receipts(
+            log_receipts
+        )
         tx_hashes = OrderedDict.fromkeys(
-            [log_receipt["transactionHash"] for log_receipt in log_receipts]
+            [
+                log_receipt["transactionHash"]
+                for log_receipt in not_processed_log_receipts
+            ]
         ).keys()
         if not tx_hashes:
             return []
         else:
-            logger.debug("Prefetching and storing %d ethereum txs", len(tx_hashes))
-            self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
-            logger.debug("End prefetching and storing of ethereum txs")
+            self._prefetch_ethereum_txs(tx_hashes)
 
             logger.debug("Storing TokenTransfer objects")
-            not_processed_log_receipts = [
-                log_receipt
-                for log_receipt in log_receipts
-                if not self.element_already_processed_checker.is_processed(
-                    log_receipt["transactionHash"],
-                    log_receipt["blockHash"],
-                    log_receipt["logIndex"],
-                )
-            ]
             logger.debug("Storing Transfer Events")
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
                 self.events_to_erc20_transfer(not_processed_log_receipts),
@@ -224,12 +219,7 @@ class Erc20EventsIndexer(EventsIndexer):
                 "Stored %d Safe Relevant Transactions", result_safe_relevant_transaction
             )
             logger.debug("Marking events as processed")
-            for log_receipt in not_processed_log_receipts:
-                self.element_already_processed_checker.mark_as_processed(
-                    log_receipt["transactionHash"],
-                    log_receipt["blockHash"],
-                    log_receipt["logIndex"],
-                )
+            self._mark_log_receipts_processed(not_processed_log_receipts)
             logger.debug("Marked events as processed")
             return range(
                 result_erc20 + result_erc721
