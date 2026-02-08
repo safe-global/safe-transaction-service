@@ -108,7 +108,7 @@ TASKS = [
         description="Index new Proxies (every 15 seconds)",
         interval=15,
         period=IntervalSchedule.SECONDS,
-        enabled=settings.ETH_L2_NETWORK,
+        enabled=False,  # index_safe_events_task is used instead
     ),
     CeleryTaskConfiguration(
         name="safe_transaction_service.history.tasks.index_erc20_events_task",

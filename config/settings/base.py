@@ -63,7 +63,9 @@ GUNICORN_WORKERS = gunicorn_workers
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
-DB_STATEMENT_TIMEOUT = env.int("DB_STATEMENT_TIMEOUT", 60_000)
+# DB statements should timeout before Gunicorn, so this value must be less than WEB_WORKER_TIMEOUT on gunicorn.py
+DB_STATEMENT_TIMEOUT = env.int("DB_STATEMENT_TIMEOUT", 50_000)
+
 DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
@@ -77,8 +79,8 @@ DATABASES["default"]["OPTIONS"] = {
         "min_size": env.int("DB_MIN_CONNS", default=4),
         "max_size": env.int("DB_MAX_CONNS", default=100),
         "timeout": env.int("DB_POOL_TIMEOUT", default=10),
-        "max_lifetime": env.int("DB_POOL_MAX_LIFETIME", default=60 * 60),  # 1 hour
-        "max_idle": env.int("DB_POOL_MAX_IDLE", default=60 * 10),  # 10 minutes
+        "max_lifetime": env.int("DB_POOL_MAX_LIFETIME", default=60 * 5),  # 5 minutes
+        "max_idle": env.int("DB_POOL_MAX_IDLE", default=60 * 2),  # 2 minutes
     },
 }
 
@@ -617,6 +619,15 @@ ETH_REORG_BLOCKS = env.int(
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`
+ETH_EVENTS_IGNORED_INITIATORS: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("ETH_EVENTS_IGNORED_INITIATORS", default=[])
+}  # Initiator addresses whose created Safes should be ignored during L2 indexing
+ETH_EVENTS_IGNORED_TO: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("ETH_EVENTS_IGNORED_TO", default=[])
+}  # Transaction 'to' addresses to ignore during L2 indexing
+
 
 # ENABLE/DISABLE COLLECTIBLES DOWNLOAD METADATA, enable=True, disabled by default
 COLLECTIBLES_ENABLE_DOWNLOAD_METADATA = env.bool(
