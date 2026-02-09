@@ -674,7 +674,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         queryset = MultisigTransaction.objects.filter(safe=address)
         if only_trusted:
             queryset = queryset.filter(trusted=True)
-        return queryset.distinct("nonce").count()
+        return queryset.values("nonce").distinct().count()
 
     def get_serializer_class(self):
         """
