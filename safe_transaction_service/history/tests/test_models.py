@@ -453,6 +453,28 @@ class TestTokenTransfer(TestCase):
             [e1.address, e2.address],
         )
 
+    def test_not_self_transfers(self):
+        address = Account.create().address
+        other_address = Account.create().address
+
+        ERC20TransferFactory(_from=address, to=address)
+        erc20_non_self = ERC20TransferFactory(_from=address, to=other_address)
+        self.assertCountEqual(
+            ERC20Transfer.objects.outgoing(address)
+            .not_self_transfers()
+            .values_list("id", flat=True),
+            [erc20_non_self.id],
+        )
+
+        ERC721TransferFactory(_from=address, to=address)
+        erc721_non_self = ERC721TransferFactory(_from=address, to=other_address)
+        self.assertCountEqual(
+            ERC721Transfer.objects.outgoing(address)
+            .not_self_transfers()
+            .values_list("id", flat=True),
+            [erc721_non_self.id],
+        )
+
     def test_incoming_tokens(self):
         address = Account.create().address
         self.assertFalse(InternalTx.objects.token_incoming_txs_for_address(address))
