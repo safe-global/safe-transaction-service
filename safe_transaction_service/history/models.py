@@ -518,6 +518,9 @@ class TokenTransferQuerySet(models.QuerySet):
     def outgoing(self, address: ChecksumAddress):
         return self.filter(_from=address)
 
+    def not_self_transfers(self):
+        return self.exclude(_from=F("to"))
+
     def token_txs(self):
         raise NotImplementedError
 
@@ -1087,6 +1090,34 @@ class InternalTxQuerySet(models.QuerySet):
             .union(erc20_queryset.values(*values), all=True)
             .union(erc721_queryset.values(*values), all=True)
             .order_by("-block")
+        )
+
+    def union_optimized_ether_and_token_txs(
+        self,
+        erc20_in_queryset: QuerySet,
+        erc20_out_queryset: QuerySet,
+        erc721_in_queryset: QuerySet,
+        erc721_out_queryset: QuerySet,
+        ether_queryset: QuerySet,
+    ) -> TransferDict:
+        values = [
+            "block",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+            "_log_index",
+            "_trace_address",
+        ]
+        return (
+            ether_queryset.values(*values)
+            .union(erc20_in_queryset.values(*values), all=True)
+            .union(erc20_out_queryset.values(*values), all=True)
+            .union(erc721_in_queryset.values(*values), all=True)
+            .union(erc721_out_queryset.values(*values), all=True)
         )
 
     def ether_txs_values(
