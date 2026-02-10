@@ -584,6 +584,9 @@ ETH_L2_NETWORK = env.bool(
 ETH_ZKSYNC_COMPATIBLE_NETWORK = env.bool(
     "ETH_ZKSYNC_COMPATIBLE_NETWORK", default=False
 )  # Fix some issues regarding zkSync compatible networks
+ETH_ALLOW_EMPTY_TRANSACTION_DATA = env.bool(
+    "ETH_ALLOW_EMPTY_TRANSACTION_DATA", default=False
+)  # Allow transactions with null data/input fields (required for some networks like Tempo)
 ETH_EVENTS_BLOCK_PROCESS_LIMIT = env.int(
     "ETH_EVENTS_BLOCK_PROCESS_LIMIT", default=50
 )  # Initial number of blocks to process together when searching for events. It will be auto increased. 0 == no limit.
