@@ -375,6 +375,17 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
                     f"Set ETH_ALLOW_EMPTY_TRANSACTION_DATA=true if this is expected for your network."
                 )
         data = HexBytes(data_value)
+
+        # Handle missing value field
+        if "value" not in tx:
+            if settings.ETH_ALLOW_EMPTY_TRANSACTION_DATA:
+                tx["value"] = 0
+            else:
+                raise ValueError(
+                    f"Transaction missing value field. TxHash: {tx.get('hash')}. "
+                    f"Set ETH_ALLOW_EMPTY_TRANSACTION_DATA=true if this is expected for your network."
+                )
+
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
         ]
