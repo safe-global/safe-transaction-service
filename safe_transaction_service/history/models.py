@@ -401,7 +401,7 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
             data=data if data else None,
             nonce=tx["nonce"],
             to=tx.get("to"),
-            value=tx["value"],
+            value=tx.get("value", 0),
             type=tx.get("type", 0),
         )
 
