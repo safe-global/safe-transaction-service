@@ -161,14 +161,16 @@ class BulkCreateSignalMixin:
     def bulk_create_from_generator(
         self,
         objs: Iterator[Any],
-        batch_size: int = 10_000,
+        batch_size: int = 25_000,
         ignore_conflicts: bool = False,
     ) -> int:
         """
-        Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
-        they will be brought to RAM. This approach is more RAM friendly.
-
-        :return: Count of inserted elements
+                Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
+                they will be brought to RAM. This approach is more RAM friendly.
+        ns.AddIndex(
+                    model_name='erc20transfer',
+                    index=models.Index(
+                :return: Count of inserted elements
         """
         assert batch_size is not None and batch_size > 0
         iterator = iter(
