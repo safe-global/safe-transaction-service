@@ -506,6 +506,12 @@ LOGGING = {
         "safe_transaction_service.history.tasks.index_erc20_events_task": {
             "level": ERC20_721_INDEXER_LOG_LEVEL,
         },
+        "safe_transaction_service.history.indexers.ethereum_indexer": {
+            "level": ERC20_721_INDEXER_LOG_LEVEL,
+        },
+        "safe_transaction_service.history.indexers.events_indexer": {
+            "level": ERC20_721_INDEXER_LOG_LEVEL,
+        },
         # PROXY_FACTORY_INDEXER_LOG_LEVEL
         "safe_transaction_service.history.indexers.proxy_factory_indexer": {
             "level": PROXY_FACTORY_INDEXER_LOG_LEVEL,
