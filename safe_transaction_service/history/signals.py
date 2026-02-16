@@ -143,6 +143,17 @@ def _process_event(
 
     logger.debug("Removing cache for object=%s", instance)
     remove_cache_view_by_instance(instance)
+
+    # Skip heavy cache invalidation and payload generation for events
+    # that won't be emitted anyway (for example, old/reindexed txs).
+    if not is_relevant_event(sender, instance, created):
+        logger.debug(
+            "Skipping non-relevant event for created=%s object=%s",
+            created,
+            instance,
+        )
+        return None
+
     logger.debug("Start building payloads for created=%s object=%s", created, instance)
     payloads = build_event_payload(sender, instance, deleted=deleted)
     logger.debug(
@@ -150,22 +161,14 @@ def _process_event(
     )
     for payload in payloads:
         if address := payload.get("address"):
-            if is_relevant_event(sender, instance, created):
-                logger.debug(
-                    "[%s] Triggering send_event tasks for created=%s object=%s",
-                    address,
-                    created,
-                    instance,
-                )
-                queue_service = get_queue_service()
-                queue_service.send_event(payload)
-            else:
-                logger.debug(
-                    "[%s] Event will not be sent for created=%s object=%s",
-                    address,
-                    created,
-                    instance,
-                )
+            logger.debug(
+                "[%s] Triggering send_event tasks for created=%s object=%s",
+                address,
+                created,
+                instance,
+            )
+            queue_service = get_queue_service()
+            queue_service.send_event(payload)
 
 
 @receiver(
