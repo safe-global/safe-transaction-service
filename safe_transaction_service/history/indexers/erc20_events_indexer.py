@@ -1,10 +1,10 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from collections import OrderedDict
 from collections.abc import Iterator, Sequence
 from logging import getLogger
 from typing import NamedTuple
 
-from django.db import transaction
 from django.db.models import QuerySet
 from django.db.models.query import EmptyQuerySet
 
@@ -195,32 +195,30 @@ class Erc20EventsIndexer(EventsIndexer):
             return []
         else:
             self._prefetch_ethereum_txs(tx_hashes)
-
-            with transaction.atomic():
-                logger.debug("Storing TokenTransfer objects")
-                logger.debug("Storing Transfer Events")
-                result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
-                    self.events_to_erc20_transfer(not_processed_log_receipts),
+            logger.debug("Storing TokenTransfer objects")
+            logger.debug("Storing Transfer Events")
+            result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
+                self.events_to_erc20_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
+            )
+            logger.debug("Stored %d ERC20 Events", result_erc20)
+            result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
+                self.events_to_erc721_transfer(not_processed_log_receipts),
+                ignore_conflicts=True,
+            )
+            logger.debug("Stored %d ERC721 Events", result_erc721)
+            result_safe_relevant_transaction = (
+                SafeRelevantTransaction.objects.bulk_create_from_generator(
+                    self.events_to_safe_relevant_transaction(
+                        not_processed_log_receipts
+                    ),
                     ignore_conflicts=True,
                 )
-                logger.debug("Stored %d ERC20 Events", result_erc20)
-                result_erc721 = ERC721Transfer.objects.bulk_create_from_generator(
-                    self.events_to_erc721_transfer(not_processed_log_receipts),
-                    ignore_conflicts=True,
-                )
-                logger.debug("Stored %d ERC721 Events", result_erc721)
-                result_safe_relevant_transaction = (
-                    SafeRelevantTransaction.objects.bulk_create_from_generator(
-                        self.events_to_safe_relevant_transaction(
-                            not_processed_log_receipts
-                        ),
-                        ignore_conflicts=True,
-                    )
-                )
-                logger.debug(
-                    "Stored %d Safe Relevant Transactions",
-                    result_safe_relevant_transaction,
-                )
+            )
+            logger.debug(
+                "Stored %d Safe Relevant Transactions",
+                result_safe_relevant_transaction,
+            )
             logger.debug("Marking events as processed")
             self._mark_log_receipts_processed(not_processed_log_receipts)
             logger.debug("Marked events as processed")
