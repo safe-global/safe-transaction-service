@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from datetime import timedelta
 from unittest import mock
@@ -173,11 +172,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         )
 
     @mock.patch.object(QueueService, "send_event")
-    @mock.patch(
-        "safe_transaction_service.history.signals.gevent.spawn",
-        side_effect=lambda fn, *args, **kwargs: fn(*args, **kwargs),
-    )
-    def test_signals_are_correctly_fired(self, _, send_event_mock: MagicMock):
+    def test_signals_are_correctly_fired(self, send_event_mock: MagicMock):
         # Not trusted txs should not fire any event
         MultisigTransactionFactory(trusted=False)
         send_event_mock.assert_not_called()
