@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from logging import getLogger
 
 from django.conf import settings
@@ -5,6 +6,8 @@ from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+import gevent
 
 from ..events.services.queue_service import get_queue_service
 from .cache import remove_cache_view_by_instance
@@ -168,7 +171,7 @@ def _process_event(
                 instance,
             )
             queue_service = get_queue_service()
-            queue_service.send_event(payload)
+            gevent.spawn(queue_service.send_event, payload)
 
 
 @receiver(
