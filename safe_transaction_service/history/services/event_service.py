@@ -54,9 +54,7 @@ def build_event_payload(
                 "address": instance.multisig_transaction.safe,  # This could make a db call
                 "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
-                "safeTxHash": to_0x_hex_str(
-                    HexBytes(instance.multisig_transaction.safe_tx_hash)
-                ),
+                "safeTxHash": to_0x_hex_str(HexBytes(instance.multisig_transaction_id)),
             }
         ]
     elif sender == MultisigTransaction and deleted:
@@ -146,15 +144,15 @@ def build_event_payload(
             {
                 "address": instance.safe_message.safe,  # This could make a db call
                 "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
-                "messageHash": to_0x_hex_str(
-                    HexBytes(instance.safe_message.message_hash)
-                ),
+                "messageHash": to_0x_hex_str(HexBytes(instance.safe_message_id)),
             }
         ]
 
     # Add chainId to every payload
-    for payload in payloads:
-        payload["chainId"] = str(get_chain_id())
+    if payloads:
+        chain_id = str(get_chain_id())
+        for payload in payloads:
+            payload["chainId"] = chain_id
 
     return payloads
 
