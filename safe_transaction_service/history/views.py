@@ -674,7 +674,7 @@ class SafeMultisigTransactionListView(ListAPIView):
         queryset = MultisigTransaction.objects.filter(safe=address)
         if only_trusted:
             queryset = queryset.filter(trusted=True)
-        return queryset.distinct("nonce").count()
+        return queryset.values("nonce").distinct().count()
 
     def get_serializer_class(self):
         """
@@ -948,20 +948,35 @@ class SafeTransferListView(ListAPIView):
     pagination_class = pagination.DefaultPagination
 
     def get_transfers(self, address: str):
-        erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.to_or_from(address).token_txs().order_by("-timestamp")
+        order_by = "-timestamp"
+        erc20_in_queryset = self.filter_queryset(
+            ERC20Transfer.objects.incoming(address).token_txs().order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
-        erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.to_or_from(address)
+        erc20_out_queryset = self.filter_queryset(
+            ERC20Transfer.objects.outgoing(address)
+            .not_self_transfers()
             .token_txs()
-            .order_by("-timestamp")
+            .order_by(order_by)
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
+        erc721_in_queryset = self.filter_queryset(
+            ERC721Transfer.objects.incoming(address).token_txs().order_by(order_by)
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
+        erc721_out_queryset = self.filter_queryset(
+            ERC721Transfer.objects.outgoing(address)
+            .not_self_transfers()
+            .token_txs()
+            .order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_txs_for_address(address).order_by("-timestamp")
+            InternalTx.objects.ether_txs_for_address(address).order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
-        return InternalTx.objects.union_ether_and_token_txs(
-            erc20_queryset, erc721_queryset, ether_queryset
-        )
+        return InternalTx.objects.union_optimized_ether_and_token_txs(
+            erc20_in_queryset,
+            erc20_out_queryset,
+            erc721_in_queryset,
+            erc721_out_queryset,
+            ether_queryset,
+        ).order_by("-execution_date")
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
@@ -1031,21 +1046,22 @@ class SafeIncomingTransferListView(SafeTransferListView):
         return super().get(*args, **kwargs)
 
     def get_transfers(self, address: str):
+        order_by = "-timestamp"
         erc20_queryset = self.filter_queryset(
-            ERC20Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
+            ERC20Transfer.objects.incoming(address).token_txs().order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         erc721_queryset = self.filter_queryset(
-            ERC721Transfer.objects.incoming(address).token_txs().order_by("-timestamp")
+            ERC721Transfer.objects.incoming(address).token_txs().order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         ether_queryset = self.filter_queryset(
             InternalTx.objects.ether_incoming_txs_for_address(address).order_by(
-                "-timestamp"
+                order_by
             )
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
 
         return InternalTx.objects.union_ether_and_token_txs(
             erc20_queryset, erc721_queryset, ether_queryset
-        )
+        ).order_by("-execution_date")
 
 
 class SafeCreationView(GenericAPIView):

@@ -26,7 +26,7 @@ from ..models import (
     MultisigTransaction,
     TransactionServiceEventType,
 )
-from ..signals import build_event_payload, is_relevant_event
+from ..signals import _process_event, build_event_payload, is_relevant_event
 from .factories import (
     ERC20TransferFactory,
     InternalTxFactory,
@@ -258,7 +258,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         # Deleted delegate should fire an event
         delegate_to_delete = SafeContractDelegateFactory()
         delegate_to_delete.delete()
-        updated_delegate_user_payload = {
+        deleted_delegate_user_payload = {
             "type": TransactionServiceEventType.DELETED_DELEGATE.name,
             "address": delegate_to_delete.safe_contract.address,
             "delegate": delegate_to_delete.delegate,
@@ -267,4 +267,25 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(updated_delegate_user_payload)
+        send_event_mock.assert_called_with(deleted_delegate_user_payload)
+
+    @factory.django.mute_signals(post_save)
+    @mock.patch(
+        "safe_transaction_service.history.signals.remove_cache_view_by_instance"
+    )
+    @mock.patch("safe_transaction_service.history.signals.build_event_payload")
+    @mock.patch.object(QueueService, "send_event")
+    def test_irrelevant_events_skip(
+        self,
+        send_event_mock: MagicMock,
+        build_event_payload_mock: MagicMock,
+        remove_cache_mock: MagicMock,
+    ):
+        # Old events are not relevant and should short-circuit before cache/payload work
+        tx = ERC20TransferFactory(timestamp=timezone.now() - timedelta(minutes=120))
+
+        _process_event(ERC20Transfer, tx, created=True, deleted=False)
+
+        remove_cache_mock.assert_called_once()
+        build_event_payload_mock.assert_not_called()
+        send_event_mock.assert_not_called()

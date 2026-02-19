@@ -161,14 +161,16 @@ class BulkCreateSignalMixin:
     def bulk_create_from_generator(
         self,
         objs: Iterator[Any],
-        batch_size: int = 10_000,
+        batch_size: int = 25_000,
         ignore_conflicts: bool = False,
     ) -> int:
         """
-        Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
-        they will be brought to RAM. This approach is more RAM friendly.
-
-        :return: Count of inserted elements
+                Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
+                they will be brought to RAM. This approach is more RAM friendly.
+        ns.AddIndex(
+                    model_name='erc20transfer',
+                    index=models.Index(
+                :return: Count of inserted elements
         """
         assert batch_size is not None and batch_size > 0
         iterator = iter(
@@ -364,7 +366,28 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
         if tx_receipt is None:
             raise ValueError("tx_receipt cannot be empty")
 
-        data = HexBytes(tx.get("data") or tx.get("input"))
+        # Handle missing data/input field
+        data_value = tx.get("data") or tx.get("input")
+        if data_value is None:
+            if settings.ETH_ALLOW_EMPTY_TRANSACTION_DATA:
+                data_value = b""
+            else:
+                raise ValueError(
+                    f"Transaction missing data/input field. TxHash: {tx.get('hash')}. "
+                    f"Set ETH_ALLOW_EMPTY_TRANSACTION_DATA=true if this is expected for your network."
+                )
+        data = HexBytes(data_value)
+
+        # Handle missing value field
+        if "value" not in tx:
+            if settings.ETH_ALLOW_EMPTY_TRANSACTION_DATA:
+                tx["value"] = 0
+            else:
+                raise ValueError(
+                    f"Transaction missing value field. TxHash: {tx.get('hash')}. "
+                    f"Set ETH_ALLOW_EMPTY_TRANSACTION_DATA=true if this is expected for your network."
+                )
+
         logs = tx_receipt and [
             clean_receipt_log(log) for log in tx_receipt.get("logs", [])
         ]
@@ -517,6 +540,9 @@ class TokenTransferQuerySet(models.QuerySet):
 
     def outgoing(self, address: ChecksumAddress):
         return self.filter(_from=address)
+
+    def not_self_transfers(self):
+        return self.exclude(_from=F("to"))
 
     def token_txs(self):
         raise NotImplementedError
@@ -1087,6 +1113,34 @@ class InternalTxQuerySet(models.QuerySet):
             .union(erc20_queryset.values(*values), all=True)
             .union(erc721_queryset.values(*values), all=True)
             .order_by("-block")
+        )
+
+    def union_optimized_ether_and_token_txs(
+        self,
+        erc20_in_queryset: QuerySet,
+        erc20_out_queryset: QuerySet,
+        erc721_in_queryset: QuerySet,
+        erc721_out_queryset: QuerySet,
+        ether_queryset: QuerySet,
+    ) -> TransferDict:
+        values = [
+            "block",
+            "transaction_hash",
+            "to",
+            "_from",
+            "_value",
+            "execution_date",
+            "_token_id",
+            "token_address",
+            "_log_index",
+            "_trace_address",
+        ]
+        return (
+            ether_queryset.values(*values)
+            .union(erc20_in_queryset.values(*values), all=True)
+            .union(erc20_out_queryset.values(*values), all=True)
+            .union(erc721_in_queryset.values(*values), all=True)
+            .union(erc721_out_queryset.values(*values), all=True)
         )
 
     def ether_txs_values(

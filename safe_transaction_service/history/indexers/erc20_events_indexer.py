@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from collections import OrderedDict
 from collections.abc import Iterator, Sequence
@@ -194,7 +195,6 @@ class Erc20EventsIndexer(EventsIndexer):
             return []
         else:
             self._prefetch_ethereum_txs(tx_hashes)
-
             logger.debug("Storing TokenTransfer objects")
             logger.debug("Storing Transfer Events")
             result_erc20 = ERC20Transfer.objects.bulk_create_from_generator(
@@ -216,7 +216,8 @@ class Erc20EventsIndexer(EventsIndexer):
                 )
             )
             logger.debug(
-                "Stored %d Safe Relevant Transactions", result_safe_relevant_transaction
+                "Stored %d Safe Relevant Transactions",
+                result_safe_relevant_transaction,
             )
             logger.debug("Marking events as processed")
             self._mark_log_receipts_processed(not_processed_log_receipts)

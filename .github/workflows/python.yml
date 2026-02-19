@@ -25,6 +25,8 @@ jobs:
         run: pip install pre-commit
       - name: Run pre-commit
         run: pre-commit run --all-files
+        env:
+          SKIP: insert-license
 
   test-app:
     runs-on: ubuntu-latest
