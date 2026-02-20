@@ -6,25 +6,28 @@ from django.test import TestCase
 from pika.channel import Channel
 from pika.exceptions import ConnectionClosedByBroker
 
-from ..services.queue_service import BrokerConnection, QueueService, get_queue_service
+from ..services.queue_service import BrokerConnection, QueueService
 
 
 class TestQueueService(TestCase):
     def setUp(self):
-        broker_connection = BrokerConnection()
+        self._broker_connection = BrokerConnection()
         # Create queue for test
         self.queue = "test_queue"
 
-        broker_connection.channel.queue_declare(self.queue)
-        broker_connection.channel.queue_bind(
-            self.queue, broker_connection.exchange_name
+        self._broker_connection.channel.queue_declare(self.queue)
+        self._broker_connection.channel.queue_bind(
+            self.queue, self._broker_connection.exchange_name
         )
         # Clean queue to avoid old messages
-        broker_connection.channel.queue_purge(self.queue)
+        self._broker_connection.channel.queue_purge(self.queue)
+
+    def tearDown(self):
+        if getattr(self, "_broker_connection", None) is not None:
+            self._broker_connection.close()
 
     def test_send_unsent_messages(self):
-        queue_service = get_queue_service()
-        # Clean previous pool connections
+        queue_service = QueueService()
         queue_service._connection_pool = []
         messages_to_send = 10
         queue_service.clear_unsent_events()
@@ -35,32 +38,35 @@ class TestQueueService(TestCase):
             side_effect=ConnectionClosedByBroker(320, "Connection closed"),
         ):
             for i in range(messages_to_send):
-                payload = f"not sent {i}"
+                payload = {"message": f"not sent {i}"}
                 queue_service.send_event(payload)
 
             self.assertEqual(len(queue_service.unsent_events), messages_to_send)
             self.assertEqual(queue_service.send_unsent_events(), 0)
 
         # After reconnection should send event and previous messages (10+1)
-        self.assertEqual(queue_service.send_event("not sent 11"), messages_to_send + 1)
+        self.assertEqual(
+            queue_service.send_event({"message": "not sent 11"}), messages_to_send + 1
+        )
         # Everything should be sent by send_event
         self.assertEqual(queue_service.send_unsent_events(), 0)
         self.assertEqual(len(queue_service.unsent_events), 0)
         # Just one connection should be requested
         self.assertEqual(len(queue_service._connection_pool), 1)
         broker_connection = queue_service.get_connection()
-        # First event published should be the last 1
+        # First event published should be the last one
         _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
-        self.assertEqual(json.loads(body), "not sent 11")
+        self.assertEqual(json.loads(body), {"message": "not sent 11"})
         # Check if all unsent_events were sent
         for i in range(messages_to_send):
-            payload = f"not sent {i}"
+            payload = {"message": f"not sent {i}"}
             _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
             self.assertEqual(json.loads(body), payload)
+        queue_service.release_connection(broker_connection)
 
     def test_send_with_pool_limit(self):
         queue_service = QueueService()
-        payload = "Pool limit test"
+        payload = {"message": "Pool limit test"}
         # Unused connection, just to reach the limit
         connection_1 = queue_service.get_connection()
         self.assertEqual(len(queue_service.unsent_events), 0)
@@ -87,6 +93,7 @@ class TestQueueService(TestCase):
         # Check if message was written to the queue
         _, _, body = broker_connection.channel.basic_get(self.queue, auto_ack=True)
         self.assertEqual(json.loads(body), payload)
+        queue_service.release_connection(broker_connection)
 
     def test_get_connection(self):
         queue_service = QueueService()
@@ -107,11 +114,12 @@ class TestQueueService(TestCase):
         self.assertEqual(len(queue_service._connection_pool), 2)
         self.assertEqual(queue_service._total_connections, 0)
         with self.settings(EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT=1):
-            connection_1 = queue_service.get_connection()
+            held_connection = queue_service.get_connection()
             self.assertEqual(len(queue_service._connection_pool), 1)
             self.assertEqual(queue_service._total_connections, 1)
             # We should reach the connection limit of the pool
-            connection_1 = queue_service.get_connection()
+            connection_2 = queue_service.get_connection()
             self.assertEqual(len(queue_service._connection_pool), 1)
             self.assertEqual(queue_service._total_connections, 1)
-            self.assertIsNone(connection_1)
+            self.assertIsNone(connection_2)
+            queue_service.release_connection(held_connection)
