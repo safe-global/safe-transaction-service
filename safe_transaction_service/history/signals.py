@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from logging import getLogger
 
 from django.conf import settings
@@ -140,9 +141,10 @@ def _process_event(
     assert not (created and deleted), (
         "An instance cannot be created and deleted at the same time"
     )
-
-    logger.debug("Removing cache for object=%s", instance)
-    remove_cache_view_by_instance(instance)
+    if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
+        logger.debug("Removing cache for object=%s", instance)
+        remove_cache_view_by_instance(instance)
+        logger.debug("Removed cache for object=%s", instance)
 
     # Skip heavy cache invalidation and payload generation for events
     # that won't be emitted anyway (for example, old/reindexed txs).
