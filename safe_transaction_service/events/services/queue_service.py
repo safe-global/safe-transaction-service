@@ -1,10 +1,11 @@
-import json
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 from functools import cache
 from typing import Any
 
 from django.conf import settings
 
+import orjson
 import pika.exceptions
 from pika import BlockingConnection, URLParameters
 from pika.channel import Channel
@@ -127,7 +128,8 @@ class QueueService:
 
         :param payload: Number of events published
         """
-        event: str = json.dumps(payload)
+
+        event: str = orjson.dumps(payload).decode("utf-8")
         if not (broker_connection := self.get_connection()):
             # No available connections in the pool, store event to send it later
             self.unsent_events.append(event)
