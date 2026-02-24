@@ -323,7 +323,12 @@ class IndexService:
                     f"Cannot find blockHash for tx with "
                     f"tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
-
+            assert tx["hash"] == tx_receipt["transactionHash"], (
+                "Mismatched tx hash for requested tx_hash="
+                f"{to_0x_hex_str(HexBytes(tx_hash))}: "
+                f"tx.hash={to_0x_hex_str(tx['hash'])}, "
+                f"receipt.transactionHash={to_0x_hex_str(tx_receipt['transactionHash'])}"
+            )
             block_hashes.add(to_0x_hex_str(tx["blockHash"]))
             block_hash_per_tx.append(tx["blockHash"])
             ethereum_txs_to_insert.append(
