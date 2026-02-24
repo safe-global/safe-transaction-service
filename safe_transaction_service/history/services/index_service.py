@@ -286,7 +286,7 @@ class IndexService:
         txs_greenlet = gevent.spawn(
             self.ethereum_client.get_transactions, tx_hashes_not_in_db
         )
-        gevent.joinall([receipts_greenlet, txs_greenlet])
+        gevent.joinall([receipts_greenlet, txs_greenlet], raise_error=True)
 
         logger.debug("Got tx receipts and transactions from RPC")
         block_hashes = set()
