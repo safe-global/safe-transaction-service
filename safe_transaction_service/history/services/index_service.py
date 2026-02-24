@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 from collections import OrderedDict
 from collections.abc import Collection
@@ -6,6 +7,7 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.db.models import Min, Q
 
+import gevent
 from eth_typing import ChecksumAddress, Hash32
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -276,12 +278,24 @@ class IndexService:
         if not tx_hashes_not_in_db:
             return list(ethereum_txs_dict.values())
 
-        # Get receipts for hashes not in db. First get the receipts as they guarantee tx is mined and confirmed
-        logger.debug("Get tx receipts for hashes not on db")
-        tx_receipts = []
-        for tx_hash, tx_receipt in zip(
+        # Fetch receipts and transactions concurrently - both are independent RPC batch calls
+        logger.debug("Get tx receipts and transactions for hashes not on db")
+        receipts_greenlet = gevent.spawn(
+            self.ethereum_client.get_transaction_receipts, tx_hashes_not_in_db
+        )
+        txs_greenlet = gevent.spawn(
+            self.ethereum_client.get_transactions, tx_hashes_not_in_db
+        )
+        gevent.joinall([receipts_greenlet, txs_greenlet])
+
+        logger.debug("Got tx receipts and transactions from RPC")
+        block_hashes = set()
+        block_hash_per_tx = []
+        ethereum_txs_to_insert = []
+        for tx_hash, tx_receipt, tx in zip(
             tx_hashes_not_in_db,
-            self.ethereum_client.get_transaction_receipts(tx_hashes_not_in_db),
+            receipts_greenlet.value,
+            txs_greenlet.value,
             strict=False,
         ):
             tx_receipt = tx_receipt or self.ethereum_client.get_transaction_receipt(
@@ -291,21 +305,12 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
-
             if tx_receipt.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx-receipt with "
                     f"tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
 
-            tx_receipts.append(tx_receipt)
-
-        logger.debug("Got tx receipts. Now getting transactions not on db")
-        # Get transactions for hashes not in db
-        fetched_txs = self.ethereum_client.get_transactions(tx_hashes_not_in_db)
-        block_hashes = set()
-        txs = []
-        for tx_hash, tx in zip(tx_hashes_not_in_db, fetched_txs, strict=False):
             tx = tx or self.ethereum_client.get_transaction(
                 tx_hash
             )  # Retry fetching if failed
@@ -313,15 +318,22 @@ class IndexService:
                 raise TransactionNotFoundException(
                     f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
-
             if tx.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
                     f"Cannot find blockHash for tx with "
                     f"tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
                 )
-
+            assert tx["hash"] == tx_receipt["transactionHash"], (
+                "Mismatched tx hash for requested tx_hash="
+                f"{to_0x_hex_str(HexBytes(tx_hash))}: "
+                f"tx.hash={to_0x_hex_str(tx['hash'])}, "
+                f"receipt.transactionHash={to_0x_hex_str(tx_receipt['transactionHash'])}"
+            )
             block_hashes.add(to_0x_hex_str(tx["blockHash"]))
-            txs.append(tx)
+            block_hash_per_tx.append(tx["blockHash"])
+            ethereum_txs_to_insert.append(
+                EthereumTx.objects.from_tx_dict(tx, tx_receipt)
+            )
 
         logger.debug(
             "Got txs from RPC. Getting and inserting %d blocks", len(block_hashes)
@@ -331,24 +343,17 @@ class IndexService:
         )
         logger.debug("Inserted %d blocks", number_inserted_blocks)
 
-        logger.debug("Inserting %d transactions", len(txs))
-        # Create new transactions or ignore if they already exist
-        ethereum_txs_to_insert = [
-            EthereumTx.objects.from_tx_dict(tx, tx_receipt)
-            for tx, tx_receipt in zip(txs, tx_receipts, strict=False)
-        ]
+        # Set block on each tx and register in the result dict before bulk insert
+        for ethereum_tx, tx_block_hash in zip(
+            ethereum_txs_to_insert, block_hash_per_tx, strict=True
+        ):
+            ethereum_tx.block = blocks[tx_block_hash]
+            ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash)] = ethereum_tx
+
+        logger.debug("Inserting %d transactions", len(ethereum_txs_to_insert))
         number_inserted_txs = EthereumTx.objects.bulk_create_from_generator(
             iter(ethereum_txs_to_insert), ignore_conflicts=True
         )
-        for ethereum_tx, tx in zip(ethereum_txs_to_insert, txs, strict=False):
-            # Trust they were inserted and add them to the txs dictionary
-            assert ethereum_tx.tx_hash == to_0x_hex_str(tx["hash"]), (
-                f"{ethereum_tx.tx_hash} does not match retrieved tx hash"
-            )
-            ethereum_tx.block = blocks[tx["blockHash"]]
-            ethereum_txs_dict[HexBytes(ethereum_tx.tx_hash)] = ethereum_tx
-            # Block info is required for traces
-
         logger.debug("Inserted %d transactions", number_inserted_txs)
 
         logger.debug("Blocks, transactions and receipts were inserted")
