@@ -7,6 +7,9 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
+import gevent
+from gevent.greenlet import Greenlet
+
 from ..events.services.queue_service import get_queue_service
 from .cache import remove_cache_view_by_instance
 from .models import (
@@ -22,6 +25,7 @@ from .models import (
     SafeMasterCopy,
     SafeStatus,
     TokenTransfer,
+    post_bulk_create,
 )
 from .services.event_service import (
     build_delete_delegate_payload,
@@ -215,6 +219,59 @@ def process_event(
     **kwargs,
 ) -> None:
     return _process_event(sender, instance, created, False)
+
+
+@receiver(
+    post_bulk_create,
+    sender=ModuleTransaction,
+    dispatch_uid="module_transaction.process_event",
+)
+@receiver(
+    post_bulk_create,
+    sender=MultisigConfirmation,
+    dispatch_uid="multisig_confirmation.process_event",
+)
+@receiver(
+    post_bulk_create,
+    sender=MultisigTransaction,
+    dispatch_uid="multisig_transaction.process_event",
+)
+@receiver(
+    post_bulk_create,
+    sender=ERC20Transfer,
+    dispatch_uid="erc20_transfer.process_event",
+)
+@receiver(
+    post_bulk_create,
+    sender=ERC721Transfer,
+    dispatch_uid="erc721_transfer.process_event",
+)
+@receiver(post_bulk_create, sender=InternalTx, dispatch_uid="internal_tx.process_event")
+@receiver(
+    post_bulk_create,
+    sender=SafeContract,
+    dispatch_uid="safe_contract.process_event",
+)
+def process_event_from_bulk_create(
+    sender: type[Model],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | SafeContract,
+    created: bool,
+    **kwargs,
+) -> Greenlet:
+    """
+    Handle post_bulk_create signals by spawning a greenlet to process events asynchronously.
+
+    :param sender: Model class that sent the signal
+    :param instance: Instance of the created model
+    :param created: `True` if model has just been created, `False` otherwise
+    :param kwargs:
+    :return: Greenlet running _process_event
+    """
+    return gevent.spawn(_process_event, sender, instance, created, False)
 
 
 @receiver(

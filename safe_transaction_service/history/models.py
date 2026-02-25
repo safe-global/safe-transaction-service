@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import json
 from collections.abc import Iterator, Sequence
@@ -41,7 +42,7 @@ from django.db.models.expressions import (
 )
 from django.db.models.functions import Coalesce
 from django.db.models.query import RawQuerySet
-from django.db.models.signals import post_save
+from django.db.models.signals import Signal
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -74,6 +75,7 @@ from safe_transaction_service.utils.constants import (
 from .constants import SAFE_PROXY_FACTORY_CREATION_EVENT_TOPIC
 from .utils import clean_receipt_log
 
+post_bulk_create = Signal()
 logger = getLogger(__name__)
 
 
@@ -155,7 +157,7 @@ class BulkCreateSignalMixin:
             objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts
         )
         for obj in objs:
-            post_save.send(obj.__class__, instance=obj, created=True)
+            post_bulk_create.send(obj.__class__, instance=obj, created=True)
         return result
 
     def bulk_create_from_generator(
