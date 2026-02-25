@@ -101,6 +101,7 @@ jobs:
         REDIS_URL: redis://localhost:6379/0
         EVENTS_QUEUE_URL: amqp://guest:guest@localhost:5672/
     - name: Coveralls
+      if: github.ref != 'refs/heads/main'
       uses: coverallsapp/github-action@v2
   docker-deploy:
     runs-on: ubuntu-latest
