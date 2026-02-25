@@ -7,6 +7,8 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
+import gevent
+
 from ..events.services.queue_service import get_queue_service
 from .cache import remove_cache_view_by_instance
 from .models import (
@@ -214,7 +216,7 @@ def process_event(
     created: bool,
     **kwargs,
 ) -> None:
-    return _process_event(sender, instance, created, False)
+    return gevent.spawn(_process_event, sender, instance, created, False)
 
 
 @receiver(
