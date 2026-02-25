@@ -262,6 +262,15 @@ def process_event_from_bulk_create(
     created: bool,
     **kwargs,
 ) -> Greenlet:
+    """
+    Handle post_bulk_create signals by spawning a greenlet to process events asynchronously.
+
+    :param sender: Model class that sent the signal
+    :param instance: Instance of the created model
+    :param created: `True` if model has just been created, `False` otherwise
+    :param kwargs:
+    :return: Greenlet running _process_event
+    """
     return gevent.spawn(_process_event, sender, instance, created, False)
 
 
