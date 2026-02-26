@@ -108,7 +108,7 @@ class QueueService:
             settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
             and self._total_connections >= settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
         ):
-            logger.warning(
+            logger.debug(
                 "Number of active connections reached the pool limit: %d",
                 self._total_connections,
             )
