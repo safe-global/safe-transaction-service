@@ -116,13 +116,20 @@ class QueueService:
 
         if self._connection_pool:
             broker_connection = self._connection_pool.pop()
-        else:
-            broker_connection = BrokerConnection()
+            if broker_connection.channel:
+                self._total_connections += 1
+                return broker_connection
+            logger.warning("RabbitMQ channel is not available")
+            return None
 
+        # Reserve the slot before network I/O to prevent concurrent greenlets
+        # from bypassing the pool limit
+        self._total_connections += 1
+        broker_connection = BrokerConnection()
         if broker_connection.channel:
-            self._total_connections += 1
             return broker_connection
 
+        self._total_connections -= 1
         logger.warning("RabbitMQ channel is not available")
         return None
 
