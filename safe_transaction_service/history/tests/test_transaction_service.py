@@ -1,9 +1,11 @@
 from datetime import timedelta
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
 
 from eth_account import Account
+from safe_eth.safe import SafeOperationEnum
 
 from ..models import (
     EthereumTx,
@@ -199,3 +201,58 @@ class TestTransactionService(TestCase):
         self.assertEqual(len(all_txs_serialized), len(all_txs_2))
         for tx_serialized in all_txs_serialized:
             self.assertTrue(isinstance(tx_serialized, dict))
+
+    def test_multisend_native_transfers_enriched_when_no_traces(self):
+        """
+        When a multiSend tx has no indexed native transfers (e.g. chain without
+        tracing like Berachain/Scroll), synthetic ETHER_TRANSFER entries are
+        built from decoded batch data (issue #2764).
+        """
+        transaction_service: TransactionService = self.transaction_service
+        safe_address = Account.create().address
+        # MultiSend v1.3.0 address (DELEGATE_CALL)
+        multisend_address = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
+        MultisigTransactionFactory(
+            safe=safe_address,
+            to=multisend_address,
+            operation=SafeOperationEnum.DELEGATE_CALL.value,
+            data=b"\x8d\x80\xff\x0a\x00\x00",  # multiSend selector + payload stub
+        )
+        # No InternalTx ether transfers for this tx (simulates chain without tracing)
+        queryset = transaction_service.get_all_tx_identifiers(safe_address)
+        all_tx_hashes = [q.ethereum_tx_id for q in queryset]
+        decoded_native = [
+            {
+                "operation": 0,
+                "value": "100000000000000",
+                "to": "0x3B747C372C2088963ABc2194B7D5ADe238965b33",
+                "data": None,
+            },
+            {
+                "operation": 0,
+                "value": "200000000000000",
+                "to": "0x3B747C372C2088963ABc2194B7D5ADe238965b33",
+                "data": None,
+            },
+        ]
+        with mock.patch(
+            "safe_transaction_service.history.services.transaction_service.get_tx_decoder"
+        ) as get_decoder:
+            get_decoder.return_value.decode_multisend_data.return_value = decoded_native
+            all_txs = transaction_service.get_all_txs_from_identifiers(
+                safe_address, all_tx_hashes
+            )
+        multisig_txs = [t for t in all_txs if isinstance(t, MultisigTransaction)]
+        self.assertEqual(len(multisig_txs), 1)
+        tx = multisig_txs[0]
+        self.assertEqual(tx.safe, safe_address)
+        self.assertEqual(len(tx.transfers), 2)
+        for i, transfer in enumerate(tx.transfers):
+            self.assertIsNone(transfer.get("token_address"))
+            self.assertEqual(transfer["_from"], safe_address)
+            self.assertEqual(
+                transfer["to"], "0x3B747C372C2088963ABc2194B7D5ADe238965b33"
+            )
+            self.assertEqual(transfer["_value"], [100000000000000, 200000000000000][i])
+            self.assertIn("execution_date", transfer)
+            self.assertEqual(transfer["_trace_address"], str(i))
