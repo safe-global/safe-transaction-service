@@ -11,7 +11,8 @@ from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from safe_eth.eth import get_auto_ethereum_client
-from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationV6
+from safe_eth.eth.account_abstraction import UserOperationV07 as UserOperationV7
 from safe_eth.eth.utils import fast_keccak, fast_to_checksum_address
 from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
@@ -91,14 +92,29 @@ class SafeOperationSerializer(
     SafeOperationSignatureValidatorMixin, serializers.Serializer
 ):
     nonce = serializers.IntegerField(min_value=0)
-    init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
     call_gas_limit = serializers.IntegerField(min_value=0)
     verification_gas_limit = serializers.IntegerField(min_value=0)
     pre_verification_gas = serializers.IntegerField(min_value=0)
     max_fee_per_gas = serializers.IntegerField(min_value=0)
     max_priority_fee_per_gas = serializers.IntegerField(min_value=0)
-    paymaster_and_data = eth_serializers.HexadecimalField(allow_null=True)
+    # v6 fields
+    init_code = eth_serializers.HexadecimalField(allow_null=True, required=False)
+    paymaster_and_data = eth_serializers.HexadecimalField(
+        allow_null=True, required=False
+    )
+    # v7 fields
+    factory = eth_serializers.EthereumAddressField(allow_null=True, required=False)
+    factory_data = eth_serializers.HexadecimalField(allow_null=True, required=False)
+    paymaster = eth_serializers.EthereumAddressField(allow_null=True, required=False)
+    paymaster_data = eth_serializers.HexadecimalField(allow_null=True, required=False)
+    paymaster_verification_gas_limit = serializers.IntegerField(
+        min_value=0, allow_null=True, required=False
+    )
+    paymaster_post_op_gas_limit = serializers.IntegerField(
+        min_value=0, allow_null=True, required=False
+    )
+
     signature = eth_serializers.HexadecimalField(
         min_length=65, max_length=SIGNATURE_LENGTH
     )
@@ -207,6 +223,53 @@ class SafeOperationSerializer(
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
+        entry_point = attrs["entry_point"]
+        module_address = attrs["module_address"]
+        is_v7 = entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
+
+        # Validate module address is compatible with entrypoint version
+        if (
+            is_v7
+            and module_address.lower()
+            != settings.ETHEREUM_4337_SAFE_MODULE_ADDRESS_V07.lower()
+        ) or (
+            not is_v7
+            and module_address.lower()
+            != settings.ETHEREUM_4337_SAFE_MODULE_ADDRESS_V06.lower()
+        ):
+            raise ValidationError(f"Invalid Module address {module_address}")
+
+        # Validate version-specific fields
+        if is_v7:
+            if attrs.get("init_code"):
+                raise ValidationError(
+                    "`init_code` is not supported for EntryPoint v0.7"
+                )
+            if attrs.get("paymaster_and_data"):
+                raise ValidationError(
+                    "`paymaster_and_data` is not supported for EntryPoint v0.7, use paymaster fields instead"
+                )
+            # Validate paymaster_data requires paymaster
+            if attrs.get("paymaster_data") and not attrs.get("paymaster"):
+                raise ValidationError("`paymaster_data` requires `paymaster` to be set")
+            # Validate factory_data requires factory
+            if attrs.get("factory_data") and not attrs.get("factory"):
+                raise ValidationError("`factory_data` requires `factory` to be set")
+        else:
+            if attrs.get("factory") or attrs.get("factory_data"):
+                raise ValidationError(
+                    "`factory` fields are only supported for EntryPoint v0.7"
+                )
+            if (
+                attrs.get("paymaster")
+                or attrs.get("paymaster_data")
+                or attrs.get("paymaster_verification_gas_limit")
+                or attrs.get("paymaster_post_op_gas_limit")
+            ):
+                raise ValidationError(
+                    "Paymaster, paymaster_verification_gas_limit, paymaster_post_op_gas_limit and paymaster_data fields are only supported for EntryPoint v0.7"
+                )
+
         valid_after, valid_until = [
             int(attrs[key].timestamp()) if attrs[key] else 0
             for key in ("valid_after", "valid_until")
@@ -218,14 +281,14 @@ class SafeOperationSerializer(
         safe_operation = SafeOperationClass(
             safe_address,
             attrs["nonce"],
-            fast_keccak(attrs["init_code"] or b""),
+            fast_keccak(attrs.get("init_code") or b""),
             fast_keccak(attrs["call_data"] or b""),
             attrs["call_gas_limit"],
             attrs["verification_gas_limit"],
             attrs["pre_verification_gas"],
             attrs["max_fee_per_gas"],
             attrs["max_priority_fee_per_gas"],
-            fast_keccak(attrs["paymaster_and_data"] or b""),
+            fast_keccak(attrs.get("paymaster_and_data") or b""),
             valid_after,
             valid_until,
             attrs["entry_point"],
@@ -260,44 +323,100 @@ class SafeOperationSerializer(
 
     @transaction.atomic
     def save(self, **kwargs):
-        user_operation = UserOperationClass(
-            b"",  # Hash will be calculated later
-            self.context["safe_address"],
-            self.validated_data["nonce"],
-            self.validated_data["init_code"] or b"",
-            self.validated_data["call_data"] or b"",
-            self.validated_data["call_gas_limit"],
-            self.validated_data["verification_gas_limit"],
-            self.validated_data["pre_verification_gas"],
-            self.validated_data["max_fee_per_gas"],
-            self.validated_data["max_priority_fee_per_gas"],
-            self.validated_data["paymaster_and_data"] or b"",
-            self.validated_data["signature"],
-            self.validated_data["entry_point"],
-        )
+        entry_point = self.validated_data["entry_point"]
+        is_v7 = entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
+
+        if is_v7:
+            factory = self.validated_data["factory"]
+            factory_data = self.validated_data["factory_data"] if factory else None
+            paymaster = self.validated_data["paymaster"]
+            paymaster_data = (
+                self.validated_data.get("paymaster_data") if paymaster else None
+            )
+            user_operation: UserOperationV7 | UserOperationV6 = UserOperationV7(
+                b"",  # Hash will be calculated later
+                self.context["safe_address"],
+                self.validated_data["nonce"],
+                self.validated_data["call_data"] or b"",
+                self.validated_data["call_gas_limit"],
+                self.validated_data["verification_gas_limit"],
+                self.validated_data["pre_verification_gas"],
+                self.validated_data["max_fee_per_gas"],
+                self.validated_data["max_priority_fee_per_gas"],
+                self.validated_data["signature"],
+                self.validated_data["entry_point"],
+                factory,
+                factory_data or b"",
+                self.validated_data["paymaster_verification_gas_limit"],
+                self.validated_data["paymaster_post_op_gas_limit"],
+                paymaster,
+                paymaster_data or b"",
+            )
+        else:
+            user_operation = UserOperationV6(
+                b"",  # Hash will be calculated later
+                self.context["safe_address"],
+                self.validated_data["nonce"],
+                self.validated_data["init_code"] or b"",
+                self.validated_data["call_data"] or b"",
+                self.validated_data["call_gas_limit"],
+                self.validated_data["verification_gas_limit"],
+                self.validated_data["pre_verification_gas"],
+                self.validated_data["max_fee_per_gas"],
+                self.validated_data["max_priority_fee_per_gas"],
+                self.validated_data["paymaster_and_data"] or b"",
+                self.validated_data["signature"],
+                self.validated_data["entry_point"],
+            )
 
         user_operation_hash = user_operation.calculate_user_operation_hash(
             self.validated_data["chain_id"]
         )
 
+        defaults = {
+            "ethereum_tx": None,
+            "sender": user_operation.sender,
+            "nonce": user_operation.nonce,
+            "call_data": user_operation.call_data,
+            "call_gas_limit": user_operation.call_gas_limit,
+            "verification_gas_limit": user_operation.verification_gas_limit,
+            "pre_verification_gas": user_operation.pre_verification_gas,
+            "max_fee_per_gas": user_operation.max_fee_per_gas,
+            "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
+            "paymaster": user_operation.paymaster,
+            "paymaster_data": user_operation.paymaster_data,
+            "signature": user_operation.signature,
+            "entry_point": user_operation.entry_point,
+        }
+
+        if is_v7:
+            # v7 specific fields
+            # Ensure factory_data and paymaster_data are None when factory/paymaster is None
+            # to satisfy database constraints
+            defaults.update(
+                {
+                    "factory": user_operation.factory,
+                    "factory_data": user_operation.factory_data
+                    if user_operation.factory
+                    else None,
+                    "paymaster_verification_gas_limit": user_operation.paymaster_verification_gas_limit,
+                    "paymaster_post_op_gas_limit": user_operation.paymaster_post_op_gas_limit,
+                    "paymaster_data": user_operation.paymaster_data
+                    if user_operation.paymaster
+                    else None,
+                }
+            )
+        else:
+            # v6 specific fields
+            defaults.update(
+                {
+                    "init_code": user_operation.init_code,
+                }
+            )
+
         user_operation_model, _ = UserOperationModel.objects.get_or_create(
             hash=user_operation_hash,
-            defaults={
-                "ethereum_tx": None,
-                "sender": user_operation.sender,
-                "nonce": user_operation.nonce,
-                "init_code": user_operation.init_code,
-                "call_data": user_operation.call_data,
-                "call_gas_limit": user_operation.call_gas_limit,
-                "verification_gas_limit": user_operation.verification_gas_limit,
-                "pre_verification_gas": user_operation.pre_verification_gas,
-                "max_fee_per_gas": user_operation.max_fee_per_gas,
-                "max_priority_fee_per_gas": user_operation.max_priority_fee_per_gas,
-                "paymaster": user_operation.paymaster,
-                "paymaster_data": user_operation.paymaster_data,
-                "signature": user_operation.signature,
-                "entry_point": user_operation.entry_point,
-            },
+            defaults=defaults,
         )
 
         safe_operation_model, _ = SafeOperationModel.objects.get_or_create(
@@ -358,6 +477,15 @@ class SafeOperationConfirmationSerializer(
                 bytes(user_operation_model.init_code), self.ethereum_client
             )
             self._deployment_owners = decoded_init_code.owners
+        elif user_operation_model.factory and user_operation_model.factory_data:
+            # v7: init_code = factory + factory_data
+            init_code_bytes = HexBytes(user_operation_model.factory) + HexBytes(
+                user_operation_model.factory_data
+            )
+            decoded_init_code = decode_init_code(
+                bytes(init_code_bytes), self.ethereum_client
+            )
+            self._deployment_owners = decoded_init_code.owners
 
         safe_signatures = self._validate_signature(
             safe_operation.safe,
@@ -413,7 +541,6 @@ class UserOperationResponseSerializer(serializers.Serializer):
     sender = eth_serializers.EthereumAddressField()
     user_operation_hash = eth_serializers.HexadecimalField(source="hash")
     nonce = serializers.CharField()
-    init_code = eth_serializers.HexadecimalField(allow_null=True)
     call_data = eth_serializers.HexadecimalField(allow_null=True)
     call_gas_limit = serializers.CharField()
     verification_gas_limit = serializers.CharField()
@@ -424,6 +551,31 @@ class UserOperationResponseSerializer(serializers.Serializer):
     paymaster_data = eth_serializers.HexadecimalField(allow_null=True)
     signature = eth_serializers.HexadecimalField()
     entry_point = eth_serializers.EthereumAddressField()
+    # v6 field
+    init_code = eth_serializers.HexadecimalField(allow_null=True)
+    # v7 fields
+    factory = eth_serializers.EthereumAddressField(allow_null=True)
+    factory_data = eth_serializers.HexadecimalField(allow_null=True)
+    paymaster_verification_gas_limit = serializers.CharField(allow_null=True)
+    paymaster_post_op_gas_limit = serializers.CharField(allow_null=True)
+
+    def to_representation(self, instance):
+        # Remove version-specific fields based on entrypoint
+        data = super().to_representation(instance)
+
+        is_v7 = (
+            instance.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower()
+        )
+
+        if is_v7:
+            data.pop("init_code", None)
+        else:
+            data.pop("factory", None)
+            data.pop("factory_data", None)
+            data.pop("paymaster_verification_gas_limit", None)
+            data.pop("paymaster_post_op_gas_limit", None)
+
+        return data
 
 
 class SafeOperationResponseSerializer(serializers.Serializer):
