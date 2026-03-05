@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import os.path
 import tempfile
 from io import StringIO
@@ -410,10 +411,10 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             last_proxy_factory.tx_block_number, last_proxy_factory_initial_block
         )
 
-        # At Nov 2023 we support 12 Master Copies, 3 L2 Master Copies and 6 Proxy Factories
-        self.assertEqual(SafeMasterCopy.objects.count(), 12)
-        self.assertEqual(SafeMasterCopy.objects.l2().count(), 3)
-        self.assertEqual(ProxyFactory.objects.count(), 6)
+        # At Mar 2025 we support 14 Master Copies, 4 L2 Master Copies and 7 Proxy Factories
+        self.assertEqual(SafeMasterCopy.objects.count(), 14)
+        self.assertEqual(SafeMasterCopy.objects.l2().count(), 4)
+        self.assertEqual(ProxyFactory.objects.count(), 7)
 
     def test_setup_service_mainnet_erc20_indexing_setup(self):
         # Test IndexingStatus ERC20 is not modified if higher than the oldest master copy
