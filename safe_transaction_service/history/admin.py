@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import Any
 
 from django import forms
@@ -126,6 +127,7 @@ class EthereumBlockAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "==block_hash",
     ]
     ordering = ["-number"]
+    show_full_result_count = False
 
 
 class TokenTransferAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
@@ -144,6 +146,7 @@ class TokenTransferAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     ordering = ["-timestamp"]
     search_fields = ["==_from", "==to", "==address", "==ethereum_tx__tx_hash"]
     raw_id_fields = ("ethereum_tx",)
+    show_full_result_count = False
 
 
 @admin.register(ERC20Transfer)
@@ -184,6 +187,7 @@ class EthereumTxAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     search_fields = ["==block_id", "==tx_hash", "==_from", "==to"]
     ordering = ["-block_id"]
     raw_id_fields = ("block",)
+    show_full_result_count = False
 
 
 @admin.register(InternalTx)
@@ -202,11 +206,7 @@ class InternalTxAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     )
     list_filter = ("tx_type", "call_type")
     list_select_related = ("ethereum_tx",)
-    ordering = [
-        "-block_number",
-        "-ethereum_tx__transaction_index",
-        "-pk",
-    ]
+    ordering = ["-pk"]
     readonly_fields = ("timestamp", "block_number")
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
@@ -216,6 +216,7 @@ class InternalTxAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "==ethereum_tx__tx_hash",
         "==contract_address",
     ]
+    show_full_result_count = False
 
 
 class InternalTxDecodedOfficialListFilter(admin.SimpleListFilter):
@@ -251,11 +252,7 @@ class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     )
     list_filter = ("function_name", "processed", InternalTxDecodedOfficialListFilter)
     list_select_related = ("internal_tx__ethereum_tx",)
-    ordering = [
-        "-internal_tx__block_number",
-        "-internal_tx__ethereum_tx__transaction_index",
-        "-internal_tx_id",
-    ]
+    ordering = ["-internal_tx_id"]
     raw_id_fields = ("internal_tx",)
     readonly_fields = ("safe_address",)
     search_fields = [
@@ -265,6 +262,7 @@ class InternalTxDecodedAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "==internal_tx__ethereum_tx__tx_hash",
         "==internal_tx__block_number",
     ]
+    show_full_result_count = False
 
     @admin.action(description="Process internal tx again")
     def process_again(self, request, queryset):
@@ -308,6 +306,7 @@ class MultisigConfirmationAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "==multisig_transaction_hash",
         "==owner",
     ]
+    show_full_result_count = False
 
     @admin.display()
     def block_number(self, obj: MultisigConfirmation) -> int | None:
@@ -385,6 +384,7 @@ class MultisigTransactionAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     raw_id_fields = ("ethereum_tx",)
     readonly_fields = ("safe_tx_hash",)
     search_fields = ["==ethereum_tx__tx_hash", "==safe", "==to", "==safe_tx_hash"]
+    show_full_result_count = False
 
     @admin.display(boolean=True)
     def executed(self, obj: MultisigTransaction):
@@ -443,6 +443,7 @@ class ModuleTransactionAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     ordering = ["-created"]
     raw_id_fields = ("internal_tx",)
     search_fields = ["==safe", "==module", "==to"]
+    show_full_result_count = False
 
     def data_hex(self, o: ModuleTransaction):
         return to_0x_hex_str(HexBytes(o.data)) if o.data else None
@@ -537,7 +538,7 @@ class SafeContractAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     )
     list_filter = (SafeContractERC20ListFilter, "banned")
     list_select_related = ("ethereum_tx",)
-    ordering = ["-ethereum_tx__block_id"]
+    ordering = ["-created"]
     raw_id_fields = ("ethereum_tx",)
     search_fields = [
         "==address",
@@ -612,8 +613,9 @@ class SafeLastStatusAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         SafeStatusModulesListFilter,
     )
     list_select_related = ("internal_tx__ethereum_tx", "internal_tx__decoded_tx")
-    ordering = ["-internal_tx__ethereum_tx__block_id", "-internal_tx_id"]
+    ordering = ["-internal_tx_id"]
     raw_id_fields = ("internal_tx",)
+    show_full_result_count = False
     search_fields = [
         "==address",
         "owners__icontains",

@@ -12,22 +12,24 @@ class ContractAbiFactory(DjangoModelFactory):
 
     # Prevent duplicated abis
     abi = factory.Sequence(
-        lambda n: sourcify_safe_metadata["output"]["abi"]
-        + [
-            {
-                "anonymous": False,
-                "inputs": [
-                    {
-                        "indexed": False,
-                        "internalType": "address",
-                        "name": "owner",
-                        "type": "address",
-                    }
-                ],
-                "name": f"EventToPreventUniqueError-{n}",
-                "type": "event",
-            }
-        ]
+        lambda n: (
+            sourcify_safe_metadata["output"]["abi"]
+            + [
+                {
+                    "anonymous": False,
+                    "inputs": [
+                        {
+                            "indexed": False,
+                            "internalType": "address",
+                            "name": "owner",
+                            "type": "address",
+                        }
+                    ],
+                    "name": f"EventToPreventUniqueError-{n}",
+                    "type": "event",
+                }
+            ]
+        )
     )
     description = "Gnosis Safe v1.2.0 ABI"
     relevance = 1
