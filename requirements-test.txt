@@ -8,6 +8,6 @@ mypy==1.19.1
 pytest==9.0.2
 pytest-celery==1.2.1
 pytest-django==4.11.1
-pytest-env==1.2.0
+pytest-env==1.5.0
 pytest-rerunfailures==16.1
 pytest-sugar==1.1.1
