@@ -49,3 +49,7 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 ## Testing
 - `Virtualenv` available at `.venv`
 - Use `pytest` (no parameters). It should auto-detect configuration.
+- Use factories (e.g. `SafeContractFactory`) instead of inline helpers or `get_or_create` calls in tests.
+
+## Performance Conventions
+- Prefer `safe_eth.eth.utils.fast_to_checksum_address` and `fast_is_checksum_address` over `Web3.to_checksum_address` / `Web3.is_address` — the `fast_*` variants use `pysha3` for keccak256, making them significantly faster.

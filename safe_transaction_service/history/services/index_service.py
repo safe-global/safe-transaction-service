@@ -579,7 +579,7 @@ class IndexService:
         from_block_number: int,
         to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: ChecksumAddress | None = None,
+        addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
         :param indexer: A new instance must be provider, providing the singleton one can break indexing
@@ -641,7 +641,7 @@ class IndexService:
         from_block_number: int,
         to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: ChecksumAddress | None = None,
+        addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
         Reindex master copies in parallel with the current running indexer, so service will have no missing txs
@@ -676,7 +676,7 @@ class IndexService:
         from_block_number: int,
         to_block_number: int | None = None,
         block_process_limit: int = 100,
-        addresses: ChecksumAddress | None = None,
+        addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
         Reindex erc20/721 events parallel with the current running indexer, so service will have no missing
