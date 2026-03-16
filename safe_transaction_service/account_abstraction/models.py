@@ -1,20 +1,23 @@
 import logging
 from functools import cached_property
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Index
 
 from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
-from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass
+from safe_eth.eth.account_abstraction import UserOperation as UserOperationV6
 from safe_eth.eth.account_abstraction import UserOperationMetadata
+from safe_eth.eth.account_abstraction import UserOperationV07 as UserOperationV7
 from safe_eth.eth.django.models import (
     EthereumAddressBinaryField,
     HexV2Field,
     Keccak256Field,
     Uint256Field,
 )
+from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.account_abstraction import SafeOperation as SafeOperationClass
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
@@ -52,9 +55,48 @@ class UserOperation(models.Model):
     signature = models.BinaryField(null=True, blank=True, editable=True)
     entry_point = EthereumAddressBinaryField(db_index=True)
 
+    # UserOperation v7 specific fields, filled as `None` for <= v6
+    factory = EthereumAddressBinaryField(
+        db_index=True, null=True, blank=True, editable=True
+    )
+    factory_data = models.BinaryField(null=True, blank=True, editable=True)
+    paymaster_verification_gas_limit = Uint256Field(
+        null=True, blank=True, editable=True
+    )
+    paymaster_post_op_gas_limit = Uint256Field(null=True, blank=True, editable=True)
+
     class Meta:
         indexes = [
             Index(fields=["sender", "-nonce"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(factory__isnull=True)
+                | models.Q(init_code__isnull=True),
+                name="factory_or_init_code_not_both",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    paymaster_verification_gas_limit__isnull=True,
+                    paymaster_post_op_gas_limit__isnull=True,
+                    paymaster_data__isnull=True,
+                )
+                | models.Q(paymaster__isnull=False),
+                name="paymaster_required_with_paymaster_fields",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(init_code__isnull=True)
+                | models.Q(
+                    paymaster_verification_gas_limit__isnull=True,
+                    paymaster_post_op_gas_limit__isnull=True,
+                ),
+                name="v7_paymaster_gas_limits_not_with_init_code",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(factory_data__isnull=True)
+                | models.Q(factory__isnull=False),
+                name="factory_required_with_factory_data",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -65,7 +107,9 @@ class UserOperation(models.Model):
         if self.paymaster and self.paymaster_data:
             return HexBytes(HexBytes(self.paymaster) + HexBytes(self.paymaster_data))
 
-    def to_user_operation(self, add_tx_metadata: bool = False) -> UserOperationClass:
+    def to_user_operation(
+        self, add_tx_metadata: bool = False
+    ) -> UserOperationV6 | UserOperationV7:
         """
         Returns a safe-eth-py UserOperation object
 
@@ -86,23 +130,50 @@ class UserOperation(models.Model):
         if not self.signature:
             raise ValueError("Signature should not be empty")
         signature = HexBytes(self.signature)
-
-        return UserOperationClass(
-            HexBytes(self.hash),
-            self.sender,
-            self.nonce,
-            HexBytes(self.init_code) if self.init_code else b"",
-            HexBytes(self.call_data) if self.call_data else b"",
-            self.call_gas_limit,
-            self.verification_gas_limit,
-            self.pre_verification_gas,
-            self.max_fee_per_gas,
-            self.max_priority_fee_per_gas,
-            self.paymaster_and_data if self.paymaster_and_data else b"",
-            signature,
-            self.entry_point,
-            user_operation_metadata,
-        )
+        if self.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V6.lower():
+            return UserOperationV6(
+                HexBytes(self.hash),
+                self.sender,
+                self.nonce,
+                HexBytes(self.init_code) if self.init_code else b"",
+                HexBytes(self.call_data) if self.call_data else b"",
+                self.call_gas_limit,
+                self.verification_gas_limit,
+                self.pre_verification_gas,
+                self.max_fee_per_gas,
+                self.max_priority_fee_per_gas,
+                self.paymaster_and_data if self.paymaster_and_data else b"",
+                signature,
+                self.entry_point,
+                user_operation_metadata,
+            )
+        elif self.entry_point.lower() == settings.ETHEREUM_4337_ENTRYPOINT_V7.lower():
+            return UserOperationV7(
+                HexBytes(self.hash),
+                self.sender,
+                self.nonce,
+                HexBytes(self.call_data) if self.call_data else HexBytes(b""),
+                self.call_gas_limit,
+                self.verification_gas_limit,
+                self.pre_verification_gas,
+                self.max_fee_per_gas,
+                self.max_priority_fee_per_gas,
+                signature,
+                self.entry_point,
+                fast_to_checksum_address(self.factory) if self.factory else None,
+                HexBytes(self.factory_data) if self.factory_data else b"",
+                self.paymaster_verification_gas_limit
+                if self.paymaster_verification_gas_limit
+                else None,
+                self.paymaster_post_op_gas_limit
+                if self.paymaster_post_op_gas_limit
+                else None,
+                fast_to_checksum_address(self.paymaster) if self.paymaster else None,
+                HexBytes(self.paymaster_data) if self.paymaster_data else None,
+                user_operation_metadata,
+            )
+        else:
+            raise ValueError("Unsupported entrypoint")
 
     def to_safe_operation(self) -> SafeOperationClass:
         """
