@@ -44,7 +44,7 @@ jobs:
         ports:
           - 6379:6379
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -101,6 +101,7 @@ jobs:
         REDIS_URL: redis://localhost:6379/0
         EVENTS_QUEUE_URL: amqp://guest:guest@localhost:5672/
     - name: Coveralls
+      if: github.ref != 'refs/heads/main' && github.event_name != 'release'
       uses: coverallsapp/github-action@v2
   docker-deploy:
     runs-on: ubuntu-latest
