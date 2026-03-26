@@ -2,6 +2,7 @@
 from logging import getLogger
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -121,6 +122,10 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
+def _send_event(payload: dict) -> None:
+    transaction.on_commit(lambda: get_queue_service().send_event(payload))
+
+
 def _process_event(
     sender: type[Model],
     instance: TokenTransfer
@@ -132,7 +137,13 @@ def _process_event(
     deleted: bool,
 ) -> None:
     """
-    Process models and
+    Process models and schedule event emission after the current DB transaction commits.
+
+    Relevance checking and payload building happen eagerly (before commit) to capture
+    the current instance state. The actual queue send is deferred via
+    ``transaction.on_commit`` so that the data is visible to API consumers by the time
+    the event is delivered.
+
     :param sender:
     :param instance:
     :param created:
@@ -145,13 +156,15 @@ def _process_event(
     assert not (created and deleted), (
         "An instance cannot be created and deleted at the same time"
     )
+
     if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
         logger.debug("Removing cache for object=%s", instance)
         remove_cache_view_by_instance(instance)
         logger.debug("Removed cache for object=%s", instance)
 
-    # Skip heavy cache invalidation and payload generation for events
-    # that won't be emitted anyway (for example, old/reindexed txs).
+    # Skip payload generation for events that won't be emitted anyway
+    # (e.g. old/reindexed txs). Cache is still invalidated above so that
+    # clients don't receive stale API responses regardless of webhook relevance.
     if not is_relevant_event(sender, instance, created):
         logger.debug(
             "Skipping non-relevant event for created=%s object=%s",
@@ -165,6 +178,7 @@ def _process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
+
     for payload in payloads:
         if address := payload.get("address"):
             logger.debug(
@@ -173,8 +187,7 @@ def _process_event(
                 created,
                 instance,
             )
-            queue_service = get_queue_service()
-            queue_service.send_event(payload)
+            _send_event(payload)
 
 
 @receiver(
@@ -218,7 +231,7 @@ def process_event(
     created: bool,
     **kwargs,
 ) -> None:
-    return _process_event(sender, instance, created, False)
+    _process_event(sender, instance, created, False)
 
 
 @receiver(
@@ -264,6 +277,14 @@ def process_event_from_bulk_create(
 ) -> Greenlet:
     """
     Handle post_bulk_create signals by spawning a greenlet to process events asynchronously.
+
+    ``gevent.spawn`` is intentional: ``bulk_create`` is called per-object from
+    ``BulkCreateSignalMixin`` after the insert returns, usually outside an explicit
+    transaction. Running ``_process_event`` inline would execute cache invalidation and
+    payload building synchronously for every object, which materially slows
+    high-volume indexers. Spawning a greenlet keeps the indexer non-blocking;
+    ``_process_event`` still defers the queue publish via ``transaction.on_commit``
+    so events are only emitted once the data is committed.
 
     :param sender: Model class that sent the signal
     :param instance: Instance of the created model
@@ -327,8 +348,7 @@ def process_save_delegate_user_event(
     **kwargs,
 ):
     payload_event = build_save_delegate_payload(instance, created)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    return _send_event(payload_event)
 
 
 @receiver(
@@ -340,5 +360,4 @@ def process_delete_delegate_user_event(
     sender: type[Model], instance: SafeContractDelegate, *args, **kwargs
 ):
     payload_event = build_delete_delegate_payload(instance)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    return _send_event(payload_event)
