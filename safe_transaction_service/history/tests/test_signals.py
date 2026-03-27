@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from datetime import timedelta
 from unittest import mock
@@ -175,13 +174,11 @@ class TestSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(self, send_event_mock: MagicMock):
         # Not trusted txs should not fire any event
-        with self.captureOnCommitCallbacks(execute=True):
-            MultisigTransactionFactory(trusted=False)
+        MultisigTransactionFactory(trusted=False)
         send_event_mock.assert_not_called()
 
         # Trusted txs should fire an event
-        with self.captureOnCommitCallbacks(execute=True):
-            multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
+        multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
         pending_multisig_transaction_payload = {
             "address": multisig_tx.safe,
             "type": TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
@@ -199,8 +196,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         # Deleting a tx should fire an event
         send_event_mock.reset_mock()
         safe_tx_hash = multisig_tx.safe_tx_hash
-        with self.captureOnCommitCallbacks(execute=True):
-            multisig_tx.delete()
+        multisig_tx.delete()
 
         deleted_multisig_transaction_payload = {
             "address": multisig_tx.safe,
@@ -213,8 +209,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
     @mock.patch.object(QueueService, "send_event")
     def test_delegates_signals_are_correctly_fired(self, send_event_mock: MagicMock):
         # New delegate should fire an event
-        with self.captureOnCommitCallbacks(execute=True):
-            delegate_for_safe = SafeContractDelegateFactory()
+        delegate_for_safe = SafeContractDelegateFactory()
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
             "address": delegate_for_safe.safe_contract.address,
@@ -226,10 +221,9 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         }
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
-        with self.captureOnCommitCallbacks(execute=True):
-            permanent_delegate_without_safe = SafeContractDelegateFactory(
-                safe_contract=None, expiry_date=None
-            )
+        permanent_delegate_without_safe = SafeContractDelegateFactory(
+            safe_contract=None, expiry_date=None
+        )
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
             "address": None,
@@ -242,16 +236,14 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         send_event_mock.assert_called_with(new_delegate_user_payload)
 
         # Updated delegate should fire an event
-        with self.captureOnCommitCallbacks(execute=True):
-            delegate_to_update = SafeContractDelegateFactory()
+        delegate_to_update = SafeContractDelegateFactory()
         new_safe = SafeContractFactory()
         new_label = "Updated Label"
         new_expiry_date = timezone.now() + datetime.timedelta(minutes=5)
         delegate_to_update.safe_contract = new_safe
         delegate_to_update.label = new_label
         delegate_to_update.expiry_date = new_expiry_date
-        with self.captureOnCommitCallbacks(execute=True):
-            delegate_to_update.save()
+        delegate_to_update.save()
         updated_delegate_user_payload = {
             "type": TransactionServiceEventType.UPDATED_DELEGATE.name,
             "address": new_safe.address,
@@ -264,10 +256,8 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         send_event_mock.assert_called_with(updated_delegate_user_payload)
 
         # Deleted delegate should fire an event
-        with self.captureOnCommitCallbacks(execute=True):
-            delegate_to_delete = SafeContractDelegateFactory()
-        with self.captureOnCommitCallbacks(execute=True):
-            delegate_to_delete.delete()
+        delegate_to_delete = SafeContractDelegateFactory()
+        delegate_to_delete.delete()
         deleted_delegate_user_payload = {
             "type": TransactionServiceEventType.DELETED_DELEGATE.name,
             "address": delegate_to_delete.safe_contract.address,
