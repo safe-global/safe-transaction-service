@@ -821,7 +821,7 @@ class SafeEventsIndexer(EventsIndexer):
             if setup_event:
                 if not proxy_creation_event:
                     # SafeSetup without ProxyCreation means proxy was created in a previous block
-                    # ProxyCreation is also emitted when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emmited on v1.5.0.
+                    # ProxyCreation is also emitted when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emitted on v1.5.0.
                     logger.debug(
                         "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
                         safe_address,
