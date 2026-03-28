@@ -20,7 +20,7 @@ djangorestframework-camel-case==1.4.2
 docutils==0.22.4
 drf-spectacular==0.29.0
 flower==2.0.1
-gunicorn[gevent]==23.0.0
+gunicorn[gevent]==25.1.0
 orjson==3.11.7
 packaging>=21.0
 pillow==12.1.1
