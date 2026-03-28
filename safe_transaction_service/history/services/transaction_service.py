@@ -17,7 +17,9 @@ from hexbytes import HexBytes
 from redis import Redis
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.safe import SafeOperationEnum
 
+from safe_transaction_service.contracts.tx_decoder import get_tx_decoder
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.utils.redis import get_redis
 
@@ -65,6 +67,102 @@ class TransactionService:
         self.ethereum_client = ethereum_client
         self.redis = redis
         self.cache_expiration = settings.CACHE_ALL_TXS_VIEW
+
+    def _get_native_transfers_from_multisend(
+        self,
+        multisig_tx: MultisigTransaction,
+    ) -> list[TransferDict]:
+        """
+        Build synthetic ETHER_TRANSFER entries from decoded multiSend data.
+        Used when the chain does not index internal txs (e.g. Berachain, Scroll, Unichain),
+        so native transfers in batch txs would otherwise be missing from the API.
+        """
+        if not multisig_tx.data or not multisig_tx.ethereum_tx_id:
+            return []
+        if multisig_tx.operation != SafeOperationEnum.DELEGATE_CALL.value:
+            return []
+        ethereum_tx = multisig_tx.ethereum_tx
+        if not ethereum_tx or not getattr(ethereum_tx, "block", None):
+            return []
+        try:
+            decoded = get_tx_decoder().decode_multisend_data(multisig_tx.data)
+        except Exception:
+            return []
+        if not decoded:
+            return []
+        safe_address = multisig_tx.safe
+        if isinstance(safe_address, bytes):
+            safe_address = fast_to_checksum_address(safe_address)
+        block = ethereum_tx.block
+        execution_date = block.timestamp
+        block_number = block.number
+        tx_hash = multisig_tx.ethereum_tx_id
+        if isinstance(tx_hash, bytes):
+            pass
+        else:
+            tx_hash = HexBytes(tx_hash) if tx_hash else None
+        if not tx_hash:
+            return []
+        result: list[TransferDict] = []
+        for idx, item in enumerate(decoded):
+            operation = item.get("operation")
+            value_str = item.get("value")
+            to_addr = item.get("to")
+            if operation != 0:
+                continue
+            try:
+                value_int = int(value_str) if value_str else 0
+            except (TypeError, ValueError):
+                continue
+            if value_int <= 0 or not to_addr:
+                continue
+            to_checksum = (
+                fast_to_checksum_address(to_addr)
+                if isinstance(to_addr, bytes)
+                else to_addr
+            )
+            result.append(
+                {
+                    "block": block_number,
+                    "transaction_hash": tx_hash,
+                    "to": to_checksum,
+                    "_from": safe_address,
+                    "_value": value_int,
+                    "execution_date": execution_date,
+                    "_token_id": None,
+                    "token_address": None,
+                    "_log_index": None,
+                    "_trace_address": str(idx),
+                }
+            )
+        return result
+
+    def _enrich_transfers_from_multisend_decoded(
+        self,
+        safe_address: str,
+        ids_with_multisig_txs: dict,
+        transfer_dict: defaultdict,
+    ) -> defaultdict:
+        """
+        For multiSend txs that have no indexed native transfers (e.g. chains without
+        tracing), add synthetic ETHER_TRANSFER entries from decoded batch data.
+        """
+        for _tx_id, multisig_txs in ids_with_multisig_txs.items():
+            for multisig_tx in multisig_txs:
+                if multisig_tx.ethereum_tx_id is None:
+                    continue
+                tx_id = multisig_tx.ethereum_tx_id
+                existing = transfer_dict.get(tx_id, [])
+                ether_count = sum(1 for t in existing if t.get("token_address") is None)
+                if ether_count > 0:
+                    continue
+                synthetic = self._get_native_transfers_from_multisend(multisig_tx)
+                if not synthetic:
+                    continue
+                for t in synthetic:
+                    t["token"] = None
+                transfer_dict[tx_id].extend(synthetic)
+        return transfer_dict
 
     #  Cache methods ---------------------------------
     def get_cache_key(self, safe_address: str, tx_id: str):
@@ -277,6 +375,14 @@ class TransactionService:
 
         for transfer in transfers:
             transfer["token"] = tokens.get(transfer["token_address"])
+
+        # Enrich with native transfers from decoded multiSend when tracing didn't index them
+        # (e.g. on Berachain, Scroll, Unichain where internal txs may not be available)
+        transfer_dict = self._enrich_transfers_from_multisend_decoded(
+            safe_address,
+            ids_with_multisig_txs,
+            transfer_dict,
+        )
 
         # Build the list
         def get_the_transactions(
