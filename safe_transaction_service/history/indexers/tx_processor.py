@@ -158,6 +158,9 @@ class SafeTxProcessor(TxProcessor):
         self.safe_tx_success_events_topics = {
             event_abi_to_log_topic(event.abi) for event in self.safe_tx_success_events
         }
+        self.safe_tx_execution_events_topics = (
+            self.safe_tx_failure_events_topics | self.safe_tx_success_events_topics
+        )
         self.safe_tx_module_failure_topics = {
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
@@ -197,12 +200,10 @@ class SafeTxProcessor(TxProcessor):
         """
         # TODO Refactor this function to `Safe` in safe-eth-py, it doesn't belong here
         safe_tx_hash = HexBytes(safe_tx_hash)
-        all_execution_topics = (
-            self.safe_tx_failure_events_topics | self.safe_tx_success_events_topics
-        )
         for log in ethereum_tx.logs:
             if not (
-                log["topics"] and HexBytes(log["topics"][0]) in all_execution_topics
+                log["topics"]
+                and HexBytes(log["topics"][0]) in self.safe_tx_execution_events_topics
             ):
                 continue
 
