@@ -15,7 +15,7 @@ def set_failed_for_multisig_txs(apps, schema_editor):
     for multisig_tx in MultisigTransaction.objects.filter(failed=None).exclude(
         ethereum_tx=None
     ):
-        multisig_tx.failed = safe_tx_processor.is_failed(
+        multisig_tx.failed, _ = safe_tx_processor.get_execution_result(
             multisig_tx.ethereum_tx_id, multisig_tx.safe_tx_hash
         )
         multisig_tx.save(update_fields=["failed"])
