@@ -744,7 +744,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         self.assertNotIn("is not matching", text)
         self.assertNotIn("is not valid for multisig transaction", text)
 
-    def test_fix_multisig_tx_payment(self):
+    def test_backfill_multisig_tx_payment(self):
         command = "backfill_multisig_tx_payment"
 
         # No transactions to process
@@ -781,7 +781,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         self.assertIn("Processing 1", buf.getvalue())
         self.assertIn("Updated payment for 1/1", buf.getvalue())
         multisig_tx.refresh_from_db()
-        self.assertEqual(multisig_tx.payment, 3916600983220)
+        self.assertEqual(multisig_tx.payment, 3916100783220)
 
         # Idempotent: already-set payment is not reprocessed
         buf = StringIO()

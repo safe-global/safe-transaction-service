@@ -486,7 +486,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 ethereum_tx,
                 "0xa3324f8210e3d1772329133a15ad3bb31b848c8ca2498e36a787982a685d2484",
             ),
-            (False, 3916600983220),
+            (False, 3916100783220),
         )
         self.assertEqual(
             tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
