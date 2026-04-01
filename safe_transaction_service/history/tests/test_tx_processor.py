@@ -402,60 +402,69 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
 
     def test_tx_processor_get_execution_result(self):
         tx_processor = self.tx_processor
-        # keccak256("ExecutionFailure(bytes32,uint256)") — v1.3.0+
-        failure_topic = (
-            "0x23428b18acfb3ea64b08dc0c1d296ea9c09702c09083ca5272e64d115b687d23"
-        )
-        # keccak256("ExecutionSuccess(bytes32,uint256)") — v1.3.0+
-        success_topic = to_0x_hex_str(keccak(text="ExecutionSuccess(bytes32,uint256)"))
-        safe_tx_hash = (
-            "0x4c15b21b9c3b57aebba3c274bf0a437950bd0eea46bc7a7b2df892f91f720311"
-        )
         other_hash = to_0x_hex_str(fast_keccak_text("hola"))
-        payment_hex = (
-            "0000000000000000000000000000000000000000000000000000000000000064"  # 100
+
+        # ExecutionFailure v1.4.1 — indexed txHash in topics[1], payment=0 in data
+        logs = [
+            {
+                "topics": [
+                    "0x23428b18acfb3ea64b08dc0c1d296ea9c09702c09083ca5272e64d115b687d23",
+                    "0xd6dfcc85421ca06ca8501b3f3e843b6db54a291d4545377a0db34f79cb02e58c",
+                ],
+                "data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            }
+        ]
+        ethereum_tx = EthereumTxFactory(logs=logs)
+        self.assertEqual(
+            tx_processor.get_execution_result(
+                ethereum_tx,
+                "0xd6dfcc85421ca06ca8501b3f3e843b6db54a291d4545377a0db34f79cb02e58c",
+            ),
+            (True, 0),
+        )
+        self.assertEqual(
+            tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
         )
 
         # ExecutionFailure v1.3.0 — unindexed txHash, payment in data
         logs = [
             {
-                "data": safe_tx_hash + payment_hex,
-                "topics": [failure_topic],
+                "topics": [
+                    "0x23428b18acfb3ea64b08dc0c1d296ea9c09702c09083ca5272e64d115b687d23",
+                ],
+                "data": "0xb3418ba0a5d1af8a5e17b410e54f709e89ed6f45362ef772c12f70529c538ae7"
+                "0000000000000000000000000000000000000000000000000000023f62a7b29c",
             }
         ]
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, safe_tx_hash), (True, 100)
+            tx_processor.get_execution_result(
+                ethereum_tx,
+                "0xb3418ba0a5d1af8a5e17b410e54f709e89ed6f45362ef772c12f70529c538ae7",
+            ),
+            (True, 2471261352604),
         )
         self.assertEqual(
             tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
         )
 
-        # ExecutionFailure v1.4.1 — indexed txHash in topics[1], payment in data
+        # ExecutionSuccess v1.3.0 — unindexed txHash, payment=0 in data
         logs = [
             {
-                "data": payment_hex,
-                "topics": [failure_topic, safe_tx_hash],
+                "topics": [
+                    "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e",
+                ],
+                "data": "0x71a7bab18403a05d3ab369b3206ceaca9b4ab3e29d0b804ed7d05c6403a53df8"
+                "0000000000000000000000000000000000000000000000000000000000000000",
             }
         ]
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, safe_tx_hash), (True, 100)
-        )
-        self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
-        )
-
-        # ExecutionSuccess v1.3.0 — unindexed txHash, payment in data
-        logs = [
-            {
-                "data": safe_tx_hash + payment_hex,
-                "topics": [success_topic],
-            }
-        ]
-        ethereum_tx = EthereumTxFactory(logs=logs)
-        self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, safe_tx_hash), (False, 100)
+            tx_processor.get_execution_result(
+                ethereum_tx,
+                "0x71a7bab18403a05d3ab369b3206ceaca9b4ab3e29d0b804ed7d05c6403a53df8",
+            ),
+            (False, 0),
         )
         self.assertEqual(
             tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
@@ -464,13 +473,20 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         # ExecutionSuccess v1.4.1 — indexed txHash in topics[1], payment in data
         logs = [
             {
-                "data": payment_hex,
-                "topics": [success_topic, safe_tx_hash],
+                "topics": [
+                    "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e",
+                    "0xa3324f8210e3d1772329133a15ad3bb31b848c8ca2498e36a787982a685d2484",
+                ],
+                "data": "0x0000000000000000000000000000000000000000000000000000038fc9cbcc74",
             }
         ]
         ethereum_tx = EthereumTxFactory(logs=logs)
         self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, safe_tx_hash), (False, 100)
+            tx_processor.get_execution_result(
+                ethereum_tx,
+                "0xa3324f8210e3d1772329133a15ad3bb31b848c8ca2498e36a787982a685d2484",
+            ),
+            (False, 3916600983220),
         )
         self.assertEqual(
             tx_processor.get_execution_result(ethereum_tx, other_hash), (False, None)
@@ -479,7 +495,11 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         # No matching log → default
         ethereum_tx = EthereumTxFactory(logs=[])
         self.assertEqual(
-            tx_processor.get_execution_result(ethereum_tx, safe_tx_hash), (False, None)
+            tx_processor.get_execution_result(
+                ethereum_tx,
+                "0xa3324f8210e3d1772329133a15ad3bb31b848c8ca2498e36a787982a685d2484",
+            ),
+            (False, None),
         )
 
     def test_tx_is_version_breaking_signatures(self):
