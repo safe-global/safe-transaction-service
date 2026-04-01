@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.test import TestCase
 
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin

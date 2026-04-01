@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import factory
 from eth_account import Account
 from factory.django import DjangoModelFactory

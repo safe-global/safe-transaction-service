@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import dataclasses
 
 from eth_typing import ChecksumAddress

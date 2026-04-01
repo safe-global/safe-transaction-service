@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.http import HttpRequest
 
 from rest_framework.pagination import LimitOffsetPagination

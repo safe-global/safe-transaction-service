@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from safe_eth.eth.clients import ContractMetadata
 
 sourcify_metadata_mock = ContractMetadata(

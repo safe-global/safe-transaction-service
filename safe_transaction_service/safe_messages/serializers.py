@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import json
 from collections.abc import Sequence
 from typing import Any

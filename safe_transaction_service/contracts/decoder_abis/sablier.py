@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 sablier_ctoken_manager = [
     {
         "constant": True,

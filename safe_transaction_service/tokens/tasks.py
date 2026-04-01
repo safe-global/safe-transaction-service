@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from dataclasses import dataclass
 from datetime import datetime
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.core.management.base import BaseCommand
 
 from ...tasks import index_erc20_events_out_of_sync_task

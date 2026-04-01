@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 initializable_admin_upgradeability_proxy_abi = [
     {
         "anonymous": False,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 Store gunicorn variables in this file, so they can be read by Django
 """

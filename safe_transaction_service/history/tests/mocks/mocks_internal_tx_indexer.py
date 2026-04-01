@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from hexbytes import HexBytes
 
 # Only thing important for the trace filter are the `transactionHash` that will use to call `trace_transaction`

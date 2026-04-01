@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand

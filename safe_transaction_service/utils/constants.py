@@ -1,1 +1,2 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 SIGNATURE_LENGTH = 5_000

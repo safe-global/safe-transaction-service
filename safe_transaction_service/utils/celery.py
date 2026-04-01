@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from functools import wraps
 
 from celery.utils.log import get_task_logger

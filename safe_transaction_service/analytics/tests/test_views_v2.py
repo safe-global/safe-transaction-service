@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.contrib.auth.models import User
 from django.urls import reverse
 

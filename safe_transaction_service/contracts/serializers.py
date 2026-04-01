@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from rest_framework import serializers
 from safe_eth.eth.django.serializers import EthereumAddressField
 

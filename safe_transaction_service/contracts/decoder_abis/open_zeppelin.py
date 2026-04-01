@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 open_zeppelin_admin_upgradeability_proxy = [
     {
         "inputs": [
