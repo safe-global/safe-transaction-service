@@ -85,6 +85,7 @@ jobs:
         uv run python manage.py check
         uv run python manage.py makemigrations --check --dry-run
         uv run coverage run --source=$SOURCE_FOLDER -m pytest -rxXs --reruns 3
+        uv run coverage lcov -o coverage.lcov
       env:
         SOURCE_FOLDER: safe_transaction_service
         CELERY_BROKER_URL: redis://localhost:6379/0
@@ -101,6 +102,8 @@ jobs:
     - name: Coveralls
       if: github.ref != 'refs/heads/main' && github.event_name != 'release'
       uses: coverallsapp/github-action@v2
+      with:
+        file: coverage.lcov
   docker-deploy:
     runs-on: ubuntu-latest
     needs:
