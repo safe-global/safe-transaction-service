@@ -53,3 +53,17 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 
 ## Performance Conventions
 - Prefer `safe_eth.eth.utils.fast_to_checksum_address` and `fast_is_checksum_address` over `Web3.to_checksum_address` / `Web3.is_address` — the `fast_*` variants use `pysha3` for keccak256, making them significantly faster.
+
+## Event Log Parsing Conventions
+- `ExecutionSuccess` and `ExecutionFailure` events exist in two formats depending on Safe version:
+  - v1.3.0: `event ExecutionSuccess(bytes32 txHash, uint256 payment)` — txHash is the first 32 bytes of `data`, payment is the next 32 bytes.
+  - v1.4.1+: `event ExecutionSuccess(bytes32 indexed txHash, uint256 payment)` — txHash is `topics[1]`, payment is the first 32 bytes of `data`.
+- `SafeTxProcessor.get_execution_result(ethereum_tx, safe_tx_hash)` handles both formats in a single log scan and returns `(failed: bool, payment: int | None)`. Use this instead of separate failed/payment lookups.
+- `safe_tx_execution_events_topics` on `SafeTxProcessor` is the combined set of ExecutionSuccess + ExecutionFailure topics, precomputed in `__init__` for efficient log filtering.
+
+## Backfill Management Commands
+- Place one-off backfill commands in `safe_transaction_service/history/management/commands/`.
+- Name them `backfill_<thing>.py`.
+- Filter only rows that need updating (e.g. `payment__isnull=True`) so the command is idempotent.
+- Use `.iterator()` on the queryset to avoid loading all rows into memory; call `.count()` separately beforehand for progress reporting.
+- Log progress every 100 items and emit a final `self.style.SUCCESS(...)` summary.
