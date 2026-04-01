@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 aave_a_token = [
     {
         "inputs": [

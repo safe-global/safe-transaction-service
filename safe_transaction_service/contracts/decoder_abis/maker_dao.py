@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import json
 
 maker_dao_erc20_fee_proxy = json.loads(

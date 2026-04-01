@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from collections import OrderedDict
 from collections.abc import Generator, Iterable, Sequence
 from logging import getLogger

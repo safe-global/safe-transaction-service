@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from datetime import datetime
 
 from eth_typing import ChecksumAddress

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.contrib import admin
 
 from safe_transaction_service.utils.admin import AdvancedAdminSearchMixin

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Sequence

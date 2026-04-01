@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 dappcon_nft_metadata_mock = {
     "minted": "Minted on Mintbase.io",
     "image": "https://firebasestorage.googleapis.com/v0/b/thing-1d2be.appspot.com/o/token%2Fasset-1581932081565?alt=media&token=57b47904-1782-40e0-ab6d-4f8ca82e6884",

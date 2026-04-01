@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from config.gunicorn import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,

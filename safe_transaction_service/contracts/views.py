@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.core.cache import cache as django_cache
 
 import django_filters

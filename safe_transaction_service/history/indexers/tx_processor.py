@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 Contains classes for processing indexed data and store Safe related models in database
 """

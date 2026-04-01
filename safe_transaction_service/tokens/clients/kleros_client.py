@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from collections.abc import Sequence
 from dataclasses import dataclass
 

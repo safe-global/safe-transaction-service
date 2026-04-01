@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.test import TestCase
 
 from safe_eth.eth.account_abstraction import UserOperation as UserOperationClass

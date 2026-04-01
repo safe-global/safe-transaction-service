@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence

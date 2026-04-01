@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 mainnet_deployments_1_5_0_safe = {
     "contractName": "Safe",
     "address": "0xFf51A5898e281Db6DfC7855790607438dF2ca44b",

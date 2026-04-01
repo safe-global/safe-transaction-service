@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import django_filters
 from django_filters import rest_framework as filters
 from safe_eth.eth.django.filters import Keccak256Filter
