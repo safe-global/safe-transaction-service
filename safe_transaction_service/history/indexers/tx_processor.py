@@ -350,7 +350,7 @@ class SafeTxProcessor(TxProcessor):
         MultisigConfirmation.objects.remove_unused_confirmations(
             contract_address, safe_status.nonce, owner
         )
-        safe_message_models.SafeMessageConfirmation.objects.filter(owner=owner).delete()
+        safe_message_models.SafeMessageConfirmation.objects.filter(safe_message__safe=contract_address, owner=owner).delete()
 
     def disable_module(
         self,
@@ -857,6 +857,7 @@ class SafeTxProcessor(TxProcessor):
                 for safe_signature in SafeSignature.parse_signature(
                     safe_tx.signatures, safe_tx_hash
                 ):
+                    exported_signature = safe_signature.export_signature()
                     (
                         multisig_confirmation,
                         _,
@@ -867,14 +868,12 @@ class SafeTxProcessor(TxProcessor):
                             "created": internal_tx.timestamp,
                             "ethereum_tx": None,
                             "multisig_transaction": multisig_tx,
-                            "signature": safe_signature.export_signature(),
+                            "signature": exported_signature,
                             "signature_type": safe_signature.signature_type.value,
                         },
                     )
-                    if multisig_confirmation.signature != safe_signature.signature:
-                        multisig_confirmation.signature = (
-                            safe_signature.export_signature()
-                        )
+                    if HexBytes(multisig_confirmation.signature) != exported_signature:
+                        multisig_confirmation.signature = exported_signature
                         multisig_confirmation.signature_type = (
                             safe_signature.signature_type.value
                         )
@@ -884,11 +883,6 @@ class SafeTxProcessor(TxProcessor):
 
                 safe_last_status.nonce = nonce + 1
                 self.store_new_safe_status(safe_last_status, internal_tx, ["nonce"])
-            elif function_name == "execTransactionFromModule":
-                logger.debug(
-                    "[%s] Not processing execTransactionFromModule", contract_address
-                )
-                # No side effects or nonce increasing, but trace will be set as processed
             else:
                 processed_successfully = False
                 logger.warning(
