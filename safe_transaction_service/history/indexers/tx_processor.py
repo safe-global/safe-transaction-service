@@ -141,6 +141,11 @@ class SafeTxProcessor(TxProcessor):
             get_safe_V1_4_1_contract(dummy_w3).events.ExecutionFailure(),
             get_safe_V1_5_0_contract(dummy_w3).events.ExecutionFailure(),
         ]
+        self.safe_tx_success_events = [
+            get_safe_V1_3_0_contract(dummy_w3).events.ExecutionSuccess(),
+            get_safe_V1_4_1_contract(dummy_w3).events.ExecutionSuccess(),
+            get_safe_V1_5_0_contract(dummy_w3).events.ExecutionSuccess(),
+        ]
         self.safe_tx_module_failure_events = [
             get_safe_V1_3_0_contract(dummy_w3).events.ExecutionFromModuleFailure(),
             get_safe_V1_4_1_contract(dummy_w3).events.ExecutionFromModuleFailure(),
@@ -150,6 +155,12 @@ class SafeTxProcessor(TxProcessor):
         self.safe_tx_failure_events_topics = {
             event_abi_to_log_topic(event.abi) for event in self.safe_tx_failure_events
         }
+        self.safe_tx_success_events_topics = {
+            event_abi_to_log_topic(event.abi) for event in self.safe_tx_success_events
+        }
+        self.safe_tx_execution_events_topics = (
+            self.safe_tx_failure_events_topics | self.safe_tx_success_events_topics
+        )
         self.safe_tx_module_failure_topics = {
             event_abi_to_log_topic(event.abi)
             for event in self.safe_tx_module_failure_events
@@ -173,34 +184,57 @@ class SafeTxProcessor(TxProcessor):
             self.safe_last_status_cache.clear()
             return True
 
-    def is_failed(self, ethereum_tx: EthereumTx, safe_tx_hash: HexStr | bytes) -> bool:
+    def get_execution_result(
+        self, ethereum_tx: EthereumTx, safe_tx_hash: HexStr | bytes
+    ) -> tuple[bool, int | None]:
         """
-        Detects failure events on a Safe Multisig Tx
+        Scans transaction logs to determine whether a Safe multisig tx failed and
+        what payment was made to the executor.
+
+        Both ExecutionSuccess and ExecutionFailure carry a `payment` field representing
+        the gas refund paid by the Safe to the transaction executor.
 
         :param ethereum_tx:
         :param safe_tx_hash:
-        :return: True if a Multisig Transaction is failed, False otherwise
+        :return: (failed, payment) — payment is None when it cannot be recovered
         """
         # TODO Refactor this function to `Safe` in safe-eth-py, it doesn't belong here
         safe_tx_hash = HexBytes(safe_tx_hash)
         for log in ethereum_tx.logs:
-            if (
+            if not (
                 log["topics"]
-                and log["data"]
-                and HexBytes(log["topics"][0]) in self.safe_tx_failure_events_topics
+                and HexBytes(log["topics"][0]) in self.safe_tx_execution_events_topics
             ):
-                if (
-                    len(log["topics"]) == 2
-                    and HexBytes(log["topics"][1]) == safe_tx_hash
-                ):
-                    # On v1.4.1 safe_tx_hash is indexed, so it will be topic[1]
-                    # event ExecutionFailure(bytes32 indexed txHash, uint256 payment);
-                    return True
-                elif HexBytes(log["data"])[:32] == safe_tx_hash:
-                    # On v1.3.0 safe_tx_hash was not indexed, it was stored in the first 32 bytes, the rest is payment
-                    # event ExecutionFailure(bytes32 txHash, uint256 payment);
-                    return True
-        return False
+                continue
+
+            is_failure = (
+                HexBytes(log["topics"][0]) in self.safe_tx_failure_events_topics
+            )
+
+            if len(log["topics"]) == 2 and HexBytes(log["topics"][1]) == safe_tx_hash:
+                # On v1.4.1 safe_tx_hash is indexed, so it will be topic[1]
+                # event ExecutionSuccess(bytes32 indexed txHash, uint256 payment);
+                # event ExecutionFailure(bytes32 indexed txHash, uint256 payment);
+                data = HexBytes(log["data"]) if log["data"] else b""
+                payment = (
+                    int.from_bytes(data[:32], byteorder="big")
+                    if len(data) >= 32
+                    else None
+                )
+                return is_failure, payment
+            elif log["data"] and HexBytes(log["data"])[:32] == safe_tx_hash:
+                # On v1.3.0 safe_tx_hash was not indexed, it was stored in the first 32 bytes, the rest is payment
+                # event ExecutionSuccess(bytes32 txHash, uint256 payment);
+                # event ExecutionFailure(bytes32 txHash, uint256 payment);
+                data = HexBytes(log["data"])
+                payment = (
+                    int.from_bytes(data[32:64], byteorder="big")
+                    if len(data) >= 64
+                    else None
+                )
+                return is_failure, payment
+
+        return False, None
 
     def is_module_failed(
         self,
@@ -774,7 +808,7 @@ class SafeTxProcessor(TxProcessor):
                     to_0x_hex_str(safe_tx_hash),
                 )
 
-                failed = self.is_failed(ethereum_tx, safe_tx_hash)
+                failed, payment = self.get_execution_result(ethereum_tx, safe_tx_hash)
                 multisig_tx, _ = MultisigTransaction.objects.get_or_create(
                     safe_tx_hash=safe_tx_hash,
                     defaults={
@@ -793,6 +827,7 @@ class SafeTxProcessor(TxProcessor):
                         "nonce": safe_tx.safe_nonce,
                         "signatures": safe_tx.signatures,
                         "failed": failed,
+                        "payment": payment,
                         "trusted": True,
                     },
                 )
@@ -806,10 +841,17 @@ class SafeTxProcessor(TxProcessor):
                 if not multisig_tx.ethereum_tx_id:
                     multisig_tx.ethereum_tx = ethereum_tx
                     multisig_tx.failed = failed
+                    multisig_tx.payment = payment
                     multisig_tx.signatures = HexBytes(arguments["signatures"])
                     multisig_tx.trusted = True
                     multisig_tx.save(
-                        update_fields=["ethereum_tx", "failed", "signatures", "trusted"]
+                        update_fields=[
+                            "ethereum_tx",
+                            "failed",
+                            "payment",
+                            "signatures",
+                            "trusted",
+                        ]
                     )
 
                 for safe_signature in SafeSignature.parse_signature(

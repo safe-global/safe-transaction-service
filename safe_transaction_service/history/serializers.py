@@ -749,6 +749,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     max_priority_fee_per_gas = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
+    payment = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
@@ -776,10 +777,17 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         if obj.ethereum_tx_id:
             return obj.ethereum_tx._from
 
-    def get_fee(self, obj: MultisigTransaction) -> int | None:
+    def get_fee(self, obj: MultisigTransaction) -> str | None:
+        # Rough estimate of the network-level gas cost: gas_used * gas_price.
+        # This differs from `payment`, which is the exact refund paid by the Safe
+        # to the executor as emitted in the ExecutionSuccess/ExecutionFailure event.
         if obj.ethereum_tx:
             if obj.ethereum_tx.gas_used and obj.ethereum_tx.gas_price:
                 return str(obj.ethereum_tx.gas_used * obj.ethereum_tx.gas_price)
+
+    def get_payment(self, obj: MultisigTransaction) -> str | None:
+        if obj.payment is not None:
+            return str(obj.payment)
 
     def get_eth_gas_price(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx and obj.ethereum_tx.gas_price:

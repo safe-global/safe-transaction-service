@@ -27,6 +27,7 @@ from ..models import (
 from ..services import IndexServiceProvider
 from ..tasks import logger as task_logger
 from .factories import (
+    EthereumTxFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeContractFactory,
@@ -742,3 +743,83 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         )
         self.assertNotIn("is not matching", text)
         self.assertNotIn("is not valid for multisig transaction", text)
+
+    def test_backfill_multisig_tx_payment(self):
+        command = "backfill_multisig_tx_payment"
+
+        # No transactions to process
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Processing 0", buf.getvalue())
+
+        # Transaction without ethereum_tx is skipped
+        MultisigTransactionFactory(ethereum_tx=None)
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Processing 0", buf.getvalue())
+
+        # ExecutionSuccess v1.4.1 — indexed txHash in topics[1], payment in data
+        safe_tx_hash = (
+            "0xa3324f8210e3d1772329133a15ad3bb31b848c8ca2498e36a787982a685d2484"
+        )
+        ethereum_tx = EthereumTxFactory(
+            logs=[
+                {
+                    "topics": [
+                        "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e",
+                        safe_tx_hash,
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000000038fc9cbcc74",
+                }
+            ]
+        )
+        multisig_tx = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash, ethereum_tx=ethereum_tx
+        )
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Processing 1", buf.getvalue())
+        self.assertIn("Updated payment for 1/1", buf.getvalue())
+        multisig_tx.refresh_from_db()
+        self.assertEqual(multisig_tx.payment, 3916100783220)
+
+        # Idempotent: already-set payment is not reprocessed
+        buf = StringIO()
+        call_command(command, stdout=buf)
+        self.assertIn("Processing 0", buf.getvalue())
+
+        # ExecutionFailure v1.3.0 — unindexed txHash, payment in data
+        safe_tx_hash_2 = (
+            "0xb3418ba0a5d1af8a5e17b410e54f709e89ed6f45362ef772c12f70529c538ae7"
+        )
+        ethereum_tx_2 = EthereumTxFactory(
+            logs=[
+                {
+                    "topics": [
+                        "0x23428b18acfb3ea64b08dc0c1d296ea9c09702c09083ca5272e64d115b687d23",
+                    ],
+                    "data": (
+                        "0xb3418ba0a5d1af8a5e17b410e54f709e89ed6f45362ef772c12f70529c538ae7"
+                        "0000000000000000000000000000000000000000000000000000023f62a7b29c"
+                    ),
+                }
+            ]
+        )
+        multisig_tx_2 = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash_2, ethereum_tx=ethereum_tx_2
+        )
+
+        # Wrong safe address → skipped
+        buf = StringIO()
+        call_command(command, f"--safe-address={Account.create().address}", stdout=buf)
+        self.assertIn("Processing 0", buf.getvalue())
+        multisig_tx_2.refresh_from_db()
+        self.assertIsNone(multisig_tx_2.payment)
+
+        # Correct safe address → processed
+        buf = StringIO()
+        call_command(command, f"--safe-address={multisig_tx_2.safe}", stdout=buf)
+        self.assertIn("Processing 1", buf.getvalue())
+        self.assertIn("Updated payment for 1/1", buf.getvalue())
+        multisig_tx_2.refresh_from_db()
+        self.assertEqual(multisig_tx_2.payment, 2471261352604)
