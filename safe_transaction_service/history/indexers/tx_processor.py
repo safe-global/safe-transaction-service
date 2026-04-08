@@ -350,7 +350,9 @@ class SafeTxProcessor(TxProcessor):
         MultisigConfirmation.objects.remove_unused_confirmations(
             contract_address, safe_status.nonce, owner
         )
-        safe_message_models.SafeMessageConfirmation.objects.filter(safe_message__safe=contract_address, owner=owner).delete()
+        safe_message_models.SafeMessageConfirmation.objects.filter(
+            safe_message__safe=contract_address, owner=owner
+        ).delete()
 
     def disable_module(
         self,
@@ -692,23 +694,31 @@ class SafeTxProcessor(TxProcessor):
                     ethereum_tx, module_address, contract_address
                 )
                 module_data = HexBytes(arguments["data"])
-                ModuleTransaction.objects.get_or_create(
-                    internal_tx=internal_tx,
-                    defaults={
-                        "created": internal_tx.timestamp,
-                        "safe": contract_address,
-                        "module": module_address,
-                        "to": arguments["to"],
-                        "value": arguments["value"],
-                        "data": module_data if module_data else None,
-                        "operation": arguments["operation"],
-                        "failed": failed,
-                    },
+                ModuleTransaction.objects.bulk_create(
+                    [
+                        ModuleTransaction(
+                            internal_tx=internal_tx,
+                            created=internal_tx.timestamp,
+                            safe=contract_address,
+                            module=module_address,
+                            to=arguments["to"],
+                            value=arguments["value"],
+                            data=module_data if module_data else None,
+                            operation=arguments["operation"],
+                            failed=failed,
+                        )
+                    ],
+                    ignore_conflicts=True,
                 )
-                SafeRelevantTransaction.objects.get_or_create(
-                    ethereum_tx=ethereum_tx,
-                    safe=contract_address,
-                    defaults={"timestamp": internal_tx.timestamp},
+                SafeRelevantTransaction.objects.bulk_create(
+                    [
+                        SafeRelevantTransaction(
+                            ethereum_tx=ethereum_tx,
+                            safe=contract_address,
+                            timestamp=internal_tx.timestamp,
+                        )
+                    ],
+                    ignore_conflicts=True,
                 )
                 # Detect 4337 UserOperations in this transaction
                 number_detected_user_operations = (
@@ -831,10 +841,15 @@ class SafeTxProcessor(TxProcessor):
                         "trusted": True,
                     },
                 )
-                SafeRelevantTransaction.objects.get_or_create(
-                    ethereum_tx=ethereum_tx,
-                    safe=contract_address,
-                    defaults={"timestamp": internal_tx.timestamp},
+                SafeRelevantTransaction.objects.bulk_create(
+                    [
+                        SafeRelevantTransaction(
+                            ethereum_tx=ethereum_tx,
+                            safe=contract_address,
+                            timestamp=internal_tx.timestamp,
+                        )
+                    ],
+                    ignore_conflicts=True,
                 )
 
                 # Don't modify created
