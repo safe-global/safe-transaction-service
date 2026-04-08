@@ -21,3 +21,4 @@ docs
 # Other
 docker-compose.yml
 run_tests.sh
+.venv

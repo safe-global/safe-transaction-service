@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.db.models import Q
 
 import django_filters

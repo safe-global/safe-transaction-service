@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import itertools
 import json
@@ -102,6 +103,9 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
                 f"Transaction with safe-tx-hash={safe_tx_hash} was already executed"
             )
 
+        # Use it later in save()
+        self.multisig_transaction = multisig_transaction
+
         safe_address = multisig_transaction.safe
         ethereum_client = get_auto_ethereum_client()
         safe = Safe(safe_address, ethereum_client)
@@ -145,6 +149,10 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         return signature
 
     def save(self, **kwargs):
+        assert self.multisig_transaction, (
+            "MultisigTransaction must be stored by `validate_signature`"
+        )
+
         safe_tx_hash = self.context["safe_tx_hash"]
         signature = self.validated_data["signature"]
         multisig_confirmations = []
@@ -154,7 +162,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
                 multisig_transaction_hash=safe_tx_hash,
                 owner=safe_signature.owner,
                 defaults={
-                    "multisig_transaction_id": safe_tx_hash,
+                    "multisig_transaction": self.multisig_transaction,
                     "signature": safe_signature.export_signature(),
                     "signature_type": safe_signature.signature_type.value,
                 },
@@ -741,6 +749,7 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
     max_priority_fee_per_gas = serializers.SerializerMethodField()
     gas_used = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField()
+    payment = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
     data_decoded = serializers.SerializerMethodField()
     confirmations_required = serializers.IntegerField()
@@ -768,10 +777,17 @@ class SafeMultisigTransactionResponseSerializer(SafeMultisigTxSerializer):
         if obj.ethereum_tx_id:
             return obj.ethereum_tx._from
 
-    def get_fee(self, obj: MultisigTransaction) -> int | None:
+    def get_fee(self, obj: MultisigTransaction) -> str | None:
+        # Rough estimate of the network-level gas cost: gas_used * gas_price.
+        # This differs from `payment`, which is the exact refund paid by the Safe
+        # to the executor as emitted in the ExecutionSuccess/ExecutionFailure event.
         if obj.ethereum_tx:
             if obj.ethereum_tx.gas_used and obj.ethereum_tx.gas_price:
                 return str(obj.ethereum_tx.gas_used * obj.ethereum_tx.gas_price)
+
+    def get_payment(self, obj: MultisigTransaction) -> str | None:
+        if obj.payment is not None:
+            return str(obj.payment)
 
     def get_eth_gas_price(self, obj: MultisigTransaction) -> str | None:
         if obj.ethereum_tx and obj.ethereum_tx.gas_price:

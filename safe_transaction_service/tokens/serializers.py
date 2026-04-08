@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from enum import Enum
 
 from rest_framework import serializers

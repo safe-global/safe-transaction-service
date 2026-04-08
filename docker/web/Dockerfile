@@ -8,7 +8,13 @@ ENV PYTHONUNBUFFERED=1
 # `pysha3` is way faster than `pycryptodome` for CPython
 ENV ETH_HASH_BACKEND=pysha3
 
-COPY requirements.txt ./
+# Install uv — copy binary from official image, no pip bootstrap needed
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV VIRTUAL_ENV=${APP_HOME}/.venv
+ENV PATH="${APP_HOME}/.venv/bin:${PATH}"
+
+COPY pyproject.toml uv.lock ./
 RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
@@ -19,8 +25,7 @@ RUN set -ex \
     && apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends $buildDeps tmux postgresql-client \
-    && pip install -U --no-cache-dir wheel setuptools pip \
-    && pip install --no-cache-dir -r requirements.txt \
+    && uv sync --no-dev --frozen --no-install-project \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/*
 

@@ -12,11 +12,13 @@ def set_failed_for_multisig_txs(apps, schema_editor):
     # version than this migration expects. We use the historical version.
     safe_tx_processor = SafeTxProcessorProvider()
     MultisigTransaction = apps.get_model("history", "MultisigTransaction")
-    for multisig_tx in MultisigTransaction.objects.filter(failed=None).exclude(
-        ethereum_tx=None
+    for multisig_tx in (
+        MultisigTransaction.objects.filter(failed=None)
+        .exclude(ethereum_tx=None)
+        .select_related("ethereum_tx")
     ):
-        multisig_tx.failed = safe_tx_processor.is_failed(
-            multisig_tx.ethereum_tx_id, multisig_tx.safe_tx_hash
+        multisig_tx.failed, _ = safe_tx_processor.get_execution_result(
+            multisig_tx.ethereum_tx, multisig_tx.safe_tx_hash
         )
         multisig_tx.save(update_fields=["failed"])
 

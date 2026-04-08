@@ -1,6 +1,0 @@
--r requirements.txt
--r requirements-test.txt
-ipdb
-ipython
-pre-commit
-ruff

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.conf import settings
 from django.test import TestCase
 

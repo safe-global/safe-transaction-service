@@ -24,17 +24,12 @@ a transaction that is pending to be sent to the blockchain.
 - [Deploying the service](https://github.com/safe-global/safe-infrastructure)
 
 ## Setup for development
-Use a [virtualenv](https://docs.python.org/es/3/library/venv.html) if possible:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then install the
+dependencies (uv manages the virtualenv automatically):
 
 ```bash
-python -m venv venv
-```
-
-Then enter the `virtualenv` and install the dependencies:
-
-```bash
-source venv/bin/activate
-pip install -r requirements-dev.txt
+uv sync --group dev --frozen
+source .venv/bin/activate
 pre-commit install -f
 cp .env.dev .env
 ./run_tests.sh

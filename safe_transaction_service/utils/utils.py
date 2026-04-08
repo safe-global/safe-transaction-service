@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import socket
 from collections.abc import Iterable

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 request_erc20_proxy = [
     {
         "anonymous": False,

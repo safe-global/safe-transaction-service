@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 # flake8: noqa F401
 from .balance_service import BalanceService, BalanceServiceProvider
 from .collectibles_service import CollectiblesService, CollectiblesServiceProvider

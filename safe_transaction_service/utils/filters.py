@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import django_filters
 from safe_eth.eth.django.filters import EthereumAddressFilter, Keccak256Filter
 from safe_eth.eth.django.models import (

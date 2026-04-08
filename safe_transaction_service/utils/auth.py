@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.conf import settings
 from django.contrib.auth.backends import RemoteUserBackend
 from django.contrib.auth.middleware import RemoteUserMiddleware

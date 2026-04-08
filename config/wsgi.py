@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 WSGI config for Safe Transaction Service project.
 

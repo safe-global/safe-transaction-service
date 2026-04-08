@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from django.conf import settings
 from django.conf.urls import include
 from django.contrib import admin

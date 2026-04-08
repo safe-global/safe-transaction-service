@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 Base settings to build other settings files upon.
 """

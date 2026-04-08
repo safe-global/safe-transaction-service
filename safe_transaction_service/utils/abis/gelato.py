@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 gelato_relay_1_balance_v2_abi = [
     {
         "anonymous": False,

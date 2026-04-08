@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 # Wrapped token list on https://wispy-bird-88a7.uniswap.workers.dev/?url=http://wrapped.tokensoft.eth.link
 token_list_mock = {
     "name": "Wrapped Tokens",

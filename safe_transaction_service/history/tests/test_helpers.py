@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from unittest.mock import MagicMock
 
 from django.test import TestCase

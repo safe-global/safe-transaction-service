@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from hexbytes import HexBytes
 from safe_eth.eth.tests.mocks.mock_internal_txs import creation_internal_txs  # noqa
 

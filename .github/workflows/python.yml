@@ -17,14 +17,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - name: Install dependencies
-        run: pip install pre-commit
+        run: uv sync --group dev --frozen --no-install-project
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
         env:
           SKIP: insert-license
 
@@ -70,23 +72,20 @@ jobs:
         docker network create ganache
         docker run --detach --publish 8545:8545 --network ganache -e DOCKER=true trufflesuite/ganache:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --chain.chainId 1337 --chain.networkId 1337 -d
     - uses: actions/checkout@v6
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: 'requirements*.txt'
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
     - name: Install dependencies
-      run: |
-        pip install wheel setuptools
-        pip install -r requirements-test.txt
-      env:
-        PIP_USE_MIRRORS: true
+      run: uv sync --group dev --frozen --no-install-project
     - name: Run tests and coverage
       run: |
-        python manage.py check
-        python manage.py makemigrations --check --dry-run
-        coverage run --source=$SOURCE_FOLDER -m pytest -rxXs --reruns 3
+        uv run python manage.py check
+        uv run python manage.py makemigrations --check --dry-run
+        uv run coverage run --source=$SOURCE_FOLDER -m pytest -rxXs --reruns 3
+        uv run coverage lcov -o coverage.lcov
       env:
         SOURCE_FOLDER: safe_transaction_service
         CELERY_BROKER_URL: redis://localhost:6379/0
@@ -103,6 +102,8 @@ jobs:
     - name: Coveralls
       if: github.ref != 'refs/heads/main' && github.event_name != 'release'
       uses: coverallsapp/github-action@v2
+      with:
+        file: coverage.lcov
   docker-deploy:
     runs-on: ubuntu-latest
     needs:
@@ -111,18 +112,18 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.event_name == 'release' && github.event.action == 'released')
     steps:
     - uses: actions/checkout@v6
-    - uses: docker/setup-qemu-action@v3
+    - uses: docker/setup-qemu-action@v4
       with:
         platforms: arm64
-    - uses: docker/setup-buildx-action@v3
+    - uses: docker/setup-buildx-action@v4
     - name: Dockerhub login
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     - name: Deploy Master
       if: github.ref == 'refs/heads/main'
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: docker/web/Dockerfile
@@ -135,7 +136,7 @@ jobs:
         cache-to: type=gha,mode=max
     - name: Deploy Develop
       if: github.ref == 'refs/heads/develop'
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: docker/web/Dockerfile
@@ -148,7 +149,7 @@ jobs:
         cache-to: type=gha,mode=max
     - name: Deploy Tag
       if: (github.event_name == 'release' && github.event.action == 'released')
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: docker/web/Dockerfile

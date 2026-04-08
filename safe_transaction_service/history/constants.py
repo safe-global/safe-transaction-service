@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from eth_utils import event_abi_to_log_topic
 from safe_eth.eth.contracts import get_proxy_factory_V1_4_1_contract
 from web3 import Web3

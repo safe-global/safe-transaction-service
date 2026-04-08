@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from hexbytes import HexBytes
 
 aa_chain_id = 11155111
