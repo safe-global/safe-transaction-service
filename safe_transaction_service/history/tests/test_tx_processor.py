@@ -168,12 +168,12 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             multisig_transaction__nonce=safe_status.nonce + 1,
             multisig_transaction__safe=safe_address,
         )
-        # This will be deleted
+        # This won't be deleted: message belongs to a different Safe, deletion is scoped to safe_address
         safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
         unused_message_confirmation = SafeMessageConfirmationFactory(
             owner=another_owner, safe_message=safe_message
         )
-        # This won't be deleted
+        # This won't be deleted either
         unused_message_confirmation_2 = SafeMessageConfirmationFactory(
             safe_message=unused_message_confirmation.safe_message
         )
@@ -210,7 +210,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             MultisigConfirmation.objects.count(), number_confirmations + 1 - 1
         )
         unused_multisig_confirmation.multisig_transaction.delete()  # Remove this transaction inserted manually
-        self.assertEqual(SafeMessageConfirmation.objects.count(), 1)
+        # Both confirmations remain: deletion is scoped to safe_address, but this message belongs to a different Safe
+        self.assertEqual(SafeMessageConfirmation.objects.count(), 2)
         self.assertTrue(
             SafeMessageConfirmation.objects.filter(
                 owner=unused_message_confirmation_2.owner
