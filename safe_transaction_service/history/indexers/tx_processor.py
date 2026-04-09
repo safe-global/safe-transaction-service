@@ -98,7 +98,7 @@ class SafeTxProcessorProvider:
 
 class TxProcessor(ABC):
     @abstractmethod
-    def process_decoded_transaction(
+    def _process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
     ) -> bool:
         pass
@@ -107,7 +107,7 @@ class TxProcessor(ABC):
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
         return [
-            self.process_decoded_transaction(decoded_transaction)
+            self._process_decoded_transaction(decoded_transaction)
             for decoded_transaction in internal_txs_decoded
         ]
 
@@ -449,7 +449,7 @@ class SafeTxProcessor(TxProcessor):
         return safe_last_status
 
     @transaction.atomic
-    def process_decoded_transaction(
+    def _process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
     ) -> bool:
         contract_address = internal_tx_decoded.internal_tx._from

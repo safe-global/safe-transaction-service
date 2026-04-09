@@ -68,7 +68,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         master_copy = Account.create().address
         threshold = 1
         self.assertEqual(SafeRelevantTransaction.objects.count(), 0)
-        tx_processor.process_decoded_transaction(
+        tx_processor._process_decoded_transaction(
             InternalTxDecodedFactory(
                 function_name="setup",
                 owner=owner,
@@ -537,7 +537,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         safe_1_1_0_master_copy = SafeMasterCopyFactory(version="1.1.0")
         safe_1_2_0_master_copy = SafeMasterCopyFactory(version="1.2.0")
         safe_1_3_0_master_copy = SafeMasterCopyFactory(version="1.3.0")
-        tx_processor.process_decoded_transaction(
+        tx_processor._process_decoded_transaction(
             InternalTxDecodedFactory(
                 function_name="setup",
                 owner=owner,
@@ -606,7 +606,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         with self.assertRaises(
             CannotFindPreviousTrace
         ):  # trace_transaction not supported
-            safe_tx_processor.process_decoded_transaction(module_internal_tx_decoded)
+            safe_tx_processor._process_decoded_transaction(module_internal_tx_decoded)
             self.assertEqual(ModuleTransaction.objects.count(), 0)
 
         with mock.patch.object(
@@ -615,7 +615,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             autospec=True,
             return_value=module_traces,
         ):
-            safe_tx_processor.process_decoded_transaction(module_internal_tx_decoded)
+            safe_tx_processor._process_decoded_transaction(module_internal_tx_decoded)
             self.assertEqual(ModuleTransaction.objects.count(), 1)
             module_tx = ModuleTransaction.objects.get()
             self.assertEqual(
@@ -646,7 +646,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         )
 
         with self.assertRaises(ModuleCannotBeDisabled):
-            safe_tx_processor.process_decoded_transaction(disable_module_tx_decoded)
+            safe_tx_processor._process_decoded_transaction(disable_module_tx_decoded)
 
         enable_module_tx_decoded = InternalTxDecodedFactory(
             function_name="enableModule",
@@ -655,12 +655,12 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             internal_tx__value=0,
         )
         self.assertTrue(
-            safe_tx_processor.process_decoded_transaction(enable_module_tx_decoded)
+            safe_tx_processor._process_decoded_transaction(enable_module_tx_decoded)
         )
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_last_status.enabled_modules, [module])
         self.assertTrue(
-            safe_tx_processor.process_decoded_transaction(disable_module_tx_decoded)
+            safe_tx_processor._process_decoded_transaction(disable_module_tx_decoded)
         )
         safe_last_status = SafeLastStatus.objects.get(address=safe_address)
         self.assertEqual(safe_last_status.enabled_modules, [])
