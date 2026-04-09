@@ -98,18 +98,10 @@ class SafeTxProcessorProvider:
 
 class TxProcessor(ABC):
     @abstractmethod
-    def process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        pass
-
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
-        return [
-            self.process_decoded_transaction(decoded_transaction)
-            for decoded_transaction in internal_txs_decoded
-        ]
+        pass
 
 
 class SafeTxProcessor(TxProcessor):
@@ -262,6 +254,46 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
+    def _get_previous_trace(self, internal_tx: InternalTx):
+        """
+        Fetches the previous trace for a given InternalTx using the tracing client.
+
+        :param internal_tx:
+        :return: Previous trace
+        :raises CannotFindPreviousTrace: If the tracing client is not configured, the RPC
+            call fails, or no previous trace exists
+        """
+        contract_address = internal_tx._from
+        if not self.ethereum_tracing_client:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}: "
+                f"ethereum tracing client is not configured"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        try:
+            previous_trace = self.ethereum_tracing_client.tracing.get_previous_trace(
+                internal_tx.ethereum_tx_id,
+                internal_tx.trace_address_as_list,
+                skip_delegate_calls=True,
+            )
+        except Web3RPCError:
+            previous_trace = None
+
+        if not previous_trace:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        return previous_trace
+
     def get_safe_version_from_master_copy(
         self, master_copy: ChecksumAddress
     ) -> str | None:
@@ -409,21 +441,6 @@ class SafeTxProcessor(TxProcessor):
         return safe_last_status
 
     @transaction.atomic
-    def process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        contract_address = internal_tx_decoded.internal_tx._from
-        self.clear_cache(safe_address=contract_address)
-        try:
-            processed_successfully = self.__process_decoded_transaction(
-                internal_tx_decoded
-            )
-            internal_tx_decoded.set_processed()
-        finally:
-            self.clear_cache(safe_address=contract_address)
-        return processed_successfully
-
-    @transaction.atomic
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
@@ -466,10 +483,12 @@ class SafeTxProcessor(TxProcessor):
                             contract_address,
                         )
                         raise
-                    except TxProcessorException:
+                    except TxProcessorException as exc:
                         logger.error(
-                            "[%s] Problem processing internal txs for Safe, ignoring",
+                            "[%s] Problem processing internal txs for Safe, ignoring: %s - %s",
                             contract_address,
+                            exc.__class__.__name__,
+                            exc,
                         )
                         results.append(False)
 
@@ -665,25 +684,7 @@ class SafeTxProcessor(TxProcessor):
                     # Regular Safe indexed using tracing
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                     # The trace that is being processed is the last one, so indexer needs to get the previous trace
-                    try:
-                        previous_trace = (
-                            self.ethereum_tracing_client.tracing.get_previous_trace(
-                                internal_tx.ethereum_tx_id,
-                                internal_tx.trace_address_as_list,
-                                skip_delegate_calls=True,
-                            )
-                        )
-                    except Web3RPCError:
-                        previous_trace = None
-
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for "
-                            f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
-                            f"and trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     module_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
@@ -720,16 +721,15 @@ class SafeTxProcessor(TxProcessor):
                     ],
                     ignore_conflicts=True,
                 )
-                # Detect 4337 UserOperations in this transaction
-                number_detected_user_operations = (
-                    self.aa_processor_service.process_aa_transaction(
+                # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block.
+                # robust=True ensures an exception from one callback does not abort sibling callbacks
+                # registered for the same atomic block — without it a failing process_aa_transaction
+                # would silently skip all later 4337 UserOperation callbacks in the same batch.
+                transaction.on_commit(
+                    lambda: self.aa_processor_service.process_aa_transaction(
                         contract_address, ethereum_tx
-                    )
-                )
-                logger.debug(
-                    "[%s] Detected %d 4337 transaction(s)",
-                    contract_address,
-                    number_detected_user_operations,
+                    ),
+                    robust=True,
                 )
 
             elif function_name == "approveHash":
@@ -738,20 +738,7 @@ class SafeTxProcessor(TxProcessor):
                 if "owner" in arguments:  # Event approveHash
                     owner = arguments["owner"]
                 else:
-                    previous_trace = (
-                        self.ethereum_tracing_client.tracing.get_previous_trace(
-                            internal_tx.ethereum_tx_id,
-                            internal_tx.trace_address_as_list,
-                            skip_delegate_calls=True,
-                        )
-                    )
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} and "
-                            f"trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     previous_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
