@@ -262,6 +262,46 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
+    def _get_previous_trace(self, internal_tx: InternalTx):
+        """
+        Fetches the previous trace for a given InternalTx using the tracing client.
+
+        :param internal_tx:
+        :return: Previous trace
+        :raises CannotFindPreviousTrace: If the tracing client is not configured, the RPC
+            call fails, or no previous trace exists
+        """
+        contract_address = internal_tx._from
+        if not self.ethereum_tracing_client:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}: "
+                f"ethereum tracing client is not configured"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        try:
+            previous_trace = self.ethereum_tracing_client.tracing.get_previous_trace(
+                internal_tx.ethereum_tx_id,
+                internal_tx.trace_address_as_list,
+                skip_delegate_calls=True,
+            )
+        except Web3RPCError:
+            previous_trace = None
+
+        if not previous_trace:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        return previous_trace
+
     def get_safe_version_from_master_copy(
         self, master_copy: ChecksumAddress
     ) -> str | None:
@@ -665,25 +705,7 @@ class SafeTxProcessor(TxProcessor):
                     # Regular Safe indexed using tracing
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                     # The trace that is being processed is the last one, so indexer needs to get the previous trace
-                    try:
-                        previous_trace = (
-                            self.ethereum_tracing_client.tracing.get_previous_trace(
-                                internal_tx.ethereum_tx_id,
-                                internal_tx.trace_address_as_list,
-                                skip_delegate_calls=True,
-                            )
-                        )
-                    except Web3RPCError:
-                        previous_trace = None
-
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for "
-                            f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
-                            f"and trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     module_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
@@ -738,20 +760,7 @@ class SafeTxProcessor(TxProcessor):
                 if "owner" in arguments:  # Event approveHash
                     owner = arguments["owner"]
                 else:
-                    previous_trace = (
-                        self.ethereum_tracing_client.tracing.get_previous_trace(
-                            internal_tx.ethereum_tx_id,
-                            internal_tx.trace_address_as_list,
-                            skip_delegate_calls=True,
-                        )
-                    )
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} and "
-                            f"trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     previous_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
