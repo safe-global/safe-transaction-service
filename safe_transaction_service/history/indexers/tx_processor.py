@@ -742,16 +742,11 @@ class SafeTxProcessor(TxProcessor):
                     ],
                     ignore_conflicts=True,
                 )
-                # Detect 4337 UserOperations in this transaction
-                number_detected_user_operations = (
-                    self.aa_processor_service.process_aa_transaction(
+                # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block
+                transaction.on_commit(
+                    lambda: self.aa_processor_service.process_aa_transaction(
                         contract_address, ethereum_tx
                     )
-                )
-                logger.debug(
-                    "[%s] Detected %d 4337 transaction(s)",
-                    contract_address,
-                    number_detected_user_operations,
                 )
 
             elif function_name == "approveHash":
