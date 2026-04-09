@@ -1120,6 +1120,21 @@ class TestSafeContract(TestCase):
             block_number_3,
         )
 
+    def test_upsert_from_ethereum_tx_hash(self):
+        address = Account.create().address
+        ethereum_tx = EthereumTxFactory()
+
+        # Record does not exist → inserts
+        SafeContract.objects.upsert_from_ethereum_tx_hash(address, ethereum_tx.tx_hash)
+        safe_contract = SafeContract.objects.get(address=address)
+        self.assertEqual(safe_contract.ethereum_tx_id, ethereum_tx.tx_hash)
+
+        # Record already exists → updates ethereum_tx_id
+        another_tx = EthereumTxFactory()
+        SafeContract.objects.upsert_from_ethereum_tx_hash(address, another_tx.tx_hash)
+        safe_contract.refresh_from_db()
+        self.assertEqual(safe_contract.ethereum_tx_id, another_tx.tx_hash)
+
 
 class TestSafeContractDelegate(TestCase):
     def test_get_for_safe(self):
