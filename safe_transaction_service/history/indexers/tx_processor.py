@@ -98,18 +98,10 @@ class SafeTxProcessorProvider:
 
 class TxProcessor(ABC):
     @abstractmethod
-    def _process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        pass
-
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
-        return [
-            self._process_decoded_transaction(decoded_transaction)
-            for decoded_transaction in internal_txs_decoded
-        ]
+        pass
 
 
 class SafeTxProcessor(TxProcessor):
@@ -449,21 +441,6 @@ class SafeTxProcessor(TxProcessor):
         return safe_last_status
 
     @transaction.atomic
-    def _process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        contract_address = internal_tx_decoded.internal_tx._from
-        self.clear_cache(safe_address=contract_address)
-        try:
-            processed_successfully = self.__process_decoded_transaction(
-                internal_tx_decoded
-            )
-            internal_tx_decoded.set_processed()
-        finally:
-            self.clear_cache(safe_address=contract_address)
-        return processed_successfully
-
-    @transaction.atomic
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
@@ -506,10 +483,12 @@ class SafeTxProcessor(TxProcessor):
                             contract_address,
                         )
                         raise
-                    except TxProcessorException:
+                    except TxProcessorException as exc:
                         logger.error(
-                            "[%s] Problem processing internal txs for Safe, ignoring",
+                            "[%s] Problem processing internal txs for Safe, ignoring: %s - %s",
                             contract_address,
+                            exc.__class__.__name__,
+                            exc,
                         )
                         results.append(False)
 
