@@ -73,29 +73,31 @@ def bind_confirmation(
         )
         if updated:
             # Update modified on MultisigTransaction if at least one confirmation is added. Tx will now be trusted
-            instance.modified = timezone.now()
+            now = timezone.now()
+            MultisigTransaction.objects.filter(pk=instance.safe_tx_hash).update(
+                modified=now, trusted=True
+            )
+            # Keep the in-memory instance in sync so subsequent signal handlers
+            # (e.g. process_event → is_relevant_event) see the updated state.
             instance.trusted = True
-            instance.save(update_fields=["modified", "trusted"])
+            instance.modified = now
     elif sender == MultisigConfirmation:
         if instance.multisig_transaction_id:
             # Update modified on MultisigTransaction if one confirmation is added. Tx will now be trusted
             MultisigTransaction.objects.filter(
+                safe_tx_hash=instance.multisig_transaction_id
+            ).update(modified=instance.created, trusted=True)
+        elif instance.multisig_transaction_hash:
+            MultisigTransaction.objects.filter(
                 safe_tx_hash=instance.multisig_transaction_hash
             ).update(modified=instance.created, trusted=True)
-        else:
-            try:
-                if instance.multisig_transaction_hash:
-                    multisig_transaction = MultisigTransaction.objects.get(
-                        safe_tx_hash=instance.multisig_transaction_hash
-                    )
-                    multisig_transaction.modified = instance.created
-                    multisig_transaction.trusted = True
-                    multisig_transaction.save(update_fields=["modified", "trusted"])
-
-                    instance.multisig_transaction = multisig_transaction
-                    instance.save(update_fields=["multisig_transaction"])
-            except MultisigTransaction.DoesNotExist:
-                pass
+            # Use a subquery so the FK update only runs if the MultisigTransaction
+            # exists, regardless of whether the previous update changed any values
+            MultisigConfirmation.objects.filter(pk=instance.pk).filter(
+                multisig_transaction_hash__in=MultisigTransaction.objects.filter(
+                    safe_tx_hash=instance.multisig_transaction_hash
+                ).values("safe_tx_hash")
+            ).update(multisig_transaction_id=instance.multisig_transaction_hash)
 
 
 @receiver(
@@ -105,7 +107,7 @@ def bind_confirmation(
 )
 def safe_master_copy_clear_cache(
     sender: type[Model],
-    instance: MultisigConfirmation | MultisigTransaction,
+    instance: SafeMasterCopy,
     created: bool,
     **kwargs,
 ) -> None:
