@@ -568,19 +568,9 @@ class SafeTxProcessor(TxProcessor):
             threshold = arguments["_threshold"]
             fallback_handler = arguments.get("fallbackHandler", NULL_ADDRESS)
             nonce = 0
-            try:
-                safe_contract: SafeContract = SafeContract.objects.get(
-                    address=contract_address
-                )
-                if not safe_contract.ethereum_tx_id:
-                    safe_contract.ethereum_tx = internal_tx.ethereum_tx
-                    safe_contract.save(update_fields=["ethereum_tx"])
-            except SafeContract.DoesNotExist:
-                SafeContract.objects.create(
-                    address=contract_address,
-                    ethereum_tx=internal_tx.ethereum_tx,
-                )
-                logger.info("Found new Safe=%s", contract_address)
+            SafeContract.objects.upsert_from_ethereum_tx_hash(
+                contract_address, internal_tx.ethereum_tx_id
+            )
 
             self.store_new_safe_status(
                 SafeLastStatus(
