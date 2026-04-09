@@ -721,11 +721,15 @@ class SafeTxProcessor(TxProcessor):
                     ],
                     ignore_conflicts=True,
                 )
-                # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block
+                # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block.
+                # robust=True ensures an exception from one callback does not abort sibling callbacks
+                # registered for the same atomic block — without it a failing process_aa_transaction
+                # would silently skip all later 4337 UserOperation callbacks in the same batch.
                 transaction.on_commit(
                     lambda: self.aa_processor_service.process_aa_transaction(
                         contract_address, ethereum_tx
-                    )
+                    ),
+                    robust=True,
                 )
 
             elif function_name == "approveHash":
