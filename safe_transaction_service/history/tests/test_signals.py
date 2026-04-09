@@ -11,6 +11,7 @@ from django.utils import timezone
 import factory
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
+from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
@@ -206,6 +207,41 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(deleted_multisig_transaction_payload)
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_pending_event_emitted_when_tx_bound_to_existing_confirmations(
+        self, send_event_mock: MagicMock
+    ):
+        """
+        When a MultisigTransaction is created with trusted=False but unlinked
+        confirmations already exist, bind_confirmation promotes it to trusted=True
+        in the DB. The in-memory instance must also be updated so the subsequent
+        process_event signal handler emits PENDING_MULTISIG_TRANSACTION.
+        """
+        known_hash = to_0x_hex_str(fast_keccak_text("bind-test-tx-pending-event"))
+
+        # Create the confirmation before the transaction exists (unlinked).
+        # Mute signals so this creation doesn't interfere with the mock state.
+        with factory.django.mute_signals(post_save):
+            MultisigConfirmationFactory(
+                multisig_transaction=None,
+                multisig_transaction_hash=known_hash,
+            )
+        send_event_mock.assert_not_called()
+
+        # Now create the transaction with trusted=False.  bind_confirmation should
+        # find the orphaned confirmation, set trusted=True in the DB *and* on the
+        # in-memory instance so process_event can emit the notification.
+        MultisigTransactionFactory(
+            trusted=False, ethereum_tx=None, safe_tx_hash=known_hash
+        )
+
+        emitted_types = [
+            call.args[0]["type"] for call in send_event_mock.call_args_list
+        ]
+        self.assertIn(
+            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name, emitted_types
+        )
 
     @mock.patch.object(QueueService, "send_event")
     def test_delegates_signals_are_correctly_fired(self, send_event_mock: MagicMock):
