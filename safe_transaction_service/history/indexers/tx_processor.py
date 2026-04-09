@@ -3,6 +3,7 @@
 Contains classes for processing indexed data and store Safe related models in database
 """
 
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -69,6 +70,14 @@ class CannotFindPreviousTrace(TxProcessorException):
 
 class UserOperationFailed(TxProcessorException):
     pass
+
+
+@dataclasses.dataclass
+class ProcessedResult:
+    processed: bool
+    safe_relevant_transactions: list[SafeRelevantTransaction] = dataclasses.field(
+        default_factory=list
+    )
 
 
 class SafeTxProcessorProvider:
@@ -455,6 +464,7 @@ class SafeTxProcessor(TxProcessor):
             return results
 
         internal_tx_ids = []
+        safe_relevant_txs: list[SafeRelevantTransaction] = []
         contract_addresses = {
             internal_tx_decoded.internal_tx._from
             for internal_tx_decoded in internal_txs_decoded
@@ -475,8 +485,13 @@ class SafeTxProcessor(TxProcessor):
                     results.append(False)
                 else:
                     try:
-                        result = self.__process_decoded_transaction(internal_tx_decoded)
-                        results.append(result)
+                        processed_result = self.__process_decoded_transaction(
+                            internal_tx_decoded
+                        )
+                        results.append(processed_result.processed)
+                        safe_relevant_txs.extend(
+                            processed_result.safe_relevant_transactions
+                        )
                     except CannotFindPreviousTrace:
                         logger.critical(
                             "[%s] There's a problem with the RPC, it needs to be checked",
@@ -492,6 +507,14 @@ class SafeTxProcessor(TxProcessor):
                         )
                         results.append(False)
 
+            # Insert at the very end to minimize the lock window: erc20_events_indexer
+            # inserts the same (ethereum_tx, safe) unique key, so inserting here means
+            # the conflict lock is held only until commit, not for the full batch duration.
+            if safe_relevant_txs:
+                SafeRelevantTransaction.objects.bulk_create(
+                    safe_relevant_txs, ignore_conflicts=True
+                )
+
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
                 processed=True
@@ -503,11 +526,11 @@ class SafeTxProcessor(TxProcessor):
 
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
+    ) -> ProcessedResult:
         """
         Decode internal tx and creates needed models
         :param internal_tx_decoded: InternalTxDecoded to process. It will be set as `processed`
-        :return: True if tx could be processed, False otherwise
+        :return: ProcessedResult with whether the tx was processed and any SafeRelevantTransaction to insert
         """
         internal_tx = internal_tx_decoded.internal_tx
         ethereum_tx = internal_tx.ethereum_tx
@@ -531,11 +554,12 @@ class SafeTxProcessor(TxProcessor):
                 contract_address,
                 internal_tx.gas_used,
             )
-            return False
+            return ProcessedResult(processed=False)
 
         arguments = internal_tx_decoded.arguments
         master_copy = internal_tx.to
         processed_successfully = True
+        safe_relevant_txs: list[SafeRelevantTransaction] = []
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -711,15 +735,12 @@ class SafeTxProcessor(TxProcessor):
                     ],
                     ignore_conflicts=True,
                 )
-                SafeRelevantTransaction.objects.bulk_create(
-                    [
-                        SafeRelevantTransaction(
-                            ethereum_tx=ethereum_tx,
-                            safe=contract_address,
-                            timestamp=internal_tx.timestamp,
-                        )
-                    ],
-                    ignore_conflicts=True,
+                safe_relevant_txs.append(
+                    SafeRelevantTransaction(
+                        ethereum_tx=ethereum_tx,
+                        safe=contract_address,
+                        timestamp=internal_tx.timestamp,
+                    )
                 )
                 # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block.
                 # robust=True ensures an exception from one callback does not abort sibling callbacks
@@ -828,15 +849,12 @@ class SafeTxProcessor(TxProcessor):
                         "trusted": True,
                     },
                 )
-                SafeRelevantTransaction.objects.bulk_create(
-                    [
-                        SafeRelevantTransaction(
-                            ethereum_tx=ethereum_tx,
-                            safe=contract_address,
-                            timestamp=internal_tx.timestamp,
-                        )
-                    ],
-                    ignore_conflicts=True,
+                safe_relevant_txs.append(
+                    SafeRelevantTransaction(
+                        ethereum_tx=ethereum_tx,
+                        safe=contract_address,
+                        timestamp=internal_tx.timestamp,
+                    )
                 )
 
                 # Don't modify created
@@ -894,4 +912,7 @@ class SafeTxProcessor(TxProcessor):
                     arguments,
                 )
         logger.debug("[%s] End processing", contract_address)
-        return processed_successfully
+        return ProcessedResult(
+            processed=processed_successfully,
+            safe_relevant_transactions=safe_relevant_txs,
+        )
