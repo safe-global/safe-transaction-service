@@ -30,7 +30,7 @@ dependencies = [
     "packaging>=21.0",
     "pillow==12.1.1",
     "psycopg[binary,pool]==3.3.3",
-    "redis[hiredis]==7.1.0",
+    "redis[hiredis]==7.4.0",
     "requests==2.33.1",
     "safe-eth-py[django]==7.20.0",
     "web3==7.14.1",
