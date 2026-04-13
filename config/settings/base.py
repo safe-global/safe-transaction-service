@@ -66,6 +66,15 @@ GUNICORN_WORKERS = gunicorn_workers
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
 # DB statements should timeout before Gunicorn, so this value must be less than WEB_WORKER_TIMEOUT on gunicorn.py
 DB_STATEMENT_TIMEOUT = env.int("DB_STATEMENT_TIMEOUT", 50_000)
+# Kills a statement waiting on a lock. Without this, a slow transaction holding a row lock causes other requests to
+# queue behind it — that queue can cascade into an outage. Must be lower than DB_STATEMENT_TIMEOUT.
+DB_LOCK_TIMEOUT = env.int("DB_LOCK_TIMEOUT", 5_000)
+# Kills a connection that is inside a transaction but idle (e.g. app crash mid-request, network drop). Without this,
+# those connections hold locks indefinitely until the pool recycles them via max_lifetime. Critical for preventing
+# lock pile-ups.
+DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT = env.int(
+    "DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT", 30_000
+)
 
 DATABASES = {
     "default": env.db("DATABASE_URL"),
@@ -74,11 +83,15 @@ DATABASES["default"]["ATOMIC_REQUESTS"] = False
 DATABASES["default"]["ENGINE"] = "django.db.backends.postgresql"
 DATABASES["default"]["CONN_MAX_AGE"] = 0
 DATABASES["default"]["OPTIONS"] = {
-    "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
+    "options": (
+        f"-c statement_timeout={DB_STATEMENT_TIMEOUT}"
+        f" -c lock_timeout={DB_LOCK_TIMEOUT}"
+        f" -c idle_in_transaction_session_timeout={DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT}"
+    ),
     "pool": {
         # https://www.psycopg.org/psycopg3/docs/api/pool.html#psycopg_pool.ConnectionPool
         "min_size": env.int("DB_MIN_CONNS", default=4),
-        "max_size": env.int("DB_MAX_CONNS", default=100),
+        "max_size": env.int("DB_MAX_CONNS", default=200),
         "timeout": env.int("DB_POOL_TIMEOUT", default=10),
         "max_lifetime": env.int("DB_POOL_MAX_LIFETIME", default=60 * 5),  # 5 minutes
         "max_idle": env.int("DB_POOL_MAX_IDLE", default=60 * 2),  # 2 minutes
