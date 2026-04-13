@@ -38,7 +38,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "coverage==7.13.1",
+    "coverage==7.13.5",
     "django-stubs==5.2.9",
     "django-test-migrations==1.5.0",
     "factory-boy==3.3.3",
