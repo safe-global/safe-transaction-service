@@ -91,7 +91,7 @@ DATABASES["default"]["OPTIONS"] = {
     "pool": {
         # https://www.psycopg.org/psycopg3/docs/api/pool.html#psycopg_pool.ConnectionPool
         "min_size": env.int("DB_MIN_CONNS", default=4),
-        "max_size": env.int("DB_MAX_CONNS", default=200),
+        "max_size": env.int("DB_MAX_CONNS", default=100),
         "timeout": env.int("DB_POOL_TIMEOUT", default=10),
         "max_lifetime": env.int("DB_POOL_MAX_LIFETIME", default=60 * 5),  # 5 minutes
         "max_idle": env.int("DB_POOL_MAX_IDLE", default=60 * 2),  # 2 minutes
