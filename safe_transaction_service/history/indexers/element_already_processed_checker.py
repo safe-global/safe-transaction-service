@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from logging import getLogger
 
+from eth_typing import HexStr
 from hexbytes import HexBytes
 from safe_eth.util.util import to_0x_hex_str
 
@@ -20,14 +21,16 @@ class ElementAlreadyProcessedChecker:
     def clear(self) -> None:
         return self._processed_element_cache.clear()
 
-    def get_key(self, tx_hash: HexBytes, block_hash: HexBytes, index: int) -> HexBytes:
-        tx_hash = HexBytes(tx_hash)
-        block_hash = HexBytes(block_hash or 0)
-        index = HexBytes(index)
-        return tx_hash + block_hash + index
+    def get_key(
+        self, tx_hash: HexStr | bytes, block_hash: HexStr | bytes | None, index: int
+    ) -> bytes:
+        tx_hash_bytes = HexBytes(tx_hash)
+        block_hash_bytes = HexBytes(block_hash or 0)
+        index_bytes = HexBytes(index)
+        return tx_hash_bytes + block_hash_bytes + index_bytes
 
     def is_processed(
-        self, tx_hash: HexBytes, block_hash: HexBytes | None, index: int = 0
+        self, tx_hash: HexStr | bytes, block_hash: HexStr | bytes | None, index: int = 0
     ) -> bool:
         """
         :param tx_hash:
@@ -39,7 +42,7 @@ class ElementAlreadyProcessedChecker:
         return tx_id in self._processed_element_cache
 
     def mark_as_processed(
-        self, tx_hash: HexBytes, block_hash: HexBytes | None, index: int = 0
+        self, tx_hash: HexStr | bytes, block_hash: HexStr | bytes | None, index: int = 0
     ) -> bool:
         """
         Mark element as processed if it is not already marked
@@ -54,16 +57,16 @@ class ElementAlreadyProcessedChecker:
         if tx_id in self._processed_element_cache:
             logger.debug(
                 "Element with tx-hash=%s on block=%s with index=%d was already processed",
-                to_0x_hex_str(tx_hash),
-                to_0x_hex_str(block_hash),
+                to_0x_hex_str(HexBytes(tx_hash)),
+                to_0x_hex_str(HexBytes(block_hash or 0)),
                 index,
             )
             return False
         else:
             logger.debug(
                 "Marking element with tx-hash=%s on block=%s with index=%d as processed",
-                to_0x_hex_str(tx_hash),
-                to_0x_hex_str(block_hash),
+                to_0x_hex_str(HexBytes(tx_hash)),
+                to_0x_hex_str(HexBytes(block_hash or 0)),
                 index,
             )
             self._processed_element_cache[tx_id] = None
