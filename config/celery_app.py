@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import os
 
+from django.db import close_old_connections
+
 from celery import Celery
-from celery.signals import setup_logging
+from celery.signals import setup_logging, task_postrun
 
 
 @setup_logging.connect
@@ -24,6 +26,26 @@ def on_celery_setup_logging(**kwargs):
             if key in logger:
                 logger[key] = ["celery_console"]
         dictConfig(settings.LOGGING)
+
+
+@task_postrun.connect
+def close_db_connections(**kwargs):
+    # Django's close_old_connections() is called automatically at the end of each web request
+    # via middleware signals, but Celery tasks have no equivalent lifecycle hook.
+    #
+    # Without this, connections acquired via pool.getconn() during a task are never returned
+    # to the psycopg3 pool via pool.putconn() — the pool exhausts its max_size slots and new
+    # tasks block until max_lifetime/max_idle timers recycle them.
+    #
+    # NOTE: Celery 5.x has built-in pool handling for Django 5.1+ (close_pool on worker
+    # process init — see https://docs.celeryq.dev/en/main/django/first-steps-with-django.html#django-connection-pool),
+    # but that only covers the fork/process-start path. With --pool=gevent there is no forking:
+    # all tasks run as greenlets inside a single process, so close_pool never fires and
+    # per-task connection cleanup must be handled explicitly here.
+    #
+    # CONN_MAX_AGE=0 means close_old_connections() treats every connection as expired,
+    # triggering close() → putconn() and returning the slot to the pool immediately.
+    close_old_connections()
 
 
 # set the default Django settings module for the 'celery' program.
