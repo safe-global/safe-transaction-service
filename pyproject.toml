@@ -28,7 +28,7 @@ dependencies = [
     "gunicorn[gevent]==25.3.0",
     "orjson==3.11.8",
     "packaging>=21.0",
-    "pillow==12.1.1",
+    "pillow==12.2.0",
     "psycopg[binary,pool]==3.3.3",
     "redis[hiredis]==7.1.0",
     "requests==2.33.1",
