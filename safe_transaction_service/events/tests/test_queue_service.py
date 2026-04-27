@@ -16,11 +16,7 @@ class TestQueueService(TestCase):
         exchange = Exchange(
             settings.EVENTS_QUEUE_EXCHANGE_NAME, type="fanout", durable=True
         )
-        # exclusive=True: RabbitMQ 4.x deprecated non-durable non-exclusive queues
-        # (transient_nonexcl_queues). Exclusive queues are still allowed, are
-        # auto-deleted when the connection closes, and still receive messages
-        # routed from the fanout exchange by the broker.
-        self.test_queue = Queue("test_queue", exchange=exchange, exclusive=True)
+        self.test_queue = Queue("test_queue", exchange=exchange, durable=False)
         with self.conn.channel() as channel:
             bound = self.test_queue(channel)
             bound.declare()
