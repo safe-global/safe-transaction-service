@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import os
 
-from django.db import close_old_connections
+from django.db import connections
 
 from celery import Celery
 from celery.signals import setup_logging, task_postrun
@@ -43,9 +43,17 @@ def close_db_connections(**kwargs):
     # all tasks run as greenlets inside a single process, so close_pool never fires and
     # per-task connection cleanup must be handled explicitly here.
     #
-    # CONN_MAX_AGE=0 means close_old_connections() treats every connection as expired,
+    # CONN_MAX_AGE=0 means every connection is immediately eligible for closure,
     # triggering close() → putconn() and returning the slot to the pool immediately.
-    close_old_connections()
+    #
+    # Connections inside an atomic block are skipped: in production this never happens
+    # because task_postrun fires after the task function returns (so any transaction.atomic
+    # blocks from the task itself have already exited). In tests, Django's TestCase wraps
+    # each test in a transaction (in_atomic_block=True), and closing the connection there
+    # would break test isolation.
+    for conn in connections.all(initialized_only=True):
+        if not conn.in_atomic_block:
+            conn.close_if_unusable_or_obsolete()
 
 
 # set the default Django settings module for the 'celery' program.
