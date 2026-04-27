@@ -67,6 +67,7 @@ path = "safe_transaction_service/__init__.py"
 # Reject packages published less than 7 days ago to avoid supply-chain attacks
 exclude-newer = "7 days"
 compile-bytecode = true
+exclude-newer-package = { safe-eth-py = false }
 
 [tool.ruff]
 line-length = 88
