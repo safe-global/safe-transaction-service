@@ -3,6 +3,7 @@
 Contains classes for processing indexed data and store Safe related models in database
 """
 
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -71,6 +72,14 @@ class UserOperationFailed(TxProcessorException):
     pass
 
 
+@dataclasses.dataclass
+class ProcessedResult:
+    processed: bool
+    safe_relevant_transactions: list[SafeRelevantTransaction] = dataclasses.field(
+        default_factory=list
+    )
+
+
 class SafeTxProcessorProvider:
     def __new__(cls):
         if not hasattr(cls, "instance"):
@@ -98,18 +107,10 @@ class SafeTxProcessorProvider:
 
 class TxProcessor(ABC):
     @abstractmethod
-    def process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        pass
-
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
-        return [
-            self.process_decoded_transaction(decoded_transaction)
-            for decoded_transaction in internal_txs_decoded
-        ]
+        pass
 
 
 class SafeTxProcessor(TxProcessor):
@@ -262,6 +263,46 @@ class SafeTxProcessor(TxProcessor):
                 return True
         return False
 
+    def _get_previous_trace(self, internal_tx: InternalTx):
+        """
+        Fetches the previous trace for a given InternalTx using the tracing client.
+
+        :param internal_tx:
+        :return: Previous trace
+        :raises CannotFindPreviousTrace: If the tracing client is not configured, the RPC
+            call fails, or no previous trace exists
+        """
+        contract_address = internal_tx._from
+        if not self.ethereum_tracing_client:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}: "
+                f"ethereum tracing client is not configured"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        try:
+            previous_trace = self.ethereum_tracing_client.tracing.get_previous_trace(
+                internal_tx.ethereum_tx_id,
+                internal_tx.trace_address_as_list,
+                skip_delegate_calls=True,
+            )
+        except Web3RPCError:
+            previous_trace = None
+
+        if not previous_trace:
+            message = (
+                f"[{contract_address}] Cannot find previous trace for "
+                f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
+                f"and trace-address={internal_tx.trace_address}"
+            )
+            logger.warning(message)
+            raise CannotFindPreviousTrace(message)
+
+        return previous_trace
+
     def get_safe_version_from_master_copy(
         self, master_copy: ChecksumAddress
     ) -> str | None:
@@ -350,7 +391,9 @@ class SafeTxProcessor(TxProcessor):
         MultisigConfirmation.objects.remove_unused_confirmations(
             contract_address, safe_status.nonce, owner
         )
-        safe_message_models.SafeMessageConfirmation.objects.filter(owner=owner).delete()
+        safe_message_models.SafeMessageConfirmation.objects.filter(
+            safe_message__safe=contract_address, owner=owner
+        ).delete()
 
     def disable_module(
         self,
@@ -407,21 +450,6 @@ class SafeTxProcessor(TxProcessor):
         return safe_last_status
 
     @transaction.atomic
-    def process_decoded_transaction(
-        self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
-        contract_address = internal_tx_decoded.internal_tx._from
-        self.clear_cache(safe_address=contract_address)
-        try:
-            processed_successfully = self.__process_decoded_transaction(
-                internal_tx_decoded
-            )
-            internal_tx_decoded.set_processed()
-        finally:
-            self.clear_cache(safe_address=contract_address)
-        return processed_successfully
-
-    @transaction.atomic
     def process_decoded_transactions(
         self, internal_txs_decoded: Sequence[InternalTxDecoded]
     ) -> list[bool]:
@@ -436,6 +464,7 @@ class SafeTxProcessor(TxProcessor):
             return results
 
         internal_tx_ids = []
+        safe_relevant_txs: list[SafeRelevantTransaction] = []
         contract_addresses = {
             internal_tx_decoded.internal_tx._from
             for internal_tx_decoded in internal_txs_decoded
@@ -456,20 +485,35 @@ class SafeTxProcessor(TxProcessor):
                     results.append(False)
                 else:
                     try:
-                        result = self.__process_decoded_transaction(internal_tx_decoded)
-                        results.append(result)
+                        processed_result = self.__process_decoded_transaction(
+                            internal_tx_decoded
+                        )
+                        results.append(processed_result.processed)
+                        safe_relevant_txs.extend(
+                            processed_result.safe_relevant_transactions
+                        )
                     except CannotFindPreviousTrace:
                         logger.critical(
                             "[%s] There's a problem with the RPC, it needs to be checked",
                             contract_address,
                         )
                         raise
-                    except TxProcessorException:
+                    except TxProcessorException as exc:
                         logger.error(
-                            "[%s] Problem processing internal txs for Safe, ignoring",
+                            "[%s] Problem processing internal txs for Safe, ignoring: %s - %s",
                             contract_address,
+                            exc.__class__.__name__,
+                            exc,
                         )
                         results.append(False)
+
+            # Insert at the very end to minimize the lock window: erc20_events_indexer
+            # inserts the same (ethereum_tx, safe) unique key, so inserting here means
+            # the conflict lock is held only until commit, not for the full batch duration.
+            if safe_relevant_txs:
+                SafeRelevantTransaction.objects.bulk_create(
+                    safe_relevant_txs, ignore_conflicts=True
+                )
 
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
@@ -482,11 +526,11 @@ class SafeTxProcessor(TxProcessor):
 
     def __process_decoded_transaction(
         self, internal_tx_decoded: InternalTxDecoded
-    ) -> bool:
+    ) -> ProcessedResult:
         """
         Decode internal tx and creates needed models
         :param internal_tx_decoded: InternalTxDecoded to process. It will be set as `processed`
-        :return: True if tx could be processed, False otherwise
+        :return: ProcessedResult with whether the tx was processed and any SafeRelevantTransaction to insert
         """
         internal_tx = internal_tx_decoded.internal_tx
         ethereum_tx = internal_tx.ethereum_tx
@@ -510,11 +554,12 @@ class SafeTxProcessor(TxProcessor):
                 contract_address,
                 internal_tx.gas_used,
             )
-            return False
+            return ProcessedResult(processed=False)
 
         arguments = internal_tx_decoded.arguments
         master_copy = internal_tx.to
         processed_successfully = True
+        safe_relevant_txs: list[SafeRelevantTransaction] = []
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -523,19 +568,9 @@ class SafeTxProcessor(TxProcessor):
             threshold = arguments["_threshold"]
             fallback_handler = arguments.get("fallbackHandler", NULL_ADDRESS)
             nonce = 0
-            try:
-                safe_contract: SafeContract = SafeContract.objects.get(
-                    address=contract_address
-                )
-                if not safe_contract.ethereum_tx_id:
-                    safe_contract.ethereum_tx = internal_tx.ethereum_tx
-                    safe_contract.save(update_fields=["ethereum_tx"])
-            except SafeContract.DoesNotExist:
-                SafeContract.objects.create(
-                    address=contract_address,
-                    ethereum_tx=internal_tx.ethereum_tx,
-                )
-                logger.info("Found new Safe=%s", contract_address)
+            SafeContract.objects.upsert_from_ethereum_tx_hash(
+                contract_address, internal_tx.ethereum_tx_id
+            )
 
             self.store_new_safe_status(
                 SafeLastStatus(
@@ -663,25 +698,7 @@ class SafeTxProcessor(TxProcessor):
                     # Regular Safe indexed using tracing
                     # Someone calls Module -> Module calls Safe Proxy -> Safe Proxy delegate calls Master Copy
                     # The trace that is being processed is the last one, so indexer needs to get the previous trace
-                    try:
-                        previous_trace = (
-                            self.ethereum_tracing_client.tracing.get_previous_trace(
-                                internal_tx.ethereum_tx_id,
-                                internal_tx.trace_address_as_list,
-                                skip_delegate_calls=True,
-                            )
-                        )
-                    except Web3RPCError:
-                        previous_trace = None
-
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for "
-                            f"tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} "
-                            f"and trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     module_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
@@ -692,34 +709,38 @@ class SafeTxProcessor(TxProcessor):
                     ethereum_tx, module_address, contract_address
                 )
                 module_data = HexBytes(arguments["data"])
-                ModuleTransaction.objects.get_or_create(
-                    internal_tx=internal_tx,
-                    defaults={
-                        "created": internal_tx.timestamp,
-                        "safe": contract_address,
-                        "module": module_address,
-                        "to": arguments["to"],
-                        "value": arguments["value"],
-                        "data": module_data if module_data else None,
-                        "operation": arguments["operation"],
-                        "failed": failed,
-                    },
+                ModuleTransaction.objects.bulk_create(
+                    [
+                        ModuleTransaction(
+                            internal_tx=internal_tx,
+                            created=internal_tx.timestamp,
+                            safe=contract_address,
+                            module=module_address,
+                            to=arguments["to"],
+                            value=arguments["value"],
+                            data=module_data if module_data else None,
+                            operation=arguments["operation"],
+                            failed=failed,
+                        )
+                    ],
+                    ignore_conflicts=True,
                 )
-                SafeRelevantTransaction.objects.get_or_create(
-                    ethereum_tx=ethereum_tx,
-                    safe=contract_address,
-                    defaults={"timestamp": internal_tx.timestamp},
-                )
-                # Detect 4337 UserOperations in this transaction
-                number_detected_user_operations = (
-                    self.aa_processor_service.process_aa_transaction(
-                        contract_address, ethereum_tx
+                safe_relevant_txs.append(
+                    SafeRelevantTransaction(
+                        ethereum_tx=ethereum_tx,
+                        safe=contract_address,
+                        timestamp=internal_tx.timestamp,
                     )
                 )
-                logger.debug(
-                    "[%s] Detected %d 4337 transaction(s)",
-                    contract_address,
-                    number_detected_user_operations,
+                # Run after commit to avoid bundler RPC calls holding DB locks inside the atomic block.
+                # robust=True ensures an exception from one callback does not abort sibling callbacks
+                # registered for the same atomic block — without it a failing process_aa_transaction
+                # would silently skip all later 4337 UserOperation callbacks in the same batch.
+                transaction.on_commit(
+                    lambda: self.aa_processor_service.process_aa_transaction(
+                        contract_address, ethereum_tx
+                    ),
+                    robust=True,
                 )
 
             elif function_name == "approveHash":
@@ -728,20 +749,7 @@ class SafeTxProcessor(TxProcessor):
                 if "owner" in arguments:  # Event approveHash
                     owner = arguments["owner"]
                 else:
-                    previous_trace = (
-                        self.ethereum_tracing_client.tracing.get_previous_trace(
-                            internal_tx.ethereum_tx_id,
-                            internal_tx.trace_address_as_list,
-                            skip_delegate_calls=True,
-                        )
-                    )
-                    if not previous_trace:
-                        message = (
-                            f"[{contract_address}] Cannot find previous trace for tx-hash={to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))} and "
-                            f"trace-address={internal_tx.trace_address}"
-                        )
-                        logger.warning(message)
-                        raise CannotFindPreviousTrace(message)
+                    previous_trace = self._get_previous_trace(internal_tx)
                     previous_internal_tx = InternalTx.objects.build_from_trace(
                         previous_trace, internal_tx.ethereum_tx
                     )
@@ -831,10 +839,12 @@ class SafeTxProcessor(TxProcessor):
                         "trusted": True,
                     },
                 )
-                SafeRelevantTransaction.objects.get_or_create(
-                    ethereum_tx=ethereum_tx,
-                    safe=contract_address,
-                    defaults={"timestamp": internal_tx.timestamp},
+                safe_relevant_txs.append(
+                    SafeRelevantTransaction(
+                        ethereum_tx=ethereum_tx,
+                        safe=contract_address,
+                        timestamp=internal_tx.timestamp,
+                    )
                 )
 
                 # Don't modify created
@@ -857,6 +867,7 @@ class SafeTxProcessor(TxProcessor):
                 for safe_signature in SafeSignature.parse_signature(
                     safe_tx.signatures, safe_tx_hash
                 ):
+                    exported_signature = safe_signature.export_signature()
                     (
                         multisig_confirmation,
                         _,
@@ -867,14 +878,12 @@ class SafeTxProcessor(TxProcessor):
                             "created": internal_tx.timestamp,
                             "ethereum_tx": None,
                             "multisig_transaction": multisig_tx,
-                            "signature": safe_signature.export_signature(),
+                            "signature": exported_signature,
                             "signature_type": safe_signature.signature_type.value,
                         },
                     )
-                    if multisig_confirmation.signature != safe_signature.signature:
-                        multisig_confirmation.signature = (
-                            safe_signature.export_signature()
-                        )
+                    if HexBytes(multisig_confirmation.signature) != exported_signature:
+                        multisig_confirmation.signature = exported_signature
                         multisig_confirmation.signature_type = (
                             safe_signature.signature_type.value
                         )
@@ -884,11 +893,6 @@ class SafeTxProcessor(TxProcessor):
 
                 safe_last_status.nonce = nonce + 1
                 self.store_new_safe_status(safe_last_status, internal_tx, ["nonce"])
-            elif function_name == "execTransactionFromModule":
-                logger.debug(
-                    "[%s] Not processing execTransactionFromModule", contract_address
-                )
-                # No side effects or nonce increasing, but trace will be set as processed
             else:
                 processed_successfully = False
                 logger.warning(
@@ -898,4 +902,7 @@ class SafeTxProcessor(TxProcessor):
                     arguments,
                 )
         logger.debug("[%s] End processing", contract_address)
-        return processed_successfully
+        return ProcessedResult(
+            processed=processed_successfully,
+            safe_relevant_transactions=safe_relevant_txs,
+        )

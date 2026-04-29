@@ -374,6 +374,8 @@ class AaProcessorService:
         :param ethereum_tx: EthereumTx to check for UserOperations
         :return: Number of detected ``UserOperations`` in transaction
         """
+
+        logger.debug("Processing 4337 User Operation")
         user_operation_hashes = self.get_user_operation_hashes_from_logs(
             safe_address, ethereum_tx.logs
         )

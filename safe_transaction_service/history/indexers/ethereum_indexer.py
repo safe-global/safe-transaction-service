@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from logging import getLogger
 from typing import Any
 
-from django.db.models import Min
+from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
 from eth_typing import ChecksumAddress, HexStr
@@ -30,7 +30,7 @@ class EthereumIndexer(ABC):
     `database_field` should be defined with the field used to store the current block number for a monitored address
     `find_relevant_elements` elements should be defined with the query to get the relevant txs/events/etc.
     `process_elements` defines what happens with elements found
-    So the flow would be `start()` -> `process_addresses` -> `find_revelant_elements` -> `process_elements` ->
+    So the flow would be `start()` -> `process_addresses` -> `find_relevant_elements` -> `process_elements` ->
     `process_element`
     """
 
@@ -110,14 +110,14 @@ class EthereumIndexer(ABC):
 
     @property
     @abstractmethod
-    def database_field(self):
+    def database_field(self) -> str:
         """
         :return: Database field for `database_queryset` to store scan status
         """
 
     @property
     @abstractmethod
-    def database_queryset(self):
+    def database_queryset(self) -> QuerySet:
         """
         :return: Queryset of objects being scanned
         """
@@ -134,8 +134,8 @@ class EthereumIndexer(ABC):
         Find blockchain relevant elements for the `addresses`
 
         :param addresses:
-        :param from_block_number
-        :param to_block_number
+        :param from_block_number:
+        :param to_block_number:
         :param current_block_number:
         :return: Set of relevant elements
         """
@@ -304,11 +304,14 @@ class EthereumIndexer(ABC):
         return not_updated_addresses
 
     def update_monitored_addresses(
-        self, addresses: set[str], from_block_number: int, to_block_number: int
-    ) -> bool:
+        self,
+        addresses: set[ChecksumAddress],
+        from_block_number: int,
+        to_block_number: int,
+    ) -> int:
         """
         :param addresses: Addresses to have the block number updated
-        :param from_block_number: Make sure that no reorg has happened checking that block number was not rollbacked
+        :param from_block_number: Make sure that no reorg has happened checking that block number was not rolled back
         :param to_block_number: Block number to be updated
         :return: Number of addresses updated
         """
@@ -513,6 +516,8 @@ class EthereumIndexer(ABC):
                 )
                 total_number_processed_elements += number_processed_elements
                 if start_block is None:
+                    # from_block_number can be None if no blocks to scan; that's fine
+                    # because the guard prevents overwriting a previously valid start_block
                     start_block = from_block_number
             last_block = to_block_number
         else:
@@ -540,7 +545,9 @@ class EthereumIndexer(ABC):
                     not_updated_addresses,
                     current_block_number=current_block_number,
                 )
-                if start_block is None or from_block_number < start_block:
+                if from_block_number is not None and (
+                    start_block is None or from_block_number < start_block
+                ):
                     start_block = from_block_number
 
                 number_processed_elements = len(processed_elements)
@@ -552,7 +559,8 @@ class EthereumIndexer(ABC):
                     to_block_number,
                 )
                 total_number_processed_elements += number_processed_elements
-                from_block_number += 1
+                if from_block_number is not None:
+                    from_block_number += 1
             if last_block is None or to_block_number > last_block:
                 last_block = to_block_number
         else:

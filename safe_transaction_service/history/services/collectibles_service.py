@@ -310,7 +310,7 @@ class CollectiblesService:
     def get_metadata(self, collectible: Collectible | CollectibleWithMetadata) -> Any:
         """
         Return metadata for a collectible
-        :param collectible
+        :param collectible:
         """
         if not settings.COLLECTIBLES_ENABLE_DOWNLOAD_METADATA:
             logger.warning("Downloading collectibles metadata is disabled")

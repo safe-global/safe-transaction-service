@@ -227,7 +227,7 @@ class TransactionService:
         - Incoming native token transfers
 
         :param safe_address:
-        :return: Querylist with elements from `SafeRelevantTransaction` model
+        :return: QuerySet with elements from `SafeRelevantTransaction` model
         """
         logger.debug(
             "[%s] Getting all tx identifiers",
