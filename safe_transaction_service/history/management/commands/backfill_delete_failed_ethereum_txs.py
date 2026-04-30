@@ -27,8 +27,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--days",
             type=int,
-            default=30,
-            help="Only inspect EthereumTx created in the last N days",
+            default=None,
+            help="Only inspect EthereumTx created in the last N days (default: all)",
         )
         parser.add_argument(
             "--dry-run",
@@ -69,16 +69,20 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         retries = options["retries"]
         backoff = options["backoff"]
-        cutoff = timezone.now() - timedelta(days=days)
         ethereum_client = EthereumClientProvider()
 
-        queryset = EthereumTx.objects.filter(status=1, created__gte=cutoff).only(
-            "tx_hash"
-        )
+        queryset = EthereumTx.objects.filter(status=1).only("tx_hash")
+        if days is not None:
+            cutoff = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(created__gte=cutoff)
+            scope_msg = f"created since {cutoff.isoformat()}"
+        else:
+            scope_msg = "all time"
+
         total = queryset.count()
         self.stdout.write(
             self.style.SUCCESS(
-                f"Checking {total} EthereumTx rows with status=1 created since {cutoff.isoformat()}"
+                f"Checking {total} EthereumTx rows with status=1 ({scope_msg})"
             )
         )
 
