@@ -45,7 +45,7 @@ class Command(BaseCommand):
             "--backoff",
             type=float,
             default=2.0,
-            help="Base backoff in seconds between retries (exponential: backoff ** attempt)",
+            help="Base backoff in seconds between retries (exponential: backoff ** (attempt + 1))",
         )
 
     def _get_receipt_with_retry(self, ethereum_client, tx_hash, retries, backoff):
@@ -55,7 +55,7 @@ class Command(BaseCommand):
             except Exception as exc:
                 if attempt == retries - 1:
                     raise
-                delay = backoff**attempt
+                delay = backoff ** (attempt + 1)
                 self.stdout.write(
                     self.style.WARNING(
                         f"RPC error for {tx_hash} (attempt {attempt + 1}/{retries}): {exc}. "

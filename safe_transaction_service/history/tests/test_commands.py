@@ -907,6 +907,7 @@ class TestBackfillDeleteFailedEthereumTxsCommand(TestCase):
 
         self.assertFalse(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
         self.assertIn("Deleted 1/1", buf.getvalue())
+        mock_sleep.assert_called_once_with(0.0)
 
     @mock.patch("time.sleep")
     @mock.patch(_CLIENT_PATH)
