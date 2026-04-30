@@ -939,3 +939,20 @@ class TestBackfillDeleteFailedEthereumTxsCommand(TestCase):
 
         self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
         self.assertIn("Checking 0 EthereumTx rows", buf.getvalue())
+
+    @mock.patch(_CLIENT_PATH)
+    def test_no_days_includes_all_txs(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 0}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        EthereumTx.objects.filter(tx_hash=tx.tx_hash).update(
+            created=timezone.now() - timedelta(days=365)
+        )
+
+        buf = StringIO()
+        call_command(_COMMAND, stdout=buf)
+
+        self.assertFalse(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("all time", buf.getvalue())
