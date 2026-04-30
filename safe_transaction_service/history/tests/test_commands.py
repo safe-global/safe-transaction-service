@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import os.path
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
 from django.core.management import CommandError, call_command
 from django.test import TestCase
+from django.utils import timezone
 
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
@@ -18,6 +20,7 @@ from safe_eth.util.util import to_0x_hex_str
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
 from ..models import (
+    EthereumTx,
     IndexingStatus,
     InternalTxDecoded,
     ProxyFactory,
@@ -823,3 +826,134 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         self.assertIn("Updated payment for 1/1", buf.getvalue())
         multisig_tx_2.refresh_from_db()
         self.assertEqual(multisig_tx_2.payment, 2471261352604)
+
+
+_COMMAND = "backfill_delete_failed_ethereum_txs"
+_CLIENT_PATH = "safe_transaction_service.history.management.commands.backfill_delete_failed_ethereum_txs.EthereumClientProvider"
+
+
+class TestBackfillDeleteFailedEthereumTxsCommand(TestCase):
+    def _make_client_mock(self, receipt):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = receipt
+        mock_provider = MagicMock(return_value=client)
+        return mock_provider, client
+
+    @mock.patch(_CLIENT_PATH)
+    def test_deletes_tx_with_failed_receipt(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 0}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, stdout=buf)
+
+        self.assertFalse(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("Deleted 1/1", buf.getvalue())
+
+    @mock.patch(_CLIENT_PATH)
+    def test_keeps_tx_with_successful_receipt(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 1}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, stdout=buf)
+
+        self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("Deleted 0/1", buf.getvalue())
+
+    @mock.patch(_CLIENT_PATH)
+    def test_skips_tx_with_missing_receipt(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = None
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, stdout=buf)
+
+        self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("missing_receipts=1", buf.getvalue())
+
+    @mock.patch(_CLIENT_PATH)
+    def test_dry_run_does_not_delete(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 0}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, "--dry-run", stdout=buf)
+
+        self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("Would delete 1/1", buf.getvalue())
+
+    @mock.patch("time.sleep")
+    @mock.patch(_CLIENT_PATH)
+    def test_retries_on_rpc_error_then_succeeds(self, mock_provider, mock_sleep):
+        client = MagicMock()
+        client.get_transaction_receipt.side_effect = [
+            Exception("timeout"),
+            {"status": 0},
+        ]
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, "--retries=2", "--backoff=0", stdout=buf)
+
+        self.assertFalse(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("Deleted 1/1", buf.getvalue())
+        mock_sleep.assert_called_once_with(0.0)
+
+    @mock.patch("time.sleep")
+    @mock.patch(_CLIENT_PATH)
+    def test_skips_tx_after_exhausted_retries(self, mock_provider, mock_sleep):
+        client = MagicMock()
+        client.get_transaction_receipt.side_effect = Exception("timeout")
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        buf = StringIO()
+        call_command(_COMMAND, "--retries=3", "--backoff=0", stdout=buf)
+
+        self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("rpc_errors=1", buf.getvalue())
+        self.assertEqual(client.get_transaction_receipt.call_count, 3)
+
+    @mock.patch(_CLIENT_PATH)
+    def test_days_filter_excludes_old_txs(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 0}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        EthereumTx.objects.filter(tx_hash=tx.tx_hash).update(
+            created=timezone.now() - timedelta(days=40)
+        )
+
+        buf = StringIO()
+        call_command(_COMMAND, "--days=30", stdout=buf)
+
+        self.assertTrue(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("Checking 0 EthereumTx rows", buf.getvalue())
+
+    @mock.patch(_CLIENT_PATH)
+    def test_no_days_includes_all_txs(self, mock_provider):
+        client = MagicMock()
+        client.get_transaction_receipt.return_value = {"status": 0}
+        mock_provider.return_value = client
+
+        tx = EthereumTxFactory(status=1)
+        EthereumTx.objects.filter(tx_hash=tx.tx_hash).update(
+            created=timezone.now() - timedelta(days=365)
+        )
+
+        buf = StringIO()
+        call_command(_COMMAND, stdout=buf)
+
+        self.assertFalse(EthereumTx.objects.filter(tx_hash=tx.tx_hash).exists())
+        self.assertIn("all time", buf.getvalue())
