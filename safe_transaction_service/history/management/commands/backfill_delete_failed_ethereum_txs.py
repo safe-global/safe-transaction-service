@@ -119,7 +119,7 @@ class Command(BaseCommand):
                 continue
 
             if tx_receipt.get("status") == 0:
-                self.stdout.write(f"Deleting {ethereum_tx.tx_hash.hex()}")
+                self.stdout.write(f"Deleting {ethereum_tx.tx_hash}")
                 if not dry_run:
                     ethereum_tx.delete()
                 deleted += 1
