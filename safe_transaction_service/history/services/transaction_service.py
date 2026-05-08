@@ -458,6 +458,10 @@ class TransactionService:
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
                 -- Just get the nonces from the provided Safe
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
+                encode(mt.gas_token, 'hex') AS gas_token,
+                (et.gas_used * et.gas_price)::text AS fee,
+                gt.symbol AS gas_token_symbol,
+                gt.decimals AS gas_token_decimals,
                 -- Assigns a row number to each ERC20 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -477,6 +481,7 @@ class TransactionService:
             LEFT JOIN history_internaltx itx ON itx.ethereum_tx_id = erc20.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
             LEFT JOIN tokens_token t ON erc20.address = t.address
+            LEFT JOIN tokens_token gt ON mt.gas_token = gt.address
             WHERE (erc20.to = %s OR erc20._from = %s){erc20_timestamp_conditions}
 
             UNION ALL
@@ -500,6 +505,10 @@ class TransactionService:
                 encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
                 -- Just get the nonces from the provided Safe
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
+                encode(mt.gas_token, 'hex') AS gas_token,
+                (et.gas_used * et.gas_price)::text AS fee,
+                gt.symbol AS gas_token_symbol,
+                gt.decimals AS gas_token_decimals,
                 -- Assigns a row number to each ERC721 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -519,6 +528,7 @@ class TransactionService:
             LEFT JOIN history_internaltx itx ON itx.ethereum_tx_id = erc721.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
             LEFT JOIN tokens_token t ON erc721.address = t.address
+            LEFT JOIN tokens_token gt ON mt.gas_token = gt.address
             WHERE (erc721.to = %s OR erc721._from = %s){erc721_timestamp_conditions}
 
             UNION ALL
@@ -543,6 +553,10 @@ class TransactionService:
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
                 -- Just get the nonces from the provided Safe
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
+                encode(mt.gas_token, 'hex') AS gas_token,
+                (et.gas_used * et.gas_price)::text AS fee,
+                gt.symbol AS gas_token_symbol,
+                gt.decimals AS gas_token_decimals,
                 -- Assigns a row number to each native transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -560,6 +574,7 @@ class TransactionService:
             JOIN history_ethereumtx et ON rel.ethereum_tx_id = et.tx_hash
             LEFT JOIN history_multisigtransaction mt ON itx.ethereum_tx_id = mt.ethereum_tx_id
             LEFT JOIN history_moduletransaction modtx ON modtx.internal_tx_id = itx.id
+            LEFT JOIN tokens_token gt ON mt.gas_token = gt.address
             WHERE(itx.to = %s OR itx._from = %s)
             AND itx.call_type = 0
             AND itx.value > 0{native_timestamp_conditions}
@@ -581,7 +596,11 @@ class TransactionService:
             note,
             transaction_hash,
             contract_address,
-            nonce
+            nonce,
+            gas_token,
+            fee,
+            gas_token_symbol,
+            gas_token_decimals
         FROM export_data
         WHERE rn = 1
         ORDER BY execution_date DESC, transaction_hash
@@ -685,6 +704,14 @@ class TransactionService:
                         else None
                     ),
                     "nonce": row_dict["nonce"],
+                    "gas_token": (
+                        fast_to_checksum_address(row_dict["gas_token"])
+                        if row_dict["gas_token"] is not None
+                        else None
+                    ),
+                    "fee": row_dict["fee"],
+                    "gas_token_symbol": row_dict["gas_token_symbol"],
+                    "gas_token_decimals": row_dict["gas_token_decimals"],
                 }
                 results.append(export_item)
 
