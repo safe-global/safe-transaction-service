@@ -456,12 +456,16 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                -- Just get the nonces from the provided Safe
+                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
+                -- Edge case: when Safe A sends to Safe B, Safe B's export sees a multisig tx
+                -- from Safe A (with its nonce, gas_token and payment) — those should be null.
+                -- payment is the exact refund paid by the Safe to the executor as emitted in
+                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
-                encode(mt.gas_token, 'hex') AS gas_token,
-                (et.gas_used * et.gas_price)::text AS fee,
-                gt.symbol AS gas_token_symbol,
-                gt.decimals AS gas_token_decimals,
+                CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
+                CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
+                CASE WHEN mt.safe = %s THEN gt.symbol ELSE NULL END AS gas_token_symbol,
+                CASE WHEN mt.safe = %s THEN gt.decimals ELSE NULL END AS gas_token_decimals,
                 -- Assigns a row number to each ERC20 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -503,12 +507,16 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
-                -- Just get the nonces from the provided Safe
+                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
+                -- Edge case: when Safe A sends to Safe B, Safe B's export sees Safe A's multisig
+                -- tx — nonce, gas_token and payment should be null from Safe B's perspective.
+                -- payment is the exact refund paid by the Safe to the executor as emitted in
+                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
-                encode(mt.gas_token, 'hex') AS gas_token,
-                (et.gas_used * et.gas_price)::text AS fee,
-                gt.symbol AS gas_token_symbol,
-                gt.decimals AS gas_token_decimals,
+                CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
+                CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
+                CASE WHEN mt.safe = %s THEN gt.symbol ELSE NULL END AS gas_token_symbol,
+                CASE WHEN mt.safe = %s THEN gt.decimals ELSE NULL END AS gas_token_decimals,
                 -- Assigns a row number to each ERC721 transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -551,12 +559,16 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                -- Just get the nonces from the provided Safe
+                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
+                -- Edge case: when Safe A sends to Safe B, Safe B's export sees Safe A's multisig
+                -- tx — nonce, gas_token and payment should be null from Safe B's perspective.
+                -- payment is the exact refund paid by the Safe to the executor as emitted in
+                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
-                encode(mt.gas_token, 'hex') AS gas_token,
-                (et.gas_used * et.gas_price)::text AS fee,
-                gt.symbol AS gas_token_symbol,
-                gt.decimals AS gas_token_decimals,
+                CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
+                CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
+                CASE WHEN mt.safe = %s THEN gt.symbol ELSE NULL END AS gas_token_symbol,
+                CASE WHEN mt.safe = %s THEN gt.decimals ELSE NULL END AS gas_token_decimals,
                 -- Assigns a row number to each native transfer grouped by tx and log index.
                 -- Prioritizes module > multisig > standalone using execution time as tiebreaker.
                 ROW_NUMBER() OVER (
@@ -598,7 +610,7 @@ class TransactionService:
             contract_address,
             nonce,
             gas_token,
-            fee,
+            payment,
             gas_token_symbol,
             gas_token_decimals
         FROM export_data
@@ -610,7 +622,7 @@ class TransactionService:
         safe_address_bytes = HexBytes(safe_address)
         main_params = [
             safe_address_bytes
-        ] * 15 + [  # 15 instances of safe address in the query
+        ] * 27 + [  # 27 instances of safe address in the query
             limit,
             offset,
         ]
@@ -709,7 +721,7 @@ class TransactionService:
                         if row_dict["gas_token"] is not None
                         else None
                     ),
-                    "fee": row_dict["fee"],
+                    "payment": row_dict["payment"],
                     "gas_token_symbol": row_dict["gas_token_symbol"],
                     "gas_token_decimals": row_dict["gas_token_decimals"],
                 }

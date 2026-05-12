@@ -1415,7 +1415,7 @@ class SafeExportTransactionSerializer(serializers.Serializer):
     contract_address = EthereumAddressField(allow_null=True)
     nonce = serializers.CharField(allow_null=True)
     gas_token = EthereumAddressField(allow_null=True)
-    fee = serializers.CharField(allow_null=True)
+    payment = serializers.CharField(allow_null=True)
     gas_token_symbol = serializers.CharField(allow_null=True)
     gas_token_decimals = serializers.IntegerField(allow_null=True)
 
