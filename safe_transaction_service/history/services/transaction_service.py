@@ -456,11 +456,7 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc20.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
-                -- Edge case: when Safe A sends to Safe B, Safe B's export sees a multisig tx
-                -- from Safe A (with its nonce, gas_token and payment) — those should be null.
-                -- payment is the exact refund paid by the Safe to the executor as emitted in
-                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
+                -- Only expose the nonces and gas fee fields when the multisig tx belongs to the queried Safe.
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
                 CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
@@ -507,11 +503,7 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(erc721.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(modtx.to, mt.to), 'hex') as contract_address,
-                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
-                -- Edge case: when Safe A sends to Safe B, Safe B's export sees Safe A's multisig
-                -- tx — nonce, gas_token and payment should be null from Safe B's perspective.
-                -- payment is the exact refund paid by the Safe to the executor as emitted in
-                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
+                -- Only expose the nonces and gas fee fields when the multisig tx belongs to the queried Safe.
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
                 CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
@@ -559,11 +551,7 @@ class TransactionService:
                 COALESCE(mt.origin->> 'note', '') as note,
                 encode(itx.ethereum_tx_id, 'hex') as transaction_hash,
                 encode(COALESCE(mt.to, modtx.to), 'hex') as contract_address,
-                -- Only expose gas fee fields when the multisig tx belongs to the queried Safe.
-                -- Edge case: when Safe A sends to Safe B, Safe B's export sees Safe A's multisig
-                -- tx — nonce, gas_token and payment should be null from Safe B's perspective.
-                -- payment is the exact refund paid by the Safe to the executor as emitted in
-                -- the ExecutionSuccess/ExecutionFailure event (differs from gas_used * gas_price).
+                -- Only expose the nonces and gas fee fields when the multisig tx belongs to the queried Safe.
                 CASE WHEN mt.safe = %s THEN mt.nonce ELSE NULL END AS nonce,
                 CASE WHEN mt.safe = %s THEN encode(mt.gas_token, 'hex') ELSE NULL END AS gas_token,
                 CASE WHEN mt.safe = %s THEN mt.payment::text ELSE NULL END AS payment,
