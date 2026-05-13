@@ -829,7 +829,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
 
 
 _COMMAND = "backfill_delete_failed_ethereum_txs"
-_CLIENT_PATH = "safe_transaction_service.history.management.commands.backfill_delete_failed_ethereum_txs.EthereumClientProvider"
+_CLIENT_PATH = "safe_transaction_service.history.management.commands.backfill_delete_failed_ethereum_txs.get_auto_ethereum_client"
 
 
 class TestBackfillDeleteFailedEthereumTxsCommand(TestCase):
