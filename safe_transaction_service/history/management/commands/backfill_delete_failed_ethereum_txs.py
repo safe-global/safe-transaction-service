@@ -1,20 +1,22 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import argparse
 import time
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-try:
-    from safe_eth.eth import EthereumClientProvider
-except ImportError:  # pragma: no cover - fallback for environments without provider
-    from safe_eth.eth import get_auto_ethereum_client
-
-    def EthereumClientProvider():
-        return get_auto_ethereum_client()
-
+from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from web3.types import TxReceipt
 
 from ...models import EthereumTx
+
+
+def _positive_int(value: str) -> int:
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"{value} must be a positive integer")
+    return ivalue
 
 
 class Command(BaseCommand):
@@ -37,9 +39,9 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--retries",
-            type=int,
+            type=_positive_int,
             default=3,
-            help="Number of RPC attempts per transaction before skipping",
+            help="Number of RPC attempts per transaction before skipping (must be > 0)",
         )
         parser.add_argument(
             "--backoff",
@@ -48,7 +50,13 @@ class Command(BaseCommand):
             help="Base backoff in seconds between retries (exponential: backoff ** (attempt + 1))",
         )
 
-    def _get_receipt_with_retry(self, ethereum_client, tx_hash, retries, backoff):
+    def _get_receipt_with_retry(
+        self,
+        ethereum_client: EthereumClient,
+        tx_hash: str,
+        retries: int,
+        backoff: float,
+    ) -> TxReceipt | None:
         for attempt in range(retries):
             try:
                 return ethereum_client.get_transaction_receipt(tx_hash)
@@ -69,7 +77,7 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         retries = options["retries"]
         backoff = options["backoff"]
-        ethereum_client = EthereumClientProvider()
+        ethereum_client = get_auto_ethereum_client()
 
         queryset = EthereumTx.objects.filter(status=1).only("tx_hash")
         if days is not None:
