@@ -5011,6 +5011,197 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(result["transactionHash"], ethereum_tx.tx_hash)
         # Standalone transfers should not have safe_tx_hash
 
+    def test_export_view_gas_fee_fields(self):
+        """Test that gas fee fields are populated for GTF transactions and null otherwise."""
+        self._setup_export_tests()
+
+        # Case 1: ERC20 transfer with GTF, gas_token = NULL_ADDRESS (native ETH)
+        ethereum_tx_erc20 = EthereumTxFactory(gas_used=21000)
+        MultisigTransactionFactory(
+            safe=self.safe_address,
+            ethereum_tx=ethereum_tx_erc20,
+            trusted=True,
+            gas_price=1000000000,
+            gas_token=NULL_ADDRESS,
+            payment=21000000000000,
+        )
+        ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_erc20,
+            address=self.token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=1000000000000000000,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.json()["results"][0]
+        self.assertEqual(result["assetType"], "erc20")
+        self.assertEqual(result["gasToken"], NULL_ADDRESS)
+        self.assertIsNone(result["gasTokenSymbol"])
+        self.assertIsNone(result["gasTokenDecimals"])
+        self.assertIsNotNone(result["payment"])
+        self.assertTrue(int(result["payment"]) > 0)
+
+        # Case 2: ERC721 transfer with GTF, gas_token = NULL_ADDRESS
+        ethereum_tx_erc721 = EthereumTxFactory(gas_used=21000)
+        MultisigTransactionFactory(
+            safe=self.safe_address,
+            ethereum_tx=ethereum_tx_erc721,
+            trusted=True,
+            gas_price=1000000000,
+            gas_token=NULL_ADDRESS,
+            payment=21000000000000,
+        )
+        ERC721TransferFactory(
+            ethereum_tx=ethereum_tx_erc721,
+            address=self.nft_token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            token_id=999,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        erc721_result = next(
+            r for r in response.json()["results"] if r["assetType"] == "erc721"
+        )
+        self.assertEqual(erc721_result["gasToken"], NULL_ADDRESS)
+        self.assertIsNone(erc721_result["gasTokenSymbol"])
+        self.assertIsNone(erc721_result["gasTokenDecimals"])
+        self.assertIsNotNone(erc721_result["payment"])
+
+        # Case 3: Native ETH transfer with GTF, gas_token = NULL_ADDRESS
+        ethereum_tx_native = EthereumTxFactory(gas_used=21000)
+        MultisigTransactionFactory(
+            safe=self.safe_address,
+            ethereum_tx=ethereum_tx_native,
+            trusted=True,
+            gas_price=1000000000,
+            gas_token=NULL_ADDRESS,
+            to=self.external_address,
+            value=1000000000000000000,
+            payment=21000000000000,
+        )
+        InternalTxFactory(
+            ethereum_tx=ethereum_tx_native,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=1000000000000000000,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        native_result = next(
+            r for r in response.json()["results"] if r["assetType"] == "native"
+        )
+        self.assertEqual(native_result["gasToken"], NULL_ADDRESS)
+        self.assertIsNone(native_result["gasTokenSymbol"])
+        self.assertIsNone(native_result["gasTokenDecimals"])
+        self.assertIsNotNone(native_result["payment"])
+
+        # Case 4: standalone incoming transfer (no multisig tx) → all four gas fee fields are null
+        ethereum_tx_standalone = EthereumTxFactory()
+        ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_standalone,
+            address=self.token.address,
+            _from=self.external_address,
+            to=self.safe_address,
+            value=500000000000000000,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        standalone_results = [
+            r for r in response.json()["results"] if r["gasToken"] is None
+        ]
+        self.assertEqual(len(standalone_results), 1)
+        standalone = standalone_results[0]
+        self.assertIsNone(standalone["payment"])
+        self.assertIsNone(standalone["gasTokenSymbol"])
+        self.assertIsNone(standalone["gasTokenDecimals"])
+
+        # Case 5: GTF with ERC20 token as gas_token
+        gas_token = TokenFactory(
+            address=Account.create().address, symbol="USDC", decimals=6
+        )
+        ethereum_tx_erc20_gas = EthereumTxFactory(gas_used=21000)
+        MultisigTransactionFactory(
+            safe=self.safe_address,
+            ethereum_tx=ethereum_tx_erc20_gas,
+            trusted=True,
+            gas_price=1000000000,
+            gas_token=gas_token.address,
+            payment=21000000000000,
+        )
+        ERC20TransferFactory(
+            ethereum_tx=ethereum_tx_erc20_gas,
+            address=self.token.address,
+            _from=self.safe_address,
+            to=self.external_address,
+            value=100000000000000000,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        usdc_results = [
+            r
+            for r in response.json()["results"]
+            if r.get("gasToken") == gas_token.address
+        ]
+        self.assertEqual(len(usdc_results), 1)
+        usdc_result = usdc_results[0]
+        self.assertEqual(usdc_result["gasToken"], gas_token.address)
+        self.assertEqual(usdc_result["gasTokenSymbol"], "USDC")
+        self.assertEqual(usdc_result["gasTokenDecimals"], 6)
+        self.assertIsNotNone(usdc_result["payment"])
+
+    def test_export_view_incoming_transfer_from_safe_payment_is_null(self):
+        """
+        When Safe B receives a transfer from Safe A, the multisig transaction
+        belongs to Safe A. Safe B's export should show null for payment, gas_token,
+        gas_token_symbol and gas_token_decimals (case: Safe-to-Safe transfer).
+        """
+        self._setup_export_tests()
+
+        sender_safe_address = Account.create().address
+        ethereum_tx = EthereumTxFactory(gas_used=21000)
+        # Multisig tx belongs to the sender Safe, not the queried Safe
+        MultisigTransactionFactory(
+            safe=sender_safe_address,
+            ethereum_tx=ethereum_tx,
+            trusted=True,
+            gas_price=1000000000,
+            gas_token=NULL_ADDRESS,
+            payment=21000000000000,
+        )
+        # ERC20TransferFactory already registers SafeRelevantTransaction for both _from and to
+        ERC20TransferFactory(
+            ethereum_tx=ethereum_tx,
+            address=self.token.address,
+            _from=sender_safe_address,
+            to=self.safe_address,
+            value=500000000000000000,
+        )
+
+        response = self.client.get(
+            reverse("v1:history:safe-export", args=(self.safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        result = results[0]
+        self.assertIsNone(result["payment"])
+        self.assertIsNone(result["gasToken"])
+        self.assertIsNone(result["gasTokenSymbol"])
+        self.assertIsNone(result["gasTokenDecimals"])
+
 
 class TestViewsV141(TestViewsV150):
     """
