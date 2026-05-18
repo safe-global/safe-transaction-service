@@ -36,7 +36,6 @@ jobs:
   test-app:
     permissions:
       contents: read
-      statuses: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
