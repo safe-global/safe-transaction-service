@@ -7,9 +7,12 @@ on:
   pull_request:
   release:
     types: [ released ]
+permissions: {}
 
 jobs:
   linting:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -31,6 +34,9 @@ jobs:
           SKIP: insert-license
 
   test-app:
+    permissions:
+      contents: read
+      statuses: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -105,6 +111,8 @@ jobs:
       with:
         file: coverage.lcov
   docker-deploy:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     needs:
       - linting
@@ -163,6 +171,8 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
   autodeploy:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     needs: [docker-deploy]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
