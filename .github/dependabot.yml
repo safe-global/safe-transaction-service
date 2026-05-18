@@ -5,21 +5,15 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    reviewers:
-      - "safe-global/core-api"
 
   - package-ecosystem: docker
     directory: "/docker/web"
     schedule:
       interval: weekly
       day: monday
-    reviewers:
-      - "safe-global/core-api"
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
       day: monday
-    reviewers:
-      - "safe-global/core-api"
