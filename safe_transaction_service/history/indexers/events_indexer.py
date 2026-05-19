@@ -16,7 +16,7 @@ from gevent import pool
 from hexbytes import HexBytes
 from safe_eth.util.util import to_0x_hex_str
 from web3.contract.contract import ContractEvent
-from web3.exceptions import LogTopicError
+from web3.exceptions import LogTopicError, Web3RPCError
 from web3.types import EventData, FilterParams, LogReceipt
 
 from safe_transaction_service.utils.utils import chunks
@@ -149,18 +149,13 @@ class EventsIndexer(EthereumIndexer):
 
         try:
             return self._do_node_query(addresses, from_block_number, to_block_number)
-        except OSError as e:
-            raise FindRelevantElementsException(
-                f"Request error retrieving events "
-                f"from-block={from_block_number} to-block={to_block_number}"
-            ) from e
-        except ValueError as e:
+        except (OSError, ValueError, Web3RPCError) as e:
             # For example, Polygon returns:
             #   ValueError({'code': -32005, 'message': 'eth_getLogs block range too large, range: 138001, max: 100000'})
             # BSC returns:
             #   ValueError({'code': -32000, 'message': 'exceed maximum block range: 5000'})
             logger.warning(
-                "%s: Value error retrieving events from-block=%d to-block=%d : %s",
+                "%s: Error retrieving events from-block=%d to-block=%d : %s",
                 self.__class__.__name__,
                 from_block_number,
                 to_block_number,

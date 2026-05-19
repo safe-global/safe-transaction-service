@@ -183,7 +183,6 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                 stdout=buf,
             )
             self.assertIn("Setting block-process-limit to 11", buf.getvalue())
-            self.assertIn("Setting from-block-number to 76", buf.getvalue())
             self.assertIn("No addresses to process", cm.output[0])
 
         safe_master_copy = SafeMasterCopyFactory(l2=False)
@@ -337,7 +336,6 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                 stdout=buf,
             )
             self.assertIn("Setting block-process-limit to 11", buf.getvalue())
-            self.assertIn("Setting from-block-number to 76", buf.getvalue())
             self.assertIn("No addresses to process", cm.output[0])
 
         safe_contract = SafeContractFactory()

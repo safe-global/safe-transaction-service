@@ -10,6 +10,7 @@ from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
 from safe_eth.util.util import to_0x_hex_str
+from web3.exceptions import Web3RPCError
 from web3.types import BlockTrace, FilterTrace
 
 from safe_transaction_service.contracts.tx_decoder import (
@@ -170,7 +171,7 @@ class InternalTxIndexer(EthereumIndexer):
                     del traces[tx_hash]
 
             return traces
-        except OSError as e:
+        except (OSError, ValueError, Web3RPCError) as e:
             raise FindRelevantElementsException(
                 "Request error calling `trace_block`"
             ) from e
@@ -203,15 +204,11 @@ class InternalTxIndexer(EthereumIndexer):
                     to_block=to_block_number,
                     to_address=list(addresses),
                 )
-        except OSError as e:
-            raise FindRelevantElementsException(
-                "Request error calling `trace_filter`"
-            ) from e
-        except ValueError as e:
+        except (OSError, ValueError, Web3RPCError) as e:
             # For example, Infura returns:
             #   ValueError: {'code': -32005, 'data': {'from': '0x6BBCE1', 'limit': 10000, 'to': '0x7072DB'}, 'message': 'query returned more than 10000 results. Try with this block range [0x6BBCE1, 0x7072DB].'}
             logger.warning(
-                "%s: Value error retrieving trace_filter results from-block=%d to-block=%d : %s",
+                "%s: Error retrieving trace_filter results from-block=%d to-block=%d : %s",
                 self.__class__.__name__,
                 from_block_number,
                 to_block_number,
