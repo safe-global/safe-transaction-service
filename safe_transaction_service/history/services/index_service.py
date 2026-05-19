@@ -77,6 +77,7 @@ class IndexServiceProvider:
                 settings.ETH_L2_NETWORK,
                 settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH,
                 settings.PROCESSING_ENABLE_OUT_OF_ORDER_CHECK,
+                settings.ETH_REINDEX_MAX_RETRIES,
             )
         return cls.instance
 
@@ -94,6 +95,7 @@ class IndexService:
         eth_l2_network: bool,
         eth_internal_tx_decoded_process_batch: int,
         processing_enable_out_of_order_check: bool,
+        eth_reindex_max_retries: int,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
@@ -102,6 +104,7 @@ class IndexService:
             eth_internal_tx_decoded_process_batch
         )
         self.processing_enable_out_of_order_check = processing_enable_out_of_order_check
+        self.eth_reindex_max_retries = eth_reindex_max_retries
 
         # Prevent circular import
         from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
@@ -624,6 +627,7 @@ class IndexService:
 
         element_number: int = 0
         block_number = from_block_number
+        consecutive_failures = 0
         while block_number <= stop_block_number:
             chunk_to = min(
                 block_number + indexer.block_process_limit - 1, stop_block_number
@@ -636,7 +640,22 @@ class IndexService:
             except FindRelevantElementsException as exc:
                 # Mirror `EthereumIndexer.process_addresses` recovery: drop the
                 # window to the minimum and retry the same range. Auto-adjust
-                # will grow it back as requests succeed.
+                # will grow it back as requests succeed. Abort if the same
+                # single-block range keeps failing, so we surface bad blocks
+                # / node bugs instead of looping forever.
+                consecutive_failures += 1
+                if (
+                    indexer.block_process_limit == 1
+                    and consecutive_failures >= self.eth_reindex_max_retries
+                ):
+                    logger.error(
+                        "Block range [%d, %d] failed %d consecutive times at "
+                        "block_process_limit=1, aborting reindex",
+                        block_number,
+                        chunk_to,
+                        consecutive_failures,
+                    )
+                    raise
                 logger.warning(
                     "Error reindexing block range [%d, %d]: %s. "
                     "Retrying with block_process_limit=1",
@@ -647,6 +666,7 @@ class IndexService:
                 indexer.block_process_limit = 1
                 continue
 
+            consecutive_failures = 0
             logger.info(
                 "Reindexed block range [%d, %d], found %d traces/events",
                 block_number,
