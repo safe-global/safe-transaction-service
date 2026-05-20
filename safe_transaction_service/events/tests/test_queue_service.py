@@ -3,7 +3,7 @@ import json
 from unittest import mock
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from kombu import Connection, Exchange, Queue
 
@@ -79,3 +79,64 @@ class TestQueueService(TestCase):
         result = queue_service.send_event({"message": "recovered"})
         self.assertEqual(result, 2)
         self.assertEqual(len(queue_service.unsent_events), 0)
+
+
+class TestBuildRoutingKey(SimpleTestCase):
+    """
+    The routing key is the contract consumers bind their queues against,
+    so its shape must stay stable. These tests pin the format.
+    """
+
+    def test_full_payload_renders_chainid_type_address(self):
+        payload = {
+            "chainId": "1",
+            "type": "EXECUTED_MULTISIG_TRANSACTION",
+            "address": "0x1234567890abcdef1234567890abcdef12345678",
+        }
+        self.assertEqual(
+            QueueService._build_routing_key(payload),
+            "1.EXECUTED_MULTISIG_TRANSACTION."
+            "0x1234567890abcdef1234567890abcdef12345678",
+        )
+
+    def test_address_is_lowercased_for_case_insensitive_bindings(self):
+        # Payloads can carry EIP-55 checksum-cased addresses, but consumers
+        # bind with a fixed casing — lowercase the address segment so the
+        # routing key is stable regardless of how the payload was built.
+        key = QueueService._build_routing_key(
+            {
+                "chainId": "1",
+                "type": "MODULE_TRANSACTION",
+                "address": "0xABCDef0000000000000000000000000000000000",
+            }
+        )
+        self.assertEqual(
+            key,
+            "1.MODULE_TRANSACTION.0xabcdef0000000000000000000000000000000000",
+        )
+
+    def test_missing_address_uses_placeholder_to_preserve_three_segments(self):
+        # A topic-exchange `*` matches exactly one word. If we emitted
+        # "1.REORG_DETECTED." (trailing empty segment), bindings like
+        # "*.*.0x..." would no longer match anything. The "_" placeholder
+        # keeps the segment count at 3 so wildcard bindings work uniformly.
+        self.assertEqual(
+            QueueService._build_routing_key({"chainId": "1", "type": "REORG_DETECTED"}),
+            "1.REORG_DETECTED._",
+        )
+
+    def test_none_address_is_treated_as_missing(self):
+        # SafeContractDelegate without a safe_contract_id produces a payload
+        # with address=None; it must not blow up or end up as "none" in the
+        # routing key.
+        self.assertEqual(
+            QueueService._build_routing_key(
+                {"chainId": "1", "type": "NEW_DELEGATE", "address": None}
+            ),
+            "1.NEW_DELEGATE._",
+        )
+
+    def test_empty_payload_returns_all_placeholders(self):
+        # Defensive: an unexpected/empty payload must still produce a valid
+        # 3-segment routing key so the publish call does not crash.
+        self.assertEqual(QueueService._build_routing_key({}), "_._._")
