@@ -691,7 +691,13 @@ SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
 # Events
 # ------------------------------------------------------------------------------
 EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
-EVENTS_QUEUE_EXCHANGE_NAME = env("EVENTS_QUEUE_EXCHANGE_NAME", default="amq.fanout")
+EVENTS_QUEUE_EXCHANGE_NAME = env(
+    "EVENTS_QUEUE_EXCHANGE_NAME", default="safe-transaction-service-events"
+)
+EVENTS_QUEUE_TOPIC_EXCHANGE_NAME = env(
+    "EVENTS_QUEUE_TOPIC_EXCHANGE_NAME",
+    default="safe-transaction-service-events-with-topics",
+)
 EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT = env.int(
     "EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT", default=20
 )
