@@ -21,8 +21,9 @@ class Command(BaseCommand):
         parser.add_argument(
             "--block-process-limit",
             type=int,
-            help="Number of blocks to query each time",
-            default=100,
+            help="Initial number of blocks to query each time. "
+            "If not provided, the indexer's configured value is used and auto-adjust drives it from there.",
+            required=False,
         )
         parser.add_argument(
             "--from-block-number",
@@ -35,7 +36,11 @@ class Command(BaseCommand):
         block_process_limit = options["block_process_limit"]
         from_block_number = options["from_block_number"]
         addresses = options["addresses"]
-        if addresses and not from_block_number:
+        if from_block_number is None:
+            if not addresses:
+                raise CommandError(
+                    "--from-block-number must be set if --addresses are not provided"
+                )
             from_block_number = SafeContract.objects.get_minimum_creation_block_number(
                 addresses
             )
@@ -46,17 +51,13 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Setting from-block-number to {from_block_number}")
             )
-        elif not from_block_number:
-            raise CommandError(
-                "--from-block-number must be set if --addresses are not provided"
-            )
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Setting block-process-limit to {block_process_limit}")
-        )
-        self.stdout.write(
-            self.style.SUCCESS(f"Setting from-block-number to {from_block_number}")
-        )
+        if block_process_limit is not None:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Setting block-process-limit to {block_process_limit}"
+                )
+            )
 
         self.reindex(from_block_number, block_process_limit, addresses)
 

@@ -77,6 +77,7 @@ class IndexServiceProvider:
                 settings.ETH_L2_NETWORK,
                 settings.ETH_INTERNAL_TX_DECODED_PROCESS_BATCH,
                 settings.PROCESSING_ENABLE_OUT_OF_ORDER_CHECK,
+                settings.ETH_REINDEX_MAX_RETRIES,
             )
         return cls.instance
 
@@ -94,6 +95,7 @@ class IndexService:
         eth_l2_network: bool,
         eth_internal_tx_decoded_process_batch: int,
         processing_enable_out_of_order_check: bool,
+        eth_reindex_max_retries: int,
     ):
         self.ethereum_client = ethereum_client
         self.eth_reorg_blocks = eth_reorg_blocks
@@ -102,6 +104,7 @@ class IndexService:
             eth_internal_tx_decoded_process_batch
         )
         self.processing_enable_out_of_order_check = processing_enable_out_of_order_check
+        self.eth_reindex_max_retries = eth_reindex_max_retries
 
         # Prevent circular import
         from ..indexers.tx_processor import SafeTxProcessor, SafeTxProcessorProvider
@@ -578,17 +581,21 @@ class IndexService:
         indexer: "EthereumIndexer",  # noqa F821
         from_block_number: int,
         to_block_number: int | None = None,
-        block_process_limit: int = 100,
+        block_process_limit: int | None = None,
         addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
         :param indexer: A new instance must be provider, providing the singleton one can break indexing
         :param from_block_number:
         :param to_block_number:
-        :param block_process_limit:
+        :param block_process_limit: Initial chunk size. If ``None``, the indexer's
+            configured ``block_process_limit`` is used. The indexer's auto-adjust
+            mechanism may grow or shrink the limit during the run.
         :param addresses:
         :return: Number of reindexed elements
         """
+        from ..indexers import FindRelevantElementsException
+
         assert (not to_block_number) or to_block_number > from_block_number
 
         if addresses:
@@ -598,49 +605,85 @@ class IndexService:
         else:
             addresses = set(indexer.database_queryset.values_list("address", flat=True))
 
-        element_number: int = 0
         if not addresses:
             logger.warning("No addresses to process")
-        else:
-            # Don't log all the addresses
-            addresses_len = len(addresses)
-            addresses_str = (
-                str(addresses)
-                if addresses_len < 10
-                else f"{addresses_len} addresses..."
+            return 0
+
+        if block_process_limit is not None:
+            indexer.block_process_limit = block_process_limit
+
+        # Don't log all the addresses
+        addresses_len = len(addresses)
+        addresses_str = (
+            str(addresses) if addresses_len < 10 else f"{addresses_len} addresses..."
+        )
+        logger.info("Start reindexing addresses %s", addresses_str)
+        current_block_number = self.ethereum_client.current_block_number
+        stop_block_number = (
+            min(current_block_number, to_block_number)
+            if to_block_number
+            else current_block_number
+        )
+
+        element_number: int = 0
+        block_number = from_block_number
+        consecutive_failures = 0
+        while block_number <= stop_block_number:
+            chunk_to = min(
+                block_number + indexer.block_process_limit - 1, stop_block_number
             )
-            logger.info("Start reindexing addresses %s", addresses_str)
-            current_block_number = self.ethereum_client.current_block_number
-            stop_block_number = (
-                min(current_block_number, to_block_number)
-                if to_block_number
-                else current_block_number
-            )
-            for block_number in range(
-                from_block_number, stop_block_number + 1, block_process_limit
-            ):
+            try:
                 elements = indexer.find_relevant_elements(
-                    addresses,
-                    block_number,
-                    min(block_number + block_process_limit - 1, stop_block_number),
+                    addresses, block_number, chunk_to
                 )
                 indexer.process_elements(elements)
-                logger.info(
-                    "Current block number %d, found %d traces/events",
+            except FindRelevantElementsException as exc:
+                # Mirror `EthereumIndexer.process_addresses` recovery: drop the
+                # window to the minimum and retry the same range. Auto-adjust
+                # will grow it back as requests succeed. Abort if the same
+                # single-block range keeps failing, so we surface bad blocks
+                # / node bugs instead of looping forever.
+                consecutive_failures += 1
+                if (
+                    indexer.block_process_limit == 1
+                    and consecutive_failures >= self.eth_reindex_max_retries
+                ):
+                    logger.error(
+                        "Block range [%d, %d] failed %d consecutive times at "
+                        "block_process_limit=1, aborting reindex",
+                        block_number,
+                        chunk_to,
+                        consecutive_failures,
+                    )
+                    raise
+                logger.warning(
+                    "Error reindexing block range [%d, %d]: %s. "
+                    "Retrying with block_process_limit=1",
                     block_number,
-                    len(elements),
+                    chunk_to,
+                    exc,
                 )
-                element_number += len(elements)
+                indexer.block_process_limit = 1
+                continue
 
-            logger.info("End reindexing addresses %s", addresses_str)
+            consecutive_failures = 0
+            logger.info(
+                "Reindexed block range [%d, %d], found %d traces/events",
+                block_number,
+                chunk_to,
+                len(elements),
+            )
+            element_number += len(elements)
+            block_number = chunk_to + 1
 
+        logger.info("End reindexing addresses %s", addresses_str)
         return element_number
 
     def reindex_master_copies(
         self,
         from_block_number: int,
         to_block_number: int | None = None,
-        block_process_limit: int = 100,
+        block_process_limit: int | None = None,
         addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
@@ -649,7 +692,8 @@ class IndexService:
 
         :param from_block_number: Block number to start indexing from
         :param to_block_number: Block number to stop indexing on
-        :param block_process_limit: Number of blocks to process each time
+        :param block_process_limit: Initial number of blocks to process each time.
+            If ``None``, the indexer's configured value is used and auto-adjust drives it from there.
         :param addresses: Master Copy or Safes(for L2 event processing) addresses. If not provided,
             all master copies will be used
         """
@@ -675,7 +719,7 @@ class IndexService:
         self,
         from_block_number: int,
         to_block_number: int | None = None,
-        block_process_limit: int = 100,
+        block_process_limit: int | None = None,
         addresses: Collection[ChecksumAddress] | None = None,
     ) -> int:
         """
@@ -684,7 +728,8 @@ class IndexService:
 
         :param from_block_number: Block number to start indexing from
         :param to_block_number: Block number to stop indexing on
-        :param block_process_limit: Number of blocks to process each time
+        :param block_process_limit: Initial number of blocks to process each time.
+            If ``None``, the indexer's configured value is used and auto-adjust drives it from there.
         :param addresses: Safe addresses. If not provided, all Safe addresses will be used
         """
         assert (not to_block_number) or to_block_number > from_block_number

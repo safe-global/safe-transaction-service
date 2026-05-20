@@ -7,6 +7,9 @@ It is the preferred place to capture shared context and expectations.
 ## Indexer Architecture (Summary)
 This repository includes multiple indexers under `safe_transaction_service/history/indexers/`.
 
+## Linear
+- All tickets go into `PLATFORM` team and with labels `Backend` and `Transaction Service`
+
 ### Base Classes
 - `ethereum_indexer.py`
   - Orchestrates block range selection and indexing flow.
@@ -35,7 +38,7 @@ This repository includes multiple indexers under `safe_transaction_service/histo
   - Indexes Safe `ProxyCreation` events, inserts `SafeContract`.
 
 ### Key Behavioral Constraints (Must Preserve)
-- L1 uses `InternalTxIndexer` and L2 uses `SafeEventsIndexer`. They do not run in parallel.
+- L1 uses `InternalTxIndexer` and L2 uses `SafeEventsIndexer`. They never run in parallel.
 - Internal traces are matched only by `SafeMasterCopy` addresses (no other address list).
 - `EthereumTx` should not exist without at least one related table row.
 - Do not index errored transactions.
@@ -54,7 +57,8 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 
 ## Testing
 - Virtualenv is managed by uv at `.venv`. Activate with `source .venv/bin/activate` or prefix commands with `uv run`.
-- Use `pytest` (no parameters). It should auto-detect configuration.
+- Dependencies must be up before running tests: `docker compose --profile develop up db redis ganache rabbitmq -d`
+- Use `pytest` (no parameters). It should auto-detect configuration. `DJANGO_SETTINGS_MODULE=config.settings.test uv run python -m pytest`
 - Use factories (e.g. `SafeContractFactory`) instead of inline helpers or `get_or_create` calls in tests.
 
 ## Performance Conventions

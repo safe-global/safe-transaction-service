@@ -631,6 +631,9 @@ ETH_REORG_BLOCKS_BATCH = env.int(
 ETH_REORG_BLOCKS = env.int(
     "ETH_REORG_BLOCKS", default=200 if ETH_L2_NETWORK else 10
 )  # Number of blocks from the current block number needed to consider a block valid/stable
+ETH_REINDEX_MAX_RETRIES = env.int(
+    "ETH_REINDEX_MAX_RETRIES", default=5
+)  # Number of consecutive failures of the same block range during reindex
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`
