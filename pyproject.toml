@@ -3,10 +3,10 @@ name = "safe-transaction-service"
 dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
-    "boto3==1.42.91",
-    "cachetools==6.2.3",
+    "boto3>=1.42",
+    "cachetools==6.2.6",
     "celery[librabbitmq]==5.6.3",
-    "django==5.2.13",
+    "django>=5.2.13,<5.3",
     "django-cache-memoize==0.2.1",
     "django-celery-beat==2.9.0",
     "django-cors-headers==4.9.0",
@@ -26,14 +26,14 @@ dependencies = [
     "drf-spectacular==0.29.0",
     "flower==2.0.1",
     "gunicorn[gevent]==25.3.0",
-    "orjson==3.11.8",
+    "orjson==3.11.9",
     "packaging>=21.0",
     "pillow==12.2.0",
-    "psycopg[binary,pool]==3.3.3",
+    "psycopg[binary,pool]==3.3.4",
     "redis[hiredis]==7.4.0",
-    "requests==2.33.1",
+    "requests==2.34.0",
     "safe-eth-py[django]==7.21.0",
-    "web3==7.15.0",
+    "web3==7.16.0",
 ]
 
 [dependency-groups]
