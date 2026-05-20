@@ -316,6 +316,44 @@ class TestCommands(SafeTestCaseMixin, TestCase):
     @mock.patch.object(
         EthereumClient, "current_block_number", new_callable=PropertyMock
     )
+    def test_reindex_master_copies_without_block_process_limit(
+        self, current_block_number_mock: PropertyMock
+    ):
+        """
+        When ``--block-process-limit`` is not provided the indexer's
+        settings-derived limit must drive the first chunk (so auto-adjust
+        engages from that anchor), and no "Setting block-process-limit"
+        line is printed.
+        """
+        from django.conf import settings
+
+        # Set high enough so the first chunk is not clamped by stop_block_number
+        current_block_number_mock.return_value = 1_000_000
+        safe_master_copy = SafeMasterCopyFactory(l2=False)
+
+        buf = StringIO()
+        with mock.patch.object(
+            InternalTxIndexer, "find_relevant_elements", return_value=[]
+        ) as find_relevant_elements_mock:
+            IndexServiceProvider.del_singleton()
+            from_block_number = 100
+            call_command(
+                "reindex_master_copies",
+                f"--from-block-number={from_block_number}",
+                stdout=buf,
+            )
+            self.assertNotIn("Setting block-process-limit", buf.getvalue())
+            expected_limit = settings.ETH_INTERNAL_TXS_BLOCK_PROCESS_LIMIT
+            find_relevant_elements_mock.assert_any_call(
+                {safe_master_copy.address},
+                from_block_number,
+                from_block_number + expected_limit - 1,
+            )
+        IndexServiceProvider.del_singleton()
+
+    @mock.patch.object(
+        EthereumClient, "current_block_number", new_callable=PropertyMock
+    )
     def test_reindex_erc20_events(self, current_block_number_mock: PropertyMock):
         logger_name = "safe_transaction_service.history.services.index_service"
         current_block_number_mock.return_value = 1000
