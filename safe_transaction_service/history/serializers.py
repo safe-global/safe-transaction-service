@@ -294,7 +294,12 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
                     f"Signer={owner} is not authorized to interact with the service"
                 )
 
-            if owner in delegates and len(parsed_signatures) > 1:
+            if (
+                owner in delegates
+                # An address that is both owner and delegate is treated as owner
+                and owner not in safe_owners
+                and len(parsed_signatures) > 1
+            ):
                 raise ValidationError(
                     "Just one signature is expected if using delegates"
                 )

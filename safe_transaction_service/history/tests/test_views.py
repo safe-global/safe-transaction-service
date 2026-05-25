@@ -2290,6 +2290,93 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
 
+    def test_post_multisig_transactions_with_owner_and_delegate(self):
+        """Owner that is also a delegate should be able to sign alongside other owners."""
+        safe_owners = [Account.create() for _ in range(4)]
+        safe_owner_addresses = [s.address for s in safe_owners]
+        # safe_owners[0] will be both an owner and a delegate
+        owner_and_delegate = safe_owners[0]
+        safe = self.deploy_test_safe(owners=safe_owner_addresses, threshold=3)
+        safe_address = safe.address
+
+        to = Account.create().address
+        data = {
+            "to": to,
+            "value": 100000000000000000,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": "0x0000000000000000000000000000000000000000",
+            "refundReceiver": "0x0000000000000000000000000000000000000000",
+            "sender": owner_and_delegate.address,
+            "origin": "Testing origin field",
+        }
+
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        safe_tx_hash = safe_tx.safe_tx_hash
+
+        # Register owner_and_delegate as a delegate for another owner
+        owner_delegate_record = SafeContractDelegateFactory(
+            safe_contract__address=safe_address,
+            delegate=owner_and_delegate.address,
+            delegator=safe_owners[1].address,
+        )
+
+        # Multiple owner signatures including the owner+delegate
+        sig_a = owner_and_delegate.unsafe_sign_hash(safe_tx_hash)["signature"]
+        sig_b = safe_owners[1].unsafe_sign_hash(safe_tx_hash)["signature"]
+        sig_c = safe_owners[2].unsafe_sign_hash(safe_tx_hash)["signature"]
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx_hash)
+        data["signature"] = to_0x_hex_str(sig_a + sig_b + sig_c)
+
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        multisig_transaction = MultisigTransaction.objects.get()
+        self.assertTrue(multisig_transaction.trusted)
+        # Sender is an owner, so proposer is the sender directly
+        self.assertEqual(multisig_transaction.proposer, owner_and_delegate.address)
+        self.assertIsNone(multisig_transaction.proposed_by_delegate)
+
+        # A pure delegate (non-owner) with multiple signatures still fails
+        MultisigTransaction.objects.all().delete()
+        pure_delegate = Account.create()
+        SafeContractDelegateFactory(
+            safe_contract=owner_delegate_record.safe_contract,
+            delegate=pure_delegate.address,
+            delegator=safe_owners[2].address,
+        )
+        data["sender"] = pure_delegate.address
+        sig_delegate = pure_delegate.unsafe_sign_hash(safe_tx_hash)["signature"]
+        data["signature"] = to_0x_hex_str(sig_delegate + sig_b)
+        response = self.client.post(
+            reverse("v1:history:multisig-transactions", args=(safe_address,)),
+            format="json",
+            data=data,
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn(
+            "Just one signature is expected if using delegates",
+            response.data["non_field_errors"][0],
+        )
+
     def test_post_multisig_transactions_with_banned_signatures(self):
         safe_owners = [Account.create() for _ in range(4)]
         safe_owner_addresses = [s.address for s in safe_owners]
