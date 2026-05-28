@@ -219,6 +219,7 @@ class SafeMessageResponseSerializer(serializers.Serializer):
     safe_app_id = serializers.IntegerField()
     confirmations = serializers.SerializerMethodField()
     prepared_signature = serializers.SerializerMethodField()
+    prepared_signature_eip1271 = serializers.SerializerMethodField()
     origin = serializers.SerializerMethodField()
 
     def get_confirmations(self, obj: SafeMessage) -> dict[str, Any]:
@@ -234,12 +235,28 @@ class SafeMessageResponseSerializer(serializers.Serializer):
 
     def get_prepared_signature(self, obj: SafeMessage) -> str | None:
         """
-        Prepared signature sorted
+        Prepared signature sorted by owner.
+
+        Note: this is a raw concatenation of per-owner confirmations and is only directly
+        usable when every confirmation is an EOA signature. For messages with ``CONTRACT_SIGNATURE``
+        confirmations (nested EIP-1271) use ``preparedSignatureEip1271`` instead.
 
         :param obj: SafeMessage instance
         :return: Serialized queryset
         """
         signature = HexBytes(obj.build_signature())
+        return to_0x_hex_str(HexBytes(signature)) if signature else None
+
+    def get_prepared_signature_eip1271(self, obj: SafeMessage) -> str | None:
+        """
+        Single EIP-1271 signature ready to be consumed as a ``SafeSignature`` whose owner is
+        ``obj.safe`` (e.g. for ``/api/v2/delegates/`` when the delegator is a Safe). Handles
+        both EOA-only and ``CONTRACT_SIGNATURE`` confirmations, including nested ones.
+
+        :param obj: SafeMessage instance
+        :return: Hex-encoded signature, or ``None`` if there are no parseable confirmations yet
+        """
+        signature = obj.build_eip1271_signature()
         return to_0x_hex_str(HexBytes(signature)) if signature else None
 
     def get_origin(self, obj: SafeMessage) -> str:

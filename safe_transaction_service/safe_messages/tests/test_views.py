@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 from django.urls import reverse
 
 import eth_abi
+from eth_abi.packed import encode_packed
 from eth_account import Account
 from hexbytes import HexBytes
 from packaging.version import Version
@@ -15,11 +16,14 @@ from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase
 from safe_eth.eth.eip712 import eip712_encode
 from safe_eth.eth.utils import fast_keccak
-from safe_eth.safe.safe_signature import SafeSignatureEOA
+from safe_eth.safe.safe_signature import SafeSignatureContract, SafeSignatureEOA
 from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.history.helpers import DelegateSignatureHelperV2
+from safe_transaction_service.history.models import SafeContractDelegate
+from safe_transaction_service.history.tests.factories import SafeContractFactory
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
@@ -65,6 +69,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
                 "preparedSignature": None,
+                "preparedSignatureEip1271": None,
                 "confirmations": [],
             },
         )
@@ -89,6 +94,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
                 "preparedSignature": to_0x_hex_str(safe_message_confirmation.signature),
+                "preparedSignatureEip1271": to_0x_hex_str(
+                    HexBytes(safe_message.build_eip1271_signature())
+                ),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
@@ -126,6 +134,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
                 "preparedSignature": to_0x_hex_str(safe_message_confirmation.signature),
+                "preparedSignatureEip1271": to_0x_hex_str(
+                    HexBytes(safe_message.build_eip1271_signature())
+                ),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
@@ -500,6 +511,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "safeAppId": safe_message.safe_app_id,
                         "origin": json.dumps(safe_message.origin),
                         "preparedSignature": None,
+                        "preparedSignatureEip1271": None,
                         "confirmations": [],
                     }
                 ],
@@ -532,6 +544,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "origin": json.dumps(safe_message.origin),
                         "preparedSignature": to_0x_hex_str(
                             safe_message_confirmation.signature
+                        ),
+                        "preparedSignatureEip1271": to_0x_hex_str(
+                            HexBytes(safe_message.build_eip1271_signature())
                         ),
                         "confirmations": [
                             {
@@ -585,6 +600,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "preparedSignature": to_0x_hex_str(
                             safe_message_confirmation.signature
                         ),
+                        "preparedSignatureEip1271": to_0x_hex_str(
+                            HexBytes(safe_message.build_eip1271_signature())
+                        ),
                         "confirmations": [
                             {
                                 "created": datetime_to_str(
@@ -633,6 +651,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
                 "preparedSignature": None,
+                "preparedSignatureEip1271": None,
                 "confirmations": [],
             },
         )
@@ -657,6 +676,9 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 "safeAppId": safe_message.safe_app_id,
                 "origin": json.dumps(safe_message.origin),
                 "preparedSignature": to_0x_hex_str(safe_message_confirmation.signature),
+                "preparedSignatureEip1271": to_0x_hex_str(
+                    HexBytes(safe_message.build_eip1271_signature())
+                ),
                 "confirmations": [
                     {
                         "created": datetime_to_str(safe_message_confirmation.created),
@@ -668,3 +690,126 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                 ],
             },
         )
+
+    def test_nested_eip1271_delegate_flow_end_to_end(self):
+        """
+        End-to-end: EOA owns Safe1, Safe1 owns Safe2, Safe2 owns Safe3. Add a delegate
+        for Safe2 (delegator) in Safe3 (safe).
+
+        Signatures are collected through ``/safe-messages/`` on Safe2 (one
+        ``CONTRACT_SIGNATURE`` confirmation by Safe1, whose payload is the EOA's
+        signature over the double-wrapped SafeMessage). The resulting
+        ``preparedSignatureEip1271`` is then used as-is to create the delegate.
+        """
+        eoa = Account.create()
+        chain_id = self.ethereum_client.get_chain_id()
+
+        safe1 = self.deploy_test_safe(owners=[eoa.address], threshold=1)
+        safe2 = self.deploy_test_safe(owners=[safe1.address], threshold=1)
+        safe3 = self.deploy_test_safe(owners=[safe2.address], threshold=1)
+        SafeContractFactory(address=safe3.address)
+
+        delegate = Account.create()
+        delegate_msg_hash, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
+            delegate.address, chain_id, previous_totp=False
+        )
+        totp = DelegateSignatureHelperV2.calculate_totp(previous=False)
+
+        delegate_eip712_message = {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                ],
+                "Delegate": [
+                    {"name": "delegateAddress", "type": "address"},
+                    {"name": "totp", "type": "uint256"},
+                ],
+            },
+            "primaryType": "Delegate",
+            "domain": {
+                "name": "Safe Transaction Service",
+                "version": "1.0",
+                "chainId": chain_id,
+            },
+            "message": {"delegateAddress": delegate.address, "totp": totp},
+        }
+        # The EIP-712 hash of the message we POST must match what the delegate
+        # endpoint will reproduce locally via DelegateSignatureHelperV2.
+        self.assertEqual(
+            fast_keccak(b"".join(eip712_encode(delegate_eip712_message))),
+            bytes(delegate_msg_hash),
+        )
+
+        # The EOA signs the doubly-wrapped SafeMessage hash. For Safe v1.5 the on-chain
+        # `isValidSignature(bytes32, bytes)` recomputes the SafeMessage of its msg.sender
+        # over the input hash, so we feed the bytes32 form into each `get_message_hash`.
+        safe2_message_hash = safe2.get_message_hash(delegate_msg_hash)
+        safe1_message_hash = safe1.get_message_hash(safe2_message_hash)
+        eoa_signature = eoa.unsafe_sign_hash(safe1_message_hash)["signature"]
+
+        # Safe1's CONTRACT_SIGNATURE blob, posted as the proposal for Safe2's SafeMessage
+        # The dynamic part for a CONTRACT_SIGNATURE is `[32B length][raw signature bytes]`.
+        # `encode_packed` lays them out directly without abi offset/padding, matching the
+        # exact layout produced by `SafeSignatureContract.export_signature()`.
+        eoa_signature_bytes = bytes(eoa_signature)
+        safe1_contract_signature = signature_to_bytes(
+            0, int.from_bytes(HexBytes(safe1.address), byteorder="big"), 65
+        ) + encode_packed(
+            ["uint256", "bytes"], [len(eoa_signature_bytes), eoa_signature_bytes]
+        )
+        # Cross-check the manual construction against the canonical builder in safe-eth-py
+        safe1_contract_signature_via_helper = bytes(
+            SafeSignatureContract.from_values(
+                safe_owner=safe1.address,
+                safe_hash=safe2_message_hash,
+                safe_hash_preimage=safe2_message_hash,
+                contract_signature=eoa_signature_bytes,
+            ).export_signature()
+        )
+        self.assertEqual(safe1_contract_signature, safe1_contract_signature_via_helper)
+
+        # 1) POST the SafeMessage on Safe2 with Safe1's EIP-1271 confirmation
+        response = self.client.post(
+            reverse("v1:safe_messages:safe-messages", args=(safe2.address,)),
+            format="json",
+            data={
+                "message": delegate_eip712_message,
+                "signature": to_0x_hex_str(HexBytes(safe1_contract_signature)),
+            },
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.content
+        )
+
+        # 2) Retrieve preparedSignatureEip1271 from the SafeMessage detail endpoint
+        safe_message_hash_hex = to_0x_hex_str(safe2_message_hash)
+        response = self.client.get(
+            reverse("v1:safe_messages:message", args=(safe_message_hash_hex,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        prepared_eip1271 = response.json()["preparedSignatureEip1271"]
+        self.assertIsNotNone(prepared_eip1271)
+
+        # 3) Use it directly as the delegator signature when adding the delegate to Safe3
+        response = self.client.post(
+            reverse("v2:history:delegates"),
+            format="json",
+            data={
+                "label": "Nested 3-level Safe delegator",
+                "safe": safe3.address,
+                "delegate": delegate.address,
+                "delegator": safe2.address,
+                "signature": prepared_eip1271,
+            },
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.content
+        )
+
+        self.assertEqual(SafeContractDelegate.objects.count(), 1)
+        record = SafeContractDelegate.objects.get()
+        self.assertEqual(record.delegate, delegate.address)
+        self.assertEqual(record.delegator, safe2.address)
+        self.assertEqual(record.safe_contract_id, safe3.address)
