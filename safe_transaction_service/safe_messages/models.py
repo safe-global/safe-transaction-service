@@ -11,7 +11,11 @@ from safe_eth.eth.django.models import (
     HexV2Field,
     Keccak256Field,
 )
-from safe_eth.safe.safe_signature import SafeSignatureType
+from safe_eth.safe.safe_signature import (
+    SafeSignature,
+    SafeSignatureContract,
+    SafeSignatureType,
+)
 from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.utils.constants import SIGNATURE_LENGTH
@@ -54,6 +58,54 @@ class SafeMessage(TimeStampedModel):
                 )
             ]
         )
+
+    def build_eip1271_signature(self) -> bytes:
+        """
+        Build a single EIP-1271 signature claiming ``self.safe`` as signer, with the inner
+        multi-owner blob assembled in the format expected by Safe's ``checkSignatures``
+        (statics first, dynamics last with cumulative offsets).
+
+        Unlike ``build_signature``, which naively concatenates per-owner confirmations and
+        works only when every confirmation is an EOA signature, this produces a blob that is
+        directly usable wherever a single ``SafeSignature`` signed by this Safe is expected
+        (e.g. as the ``signature`` body for ``/api/v2/delegates/`` when the delegator is a
+        Safe). The consumer does not need to wrap or rewrite offsets.
+
+        :return: Wrapped ``CONTRACT_SIGNATURE`` bytes (``v=0 | r=safe | s=65 | length | inner``)
+            or ``b""`` if there are no parseable confirmations yet.
+        """
+        message_hash = HexBytes(self.message_hash)
+        parsed_signatures: list[SafeSignature] = []
+        for confirmation in self.confirmations.all():
+            parsed = SafeSignature.parse_signature(
+                bytes(confirmation.signature), message_hash
+            )
+            if len(parsed) != 1:
+                logger.warning(
+                    "SafeMessage=%s confirmation for owner=%s parsed into %d signatures; skipping",
+                    to_0x_hex_str(message_hash),
+                    confirmation.owner,
+                    len(parsed),
+                )
+                continue
+            parsed_signatures.append(parsed[0])
+
+        if not parsed_signatures:
+            return b""
+
+        # `export_signatures` (plural) sorts by owner.lower() and rewrites the contract
+        # signature offsets so the resulting blob satisfies GS020-GS023 of `checkSignatures`.
+        inner_blob = SafeSignature.export_signatures(parsed_signatures)
+
+        # `safe_hash`/`safe_hash_preimage` are metadata kept on the object for `is_valid()`
+        # and do not appear in the exported bytes, so the stored message_hash is enough.
+        outer = SafeSignatureContract.from_values(
+            safe_owner=self.safe,
+            safe_hash=message_hash,
+            safe_hash_preimage=message_hash,
+            contract_signature=inner_blob,
+        )
+        return bytes(outer.export_signature())
 
 
 class SafeMessageConfirmation(TimeStampedModel):

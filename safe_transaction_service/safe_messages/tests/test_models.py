@@ -4,12 +4,20 @@ from unittest.mock import PropertyMock
 
 from django.test import TestCase
 
+import eth_abi
 from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_keccak
+from safe_eth.safe.safe_signature import (
+    SafeSignature,
+    SafeSignatureContract,
+    SafeSignatureType,
+)
+from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from ..models import SafeMessageConfirmation
 from ..utils import get_message_encoded, get_safe_message_hash_and_preimage_for_message
 from .factories import SafeMessageConfirmationFactory, SafeMessageFactory
 from .mocks import get_eip712_payload_mock
@@ -100,3 +108,118 @@ class TestSafeMessage(SafeTestCaseMixin, TestCase):
             safe_message_confirmation_1.signature
         )
         self.assertEqual(safe_message.build_signature(), expected_signature)
+
+    def test_build_eip1271_signature_empty(self):
+        safe_message = SafeMessageFactory(safe=self.deploy_test_safe().address)
+        self.assertEqual(safe_message.build_eip1271_signature(), b"")
+
+    def test_build_eip1271_signature_eoa_only(self):
+        owner_1 = Account.create()
+        owner_2 = Account.create()
+        safe = self.deploy_test_safe(
+            owners=[owner_1.address, owner_2.address], threshold=2
+        )
+        safe_message = SafeMessageFactory(safe=safe.address)
+        SafeMessageConfirmationFactory(signing_owner=owner_1, safe_message=safe_message)
+        SafeMessageConfirmationFactory(signing_owner=owner_2, safe_message=safe_message)
+
+        wrapped = safe_message.build_eip1271_signature()
+        message_hash = HexBytes(safe_message.message_hash)
+
+        # The wrapped blob must parse as a single SafeSignature whose owner is the Safe
+        outer_signatures = SafeSignature.parse_signature(wrapped, message_hash)
+        self.assertEqual(len(outer_signatures), 1)
+        self.assertIsInstance(outer_signatures[0], SafeSignatureContract)
+        self.assertEqual(outer_signatures[0].owner, safe.address)
+
+        # Unwrapping the contract signature payload yields the two EOA sigs ordered ascending
+        inner_signatures = SafeSignature.parse_signature(
+            outer_signatures[0].contract_signature, message_hash
+        )
+        self.assertEqual(len(inner_signatures), 2)
+        self.assertEqual(
+            [sig.signature_type for sig in inner_signatures],
+            [SafeSignatureType.EOA, SafeSignatureType.EOA],
+        )
+        recovered_owners = [sig.owner for sig in inner_signatures]
+        self.assertEqual(recovered_owners, sorted(recovered_owners, key=str.lower))
+        self.assertEqual(set(recovered_owners), {owner_1.address, owner_2.address})
+
+    def test_build_eip1271_signature_with_contract_signature(self):
+        """
+        Cover the case the naive `build_signature` cannot: a confirmation whose owner is
+        itself a Safe (nested EIP-1271). The wrapped blob must keep GS021 happy — every
+        inner `CONTRACT_SIGNATURE` static must point to an offset ``>= n_signatures * 65``.
+        """
+        eoa_owner_1 = Account.create()
+        eoa_owner_2 = Account.create()
+        nested_eoa = Account.create()
+        safe_owner = self.deploy_test_safe(owners=[nested_eoa.address])
+        safe = self.deploy_test_safe(
+            owners=[eoa_owner_1.address, eoa_owner_2.address, safe_owner.address],
+            threshold=3,
+        )
+        safe_message = SafeMessageFactory(safe=safe.address)
+        message_hash = HexBytes(safe_message.message_hash)
+
+        # Two EOA confirmations via the factory
+        SafeMessageConfirmationFactory(
+            signing_owner=eoa_owner_1, safe_message=safe_message
+        )
+        SafeMessageConfirmationFactory(
+            signing_owner=eoa_owner_2, safe_message=safe_message
+        )
+
+        # The Safe-owner confirmation: a CONTRACT_SIGNATURE whose payload is the nested EOA
+        # signing the double-wrapped SafeMessage hash. The bytes here are synthetic: this
+        # test verifies structural wrapping, not on-chain EIP-1271 validation.
+        safe_owner_message_hash, _ = safe_owner.get_message_hash_and_preimage(
+            message_hash
+        )
+        nested_eoa_sig = nested_eoa.unsafe_sign_hash(safe_owner_message_hash)[
+            "signature"
+        ]
+        contract_signature_bytes = (
+            signature_to_bytes(
+                0,
+                int.from_bytes(HexBytes(safe_owner.address), byteorder="big"),
+                65,
+            )
+            + eth_abi.encode(["bytes"], [bytes(nested_eoa_sig)])[32:]
+        )
+        SafeMessageConfirmation.objects.create(
+            safe_message=safe_message,
+            owner=safe_owner.address,
+            signature=contract_signature_bytes,
+            signature_type=SafeSignatureType.CONTRACT_SIGNATURE.value,
+        )
+
+        wrapped = safe_message.build_eip1271_signature()
+
+        # Outer wrap: single CONTRACT_SIGNATURE pointing to the Safe
+        outer_signatures = SafeSignature.parse_signature(wrapped, message_hash)
+        self.assertEqual(len(outer_signatures), 1)
+        self.assertIsInstance(outer_signatures[0], SafeSignatureContract)
+        self.assertEqual(outer_signatures[0].owner, safe.address)
+
+        # Inner blob: three signatures, sorted ascending by owner.lower(), with the contract
+        # sig's offset satisfying GS021 (>= 3 * 65 = 195).
+        inner_signatures = SafeSignature.parse_signature(
+            outer_signatures[0].contract_signature, message_hash
+        )
+        self.assertEqual(len(inner_signatures), 3)
+        recovered_owners = [sig.owner for sig in inner_signatures]
+        self.assertEqual(recovered_owners, sorted(recovered_owners, key=str.lower))
+        self.assertEqual(
+            set(recovered_owners),
+            {eoa_owner_1.address, eoa_owner_2.address, safe_owner.address},
+        )
+        contract_sig_in_inner = next(
+            sig
+            for sig in inner_signatures
+            if sig.signature_type == SafeSignatureType.CONTRACT_SIGNATURE
+        )
+        self.assertGreaterEqual(contract_sig_in_inner.s, 3 * 65)
+        self.assertEqual(
+            bytes(contract_sig_in_inner.contract_signature), bytes(nested_eoa_sig)
+        )
