@@ -1662,7 +1662,7 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
         self.assertTrue(response.data["results"][0]["trusted"])
 
-        # Sign with a different user that sender
+        # Sign with a different user than sender
         random_user_account = Account.create()
         data["signature"] = to_0x_hex_str(
             random_user_account.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
