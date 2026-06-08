@@ -11,6 +11,7 @@ import gevent
 from gevent.greenlet import Greenlet
 
 from ..events.services.queue_service import get_queue_service
+from ..utils.database import close_unusable_or_obsolete_connections
 from .cache import remove_cache_view_by_instance
 from .models import (
     ERC20Transfer,
@@ -223,6 +224,42 @@ def process_event(
     return _process_event(sender, instance, created, False)
 
 
+def _process_event_and_close_connections(
+    sender: type[Model],
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | SafeContract,
+    created: bool,
+    deleted: bool,
+) -> None:
+    """
+    Run ``_process_event`` and return any DB connection opened by the greenlet to the pool.
+
+    These greenlets are spawned fire-and-forget from the indexer flow, so they run on their
+    own greenlet-local connection *after* Celery's ``task_postrun`` cleanup
+    (``config.celery_app.close_db_connections``) has already fired for the task. Nothing else
+    closes that connection, so it lingers until the psycopg3 pool recycles it by idle/lifetime
+    timers. Some senders (e.g. ``MultisigConfirmation``) lazily load FKs while building the
+    payload, opening such a connection.
+
+    Mirrors the ``task_postrun`` cleanup pattern. ``close_if_unusable_or_obsolete`` is a no-op
+    when no connection was opened (the common transfer/ether case touches only Redis/queue), so
+    this is cheap.
+
+    :param sender: Sender type
+    :param instance: Sender instance
+    :param created: `True` if the instance has just been created, `False` otherwise
+    :param deleted: `True` if the instance has been deleted, `False` otherwise
+    :return:
+    """
+    try:
+        _process_event(sender, instance, created, deleted)
+    finally:
+        close_unusable_or_obsolete_connections()
+
+
 @receiver(
     post_bulk_create,
     sender=ModuleTransaction,
@@ -273,7 +310,9 @@ def process_event_from_bulk_create(
     :param kwargs:
     :return: Greenlet running _process_event
     """
-    return gevent.spawn(_process_event, sender, instance, created, False)
+    return gevent.spawn(
+        _process_event_and_close_connections, sender, instance, created, False
+    )
 
 
 @receiver(
