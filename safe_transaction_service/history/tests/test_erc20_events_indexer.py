@@ -4,6 +4,7 @@ from django.test import TestCase
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexerProvider
+from ..indexers.erc20_events_indexer import AddressesCache
 from ..models import ERC20Transfer, EthereumTx, IndexingStatus, SafeRelevantTransaction
 from .factories import EthereumTxFactory, SafeContractFactory
 from .mocks.mocks_erc20_events_indexer import log_receipt_mock
@@ -105,6 +106,35 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertEqual(
             len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 1
         )
+
+    def test_events_to_transfer_annotates_safe_membership(self):
+        indexer = self.erc20_events_indexer
+
+        # Block/tx must exist so `from_decoded_event` can resolve the timestamp
+        for log_receipt in log_receipt_mock:
+            EthereumTxFactory(
+                tx_hash=log_receipt["transactionHash"],
+                block__block_hash=log_receipt["blockHash"],
+            )
+
+        # Without a populated address cache the transfer is left unannotated, so
+        # build_event_payload will log the "lacking metadata" error rather than guess.
+        indexer.addresses_cache = None
+        (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
+        self.assertFalse(hasattr(transfer, "_to_is_a_safe"))
+        self.assertFalse(hasattr(transfer, "_from_is_a_safe"))
+
+        # With only the recipient tracked: incoming side is a Safe, outgoing side is not.
+        indexer.addresses_cache = AddressesCache({transfer.to}, None)
+        (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
+        self.assertTrue(transfer._to_is_a_safe)
+        self.assertFalse(transfer._from_is_a_safe)
+
+        # With only the sender tracked: outgoing side is a Safe, incoming side is not.
+        indexer.addresses_cache = AddressesCache({transfer._from}, None)
+        (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
+        self.assertFalse(transfer._to_is_a_safe)
+        self.assertTrue(transfer._from_is_a_safe)
 
     def test_get_almost_updated_addresses(self):
         self.assertIsNone(self.erc20_events_indexer.addresses_cache)

@@ -36,6 +36,7 @@ from ..models import (
     SafeMasterCopy,
     SafeRelevantTransaction,
 )
+from ..services.event_service import set_safe_membership
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -719,6 +720,19 @@ class SafeEventsIndexer(EventsIndexer):
 
         if not internal_tx:
             return []
+
+        # Annotate Safe membership so ether transfers only emit the directional event for the
+        # Safe side. The Safe is always `safe_address` (the event emitter): `SafeReceived` has
+        # to=safe (incoming only); an exec-tx ether transfer has _from=safe (outgoing only).
+        # A Safe->Safe transfer's incoming side is covered by the recipient's own SafeReceived.
+        for tx in (internal_tx, child_internal_tx):
+            if tx is not None:
+                set_safe_membership(
+                    tx,
+                    to_is_a_safe=tx.to == safe_address,
+                    from_is_a_safe=tx._from == safe_address,
+                )
+
         return [
             internal_tx,
             internal_tx_decoded,
