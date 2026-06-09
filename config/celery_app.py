@@ -2,6 +2,10 @@
 from celery import Celery
 from celery.signals import setup_logging, task_postrun
 
+from safe_transaction_service.utils.database import (
+    close_unusable_or_obsolete_connections,
+)
+
 
 @setup_logging.connect
 def on_celery_setup_logging(**kwargs):
@@ -26,8 +30,6 @@ def on_celery_setup_logging(**kwargs):
 
 @task_postrun.connect
 def close_db_connections(**kwargs):
-    from django.db import connections
-
     # Django's close_old_connections() is called automatically at the end of each web request
     # via middleware signals, but Celery tasks have no equivalent lifecycle hook.
     #
@@ -40,18 +42,7 @@ def close_db_connections(**kwargs):
     # but that only covers the fork/process-start path. With --pool=gevent there is no forking:
     # all tasks run as greenlets inside a single process, so close_pool never fires and
     # per-task connection cleanup must be handled explicitly here.
-    #
-    # CONN_MAX_AGE=0 means every connection is immediately eligible for closure,
-    # triggering close() → putconn() and returning the slot to the pool immediately.
-    #
-    # Connections inside an atomic block are skipped: in production this never happens
-    # because task_postrun fires after the task function returns (so any transaction.atomic
-    # blocks from the task itself have already exited). In tests, Django's TestCase wraps
-    # each test in a transaction (in_atomic_block=True), and closing the connection there
-    # would break test isolation.
-    for conn in connections.all(initialized_only=True):
-        if not conn.in_atomic_block:
-            conn.close_if_unusable_or_obsolete()
+    close_unusable_or_obsolete_connections()
 
 
 app = Celery("safe_transaction_service")
