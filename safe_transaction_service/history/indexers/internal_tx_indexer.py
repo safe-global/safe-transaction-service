@@ -28,6 +28,7 @@ from ..models import (
     SafeMasterCopy,
     SafeRelevantTransaction,
 )
+from ..services.event_service import set_safe_membership
 from .ethereum_indexer import EthereumIndexer, FindRelevantElementsException
 
 logger = getLogger(__name__)
@@ -373,12 +374,30 @@ class InternalTxIndexer(EthereumIndexer):
 
         ethereum_txs = self._prefetch_ethereum_txs(tx_hashes)
 
-        internal_txs = [
-            InternalTx.objects.build_from_trace(trace, ethereum_tx)
-            for ethereum_tx in ethereum_txs
-            if ethereum_tx.success
-            for trace in filtered_traces_by_tx_hash[HexBytes(ethereum_tx.tx_hash)]
-        ]
+        # Identify the Safe proxies active in each tx so ether transfers only emit a
+        # directional event for the Safe side. This indexer monitors Safe master-copy
+        # (singleton) addresses, so a tx is pulled in whenever any trace touches a master
+        # copy and then ALL its value hops are stored - including router->router hops with
+        # no Safe on either side. The Safe proxies are the `from` of the delegatecall to a
+        # master copy (computed from the full, pre-`is_relevant_trace` traces so empty-data
+        # fallback delegatecalls from plain ETH receives are not missed).
+        master_copies = self._get_master_copy_addresses()
+        internal_txs: list[InternalTx] = []
+        for ethereum_tx in ethereum_txs:
+            if not ethereum_tx.success:
+                continue
+            tx_hash = HexBytes(ethereum_tx.tx_hash)
+            safe_proxies = self._extract_safe_proxies(
+                tx_hash_with_traces.get(tx_hash), master_copies
+            )
+            for trace in filtered_traces_by_tx_hash[tx_hash]:
+                internal_tx = InternalTx.objects.build_from_trace(trace, ethereum_tx)
+                set_safe_membership(
+                    internal_tx,
+                    to_is_a_safe=internal_tx.to in safe_proxies,
+                    from_is_a_safe=internal_tx._from in safe_proxies,
+                )
+                internal_txs.append(internal_tx)
 
         with transaction.atomic():
             logger.debug("Storing traces")
@@ -418,6 +437,41 @@ class InternalTxIndexer(EthereumIndexer):
             )
             self._mark_processed(tx_hash, block_hash)
         return tx_hashes
+
+    @staticmethod
+    def _get_master_copy_addresses() -> set[ChecksumAddress]:
+        """
+        :return: The monitored Safe master-copy (singleton) addresses. A Safe proxy is
+            identified in a tx by delegatecalling one of these.
+        """
+        return set(SafeMasterCopy.objects.values_list("address", flat=True))
+
+    @staticmethod
+    def _extract_safe_proxies(
+        traces: list[FilterTrace] | None, master_copies: set[ChecksumAddress]
+    ) -> set[ChecksumAddress]:
+        """
+        Derive the Safe proxy addresses active in a tx: the `from` of any non-errored
+        ``DELEGATE_CALL`` whose `to` is a monitored master copy.
+
+        :param traces: Full (pre-filter) trace list for the tx, or ``None``
+        :param master_copies: Monitored master-copy addresses
+        :return: Set of Safe proxy addresses present in the tx
+        """
+        safe_proxies: set[ChecksumAddress] = set()
+        if not traces:
+            return safe_proxies
+        for trace in traces:
+            action = trace.get("action", {})
+            if (
+                EthereumTxCallType.parse_call_type(action.get("callType"))
+                == EthereumTxCallType.DELEGATE_CALL
+                and not trace.get("error")
+                and action.get("to") in master_copies
+            ):
+                if safe_proxy := action.get("from"):
+                    safe_proxies.add(safe_proxy)
+        return safe_proxies
 
     @staticmethod
     def is_relevant_trace(trace: FilterTrace) -> bool:

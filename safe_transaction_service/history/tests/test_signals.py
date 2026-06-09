@@ -29,6 +29,7 @@ from ..models import (
     TransactionServiceEventType,
     post_bulk_create,
 )
+from ..services.event_service import set_safe_membership
 from ..signals import (
     _process_event,
     _process_event_and_close_connections,
@@ -46,13 +47,20 @@ from .factories import (
 
 
 class TestSignals(SafeTestCaseMixin, TestCase):
+    @staticmethod
+    def _annotated(instance):
+        # Mark both sides as tracked Safes so both directional events are emitted (the
+        # default for these structural assertions; gating is covered by dedicated tests).
+        set_safe_membership(instance, to_is_a_safe=True, from_is_a_safe=True)
+        return instance
+
     @factory.django.mute_signals(post_save)
     def test_build_message_payload(self):
         self.assertEqual(
             [
                 payload["type"]
                 for payload in build_event_payload(
-                    ERC20Transfer, ERC20TransferFactory()
+                    ERC20Transfer, self._annotated(ERC20TransferFactory())
                 )
             ],
             [
@@ -63,7 +71,9 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             [
                 payload["type"]
-                for payload in build_event_payload(InternalTx, InternalTxFactory())
+                for payload in build_event_payload(
+                    InternalTx, self._annotated(InternalTxFactory())
+                )
             ],
             [
                 TransactionServiceEventType.INCOMING_ETHER.name,
@@ -74,7 +84,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             [
                 payload["chainId"]
                 for payload in build_event_payload(
-                    ERC20Transfer, ERC20TransferFactory()
+                    ERC20Transfer, self._annotated(ERC20TransferFactory())
                 )
             ],
             [str(EthereumNetwork.GANACHE.value), str(EthereumNetwork.GANACHE.value)],
@@ -137,6 +147,77 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+
+    EVENT_SERVICE_LOGGER = "safe_transaction_service.history.services.event_service"
+
+    @factory.django.mute_signals(post_save)
+    def test_build_event_payload_token_gating(self):
+        # Only the directional event whose side is a tracked Safe is emitted
+        cases = [
+            (
+                True,
+                True,
+                [
+                    TransactionServiceEventType.INCOMING_TOKEN.name,
+                    TransactionServiceEventType.OUTGOING_TOKEN.name,
+                ],
+            ),
+            (True, False, [TransactionServiceEventType.INCOMING_TOKEN.name]),
+            (False, True, [TransactionServiceEventType.OUTGOING_TOKEN.name]),
+            (False, False, []),  # router->router: emit neither, silently
+        ]
+        for to_is_a_safe, from_is_a_safe, expected in cases:
+            with self.subTest(to=to_is_a_safe, from_=from_is_a_safe):
+                transfer = ERC20TransferFactory()
+                set_safe_membership(
+                    transfer, to_is_a_safe=to_is_a_safe, from_is_a_safe=from_is_a_safe
+                )
+                with self.assertNoLogs(self.EVENT_SERVICE_LOGGER, level="ERROR"):
+                    payloads = build_event_payload(ERC20Transfer, transfer)
+                self.assertEqual([p["type"] for p in payloads], expected)
+
+    @factory.django.mute_signals(post_save)
+    def test_build_event_payload_ether_gating(self):
+        cases = [
+            (
+                True,
+                True,
+                [
+                    TransactionServiceEventType.INCOMING_ETHER.name,
+                    TransactionServiceEventType.OUTGOING_ETHER.name,
+                ],
+            ),
+            (True, False, [TransactionServiceEventType.INCOMING_ETHER.name]),
+            (False, True, [TransactionServiceEventType.OUTGOING_ETHER.name]),
+            (False, False, []),
+        ]
+        for to_is_a_safe, from_is_a_safe, expected in cases:
+            with self.subTest(to=to_is_a_safe, from_=from_is_a_safe):
+                internal_tx = InternalTxFactory()
+                set_safe_membership(
+                    internal_tx,
+                    to_is_a_safe=to_is_a_safe,
+                    from_is_a_safe=from_is_a_safe,
+                )
+                with self.assertNoLogs(self.EVENT_SERVICE_LOGGER, level="ERROR"):
+                    payloads = build_event_payload(InternalTx, internal_tx)
+                self.assertEqual([p["type"] for p in payloads], expected)
+
+    @factory.django.mute_signals(post_save)
+    def test_build_event_payload_missing_metadata_logs_error(self):
+        # Unannotated instances must emit nothing and log an error pinpointing the transfer
+        transfer = ERC20TransferFactory()  # not annotated
+        with self.assertLogs(self.EVENT_SERVICE_LOGGER, level="ERROR") as cm:
+            self.assertEqual(build_event_payload(ERC20Transfer, transfer), [])
+        self.assertIn("Lacking metadata", cm.output[0])
+        self.assertIn(to_0x_hex_str(HexBytes(transfer.ethereum_tx_id)), cm.output[0])
+        self.assertIn(str(transfer.log_index), cm.output[0])
+
+        internal_tx = InternalTxFactory()  # not annotated, is_ether_transfer
+        with self.assertLogs(self.EVENT_SERVICE_LOGGER, level="ERROR") as cm:
+            self.assertEqual(build_event_payload(InternalTx, internal_tx), [])
+        self.assertIn(to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id)), cm.output[0])
+        self.assertIn(internal_tx.trace_address, cm.output[0])
 
     @factory.django.mute_signals(post_save)
     def test_is_relevant_event_multisig_confirmation(self):
