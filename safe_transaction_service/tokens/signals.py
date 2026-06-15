@@ -11,6 +11,7 @@ from safe_transaction_service.history.services import (
 )
 
 from .models import Token
+from .services import TokenServiceProvider
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ def clear_cache(sender: type[Model], instance: Token, created: bool, **kwargs) -
     :param kwargs:
     :return:
     """
+
+    TokenServiceProvider().cache_trusted_addresses.clear()
 
     if not created:
         balance_service = BalanceServiceProvider()

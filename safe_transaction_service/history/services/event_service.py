@@ -30,6 +30,7 @@ from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
 )
+from safe_transaction_service.tokens.services import TokenServiceProvider
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 logger = getLogger(__name__)
@@ -183,6 +184,7 @@ def build_event_payload(
             "type": TransactionServiceEventType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
             "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
+            "trusted": TokenServiceProvider().is_trusted(instance.address),
         }
         if isinstance(instance, ERC20Transfer):
             incoming_payload["value"] = str(instance.value)

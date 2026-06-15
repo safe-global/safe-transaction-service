@@ -10,6 +10,7 @@ from safe_eth.eth.ethereum_client import EthereumNetwork
 
 from ...utils.redis import get_redis
 from ..models import TokenList
+from ..services import TokenServiceProvider
 from ..tasks import fix_pool_tokens_task, update_token_info_from_token_list_task
 from .factories import TokenFactory, TokenListFactory
 from .mocks import token_list_mock
@@ -61,9 +62,15 @@ class TestTasks(TestCase):
             symbol="OLD",
         )
         self.assertFalse(token.trusted)
+        # Populate the trusted tokens cache while the token is not trusted yet
+        token_service = TokenServiceProvider()
+        self.assertEqual(token_service.get_trusted_token_addresses(), frozenset())
         self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
         token.refresh_from_db()
         self.assertTrue(token.trusted)
+        # The task marks tokens as trusted with a bulk `update` (no `post_save`
+        # signal), so it must clear the cache itself for the change to be visible
+        self.assertIn(token.address, token_service.get_trusted_token_addresses())
         self.assertEqual(
             token.logo_uri,
             "https://cloudflare-ipfs.com/ipfs/QmYNLKHDEoG9FLJtbJ1r8HCyi7by9gksuacRkhkakxwEQ8",
