@@ -5,6 +5,7 @@ Build event payloads for the queue
 
 import json
 from datetime import timedelta
+from logging import getLogger
 from typing import Any, Literal, TypedDict
 
 from django.db.models import Model
@@ -30,6 +31,81 @@ from safe_transaction_service.safe_messages.models import (
     SafeMessageConfirmation,
 )
 from safe_transaction_service.utils.ethereum import get_chain_id
+
+logger = getLogger(__name__)
+
+# Transient (non-DB) attributes set by the indexers on transfer / ether ``InternalTx``
+# instances, telling whether the `to` / `_from` side is a tracked Safe. Used by
+# `build_event_payload` to only emit the directional event whose side is a Safe.
+TO_IS_A_SAFE_ATTR = "_to_is_a_safe"
+FROM_IS_A_SAFE_ATTR = "_from_is_a_safe"
+
+
+def set_safe_membership(
+    instance: TokenTransfer | InternalTx,
+    to_is_a_safe: bool,
+    from_is_a_safe: bool,
+) -> None:
+    """
+    Annotate a ``TokenTransfer`` / ether ``InternalTx`` with whether its `to` / `_from`
+    side is a tracked Safe, so `build_event_payload` only emits the directional
+    event for the Safe side.
+
+    Called by the indexers at index time (where Safe membership is known in memory). The
+    attribute is transient; it survives to the `post_bulk_create` signal because the same
+    instance is passed through (see ``BulkCreateSignalMixin.bulk_create``).
+
+    :param instance: ``TokenTransfer`` or ether ``InternalTx`` about to be stored
+    :param to_is_a_safe: whether ``instance.to`` is a tracked Safe
+    :param from_is_a_safe: whether ``instance._from`` is a tracked Safe
+    :return:
+    """
+    setattr(instance, TO_IS_A_SAFE_ATTR, to_is_a_safe)
+    setattr(instance, FROM_IS_A_SAFE_ATTR, from_is_a_safe)
+
+
+def _filter_not_safe_transfers(
+    instance: TokenTransfer | InternalTx,
+    incoming_payload: dict[str, Any],
+    outgoing_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """
+    Keep only the directional payloads whose addressed side is a tracked Safe.
+
+    ``INCOMING_*`` is addressed by ``instance.to`` and gated by ``_to_is_a_safe``;
+    ``OUTGOING_*`` by ``instance._from`` and gated by ``_from_is_a_safe``. The indexers
+    annotate both attributes (each possibly ``False`` when that side is not a Safe).
+
+    If both attributes are absent, the instance reached payload building without going
+    through an annotating indexer: emit nothing and log an error so the gap is visible.
+
+    :param instance: ``TokenTransfer`` or ether ``InternalTx`` being processed
+    :param incoming_payload: payload addressed to ``instance.to``
+    :param outgoing_payload: payload addressed to ``instance._from``
+    :return: the subset of payloads that should be emitted
+    """
+    to_is_a_safe = getattr(instance, TO_IS_A_SAFE_ATTR, None)
+    from_is_a_safe = getattr(instance, FROM_IS_A_SAFE_ATTR, None)
+
+    if to_is_a_safe is None and from_is_a_safe is None:
+        identifier = (
+            instance.trace_address
+            if isinstance(instance, InternalTx)
+            else instance.log_index
+        )
+        logger.error(
+            "Lacking metadata to build event for transfer with hash=%s identifier=%s",
+            to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
+            identifier,
+        )
+        return []
+
+    payloads: list[dict[str, Any]] = []
+    if to_is_a_safe:
+        payloads.append(incoming_payload)
+    if from_is_a_safe:
+        payloads.append(outgoing_payload)
+    return payloads
 
 
 def build_event_payload(
@@ -97,7 +173,9 @@ def build_event_payload(
         outgoing_payload = dict(incoming_payload)
         outgoing_payload["type"] = TransactionServiceEventType.OUTGOING_ETHER.name
         outgoing_payload["address"] = instance._from
-        payloads = [incoming_payload, outgoing_payload]
+        payloads = _filter_not_safe_transfers(
+            instance, incoming_payload, outgoing_payload
+        )
     elif sender in (ERC20Transfer, ERC721Transfer):
         # INCOMING_TOKEN / OUTGOING_TOKEN
         incoming_payload = {
@@ -113,7 +191,9 @@ def build_event_payload(
         outgoing_payload = dict(incoming_payload)
         outgoing_payload["type"] = TransactionServiceEventType.OUTGOING_TOKEN.name
         outgoing_payload["address"] = instance._from
-        payloads = [incoming_payload, outgoing_payload]
+        payloads = _filter_not_safe_transfers(
+            instance, incoming_payload, outgoing_payload
+        )
     elif sender == SafeContract:  # Safe created
         payloads = [
             {

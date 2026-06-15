@@ -86,6 +86,51 @@ class TestInternalTxIndexer(TestCase):
         self.assertTrue(indexer.is_relevant_trace(create_trace))
         self.assertFalse(indexer.is_relevant_trace(not_relevant_trace))
 
+    def test_extract_safe_proxies(self):
+        indexer = self.internal_tx_indexer
+        master_copy = "0x" + "ab" * 20
+        safe_proxy = "0x" + "11" * 20
+        other = "0x" + "22" * 20
+
+        traces = [
+            # Safe proxy delegatecalling its master copy -> proxy identified
+            {
+                "type": "call",
+                "action": {
+                    "callType": "delegatecall",
+                    "from": safe_proxy,
+                    "to": master_copy,
+                },
+            },
+            # delegatecall to a non-master-copy -> ignored
+            {
+                "type": "call",
+                "action": {"callType": "delegatecall", "from": other, "to": other},
+            },
+            # plain CALL to the master copy (not a delegatecall) -> ignored
+            {
+                "type": "call",
+                "action": {"callType": "call", "from": other, "to": master_copy},
+            },
+            # errored delegatecall to the master copy -> ignored
+            {
+                "type": "call",
+                "error": "Reverted",
+                "action": {
+                    "callType": "delegatecall",
+                    "from": other,
+                    "to": master_copy,
+                },
+            },
+        ]
+
+        self.assertEqual(
+            indexer._extract_safe_proxies(traces, {master_copy}), {safe_proxy}
+        )
+        # No traces / empty input -> empty set, never raises
+        self.assertEqual(indexer._extract_safe_proxies(None, {master_copy}), set())
+        self.assertEqual(indexer._extract_safe_proxies([], {master_copy}), set())
+
     def return_sorted_blocks(self, hashes: HexStr):
         """
         Mock function helper

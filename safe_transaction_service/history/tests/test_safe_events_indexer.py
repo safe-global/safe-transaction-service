@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 
 from django.test import TestCase
+from django.utils import timezone
 
 from eth_account import Account
 from eth_typing import ChecksumAddress
@@ -1586,3 +1587,33 @@ class TestSafeEventsIndexerV1_3_0(SafeEventsIndexerBaseAbstractTestBase):
         :return: Last Safe Contract available
         """
         return get_safe_V1_3_0_contract(w3, address=address)
+
+
+class TestSafeEventsIndexerSafeMembership(SafeTestCaseMixin, TestCase):
+    def test_process_decoded_element_annotates_safe_membership(self):
+        # On L2 the Safe is always the event emitter (`address`), so an incoming
+        # `SafeReceived` must be annotated as incoming-only (to=safe, _from=sender).
+        indexer = SafeEventsIndexer(
+            self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
+        )
+        safe_address = Account.create().address
+        sender = Account.create().address
+        block_hash = HexBytes("0x" + "ab" * 32)
+        indexer.block_hashes_with_timestamp = {block_hash: timezone.now()}
+
+        element = AttributeDict(
+            {
+                "event": "SafeReceived",
+                "address": safe_address,
+                "blockNumber": 1,
+                "transactionHash": HexBytes("0x" + "cd" * 32),
+                "logIndex": 0,
+                "blockHash": block_hash,
+                "args": AttributeDict({"sender": sender, "value": 1000}),
+            }
+        )
+
+        internal_tx = indexer._process_decoded_element(element)[0]
+        self.assertTrue(internal_tx.is_ether_transfer)
+        self.assertTrue(internal_tx._to_is_a_safe)
+        self.assertFalse(internal_tx._from_is_a_safe)
