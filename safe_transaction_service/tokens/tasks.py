@@ -17,6 +17,7 @@ from safe_transaction_service.utils.ethereum import get_ethereum_network
 from ..utils.celery import task_timeout
 from .exceptions import TokenListRetrievalException
 from .models import Token, TokenList, TokenListToken
+from .services import TokenServiceProvider
 
 logger = get_task_logger(__name__)
 
@@ -140,4 +141,6 @@ def update_token_info_from_token_list_task() -> int:
                 tokens_updated_count += Token.objects.filter(
                     address=token_address
                 ).update(**update_fields)
-        return tokens_updated_count
+
+    TokenServiceProvider().cache_trusted_addresses.clear()
+    return tokens_updated_count

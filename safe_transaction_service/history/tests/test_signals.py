@@ -21,8 +21,11 @@ from ...safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
     SafeMessageFactory,
 )
+from ...tokens.services import TokenServiceProvider
+from ...tokens.tests.factories import TokenFactory
 from ..models import (
     ERC20Transfer,
+    ERC721Transfer,
     InternalTx,
     MultisigConfirmation,
     MultisigTransaction,
@@ -38,6 +41,7 @@ from ..signals import (
 )
 from .factories import (
     ERC20TransferFactory,
+    ERC721TransferFactory,
     InternalTxFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
@@ -175,6 +179,27 @@ class TestSignals(SafeTestCaseMixin, TestCase):
                 with self.assertNoLogs(self.EVENT_SERVICE_LOGGER, level="ERROR"):
                     payloads = build_event_payload(ERC20Transfer, transfer)
                 self.assertEqual([p["type"] for p in payloads], expected)
+
+    @factory.django.mute_signals(post_save)
+    def test_build_event_payload_token_trusted(self):
+        self.addCleanup(TokenServiceProvider.del_singleton)
+        for sender, transfer_factory in (
+            (ERC20Transfer, ERC20TransferFactory),
+            (ERC721Transfer, ERC721TransferFactory),
+        ):
+            with self.subTest(sender=sender):
+                # An unknown / non-trusted token is flagged as not trusted
+                TokenServiceProvider.del_singleton()
+                transfer = self._annotated(transfer_factory())
+                payloads = build_event_payload(sender, transfer)
+                self.assertEqual([p["trusted"] for p in payloads], [False, False])
+
+                # A trusted token is flagged as trusted on both directional payloads
+                TokenServiceProvider.del_singleton()
+                trusted_transfer = self._annotated(transfer_factory())
+                TokenFactory(address=trusted_transfer.address, trusted=True)
+                payloads = build_event_payload(sender, trusted_transfer)
+                self.assertEqual([p["trusted"] for p in payloads], [True, True])
 
     @factory.django.mute_signals(post_save)
     def test_build_event_payload_ether_gating(self):

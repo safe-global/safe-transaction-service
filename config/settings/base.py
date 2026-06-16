@@ -675,6 +675,9 @@ TOKENS_ENS_IMAGE_URL = env.str(
 TOKENS_ERC20_GET_BALANCES_BATCH = env.int(
     "TOKENS_ERC20_GET_BALANCES_BATCH", default=2_000
 )  # Number of tokens to get balances from in the same request. From 2_500 some nodes raise HTTP 413
+TOKENS_TRUSTED_CACHE_TTL = env.int(
+    "TOKENS_TRUSTED_CACHE_TTL", default=60 * 60
+)  # Seconds the in-memory set of trusted token addresses is cached for (default 1h)
 
 # ENS
 # ------------------------------------------------------------------------------
