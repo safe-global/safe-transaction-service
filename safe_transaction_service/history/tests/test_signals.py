@@ -277,6 +277,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
                 to_0x_hex_str(HexBytes(multisig_tx.data)) if multisig_tx.data else None
             ),
             "failed": "false",
+            "isFailed": False,
             "txHash": multisig_tx.ethereum_tx_id,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
