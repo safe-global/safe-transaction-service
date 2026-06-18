@@ -143,10 +143,13 @@ class ContractQuerySet(models.QuerySet):
     def trusted_for_delegate_call(self):
         return self.filter(trusted_for_delegate_call=True)
 
+    def trusted_addresses_for_delegate_call(self):
+        return self._cached_trusted_addresses_for_delegate_call()
+
     @cachedmethod(
         cache=operator.attrgetter("cache_trusted_addresses_for_delegate_call")
     )
-    def trusted_addresses_for_delegate_call(self):
+    def _cached_trusted_addresses_for_delegate_call(self):
         return self.trusted_for_delegate_call().values_list("address", flat=True)
 
 
