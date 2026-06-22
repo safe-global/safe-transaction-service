@@ -17,7 +17,7 @@ dependencies = [
     "django-filter==25.2",
     "django-imagekit==6.1.0",
     "django-model-utils==5.0.0",
-    "django-redis==6.0.0",
+    "django-redis==7.0.0",
     "django-s3-storage==0.15.0",
     "django-timezone-field==7.2.1",
     "djangorestframework==3.17.1",
