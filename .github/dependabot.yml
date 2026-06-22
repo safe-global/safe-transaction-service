@@ -5,15 +5,62 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 10
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 7
+    groups:
+      django:
+        patterns:
+          - "django*"
+          - "drf*"
+        update-types:
+          - minor
+          - patch
+      eth:
+        patterns:
+          - "safe-eth-py"
+          - "web3"
+          - "eth-*"
+        update-types:
+          - minor
+          - patch
+      dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: docker
     directory: "/docker/web"
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    groups:
+      docker:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
