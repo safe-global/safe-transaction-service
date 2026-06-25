@@ -14,6 +14,7 @@ from django.utils import timezone
 from hexbytes import HexBytes
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.history.helpers import build_transfer_unique_id
 from safe_transaction_service.history.models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -164,11 +165,17 @@ def build_event_payload(
                 TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name
             )
         payloads = [payload]
-    elif sender == InternalTx and instance.is_ether_transfer:  # INCOMING_ETHER
+    elif sender == InternalTx and instance.is_ether_transfer:
+        # INCOMING_ETHER / OUTGOING_ETHER
+        transaction_hash = HexBytes(instance.ethereum_tx_id)
         incoming_payload = {
+            "id": build_transfer_unique_id(
+                transaction_hash, trace_address=instance.trace_address
+            ),
+            "timestamp": int(instance.timestamp.timestamp()),
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_ETHER.name,
-            "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
+            "txHash": to_0x_hex_str(transaction_hash),
             "value": str(instance.value),
         }
         outgoing_payload = dict(incoming_payload)
@@ -179,11 +186,16 @@ def build_event_payload(
         )
     elif sender in (ERC20Transfer, ERC721Transfer):
         # INCOMING_TOKEN / OUTGOING_TOKEN
+        transaction_hash = HexBytes(instance.ethereum_tx_id)
         incoming_payload = {
+            "id": build_transfer_unique_id(
+                transaction_hash, log_index=instance.log_index
+            ),
+            "timestamp": int(instance.timestamp.timestamp()),
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
-            "txHash": to_0x_hex_str(HexBytes(instance.ethereum_tx_id)),
+            "txHash": to_0x_hex_str(transaction_hash),
             "trusted": TokenServiceProvider().is_trusted(instance.address),
         }
         if isinstance(instance, ERC20Transfer):
