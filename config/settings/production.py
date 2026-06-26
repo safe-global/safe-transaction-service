@@ -87,7 +87,7 @@ if SSO_ENABLED:
     SSO_ADMINS = env.list("SSO_ADMINS", default=[])
     # Google OAuth client ID — used to verify the JWT aud claim so only tokens
     # issued for this app are accepted. Must match the client_id in APISIX config.
-    SSO_CLIENT_ID = env("SSO_CLIENT_ID", default=None)
+    SSO_CLIENT_ID = env("SSO_CLIENT_ID")
     SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global")
 
 # ADMIN
