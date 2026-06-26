@@ -23,6 +23,7 @@ from ...safe_messages.tests.factories import (
 )
 from ...tokens.services import TokenServiceProvider
 from ...tokens.tests.factories import TokenFactory
+from ..helpers import build_transfer_unique_id
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -151,6 +152,45 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+
+    @factory.django.mute_signals(post_save)
+    def test_build_event_payload_transfer_id_and_timestamp(self):
+        # Token transfer: `id` uses the log_index scheme, both directional payloads
+        # share the same `id` and `timestamp` (Unix epoch seconds, int)
+        transfer = self._annotated(ERC20TransferFactory())
+        expected_id = build_transfer_unique_id(
+            HexBytes(transfer.ethereum_tx_id), log_index=transfer.log_index
+        )
+        expected_timestamp = int(transfer.timestamp.timestamp())
+        payloads = build_event_payload(ERC20Transfer, transfer)
+        self.assertEqual(len(payloads), 2)
+        for payload in payloads:
+            self.assertEqual(payload["id"], expected_id)
+            self.assertEqual(payload["timestamp"], expected_timestamp)
+            self.assertIsInstance(payload["timestamp"], int)
+
+        # Ether transfer: `id` uses the trace_address scheme
+        internal_tx = self._annotated(InternalTxFactory())
+        expected_id = build_transfer_unique_id(
+            HexBytes(internal_tx.ethereum_tx_id),
+            trace_address=internal_tx.trace_address,
+        )
+        expected_timestamp = int(internal_tx.timestamp.timestamp())
+        payloads = build_event_payload(InternalTx, internal_tx)
+        self.assertEqual(len(payloads), 2)
+        for payload in payloads:
+            self.assertEqual(payload["id"], expected_id)
+            self.assertEqual(payload["timestamp"], expected_timestamp)
+            self.assertIsInstance(payload["timestamp"], int)
+
+    def test_build_transfer_unique_id_requires_exactly_one_identifier(self):
+        tx_hash = HexBytes("0x" + "ab" * 32)
+        # Neither identifier provided
+        with self.assertRaises(ValueError):
+            build_transfer_unique_id(tx_hash)
+        # Both identifiers provided
+        with self.assertRaises(ValueError):
+            build_transfer_unique_id(tx_hash, log_index=0, trace_address="0")
 
     EVENT_SERVICE_LOGGER = "safe_transaction_service.history.services.event_service"
 

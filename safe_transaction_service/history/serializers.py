@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema_field
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
@@ -47,6 +48,7 @@ from .helpers import (
     DelegateSignatureHelper,
     DelegateSignatureHelperV2,
     DeleteMultisigTxSignatureHelper,
+    build_transfer_unique_id,
 )
 from .models import (
     MAX_SIGNATURE_LENGTH,
@@ -1002,11 +1004,15 @@ class TransferResponseSerializer(serializers.Serializer):
             return TransferType.UNKNOWN.name
 
     def get_transfer_id(self, obj: TransferDict) -> str:
-        transaction_hash = obj["transaction_hash"][2:]  # Remove 0x
+        transaction_hash = HexBytes(obj["transaction_hash"])
         if self.get_type(obj) == TransferType.ETHER_TRANSFER.name:
-            return "i" + transaction_hash + obj["_trace_address"]
+            return build_transfer_unique_id(
+                transaction_hash, trace_address=obj["_trace_address"]
+            )
         else:
-            return "e" + transaction_hash + str(obj["_log_index"])
+            return build_transfer_unique_id(
+                transaction_hash, log_index=obj["_log_index"]
+            )
 
     def validate(self, attrs):
         super().validate(attrs)

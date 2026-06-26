@@ -4,6 +4,7 @@ import time
 
 from eth_typing import ChecksumAddress, Hash32, HexStr
 from eth_utils import keccak
+from hexbytes import HexBytes
 from safe_eth.eth.eip712 import eip712_encode, eip712_encode_hash
 from safe_eth.eth.utils import fast_keccak
 
@@ -128,6 +129,35 @@ class DelegateSignatureHelperV2(TemporarySignatureHelper):
 
         preimage = b"".join(eip712_encode(payload))
         return fast_keccak(preimage), preimage
+
+
+def build_transfer_unique_id(
+    transaction_hash: bytes,
+    log_index: int | None = None,
+    trace_address: str | None = None,
+) -> str:
+    """
+    Build the unique transfer id shared by the API and the queue events, so the format
+    is defined in a single place.
+
+    Token transfers (ERC20/ERC721) are identified as ``e`` + transaction_hash + log_index.
+    Ether transfers (internal txs) are identified as ``i`` + transaction_hash + trace_address.
+
+    :param transaction_hash: transaction hash, as bytes
+    :param log_index: log index, set for token transfers
+    :param trace_address: trace address, set for ether transfers
+    :return: unique transfer id
+    :raises ValueError: if not exactly one of ``log_index`` / ``trace_address`` is provided
+    """
+    if (log_index is None) == (trace_address is None):
+        raise ValueError(
+            "Exactly one of log_index (token transfers) or trace_address "
+            "(ether transfers) must be provided"
+        )
+    tx_hash = bytes(HexBytes(transaction_hash)).hex()
+    if trace_address is not None:
+        return f"i{tx_hash}{trace_address}"
+    return f"e{tx_hash}{log_index}"
 
 
 def is_valid_unique_transfer_id(unique_transfer_id: str) -> bool:
