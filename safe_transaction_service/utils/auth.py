@@ -2,7 +2,7 @@
 import logging
 
 from django.conf import settings
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth.backends import RemoteUserBackend
 
 from google.auth.transport import requests as google_requests
@@ -36,21 +36,37 @@ class GoogleOIDCMiddleware:
             if not claims.get("email_verified"):
                 raise ValueError("JWT rejected: email not verified")
             user = authenticate(request, remote_user=claims["email"])
-            if user:
+            if user and claims["email"] in settings.SSO_ADMINS:
                 request.user = user
                 login(request, user)
                 logger.info("SSO authenticated email=%s", claims["email"])
+            elif user:
+                logger.warning(
+                    "SSO access denied email=%s not in SSO_ADMINS", claims["email"]
+                )
             else:
                 logger.warning("SSO authentication failed email=%s", claims["email"])
         return self.get_response(request)
 
 
 class CustomRemoteUserBackend(RemoteUserBackend):
+    def authenticate(self, request, remote_user):
+        if not remote_user:
+            return None
+        UserModel = get_user_model()
+        username = self.clean_username(remote_user)
+        user, created = UserModel._default_manager.get_or_create(
+            **{UserModel.USERNAME_FIELD: username}
+        )
+        user = self.configure_user(request, user, created)
+        return user if self.user_can_authenticate(user) else None
+
     def configure_user(self, request, user, created=True):
         user = super().configure_user(request, user, created)
         if created:
             logger.info("SSO user created email=%s", user.username)
         if user.username in settings.SSO_ADMINS:
+            user.is_active = True
             user.is_superuser = True
             user.is_staff = True
             logger.info("SSO admin access granted email=%s", user.username)
