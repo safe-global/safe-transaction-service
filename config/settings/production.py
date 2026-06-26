@@ -55,26 +55,25 @@ SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
 # https://docs.djangoproject.com/en/5.0/ref/settings/#csrf-trusted-origins
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
-# SSO (tested with https://github.com/buzzfeed/sso)
+# SSO — Google OIDC + JWT verification
 # ------------------------------------------------------------------------------
-# Be really careful when enabling SSO. If the `SSO_USERNAME_HEADER` can be spoofed
-# auth is broken and anyone will be able to log in as any user
+# The reverse proxy handles the Google OIDC flow and forwards the raw RS256-signed
+# ID token as X-Enc-ID-Token. GoogleOIDCMiddleware verifies the JWT signature against
+# Google's public JWKS before trusting anything in the header.
 SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
 if SSO_ENABLED:
-    SSO_USERNAME_HEADER = env.str(
-        "SSO_USERNAME_HEADER", default="HTTP_X_FORWARDED_USER"
-    )
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
     MIDDLEWARE.append(  # noqa F405
-        "safe_transaction_service.utils.auth.CustomHeaderRemoteUserMiddleware"
+        "safe_transaction_service.utils.auth.GoogleOIDCMiddleware"
     )
     AUTHENTICATION_BACKENDS = [
         "safe_transaction_service.utils.auth.CustomRemoteUserBackend"
         # "django.contrib.auth.backends.ModelBackend",
     ]
-    # When creating a user, give superuser permissions if username is in SSO_ADMIN
-    SSO_ADMINS = env.list("SSO_ADMINS", default=["richard", "uxio"])
+    # When creating a user, give superuser permissions if email is in SSO_ADMINS
+    # e.g. SSO_ADMINS=alice@safe.global,bob@safe.global
+    SSO_ADMINS = env.list("SSO_ADMINS", default=[])
 
 # ADMIN
 # ------------------------------------------------------------------------------
