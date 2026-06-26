@@ -378,6 +378,17 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             multisig_transaction.trusted = trusted
             multisig_transaction.save(update_fields=["origin", "trusted"])
 
+        if created and not trusted:
+            logger.info(
+                "Proposed untrusted MultisigTransaction safe_tx_hash=%s safe=%s "
+                "proposer=%s proposed_by_delegate=%s sender=%s",
+                to_0x_hex_str(safe_tx_hash),
+                self.validated_data["safe"],
+                proposer,
+                proposed_by_delegate,
+                self.validated_data["sender"],
+            )
+
         logger.info(
             f"MultisigTransaction {'Created' if created else 'Updated'}",
             extra={
