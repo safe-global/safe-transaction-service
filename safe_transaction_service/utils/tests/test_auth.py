@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase, override_settings
+
+import google.auth.exceptions
 
 from safe_transaction_service.utils.auth import (
     CustomRemoteUserBackend,
@@ -39,7 +41,11 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.get_response = MagicMock(return_value=MagicMock())
         self.middleware = GoogleOIDCMiddleware(self.get_response)
 
-    @override_settings(SSO_ADMINS=["dev@safe.global"])
+    @override_settings(
+        SSO_ADMINS=["dev@safe.global"],
+        SSO_HOSTED_DOMAIN="safe.global",
+        SSO_CLIENT_ID=None,
+    )
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
@@ -53,18 +59,23 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         request = _anon_request(self.factory, token="valid.jwt.token")
         self.middleware(request)
 
-        mock_verify.assert_called_once()
+        mock_verify.assert_called_once_with("valid.jwt.token", ANY, audience=None)
         mock_authenticate.assert_called_once_with(
             request, remote_user="dev@safe.global"
         )
         mock_login.assert_called_once_with(request, user)
         self.assertEqual(request.user, user)
+        self.get_response.assert_called_once_with(request)
 
-    @override_settings(SSO_ADMINS=["other@safe.global"])
+    @override_settings(
+        SSO_ADMINS=["dev@safe.global"],
+        SSO_HOSTED_DOMAIN="safe.global",
+        SSO_CLIENT_ID="my-client-id.apps.googleusercontent.com",
+    )
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_user_not_in_admins_does_not_login(
+    def test_sso_client_id_passed_as_audience(
         self, mock_authenticate, mock_login, mock_verify
     ):
         mock_verify.return_value = VALID_CLAIMS
@@ -73,9 +84,37 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         request = _anon_request(self.factory, token="valid.jwt.token")
         self.middleware(request)
 
+        mock_verify.assert_called_once_with(
+            "valid.jwt.token",
+            ANY,
+            audience="my-client-id.apps.googleusercontent.com",
+        )
+        self.get_response.assert_called_once_with(request)
+
+    @override_settings(
+        SSO_ADMINS=["other@safe.global"],
+        SSO_HOSTED_DOMAIN="safe.global",
+        SSO_CLIENT_ID=None,
+    )
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.login")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_user_not_in_admins_does_not_login(
+        self, mock_authenticate, mock_login, mock_verify
+    ):
+        mock_verify.return_value = VALID_CLAIMS
+        mock_authenticate.return_value = (
+            None  # backend returns None when not in SSO_ADMINS
+        )
+
+        request = _anon_request(self.factory, token="valid.jwt.token")
+        self.middleware(request)
+
         mock_login.assert_not_called()
         self.assertIsInstance(request.user, AnonymousUser)
+        self.get_response.assert_called_once_with(request)
 
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_wrong_hosted_domain_raises(self, mock_authenticate, mock_verify):
@@ -86,20 +125,34 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         }
 
         request = _anon_request(self.factory, token="bad.jwt.token")
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "wrong hosted domain"):
             self.middleware(request)
 
         mock_authenticate.assert_not_called()
 
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_unverified_email_raises(self, mock_authenticate, mock_verify):
         mock_verify.return_value = {**VALID_CLAIMS, "email_verified": False}
 
         request = _anon_request(self.factory, token="bad.jwt.token")
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "email not verified"):
             self.middleware(request)
 
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_missing_email_claim_raises(self, mock_authenticate, mock_verify):
+        mock_verify.return_value = {**VALID_CLAIMS, "email": None}
+
+        request = _anon_request(self.factory, token="valid.jwt.token")
+        with self.assertRaisesRegex(ValueError, "missing email claim"):
+            self.middleware(request)
+
+        mock_authenticate.assert_not_called()
+
+    @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_invalid_jwt_raises(self, mock_authenticate, mock_verify):
@@ -119,7 +172,19 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
         mock_verify.assert_not_called()
         mock_authenticate.assert_not_called()
+        self.get_response.assert_called_once_with(request)
 
+    def test_no_jwt_no_session_logs_warning(self):
+        request = _anon_request(self.factory, token="")
+        with self.assertLogs(
+            "safe_transaction_service.utils.auth", level="WARNING"
+        ) as logs:
+            self.middleware(request)
+
+        self.assertTrue(any("no JWT, no session" in msg for msg in logs.output))
+        self.get_response.assert_called_once_with(request)
+
+    @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_already_authenticated_skips_decode(self, mock_authenticate, mock_verify):
@@ -129,7 +194,55 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
         mock_verify.assert_not_called()
         mock_authenticate.assert_not_called()
+        self.get_response.assert_called_once_with(request)
 
+    @patch("safe_transaction_service.utils.auth.logout")
+    def test_authenticated_user_without_token_is_logged_out(self, mock_logout):
+        # No X-Enc-ID-Token header — APISIX not forwarding; session revoked immediately.
+        request = _authed_request(self.factory)
+        self.middleware(request)
+
+        mock_logout.assert_called_once_with(request)
+        self.get_response.assert_called_once_with(request)
+
+    @override_settings(SSO_ADMINS=[])
+    @patch("safe_transaction_service.utils.auth.logout")
+    def test_authenticated_user_removed_from_admins_is_revoked(self, mock_logout):
+        request = _authed_request(self.factory, username="dev@safe.global")
+        request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
+        user = request.user
+
+        self.middleware(request)
+
+        self.assertFalse(user.is_active)
+        self.assertFalse(user.is_superuser)
+        self.assertFalse(user.is_staff)
+        user.save.assert_called_once()
+        mock_logout.assert_called_once_with(request)
+        self.get_response.assert_called_once_with(request)
+
+    @override_settings(SSO_ADMINS=["dev@safe.global"])
+    @patch("safe_transaction_service.utils.auth.logout")
+    def test_authenticated_user_in_admins_stays_logged_in(self, mock_logout):
+        request = _authed_request(self.factory, username="dev@safe.global")
+        request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
+
+        self.middleware(request)
+
+        mock_logout.assert_not_called()
+        self.get_response.assert_called_once_with(request)
+
+    @override_settings(SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    def test_google_transport_error_returns_503(self, mock_verify):
+        mock_verify.side_effect = google.auth.exceptions.TransportError("network error")
+
+        request = _anon_request(self.factory, token="valid.jwt.token")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 503)
+
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_authenticate_returns_none_does_not_set_user(
@@ -142,6 +255,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.middleware(request)
 
         self.assertIsInstance(request.user, AnonymousUser)
+        self.get_response.assert_called_once_with(request)
 
 
 class CustomRemoteUserBackendTest(SimpleTestCase):
@@ -165,7 +279,11 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertTrue(result.is_active)
         self.assertTrue(result.is_superuser)
         self.assertTrue(result.is_staff)
-        result.save.assert_called()
+        result.save.assert_called_once()
+
+    def test_authenticate_empty_remote_user_returns_none(self):
+        result = self.backend.authenticate(self.request, remote_user="")
+        self.assertIsNone(result)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("safe_transaction_service.utils.auth.get_user_model")
@@ -173,7 +291,6 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self, mock_get_user_model
     ):
         user = self._make_user("dev@safe.global")
-        user.is_active = True
         mock_model = MagicMock()
         mock_model.USERNAME_FIELD = "username"
         mock_model._default_manager.get_or_create.return_value = (user, False)
@@ -187,9 +304,7 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_deactivated_user_added_back_to_admins_is_reactivated(
-        self, mock_super
-    ):
+    def test_deactivated_user_added_back_to_admins_is_reactivated(self, mock_super):
         user = self._make_user("dev@safe.global")
         user.is_active = False
         mock_super.return_value = user
@@ -199,6 +314,7 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.is_staff)
+        user.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
@@ -209,7 +325,9 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         result = self.backend.configure_user(self.request, user, created=True)
 
         self.assertFalse(result.is_active)
-        result.save.assert_called()
+        self.assertFalse(result.is_superuser)
+        self.assertFalse(result.is_staff)
+        result.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=[])
     @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
@@ -220,6 +338,8 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         result = self.backend.configure_user(self.request, user, created=True)
 
         self.assertFalse(result.is_active)
+        self.assertFalse(result.is_superuser)
+        self.assertFalse(result.is_staff)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
