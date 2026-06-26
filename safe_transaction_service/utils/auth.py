@@ -24,7 +24,10 @@ class GoogleOIDCMiddleware:
     def __call__(self, request):
         token = request.META.get("HTTP_X_ENC_ID_TOKEN", "")
         if token and request.user.is_authenticated:
-            logger.debug("SSO skipping JWT, session already active email=%s", request.user.username)
+            logger.debug(
+                "SSO skipping JWT, session already active email=%s",
+                request.user.username,
+            )
         elif token and not request.user.is_authenticated:
             logger.info("SSO JWT verification started")
             claims = id_token.verify_oauth2_token(token, google_requests.Request())
@@ -53,6 +56,8 @@ class CustomRemoteUserBackend(RemoteUserBackend):
             logger.info("SSO admin access granted email=%s", user.username)
         else:
             user.is_active = False
-            logger.warning("SSO access denied email=%s not in SSO_ADMINS", user.username)
+            logger.warning(
+                "SSO access denied email=%s not in SSO_ADMINS", user.username
+            )
         user.save()
         return user

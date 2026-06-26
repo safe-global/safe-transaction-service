@@ -42,7 +42,9 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_valid_token_authenticates_user(self, mock_authenticate, mock_login, mock_verify):
+    def test_valid_token_authenticates_user(
+        self, mock_authenticate, mock_login, mock_verify
+    ):
         mock_verify.return_value = VALID_CLAIMS
         user = MagicMock()
         mock_authenticate.return_value = user
@@ -51,14 +53,20 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.middleware(request)
 
         mock_verify.assert_called_once()
-        mock_authenticate.assert_called_once_with(request, remote_user="dev@safe.global")
+        mock_authenticate.assert_called_once_with(
+            request, remote_user="dev@safe.global"
+        )
         mock_login.assert_called_once_with(request, user)
         self.assertEqual(request.user, user)
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_wrong_hosted_domain_raises(self, mock_authenticate, mock_verify):
-        mock_verify.return_value = {**VALID_CLAIMS, "hd": "gmail.com", "email": "evil@gmail.com"}
+        mock_verify.return_value = {
+            **VALID_CLAIMS,
+            "hd": "gmail.com",
+            "email": "evil@gmail.com",
+        }
 
         request = _anon_request(self.factory, token="bad.jwt.token")
         with self.assertRaises(ValueError):
@@ -107,7 +115,9 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_authenticate_returns_none_does_not_set_user(self, mock_authenticate, mock_verify):
+    def test_authenticate_returns_none_does_not_set_user(
+        self, mock_authenticate, mock_verify
+    ):
         mock_verify.return_value = VALID_CLAIMS
         mock_authenticate.return_value = None
 
@@ -166,7 +176,9 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         user = self._make_user("dev@safe.global")
         mock_super.return_value = user
 
-        with self.assertLogs("safe_transaction_service.utils.auth", level="INFO") as logs:
+        with self.assertLogs(
+            "safe_transaction_service.utils.auth", level="INFO"
+        ) as logs:
             self.backend.configure_user(self.request, user, created=False)
 
         self.assertFalse(any("user created" in msg for msg in logs.output))
