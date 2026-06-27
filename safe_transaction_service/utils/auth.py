@@ -48,11 +48,11 @@ class GoogleOIDCMiddleware:
                 return HttpResponse("SSO unavailable", status=503)
             if claims.get("hd") != settings.SSO_HOSTED_DOMAIN:
                 raise ValueError("JWT rejected: wrong hosted domain")
-            if not claims.get("email_verified"):
-                raise ValueError("JWT rejected: email not verified")
             email = claims.get("email")
             if not email:
                 raise ValueError("JWT rejected: missing email claim")
+            if not claims.get("email_verified"):
+                raise ValueError("JWT rejected: email not verified")
             user = authenticate(request, remote_user=email)
             if user:
                 request.user = user
