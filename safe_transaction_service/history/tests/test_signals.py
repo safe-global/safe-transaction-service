@@ -129,21 +129,22 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             payload["timestamp"], int(pending_multisig_tx.created.timestamp())
         )
 
-        # DELETED_MULTISIG_TRANSACTION: off-chain, timestamp from `modified`
+        # DELETED_MULTISIG_TRANSACTION: off-chain, fired on post_delete, timestamp is
+        # the current (deletion) time
         deleted_multisig_tx = MultisigTransactionFactory(ethereum_tx=None)
-        payload = build_event_payload(
-            MultisigTransaction,
-            deleted_multisig_tx,
-            deleted=True,
-        )[0]
+        delete_time = datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+        with mock.patch.object(timezone, "now", return_value=delete_time):
+            payload = build_event_payload(
+                MultisigTransaction,
+                deleted_multisig_tx,
+                deleted=True,
+            )[0]
         self.assertEqual(
             payload["type"],
             TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
-        self.assertEqual(
-            payload["timestamp"], int(deleted_multisig_tx.modified.timestamp())
-        )
+        self.assertEqual(payload["timestamp"], int(delete_time.timestamp()))
 
         # MODULE_TRANSACTION: on-chain, timestamp from the related InternalTx block time
         module_tx = ModuleTransactionFactory()
@@ -379,13 +380,15 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         }
         send_event_mock.assert_called_with(pending_multisig_transaction_payload)
 
-        # Deleting a tx should fire an event
+        # Deleting a tx should fire an event timestamped at the deletion time
         send_event_mock.reset_mock()
         safe_tx_hash = multisig_tx.safe_tx_hash
-        multisig_tx.delete()
+        delete_time = datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+        with mock.patch.object(timezone, "now", return_value=delete_time):
+            multisig_tx.delete()
 
         deleted_multisig_transaction_payload = {
-            "timestamp": int(multisig_tx.modified.timestamp()),
+            "timestamp": int(delete_time.timestamp()),
             "address": multisig_tx.safe,
             "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
             "safeTxHash": safe_tx_hash,

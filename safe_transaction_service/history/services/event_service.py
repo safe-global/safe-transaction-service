@@ -139,10 +139,11 @@ def build_event_payload(
             }
         ]
     elif sender == MultisigTransaction and deleted:
-        # Off-chain event: use the last modification time as the deletion time
+        # Off-chain event fired on post_delete: `modified` is not refreshed on delete,
+        # so use the current time as the deletion (event emission) time
         payloads = [
             {
-                "timestamp": int(instance.modified.timestamp()),
+                "timestamp": int(timezone.now().timestamp()),
                 "address": instance.safe,
                 "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
                 "safeTxHash": to_0x_hex_str(HexBytes(instance.safe_tx_hash)),
