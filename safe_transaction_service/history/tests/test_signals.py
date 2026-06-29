@@ -28,6 +28,7 @@ from ..models import (
     ERC20Transfer,
     ERC721Transfer,
     InternalTx,
+    ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
     TransactionServiceEventType,
@@ -44,6 +45,7 @@ from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
     InternalTxFactory,
+    ModuleTransactionFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
@@ -95,14 +97,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             [str(EthereumNetwork.GANACHE.value), str(EthereumNetwork.GANACHE.value)],
         )
 
-        payload = build_event_payload(
-            MultisigConfirmation, MultisigConfirmationFactory()
-        )[0]
+        # NEW_CONFIRMATION: off-chain, timestamp from `created`
+        confirmation = MultisigConfirmationFactory()
+        payload = build_event_payload(MultisigConfirmation, confirmation)[0]
         self.assertEqual(
             payload["type"], TransactionServiceEventType.NEW_CONFIRMATION.name
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(payload["timestamp"], int(confirmation.created.timestamp()))
 
+        # EXECUTED_MULTISIG_TRANSACTION is on-chain (tier 2): no timestamp yet
         payload = build_event_payload(
             MultisigTransaction, MultisigTransactionFactory()
         )[0]
@@ -111,26 +115,47 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertNotIn("timestamp", payload)
 
-        payload = build_event_payload(
-            MultisigTransaction, MultisigTransactionFactory(ethereum_tx=None)
-        )[0]
+        # PENDING_MULTISIG_TRANSACTION: off-chain, timestamp from `created`
+        pending_multisig_tx = MultisigTransactionFactory(ethereum_tx=None)
+        payload = build_event_payload(MultisigTransaction, pending_multisig_tx)[0]
         self.assertEqual(
             payload["type"],
             TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(
+            payload["timestamp"], int(pending_multisig_tx.created.timestamp())
+        )
 
-        payload = build_event_payload(
-            MultisigTransaction,
-            MultisigTransactionFactory(ethereum_tx=None),
-            deleted=True,
-        )[0]
+        # DELETED_MULTISIG_TRANSACTION: off-chain, fired on post_delete, timestamp is
+        # the current (deletion) time
+        deleted_multisig_tx = MultisigTransactionFactory(ethereum_tx=None)
+        delete_time = datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+        with mock.patch.object(timezone, "now", return_value=delete_time):
+            payload = build_event_payload(
+                MultisigTransaction,
+                deleted_multisig_tx,
+                deleted=True,
+            )[0]
         self.assertEqual(
             payload["type"],
             TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(payload["timestamp"], int(delete_time.timestamp()))
+
+        # MODULE_TRANSACTION: on-chain, timestamp from the related InternalTx block time
+        module_tx = ModuleTransactionFactory()
+        payload = build_event_payload(ModuleTransaction, module_tx)[0]
+        self.assertEqual(
+            payload["type"], TransactionServiceEventType.MODULE_TRANSACTION.name
+        )
+        self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(
+            payload["timestamp"], int(module_tx.internal_tx.timestamp.timestamp())
+        )
 
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
@@ -141,10 +166,14 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(payload["timestamp"], int(safe_message.created.timestamp()))
 
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
         payload = build_event_payload(
             SafeMessageConfirmation,
-            SafeMessageConfirmationFactory(safe_message=safe_message),
+            safe_message_confirmation,
         )[0]
         self.assertEqual(
             payload["type"], TransactionServiceEventType.MESSAGE_CONFIRMATION.name
@@ -152,6 +181,9 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["address"], safe_address)
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
+        self.assertEqual(
+            payload["timestamp"], int(safe_message_confirmation.created.timestamp())
+        )
 
     @factory.django.mute_signals(post_save)
     def test_build_event_payload_transfer_id_and_timestamp(self):
@@ -348,12 +380,15 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         }
         send_event_mock.assert_called_with(pending_multisig_transaction_payload)
 
-        # Deleting a tx should fire an event
+        # Deleting a tx should fire an event timestamped at the deletion time
         send_event_mock.reset_mock()
         safe_tx_hash = multisig_tx.safe_tx_hash
-        multisig_tx.delete()
+        delete_time = datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+        with mock.patch.object(timezone, "now", return_value=delete_time):
+            multisig_tx.delete()
 
         deleted_multisig_transaction_payload = {
+            "timestamp": int(delete_time.timestamp()),
             "address": multisig_tx.safe,
             "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
             "safeTxHash": safe_tx_hash,

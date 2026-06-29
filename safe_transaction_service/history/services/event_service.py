@@ -128,8 +128,10 @@ def build_event_payload(
     """
     payloads: list[dict[str, Any]] = []
     if sender == MultisigConfirmation and instance.multisig_transaction_id:
+        # Off-chain event: use the confirmation creation time
         payloads = [
             {
+                "timestamp": int(instance.created.timestamp()),
                 "address": instance.multisig_transaction.safe,  # This could make a db call
                 "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
@@ -137,8 +139,11 @@ def build_event_payload(
             }
         ]
     elif sender == MultisigTransaction and deleted:
+        # Off-chain event fired on post_delete: `modified` is not refreshed on delete,
+        # so use the current time as the deletion (event emission) time
         payloads = [
             {
+                "timestamp": int(timezone.now().timestamp()),
                 "address": instance.safe,
                 "type": TransactionServiceEventType.DELETED_MULTISIG_TRANSACTION.name,
                 "safeTxHash": to_0x_hex_str(HexBytes(instance.safe_tx_hash)),
@@ -161,6 +166,9 @@ def build_event_payload(
             payload["isFailed"] = instance.failed
             payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
         else:
+            # Off-chain event (not yet executed): use the proposal creation time,
+            # kept first for readability
+            payload = {"timestamp": int(instance.created.timestamp()), **payload}
             payload["type"] = (
                 TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name
             )
@@ -169,10 +177,10 @@ def build_event_payload(
         # INCOMING_ETHER / OUTGOING_ETHER
         transaction_hash = HexBytes(instance.ethereum_tx_id)
         incoming_payload = {
+            "timestamp": int(instance.timestamp.timestamp()),
             "id": build_transfer_unique_id(
                 transaction_hash, trace_address=instance.trace_address
             ),
-            "timestamp": int(instance.timestamp.timestamp()),
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_ETHER.name,
             "txHash": to_0x_hex_str(transaction_hash),
@@ -188,10 +196,10 @@ def build_event_payload(
         # INCOMING_TOKEN / OUTGOING_TOKEN
         transaction_hash = HexBytes(instance.ethereum_tx_id)
         incoming_payload = {
+            "timestamp": int(instance.timestamp.timestamp()),
             "id": build_transfer_unique_id(
                 transaction_hash, log_index=instance.log_index
             ),
-            "timestamp": int(instance.timestamp.timestamp()),
             "address": instance.to,
             "type": TransactionServiceEventType.INCOMING_TOKEN.name,
             "tokenAddress": instance.address,
@@ -218,8 +226,11 @@ def build_event_payload(
             }
         ]
     elif sender == ModuleTransaction:
+        # On-chain event: block timestamp is denormalized on the related InternalTx,
+        # which is already dereferenced below, so no extra query is needed
         payloads = [
             {
+                "timestamp": int(instance.internal_tx.timestamp.timestamp()),
                 "address": instance.safe,
                 "type": TransactionServiceEventType.MODULE_TRANSACTION.name,
                 "module": instance.module,
@@ -227,16 +238,20 @@ def build_event_payload(
             }
         ]
     elif sender == SafeMessage:
+        # Off-chain event: use the message creation time
         payloads = [
             {
+                "timestamp": int(instance.created.timestamp()),
                 "address": instance.safe,
                 "type": TransactionServiceEventType.MESSAGE_CREATED.name,
                 "messageHash": to_0x_hex_str(HexBytes(instance.message_hash)),
             }
         ]
     elif sender == SafeMessageConfirmation:
+        # Off-chain event: use the confirmation creation time
         payloads = [
             {
+                "timestamp": int(instance.created.timestamp()),
                 "address": instance.safe_message.safe,  # This could make a db call
                 "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
                 "messageHash": to_0x_hex_str(HexBytes(instance.safe_message_id)),
