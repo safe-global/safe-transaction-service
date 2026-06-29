@@ -74,3 +74,23 @@ INTERNAL_IPS = ["127.0.0.1", "10.0.2.2"]
 
 # Enable to get the host from header
 USE_X_FORWARDED_HOST = True
+
+# SSO — Google OIDC + JWT verification
+# ------------------------------------------------------------------------------
+SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
+if SSO_ENABLED:
+    USE_X_FORWARDED_PORT = True
+    MIDDLEWARE.append(  # noqa F405
+        "safe_transaction_service.utils.auth.GoogleOIDCMiddleware"
+    )
+    AUTHENTICATION_BACKENDS = [
+        "safe_transaction_service.utils.auth.CustomRemoteUserBackend",
+        # "django.contrib.auth.backends.ModelBackend",
+    ]
+    # When creating a user, give superuser permissions if email is in SSO_ADMINS
+    # e.g. SSO_ADMINS=alice@safe.global,bob@safe.global
+    SSO_ADMINS = env.list("SSO_ADMINS", default=[])
+    # Google OAuth client ID — used to verify the JWT aud claim so only tokens
+    # issued for this app are accepted. Must match the client_id in APISIX config.
+    SSO_CLIENT_ID = env("SSO_CLIENT_ID")
+    SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global")
