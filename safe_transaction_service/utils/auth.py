@@ -29,18 +29,17 @@ class GoogleOIDCMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self._google_request = google_requests.Request()
 
     def __call__(self, request):
         token = request.META.get("HTTP_X_ENC_ID_TOKEN", "")
         if token and not request.user.is_authenticated:
             # JWT present, no session — verify token against Google JWKS and create a
             # Django session if the user is authorized.
-            logger.info("SSO JWT verification started")
+            logger.debug("SSO JWT verification started")
             try:
                 claims = id_token.verify_oauth2_token(
                     token,
-                    self._google_request,
+                    google_requests.Request(),
                     audience=settings.SSO_CLIENT_ID,
                 )
             except google.auth.exceptions.TransportError as exc:
@@ -122,7 +121,8 @@ class CustomRemoteUserBackend(RemoteUserBackend):
         """
         Called by the parent's authenticate() on every login attempt. Sets is_active,
         is_superuser, and is_staff based on SSO_ADMINS membership. If the user is not
-        in SSO_ADMINS, is_active is set to False and authenticate() returns None —
+        in SSO_ADMINS, is_active is set to False. Django's authenticate() wrapper then
+        calls user_can_authenticate(), which rejects inactive users and returns None —
         no session is created.
         """
         if created:

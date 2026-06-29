@@ -323,10 +323,8 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         return user
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_user_in_admins_list_gets_staff_superuser(self, mock_super):
+    def test_user_in_admins_list_gets_staff_superuser(self):
         user = self._make_user("dev@safe.global")
-        mock_super.return_value = user
 
         result = self.backend.configure_user(self.request, user, created=True)
 
@@ -353,11 +351,9 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
             mock_configure.assert_called_once_with(self.request, user, created=False)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_deactivated_user_added_back_to_admins_is_reactivated(self, mock_super):
+    def test_deactivated_user_added_back_to_admins_is_reactivated(self):
         user = self._make_user("dev@safe.global")
         user.is_active = False
-        mock_super.return_value = user
 
         self.backend.configure_user(self.request, user, created=False)
 
@@ -367,10 +363,8 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         user.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_user_not_in_admins_list_deactivated(self, mock_super):
+    def test_user_not_in_admins_list_deactivated(self):
         user = self._make_user("other@safe.global")
-        mock_super.return_value = user
 
         result = self.backend.configure_user(self.request, user, created=True)
 
@@ -380,10 +374,8 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         result.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=[])
-    @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_empty_admins_list_deactivates_all(self, mock_super):
+    def test_empty_admins_list_deactivates_all(self):
         user = self._make_user("dev@safe.global")
-        mock_super.return_value = user
 
         result = self.backend.configure_user(self.request, user, created=True)
 
@@ -392,10 +384,8 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertFalse(result.is_staff)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
-    def test_returning_user_created_false_does_not_log_creation(self, mock_super):
+    def test_returning_user_created_false_does_not_log_creation(self):
         user = self._make_user("dev@safe.global")
-        mock_super.return_value = user
 
         with self.assertLogs(
             "safe_transaction_service.utils.auth", level="INFO"
@@ -403,3 +393,20 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
             self.backend.configure_user(self.request, user, created=False)
 
         self.assertFalse(any("user created" in msg for msg in logs.output))
+        self.assertTrue(any("admin access granted" in msg for msg in logs.output))
+
+    def test_apply_admin_flags_grants_all_flags(self):
+        user = self._make_user()
+        CustomRemoteUserBackend.apply_admin_flags(user, is_admin=True)
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.is_staff)
+        user.save.assert_called_once()
+
+    def test_apply_admin_flags_revokes_all_flags(self):
+        user = self._make_user()
+        CustomRemoteUserBackend.apply_admin_flags(user, is_admin=False)
+        self.assertFalse(user.is_active)
+        self.assertFalse(user.is_superuser)
+        self.assertFalse(user.is_staff)
+        user.save.assert_called_once()
