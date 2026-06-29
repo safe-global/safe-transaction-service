@@ -68,7 +68,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
             request, remote_user="dev@safe.global"
         )
         mock_login.assert_called_once_with(request, user)
-        self.assertEqual(request.user, user)
         self.get_response.assert_called_once_with(request)
 
     @override_settings(
@@ -229,14 +228,14 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         mock_authenticate.assert_not_called()
         self.get_response.assert_called_once_with(request)
 
-    def test_no_jwt_no_session_logs_warning(self):
+    def test_no_jwt_no_session_logs_debug(self):
         request = _anon_request(self.factory, token="")
         with self.assertLogs(
-            "safe_transaction_service.utils.auth", level="WARNING"
+            "safe_transaction_service.utils.auth", level="DEBUG"
         ) as logs:
             self.middleware(request)
 
-        self.assertTrue(any("no JWT, no session" in msg for msg in logs.output))
+        self.assertTrue(any("anonymous request" in msg for msg in logs.output))
         self.get_response.assert_called_once_with(request)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
@@ -341,21 +340,17 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertIsNone(result)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("safe_transaction_service.utils.auth.get_user_model")
-    def test_authenticate_calls_configure_user_for_existing_user(
-        self, mock_get_user_model
-    ):
+    @patch("django.contrib.auth.backends.UserModel")
+    def test_authenticate_calls_configure_user_for_existing_user(self, mock_user_model):
         user = self._make_user("dev@safe.global")
-        mock_model = MagicMock()
-        mock_model.USERNAME_FIELD = "username"
-        mock_model._default_manager.get_or_create.return_value = (user, False)
-        mock_get_user_model.return_value = mock_model
+        mock_user_model.USERNAME_FIELD = "username"
+        mock_user_model._default_manager.get_or_create.return_value = (user, False)
 
         with patch.object(
             self.backend, "configure_user", return_value=user
         ) as mock_configure:
             self.backend.authenticate(self.request, "dev@safe.global")
-            mock_configure.assert_called_once_with(self.request, user, False)
+            mock_configure.assert_called_once_with(self.request, user, created=False)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("django.contrib.auth.backends.RemoteUserBackend.configure_user")
