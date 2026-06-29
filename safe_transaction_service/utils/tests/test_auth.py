@@ -44,7 +44,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @override_settings(
         SSO_ADMINS=["dev@safe.global"],
         SSO_HOSTED_DOMAIN="safe.global",
-        SSO_CLIENT_ID=None,
+        SSO_CLIENT_ID="test-client-id.apps.googleusercontent.com",
     )
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.login")
@@ -59,7 +59,11 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         request = _anon_request(self.factory, token="valid.jwt.token")
         self.middleware(request)
 
-        mock_verify.assert_called_once_with("valid.jwt.token", ANY, audience=None)
+        mock_verify.assert_called_once_with(
+            "valid.jwt.token",
+            ANY,
+            audience="test-client-id.apps.googleusercontent.com",
+        )
         mock_authenticate.assert_called_once_with(
             request, remote_user="dev@safe.global"
         )
@@ -117,7 +121,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_wrong_hosted_domain_raises(self, mock_authenticate, mock_verify):
+    def test_wrong_hosted_domain_returns_401(self, mock_authenticate, mock_verify):
         mock_verify.return_value = {
             **VALID_CLAIMS,
             "hd": "gmail.com",
@@ -125,43 +129,94 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         }
 
         request = _anon_request(self.factory, token="bad.jwt.token")
-        with self.assertRaisesRegex(ValueError, "wrong hosted domain"):
-            self.middleware(request)
+        response = self.middleware(request)
 
+        self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
     @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_unverified_email_raises(self, mock_authenticate, mock_verify):
-        mock_verify.return_value = {**VALID_CLAIMS, "email_verified": False}
+    def test_missing_hd_claim_returns_401(self, mock_authenticate, mock_verify):
+        claims_without_hd = {k: v for k, v in VALID_CLAIMS.items() if k != "hd"}
+        mock_verify.return_value = claims_without_hd
 
         request = _anon_request(self.factory, token="bad.jwt.token")
-        with self.assertRaisesRegex(ValueError, "email not verified"):
-            self.middleware(request)
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
 
     @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_missing_email_claim_raises(self, mock_authenticate, mock_verify):
+    def test_unverified_email_returns_401(self, mock_authenticate, mock_verify):
+        mock_verify.return_value = {**VALID_CLAIMS, "email_verified": False}
+
+        request = _anon_request(self.factory, token="bad.jwt.token")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
+
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_missing_email_claim_returns_401(self, mock_authenticate, mock_verify):
         mock_verify.return_value = {**VALID_CLAIMS, "email": None}
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        with self.assertRaisesRegex(ValueError, "missing email claim"):
-            self.middleware(request)
+        response = self.middleware(request)
 
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
+
+    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_empty_hd_claim_returns_401(self, mock_authenticate, mock_verify):
+        mock_verify.return_value = {**VALID_CLAIMS, "hd": ""}
+
+        request = _anon_request(self.factory, token="valid.jwt.token")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
     @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_invalid_jwt_raises(self, mock_authenticate, mock_verify):
+    def test_expired_jwt_returns_401(self, mock_authenticate, mock_verify):
+        mock_verify.side_effect = ValueError("Token expired")
+
+        request = _anon_request(self.factory, token="expired.jwt.token")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
+
+    @override_settings(SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_invalid_jwt_returns_401(self, mock_authenticate, mock_verify):
         mock_verify.side_effect = ValueError("bad signature")
 
         request = _anon_request(self.factory, token="garbage")
-        with self.assertRaises(ValueError):
-            self.middleware(request)
+        response = self.middleware(request)
 
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
+
+    @override_settings(SSO_CLIENT_ID=None)
+    @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.authenticate")
+    def test_google_auth_error_returns_401(self, mock_authenticate, mock_verify):
+        mock_verify.side_effect = google.auth.exceptions.GoogleAuthError("wrong issuer")
+
+        request = _anon_request(self.factory, token="bad.jwt.token")
+        response = self.middleware(request)
+
+        self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")

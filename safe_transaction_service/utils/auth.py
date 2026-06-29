@@ -27,10 +27,9 @@ class GoogleOIDCMiddleware:
       the proxy).
     """
 
-    _google_request = google_requests.Request()
-
     def __init__(self, get_response):
         self.get_response = get_response
+        self._google_request = google_requests.Request()
 
     def __call__(self, request):
         token = request.META.get("HTTP_X_ENC_ID_TOKEN", "")
@@ -46,13 +45,23 @@ class GoogleOIDCMiddleware:
             except google.auth.exceptions.TransportError as exc:
                 logger.error("SSO JWT verification failed: Google unreachable: %s", exc)
                 return HttpResponse("SSO unavailable", status=503)
-            if claims.get("hd") != settings.SSO_HOSTED_DOMAIN:
-                raise ValueError("JWT rejected: wrong hosted domain")
+            except (google.auth.exceptions.GoogleAuthError, ValueError) as exc:
+                logger.warning("SSO JWT rejected: %s", exc)
+                return HttpResponse("Unauthorized", status=401)
+            hd = claims.get("hd")
+            if not hd:
+                logger.warning("SSO JWT rejected: missing hd claim")
+                return HttpResponse("Unauthorized", status=401)
+            if hd != settings.SSO_HOSTED_DOMAIN:
+                logger.warning("SSO JWT rejected: wrong hosted domain %r", hd)
+                return HttpResponse("Unauthorized", status=401)
             email = claims.get("email")
             if not email:
-                raise ValueError("JWT rejected: missing email claim")
+                logger.warning("SSO JWT rejected: missing email claim")
+                return HttpResponse("Unauthorized", status=401)
             if not claims.get("email_verified"):
-                raise ValueError("JWT rejected: email not verified")
+                logger.warning("SSO JWT rejected: email not verified for %s", email)
+                return HttpResponse("Unauthorized", status=401)
             user = authenticate(request, remote_user=email)
             if user:
                 request.user = user
@@ -62,7 +71,12 @@ class GoogleOIDCMiddleware:
                 logger.warning("SSO access denied email=%s not in SSO_ADMINS", email)
         elif token and request.user.is_authenticated:
             # JWT present, Django session active — re-check SSO_ADMINS.
-            if request.user.username not in settings.SSO_ADMINS:
+            # JWT signature is intentionally not re-verified here: the Django session is
+            # the trust anchor for authenticated users. Re-verifying against Google JWKS
+            # on every request would add latency with no security benefit — APISIX already
+            # validates the token before forwarding it. SSO_ADMINS is re-checked on every
+            # request to enforce revocation without waiting for JWT expiry.
+            if request.user.username not in getattr(settings, "SSO_ADMINS", []):
                 user = request.user
                 user.is_active = False
                 user.is_superuser = False
@@ -120,7 +134,7 @@ class CustomRemoteUserBackend(RemoteUserBackend):
         user = super().configure_user(request, user, created)
         if created:
             logger.info("SSO first login, Django user created email=%s", user.username)
-        if user.username in settings.SSO_ADMINS:
+        if user.username in getattr(settings, "SSO_ADMINS", []):
             user.is_active = True
             user.is_superuser = True
             user.is_staff = True
