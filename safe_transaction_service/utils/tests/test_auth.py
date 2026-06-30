@@ -2,6 +2,7 @@
 from unittest.mock import ANY, MagicMock, patch
 
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ImproperlyConfigured
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
 import google.auth.exceptions
@@ -279,25 +280,26 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_authenticate_returns_none_does_not_set_user(
+    def test_authenticate_returns_none_returns_401(
         self, mock_authenticate, mock_verify
     ):
         mock_verify.return_value = VALID_CLAIMS
         mock_authenticate.return_value = None
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        self.middleware(request)
+        response = self.middleware(request)
 
+        self.assertEqual(response.status_code, 401)
         self.assertIsInstance(request.user, AnonymousUser)
-        self.get_response.assert_called_once_with(request)
+        self.get_response.assert_not_called()
 
     def test_falsy_sso_client_id_raises_on_init(self):
         get_response = MagicMock()
         with override_settings(SSO_CLIENT_ID=None):
-            with self.assertRaises(AssertionError):
+            with self.assertRaises(ImproperlyConfigured):
                 GoogleOIDCMiddleware(get_response)
         with override_settings(SSO_CLIENT_ID=""):
-            with self.assertRaises(AssertionError):
+            with self.assertRaises(ImproperlyConfigured):
                 GoogleOIDCMiddleware(get_response)
 
 
@@ -338,6 +340,18 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         ) as mock_configure:
             self.backend.authenticate(self.request, "dev@safe.global")
             mock_configure.assert_called_once_with(self.request, user, created=False)
+
+    @override_settings(SSO_ADMINS=["dev@safe.global"])
+    @patch("django.contrib.auth.backends.UserModel")
+    def test_returning_non_admin_authenticate_returns_none(self, mock_user_model):
+        user = self._make_user("other@safe.global")
+        mock_user_model.USERNAME_FIELD = "username"
+        mock_user_model._default_manager.get_or_create.return_value = (user, False)
+
+        result = self.backend.authenticate(self.request, "other@safe.global")
+
+        self.assertIsNone(result)
+        self.assertFalse(user.is_active)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     def test_deactivated_user_added_back_to_admins_is_reactivated(self):

@@ -840,3 +840,34 @@ BANNED_EOAS: set[ChecksumAddress] = {
 DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
     "DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION", default=False
 )
+
+# SSO — Google OIDC + JWT verification
+# ------------------------------------------------------------------------------
+# Replaces the legacy SSO_USERNAME_HEADER / CustomHeaderRemoteUserMiddleware approach.
+# SSO_USERNAME_HEADER is no longer read — remove it from your environment.
+#
+# The reverse proxy (APISIX) handles the Google OIDC flow and must be configured to
+# forward the raw RS256-signed ID token as the X-Enc-ID-Token request header.
+# GoogleOIDCMiddleware verifies the JWT signature against Google's public JWKS
+# before trusting anything in the header — the token is never accepted on trust alone.
+#
+# Required env vars when SSO_ENABLED=true:
+#   SSO_ADMINS       — comma-separated list of emails granted Django admin access
+#   SSO_CLIENT_ID    — Google OAuth client ID (must match APISIX config); used to
+#                      verify the JWT aud claim so tokens from other apps are rejected
+# Optional:
+#   SSO_HOSTED_DOMAIN — Google Workspace domain to enforce (default: safe.global)
+SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
+if SSO_ENABLED:
+    MIDDLEWARE.append("safe_transaction_service.utils.auth.GoogleOIDCMiddleware")
+    AUTHENTICATION_BACKENDS = [
+        "safe_transaction_service.utils.auth.CustomRemoteUserBackend",
+        # "django.contrib.auth.backends.ModelBackend",
+    ]
+    # When creating a user, give superuser permissions if email is in SSO_ADMINS
+    # e.g. SSO_ADMINS=alice@safe.global,bob@safe.global
+    SSO_ADMINS = [email.lower() for email in env.list("SSO_ADMINS", default=[])]
+    # Google OAuth client ID — used to verify the JWT aud claim so only tokens
+    # issued for this app are accepted. Must match the client_id in APISIX config.
+    SSO_CLIENT_ID = env("SSO_CLIENT_ID")
+    SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global").lower()
