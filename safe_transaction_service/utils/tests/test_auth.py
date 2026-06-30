@@ -35,17 +35,17 @@ def _authed_request(factory, path="/admin/", username="dev@safe.global"):
     return request
 
 
+@override_settings(
+    SSO_CLIENT_ID="test-client-id.apps.googleusercontent.com",
+    SSO_ADMINS=["dev@safe.global"],
+    SSO_HOSTED_DOMAIN="safe.global",
+)
 class GoogleOIDCMiddlewareTest(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.get_response = MagicMock(return_value=MagicMock())
         self.middleware = GoogleOIDCMiddleware(self.get_response)
 
-    @override_settings(
-        SSO_ADMINS=["dev@safe.global"],
-        SSO_HOSTED_DOMAIN="safe.global",
-        SSO_CLIENT_ID="test-client-id.apps.googleusercontent.com",
-    )
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
@@ -94,30 +94,19 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         )
         self.get_response.assert_called_once_with(request)
 
-    @override_settings(
-        SSO_ADMINS=["other@safe.global"],
-        SSO_HOSTED_DOMAIN="safe.global",
-        SSO_CLIENT_ID=None,
-    )
+    @override_settings(SSO_ADMINS=["other@safe.global"])
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
-    @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_user_not_in_admins_does_not_login(
-        self, mock_authenticate, mock_login, mock_verify
-    ):
+    def test_user_not_in_admins_returns_401(self, mock_authenticate, mock_verify):
         mock_verify.return_value = VALID_CLAIMS
-        mock_authenticate.return_value = (
-            None  # backend returns None when not in SSO_ADMINS
-        )
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        self.middleware(request)
+        response = self.middleware(request)
 
-        mock_login.assert_not_called()
-        self.assertIsInstance(request.user, AnonymousUser)
-        self.get_response.assert_called_once_with(request)
+        self.assertEqual(response.status_code, 401)
+        mock_authenticate.assert_not_called()
+        self.get_response.assert_not_called()
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_wrong_hosted_domain_returns_401(self, mock_authenticate, mock_verify):
@@ -133,7 +122,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_missing_hd_claim_returns_401(self, mock_authenticate, mock_verify):
@@ -146,7 +134,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_unverified_email_returns_401(self, mock_authenticate, mock_verify):
@@ -158,7 +145,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_missing_email_claim_returns_401(self, mock_authenticate, mock_verify):
@@ -170,7 +156,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_empty_hd_claim_returns_401(self, mock_authenticate, mock_verify):
@@ -182,7 +167,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_expired_jwt_returns_401(self, mock_authenticate, mock_verify):
@@ -194,7 +178,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_invalid_jwt_returns_401(self, mock_authenticate, mock_verify):
@@ -206,7 +189,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
         mock_authenticate.assert_not_called()
 
-    @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_google_auth_error_returns_401(self, mock_authenticate, mock_verify):
@@ -286,7 +268,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         mock_logout.assert_not_called()
         self.get_response.assert_called_once_with(request)
 
-    @override_settings(SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     def test_google_transport_error_returns_503(self, mock_verify):
         mock_verify.side_effect = google.auth.exceptions.TransportError("network error")
@@ -296,7 +277,6 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
         self.assertEqual(response.status_code, 503)
 
-    @override_settings(SSO_HOSTED_DOMAIN="safe.global", SSO_CLIENT_ID=None)
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_authenticate_returns_none_does_not_set_user(
@@ -310,6 +290,15 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
         self.assertIsInstance(request.user, AnonymousUser)
         self.get_response.assert_called_once_with(request)
+
+    def test_falsy_sso_client_id_raises_on_init(self):
+        get_response = MagicMock()
+        with override_settings(SSO_CLIENT_ID=None):
+            with self.assertRaises(AssertionError):
+                GoogleOIDCMiddleware(get_response)
+        with override_settings(SSO_CLIENT_ID=""):
+            with self.assertRaises(AssertionError):
+                GoogleOIDCMiddleware(get_response)
 
 
 class CustomRemoteUserBackendTest(SimpleTestCase):

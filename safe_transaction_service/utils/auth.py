@@ -29,6 +29,7 @@ class GoogleOIDCMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
+        assert settings.SSO_CLIENT_ID, "SSO_CLIENT_ID must be set when SSO_ENABLED=True"
 
     def __call__(self, request):
         token = request.META.get("HTTP_X_ENC_ID_TOKEN", "")
@@ -55,26 +56,29 @@ class GoogleOIDCMiddleware:
             if hd != settings.SSO_HOSTED_DOMAIN:
                 logger.warning("SSO JWT rejected: wrong hosted domain %r", hd)
                 return HttpResponse("Unauthorized", status=401)
-            email = claims.get("email")
+            email = (claims.get("email") or "").lower()
             if not email:
                 logger.warning("SSO JWT rejected: missing email claim")
                 return HttpResponse("Unauthorized", status=401)
             if not claims.get("email_verified"):
                 logger.warning("SSO JWT rejected: email not verified for %s", email)
                 return HttpResponse("Unauthorized", status=401)
+            if email not in settings.SSO_ADMINS:
+                logger.warning("SSO access denied email=%s not in SSO_ADMINS", email)
+                return HttpResponse("Unauthorized", status=401)
             user = authenticate(request, remote_user=email)
             if user:
                 login(request, user)
                 logger.info("SSO authenticated email=%s", email)
-            else:
-                logger.warning("SSO access denied email=%s not in SSO_ADMINS", email)
         elif token and request.user.is_authenticated:
             # JWT present, Django session active — re-check SSO_ADMINS.
             # JWT signature is intentionally not re-verified here: the Django session is
             # the trust anchor for authenticated users. Re-verifying against Google JWKS
             # on every request would add latency with no security benefit — APISIX already
             # validates the token before forwarding it. SSO_ADMINS is re-checked on every
-            # request to enforce revocation without waiting for JWT expiry.
+            # request to enforce immediate revocation on allowlist changes. Token expiry
+            # and Google-side account disables are enforced by APISIX when it can no
+            # longer obtain a valid token.
             if request.user.username not in settings.SSO_ADMINS:
                 user = request.user
                 CustomRemoteUserBackend.apply_admin_flags(user, is_admin=False)
