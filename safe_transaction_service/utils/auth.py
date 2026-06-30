@@ -18,11 +18,11 @@ class GoogleOIDCMiddleware:
     """
     Runs on every request. Handles four cases:
     - Token present, no session: verifies the Google RS256 JWT in X-Enc-ID-Token,
-      checks hosted domain (hd) and email_verified, then creates a Django session
-      via CustomRemoteUserBackend if the email is in SSO_ADMINS. Returns 503 if
-      Google's JWKS endpoint is unreachable.
+      checks hosted domain (hd) and email_verified, then creates a Django session.
+      All verified org users get is_active=True and is_staff=True; SSO_ADMINS members
+      additionally get is_superuser=True. Returns 503 if Google's JWKS endpoint is unreachable.
     - Token present, session active: skips JWT re-verification (APISIX already
-      validated it) and re-checks SSO_ADMINS to enforce immediate revocation.
+      validated it) and syncs is_superuser from SSO_ADMINS on every request.
     - No token, session active: force logout. Either an authenticated user hitting
       a route not covered by OIDC, or an APISIX bypass (unlikely but a security concern).
     - No token, no session: anonymous request, passed through unchanged.
@@ -33,6 +33,10 @@ class GoogleOIDCMiddleware:
         if not settings.SSO_CLIENT_ID:
             raise ImproperlyConfigured(
                 "SSO_CLIENT_ID must be set when SSO_ENABLED=True"
+            )
+        if not settings.SSO_HOSTED_DOMAIN:
+            raise ImproperlyConfigured(
+                "SSO_HOSTED_DOMAIN must be set when SSO_ENABLED=True"
             )
 
     def __call__(self, request):
@@ -48,6 +52,7 @@ class GoogleOIDCMiddleware:
         return self.get_response(request)
 
     def _login(self, request, token):
+        """Verifies the Google RS256 JWT, validates hd and email_verified claims, then creates a Django session."""
         logger.debug("SSO JWT verification started")
         try:
             claims = id_token.verify_oauth2_token(
@@ -61,7 +66,7 @@ class GoogleOIDCMiddleware:
         except (google.auth.exceptions.GoogleAuthError, ValueError) as exc:
             logger.warning("SSO JWT rejected: %s", exc)
             return HttpResponse("Unauthorized", status=401)
-        hd = claims.get("hd")
+        hd = (claims.get("hd") or "").lower()
         if not hd:
             logger.warning("SSO JWT rejected: missing hd claim")
             return HttpResponse("Unauthorized", status=401)
@@ -75,9 +80,6 @@ class GoogleOIDCMiddleware:
         if not claims.get("email_verified"):
             logger.warning("SSO JWT rejected: email not verified for %s", email)
             return HttpResponse("Unauthorized", status=401)
-        if email not in settings.SSO_ADMINS:
-            logger.warning("SSO access denied email=%s not in SSO_ADMINS", email)
-            return HttpResponse("Unauthorized", status=401)
         user = authenticate(request, remote_user=email)
         if user:
             login(request, user)
@@ -90,33 +92,33 @@ class GoogleOIDCMiddleware:
         return self.get_response(request)
 
     def _reauthorize(self, request):
-        # JWT signature is intentionally not re-verified here: the Django session is
-        # the trust anchor for authenticated users. Re-verifying against Google JWKS
-        # on every request would add latency with no security benefit — APISIX already
-        # validates the token before forwarding it. SSO_ADMINS is re-checked on every
-        # request to enforce immediate revocation on allowlist changes. Token expiry
-        # and Google-side account disables are enforced by APISIX when it can no
-        # longer obtain a valid token.
-        if request.user.username not in settings.SSO_ADMINS:
-            user = request.user
-            CustomRemoteUserBackend.apply_admin_flags(user, is_admin=False)
-            logout(request)
-            logger.warning(
-                "SSO session revoked email=%s removed from SSO_ADMINS",
+        """
+        JWT signature intentionally not re-verified; Django session is trust anchor.
+        SSO_ADMINS membership synced on every request: adding/removing an email takes
+        effect on the very next request without requiring a new login.
+        """
+        user = request.user
+        is_admin = user.username in settings.SSO_ADMINS
+        if user.is_superuser != is_admin:
+            CustomRemoteUserBackend.apply_user_flags(user, is_admin=is_admin)
+            logger.info(
+                "SSO admin flags synced email=%s is_superuser=%s",
                 user.username,
+                is_admin,
             )
         else:
             logger.debug(
-                "SSO skipping JWT, session already active email=%s",
-                request.user.username,
+                "SSO skipping JWT, session already active email=%s", user.username
             )
         return self.get_response(request)
 
     def _force_logout(self, request):
-        # No JWT but Django session active. Two possible causes:
-        #  1. Authenticated user hitting a route not covered by OIDC (expected).
-        #  2. APISIX bypass (unlikely but a security concern).
-        # Force logout in both cases since all sessions must be OIDC-backed.
+        """
+        No JWT but Django session active. Two possible causes:
+        1. Authenticated user hitting a route not covered by OIDC (expected).
+        2. APISIX bypass (unlikely but a security concern).
+        Force logout in both cases since all sessions must be OIDC-backed.
+        """
         user = request.user
         logout(request)
         logger.info(
@@ -128,30 +130,31 @@ class GoogleOIDCMiddleware:
 
 class CustomRemoteUserBackend(RemoteUserBackend):
     @staticmethod
-    def apply_admin_flags(user, is_admin: bool) -> None:
-        user.is_active = is_admin
-        user.is_superuser = is_admin
-        user.is_staff = is_admin
+    def apply_user_flags(user, is_admin: bool, created: bool = False) -> None:
+        # Admins always overridden
+        # Non-admins only set on creation, Django controls after.
+        if is_admin or created:
+            user.is_active = True
+            user.is_staff = True
+        user.is_superuser = (
+            is_admin  # always authoritative — reflects SSO_ADMINS membership
+        )
         user.save()
 
     def configure_user(self, request, user, created=True):
         """
-        Called by the parent's authenticate() on every login attempt. Sets is_active,
-        is_superuser, and is_staff based on SSO_ADMINS membership. If the user is not
-        in SSO_ADMINS, is_active is set to False. Django's authenticate() wrapper then
-        calls user_can_authenticate(), which rejects inactive users and returns None —
-        no session is created.
+        Called by the parent's authenticate() on every login attempt. All verified org
+        users get is_active=True and is_staff=True, enabling Django admin access.
+        SSO_ADMINS members additionally get is_superuser=True.
         """
         if created:
             logger.info("SSO first login, Django user created email=%s", user.username)
 
         is_admin = user.username in settings.SSO_ADMINS
-        self.apply_admin_flags(user, is_admin)
+        self.apply_user_flags(user, is_admin, created=created)
 
         if is_admin:
             logger.info("SSO admin access granted email=%s", user.username)
         else:
-            logger.warning(
-                "SSO access denied email=%s not in SSO_ADMINS", user.username
-            )
+            logger.info("SSO staff access granted email=%s", user.username)
         return user

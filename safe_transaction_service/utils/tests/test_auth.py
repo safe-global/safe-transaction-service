@@ -95,18 +95,24 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         )
         self.get_response.assert_called_once_with(request)
 
-    @override_settings(SSO_ADMINS=["other@safe.global"])
+    @override_settings(SSO_ADMINS=[])
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
+    @patch("safe_transaction_service.utils.auth.login")
     @patch("safe_transaction_service.utils.auth.authenticate")
-    def test_user_not_in_admins_returns_401(self, mock_authenticate, mock_verify):
+    def test_user_not_in_admins_can_still_login(
+        self, mock_authenticate, mock_login, mock_verify
+    ):
         mock_verify.return_value = VALID_CLAIMS
+        mock_authenticate.return_value = MagicMock()
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        response = self.middleware(request)
+        self.middleware(request)
 
-        self.assertEqual(response.status_code, 401)
-        mock_authenticate.assert_not_called()
-        self.get_response.assert_not_called()
+        mock_authenticate.assert_called_once_with(
+            request, remote_user="dev@safe.global"
+        )
+        mock_login.assert_called_once()
+        self.get_response.assert_called_once_with(request)
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
@@ -244,18 +250,18 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
     @override_settings(SSO_ADMINS=[])
     @patch("safe_transaction_service.utils.auth.logout")
-    def test_authenticated_user_removed_from_admins_is_revoked(self, mock_logout):
+    def test_authenticated_user_removed_from_admins_loses_superuser(self, mock_logout):
         request = _authed_request(self.factory, username="dev@safe.global")
         request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
         user = request.user
 
         self.middleware(request)
 
-        self.assertFalse(user.is_active)
+        self.assertTrue(user.is_active)
         self.assertFalse(user.is_superuser)
-        self.assertFalse(user.is_staff)
+        self.assertTrue(user.is_staff)
         user.save.assert_called_once()
-        mock_logout.assert_called_once_with(request)
+        mock_logout.assert_not_called()
         self.get_response.assert_called_once_with(request)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
@@ -302,6 +308,12 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
             with self.assertRaises(ImproperlyConfigured):
                 GoogleOIDCMiddleware(get_response)
 
+    def test_falsy_sso_hosted_domain_raises_on_init(self):
+        get_response = MagicMock()
+        with override_settings(SSO_HOSTED_DOMAIN=""):
+            with self.assertRaises(ImproperlyConfigured):
+                GoogleOIDCMiddleware(get_response)
+
 
 class CustomRemoteUserBackendTest(SimpleTestCase):
     def setUp(self):
@@ -343,15 +355,17 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     @patch("django.contrib.auth.backends.UserModel")
-    def test_returning_non_admin_authenticate_returns_none(self, mock_user_model):
+    def test_returning_non_admin_authenticate_succeeds(self, mock_user_model):
         user = self._make_user("other@safe.global")
+        user.is_active = True
         mock_user_model.USERNAME_FIELD = "username"
         mock_user_model._default_manager.get_or_create.return_value = (user, False)
 
         result = self.backend.authenticate(self.request, "other@safe.global")
 
-        self.assertIsNone(result)
-        self.assertFalse(user.is_active)
+        self.assertEqual(result, user)
+        self.assertTrue(user.is_active)
+        self.assertFalse(user.is_superuser)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     def test_deactivated_user_added_back_to_admins_is_reactivated(self):
@@ -366,25 +380,25 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         user.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    def test_user_not_in_admins_list_deactivated(self):
+    def test_user_not_in_admins_list_gets_staff_access(self):
         user = self._make_user("other@safe.global")
 
         result = self.backend.configure_user(self.request, user, created=True)
 
-        self.assertFalse(result.is_active)
+        self.assertTrue(result.is_active)
         self.assertFalse(result.is_superuser)
-        self.assertFalse(result.is_staff)
+        self.assertTrue(result.is_staff)
         result.save.assert_called_once()
 
     @override_settings(SSO_ADMINS=[])
-    def test_empty_admins_list_deactivates_all(self):
+    def test_empty_admins_list_grants_staff_only(self):
         user = self._make_user("dev@safe.global")
 
         result = self.backend.configure_user(self.request, user, created=True)
 
-        self.assertFalse(result.is_active)
+        self.assertTrue(result.is_active)
         self.assertFalse(result.is_superuser)
-        self.assertFalse(result.is_staff)
+        self.assertTrue(result.is_staff)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     def test_returning_user_created_false_does_not_log_creation(self):
@@ -398,18 +412,24 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertFalse(any("user created" in msg for msg in logs.output))
         self.assertTrue(any("admin access granted" in msg for msg in logs.output))
 
-    def test_apply_admin_flags_grants_all_flags(self):
+    def test_apply_user_flags_grants_all_flags(self):
         user = self._make_user()
-        CustomRemoteUserBackend.apply_admin_flags(user, is_admin=True)
+        CustomRemoteUserBackend.apply_user_flags(user, is_admin=True)
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.is_staff)
         user.save.assert_called_once()
 
-    def test_apply_admin_flags_revokes_all_flags(self):
+    def test_apply_user_flags_non_admin_returning_clears_superuser_only(self):
         user = self._make_user()
-        CustomRemoteUserBackend.apply_admin_flags(user, is_admin=False)
-        self.assertFalse(user.is_active)
+        CustomRemoteUserBackend.apply_user_flags(user, is_admin=False, created=False)
         self.assertFalse(user.is_superuser)
-        self.assertFalse(user.is_staff)
+        user.save.assert_called_once()
+
+    def test_apply_user_flags_non_admin_created_gets_staff(self):
+        user = self._make_user()
+        CustomRemoteUserBackend.apply_user_flags(user, is_admin=False, created=True)
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_staff)
+        self.assertFalse(user.is_superuser)
         user.save.assert_called_once()
