@@ -257,9 +257,9 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
         self.middleware(request)
 
-        self.assertTrue(user.is_active)
-        self.assertFalse(user.is_superuser)
-        self.assertTrue(user.is_staff)
+        self.assertFalse(
+            user.is_superuser
+        )  # only is_superuser is written; is_active/is_staff left untouched
         user.save.assert_called_once()
         mock_logout.assert_not_called()
         self.get_response.assert_called_once_with(request)
@@ -410,11 +410,11 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
             self.backend.configure_user(self.request, user, created=False)
 
         self.assertFalse(any("user created" in msg for msg in logs.output))
-        self.assertTrue(any("admin access granted" in msg for msg in logs.output))
+        self.assertTrue(any("SSO permissions set" in msg for msg in logs.output))
 
     def test_apply_user_flags_grants_all_flags(self):
         user = self._make_user()
-        CustomRemoteUserBackend.apply_user_flags(user, is_admin=True)
+        CustomRemoteUserBackend.apply_user_flags(user, is_sso_admin=True)
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.is_staff)
@@ -422,13 +422,15 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
 
     def test_apply_user_flags_non_admin_returning_clears_superuser_only(self):
         user = self._make_user()
-        CustomRemoteUserBackend.apply_user_flags(user, is_admin=False, created=False)
+        CustomRemoteUserBackend.apply_user_flags(
+            user, is_sso_admin=False, created=False
+        )
         self.assertFalse(user.is_superuser)
         user.save.assert_called_once()
 
     def test_apply_user_flags_non_admin_created_gets_staff(self):
         user = self._make_user()
-        CustomRemoteUserBackend.apply_user_flags(user, is_admin=False, created=True)
+        CustomRemoteUserBackend.apply_user_flags(user, is_sso_admin=False, created=True)
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_staff)
         self.assertFalse(user.is_superuser)
