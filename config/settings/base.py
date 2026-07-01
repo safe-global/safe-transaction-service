@@ -847,7 +847,7 @@ DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
 # SSO_USERNAME_HEADER is no longer read — remove it from your environment.
 #
 # The reverse proxy (APISIX) handles the Google OIDC flow and must be configured to
-# forward the raw RS256-signed ID token as the X-Enc-ID-Token request header.
+# forward the raw RS256-signed ID token in the request header named by SSO_ID_TOKEN_HEADER.
 # GoogleOIDCMiddleware verifies the JWT signature against Google's public JWKS
 # before trusting anything in the header — the token is never accepted on trust alone.
 #
@@ -856,7 +856,9 @@ DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
 #   SSO_CLIENT_ID    — Google OAuth client ID (must match APISIX config); used to
 #                      verify the JWT aud claim so tokens from other apps are rejected
 # Optional:
-#   SSO_HOSTED_DOMAIN — Google Workspace domain to enforce (default: safe.global)
+#   SSO_HOSTED_DOMAIN   — Google Workspace domain to enforce (default: safe.global)
+#   SSO_ID_TOKEN_HEADER — request.META key holding the forwarded ID token
+#                         (default: HTTP_X_ENC_ID_TOKEN)
 SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
 if SSO_ENABLED:
     MIDDLEWARE.append("safe_transaction_service.utils.auth.GoogleOIDCMiddleware")
@@ -871,6 +873,7 @@ if SSO_ENABLED:
     # issued for this app are accepted. Must match the client_id in APISIX config.
     SSO_CLIENT_ID = env("SSO_CLIENT_ID")
     SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global").lower()
+    SSO_ID_TOKEN_HEADER = env.str("SSO_ID_TOKEN_HEADER", default="HTTP_X_ENC_ID_TOKEN")
     SESSION_COOKIE_AGE = (
         60 * 10
     )  # 10 minutes; re-created transparently by APISIX on each admin request

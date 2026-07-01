@@ -19,10 +19,13 @@ VALID_CLAIMS = {
     "sub": "1234567890",
 }
 
+# Placeholder only — not the real header name used in any deployed environment.
+TEST_ID_TOKEN_HEADER = "HTTP_X_TEST_ID_TOKEN"
+
 
 def _anon_request(factory, path="/admin/", token=""):
     request = factory.get(path)
-    request.META["HTTP_X_ENC_ID_TOKEN"] = token
+    request.META[TEST_ID_TOKEN_HEADER] = token
     request.user = AnonymousUser()
     return request
 
@@ -40,6 +43,7 @@ def _authed_request(factory, path="/admin/", username="dev@safe.global"):
     SSO_CLIENT_ID="test-client-id.apps.googleusercontent.com",
     SSO_ADMINS=["dev@safe.global"],
     SSO_HOSTED_DOMAIN="safe.global",
+    SSO_ID_TOKEN_HEADER=TEST_ID_TOKEN_HEADER,
 )
 class GoogleOIDCMiddlewareTest(SimpleTestCase):
     def setUp(self):
@@ -236,7 +240,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_already_authenticated_skips_decode(self, mock_authenticate, mock_verify):
         request = _authed_request(self.factory)
-        request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
+        request.META[TEST_ID_TOKEN_HEADER] = "valid.jwt.token"
         result = self.middleware(request)
 
         mock_verify.assert_not_called()
@@ -245,7 +249,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         self.assertIs(result, self.get_response.return_value)
 
     def test_authenticated_user_without_token_passes_through(self):
-        # No X-Enc-ID-Token — session expires naturally per SESSION_COOKIE_AGE.
+        # No ID token header — session expires naturally per SESSION_COOKIE_AGE.
         request = _authed_request(self.factory)
         result = self.middleware(request)
 
@@ -255,7 +259,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @override_settings(SSO_ADMINS=[])
     def test_authenticated_user_removed_from_admins_loses_superuser(self):
         request = _authed_request(self.factory, username="dev@safe.global")
-        request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
+        request.META[TEST_ID_TOKEN_HEADER] = "valid.jwt.token"
         user = request.user
 
         result = self.middleware(request)
@@ -270,7 +274,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @override_settings(SSO_ADMINS=["dev@safe.global"])
     def test_authenticated_user_in_admins_stays_logged_in(self):
         request = _authed_request(self.factory, username="dev@safe.global")
-        request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
+        request.META[TEST_ID_TOKEN_HEADER] = "valid.jwt.token"
 
         result = self.middleware(request)
 
@@ -303,12 +307,11 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
 
     def test_falsy_sso_client_id_raises_on_init(self):
         get_response = MagicMock()
-        with override_settings(SSO_CLIENT_ID=None):
-            with self.assertRaises(ImproperlyConfigured):
-                GoogleOIDCMiddleware(get_response)
-        with override_settings(SSO_CLIENT_ID=""):
-            with self.assertRaises(ImproperlyConfigured):
-                GoogleOIDCMiddleware(get_response)
+        for falsy_value in (None, ""):
+            with self.subTest(sso_client_id=falsy_value):
+                with override_settings(SSO_CLIENT_ID=falsy_value):
+                    with self.assertRaises(ImproperlyConfigured):
+                        GoogleOIDCMiddleware(get_response)
 
     def test_falsy_sso_hosted_domain_raises_on_init(self):
         get_response = MagicMock()

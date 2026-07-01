@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 class GoogleOIDCMiddleware:
     """
     Runs on every request. Handles four cases:
-    - Token present, no session: verifies the Google RS256 JWT in X-Enc-ID-Token,
-      checks hosted domain (hd) and email_verified, then creates a Django session.
+    - Token present, no session: verifies the Google RS256 JWT forwarded in the
+      configured SSO_ID_TOKEN_HEADER, checks hosted domain (hd) and email_verified,
+      then creates a Django session.
       New org users get is_active=True and is_staff=True; returning users keep their
       existing flags. SSO_ADMINS members always get is_superuser=True. Returns 503
       if Google's JWKS endpoint is unreachable.
@@ -40,7 +41,7 @@ class GoogleOIDCMiddleware:
             )
 
     def __call__(self, request):
-        token = request.META.get("HTTP_X_ENC_ID_TOKEN", "")
+        token = request.META.get(settings.SSO_ID_TOKEN_HEADER, "")
         authenticated = request.user.is_authenticated
         if token and not authenticated:
             return self._login(request, token)
