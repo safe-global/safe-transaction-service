@@ -871,3 +871,6 @@ if SSO_ENABLED:
     # issued for this app are accepted. Must match the client_id in APISIX config.
     SSO_CLIENT_ID = env("SSO_CLIENT_ID")
     SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global").lower()
+    SESSION_COOKIE_AGE = (
+        60 * 10
+    )  # 10 minutes; re-created transparently by APISIX on each admin request

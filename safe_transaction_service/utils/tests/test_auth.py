@@ -58,7 +58,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         mock_authenticate.return_value = user
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        self.middleware(request)
+        result = self.middleware(request)
 
         mock_verify.assert_called_once_with(
             "valid.jwt.token",
@@ -70,6 +70,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         )
         mock_login.assert_called_once_with(request, user)
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @override_settings(
         SSO_ADMINS=["dev@safe.global"],
@@ -86,7 +87,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         mock_authenticate.return_value = MagicMock()
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        self.middleware(request)
+        result = self.middleware(request)
 
         mock_verify.assert_called_once_with(
             "valid.jwt.token",
@@ -94,6 +95,7 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
             audience="my-client-id.apps.googleusercontent.com",
         )
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @override_settings(SSO_ADMINS=[])
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
@@ -106,13 +108,14 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
         mock_authenticate.return_value = MagicMock()
 
         request = _anon_request(self.factory, token="valid.jwt.token")
-        self.middleware(request)
+        result = self.middleware(request)
 
         mock_authenticate.assert_called_once_with(
             request, remote_user="dev@safe.global"
         )
         mock_login.assert_called_once()
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     @patch("safe_transaction_service.utils.auth.authenticate")
@@ -211,11 +214,12 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     @patch("safe_transaction_service.utils.auth.authenticate")
     def test_no_token_passes_through(self, mock_authenticate, mock_verify):
         request = _anon_request(self.factory, token="")
-        self.middleware(request)
+        result = self.middleware(request)
 
         mock_verify.assert_not_called()
         mock_authenticate.assert_not_called()
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     def test_no_jwt_no_session_logs_debug(self):
         request = _anon_request(self.factory, token="")
@@ -233,47 +237,45 @@ class GoogleOIDCMiddlewareTest(SimpleTestCase):
     def test_already_authenticated_skips_decode(self, mock_authenticate, mock_verify):
         request = _authed_request(self.factory)
         request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
-        self.middleware(request)
+        result = self.middleware(request)
 
         mock_verify.assert_not_called()
         mock_authenticate.assert_not_called()
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
-    @patch("safe_transaction_service.utils.auth.logout")
-    def test_authenticated_user_without_token_is_logged_out(self, mock_logout):
-        # No X-Enc-ID-Token header — APISIX not forwarding; session revoked immediately.
+    def test_authenticated_user_without_token_passes_through(self):
+        # No X-Enc-ID-Token — session expires naturally per SESSION_COOKIE_AGE.
         request = _authed_request(self.factory)
-        self.middleware(request)
+        result = self.middleware(request)
 
-        mock_logout.assert_called_once_with(request)
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @override_settings(SSO_ADMINS=[])
-    @patch("safe_transaction_service.utils.auth.logout")
-    def test_authenticated_user_removed_from_admins_loses_superuser(self, mock_logout):
+    def test_authenticated_user_removed_from_admins_loses_superuser(self):
         request = _authed_request(self.factory, username="dev@safe.global")
         request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
         user = request.user
 
-        self.middleware(request)
+        result = self.middleware(request)
 
         self.assertFalse(
             user.is_superuser
         )  # only is_superuser is written; is_active/is_staff left untouched
         user.save.assert_called_once()
-        mock_logout.assert_not_called()
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @override_settings(SSO_ADMINS=["dev@safe.global"])
-    @patch("safe_transaction_service.utils.auth.logout")
-    def test_authenticated_user_in_admins_stays_logged_in(self, mock_logout):
+    def test_authenticated_user_in_admins_stays_logged_in(self):
         request = _authed_request(self.factory, username="dev@safe.global")
         request.META["HTTP_X_ENC_ID_TOKEN"] = "valid.jwt.token"
 
-        self.middleware(request)
+        result = self.middleware(request)
 
-        mock_logout.assert_not_called()
         self.get_response.assert_called_once_with(request)
+        self.assertIs(result, self.get_response.return_value)
 
     @patch("safe_transaction_service.utils.auth.id_token.verify_oauth2_token")
     def test_google_transport_error_returns_503(self, mock_verify):
@@ -405,12 +407,14 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         user = self._make_user("dev@safe.global")
 
         with self.assertLogs(
-            "safe_transaction_service.utils.auth", level="INFO"
+            "safe_transaction_service.utils.auth", level="DEBUG"
         ) as logs:
             self.backend.configure_user(self.request, user, created=False)
 
         self.assertFalse(any("user created" in msg for msg in logs.output))
-        self.assertTrue(any("SSO permissions set" in msg for msg in logs.output))
+        self.assertTrue(
+            any("SSO Django user.is_superuser set" in msg for msg in logs.output)
+        )
 
     def test_apply_user_flags_grants_all_flags(self):
         user = self._make_user()
@@ -434,4 +438,12 @@ class CustomRemoteUserBackendTest(SimpleTestCase):
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_staff)
         self.assertFalse(user.is_superuser)
+        user.save.assert_called_once()
+
+    def test_apply_user_flags_admin_created_gets_all_flags(self):
+        user = self._make_user()
+        CustomRemoteUserBackend.apply_user_flags(user, is_sso_admin=True, created=True)
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.is_superuser)
         user.save.assert_called_once()
