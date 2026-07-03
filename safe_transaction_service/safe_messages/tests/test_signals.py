@@ -33,6 +33,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         safe_message = SafeMessageFactory(safe=safe_address)
         process_event(SafeMessage, safe_message, True)
         message_created_payload = {
+            "timestamp": int(safe_message.created.timestamp()),
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
@@ -58,6 +59,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         # Creating a message should fire a signal and an event should be sent
         safe_message = SafeMessageFactory(safe=safe_address)
         message_created_payload = {
+            "timestamp": int(safe_message.created.timestamp()),
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
@@ -67,8 +69,11 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
         send_event_mock.assert_called_with(message_created_payload)
 
         # Creating a confirmation should fire a signal and an event should be sent
-        SafeMessageConfirmationFactory(safe_message=safe_message)
+        safe_message_confirmation = SafeMessageConfirmationFactory(
+            safe_message=safe_message
+        )
         message_confirmation_payload = {
+            "timestamp": int(safe_message_confirmation.created.timestamp()),
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,
