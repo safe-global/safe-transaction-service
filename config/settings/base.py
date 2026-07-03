@@ -868,7 +868,7 @@ if SSO_ENABLED:
     ]
     # When creating a user, give superuser permissions if email is in SSO_ADMINS
     # e.g. SSO_ADMINS=alice@safe.global,bob@safe.global
-    SSO_ADMINS = [email.lower() for email in env.list("SSO_ADMINS", default=[])]
+    SSO_ADMINS = {email.lower() for email in env.list("SSO_ADMINS", default=[])}
     # Google OAuth client ID — used to verify the JWT aud claim so only tokens
     # issued for this app are accepted. Must match the client_id in APISIX config.
     SSO_CLIENT_ID = env("SSO_CLIENT_ID")
