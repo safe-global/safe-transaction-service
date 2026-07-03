@@ -13,6 +13,8 @@ from google.oauth2 import id_token
 
 logger = logging.getLogger(__name__)
 
+_google_request = google_requests.Request()
+
 
 class GoogleOIDCMiddleware:
     """
@@ -65,7 +67,7 @@ class GoogleOIDCMiddleware:
         try:
             claims = id_token.verify_oauth2_token(
                 token,
-                google_requests.Request(),
+                _google_request,
                 audience=settings.SSO_CLIENT_ID,
             )
         except google.auth.exceptions.TransportError as exc:
