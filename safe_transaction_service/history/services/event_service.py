@@ -24,6 +24,7 @@ from safe_transaction_service.history.models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     TokenTransfer,
     TransactionServiceEventType,
 )
@@ -110,6 +111,21 @@ def _filter_not_safe_transfers(
     return payloads
 
 
+def _get_safe_threshold(safe_address: str) -> int | None:
+    """
+    Current threshold of the Safe from ``SafeLastStatus``. Safe messages are not tied
+    to a nonce, so the current threshold is the correct value.
+
+    :param safe_address:
+    :return: Threshold, or `None` if the Safe has no indexed status yet
+    """
+    return (
+        SafeLastStatus.objects.filter(address=safe_address)
+        .values_list("threshold", flat=True)
+        .first()
+    )
+
+
 def build_event_payload(
     sender: type[Model],
     instance: TokenTransfer
@@ -136,6 +152,8 @@ def build_event_payload(
                 "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
                 "safeTxHash": to_0x_hex_str(HexBytes(instance.multisig_transaction_id)),
+                "confirmationsRequired": instance.multisig_transaction.get_confirmations_required(),
+                "confirmationsCount": instance.multisig_transaction.confirmations.count(),
             }
         ]
     elif sender == MultisigTransaction and deleted:
@@ -165,6 +183,7 @@ def build_event_payload(
             payload["failed"] = json.dumps(instance.failed)
             payload["isFailed"] = instance.failed
             payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
+            payload["executor"] = instance.ethereum_tx._from
         else:
             # Off-chain event (not yet executed): use the proposal creation time,
             # kept first for readability
@@ -245,6 +264,7 @@ def build_event_payload(
                 "address": instance.safe,
                 "type": TransactionServiceEventType.MESSAGE_CREATED.name,
                 "messageHash": to_0x_hex_str(HexBytes(instance.message_hash)),
+                "threshold": _get_safe_threshold(instance.safe),
             }
         ]
     elif sender == SafeMessageConfirmation:
@@ -255,6 +275,8 @@ def build_event_payload(
                 "address": instance.safe_message.safe,  # This could make a db call
                 "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
                 "messageHash": to_0x_hex_str(HexBytes(instance.safe_message_id)),
+                "threshold": _get_safe_threshold(instance.safe_message.safe),
+                "owner": instance.owner,
             }
         ]
 

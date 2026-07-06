@@ -50,6 +50,7 @@ from .factories import (
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
     SafeContractFactory,
+    SafeLastStatusFactory,
 )
 
 
@@ -105,17 +106,20 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertEqual(payload["timestamp"], int(confirmation.created.timestamp()))
+        self.assertEqual(payload["owner"], confirmation.owner)
+        self.assertEqual(payload["confirmationsRequired"], 1)
+        self.assertEqual(payload["confirmationsCount"], 1)
 
+        multisig_transaction = MultisigTransactionFactory()
         # EXECUTED_MULTISIG_TRANSACTION is on-chain (tier 2): no timestamp yet
-        payload = build_event_payload(
-            MultisigTransaction, MultisigTransactionFactory()
-        )[0]
+        payload = build_event_payload(MultisigTransaction, multisig_transaction)[0]
         self.assertEqual(
             payload["type"],
             TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
         )
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertNotIn("timestamp", payload)
+        self.assertEqual(payload["executor"], multisig_transaction.ethereum_tx._from)
 
         # PENDING_MULTISIG_TRANSACTION: off-chain, timestamp from `created`
         pending_multisig_tx = MultisigTransactionFactory(ethereum_tx=None)
@@ -159,6 +163,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
 
         safe_address = self.deploy_test_safe().address
         safe_message = SafeMessageFactory(safe=safe_address)
+
         payload = build_event_payload(SafeMessage, safe_message)[0]
         self.assertEqual(
             payload["type"], TransactionServiceEventType.MESSAGE_CREATED.name
@@ -167,6 +172,10 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["messageHash"], safe_message.message_hash)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertEqual(payload["timestamp"], int(safe_message.created.timestamp()))
+        self.assertIsNone(payload["threshold"])
+        SafeLastStatusFactory(address=safe_address, threshold=2)
+        payload = build_event_payload(SafeMessage, safe_message)[0]
+        self.assertEqual(payload["threshold"], 2)
 
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
@@ -184,6 +193,8 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             payload["timestamp"], int(safe_message_confirmation.created.timestamp())
         )
+        self.assertEqual(payload["threshold"], 2)
+        self.assertEqual(payload["owner"], safe_message_confirmation.owner)
 
     @factory.django.mute_signals(post_save)
     def test_build_event_payload_transfer_id_and_timestamp(self):

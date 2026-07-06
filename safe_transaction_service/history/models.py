@@ -1798,6 +1798,21 @@ class MultisigTransaction(TimeStampedModel):
             and self.to not in Contract.objects.trusted_addresses_for_delegate_call()
         )
 
+    def get_confirmations_required(self) -> int | None:
+        threshold = (
+            SafeStatus.objects.filter(address=self.safe, nonce=self.nonce)
+            .order_by("-internal_tx_id")
+            .values_list("threshold", flat=True)
+            .first()
+        )
+        if threshold is None:
+            threshold = (
+                SafeLastStatus.objects.filter(address=self.safe)
+                .values_list("threshold", flat=True)
+                .first()
+            )
+        return threshold
+
 
 class ModuleTransactionManager(models.Manager):
     def not_indexed_metadata_contract_addresses(self):
