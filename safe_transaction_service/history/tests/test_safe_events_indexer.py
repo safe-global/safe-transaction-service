@@ -36,6 +36,7 @@ from ..models import (
     SafeLastStatus,
     SafeStatus,
 )
+from ..services.index_service import TransactionNotFoundException
 from .factories import EthereumBlockFactory, EthereumTxFactory, SafeMasterCopyFactory
 from .mocks.mocks_safe_events_indexer import (
     proxy_creation_event_mock,
@@ -1403,9 +1404,10 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
     def test_conditional_indexing_receipt_fetch_failure(self):
         """
         When conditional indexing is enabled and a tx receipt cannot be fetched,
-        its events must NOT be processed (no InternalTx pointing at a missing
-        EthereumTx) and its log receipts must remain unprocessed so they are
-        retried on a later run.
+        `process_elements` must raise `TransactionNotFoundException` so the block
+        range is retried on a later run. No events must be processed (no InternalTx
+        pointing at a missing EthereumTx) and no log receipt must be marked
+        processed, since advancing past them would drop their events.
         """
         allowed_initiator = "0xA21E2615ED32CE9DdFc53A1B0ccFE689e9152f25"
         blocklisted_address = Account.create().address
@@ -1457,9 +1459,10 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
                 self.ethereum_client, "get_transaction_receipt", return_value=None
             ),
         ):
-            safe_events_indexer.process_elements(safe_events_mock)
+            with self.assertRaises(TransactionNotFoundException):
+                safe_events_indexer.process_elements(safe_events_mock)
 
-        # Receipt fetch failed for every tx: no InternalTx/InternalTxDecoded created
+        # Receipt fetch failed: no InternalTx/InternalTxDecoded created
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
 

@@ -37,6 +37,7 @@ from ..models import (
     SafeRelevantTransaction,
 )
 from ..services.event_service import set_safe_membership
+from ..services.index_service import TransactionNotFoundException
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -227,48 +228,30 @@ class SafeEventsIndexer(EventsIndexer):
             if HexBytes(tx["hash"]) in tx_hashes_to_create
         ]
 
-        # 11. Fetch receipts and store ONLY for txs with processable events
-        stored_fetched_tx_hashes: set[bytes] = set()
+        # 11. Fetch receipts and store the txs with processable events. If any
+        # receipt cannot be fetched, `_fetch_receipts_and_store` raises and the
+        # whole block range is retried on a later run instead of advancing past a
+        # tx whose EthereumTx is missing (which would leave a dangling InternalTx).
+        # This mirrors the non-conditional path, where
+        # `txs_create_or_update_from_tx_hashes` raises `TransactionNotFoundException`.
         if allowed_fetched_txs_filtered:
-            stored_fetched_tx_hashes = self._fetch_receipts_and_store(
+            number_txs_inserted = self._fetch_receipts_and_store(
                 allowed_fetched_txs_filtered
             )
             logger.debug(
-                "Conditional indexing: %d txs with processable events stored",
-                len(stored_fetched_tx_hashes),
+                "Conditional indexing: %d txs with processable events inserted",
+                number_txs_inserted,
             )
 
-        # Txs whose receipt fetch failed were NOT stored. Processing their events
-        # would create InternalTx rows pointing at a missing EthereumTx
-        # (IntegrityError), so drop those events and leave their log receipts
-        # unprocessed so they get retried on a later run.
-        failed_tx_hashes = {
-            HexBytes(tx["hash"]) for tx in allowed_fetched_txs_filtered
-        } - stored_fetched_tx_hashes
-        if failed_tx_hashes:
-            logger.warning(
-                "Conditional indexing: %d txs missing a receipt, their events "
-                "will be retried on a later run",
-                len(failed_tx_hashes),
-            )
-
-        # 12. Process every processable event except those whose tx receipt fetch
-        # failed (their tx is not in the DB, so an InternalTx would dangle)
-        processable_events = [
-            event
-            for event in processable_events
-            if HexBytes(event["transactionHash"]) not in failed_tx_hashes
-        ]
+        # 12. Process the processable events. Every referenced tx is now in the DB:
+        # existing ones from `db_txs`, the rest inserted in step 11 (a missing
+        # receipt would have raised above).
         processed_elements = self._process_decoded_elements(processable_events)
 
-        # 13. Mark original receipts as processed (so we don't re-fetch blocked or
-        # filtered-out ones), except those belonging to txs whose receipt fetch
-        # failed, which must be retried. Reuse the tx hashes normalized in step 1.
-        for log_receipt, tx_hash in zip(
-            not_processed_log_receipts, not_processed_tx_hashes_by_index, strict=True
-        ):
-            if tx_hash in failed_tx_hashes:
-                continue
+        # 13. Mark ALL original receipts as processed so blocked/filtered-out ones
+        # are never re-fetched. Receipt-fetch failures never reach here (they raise
+        # in step 11), so nothing that still needs indexing is marked here.
+        for log_receipt in not_processed_log_receipts:
             self._mark_processed(
                 log_receipt["transactionHash"],
                 log_receipt["blockHash"],
@@ -989,19 +972,22 @@ class SafeEventsIndexer(EventsIndexer):
 
         return txs
 
-    def _fetch_receipts_and_store(self, txs: list[TxData]) -> set[bytes]:
+    def _fetch_receipts_and_store(self, txs: list[TxData]) -> int:
         """
         Fetch receipts for allowed transactions and store them in the database.
         Called after filtering by tx._from to avoid fetching receipts for blocklisted txs.
 
-        Transactions whose receipt could not be fetched are skipped and NOT stored,
-        so they can be retried on a later run.
+        If a receipt cannot be fetched, raises ``TransactionNotFoundException`` so the
+        caller retries the whole block range instead of advancing past a tx whose
+        events would otherwise dangle. This matches the non-conditional path in
+        ``IndexService.txs_create_or_update_from_tx_hashes``.
 
         :param txs: List of allowed transactions to fetch receipts for and store
-        :return: Set of tx hashes (as ``HexBytes``) that were actually stored in the DB
+        :return: Number of transactions inserted
+        :raises TransactionNotFoundException: if any receipt cannot be fetched
         """
         if not txs:
-            return set()
+            return 0
 
         tx_hashes = [tx["hash"] for tx in txs]
 
@@ -1011,7 +997,6 @@ class SafeEventsIndexer(EventsIndexer):
             len(tx_hashes),
         )
 
-        # Build list of (tx, receipt) pairs, only including successful receipt fetches
         txs_with_receipts: list[tuple[TxData, TxReceipt]] = []
         for tx, tx_receipt in zip(
             txs,
@@ -1021,18 +1006,13 @@ class SafeEventsIndexer(EventsIndexer):
             tx_receipt = tx_receipt or self.ethereum_client.get_transaction_receipt(
                 tx["hash"]
             )  # Retry if failed
-            if tx_receipt:
-                txs_with_receipts.append((tx, tx_receipt))
-            else:
-                logger.warning(
-                    "Conditional indexing: failed to fetch receipt for tx %s",
-                    to_0x_hex_str(tx["hash"]),
+            if not tx_receipt:
+                raise TransactionNotFoundException(
+                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx['hash']))}"
                 )
+            txs_with_receipts.append((tx, tx_receipt))
 
-        if not txs_with_receipts:
-            return set()
-
-        # Collect block hashes only from txs with successful receipts
+        # Every receipt was fetched, so collect block hashes from all txs
         block_hashes = {to_0x_hex_str(tx["blockHash"]) for tx, _ in txs_with_receipts}
 
         # Create blocks
@@ -1047,13 +1027,9 @@ class SafeEventsIndexer(EventsIndexer):
             EthereumTx.objects.from_tx_dict(tx, receipt)
             for tx, receipt in txs_with_receipts
         ]
-        EthereumTx.objects.bulk_create_from_generator(
+        return EthereumTx.objects.bulk_create_from_generator(
             iter(ethereum_txs_to_insert), ignore_conflicts=True
         )
-        # Return every tx that is now present in the DB. `ignore_conflicts` means
-        # a conflict just implies the row already existed, so all txs with a
-        # receipt end up stored regardless of the inserted count.
-        return {HexBytes(tx["hash"]) for tx, _ in txs_with_receipts}
 
     def _process_decoded_elements(
         self, decoded_elements: list[EventData]
