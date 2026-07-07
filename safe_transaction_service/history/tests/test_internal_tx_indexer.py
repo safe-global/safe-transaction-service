@@ -61,6 +61,16 @@ class TestInternalTxIndexer(TestCase):
                 (InternalTxIndexer, InternalTxIndexerWithTraceBlock),
             )
 
+    def test_trace_txs_concurrency_floored_at_one(self):
+        # A 0/negative value must not build a gevent.pool.Pool(0), which would
+        # deadlock the first spawn. It must fall back to serial (1).
+        for configured in (0, -1):
+            InternalTxIndexerProvider.del_singleton()
+            with self.settings(ETH_INTERNAL_TRACE_TXS_CONCURRENCY=configured):
+                indexer = InternalTxIndexerProvider()
+                self.assertEqual(indexer.trace_txs_concurrency, 1)
+        InternalTxIndexerProvider.del_singleton()
+
     def test_is_relevant_trace(self):
         indexer = self.internal_tx_indexer
 

@@ -75,8 +75,13 @@ class InternalTxIndexer(EthereumIndexer):
         super().__init__(*args, **kwargs)
 
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
-        # Number of concurrent `trace_transactions` batch requests
-        self.trace_txs_concurrency: int = settings.ETH_INTERNAL_TRACE_TXS_CONCURRENCY
+        # Number of concurrent `trace_transactions` batch requests. Floor at 1:
+        # a 0/negative value (a plausible way to try to disable parallelism) would
+        # build a `gevent.pool.Pool(0)`, which never accepts a greenlet and would
+        # deadlock the first spawn. 1 means serial, the original behavior.
+        self.trace_txs_concurrency: int = max(
+            1, settings.ETH_INTERNAL_TRACE_TXS_CONCURRENCY
+        )
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
 
