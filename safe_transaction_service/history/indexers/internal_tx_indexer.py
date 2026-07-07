@@ -76,9 +76,7 @@ class InternalTxIndexer(EthereumIndexer):
 
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
         # Number of concurrent `trace_transactions` batch requests
-        self.trace_txs_concurrency: int = (
-            settings.ETH_INTERNAL_TXS_TRACE_TXS_CONCURRENCY
-        )
+        self.trace_txs_concurrency: int = settings.ETH_INTERNAL_TRACE_TXS_CONCURRENCY
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
 
@@ -292,16 +290,12 @@ class InternalTxIndexer(EthereumIndexer):
             return []
 
         batch_size = batch_size or len(tx_hashes)  # If `0`, don't use batches
-        tx_hash_chunks = [
-            list(tx_hash_chunk) for tx_hash_chunk in chunks(list(tx_hashes), batch_size)
-        ]
-
         gevent_pool = pool.Pool(self.trace_txs_concurrency)
         jobs = [
             gevent_pool.spawn(
                 self.ethereum_client.tracing.trace_transactions, tx_hash_chunk
             )
-            for tx_hash_chunk in tx_hash_chunks
+            for tx_hash_chunk in chunks(list(tx_hashes), batch_size)
         ]
 
         try:
