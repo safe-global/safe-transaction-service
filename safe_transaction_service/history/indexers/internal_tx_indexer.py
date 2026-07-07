@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from collections import OrderedDict
-from collections.abc import Generator, Iterable, Sequence
+from collections.abc import Generator, Sequence
 from logging import getLogger
 
 from django.conf import settings
 from django.db import transaction
 
+import gevent
 from eth_typing import ChecksumAddress, HexStr
+from gevent import pool
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
 from safe_eth.util.util import to_0x_hex_str
@@ -73,6 +75,10 @@ class InternalTxIndexer(EthereumIndexer):
         super().__init__(*args, **kwargs)
 
         self.trace_txs_batch_size: int = settings.ETH_INTERNAL_TRACE_TXS_BATCH_SIZE
+        # Number of concurrent `trace_transactions` batch requests
+        self.trace_txs_concurrency: int = (
+            settings.ETH_INTERNAL_TXS_TRACE_TXS_CONCURRENCY
+        )
         self.number_trace_blocks: int = settings.ETH_INTERNAL_TXS_NUMBER_TRACE_BLOCKS
         self.tx_decoder = get_safe_tx_decoder()
 
@@ -271,22 +277,46 @@ class InternalTxIndexer(EthereumIndexer):
 
     def trace_transactions(
         self, tx_hashes: Sequence[HexStr], batch_size: int
-    ) -> Iterable[list[FilterTrace]]:
+    ) -> list[list[FilterTrace]]:
+        """
+        Fetch traces for the provided ``tx_hashes`` in parallel batches.
+
+        Chunks are fetched concurrently using a gevent pool, but results are returned
+        in the same order as the input ``tx_hashes`` so callers can safely ``zip`` them.
+
+        :param tx_hashes:
+        :param batch_size: Number of txs per RPC batch call. `0` == single batch
+        :return: List of traces per tx hash, in the same order as ``tx_hashes``
+        """
+        if not tx_hashes:
+            return []
+
         batch_size = batch_size or len(tx_hashes)  # If `0`, don't use batches
-        for tx_hash_chunk in chunks(list(tx_hashes), batch_size):
-            tx_hash_chunk = list(tx_hash_chunk)
-            try:
-                yield from self.ethereum_client.tracing.trace_transactions(
-                    tx_hash_chunk
-                )
-            except OSError:
-                logger.error(
-                    "Problem calling `trace_transactions` with %d txs. "
-                    "Try lowering ETH_INTERNAL_TRACE_TXS_BATCH_SIZE",
-                    len(tx_hash_chunk),
-                    exc_info=True,
-                )
-                raise
+        tx_hash_chunks = [
+            list(tx_hash_chunk) for tx_hash_chunk in chunks(list(tx_hashes), batch_size)
+        ]
+
+        gevent_pool = pool.Pool(self.trace_txs_concurrency)
+        jobs = [
+            gevent_pool.spawn(
+                self.ethereum_client.tracing.trace_transactions, tx_hash_chunk
+            )
+            for tx_hash_chunk in tx_hash_chunks
+        ]
+
+        try:
+            gevent.joinall(jobs, raise_error=True)
+        except OSError:
+            logger.error(
+                "Problem calling `trace_transactions` with %d txs. "
+                "Try lowering ETH_INTERNAL_TRACE_TXS_BATCH_SIZE",
+                len(tx_hashes),
+                exc_info=True,
+            )
+            raise
+
+        # Concatenate per-chunk results in chunk order to preserve tx_hashes ordering
+        return [traces for job in jobs for traces in job.get()]
 
     def build_safe_relevant_txs(
         self, internal_txs: Generator[InternalTx]
