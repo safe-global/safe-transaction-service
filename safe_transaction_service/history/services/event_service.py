@@ -114,7 +114,7 @@ def _filter_not_safe_transfers(
 def _get_safe_threshold(safe_address: str) -> int | None:
     """
     Current threshold of the Safe from ``SafeLastStatus``. Safe messages are not tied
-    to a nonce, so the current threshold is the correct value.
+    to a nonce, so using the last known threshold value.
 
     :param safe_address:
     :return: Threshold, or `None` if the Safe has no indexed status yet

@@ -1799,6 +1799,15 @@ class MultisigTransaction(TimeStampedModel):
         )
 
     def get_confirmations_required(self) -> int | None:
+        """
+        Confirmations required for execution (threshold of the Safe at this tx's nonce):
+        ``SafeStatus`` at the tx nonce, falling back to the current ``SafeLastStatus``.
+
+        Returns ``None`` when neither status is indexed (e.g. Safe not yet indexed or
+        being reprocessed after a reorg).
+
+        :return: Number of confirmations required, or ``None`` if not known
+        """
         threshold = (
             SafeStatus.objects.filter(address=self.safe, nonce=self.nonce)
             .order_by("-internal_tx_id")

@@ -107,7 +107,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertEqual(payload["timestamp"], int(confirmation.created.timestamp()))
         self.assertEqual(payload["owner"], confirmation.owner)
-        self.assertEqual(payload["confirmationsRequired"], 1)
+        # No SafeStatus/SafeLastStatus indexed: confirmationsRequired is unknown (None),
+        # rather than a guessed value. confirmationsCount is always the real count.
+        self.assertIsNone(payload["confirmationsRequired"])
+        self.assertEqual(payload["confirmationsCount"], 1)
+
+        # With a SafeLastStatus, confirmationsRequired reflects the Safe threshold
+        multisig_transaction = confirmation.multisig_transaction
+        SafeLastStatusFactory(address=multisig_transaction.safe, threshold=3)
+        payload = build_event_payload(MultisigConfirmation, confirmation)[0]
+        self.assertEqual(payload["confirmationsRequired"], 3)
         self.assertEqual(payload["confirmationsCount"], 1)
 
         multisig_transaction = MultisigTransactionFactory()
@@ -387,6 +396,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "failed": "false",
             "isFailed": False,
             "txHash": multisig_tx.ethereum_tx_id,
+            "executor": multisig_tx.ethereum_tx._from,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(pending_multisig_transaction_payload)

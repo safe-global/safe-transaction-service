@@ -37,21 +37,27 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
+            # No SafeLastStatus indexed for the deployed Safe -> threshold is None
+            "threshold": None,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
 
         send_event_mock.assert_called_with(message_created_payload)
 
-        {
-            "address": safe_address,
-            "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
-            "messageHash": safe_message.message_hash,
-            "chainId": str(EthereumNetwork.GANACHE.value),
-        }
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
         )
         process_event(SafeMessageConfirmation, safe_message_confirmation, True)
+        message_confirmation_payload = {
+            "timestamp": int(safe_message_confirmation.created.timestamp()),
+            "address": safe_address,
+            "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
+            "messageHash": safe_message.message_hash,
+            "threshold": None,
+            "owner": safe_message_confirmation.owner,
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+        send_event_mock.assert_called_with(message_confirmation_payload)
 
     @mock.patch.object(QueueService, "send_event")
     def test_signals_are_correctly_fired(self, send_event_mock: MagicMock):
@@ -63,6 +69,8 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CREATED.name,
             "messageHash": safe_message.message_hash,
+            # No SafeLastStatus indexed for the deployed Safe -> threshold is None
+            "threshold": None,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
 
@@ -77,6 +85,8 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "address": safe_address,
             "type": TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             "messageHash": safe_message.message_hash,
+            "threshold": None,
+            "owner": safe_message_confirmation.owner,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_event_mock.assert_called_with(message_confirmation_payload)
