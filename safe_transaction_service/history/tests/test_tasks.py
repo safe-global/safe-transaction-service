@@ -15,9 +15,11 @@ from safe_transaction_service.events.services import QueueService
 from ...utils.redis import get_redis
 from ..indexers import (
     Erc20EventsIndexerProvider,
+    FindRelevantElementsException,
     InternalTxIndexerProvider,
     SafeEventsIndexerProvider,
 )
+from ..indexers.erc20_events_indexer import Erc20EventsIndexer
 from ..models import (
     MultisigTransaction,
     SafeContract,
@@ -34,6 +36,7 @@ from ..services import (
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..services.index_service import SpecificIndexingStatus
 from ..tasks import (
+    MAX_CONSECUTIVE_FAILURES,
     check_reorgs_task,
     check_sync_status_task,
     delete_expired_delegates_task,
@@ -119,6 +122,30 @@ class TestTasks(TestCase):
                 "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
                 cm.output[1],
             )
+
+    @patch.object(task_logger, "error")
+    @patch.object(Erc20EventsIndexer, "process_addresses")
+    def test_index_erc20_events_out_of_sync_task_consecutive_failures(
+        self,
+        process_addresses_mock: MagicMock,
+        logger_error_mock: MagicMock,
+    ):
+        # `process_addresses` keeps failing, so the loop must abort after
+        # MAX_CONSECUTIVE_FAILURES instead of spinning forever
+        process_addresses_mock.side_effect = FindRelevantElementsException(
+            "RPC is down"
+        )
+        safe_contract = SafeContractFactory()
+
+        # Call the task synchronously (no result backend needed)
+        result = index_erc20_events_out_of_sync_task(addresses=[safe_contract.address])
+
+        # The loop must abort (no infinite spinning) and return 0 processed events
+        self.assertEqual(result, 0)
+        self.assertEqual(process_addresses_mock.call_count, MAX_CONSECUTIVE_FAILURES)
+        # The abort must be logged as an error
+        logger_error_mock.assert_called_once()
+        self.assertIn("consecutive failures", logger_error_mock.call_args.args[0])
 
     def test_index_internal_txs_task(self):
         self.assertEqual(index_internal_txs_task.delay().result, (0, 0))
