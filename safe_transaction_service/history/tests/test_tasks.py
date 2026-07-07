@@ -130,7 +130,7 @@ class TestTasks(TestCase):
         logger_error_mock: MagicMock,
     ):
         # `process_addresses` keeps failing, so the loop must abort after
-        # ERC20_INDEX_MAX_CONSECUTIVE_FAILURES instead of spinning forever
+        # ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES instead of spinning forever
         max_consecutive_failures = 2
         process_addresses_mock.side_effect = FindRelevantElementsException(
             "RPC is down"
@@ -139,7 +139,7 @@ class TestTasks(TestCase):
 
         # Call the task synchronously (no result backend needed)
         with self.settings(
-            ERC20_INDEX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
+            ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
         ):
             result = index_erc20_events_out_of_sync_task(
                 addresses=[safe_contract.address]

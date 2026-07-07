@@ -168,7 +168,7 @@ def index_erc20_events_out_of_sync_task(
                 consecutive_failures += 1
                 if (
                     consecutive_failures
-                    >= settings.ERC20_INDEX_MAX_CONSECUTIVE_FAILURES
+                    >= settings.ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES
                 ):
                     logger.error(
                         "Aborting out of sync erc20/721 indexing after %d "
