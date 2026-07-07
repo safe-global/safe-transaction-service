@@ -453,9 +453,9 @@ class EthereumIndexer(ABC):
             ValueError,
             Web3RPCError,
         ) as e:
-            self.block_process_limit = 1  # Set back to the very minimum
+            self.block_process_limit = max(self.block_process_limit // 2, 1)
             logger.info(
-                "%s: block_process_limit set back to %d",
+                "%s: block_process_limit halved to %d after error",
                 self.__class__.__name__,
                 self.block_process_limit,
             )
