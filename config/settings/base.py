@@ -634,6 +634,10 @@ ETH_REORG_BLOCKS = env.int(
 ETH_REINDEX_MAX_RETRIES = env.int(
     "ETH_REINDEX_MAX_RETRIES", default=5
 )  # Number of consecutive failures of the same block range during reindex
+ERC20_INDEX_MAX_CONSECUTIVE_FAILURES = env.int(
+    "ERC20_INDEX_MAX_CONSECUTIVE_FAILURES", default=3
+)  # Consecutive failures before aborting the out-of-sync erc20/721 indexing loop,
+# so a persistently failing RPC does not spin forever until the Celery timeout
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`

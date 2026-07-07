@@ -48,11 +48,6 @@ from .services.event_service import build_reorg_payload
 
 logger = get_task_logger(__name__)
 
-# Max number of consecutive `FindRelevantElementsException` before aborting the
-# out-of-sync erc20 indexing loop, so a persistently failing RPC does not spin
-# forever hammering the node until the Celery timeout kills the task.
-MAX_CONSECUTIVE_FAILURES = 3
-
 
 @app.shared_task(bind=True)
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
@@ -171,7 +166,10 @@ def index_erc20_events_out_of_sync_task(
                 consecutive_failures = 0
             except FindRelevantElementsException:
                 consecutive_failures += 1
-                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                if (
+                    consecutive_failures
+                    >= settings.ERC20_INDEX_MAX_CONSECUTIVE_FAILURES
+                ):
                     logger.error(
                         "Aborting out of sync erc20/721 indexing after %d "
                         "consecutive failures for addresses %s",

@@ -36,7 +36,6 @@ from ..services import (
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..services.index_service import SpecificIndexingStatus
 from ..tasks import (
-    MAX_CONSECUTIVE_FAILURES,
     check_reorgs_task,
     check_sync_status_task,
     delete_expired_delegates_task,
@@ -131,18 +130,24 @@ class TestTasks(TestCase):
         logger_error_mock: MagicMock,
     ):
         # `process_addresses` keeps failing, so the loop must abort after
-        # MAX_CONSECUTIVE_FAILURES instead of spinning forever
+        # ERC20_INDEX_MAX_CONSECUTIVE_FAILURES instead of spinning forever
+        max_consecutive_failures = 2
         process_addresses_mock.side_effect = FindRelevantElementsException(
             "RPC is down"
         )
         safe_contract = SafeContractFactory()
 
         # Call the task synchronously (no result backend needed)
-        result = index_erc20_events_out_of_sync_task(addresses=[safe_contract.address])
+        with self.settings(
+            ERC20_INDEX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
+        ):
+            result = index_erc20_events_out_of_sync_task(
+                addresses=[safe_contract.address]
+            )
 
         # The loop must abort (no infinite spinning) and return 0 processed events
         self.assertEqual(result, 0)
-        self.assertEqual(process_addresses_mock.call_count, MAX_CONSECUTIVE_FAILURES)
+        self.assertEqual(process_addresses_mock.call_count, max_consecutive_failures)
         # The abort must be logged as an error
         logger_error_mock.assert_called_once()
         self.assertIn("consecutive failures", logger_error_mock.call_args.args[0])
