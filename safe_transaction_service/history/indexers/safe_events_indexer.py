@@ -242,7 +242,6 @@ class SafeEventsIndexer(EventsIndexer):
         # would create InternalTx rows pointing at a missing EthereumTx
         # (IntegrityError), so drop those events and leave their log receipts
         # unprocessed so they get retried on a later run.
-        tx_hashes_present_in_db = set(db_txs.keys()) | stored_fetched_tx_hashes
         failed_tx_hashes = {
             HexBytes(tx["hash"]) for tx in allowed_fetched_txs_filtered
         } - stored_fetched_tx_hashes
@@ -253,19 +252,22 @@ class SafeEventsIndexer(EventsIndexer):
                 len(failed_tx_hashes),
             )
 
-        # 12. Process only processable events whose tx is actually present in the DB
+        # 12. Process every processable event except those whose tx receipt fetch
+        # failed (their tx is not in the DB, so an InternalTx would dangle)
         processable_events = [
             event
             for event in processable_events
-            if HexBytes(event["transactionHash"]) in tx_hashes_present_in_db
+            if HexBytes(event["transactionHash"]) not in failed_tx_hashes
         ]
         processed_elements = self._process_decoded_elements(processable_events)
 
         # 13. Mark original receipts as processed (so we don't re-fetch blocked or
         # filtered-out ones), except those belonging to txs whose receipt fetch
-        # failed, which must be retried.
-        for log_receipt in not_processed_log_receipts:
-            if HexBytes(log_receipt["transactionHash"]) in failed_tx_hashes:
+        # failed, which must be retried. Reuse the tx hashes normalized in step 1.
+        for log_receipt, tx_hash in zip(
+            not_processed_log_receipts, not_processed_tx_hashes_by_index, strict=True
+        ):
+            if tx_hash in failed_tx_hashes:
                 continue
             self._mark_processed(
                 log_receipt["transactionHash"],
