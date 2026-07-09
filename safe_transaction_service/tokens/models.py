@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 
 import requests
@@ -93,14 +93,19 @@ class TokenManager(models.Manager):
 
         ethereum_client = get_auto_ethereum_client()
         if token_address in ENS_CONTRACTS_WITH_TLD:  # Special case for ENS
-            return self.create(
-                address=token_address,
-                name="Ethereum Name Service",
-                symbol="ENS",
-                logo="tokens/logos/ENS.png",
-                decimals=None,
-                trusted=True,
-            )
+            try:
+                with transaction.atomic():
+                    return self.create(
+                        address=token_address,
+                        name="Ethereum Name Service",
+                        symbol="ENS",
+                        logo="tokens/logos/ENS.png",
+                        decimals=None,
+                        trusted=True,
+                    )
+            except IntegrityError:
+                # Token was created by another worker in the meantime
+                return self.get(address=token_address)
         try:
             logger.debug(
                 "Querying blockchain for info for erc20 token=%s", token_address
@@ -148,9 +153,14 @@ class TokenManager(models.Manager):
             name, symbol = symbol, name
 
         try:
-            return self.create(
-                address=token_address, name=name, symbol=symbol, decimals=decimals
-            )
+            with transaction.atomic():
+                return self.create(
+                    address=token_address, name=name, symbol=symbol, decimals=decimals
+                )
+        except IntegrityError:
+            # Token was created by another worker while this one was querying
+            # the blockchain
+            return self.get(address=token_address)
         except ValueError:
             logger.error(
                 "Problem creating token with address=%s name=%s symbol=%s decimals=%s",
