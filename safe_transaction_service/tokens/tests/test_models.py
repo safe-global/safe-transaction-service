@@ -202,6 +202,25 @@ class TestModels(TestCase):
         self.assertIsNone(Token.objects.create_from_blockchain(address))
         self.assertEqual(TokenNotValid.objects.get(address=address).address, address)
 
+    @mock.patch.object(
+        Erc20Manager,
+        "get_info",
+        autospec=True,
+        return_value=Erc20Info(
+            name="PESETA",
+            symbol="PTA",
+            decimals=18,
+        ),
+    )
+    def test_create_from_blockchain_already_created(self, get_info: MagicMock):
+        # Simulate a race condition where the token is created by another
+        # worker while this one is querying the blockchain
+        existing_token = TokenFactory(name="PESETA", symbol="PTA", decimals=18)
+
+        token = Token.objects.create_from_blockchain(existing_token.address)
+        self.assertEqual(token, existing_token)
+        self.assertEqual(Token.objects.count(), 1)
+
     @mock.patch.object(TokenManager, "create", side_effect=ValueError)
     @mock.patch.object(
         Erc20Manager,
