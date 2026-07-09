@@ -32,7 +32,7 @@ dependencies = [
     "psycopg[binary,pool]==3.3.4",
     "redis[hiredis]==7.4.1",
     "requests==2.34.2",
-    "safe-eth-py[django]==7.21.0",
+    "safe-eth-py[django]==7.22.0",
     "web3==7.16.0",
 ]
 
