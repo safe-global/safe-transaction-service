@@ -1,18 +1,19 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from functools import partial
 from logging import getLogger
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
 import gevent
-from gevent.greenlet import Greenlet
 
 from ..events.services.queue_service import get_queue_service
 from ..utils.database import close_unusable_or_obsolete_connections
-from .cache import remove_cache_view_by_instance
+from .cache import get_cache_view_tag_and_addresses, remove_cache_view_for_addresses
 from .models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -135,7 +136,12 @@ def _process_event(
     deleted: bool,
 ) -> None:
     """
-    Process models and
+    Build the event payloads for the instance and schedule their publication
+    for when the current database transaction is committed, so consumers can
+    never observe an event before the data backing it is visible. Payloads are
+    built eagerly here — inside the transaction — as delete events need the
+    rows that are about to disappear.
+
     :param sender:
     :param instance:
     :param created:
@@ -148,13 +154,23 @@ def _process_event(
     assert not (created and deleted), (
         "An instance cannot be created and deleted at the same time"
     )
-    if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
+    if settings.CACHE_VIEW_DEFAULT_TIMEOUT and (
+        tag_and_addresses := get_cache_view_tag_and_addresses(instance)
+    ):
+        # `partial` over the resolved tag and addresses so the callback holds
+        # a couple of strings instead of the model instance until commit
+        remove_cache = partial(remove_cache_view_for_addresses, *tag_and_addresses)
         logger.debug("Removing cache for object=%s", instance)
-        remove_cache_view_by_instance(instance)
-        logger.debug("Removed cache for object=%s", instance)
+        remove_cache()
+        # Invalidate again after commit — between the eager invalidation and
+        # the commit, a concurrent request could repopulate the cache with
+        # pre-commit (stale) data. Registered before the events, so the cache
+        # is clean when consumers are notified
+        if transaction.get_connection().in_atomic_block:
+            transaction.on_commit(remove_cache, robust=True)
 
-    # Skip heavy cache invalidation and payload generation for events
-    # that won't be emitted anyway (for example, old/reindexed txs).
+    # Skip payload generation for events that won't be emitted anyway
+    # (for example, old/reindexed txs).
     if not is_relevant_event(sender, instance, created):
         logger.debug(
             "Skipping non-relevant event for created=%s object=%s",
@@ -168,16 +184,9 @@ def _process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    for payload in payloads:
-        if address := payload.get("address"):
-            logger.debug(
-                "[%s] Triggering send_event tasks for created=%s object=%s",
-                address,
-                created,
-                instance,
-            )
-            queue_service = get_queue_service()
-            queue_service.send_event(payload)
+    get_queue_service().send_events_on_commit(
+        [payload for payload in payloads if payload.get("address")]
+    )
 
 
 @receiver(
@@ -237,8 +246,8 @@ def _process_event_and_close_connections(
     """
     Run ``_process_event`` and return any DB connection opened by the greenlet to the pool.
 
-    These greenlets are spawned fire-and-forget from the indexer flow, so they run on their
-    own greenlet-local connection *after* Celery's ``task_postrun`` cleanup
+    These greenlets are spawned fire-and-forget once the indexer's transaction commits,
+    so they run on their own greenlet-local connection *after* Celery's ``task_postrun`` cleanup
     (``config.celery_app.close_db_connections``) has already fired for the task. Nothing else
     closes that connection, so it lingers until the psycopg3 pool recycles it by idle/lifetime
     timers. Some senders (e.g. ``MultisigConfirmation``) lazily load FKs while building the
@@ -300,18 +309,27 @@ def process_event_from_bulk_create(
     | SafeContract,
     created: bool,
     **kwargs,
-) -> Greenlet:
+) -> None:
     """
-    Handle post_bulk_create signals by spawning a greenlet to process events asynchronously.
+    Handle post_bulk_create signals by scheduling, for when the current
+    transaction is committed, a greenlet that processes events asynchronously.
+
+    The ``on_commit`` callback must be registered here — synchronously, on the
+    indexer's connection — and not inside the greenlet, which runs on its own
+    connection where no transaction is open. Deferring the spawn until commit
+    also guarantees the greenlet's connection can read the bulk-created rows.
 
     :param sender: Model class that sent the signal
     :param instance: Instance of the created model
     :param created: `True` if model has just been created, `False` otherwise
     :param kwargs:
-    :return: Greenlet running _process_event
+    :return:
     """
-    return gevent.spawn(
-        _process_event_and_close_connections, sender, instance, created, False
+    transaction.on_commit(
+        lambda: gevent.spawn(
+            _process_event_and_close_connections, sender, instance, created, False
+        ),
+        robust=True,
     )
 
 
@@ -368,8 +386,7 @@ def process_save_delegate_user_event(
     **kwargs,
 ):
     payload_event = build_save_delegate_payload(instance, created)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    get_queue_service().send_events_on_commit([payload_event])
 
 
 @receiver(
@@ -381,5 +398,4 @@ def process_delete_delegate_user_event(
     sender: type[Model], instance: SafeContractDelegate, *args, **kwargs
 ):
     payload_event = build_delete_delegate_payload(instance)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    get_queue_service().send_events_on_commit([payload_event])

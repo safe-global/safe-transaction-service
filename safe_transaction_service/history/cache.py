@@ -151,17 +151,19 @@ def cache_txs_view_for_address(
     return decorator
 
 
-def remove_cache_view_by_instance(
+def get_cache_view_tag_and_addresses(
     instance: TokenTransfer
     | InternalTx
     | MultisigConfirmation
     | MultisigTransaction
     | ModuleTransaction,
-):
+) -> tuple[str, list[ChecksumAddress]] | None:
     """
-    Remove the cache stored for instance view.
+    Resolve which view cache the instance invalidates.
 
     :param instance:
+    :return: Tuple of cache tag and addresses whose cached views the instance
+        invalidates, or ``None`` if the instance has no cached view
     """
     addresses = []
     cache_tag: str | None = None
@@ -185,7 +187,24 @@ def remove_cache_view_by_instance(
         addresses.append(instance.safe)
 
     if cache_tag:
-        remove_cache_view_for_addresses(cache_tag, addresses)
+        return cache_tag, addresses
+    return None
+
+
+def remove_cache_view_by_instance(
+    instance: TokenTransfer
+    | InternalTx
+    | MultisigConfirmation
+    | MultisigTransaction
+    | ModuleTransaction,
+):
+    """
+    Remove the cache stored for instance view.
+
+    :param instance:
+    """
+    if tag_and_addresses := get_cache_view_tag_and_addresses(instance):
+        remove_cache_view_for_addresses(*tag_and_addresses)
 
 
 def remove_cache_view_for_addresses(cache_tag: str, addresses: list[ChecksumAddress]):

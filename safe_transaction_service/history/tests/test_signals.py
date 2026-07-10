@@ -357,14 +357,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
 
-    @mock.patch.object(QueueService, "send_event")
-    def test_signals_are_correctly_fired(self, send_event_mock: MagicMock):
+    @mock.patch.object(QueueService, "send_events")
+    def test_signals_are_correctly_fired(self, send_events_mock: MagicMock):
         # Not trusted txs should not fire any event
-        MultisigTransactionFactory(trusted=False)
-        send_event_mock.assert_not_called()
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(trusted=False)
+        send_events_mock.assert_not_called()
 
         # Trusted txs should fire an event
-        multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx: MultisigTransaction = MultisigTransactionFactory(trusted=True)
         pending_multisig_transaction_payload = {
             "address": multisig_tx.safe,
             "type": TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
@@ -378,14 +380,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "txHash": multisig_tx.ethereum_tx_id,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(pending_multisig_transaction_payload)
+        send_events_mock.assert_called_with([pending_multisig_transaction_payload])
 
-        # Deleting a tx should fire an event timestamped at the deletion time
-        send_event_mock.reset_mock()
+        # Deleting a tx should fire an event timestamped at the deletion time.
+        # The payload must be built before commit, while the row still exists
+        send_events_mock.reset_mock()
         safe_tx_hash = multisig_tx.safe_tx_hash
         delete_time = datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
         with mock.patch.object(timezone, "now", return_value=delete_time):
-            multisig_tx.delete()
+            with self.captureOnCommitCallbacks(execute=True):
+                multisig_tx.delete()
 
         deleted_multisig_transaction_payload = {
             "timestamp": int(delete_time.timestamp()),
@@ -394,11 +398,24 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "safeTxHash": safe_tx_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(deleted_multisig_transaction_payload)
+        send_events_mock.assert_called_with([deleted_multisig_transaction_payload])
 
-    @mock.patch.object(QueueService, "send_event")
+    @mock.patch.object(QueueService, "send_events")
+    def test_events_are_sent_only_on_commit(self, send_events_mock: MagicMock):
+        # Events must never be published while the transaction is still open
+        # (consumers would query the API before the data is visible), only
+        # once it commits. If the transaction rolls back, Django discards the
+        # `on_commit` callbacks and nothing is published
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            MultisigTransactionFactory(trusted=True)
+            send_events_mock.assert_not_called()
+
+        self.assertGreaterEqual(len(callbacks), 1)
+        send_events_mock.assert_called()
+
+    @mock.patch.object(QueueService, "send_events")
     def test_pending_event_emitted_when_tx_bound_to_existing_confirmations(
-        self, send_event_mock: MagicMock
+        self, send_events_mock: MagicMock
     ):
         """
         When a MultisigTransaction is created with trusted=False but unlinked
@@ -415,26 +432,30 @@ class TestSignals(SafeTestCaseMixin, TestCase):
                 multisig_transaction=None,
                 multisig_transaction_hash=known_hash,
             )
-        send_event_mock.assert_not_called()
+        send_events_mock.assert_not_called()
 
         # Now create the transaction with trusted=False.  bind_confirmation should
         # find the orphaned confirmation, set trusted=True in the DB *and* on the
         # in-memory instance so process_event can emit the notification.
-        MultisigTransactionFactory(
-            trusted=False, ethereum_tx=None, safe_tx_hash=known_hash
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(
+                trusted=False, ethereum_tx=None, safe_tx_hash=known_hash
+            )
 
         emitted_types = [
-            call.args[0]["type"] for call in send_event_mock.call_args_list
+            payload["type"]
+            for call in send_events_mock.call_args_list
+            for payload in call.args[0]
         ]
         self.assertIn(
             TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name, emitted_types
         )
 
-    @mock.patch.object(QueueService, "send_event")
-    def test_delegates_signals_are_correctly_fired(self, send_event_mock: MagicMock):
+    @mock.patch.object(QueueService, "send_events")
+    def test_delegates_signals_are_correctly_fired(self, send_events_mock: MagicMock):
         # New delegate should fire an event
-        delegate_for_safe = SafeContractDelegateFactory()
+        with self.captureOnCommitCallbacks(execute=True):
+            delegate_for_safe = SafeContractDelegateFactory()
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
             "address": delegate_for_safe.safe_contract.address,
@@ -444,11 +465,12 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(delegate_for_safe.expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(new_delegate_user_payload)
+        send_events_mock.assert_called_with([new_delegate_user_payload])
 
-        permanent_delegate_without_safe = SafeContractDelegateFactory(
-            safe_contract=None, expiry_date=None
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            permanent_delegate_without_safe = SafeContractDelegateFactory(
+                safe_contract=None, expiry_date=None
+            )
         new_delegate_user_payload = {
             "type": TransactionServiceEventType.NEW_DELEGATE.name,
             "address": None,
@@ -458,17 +480,19 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": None,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(new_delegate_user_payload)
+        send_events_mock.assert_called_with([new_delegate_user_payload])
 
         # Updated delegate should fire an event
-        delegate_to_update = SafeContractDelegateFactory()
+        with self.captureOnCommitCallbacks(execute=True):
+            delegate_to_update = SafeContractDelegateFactory()
         new_safe = SafeContractFactory()
         new_label = "Updated Label"
         new_expiry_date = timezone.now() + datetime.timedelta(minutes=5)
         delegate_to_update.safe_contract = new_safe
         delegate_to_update.label = new_label
         delegate_to_update.expiry_date = new_expiry_date
-        delegate_to_update.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            delegate_to_update.save()
         updated_delegate_user_payload = {
             "type": TransactionServiceEventType.UPDATED_DELEGATE.name,
             "address": new_safe.address,
@@ -478,11 +502,13 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(new_expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(updated_delegate_user_payload)
+        send_events_mock.assert_called_with([updated_delegate_user_payload])
 
         # Deleted delegate should fire an event
-        delegate_to_delete = SafeContractDelegateFactory()
-        delegate_to_delete.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            delegate_to_delete = SafeContractDelegateFactory()
+        with self.captureOnCommitCallbacks(execute=True):
+            delegate_to_delete.delete()
         deleted_delegate_user_payload = {
             "type": TransactionServiceEventType.DELETED_DELEGATE.name,
             "address": delegate_to_delete.safe_contract.address,
@@ -492,28 +518,31 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_event_mock.assert_called_with(deleted_delegate_user_payload)
+        send_events_mock.assert_called_with([deleted_delegate_user_payload])
 
     @factory.django.mute_signals(post_save)
     @mock.patch(
-        "safe_transaction_service.history.signals.remove_cache_view_by_instance"
+        "safe_transaction_service.history.signals.remove_cache_view_for_addresses"
     )
     @mock.patch("safe_transaction_service.history.signals.build_event_payload")
-    @mock.patch.object(QueueService, "send_event")
+    @mock.patch.object(QueueService, "send_events")
     def test_irrelevant_events_skip(
         self,
-        send_event_mock: MagicMock,
+        send_events_mock: MagicMock,
         build_event_payload_mock: MagicMock,
         remove_cache_mock: MagicMock,
     ):
-        # Old events are not relevant and should short-circuit before cache/payload work
+        # Old events are not relevant and should short-circuit before payload work.
+        # Cache invalidation still happens: eagerly, and again on commit
         tx = ERC20TransferFactory(timestamp=timezone.now() - timedelta(minutes=120))
 
-        _process_event(ERC20Transfer, tx, created=True, deleted=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            _process_event(ERC20Transfer, tx, created=True, deleted=False)
+            remove_cache_mock.assert_called_once()
 
-        remove_cache_mock.assert_called_once()
+        self.assertEqual(remove_cache_mock.call_count, 2)
         build_event_payload_mock.assert_not_called()
-        send_event_mock.assert_not_called()
+        send_events_mock.assert_not_called()
 
     @factory.django.mute_signals(post_save)
     @mock.patch("safe_transaction_service.history.signals._process_event")
@@ -544,7 +573,10 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         with mock.patch(
             "safe_transaction_service.history.signals.gevent.spawn"
         ) as spawn_mock:
-            post_bulk_create.send(ERC20Transfer, instance=tx, created=True)
+            with self.captureOnCommitCallbacks(execute=True):
+                post_bulk_create.send(ERC20Transfer, instance=tx, created=True)
+                # The greenlet must only be spawned once the transaction commits
+                spawn_mock.assert_not_called()
 
         spawn_mock.assert_called_once_with(
             _process_event_and_close_connections, ERC20Transfer, tx, True, False

@@ -40,19 +40,6 @@ def process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    for payload in payloads:
-        if address := payload.get("address"):
-            logger.debug(
-                "[%s] Triggering send_event task for created=%s object=%s",
-                address,
-                created,
-                instance,
-            )
-            queue_service = get_queue_service()
-            queue_service.send_event(payload)
-        else:
-            logger.debug(
-                "Event will not be sent for created=%s object=%s",
-                created,
-                instance,
-            )
+    get_queue_service().send_events_on_commit(
+        [payload for payload in payloads if payload.get("address")]
+    )
