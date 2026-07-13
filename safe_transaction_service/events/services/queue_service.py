@@ -7,8 +7,8 @@ from django.conf import settings
 from django.db import transaction
 
 import orjson
-from kombu import Connection, Exchange
-from kombu.pools import Producer, producers
+from kombu import Connection, Exchange, Producer
+from kombu.pools import producers
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +53,8 @@ class BaseQueueService:
             # Bypass `transaction.on_commit`: with no transaction open it runs
             # the callback immediately anyway, but its autocommit check would
             # force-open a DB connection (`get_autocommit` ->
-            # `ensure_connection`) — the event-processing greenlets should not
-            # touch the database just to publish
+            # `ensure_connection`) — no need to touch the database just to
+            # publish
             self.send_events(payloads)
 
 

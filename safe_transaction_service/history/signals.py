@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from functools import partial
+
 from logging import getLogger
 
 from django.conf import settings
@@ -9,10 +9,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-import gevent
-
 from ..events.services.queue_service import get_queue_service
-from ..utils.database import close_unusable_or_obsolete_connections
 from .cache import get_cache_view_tag_and_addresses, remove_cache_view_for_addresses
 from .models import (
     ERC20Transfer,
@@ -157,9 +154,21 @@ def _process_event(
     if settings.CACHE_VIEW_DEFAULT_TIMEOUT and (
         tag_and_addresses := get_cache_view_tag_and_addresses(instance)
     ):
-        # `partial` over the resolved tag and addresses so the callback holds
-        # a couple of strings instead of the model instance until commit
-        remove_cache = partial(remove_cache_view_for_addresses, *tag_and_addresses)
+        # Close over the resolved tag and addresses so the callback holds a
+        # couple of strings instead of the model instance until commit.
+        # A named function instead of a `functools.partial`: Django's
+        # `robust=True` failure handler logs `func.__qualname__`, which
+        # `partial` lacks
+        def remove_cache() -> None:
+            try:
+                remove_cache_view_for_addresses(*tag_and_addresses)
+            except Exception:
+                # A cache failure must never abort the write that triggered
+                # the signal — it would roll back whole indexer batches
+                logger.warning(
+                    "Could not remove cache for %s", tag_and_addresses, exc_info=True
+                )
+
         logger.debug("Removing cache for object=%s", instance)
         remove_cache()
         # Invalidate again after commit — between the eager invalidation and
@@ -189,34 +198,40 @@ def _process_event(
     )
 
 
+# `dispatch_uid` uniqueness is per signal, so the same uid can be shared by
+# the `post_save` and `post_bulk_create` registrations of each sender
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ModuleTransaction,
     dispatch_uid="module_transaction.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=MultisigConfirmation,
     dispatch_uid="multisig_confirmation.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=MultisigTransaction,
     dispatch_uid="multisig_transaction.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ERC20Transfer,
     dispatch_uid="erc20_transfer.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ERC721Transfer,
     dispatch_uid="erc721_transfer.process_event",
 )
-@receiver(post_save, sender=InternalTx, dispatch_uid="internal_tx.process_event")
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
+    sender=InternalTx,
+    dispatch_uid="internal_tx.process_event",
+)
+@receiver(
+    [post_save, post_bulk_create],
     sender=SafeContract,
     dispatch_uid="safe_contract.process_event",
 )
@@ -231,106 +246,6 @@ def process_event(
     **kwargs,
 ) -> None:
     return _process_event(sender, instance, created, False)
-
-
-def _process_event_and_close_connections(
-    sender: type[Model],
-    instance: TokenTransfer
-    | InternalTx
-    | MultisigConfirmation
-    | MultisigTransaction
-    | SafeContract,
-    created: bool,
-    deleted: bool,
-) -> None:
-    """
-    Run ``_process_event`` and return any DB connection opened by the greenlet to the pool.
-
-    These greenlets are spawned fire-and-forget once the indexer's transaction commits,
-    so they run on their own greenlet-local connection *after* Celery's ``task_postrun`` cleanup
-    (``config.celery_app.close_db_connections``) has already fired for the task. Nothing else
-    closes that connection, so it lingers until the psycopg3 pool recycles it by idle/lifetime
-    timers. Some senders (e.g. ``MultisigConfirmation``) lazily load FKs while building the
-    payload, opening such a connection.
-
-    Mirrors the ``task_postrun`` cleanup pattern. ``close_if_unusable_or_obsolete`` is a no-op
-    when no connection was opened (the common transfer/ether case touches only Redis/queue), so
-    this is cheap.
-
-    :param sender: Sender type
-    :param instance: Sender instance
-    :param created: `True` if the instance has just been created, `False` otherwise
-    :param deleted: `True` if the instance has been deleted, `False` otherwise
-    :return:
-    """
-    try:
-        _process_event(sender, instance, created, deleted)
-    finally:
-        close_unusable_or_obsolete_connections()
-
-
-@receiver(
-    post_bulk_create,
-    sender=ModuleTransaction,
-    dispatch_uid="module_transaction.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=MultisigConfirmation,
-    dispatch_uid="multisig_confirmation.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=ERC20Transfer,
-    dispatch_uid="erc20_transfer.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=ERC721Transfer,
-    dispatch_uid="erc721_transfer.process_event",
-)
-@receiver(post_bulk_create, sender=InternalTx, dispatch_uid="internal_tx.process_event")
-@receiver(
-    post_bulk_create,
-    sender=SafeContract,
-    dispatch_uid="safe_contract.process_event",
-)
-def process_event_from_bulk_create(
-    sender: type[Model],
-    instance: TokenTransfer
-    | InternalTx
-    | MultisigConfirmation
-    | MultisigTransaction
-    | SafeContract,
-    created: bool,
-    **kwargs,
-) -> None:
-    """
-    Handle post_bulk_create signals by scheduling, for when the current
-    transaction is committed, a greenlet that processes events asynchronously.
-
-    The ``on_commit`` callback must be registered here — synchronously, on the
-    indexer's connection — and not inside the greenlet, which runs on its own
-    connection where no transaction is open. Deferring the spawn until commit
-    also guarantees the greenlet's connection can read the bulk-created rows.
-
-    :param sender: Model class that sent the signal
-    :param instance: Instance of the created model
-    :param created: `True` if model has just been created, `False` otherwise
-    :param kwargs:
-    :return:
-    """
-    transaction.on_commit(
-        lambda: gevent.spawn(
-            _process_event_and_close_connections, sender, instance, created, False
-        ),
-        robust=True,
-    )
 
 
 @receiver(

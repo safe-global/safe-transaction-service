@@ -191,30 +191,24 @@ def get_cache_view_tag_and_addresses(
     return None
 
 
-def remove_cache_view_by_instance(
-    instance: TokenTransfer
-    | InternalTx
-    | MultisigConfirmation
-    | MultisigTransaction
-    | ModuleTransaction,
-):
+def remove_cache_view_for_addresses(
+    cache_tag: str, addresses: list[ChecksumAddress]
+) -> None:
     """
-    Remove the cache stored for instance view.
-
-    :param instance:
-    """
-    if tag_and_addresses := get_cache_view_tag_and_addresses(instance):
-        remove_cache_view_for_addresses(*tag_and_addresses)
-
-
-def remove_cache_view_for_addresses(cache_tag: str, addresses: list[ChecksumAddress]):
-    """
-    Remove several cache for the provided cache_tag and addresses
+    Remove the cached views for the provided cache_tag and addresses with a
+    single Redis call. Never raises: it runs inside model signals, and a cache
+    backend failure must not break the write that triggered it (entries expire
+    by TTL anyway).
 
     :param cache_tag:
     :param addresses:
     :return:
     """
-    for address in addresses:
-        cache_safe_txs = CacheSafeTxsView(cache_tag, address)
-        cache_safe_txs.remove_cache()
+    if not addresses:
+        return
+    cache_names = [f"{cache_tag}:{address}" for address in addresses]
+    logger.debug("Removing all the cache for %s", cache_names)
+    try:
+        get_redis().unlink(*cache_names)
+    except Exception:
+        logger.warning("Could not remove the cache for %s", cache_names, exc_info=True)

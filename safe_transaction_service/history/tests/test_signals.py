@@ -37,7 +37,6 @@ from ..models import (
 from ..services.event_service import set_safe_membership
 from ..signals import (
     _process_event,
-    _process_event_and_close_connections,
     build_event_payload,
     is_relevant_event,
 )
@@ -544,74 +543,45 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         build_event_payload_mock.assert_not_called()
         send_events_mock.assert_not_called()
 
-    @factory.django.mute_signals(post_save)
-    @mock.patch("safe_transaction_service.history.signals._process_event")
-    def test_process_event_and_close_connections_closes_connection(
-        self, process_event_mock: MagicMock
+    @mock.patch.object(QueueService, "send_events")
+    @mock.patch(
+        "safe_transaction_service.history.signals.remove_cache_view_for_addresses",
+        side_effect=Exception("Redis is down"),
+    )
+    def test_cache_invalidation_failure_does_not_block_events(
+        self, remove_cache_mock: MagicMock, send_events_mock: MagicMock
     ):
-        # Spawned greenlets run outside Celery's `task_postrun` cleanup, so the wrapper
-        # must return any connection opened while building the payload to the pool.
-        tx = ERC20TransferFactory()
-        conn = MagicMock(in_atomic_block=False)
+        # A cache backend failure must not abort the write nor the event
+        # emission — it would otherwise roll back whole indexer batches.
+        # Note `remove_cache_view_for_addresses` itself never raises (this
+        # mock simulates a regression in that guarantee), so the signal path
+        # must tolerate it anyway
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(trusted=True)
 
-        with mock.patch("django.db.connections.all", return_value=[conn]):
-            _process_event_and_close_connections(
-                ERC20Transfer, tx, created=True, deleted=False
-            )
-
-        process_event_mock.assert_called_once_with(ERC20Transfer, tx, True, False)
-        conn.close_if_unusable_or_obsolete.assert_called_once()
+        send_events_mock.assert_called()
 
     @factory.django.mute_signals(post_save)
-    def test_post_bulk_create_dispatch_spawns_greenlet(self):
+    @mock.patch.object(QueueService, "send_events")
+    def test_post_bulk_create_dispatch_processes_event(
+        self, send_events_mock: MagicMock
+    ):
         # Regression: `post_bulk_create.send(instance=..., created=True)` must reach
-        # `process_event_from_bulk_create` (which absorbs Django's signal kwargs and
-        # spawns a greenlet). If the receiver decorators bind to a function requiring
-        # `deleted`/lacking `**kwargs`, dispatch raises TypeError and breaks bulk_create.
-        tx = ERC20TransferFactory()
+        # `process_event` (which absorbs Django's signal kwargs). If the receiver
+        # decorators bind to a function requiring `deleted`/lacking `**kwargs`,
+        # dispatch raises TypeError and breaks bulk_create.
+        tx = self._annotated(ERC20TransferFactory())
 
-        with mock.patch(
-            "safe_transaction_service.history.signals.gevent.spawn"
-        ) as spawn_mock:
-            with self.captureOnCommitCallbacks(execute=True):
-                post_bulk_create.send(ERC20Transfer, instance=tx, created=True)
-                # The greenlet must only be spawned once the transaction commits
-                spawn_mock.assert_not_called()
+        with self.captureOnCommitCallbacks(execute=True):
+            post_bulk_create.send(ERC20Transfer, instance=tx, created=True)
+            # Events are only published once the transaction commits
+            send_events_mock.assert_not_called()
 
-        spawn_mock.assert_called_once_with(
-            _process_event_and_close_connections, ERC20Transfer, tx, True, False
+        (payloads,) = send_events_mock.call_args.args
+        self.assertEqual(
+            [payload["type"] for payload in payloads],
+            [
+                TransactionServiceEventType.INCOMING_TOKEN.name,
+                TransactionServiceEventType.OUTGOING_TOKEN.name,
+            ],
         )
-
-    @factory.django.mute_signals(post_save)
-    @mock.patch("safe_transaction_service.history.signals._process_event")
-    def test_process_event_and_close_connections_closes_on_error(
-        self, process_event_mock: MagicMock
-    ):
-        # Connection must be returned even if payload building raises
-        process_event_mock.side_effect = ValueError("boom")
-        tx = ERC20TransferFactory()
-        conn = MagicMock(in_atomic_block=False)
-
-        with mock.patch("django.db.connections.all", return_value=[conn]):
-            with self.assertRaises(ValueError):
-                _process_event_and_close_connections(
-                    ERC20Transfer, tx, created=True, deleted=False
-                )
-
-        conn.close_if_unusable_or_obsolete.assert_called_once()
-
-    @factory.django.mute_signals(post_save)
-    @mock.patch("safe_transaction_service.history.signals._process_event")
-    def test_process_event_and_close_connections_skips_atomic_block(
-        self, process_event_mock: MagicMock
-    ):
-        # Connections inside an atomic block must not be closed (mirrors task_postrun cleanup)
-        tx = ERC20TransferFactory()
-        conn = MagicMock(in_atomic_block=True)
-
-        with mock.patch("django.db.connections.all", return_value=[conn]):
-            _process_event_and_close_connections(
-                ERC20Transfer, tx, created=True, deleted=False
-            )
-
-        conn.close_if_unusable_or_obsolete.assert_not_called()

@@ -68,9 +68,9 @@ class TestQueueService(TestCase):
         for i in range(messages_to_send):
             self.assertEqual(self._get_message(), {"message": f"not sent {i}"})
 
-    def test_pool_exhausted_buffers_event(self):
+    def test_publish_failure_buffers_event(self):
         queue_service = QueueService()
-        payload = {"message": "pool exhausted test"}
+        payload = {"message": "publish failure test"}
 
         with mock.patch.object(QueueService, "_try_publish", return_value=False):
             result = queue_service.send_event(payload)

@@ -7,9 +7,9 @@ def close_unusable_or_obsolete_connections() -> None:
 
     Mirrors Django's per-request cleanup for contexts that have no
     ``request_finished`` lifecycle hook, such as Celery tasks (see
-    ``config.celery_app.close_db_connections``) and fire-and-forget greenlets
-    spawned outside a task. With ``CONN_MAX_AGE=0`` every connection is eligible
-    for closure, returning the psycopg3 pool slot immediately.
+    ``config.celery_app.close_db_connections``). With ``CONN_MAX_AGE=0`` every
+    connection is eligible for closure, returning the psycopg3 pool slot
+    immediately.
 
     Connections inside an atomic block are skipped: closing them would break the
     surrounding transaction (and test isolation, as ``TestCase`` wraps each test
