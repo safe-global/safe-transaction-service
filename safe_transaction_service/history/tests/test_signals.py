@@ -399,6 +399,23 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         }
         send_events_mock.assert_called_with([deleted_multisig_transaction_payload])
 
+    @factory.django.mute_signals(post_save)
+    @mock.patch("safe_transaction_service.history.signals.get_queue_service")
+    def test_queue_service_not_resolved_without_payloads(
+        self, get_queue_service_mock: MagicMock
+    ):
+        # A transfer where neither side is a tracked Safe emits no payloads.
+        # The queue service must not even be resolved then: its construction
+        # connects to the broker and raises if it is unavailable, which would
+        # break the write for an event that was never going to be sent
+        transfer = ERC20TransferFactory()
+        set_safe_membership(transfer, to_is_a_safe=False, from_is_a_safe=False)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            _process_event(ERC20Transfer, transfer, created=True, deleted=False)
+
+        get_queue_service_mock.assert_not_called()
+
     @mock.patch.object(QueueService, "send_events")
     def test_events_are_sent_only_on_commit(self, send_events_mock: MagicMock):
         # Events must never be published while the transaction is still open

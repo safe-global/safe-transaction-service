@@ -40,6 +40,7 @@ def process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    get_queue_service().send_events_on_commit(
-        [payload for payload in payloads if payload.get("address")]
-    )
+    payloads_to_send = [payload for payload in payloads if payload.get("address")]
+    if not payloads_to_send:
+        return None
+    get_queue_service().send_events_on_commit(payloads_to_send)
