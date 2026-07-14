@@ -34,6 +34,8 @@ dependencies = [
     "requests==2.34.2",
     "safe-eth-py[django]==7.22.0",
     "web3==7.16.0",
+    "cachecontrol==0.14.4",
+    "google-auth==2.55.0",
 ]
 
 [dependency-groups]
