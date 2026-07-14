@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import logging
+
+from django.http import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -13,6 +16,8 @@ from ..history.serializers import CodeErrorResponse
 from . import filters, serializers
 from .models import Token, TokenList
 
+logger = logging.getLogger(__name__)
+
 
 @extend_schema(
     responses={
@@ -26,6 +31,25 @@ class TokenView(RetrieveAPIView):
     serializer_class = serializers.TokenInfoResponseSerializer
     lookup_field = "address"
     queryset = Token.objects.all()
+
+    def get_object(self) -> Token:
+        try:
+            return super().get_object()
+        except Http404:
+            # Tokens are catalogued lazily (balances/collectibles), so ones seen
+            # only in transaction history are missing; fetch on demand.
+            address = self.kwargs[self.lookup_field]
+            try:
+                token = Token.objects.create_from_blockchain(address)
+            except Exception:
+                # Don't let an RPC failure turn this into a 5xx storm; 404 instead.
+                logger.warning(
+                    "Could not fetch token=%s from blockchain", address, exc_info=True
+                )
+                token = None
+            if token is None:
+                raise
+            return token
 
     @method_decorator(cache_page(60 * 60))  # Cache 1 hour, this does not change often
     def get(self, request, *args, **kwargs):
