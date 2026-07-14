@@ -3114,8 +3114,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cachecontrol", specifier = "==0.14.4" },
     { name = "boto3", specifier = ">=1.43.36" },
+    { name = "cachecontrol", specifier = "==0.14.4" },
     { name = "cachetools", specifier = "==7.1.4" },
     { name = "celery", extras = ["librabbitmq"], specifier = "==5.6.3" },
     { name = "django", specifier = ">=5.2.13,<5.3" },
