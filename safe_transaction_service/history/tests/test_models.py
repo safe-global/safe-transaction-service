@@ -715,6 +715,29 @@ class TestInternalTx(TestCase):
                 internal_txs
             )  # Cannot bulk create again first 2 transactions
 
+    def test_store_internal_txs_and_decoded_in_db(self):
+        stored_internal_tx = InternalTxFactory()
+        duplicated_internal_tx = InternalTxFactory.build(
+            ethereum_tx=stored_internal_tx.ethereum_tx,
+            trace_address=stored_internal_tx.trace_address,
+        )
+        new_internal_tx = InternalTxFactory.build(
+            ethereum_tx=stored_internal_tx.ethereum_tx
+        )
+        internal_txs_decoded = [
+            InternalTxDecodedFactory.build(internal_tx=internal_tx)
+            for internal_tx in (duplicated_internal_tx, new_internal_tx)
+        ]
+
+        stored = InternalTx.objects.store_internal_txs_and_decoded_in_db(
+            [duplicated_internal_tx, new_internal_tx], internal_txs_decoded
+        )
+
+        # Duplicated InternalTx and its InternalTxDecoded must be filtered out
+        self.assertEqual(stored, [new_internal_tx])
+        self.assertEqual(InternalTx.objects.count(), 2)
+        self.assertEqual(InternalTxDecoded.objects.get().internal_tx, new_internal_tx)
+
     def test_get_parent_child(self):
         i = InternalTxFactory(trace_address="0")
         self.assertIsNone(i.get_parent())

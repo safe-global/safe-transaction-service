@@ -153,10 +153,10 @@ class EthereumIndexer(ABC):
         processed_objects = []
         total_elements = len(elements)
         for i, element in enumerate(elements):
-            logger.info(
+            logger.debug(
                 "%s: Processing element %d/%d",
-                i + 1,
                 self.__class__.__name__,
+                i + 1,
                 total_elements,
             )
             processed_objects.append(self.process_element(element))
@@ -368,9 +368,9 @@ class EthereumIndexer(ABC):
             # Auto adjustment disabled
             yield
         else:
-            start = int(time.time())
+            start = time.monotonic()
             yield
-            delta = int(time.time()) - start
+            delta = time.monotonic() - start
             if delta > 30:
                 self.block_process_limit = max(self.block_process_limit // 2, 1)
                 logger.info(
@@ -453,9 +453,9 @@ class EthereumIndexer(ABC):
             ValueError,
             Web3RPCError,
         ) as e:
-            self.block_process_limit = 1  # Set back to the very minimum
+            self.block_process_limit = max(self.block_process_limit // 2, 1)
             logger.info(
-                "%s: block_process_limit set back to %d",
+                "%s: block_process_limit halved to %d after error",
                 self.__class__.__name__,
                 self.block_process_limit,
             )
@@ -559,8 +559,6 @@ class EthereumIndexer(ABC):
                     to_block_number,
                 )
                 total_number_processed_elements += number_processed_elements
-                if from_block_number is not None:
-                    from_block_number += 1
             if last_block is None or to_block_number > last_block:
                 last_block = to_block_number
         else:
