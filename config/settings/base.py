@@ -252,6 +252,17 @@ CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=120)
 
+# Not in Celery's official docs, but supported in `celery.app.control.Control` and
+# `kombu.pidbox.Mailbox`. RabbitMQ >=4.3 denies the "transient, non-exclusive" queue
+# that Celery's control/inspect mailbox (used by `celery inspect ping`, our worker
+# liveness probe) declares by default, breaking the probe. Making the mailbox durable
+# instead of exclusive avoids that RabbitMQ restriction without tying it to a single
+# connection, which would crash a worker that restarts under the same hostname.
+# Defaults to true: durable+shared is RabbitMQ's oldest, universally-supported queue
+# type, so it's harmless on RabbitMQ <4.3 too, and every network eventually drifts
+# onto >=4.3 since the RabbitMQ image tag isn't pinned.
+CELERY_CONTROL_QUEUE_DURABLE = env.bool("CELERY_CONTROL_QUEUE_DURABLE", default=True)
+
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
 CELERY_BROKER_CONNECTION_MAX_RETRIES = (
     value
