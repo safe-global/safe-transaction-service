@@ -4,6 +4,7 @@ from datetime import timedelta
 from unittest import mock
 from unittest.mock import MagicMock
 
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.test import TestCase
 from django.utils import timezone
@@ -23,6 +24,7 @@ from ...safe_messages.tests.factories import (
 )
 from ...tokens.services import TokenServiceProvider
 from ...tokens.tests.factories import TokenFactory
+from ..cache import CacheSafeTxsView
 from ..helpers import build_transfer_unique_id
 from ..models import (
     ERC20Transfer,
@@ -537,45 +539,54 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         send_events_mock.assert_called_with([deleted_delegate_user_payload])
 
     @factory.django.mute_signals(post_save)
-    @mock.patch(
-        "safe_transaction_service.history.signals.remove_cache_view_for_addresses"
-    )
+    @mock.patch("safe_transaction_service.history.cache.remove_cache_views")
     @mock.patch("safe_transaction_service.history.signals.build_event_payload")
     @mock.patch.object(QueueService, "send_events")
     def test_irrelevant_events_skip(
         self,
         send_events_mock: MagicMock,
         build_event_payload_mock: MagicMock,
-        remove_cache_mock: MagicMock,
+        remove_cache_views_mock: MagicMock,
     ):
         # Old events are not relevant and should short-circuit before payload work.
-        # Cache invalidation still happens: eagerly, and again on commit
+        # Cache invalidation still happens, in a single call on commit
         tx = ERC20TransferFactory(timestamp=timezone.now() - timedelta(minutes=120))
+        # Keys accumulated by other writes on this connection would be drained
+        # together with this test's ones, breaking the exact assertion below.
+        # `transaction.get_connection()` returns the real `DatabaseWrapper` —
+        # `django.db.connection` is a proxy whose `__dict__` is its own
+        transaction.get_connection().__dict__.pop("_pending_cache_invalidations", None)
 
         with self.captureOnCommitCallbacks(execute=True):
             _process_event(ERC20Transfer, tx, created=True, deleted=False)
-            remove_cache_mock.assert_called_once()
+            remove_cache_views_mock.assert_not_called()
 
-        self.assertEqual(remove_cache_mock.call_count, 2)
+        transfers_cache_tag = CacheSafeTxsView.LIST_TRANSFERS_VIEW_CACHE_KEY
+        remove_cache_views_mock.assert_called_once_with(
+            {
+                f"{transfers_cache_tag}:{tx.to}",
+                f"{transfers_cache_tag}:{tx._from}",
+            }
+        )
         build_event_payload_mock.assert_not_called()
         send_events_mock.assert_not_called()
 
     @mock.patch.object(QueueService, "send_events")
     @mock.patch(
-        "safe_transaction_service.history.signals.remove_cache_view_for_addresses",
+        "safe_transaction_service.history.cache.remove_cache_views",
         side_effect=Exception("Redis is down"),
     )
     def test_cache_invalidation_failure_does_not_block_events(
-        self, remove_cache_mock: MagicMock, send_events_mock: MagicMock
+        self, remove_cache_views_mock: MagicMock, send_events_mock: MagicMock
     ):
-        # A cache backend failure must not abort the write nor the event
-        # emission — it would otherwise roll back whole indexer batches.
-        # Note `remove_cache_view_for_addresses` itself never raises (this
-        # mock simulates a regression in that guarantee), so the signal path
-        # must tolerate it anyway
+        # A cache backend failure must not prevent the events from being
+        # published. Note `remove_cache_views` itself never raises (this mock
+        # simulates a regression in that guarantee), so the `on_commit`
+        # callbacks must tolerate it anyway
         with self.captureOnCommitCallbacks(execute=True):
             MultisigTransactionFactory(trusted=True)
 
+        remove_cache_views_mock.assert_called()
         send_events_mock.assert_called()
 
     @factory.django.mute_signals(post_save)

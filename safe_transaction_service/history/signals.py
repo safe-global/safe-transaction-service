@@ -3,7 +3,6 @@
 from logging import getLogger
 
 from django.conf import settings
-from django.db import transaction
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -154,29 +153,9 @@ def _process_event(
     if settings.CACHE_VIEW_DEFAULT_TIMEOUT and (
         tag_and_addresses := get_cache_view_tag_and_addresses(instance)
     ):
-        # Close over the resolved tag and addresses so the callback holds a
-        # couple of strings instead of the model instance until commit.
-        # A named function instead of a `functools.partial`: Django's
-        # `robust=True` failure handler logs `func.__qualname__`, which
-        # `partial` lacks
-        def remove_cache() -> None:
-            try:
-                remove_cache_view_for_addresses(*tag_and_addresses)
-            except Exception:
-                # A cache failure must never abort the write that triggered
-                # the signal — it would roll back whole indexer batches
-                logger.warning(
-                    "Could not remove cache for %s", tag_and_addresses, exc_info=True
-                )
-
-        logger.debug("Removing cache for object=%s", instance)
-        remove_cache()
-        # Invalidate again after commit — between the eager invalidation and
-        # the commit, a concurrent request could repopulate the cache with
-        # pre-commit (stale) data. Registered before the events, so the cache
-        # is clean when consumers are notified
-        if transaction.get_connection().in_atomic_block:
-            transaction.on_commit(remove_cache, robust=True)
+        # Runs (or is registered) before the events, so the cache is clean
+        # when consumers are notified
+        remove_cache_view_for_addresses(*tag_and_addresses)
 
     # Skip payload generation for events that won't be emitted anyway
     # (for example, old/reindexed txs).
