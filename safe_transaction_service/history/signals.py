@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+
 from logging import getLogger
 
 from django.conf import settings
@@ -7,12 +8,8 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-import gevent
-from gevent.greenlet import Greenlet
-
 from ..events.services.queue_service import get_queue_service
-from ..utils.database import close_unusable_or_obsolete_connections
-from .cache import remove_cache_view_by_instance
+from .cache import get_cache_view_tag_and_addresses, remove_cache_view_for_addresses
 from .models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -135,7 +132,12 @@ def _process_event(
     deleted: bool,
 ) -> None:
     """
-    Process models and
+    Build the event payloads for the instance and schedule their publication
+    for when the current database transaction is committed, so consumers can
+    never observe an event before the data backing it is visible. Payloads are
+    built eagerly here — inside the transaction — as delete events need the
+    rows that are about to disappear.
+
     :param sender:
     :param instance:
     :param created:
@@ -148,13 +150,15 @@ def _process_event(
     assert not (created and deleted), (
         "An instance cannot be created and deleted at the same time"
     )
-    if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
-        logger.debug("Removing cache for object=%s", instance)
-        remove_cache_view_by_instance(instance)
-        logger.debug("Removed cache for object=%s", instance)
+    if settings.CACHE_VIEW_DEFAULT_TIMEOUT and (
+        tag_and_addresses := get_cache_view_tag_and_addresses(instance)
+    ):
+        # Runs (or is registered) before the events, so the cache is clean
+        # when consumers are notified
+        remove_cache_view_for_addresses(*tag_and_addresses)
 
-    # Skip heavy cache invalidation and payload generation for events
-    # that won't be emitted anyway (for example, old/reindexed txs).
+    # Skip payload generation for events that won't be emitted anyway
+    # (for example, old/reindexed txs).
     if not is_relevant_event(sender, instance, created):
         logger.debug(
             "Skipping non-relevant event for created=%s object=%s",
@@ -168,46 +172,46 @@ def _process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    for payload in payloads:
-        if address := payload.get("address"):
-            logger.debug(
-                "[%s] Triggering send_event tasks for created=%s object=%s",
-                address,
-                created,
-                instance,
-            )
-            queue_service = get_queue_service()
-            queue_service.send_event(payload)
+    payloads_to_send = [payload for payload in payloads if payload.get("address")]
+    if not payloads_to_send:
+        return None
+    get_queue_service().send_events_on_commit(payloads_to_send)
 
 
+# `dispatch_uid` uniqueness is per signal, so the same uid can be shared by
+# the `post_save` and `post_bulk_create` registrations of each sender
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ModuleTransaction,
     dispatch_uid="module_transaction.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=MultisigConfirmation,
     dispatch_uid="multisig_confirmation.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=MultisigTransaction,
     dispatch_uid="multisig_transaction.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ERC20Transfer,
     dispatch_uid="erc20_transfer.process_event",
 )
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
     sender=ERC721Transfer,
     dispatch_uid="erc721_transfer.process_event",
 )
-@receiver(post_save, sender=InternalTx, dispatch_uid="internal_tx.process_event")
 @receiver(
-    post_save,
+    [post_save, post_bulk_create],
+    sender=InternalTx,
+    dispatch_uid="internal_tx.process_event",
+)
+@receiver(
+    [post_save, post_bulk_create],
     sender=SafeContract,
     dispatch_uid="safe_contract.process_event",
 )
@@ -222,97 +226,6 @@ def process_event(
     **kwargs,
 ) -> None:
     return _process_event(sender, instance, created, False)
-
-
-def _process_event_and_close_connections(
-    sender: type[Model],
-    instance: TokenTransfer
-    | InternalTx
-    | MultisigConfirmation
-    | MultisigTransaction
-    | SafeContract,
-    created: bool,
-    deleted: bool,
-) -> None:
-    """
-    Run ``_process_event`` and return any DB connection opened by the greenlet to the pool.
-
-    These greenlets are spawned fire-and-forget from the indexer flow, so they run on their
-    own greenlet-local connection *after* Celery's ``task_postrun`` cleanup
-    (``config.celery_app.close_db_connections``) has already fired for the task. Nothing else
-    closes that connection, so it lingers until the psycopg3 pool recycles it by idle/lifetime
-    timers. Some senders (e.g. ``MultisigConfirmation``) lazily load FKs while building the
-    payload, opening such a connection.
-
-    Mirrors the ``task_postrun`` cleanup pattern. ``close_if_unusable_or_obsolete`` is a no-op
-    when no connection was opened (the common transfer/ether case touches only Redis/queue), so
-    this is cheap.
-
-    :param sender: Sender type
-    :param instance: Sender instance
-    :param created: `True` if the instance has just been created, `False` otherwise
-    :param deleted: `True` if the instance has been deleted, `False` otherwise
-    :return:
-    """
-    try:
-        _process_event(sender, instance, created, deleted)
-    finally:
-        close_unusable_or_obsolete_connections()
-
-
-@receiver(
-    post_bulk_create,
-    sender=ModuleTransaction,
-    dispatch_uid="module_transaction.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=MultisigConfirmation,
-    dispatch_uid="multisig_confirmation.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=MultisigTransaction,
-    dispatch_uid="multisig_transaction.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=ERC20Transfer,
-    dispatch_uid="erc20_transfer.process_event",
-)
-@receiver(
-    post_bulk_create,
-    sender=ERC721Transfer,
-    dispatch_uid="erc721_transfer.process_event",
-)
-@receiver(post_bulk_create, sender=InternalTx, dispatch_uid="internal_tx.process_event")
-@receiver(
-    post_bulk_create,
-    sender=SafeContract,
-    dispatch_uid="safe_contract.process_event",
-)
-def process_event_from_bulk_create(
-    sender: type[Model],
-    instance: TokenTransfer
-    | InternalTx
-    | MultisigConfirmation
-    | MultisigTransaction
-    | SafeContract,
-    created: bool,
-    **kwargs,
-) -> Greenlet:
-    """
-    Handle post_bulk_create signals by spawning a greenlet to process events asynchronously.
-
-    :param sender: Model class that sent the signal
-    :param instance: Instance of the created model
-    :param created: `True` if model has just been created, `False` otherwise
-    :param kwargs:
-    :return: Greenlet running _process_event
-    """
-    return gevent.spawn(
-        _process_event_and_close_connections, sender, instance, created, False
-    )
 
 
 @receiver(
@@ -368,8 +281,7 @@ def process_save_delegate_user_event(
     **kwargs,
 ):
     payload_event = build_save_delegate_payload(instance, created)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    get_queue_service().send_events_on_commit([payload_event])
 
 
 @receiver(
@@ -381,5 +293,4 @@ def process_delete_delegate_user_event(
     sender: type[Model], instance: SafeContractDelegate, *args, **kwargs
 ):
     payload_event = build_delete_delegate_payload(instance)
-    queue_service = get_queue_service()
-    queue_service.send_event(payload_event)
+    get_queue_service().send_events_on_commit([payload_event])

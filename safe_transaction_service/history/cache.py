@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import json
+from collections.abc import Collection
 from functools import cached_property, wraps
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.db import transaction
 
 from eth_typing import ChecksumAddress
 from rest_framework import status
@@ -151,17 +153,19 @@ def cache_txs_view_for_address(
     return decorator
 
 
-def remove_cache_view_by_instance(
+def get_cache_view_tag_and_addresses(
     instance: TokenTransfer
     | InternalTx
     | MultisigConfirmation
     | MultisigTransaction
     | ModuleTransaction,
-):
+) -> tuple[str, list[ChecksumAddress]] | None:
     """
-    Remove the cache stored for instance view.
+    Resolve which view cache the instance invalidates.
 
     :param instance:
+    :return: Tuple of cache tag and addresses whose cached views the instance
+        invalidates, or ``None`` if the instance has no cached view
     """
     addresses = []
     cache_tag: str | None = None
@@ -185,17 +189,64 @@ def remove_cache_view_by_instance(
         addresses.append(instance.safe)
 
     if cache_tag:
-        remove_cache_view_for_addresses(cache_tag, addresses)
+        return cache_tag, addresses
+    return None
 
 
-def remove_cache_view_for_addresses(cache_tag: str, addresses: list[ChecksumAddress]):
+def remove_cache_views(cache_names: Collection[str]) -> None:
     """
-    Remove several cache for the provided cache_tag and addresses
+    Remove the provided cached views with a single Redis call. Never raises:
+    it runs inside model signals, and a cache backend failure must not break
+    the write that triggered it (entries expire by TTL anyway).
+
+    :param cache_names: Cache keys as built by ``CacheSafeTxsView.cache_name``
+    :return:
+    """
+    if not cache_names:
+        return
+    logger.debug("Removing all the cache for %s", cache_names)
+    try:
+        get_redis().unlink(*cache_names)
+    except Exception:
+        logger.warning("Could not remove the cache for %s", cache_names, exc_info=True)
+
+
+def remove_cache_view_for_addresses(
+    cache_tag: str, addresses: list[ChecksumAddress]
+) -> None:
+    """
+    Remove the cached views for the provided cache_tag and addresses. With no
+    transaction open the removal is immediate. Inside a transaction the cache
+    only becomes wrong at commit — concurrent readers must keep seeing the
+    pre-commit data it holds until then — so the keys are accumulated on the
+    connection and removed together on commit with a single Redis call.
 
     :param cache_tag:
     :param addresses:
     :return:
     """
-    for address in addresses:
-        cache_safe_txs = CacheSafeTxsView(cache_tag, address)
-        cache_safe_txs.remove_cache()
+    cache_names = [f"{cache_tag}:{address}" for address in addresses]
+    connection = transaction.get_connection()
+    if not connection.in_atomic_block:
+        remove_cache_views(cache_names)
+    else:
+        pending = connection.__dict__.get("_pending_cache_invalidations")
+        if pending is None:
+            pending = connection.__dict__["_pending_cache_invalidations"] = set()
+        pending.update(cache_names)
+        connection.on_commit(_remove_pending_cache_invalidations, robust=True)
+
+
+def _remove_pending_cache_invalidations() -> None:
+    """
+    ``on_commit`` callback registered by ``remove_cache_view_for_addresses``
+    for every cache-invalidating write of a transaction: the first one to run
+    removes every cache key the transaction accumulated with a single Redis
+    call, the rest find nothing to do. Keys left behind by a rolled-back
+    transaction are drained by the next cache-invalidating commit on the
+    connection — the cache can be invalidated in excess, never left stale.
+
+    :return:
+    """
+    connection = transaction.get_connection()
+    remove_cache_views(connection.__dict__.pop("_pending_cache_invalidations", ()))

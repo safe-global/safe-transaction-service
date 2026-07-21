@@ -899,11 +899,14 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        multisig_tx = MultisigTransactionFactory(
-            safe=safe_address, proposer=proposer, trusted=True
-        )
-        # Not trusted multisig transaction should not be returned by default
-        MultisigTransactionFactory(safe=safe_address, proposer=proposer, trusted=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx = MultisigTransactionFactory(
+                safe=safe_address, proposer=proposer, trusted=True
+            )
+            # Not trusted multisig transaction should not be returned by default
+            MultisigTransactionFactory(
+                safe=safe_address, proposer=proposer, trusted=False
+            )
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -928,7 +931,8 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         )
         # Check Etag header
         self.assertTrue(response["Etag"])
-        MultisigConfirmationFactory(multisig_transaction=multisig_tx)
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -942,7 +946,8 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         # Check proposed_by_delegate
         delegate = Account.create().address
         multisig_tx.proposed_by_delegate = delegate
-        multisig_tx.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx.save()
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -961,9 +966,10 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
 
-        MultisigTransactionFactory(
-            safe=safe_address, nonce=multisig_tx.nonce, trusted=True
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(
+                safe=safe_address, nonce=multisig_tx.nonce, trusted=True
+            )
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1005,8 +1011,9 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
-        MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
+            MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
 
         # Unique nonce ignores not trusted transactions by default
         response = self.client.get(
@@ -1052,7 +1059,8 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             )
 
             multisig_transaction.operation = SafeOperationEnum.DELEGATE_CALL.value
-            multisig_transaction.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                multisig_transaction.save()
             response = self.client.get(
                 reverse("v2:history:multisig-transactions", args=(safe_address,)),
                 format="json",
@@ -1092,13 +1100,14 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
 
-        multisig_transaction = MultisigTransactionFactory(
-            safe=safe_address,
-            nonce=0,
-            ethereum_tx=None,
-            trusted=True,
-            enable_safe_tx_hash_calculation=True,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_transaction = MultisigTransactionFactory(
+                safe=safe_address,
+                nonce=0,
+                ethereum_tx=None,
+                trusted=True,
+                enable_safe_tx_hash_calculation=True,
+            )
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,))
             + "?nonce=0",
@@ -1157,10 +1166,11 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
 
-        MultisigConfirmationFactory(
-            multisig_transaction=multisig_transaction,
-            force_sign_with_account=safe_owner_1,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigConfirmationFactory(
+                multisig_transaction=multisig_transaction,
+                force_sign_with_account=safe_owner_1,
+            )
         response = self.client.get(
             reverse("v2:history:multisig-transactions", args=(safe_address,))
             + "?has_confirmations=True",
@@ -1371,11 +1381,12 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
-        response = self.client.post(
-            reverse("v2:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         multisig_transaction_db = MultisigTransaction.objects.first()
         self.assertFalse(multisig_transaction_db.trusted)
@@ -1397,11 +1408,12 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         data["signature"] = to_0x_hex_str(
             safe_owner_1.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
         )
-        response = self.client.post(
-            reverse("v2:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v2:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         modified = multisig_transaction_db.modified
         multisig_transaction_db.refresh_from_db()

@@ -6,6 +6,8 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
 from kombu import Connection, Exchange, Queue
+from kombu.exceptions import LimitExceeded
+from kombu.pools import producers
 
 from ..services.queue_service import QueueService
 
@@ -66,9 +68,9 @@ class TestQueueService(TestCase):
         for i in range(messages_to_send):
             self.assertEqual(self._get_message(), {"message": f"not sent {i}"})
 
-    def test_pool_exhausted_buffers_event(self):
+    def test_publish_failure_buffers_event(self):
         queue_service = QueueService()
-        payload = {"message": "pool exhausted test"}
+        payload = {"message": "publish failure test"}
 
         with mock.patch.object(QueueService, "_try_publish", return_value=False):
             result = queue_service.send_event(payload)
@@ -79,6 +81,87 @@ class TestQueueService(TestCase):
         result = queue_service.send_event({"message": "recovered"})
         self.assertEqual(result, 2)
         self.assertEqual(len(queue_service.unsent_events), 0)
+
+    def test_send_events_to_queue(self):
+        payloads = [
+            {"event": f"test_event {i}", "type": "event type"} for i in range(3)
+        ]
+        queue_service = QueueService()
+        self.assertIsNone(self._get_message())
+        self.assertEqual(queue_service.send_events(payloads), 3)
+        for payload in payloads:
+            self.assertEqual(self._get_message(), payload)
+
+    def test_send_events_empty_list(self):
+        queue_service = QueueService()
+        self.assertEqual(queue_service.send_events([]), 0)
+        self.assertIsNone(self._get_message())
+
+    def test_send_events_buffers_remaining_on_failure(self):
+        queue_service = QueueService()
+        queue_service.clear_unsent_events()
+        payloads = [{"message": f"event {i}"} for i in range(3)]
+
+        # First event publishes, second fails: it and the remaining one must be
+        # buffered, preserving order
+        with mock.patch.object(QueueService, "_try_publish", side_effect=[True, False]):
+            self.assertEqual(queue_service.send_events(payloads), 1)
+        self.assertEqual(len(queue_service.unsent_events), 2)
+
+        # Next successful batch flushes the buffer too
+        self.assertEqual(queue_service.send_events([{"message": "recovered"}]), 3)
+        self.assertEqual(len(queue_service.unsent_events), 0)
+        self.assertEqual(self._get_message(), {"message": "recovered"})
+        self.assertEqual(self._get_message(), {"message": "event 1"})
+        self.assertEqual(self._get_message(), {"message": "event 2"})
+
+    def test_send_events_buffers_on_pool_exhausted(self):
+        # `acquire(block=False)` raises `LimitExceeded` (not `OperationalError`)
+        # when the producer pool is exhausted; events must be buffered, not
+        # raise and get lost
+        queue_service = QueueService()
+        queue_service.clear_unsent_events()
+
+        with mock.patch.object(
+            producers[queue_service.connection], "acquire", side_effect=LimitExceeded
+        ):
+            self.assertEqual(queue_service.send_events([{"message": "buffered"}]), 0)
+        self.assertEqual(len(queue_service.unsent_events), 1)
+
+        # Flushed by the next successful send
+        self.assertEqual(queue_service.send_event({"message": "recovered"}), 2)
+        self.assertEqual(self._get_message(), {"message": "recovered"})
+        self.assertEqual(self._get_message(), {"message": "buffered"})
+
+    def test_send_events_skips_unserializable_payload(self):
+        # One bad payload must not prevent its siblings from being published
+        queue_service = QueueService()
+        good_payload = {"message": "good"}
+
+        with self.assertLogs(level="ERROR"):
+            self.assertEqual(
+                queue_service.send_events([{"message": b"\xff"}, good_payload]), 1
+            )
+        self.assertEqual(self._get_message(), good_payload)
+        self.assertEqual(len(queue_service.unsent_events), 0)
+
+    def test_send_events_on_commit(self):
+        payloads = [{"message": "sent on commit"}]
+        queue_service = QueueService()
+        with mock.patch.object(QueueService, "send_events") as send_events_mock:
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                queue_service.send_events_on_commit(payloads)
+                # Nothing is published while the transaction is open
+                send_events_mock.assert_not_called()
+            self.assertEqual(len(callbacks), 1)
+            send_events_mock.assert_called_once_with(payloads)
+
+    def test_send_events_on_commit_empty_list(self):
+        # No callback is registered when there is nothing to send
+        queue_service = QueueService()
+        with self.captureOnCommitCallbacks() as callbacks:
+            queue_service.send_events_on_commit([])
+        self.assertEqual(callbacks, [])
 
 
 class TestBuildRoutingKey(SimpleTestCase):

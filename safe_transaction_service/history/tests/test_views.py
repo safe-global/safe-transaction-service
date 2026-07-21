@@ -626,7 +626,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
 
-        module_transaction = ModuleTransactionFactory(safe=safe_address)
+        with self.captureOnCommitCallbacks(execute=True):
+            module_transaction = ModuleTransactionFactory(safe=safe_address)
         response = self.client.get(
             reverse("v1:history:module-transactions", args=(safe_address,)),
             format="json",
@@ -642,7 +643,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
 
         # Add another ModuleTransaction to check filters
-        ModuleTransactionFactory(safe=safe_address)
+        with self.captureOnCommitCallbacks(execute=True):
+            ModuleTransactionFactory(safe=safe_address)
 
         url = (
             reverse("v1:history:module-transactions", args=(safe_address,))
@@ -1239,11 +1241,14 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        multisig_tx = MultisigTransactionFactory(
-            safe=safe_address, proposer=proposer, trusted=True
-        )
-        # Not trusted multisig transaction should not be returned by default
-        MultisigTransactionFactory(safe=safe_address, proposer=proposer, trusted=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx = MultisigTransactionFactory(
+                safe=safe_address, proposer=proposer, trusted=True
+            )
+            # Not trusted multisig transaction should not be returned by default
+            MultisigTransactionFactory(
+                safe=safe_address, proposer=proposer, trusted=False
+            )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1268,7 +1273,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
         # Check Etag header
         self.assertTrue(response["Etag"])
-        MultisigConfirmationFactory(multisig_transaction=multisig_tx)
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigConfirmationFactory(multisig_transaction=multisig_tx)
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1282,7 +1288,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         # Check proposed_by_delegate
         delegate = Account.create().address
         multisig_tx.proposed_by_delegate = delegate
-        multisig_tx.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx.save()
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1301,9 +1308,10 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 2)
 
-        MultisigTransactionFactory(
-            safe=safe_address, nonce=multisig_tx.nonce, trusted=True
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(
+                safe=safe_address, nonce=multisig_tx.nonce, trusted=True
+            )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,)),
             format="json",
@@ -1345,8 +1353,9 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["count_unique_nonce"], 0)
 
-        MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
-        MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(safe=safe_address, nonce=6, trusted=True)
+            MultisigTransactionFactory(safe=safe_address, nonce=12, trusted=False)
 
         # Unique nonce ignores not trusted transactions by default
         response = self.client.get(
@@ -1391,7 +1400,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             )
 
             multisig_transaction.operation = SafeOperationEnum.DELEGATE_CALL.value
-            multisig_transaction.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                multisig_transaction.save()
             response = self.client.get(
                 reverse("v1:history:multisig-transactions", args=(safe_address,)),
                 format="json",
@@ -1431,13 +1441,14 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 0)
 
-        multisig_transaction = MultisigTransactionFactory(
-            safe=safe_address,
-            nonce=0,
-            ethereum_tx=None,
-            trusted=True,
-            enable_safe_tx_hash_calculation=True,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_transaction = MultisigTransactionFactory(
+                safe=safe_address,
+                nonce=0,
+                ethereum_tx=None,
+                trusted=True,
+                enable_safe_tx_hash_calculation=True,
+            )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
             + "?nonce=0",
@@ -1496,10 +1507,11 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
 
-        MultisigConfirmationFactory(
-            multisig_transaction=multisig_transaction,
-            force_sign_with_account=safe_owner_1,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigConfirmationFactory(
+                multisig_transaction=multisig_transaction,
+                force_sign_with_account=safe_owner_1,
+            )
         response = self.client.get(
             reverse("v1:history:multisig-transactions", args=(safe_address,))
             + "?has_confirmations=True",
@@ -1610,11 +1622,12 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             safe_nonce=data["nonce"],
         )
         data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
-        response = self.client.post(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         multisig_transaction_db = MultisigTransaction.objects.first()
         self.assertFalse(multisig_transaction_db.trusted)
@@ -1636,11 +1649,12 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         data["signature"] = to_0x_hex_str(
             safe_owner_1.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
         )
-        response = self.client.post(
-            reverse("v1:history:multisig-transactions", args=(safe_address,)),
-            format="json",
-            data=data,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                format="json",
+                data=data,
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         modified = multisig_transaction_db.modified
         multisig_transaction_db.refresh_from_db()
@@ -2997,18 +3011,22 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 0)
 
         value = 2
-        InternalTxFactory(to=safe_address, value=0)
-        ethereum_tx_hash = (
-            "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
-        internal_tx = InternalTxFactory(
-            ethereum_tx=ethereum_tx, trace_address="0,1", to=safe_address, value=value
-        )
-        internal_tx_transfer_id = (
-            "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1"
-        )
-        InternalTxFactory(to=Account.create().address, value=value)
+        with self.captureOnCommitCallbacks(execute=True):
+            InternalTxFactory(to=safe_address, value=0)
+            ethereum_tx_hash = (
+                "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+            internal_tx = InternalTxFactory(
+                ethereum_tx=ethereum_tx,
+                trace_address="0,1",
+                to=safe_address,
+                value=value,
+            )
+            internal_tx_transfer_id = (
+                "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1"
+            )
+            InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
             format="json",
@@ -3030,7 +3048,8 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["count"], 0)
 
         # Add from tx. Result should be the same
-        InternalTxFactory(_from=safe_address, value=value)
+        with self.captureOnCommitCallbacks(execute=True):
+            InternalTxFactory(_from=safe_address, value=value)
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
             format="json",
@@ -3047,17 +3066,18 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         token_value = 6
-        erc20_tx_hash = (
-            "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
-        ethereum_erc_20_event = ERC20TransferFactory(
-            ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
-        )
-        erc20_transfer_id = (
-            "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
-        )
-        token = TokenFactory(address=ethereum_erc_20_event.address)
+        with self.captureOnCommitCallbacks(execute=True):
+            erc20_tx_hash = (
+                "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
+            ethereum_erc_20_event = ERC20TransferFactory(
+                ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
+            )
+            erc20_transfer_id = (
+                "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
+            )
+            token = TokenFactory(address=ethereum_erc_20_event.address)
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
             format="json",
@@ -3109,16 +3129,17 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
 
         token_id = 17
-        erc721_tx_hash = (
-            "0x6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
-        ethereum_erc_721_event = ERC721TransferFactory(
-            ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=123
-        )
-        erc721_transfer_id = (
-            "e6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59123"
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            erc721_tx_hash = (
+                "0x6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
+            ethereum_erc_721_event = ERC721TransferFactory(
+                ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=123
+            )
+            erc721_transfer_id = (
+                "e6a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59123"
+            )
         response = self.client.get(
             reverse("v1:history:incoming-transfers", args=(safe_address,)),
             format="json",
@@ -3204,18 +3225,22 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["results"]), 0)
 
         value = 2
-        InternalTxFactory(to=safe_address, value=0)
-        ethereum_tx_hash = (
-            "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
-        internal_tx = InternalTxFactory(
-            ethereum_tx=ethereum_tx, trace_address="0,1,1", to=safe_address, value=value
-        )
-        internal_tx_transfer_id = (
-            "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1,1"
-        )
-        InternalTxFactory(to=Account.create().address, value=value)
+        with self.captureOnCommitCallbacks(execute=True):
+            InternalTxFactory(to=safe_address, value=0)
+            ethereum_tx_hash = (
+                "0x5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            ethereum_tx = EthereumTxFactory(tx_hash=ethereum_tx_hash)
+            internal_tx = InternalTxFactory(
+                ethereum_tx=ethereum_tx,
+                trace_address="0,1,1",
+                to=safe_address,
+                value=value,
+            )
+            internal_tx_transfer_id = (
+                "i5a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590,1,1"
+            )
+            InternalTxFactory(to=Account.create().address, value=value)
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
         )
@@ -3259,16 +3284,20 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         # Add from tx
-        ethereum_tx_hash_2 = (
-            "0x5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        ethereum_tx_2 = EthereumTxFactory(tx_hash=ethereum_tx_hash_2)
-        internal_tx_2 = InternalTxFactory(
-            ethereum_tx=ethereum_tx_2, _from=safe_address, value=value, trace_address=""
-        )
-        internal_tx_2_transfer_id = (
-            "i5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            ethereum_tx_hash_2 = (
+                "0x5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            ethereum_tx_2 = EthereumTxFactory(tx_hash=ethereum_tx_hash_2)
+            internal_tx_2 = InternalTxFactory(
+                ethereum_tx=ethereum_tx_2,
+                _from=safe_address,
+                value=value,
+                trace_address="",
+            )
+            internal_tx_2_transfer_id = (
+                "i5f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
         )
@@ -3278,30 +3307,31 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.data["results"][1]["value"], str(value))
 
         token_value = 6
-        erc20_tx_hash = (
-            "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
-        ethereum_erc_20_event = ERC20TransferFactory(
-            ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
-        )
-        erc20_transfer_id = (
-            "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
-        )
-        erc20_tx_hash_2 = (
-            "0x8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc20_tx_2 = EthereumTxFactory(tx_hash=erc20_tx_hash_2)
-        ethereum_erc_20_event_2 = ERC20TransferFactory(
-            ethereum_tx=erc20_tx_2,
-            _from=safe_address,
-            value=token_value,
-            log_index=1299,
-        )
-        erc20_transfer_id_2 = (
-            "e8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d591299"
-        )
-        token = TokenFactory(address=ethereum_erc_20_event.address)
+        with self.captureOnCommitCallbacks(execute=True):
+            erc20_tx_hash = (
+                "0x7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc20_tx = EthereumTxFactory(tx_hash=erc20_tx_hash)
+            ethereum_erc_20_event = ERC20TransferFactory(
+                ethereum_tx=erc20_tx, to=safe_address, value=token_value, log_index=12
+            )
+            erc20_transfer_id = (
+                "e7a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d5912"
+            )
+            erc20_tx_hash_2 = (
+                "0x8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc20_tx_2 = EthereumTxFactory(tx_hash=erc20_tx_hash_2)
+            ethereum_erc_20_event_2 = ERC20TransferFactory(
+                ethereum_tx=erc20_tx_2,
+                _from=safe_address,
+                value=token_value,
+                log_index=1299,
+            )
+            erc20_transfer_id_2 = (
+                "e8a6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d591299"
+            )
+            token = TokenFactory(address=ethereum_erc_20_event.address)
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
         )
@@ -3380,26 +3410,30 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.json()["results"], expected_results)
 
         token_id = 17
-        erc721_tx_hash = (
-            "0x1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
-        ethereum_erc_721_event = ERC721TransferFactory(
-            ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=0
-        )
-        erc721_transfer_id = (
-            "e1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590"
-        )
-        erc721_tx_hash_2 = (
-            "0x2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
-        )
-        erc721_tx_2 = EthereumTxFactory(tx_hash=erc721_tx_hash_2)
-        ethereum_erc_721_event_2 = ERC721TransferFactory(
-            ethereum_tx=erc721_tx_2, _from=safe_address, token_id=token_id, log_index=2
-        )
-        erc721_transfer_id_2 = (
-            "e2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d592"
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            erc721_tx_hash = (
+                "0x1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc721_tx = EthereumTxFactory(tx_hash=erc721_tx_hash)
+            ethereum_erc_721_event = ERC721TransferFactory(
+                ethereum_tx=erc721_tx, to=safe_address, token_id=token_id, log_index=0
+            )
+            erc721_transfer_id = (
+                "e1f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d590"
+            )
+            erc721_tx_hash_2 = (
+                "0x2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d59"
+            )
+            erc721_tx_2 = EthereumTxFactory(tx_hash=erc721_tx_hash_2)
+            ethereum_erc_721_event_2 = ERC721TransferFactory(
+                ethereum_tx=erc721_tx_2,
+                _from=safe_address,
+                token_id=token_id,
+                log_index=2,
+            )
+            erc721_transfer_id_2 = (
+                "e2f6854140f0432d3b5e6d8341597ec3c5338239f8d311de9061fbc959f443d592"
+            )
         response = self.client.get(
             reverse("v1:history:transfers", args=(safe_address,)), format="json"
         )
