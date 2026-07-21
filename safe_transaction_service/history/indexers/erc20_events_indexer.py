@@ -154,7 +154,11 @@ class Erc20EventsIndexer(EventsIndexer):
         for log_receipt in log_receipts:
             try:
                 transfer = ERC20Transfer.from_decoded_event(log_receipt)
-                self._annotate_safe_membership(transfer, safe_addresses)
+                set_safe_membership(
+                    transfer,
+                    to_is_a_safe=transfer.to in safe_addresses,
+                    from_is_a_safe=transfer._from in safe_addresses,
+                )
                 yield transfer
             except ValueError:
                 pass
@@ -166,38 +170,24 @@ class Erc20EventsIndexer(EventsIndexer):
         for log_receipt in log_receipts:
             try:
                 transfer = ERC721Transfer.from_decoded_event(log_receipt)
-                self._annotate_safe_membership(transfer, safe_addresses)
+                set_safe_membership(
+                    transfer,
+                    to_is_a_safe=transfer.to in safe_addresses,
+                    from_is_a_safe=transfer._from in safe_addresses,
+                )
                 yield transfer
             except ValueError:
                 pass
 
-    def _get_safe_addresses_for_membership(self) -> set[ChecksumAddress] | None:
+    def _get_safe_addresses_for_membership(self) -> set[ChecksumAddress]:
         """
-        :return: The full set of monitored Safe addresses held in memory, or ``None`` if the
-            address cache has not been populated yet (abnormal: ``process_elements`` invoked
-            outside the normal indexing cycle). ``None`` makes ``_annotate_safe_membership`` a
-            no-op, so `build_event_payload` logs a "lacking metadata" error rather than guessing.
+        :return: The full set of monitored Safe addresses held in memory, loading it from
+            database if the address cache is not populated yet (``process_elements`` invoked
+            outside the normal indexing cycle, e.g. when reindexing)
         """
-        return self.addresses_cache.addresses if self.addresses_cache else None
-
-    @staticmethod
-    def _annotate_safe_membership(
-        transfer: TokenTransfer, safe_addresses: set[ChecksumAddress] | None
-    ) -> None:
-        """
-        Tag the transfer with whether its `to` / `_from` side is a tracked Safe, so only the
-        Safe side gets a directional event. No-op when ``safe_addresses`` is ``None``.
-
-        :param transfer: Transfer about to be stored
-        :param safe_addresses: Monitored Safe addresses, or ``None`` if unavailable
-        """
-        if safe_addresses is None:
-            return
-        set_safe_membership(
-            transfer,
-            to_is_a_safe=transfer.to in safe_addresses,
-            from_is_a_safe=transfer._from in safe_addresses,
-        )
+        if self.addresses_cache:
+            return self.addresses_cache.addresses
+        return self.get_almost_updated_addresses(0)
 
     def events_to_safe_relevant_transaction(
         self, log_receipts: Sequence[EventData]

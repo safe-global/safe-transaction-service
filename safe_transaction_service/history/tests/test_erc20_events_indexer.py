@@ -117,12 +117,19 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
                 block__block_hash=log_receipt["blockHash"],
             )
 
-        # Without a populated address cache the transfer is left unannotated, so
-        # build_event_payload will log the "lacking metadata" error rather than guess.
+        # Without a populated address cache (e.g. when reindexing) membership is
+        # loaded from database, where no Safe is stored yet
         indexer.addresses_cache = None
         (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
-        self.assertFalse(hasattr(transfer, "_to_is_a_safe"))
-        self.assertFalse(hasattr(transfer, "_from_is_a_safe"))
+        self.assertFalse(transfer._to_is_a_safe)
+        self.assertFalse(transfer._from_is_a_safe)
+
+        # With the recipient stored as a Safe, membership loaded from database detects it
+        SafeContractFactory(address=transfer.to)
+        indexer.addresses_cache = None
+        (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
+        self.assertTrue(transfer._to_is_a_safe)
+        self.assertFalse(transfer._from_is_a_safe)
 
         # With only the recipient tracked: incoming side is a Safe, outgoing side is not.
         indexer.addresses_cache = AddressesCache({transfer.to}, None)
