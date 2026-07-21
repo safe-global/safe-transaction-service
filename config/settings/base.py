@@ -252,6 +252,17 @@ CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=120)
 
+# Not in Celery's official docs, but supported in `celery.app.control.Control` and
+# `kombu.pidbox.Mailbox`. RabbitMQ >=4.3 denies the "transient, non-exclusive" queue
+# that Celery's control/inspect mailbox (used by `celery inspect ping`, our worker
+# liveness probe) declares by default, breaking the probe. Making the mailbox durable
+# instead of exclusive avoids that RabbitMQ restriction without tying it to a single
+# connection, which would crash a worker that restarts under the same hostname.
+# Defaults to true: durable+shared is RabbitMQ's oldest, universally-supported queue
+# type, so it's harmless on RabbitMQ <4.3 too, and every network eventually drifts
+# onto >=4.3 since the RabbitMQ image tag isn't pinned.
+CELERY_CONTROL_QUEUE_DURABLE = env.bool("CELERY_CONTROL_QUEUE_DURABLE", default=True)
+
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
 CELERY_BROKER_CONNECTION_MAX_RETRIES = (
     value
@@ -840,3 +851,40 @@ BANNED_EOAS: set[ChecksumAddress] = {
 DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION = env.bool(
     "DISABLE_CREATION_MULTISIG_TRANSACTIONS_WITH_DELEGATE_CALL_OPERATION", default=False
 )
+
+# SSO — Google OIDC + JWT verification
+# ------------------------------------------------------------------------------
+# Replaces the legacy SSO_USERNAME_HEADER / CustomHeaderRemoteUserMiddleware approach.
+# SSO_USERNAME_HEADER is no longer read — remove it from your environment.
+#
+# The reverse proxy (APISIX) handles the Google OIDC flow and must be configured to
+# forward the raw RS256-signed ID token in the request header named by SSO_ID_TOKEN_HEADER.
+# GoogleOIDCMiddleware verifies the JWT signature against Google's public JWKS
+# before trusting anything in the header — the token is never accepted on trust alone.
+#
+# Required env vars when SSO_ENABLED=true:
+#   SSO_ADMINS       — comma-separated list of emails granted Django admin access
+#   SSO_CLIENT_ID    — Google OAuth client ID (must match APISIX config); used to
+#                      verify the JWT aud claim so tokens from other apps are rejected
+# Optional:
+#   SSO_HOSTED_DOMAIN   — Google Workspace domain to enforce (default: safe.global)
+#   SSO_ID_TOKEN_HEADER — request.META key holding the forwarded ID token
+#                         (default: HTTP_X_ENC_ID_TOKEN)
+SSO_ENABLED = env.bool("SSO_ENABLED", default=False)
+if SSO_ENABLED:
+    MIDDLEWARE.append("safe_transaction_service.utils.auth.GoogleOIDCMiddleware")
+    AUTHENTICATION_BACKENDS = [
+        "safe_transaction_service.utils.auth.CustomRemoteUserBackend",
+        # "django.contrib.auth.backends.ModelBackend",
+    ]
+    # When creating a user, give superuser permissions if email is in SSO_ADMINS
+    # e.g. SSO_ADMINS=alice@safe.global,bob@safe.global
+    SSO_ADMINS = {email.lower() for email in env.list("SSO_ADMINS", default=[])}
+    # Google OAuth client ID — used to verify the JWT aud claim so only tokens
+    # issued for this app are accepted. Must match the client_id in APISIX config.
+    SSO_CLIENT_ID = env("SSO_CLIENT_ID")
+    SSO_HOSTED_DOMAIN = env("SSO_HOSTED_DOMAIN", default="safe.global").lower()
+    SSO_ID_TOKEN_HEADER = env.str("SSO_ID_TOKEN_HEADER", default="HTTP_X_ENC_ID_TOKEN")
+    SESSION_COOKIE_AGE = (
+        60 * 10
+    )  # 10 minutes; re-created transparently by APISIX on each admin request

@@ -3,7 +3,7 @@ name = "safe-transaction-service"
 dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
-    "boto3>=1.43.36",
+    "boto3>=1.43.46",
     "cachetools==7.1.4",
     "celery[librabbitmq]==5.6.3",
     "django>=5.2.13,<5.3",
@@ -12,7 +12,7 @@ dependencies = [
     "django-cors-headers==4.9.0",
     "django-debug-toolbar",
     "django-debug-toolbar-force",
-    "django-environ==0.13.0",
+    "django-environ==0.14.0",
     "django-extensions==4.1",
     "django-filter==25.2",
     "django-imagekit==6.1.0",
@@ -28,12 +28,14 @@ dependencies = [
     "gunicorn[gevent]==26.0.0",
     "orjson==3.11.9",
     "packaging>=21.0",
-    "pillow==12.2.0",
+    "pillow==12.3.0",
     "psycopg[binary,pool]==3.3.4",
     "redis[hiredis]==7.4.1",
     "requests==2.34.2",
     "safe-eth-py[django]==7.22.0",
     "web3==7.16.0",
+    "cachecontrol==0.14.4",
+    "google-auth==2.55.2",
 ]
 
 [dependency-groups]
