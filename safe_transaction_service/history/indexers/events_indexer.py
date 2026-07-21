@@ -123,9 +123,14 @@ class EventsIndexer(EthereumIndexer):
                 for single_parameters in multiple_parameters
             ]
 
-            with self.auto_adjust_block_limit(from_block_number, to_block_number):
-                # Check how long all the jobs take
-                gevent.joinall(jobs, raise_error=True)
+            try:
+                with self.auto_adjust_block_limit(from_block_number, to_block_number):
+                    # Check how long all the jobs take
+                    gevent.joinall(jobs, raise_error=True)
+            finally:
+                # `joinall` raises on the first failed job without stopping the others,
+                # so kill any job still in flight
+                gevent.killall(jobs)
 
             return [log_receipt for job in jobs for log_receipt in job.get()]
         else:

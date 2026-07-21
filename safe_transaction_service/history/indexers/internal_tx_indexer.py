@@ -313,6 +313,10 @@ class InternalTxIndexer(EthereumIndexer):
                 exc_info=True,
             )
             raise
+        finally:
+            # `joinall` raises on the first failed job without stopping the others,
+            # so kill any job still in flight
+            gevent.killall(jobs)
 
         # Concatenate per-chunk results in chunk order to preserve tx_hashes ordering
         return [traces for job in jobs for traces in job.get()]
