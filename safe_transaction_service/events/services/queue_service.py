@@ -196,7 +196,7 @@ class QueueService(BaseQueueService):
             except Exception:
                 logger.error("Cannot serialize payload %s", payload, exc_info=True)
         if not events:
-            return 0
+            return 0 + self.send_unsent_events()
         total = self._publish_events(events)
         if total != len(events):
             unsent = events[total:]
