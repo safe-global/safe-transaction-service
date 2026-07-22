@@ -247,8 +247,7 @@ INSTALLED_APPS += [
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="django://")
 # https://docs.celeryproject.org/en/stable/userguide/optimizing.html#broker-connection-pools
 # https://docs.celeryq.dev/en/latest/userguide/optimizing.html#broker-connection-pools
-# Configured to 0 due to connection issues https://github.com/celery/celery/issues/4355
-CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
+CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=10)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=120)
 
