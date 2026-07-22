@@ -36,7 +36,7 @@ CACHES = {
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 # CELERY
-CELERY_ALWAYS_EAGER = True
+CELERY_TASK_ALWAYS_EAGER = True
 
 # Ganache #2 private key
 ETHEREUM_TEST_PRIVATE_KEY = (

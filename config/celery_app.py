@@ -20,7 +20,7 @@ def on_celery_setup_logging(**kwargs):
 
     # Patch all the code to use Celery logger (if not just logs inside tasks.py are displayed with the
     # task_id and task_name). This way every log will have the context information
-    if not settings.CELERY_ALWAYS_EAGER:
+    if not settings.CELERY_TASK_ALWAYS_EAGER:
         for _, logger in settings.LOGGING["loggers"].items():
             key = "handlers"
             if key in logger:
@@ -50,9 +50,11 @@ app = Celery("safe_transaction_service")
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.
 # - namespace='CELERY' means all celery-related configuration keys
-#   should have a `CELERY_` prefix.
-app.config_from_object("django.conf:settings")
-# app.config_from_object("django.conf:settings", namespace="CELERY")
+#   should have a `CELERY_` prefix and use Celery's modern lowercase
+#   setting names (uppercased), e.g. `CELERY_TASK_ALWAYS_EAGER` for
+#   `task_always_eager`. Pre-4.0 aliases like `CELERY_ALWAYS_EAGER`
+#   are silently ignored.
+app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
