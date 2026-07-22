@@ -37,6 +37,7 @@ from ..models import (
     SafeRelevantTransaction,
 )
 from ..services.event_service import set_safe_membership
+from ..services.index_service import TransactionNotFoundException
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
@@ -227,21 +228,29 @@ class SafeEventsIndexer(EventsIndexer):
             if HexBytes(tx["hash"]) in tx_hashes_to_create
         ]
 
-        # 11. Fetch receipts and store ONLY for txs with processable events
+        # 11. Fetch receipts and store the txs with processable events. If any
+        # receipt cannot be fetched, `_fetch_receipts_and_store` raises and the
+        # whole block range is retried on a later run instead of advancing past a
+        # tx whose EthereumTx is missing (which would leave a dangling InternalTx).
+        # This mirrors the non-conditional path, where
+        # `txs_create_or_update_from_tx_hashes` raises `TransactionNotFoundException`.
         if allowed_fetched_txs_filtered:
-            number_allowed_txs_inserted = self._fetch_receipts_and_store(
+            number_txs_inserted = self._fetch_receipts_and_store(
                 allowed_fetched_txs_filtered
             )
             logger.debug(
                 "Conditional indexing: %d txs with processable events inserted",
-                number_allowed_txs_inserted,
+                number_txs_inserted,
             )
 
-        # 12. Process only the processable events
-        # (filtering already done by _get_processable_events)
+        # 12. Process the processable events. Every referenced tx is now in the DB:
+        # existing ones from `db_txs`, the rest inserted in step 11 (a missing
+        # receipt would have raised above).
         processed_elements = self._process_decoded_elements(processable_events)
 
-        # 13. Mark ALL original receipts as processed (so we don't re-fetch blocked ones)
+        # 13. Mark ALL original receipts as processed so blocked/filtered-out ones
+        # are never re-fetched. Receipt-fetch failures never reach here (they raise
+        # in step 11), so nothing that still needs indexing is marked here.
         for log_receipt in not_processed_log_receipts:
             self._mark_processed(
                 log_receipt["transactionHash"],
@@ -807,6 +816,9 @@ class SafeEventsIndexer(EventsIndexer):
         )
         # Track Safe addresses and their creation tx hashes for SafeContract creation
         created_safe_address_with_tx_hash: dict[ChecksumAddress, bytes] = {}
+        # Safes whose proxy was created in a previous block, so their old InternalTx
+        # must be deleted in a single batch before storing the new ones
+        addresses_to_delete: set[ChecksumAddress] = set()
 
         for safe_address in addresses_to_index:
             events = safe_addresses_with_creation_events[safe_address]
@@ -837,15 +849,9 @@ class SafeEventsIndexer(EventsIndexer):
                 if not proxy_creation_event:
                     # SafeSetup without ProxyCreation means proxy was created in a previous block
                     # ProxyCreation is also emitted when ProxyCreationL2 or ChainSpecificProxyCreationL2 are emitted on v1.5.0.
-                    logger.debug(
-                        "[%s] Proxy was created in previous blocks, deleting the old InternalTx",
-                        safe_address,
-                    )
-                    InternalTx.objects.filter(contract_address=safe_address).delete()
-                    logger.debug(
-                        "[%s] Proxy was created in previous blocks, old InternalTx deleted",
-                        safe_address,
-                    )
+                    # Collect the address to delete the old InternalTx in a single
+                    # batch after the loop, before storing the new ones.
+                    addresses_to_delete.add(safe_address)
 
                 # Determine trace_address and singleton based on whether ProxyCreation exists
                 if proxy_creation_event:
@@ -887,6 +893,15 @@ class SafeEventsIndexer(EventsIndexer):
                 ]
 
         logger.debug("InternalTx and InternalTxDecoded objects for creation were built")
+
+        # Delete old InternalTx for Safes whose proxy was created in a previous
+        # block, in a single query before storing the new ones
+        if addresses_to_delete:
+            logger.debug(
+                "Deleting old InternalTx for %d Safes whose proxy was created in previous blocks",
+                len(addresses_to_delete),
+            )
+            InternalTx.objects.filter(contract_address__in=addresses_to_delete).delete()
 
         stored_internal_txs = InternalTx.objects.store_internal_txs_and_decoded_in_db(
             internal_txs, internal_txs_decoded
@@ -962,8 +977,14 @@ class SafeEventsIndexer(EventsIndexer):
         Fetch receipts for allowed transactions and store them in the database.
         Called after filtering by tx._from to avoid fetching receipts for blocklisted txs.
 
+        If a receipt cannot be fetched, raises ``TransactionNotFoundException`` so the
+        caller retries the whole block range instead of advancing past a tx whose
+        events would otherwise dangle. This matches the non-conditional path in
+        ``IndexService.txs_create_or_update_from_tx_hashes``.
+
         :param txs: List of allowed transactions to fetch receipts for and store
         :return: Number of transactions inserted
+        :raises TransactionNotFoundException: if any receipt cannot be fetched
         """
         if not txs:
             return 0
@@ -976,7 +997,6 @@ class SafeEventsIndexer(EventsIndexer):
             len(tx_hashes),
         )
 
-        # Build list of (tx, receipt) pairs, only including successful receipt fetches
         txs_with_receipts: list[tuple[TxData, TxReceipt]] = []
         for tx, tx_receipt in zip(
             txs,
@@ -986,18 +1006,13 @@ class SafeEventsIndexer(EventsIndexer):
             tx_receipt = tx_receipt or self.ethereum_client.get_transaction_receipt(
                 tx["hash"]
             )  # Retry if failed
-            if tx_receipt:
-                txs_with_receipts.append((tx, tx_receipt))
-            else:
-                logger.warning(
-                    "Conditional indexing: failed to fetch receipt for tx %s",
-                    to_0x_hex_str(tx["hash"]),
+            if not tx_receipt:
+                raise TransactionNotFoundException(
+                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx['hash']))}"
                 )
+            txs_with_receipts.append((tx, tx_receipt))
 
-        if not txs_with_receipts:
-            return 0
-
-        # Collect block hashes only from txs with successful receipts
+        # Every receipt was fetched, so collect block hashes from all txs
         block_hashes = {to_0x_hex_str(tx["blockHash"]) for tx, _ in txs_with_receipts}
 
         # Create blocks

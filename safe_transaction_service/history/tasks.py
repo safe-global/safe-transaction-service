@@ -151,6 +151,7 @@ def index_erc20_events_out_of_sync_task(
         )
         updated = False
         number_events_processed = 0
+        consecutive_failures = 0
         while not updated:
             try:
                 (
@@ -162,8 +163,20 @@ def index_erc20_events_out_of_sync_task(
                     addresses, current_block_number
                 )
                 number_events_processed += len(events_processed)
+                consecutive_failures = 0
             except FindRelevantElementsException:
-                pass
+                consecutive_failures += 1
+                if (
+                    consecutive_failures
+                    >= settings.ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES
+                ):
+                    logger.error(
+                        "Aborting out of sync erc20/721 indexing after %d "
+                        "consecutive failures for addresses %s",
+                        consecutive_failures,
+                        addresses,
+                    )
+                    break
 
         logger.info(
             "Indexing of erc20/721 events for out of sync addresses task processed %d events",
