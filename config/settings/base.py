@@ -252,16 +252,12 @@ CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=0)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-heartbeat
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=120)
 
-# Not in Celery's official docs, but supported in `celery.app.control.Control` and
-# `kombu.pidbox.Mailbox`. RabbitMQ >=4.3 denies the "transient, non-exclusive" queue
-# that Celery's control/inspect mailbox (used by `celery inspect ping`, our worker
-# liveness probe) declares by default, breaking the probe. Making the mailbox durable
-# instead of exclusive avoids that RabbitMQ restriction without tying it to a single
-# connection, which would crash a worker that restarts under the same hostname.
-# Defaults to true: durable+shared is RabbitMQ's oldest, universally-supported queue
-# type, so it's harmless on RabbitMQ <4.3 too, and every network eventually drifts
-# onto >=4.3 since the RabbitMQ image tag isn't pinned.
+# Control and event queues must be durable, as RabbitMQ >=4.3 denies declaring
+# transient non-exclusive queues
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-control_queue_durable
 CELERY_CONTROL_QUEUE_DURABLE = env.bool("CELERY_CONTROL_QUEUE_DURABLE", default=True)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-event_queue_durable
+CELERY_EVENT_QUEUE_DURABLE = env.bool("CELERY_EVENT_QUEUE_DURABLE", default=True)
 
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
 CELERY_BROKER_CONNECTION_MAX_RETRIES = (
@@ -286,19 +282,19 @@ CELERY_TASK_SERIALIZER = "json"
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-result_serializer
 CELERY_RESULT_SERIALIZER = "json"
 # We are not interested in keeping results of tasks
-CELERY_IGNORE_RESULT = True
+CELERY_TASK_IGNORE_RESULT = True
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-task_always_eager
-CELERY_ALWAYS_EAGER = False
+CELERY_TASK_ALWAYS_EAGER = False
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#task-default-priority
 # Higher = more priority on RabbitMQ, opposite on Redis ¯\_(ツ)_/¯
 CELERY_TASK_DEFAULT_PRIORITY = 5
 # https://docs.celeryproject.org/en/stable/userguide/configuration.html#task-queue-max-priority
-CELERY_TASK_QUEUE_MAX_PRIORITY = 10
+CELERY_TASK_QUEUE_MAX_PRIORITY = None
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#broker-transport-options
 CELERY_BROKER_TRANSPORT_OPTIONS = {}
 
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_routes
-CELERY_ROUTES = (
+CELERY_TASK_ROUTES = (
     [
         (
             "safe_transaction_service.history.tasks.retry_get_metadata_task",
