@@ -59,6 +59,7 @@ from safe_eth.eth.django.models import (
 )
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe import SafeOperationEnum
+from safe_eth.safe.multi_send import MultiSend
 from safe_eth.safe.safe import SafeInfo
 from safe_eth.safe.safe_signature import SafeSignature, SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
@@ -148,6 +149,25 @@ class TransferDict(TypedDict):
     _trace_address: str
 
 
+# Common annotated fields for building `TransferDict` rows with UNION queries
+TRANSFER_FIELDS = (
+    "block",
+    "transaction_hash",
+    "to",
+    "_from",
+    "_value",
+    "execution_date",
+    "_token_id",
+    "token_address",
+)
+# `_log_index` is used to build a unique transfer id
+TRANSFER_FIELDS_WITH_LOG_INDEX = TRANSFER_FIELDS + ("_log_index",)
+# `_trace_address` is also used to build a unique transfer id
+TRANSFER_FIELDS_WITH_TRACE_ADDRESS = TRANSFER_FIELDS_WITH_LOG_INDEX + (
+    "_trace_address",
+)
+
+
 class BulkCreateSignalMixin:
     def bulk_create(
         self, objs, batch_size: int | None = None, ignore_conflicts: bool = False
@@ -167,12 +187,10 @@ class BulkCreateSignalMixin:
         ignore_conflicts: bool = False,
     ) -> int:
         """
-                Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
-                they will be brought to RAM. This approach is more RAM friendly.
-        ns.AddIndex(
-                    model_name='erc20transfer',
-                    index=models.Index(
-                :return: Count of inserted elements
+        Implementation in Django is not ok, as it will do `objs = list(objs)`. If objects come from a generator
+        they will be brought to RAM. This approach is more RAM friendly.
+
+        :return: Count of inserted elements
         """
         assert batch_size is not None and batch_size > 0
         iterator = iter(
@@ -554,19 +572,8 @@ class TokenTransferQuerySet(models.QuerySet):
         erc20_queryset: QuerySet,
         erc721_queryset: QuerySet,
     ) -> TransferDict:
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-            "_log_index",
-        ]
-        return erc20_queryset.values(*values).union(
-            erc721_queryset.values(*values), all=True
+        return erc20_queryset.values(*TRANSFER_FIELDS_WITH_LOG_INDEX).union(
+            erc721_queryset.values(*TRANSFER_FIELDS_WITH_LOG_INDEX), all=True
         )
 
 
@@ -662,7 +669,7 @@ class TokenTransfer(models.Model):
         except EthereumBlock.DoesNotExist:
             # Block is not found and should be present on DB. Reorg
             EthereumTx.objects.get(
-                event_data["transactionHash"]
+                pk=event_data["transactionHash"]
             ).block.set_not_confirmed()
             raise
 
@@ -709,7 +716,7 @@ class ERC20Transfer(TokenTransfer):
         return f"ERC20 Transfer from={self._from} to={self.to} value={self.value}"
 
     @classmethod
-    def from_decoded_event(cls, event_data: EventData) -> Union["ERC20Transfer"]:
+    def from_decoded_event(cls, event_data: EventData) -> "ERC20Transfer":
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 
@@ -829,7 +836,7 @@ class ERC721Transfer(TokenTransfer):
         )
 
     @classmethod
-    def from_decoded_event(cls, event_data: EventData) -> Union["ERC721Transfer"]:
+    def from_decoded_event(cls, event_data: EventData) -> "ERC721Transfer":
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 
@@ -1070,40 +1077,20 @@ class InternalTxQuerySet(models.QuerySet):
         return self.ether_txs().filter(to=address)
 
     def token_txs(self):
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-        ]
         erc20_queryset = ERC20Transfer.objects.token_txs()
         erc721_queryset = ERC721Transfer.objects.token_txs()
         return (
-            erc20_queryset.values(*values)
-            .union(erc721_queryset.values(*values), all=True)
+            erc20_queryset.values(*TRANSFER_FIELDS)
+            .union(erc721_queryset.values(*TRANSFER_FIELDS), all=True)
             .order_by("-block")
         )
 
     def token_incoming_txs_for_address(self, address: str):
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-        ]
         erc20_queryset = ERC20Transfer.objects.incoming(address).token_txs()
         erc721_queryset = ERC721Transfer.objects.incoming(address).token_txs()
         return (
-            erc20_queryset.values(*values)
-            .union(erc721_queryset.values(*values), all=True)
+            erc20_queryset.values(*TRANSFER_FIELDS)
+            .union(erc721_queryset.values(*TRANSFER_FIELDS), all=True)
             .order_by("-block")
         )
 
@@ -1129,22 +1116,12 @@ class InternalTxQuerySet(models.QuerySet):
         erc721_queryset: QuerySet,
         ether_queryset: QuerySet,
     ) -> TransferDict:
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-            "_log_index",
-            "_trace_address",
-        ]
         return (
-            ether_queryset.values(*values)
-            .union(erc20_queryset.values(*values), all=True)
-            .union(erc721_queryset.values(*values), all=True)
+            ether_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS)
+            .union(erc20_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True)
+            .union(
+                erc721_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
+            )
             .order_by("-block")
         )
 
@@ -1156,43 +1133,28 @@ class InternalTxQuerySet(models.QuerySet):
         erc721_out_queryset: QuerySet,
         ether_queryset: QuerySet,
     ) -> TransferDict:
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-            "_log_index",
-            "_trace_address",
-        ]
         return (
-            ether_queryset.values(*values)
-            .union(erc20_in_queryset.values(*values), all=True)
-            .union(erc20_out_queryset.values(*values), all=True)
-            .union(erc721_in_queryset.values(*values), all=True)
-            .union(erc721_out_queryset.values(*values), all=True)
+            ether_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS)
+            .union(
+                erc20_in_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
+            )
+            .union(
+                erc20_out_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
+            )
+            .union(
+                erc721_in_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
+            )
+            .union(
+                erc721_out_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS),
+                all=True,
+            )
         )
 
     def ether_txs_values(
         self,
         ether_queryset: QuerySet,
     ) -> TransferDict:
-        values = [
-            "block",
-            "transaction_hash",
-            "to",
-            "_from",
-            "_value",
-            "execution_date",
-            "_token_id",
-            "token_address",
-            "_log_index",
-            "_trace_address",
-        ]
-        return ether_queryset.values(*values)
+        return ether_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS)
 
     def can_be_decoded(self):
         """
@@ -1497,11 +1459,11 @@ class InternalTxDecoded(models.Model):
         return self.internal_tx._from
 
     @property
-    def block_number(self) -> type[int]:
+    def block_number(self) -> int:
         return self.internal_tx.block_number
 
     @property
-    def tx_hash(self) -> type[int]:
+    def tx_hash(self) -> str:
         return self.internal_tx.ethereum_tx_id
 
     def set_processed(self):
@@ -1623,14 +1585,9 @@ class MultisigTransactionQuerySet(models.QuerySet):
         return self.filter(trusted=False)
 
     def multisend(self):
-        # TODO Use MultiSend.MULTISEND_ADDRESSES + MultiSend MULTISEND_CALL_ONLY_ADDRESSES
         return self.filter(
-            to__in=[
-                "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761",  # MultiSend v1.3.0
-                "0x998739BFdAAdde7C933B942a68053933098f9EDa",  # MultiSend v1.3.0 (EIP-155)
-                "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",  # MultiSend Call Only v1.3.0
-                "0xA1dabEF33b3B82c7814B6D82A79e50F4AC44102B",  # MultiSend Call Only v1.3.0 (EIP-155)
-            ]
+            to__in=MultiSend.MULTISEND_ADDRESSES
+            + MultiSend.MULTISEND_CALL_ONLY_ADDRESSES
         )
 
     def with_confirmations_required(self):
@@ -2154,7 +2111,7 @@ class SafeContract(models.Model):
         return f"Safe address={self.address} - ethereum-tx={self.ethereum_tx_id}"
 
     @property
-    def created_block_number(self) -> type[int] | None:
+    def created_block_number(self) -> int | None:
         if self.ethereum_tx:
             return self.ethereum_tx.block_id
 
@@ -2294,7 +2251,7 @@ class SafeRelevantTransaction(models.Model):
         except EthereumBlock.DoesNotExist:
             # Block is not found and should be present on DB. Reorg
             EthereumTx.objects.get(
-                event_data["transactionHash"]
+                pk=event_data["transactionHash"]
             ).block.set_not_confirmed()
             raise
         return [
@@ -2357,7 +2314,7 @@ class SafeStatusBase(models.Model):
             .filter(address=self.address, nonce__lte=self.nonce)
             .count()
         )
-        return safe_status_count and safe_status_count <= self.nonce
+        return 0 < safe_status_count <= self.nonce
 
     @classmethod
     def from_status_instance(
