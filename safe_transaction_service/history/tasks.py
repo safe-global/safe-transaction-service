@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import random
+from itertools import islice
 
 from django.conf import settings
 from django.utils import timezone
@@ -12,6 +13,7 @@ from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from redis.exceptions import LockError
+from safe_eth.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -132,14 +134,16 @@ def index_erc20_events_out_of_sync_task(
         erc20_events_indexer.block_process_limit_max = block_process_limit_max
 
     current_block_number = erc20_events_indexer.ethereum_client.current_block_number
-    addresses = (
+    addresses: set[ChecksumAddress] = (
         set(addresses)
         if addresses
-        else set(
-            list(
-                erc20_events_indexer.get_almost_updated_addresses(current_block_number)
-            )[:number_of_addresses]
-        )
+        else {
+            fast_to_checksum_address(address)
+            for address in islice(
+                erc20_events_indexer.get_almost_updated_addresses(current_block_number),
+                number_of_addresses,
+            )
+        }
     )
 
     if not addresses:
