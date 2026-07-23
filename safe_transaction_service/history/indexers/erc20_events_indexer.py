@@ -90,7 +90,13 @@ class Erc20EventsIndexer(EventsIndexer):
 
     @property
     def database_queryset(self) -> QuerySet:
-        return SafeContract.objects.all()
+        # Annotate the address as raw 20 bytes so loaders can skip the per-row
+        # keccak EIP-55 checksumming that `EthereumAddressBinaryField.from_db_value`
+        # performs. The address set is only used for membership tests, so the
+        # checksum is not needed.
+        return SafeContract.objects.all().annotate(
+            address_bytes=Cast("address", output_field=BinaryField())
+        )
 
     def _do_node_query(
         self,
@@ -300,11 +306,7 @@ class Erc20EventsIndexer(EventsIndexer):
         """
         created: datetime.datetime | None = None
         for i, (created, address) in enumerate(
-            # Load the address as raw 20 bytes to avoid the per-row keccak EIP-55
-            # checksumming that `EthereumAddressBinaryField.from_db_value` performs.
-            # The set is only used for membership tests, so the checksum is not needed.
-            query.annotate(address_bytes=Cast("address", output_field=BinaryField()))
-            .values_list("created", "address_bytes")
+            query.values_list("created", "address_bytes")
             .order_by("created")
             .iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
         ):
@@ -323,6 +325,18 @@ class Erc20EventsIndexer(EventsIndexer):
 
         logger.debug("%s: Retrieved monitored addresses", self.__class__.__name__)
         return addresses
+
+    def get_monitored_addresses(self) -> set[bytes]:
+        """
+        :return: Every monitored Safe address as raw 20-byte values (no keccak),
+            matching how the set is held in memory (see ``get_almost_updated_addresses``)
+        """
+        return {
+            bytes(address)
+            for address in self.database_queryset.values_list(
+                "address_bytes", flat=True
+            )
+        }
 
     def get_not_updated_addresses(self, current_block_number: int) -> EmptyQuerySet:
         """

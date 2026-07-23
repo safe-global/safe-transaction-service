@@ -244,6 +244,13 @@ class EthereumIndexer(ABC):
         )
         return minimum_block_number
 
+    def get_monitored_addresses(self) -> set[ChecksumAddress]:
+        """
+        :return: Every monitored address (e.g. for reindexing). Checksummed strings
+            by default; subclasses holding another representation override this.
+        """
+        return set(self.database_queryset.values_list("address", flat=True))
+
     def get_almost_updated_addresses(
         self, current_block_number: int
     ) -> set[ChecksumAddress]:
