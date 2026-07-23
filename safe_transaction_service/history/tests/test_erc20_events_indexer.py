@@ -1,11 +1,18 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from django.test import TestCase
 
+from hexbytes import HexBytes
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
 from ..indexers import Erc20EventsIndexerProvider
 from ..indexers.erc20_events_indexer import AddressesCache
-from ..models import ERC20Transfer, EthereumTx, IndexingStatus, SafeRelevantTransaction
+from ..models import (
+    ERC20Transfer,
+    EthereumBlock,
+    EthereumTx,
+    IndexingStatus,
+    SafeRelevantTransaction,
+)
 from .factories import EthereumTxFactory, SafeContractFactory
 from .mocks.mocks_erc20_events_indexer import log_receipt_mock
 
@@ -14,9 +21,15 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
     def setUp(self) -> None:
         Erc20EventsIndexerProvider.del_singleton()
         self.erc20_events_indexer = Erc20EventsIndexerProvider()
+        EthereumBlock.objects.get_timestamp_by_hash.cache_clear()
 
     def tearDown(self) -> None:
         Erc20EventsIndexerProvider.del_singleton()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        EthereumBlock.objects.get_timestamp_by_hash.cache_clear()
+        return super().tearDownClass()
 
     def test_erc20_events_indexer(self):
         erc20_events_indexer = self.erc20_events_indexer
@@ -106,6 +119,45 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertEqual(
             len(self.erc20_events_indexer.process_elements(log_receipt_mock)), 1
         )
+
+    def test_process_elements_reorged_block_is_flagged_not_confirmed(self):
+        """
+        A reorg can move an already-indexed tx to a new block. The event then
+        references a block hash missing from database while the tx is still
+        stored under the stale block. Processing must fail so the range is
+        retried without marking the events as processed, but the stale block
+        must be left as not confirmed even though the storing transaction
+        rolls back, otherwise `check_reorgs_task` will never detect the reorg
+        and the indexer will retry the same range forever.
+        """
+        log_receipt = log_receipt_mock[0]
+        ethereum_tx = EthereumTxFactory(
+            tx_hash=log_receipt["transactionHash"],
+            block__confirmed=True,  # Deep enough block, not checked for reorgs
+        )
+        stale_block = ethereum_tx.block
+        self.assertNotEqual(
+            HexBytes(stale_block.block_hash), HexBytes(log_receipt["blockHash"])
+        )
+
+        with self.assertRaises(EthereumBlock.DoesNotExist):
+            self.erc20_events_indexer.process_elements(log_receipt_mock)
+
+        # Events were not marked as processed, so they will be retried
+        self.assertEqual(
+            len(
+                self.erc20_events_indexer._filter_not_processed_log_receipts(
+                    log_receipt_mock
+                )
+            ),
+            1,
+        )
+
+        # The stale block must be flagged, so `check_reorgs_task` can
+        # detect the reorg, delete the block (cascading to the tx) and
+        # trigger reindexing
+        stale_block.refresh_from_db()
+        self.assertFalse(stale_block.confirmed)
 
     def test_events_to_transfer_annotates_safe_membership(self):
         indexer = self.erc20_events_indexer
