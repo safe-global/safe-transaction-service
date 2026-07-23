@@ -335,7 +335,7 @@ class Erc20EventsIndexer(EventsIndexer):
             bytes(address)
             for address in self.database_queryset.values_list(
                 "address_bytes", flat=True
-            )
+            ).iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
         }
 
     def get_not_updated_addresses(self, current_block_number: int) -> EmptyQuerySet:
