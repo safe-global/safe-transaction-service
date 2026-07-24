@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import random
+from itertools import islice
 
 from django.conf import settings
 from django.utils import timezone
@@ -11,7 +12,9 @@ from django.utils import timezone
 from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from redis.exceptions import LockError
+from safe_eth.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.redis import get_redis
 
@@ -132,22 +135,31 @@ def index_erc20_events_out_of_sync_task(
         erc20_events_indexer.block_process_limit_max = block_process_limit_max
 
     current_block_number = erc20_events_indexer.ethereum_client.current_block_number
-    addresses = (
-        set(addresses)
+    # Query with raw-bytes addresses (what `_do_node_query` filters against);
+    # explicit addresses arrive as checksummed strings
+    addresses: set[bytes] = (
+        {HexBytes(address) for address in addresses}
         if addresses
         else set(
-            list(
-                erc20_events_indexer.get_almost_updated_addresses(current_block_number)
-            )[:number_of_addresses]
+            islice(
+                erc20_events_indexer.get_almost_updated_addresses(current_block_number),
+                number_of_addresses,
+            )
         )
     )
 
     if not addresses:
         logger.info("No addresses to process")
     else:
+        # Log the addresses checksummed for readability, bounded like `_reindex`
+        addresses_str = (
+            [fast_to_checksum_address(address) for address in addresses]
+            if len(addresses) < 10
+            else f"{len(addresses)} addresses..."
+        )
         logger.info(
             "Start indexing of erc20/721 events for out of sync addresses %s",
-            addresses,
+            addresses_str,
         )
         updated = False
         number_events_processed = 0
@@ -174,7 +186,7 @@ def index_erc20_events_out_of_sync_task(
                         "Aborting out of sync erc20/721 indexing after %d "
                         "consecutive failures for addresses %s",
                         consecutive_failures,
-                        addresses,
+                        addresses_str,
                     )
                     break
 

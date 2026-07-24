@@ -5,10 +5,12 @@ from collections.abc import Iterator, Sequence
 from logging import getLogger
 from typing import NamedTuple
 
-from django.db.models import QuerySet
+from django.db.models import BinaryField, QuerySet
+from django.db.models.functions import Cast
 from django.db.models.query import EmptyQuerySet
 
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
 from web3.contract.contract import ContractEvent
 from web3.types import EventData, LogReceipt
@@ -29,7 +31,7 @@ logger = getLogger(__name__)
 
 
 class AddressesCache(NamedTuple):
-    addresses: set[ChecksumAddress]
+    addresses: set[bytes]
     last_checked: datetime.datetime | None
 
 
@@ -88,11 +90,17 @@ class Erc20EventsIndexer(EventsIndexer):
 
     @property
     def database_queryset(self) -> QuerySet:
-        return SafeContract.objects.all()
+        # Annotate the address as raw 20 bytes so loaders can skip the per-row
+        # keccak EIP-55 checksumming done by `EthereumAddressBinaryField.from_db_value`.
+        # The addresses are used only as lookup keys (membership tests, event
+        # filtering), never displayed, so the checksum is not needed.
+        return SafeContract.objects.all().annotate(
+            address_bytes=Cast("address", output_field=BinaryField())
+        )
 
     def _do_node_query(
         self,
-        addresses: set[ChecksumAddress],
+        addresses: set[bytes],
         from_block_number: int,
         to_block_number: int,
     ) -> list[LogReceipt]:
@@ -133,8 +141,8 @@ class Erc20EventsIndexer(EventsIndexer):
             if transfer_event["blockHash"]
             != transfer_event["transactionHash"]  # CELO ERC20 rewards
             and (
-                transfer_event["args"]["to"] in addresses
-                or transfer_event["args"]["from"] in addresses
+                HexBytes(transfer_event["args"]["to"]) in addresses
+                or HexBytes(transfer_event["args"]["from"]) in addresses
             )
         ]
 
@@ -156,8 +164,8 @@ class Erc20EventsIndexer(EventsIndexer):
                 transfer = ERC20Transfer.from_decoded_event(log_receipt)
                 set_safe_membership(
                     transfer,
-                    to_is_a_safe=transfer.to in safe_addresses,
-                    from_is_a_safe=transfer._from in safe_addresses,
+                    to_is_a_safe=HexBytes(transfer.to) in safe_addresses,
+                    from_is_a_safe=HexBytes(transfer._from) in safe_addresses,
                 )
                 yield transfer
             except ValueError:
@@ -172,14 +180,14 @@ class Erc20EventsIndexer(EventsIndexer):
                 transfer = ERC721Transfer.from_decoded_event(log_receipt)
                 set_safe_membership(
                     transfer,
-                    to_is_a_safe=transfer.to in safe_addresses,
-                    from_is_a_safe=transfer._from in safe_addresses,
+                    to_is_a_safe=HexBytes(transfer.to) in safe_addresses,
+                    from_is_a_safe=HexBytes(transfer._from) in safe_addresses,
                 )
                 yield transfer
             except ValueError:
                 pass
 
-    def _get_safe_addresses_for_membership(self) -> set[ChecksumAddress]:
+    def _get_safe_addresses_for_membership(self) -> set[bytes]:
         """
         :return: The full set of monitored Safe addresses held in memory, loading it from
             database if the address cache is not populated yet (``process_elements`` invoked
@@ -254,9 +262,7 @@ class Erc20EventsIndexer(EventsIndexer):
                 result_erc20 + result_erc721
             )  # TODO Hack to prevent returning `TokenTransfer` and using too much RAM
 
-    def get_almost_updated_addresses(
-        self, current_block_number: int
-    ) -> set[ChecksumAddress]:
+    def get_almost_updated_addresses(self, current_block_number: int) -> set[bytes]:
         """
 
         :param current_block_number:
@@ -300,11 +306,11 @@ class Erc20EventsIndexer(EventsIndexer):
         """
         created: datetime.datetime | None = None
         for i, (created, address) in enumerate(
-            query.values_list("created", "address")
+            query.values_list("created", "address_bytes")
             .order_by("created")
             .iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
         ):
-            addresses.add(address)
+            addresses.add(bytes(address))
 
             # Store addresses in cache every chunk, just in case task is interrupted during address loading
             if i % self.eth_erc20_load_addresses_chunk_size == 0:
@@ -319,6 +325,18 @@ class Erc20EventsIndexer(EventsIndexer):
 
         logger.debug("%s: Retrieved monitored addresses", self.__class__.__name__)
         return addresses
+
+    def get_monitored_addresses(self) -> set[bytes]:
+        """
+        :return: Every monitored Safe address as raw 20-byte values (no keccak),
+            matching how the set is held in memory (see ``get_almost_updated_addresses``)
+        """
+        return {
+            bytes(address)
+            for address in self.database_queryset.values_list(
+                "address_bytes", flat=True
+            ).iterator(chunk_size=self.eth_erc20_load_addresses_chunk_size)
+        }
 
     def get_not_updated_addresses(self, current_block_number: int) -> EmptyQuerySet:
         """

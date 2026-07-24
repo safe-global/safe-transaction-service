@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
+from hexbytes import HexBytes
 from safe_eth.eth.account_abstraction import BundlerClient
 from safe_eth.eth.ethereum_client import EthereumClient, EthereumNetwork
 from safe_eth.safe import Safe
@@ -117,7 +118,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
 
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract = SafeContractFactory()
-            addresses = {safe_contract.address}
+            addresses = [safe_contract.address]
             buf = StringIO()
             call_command(command, stdout=buf)
             self.assertIn(
@@ -131,7 +132,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
 
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract_2 = SafeContractFactory()
-            addresses = {safe_contract_2.address}
+            addresses = [safe_contract_2.address]
             buf = StringIO()
             call_command(command, f"--addresses={safe_contract_2.address}", stdout=buf)
             self.assertIn(
@@ -146,7 +147,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         # Test sync task call
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract_2 = SafeContractFactory()
-            addresses = {safe_contract_2.address}
+            addresses = [safe_contract_2.address]
             buf = StringIO()
             call_command(
                 command, f"--addresses={safe_contract_2.address}", "--sync", stdout=buf
@@ -200,7 +201,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                     f"--from-block-number={from_block_number}",
                     stdout=buf,
                 )
-                expected_addresses = {safe_master_copy.address}
+                expected_addresses = [safe_master_copy.address]
                 self.assertIn(
                     f"Start reindexing addresses {expected_addresses}",
                     cm.output[0],
@@ -243,7 +244,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                         f"--from-block-number={from_block_number}",
                         stdout=buf,
                     )
-                    expected_addresses = {safe_l2_master_copy.address}
+                    expected_addresses = [safe_l2_master_copy.address]
                     self.assertIn(
                         f"Start reindexing addresses {expected_addresses}",
                         cm.output[0],
@@ -391,7 +392,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                     f"--from-block-number={from_block_number}",
                     stdout=buf,
                 )
-                expected_addresses = {safe_contract.address}
+                expected_addresses = [safe_contract.address]
                 self.assertIn(
                     f"Start reindexing addresses {expected_addresses}",
                     cm.output[0],
@@ -401,13 +402,14 @@ class TestCommands(SafeTestCaseMixin, TestCase):
                     f"End reindexing addresses {expected_addresses}",
                     cm.output[3],
                 )
+                # The ERC20/721 indexer reindexes with raw-bytes addresses
                 find_relevant_elements_mock.assert_any_call(
-                    {safe_contract.address},
+                    {HexBytes(safe_contract.address)},
                     from_block_number,
                     from_block_number + block_process_limit - 1,
                 )
                 find_relevant_elements_mock.assert_any_call(
-                    {safe_contract.address},
+                    {HexBytes(safe_contract.address)},
                     from_block_number + block_process_limit,
                     current_block_number_mock.return_value,
                 )

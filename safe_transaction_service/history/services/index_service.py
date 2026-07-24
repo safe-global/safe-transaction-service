@@ -11,6 +11,7 @@ import gevent
 from eth_typing import ChecksumAddress, Hash32
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
+from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
 from ..models import (
@@ -603,7 +604,7 @@ class IndexService:
             # No issues on modifying the indexer as we should be provided with a new instance
             indexer.IGNORE_ADDRESSES_ON_LOG_FILTER = False
         else:
-            addresses = set(indexer.database_queryset.values_list("address", flat=True))
+            addresses = indexer.get_monitored_addresses()
 
         if not addresses:
             logger.warning("No addresses to process")
@@ -612,10 +613,17 @@ class IndexService:
         if block_process_limit is not None:
             indexer.block_process_limit = block_process_limit
 
-        # Don't log all the addresses
+        # Don't log all the addresses; checksum any raw-bytes ones for readability
         addresses_len = len(addresses)
         addresses_str = (
-            str(addresses) if addresses_len < 10 else f"{addresses_len} addresses..."
+            [
+                fast_to_checksum_address(address)
+                if isinstance(address, bytes)
+                else address
+                for address in addresses
+            ]
+            if addresses_len < 10
+            else f"{addresses_len} addresses..."
         )
         logger.info("Start reindexing addresses %s", addresses_str)
         current_block_number = self.ethereum_client.current_block_number

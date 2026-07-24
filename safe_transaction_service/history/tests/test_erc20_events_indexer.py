@@ -184,13 +184,13 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertFalse(transfer._from_is_a_safe)
 
         # With only the recipient tracked: incoming side is a Safe, outgoing side is not.
-        indexer.addresses_cache = AddressesCache({transfer.to}, None)
+        indexer.addresses_cache = AddressesCache({HexBytes(transfer.to)}, None)
         (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
         self.assertTrue(transfer._to_is_a_safe)
         self.assertFalse(transfer._from_is_a_safe)
 
         # With only the sender tracked: outgoing side is a Safe, incoming side is not.
-        indexer.addresses_cache = AddressesCache({transfer._from}, None)
+        indexer.addresses_cache = AddressesCache({HexBytes(transfer._from)}, None)
         (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
         self.assertFalse(transfer._to_is_a_safe)
         self.assertTrue(transfer._from_is_a_safe)
@@ -206,7 +206,11 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         safe_contract_2 = SafeContractFactory()
         self.assertGreaterEqual(safe_contract_2.created, safe_contract_1.created)
 
-        expected_addresses = {safe_contract_1.address, safe_contract_2.address}
+        # Addresses are held in memory as raw bytes, not checksummed strings
+        expected_addresses = {
+            HexBytes(safe_contract_1.address),
+            HexBytes(safe_contract_2.address),
+        }
         self.assertEqual(
             self.erc20_events_indexer.get_almost_updated_addresses(0),
             expected_addresses,
@@ -224,7 +228,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         safe_contract_3 = SafeContractFactory()
         self.assertGreater(safe_contract_3.created, safe_contract_2.created)
 
-        expected_addresses.add(safe_contract_3.address)
+        expected_addresses.add(HexBytes(safe_contract_3.address))
         self.assertEqual(
             self.erc20_events_indexer.get_almost_updated_addresses(0),
             expected_addresses,

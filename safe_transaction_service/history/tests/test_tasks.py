@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from eth_account import Account
+from hexbytes import HexBytes
 
 from safe_transaction_service.events.services import QueueService
 
@@ -112,7 +113,7 @@ class TestTasks(TestCase):
         with self.assertLogs(logger=task_logger) as cm:
             safe_contract = SafeContractFactory()
             index_erc20_events_out_of_sync_task.delay()
-            addresses = {safe_contract.address}
+            addresses = [safe_contract.address]
             self.assertIn(
                 f"Start indexing of erc20/721 events for out of sync addresses {addresses}",
                 cm.output[0],
@@ -121,6 +122,33 @@ class TestTasks(TestCase):
                 "Indexing of erc20/721 events for out of sync addresses task processed 0 events",
                 cm.output[1],
             )
+
+    @patch.object(Erc20EventsIndexer, "process_addresses")
+    def test_index_erc20_events_out_of_sync_task_queries_with_bytes(
+        self, process_addresses_mock: MagicMock
+    ):
+        # `process_addresses` must receive raw-bytes addresses so the bytes-only
+        # `_do_node_query` filter matches; checksummed strings would silently drop
+        # every event once the set exceeds `query_chunk_size`.
+        process_addresses_mock.return_value = ([], 0, 0, True)  # updated -> exit loop
+        safe_contract = SafeContractFactory()
+        expected = {HexBytes(safe_contract.address)}
+
+        # Auto-derived branch (no explicit addresses)
+        index_erc20_events_out_of_sync_task()
+        auto_addresses = process_addresses_mock.call_args.args[0]
+        self.assertEqual(auto_addresses, expected)
+        self.assertTrue(all(isinstance(address, bytes) for address in auto_addresses))
+
+        # Explicit --addresses branch (checksummed strings from the caller)
+        process_addresses_mock.reset_mock()
+        process_addresses_mock.return_value = ([], 0, 0, True)
+        index_erc20_events_out_of_sync_task(addresses=[safe_contract.address])
+        explicit_addresses = process_addresses_mock.call_args.args[0]
+        self.assertEqual(explicit_addresses, expected)
+        self.assertTrue(
+            all(isinstance(address, bytes) for address in explicit_addresses)
+        )
 
     @patch.object(task_logger, "error")
     @patch.object(Erc20EventsIndexer, "process_addresses")
