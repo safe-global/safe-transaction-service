@@ -91,9 +91,9 @@ class Erc20EventsIndexer(EventsIndexer):
     @property
     def database_queryset(self) -> QuerySet:
         # Annotate the address as raw 20 bytes so loaders can skip the per-row
-        # keccak EIP-55 checksumming that `EthereumAddressBinaryField.from_db_value`
-        # performs. The address set is only used for membership tests, so the
-        # checksum is not needed.
+        # keccak EIP-55 checksumming done by `EthereumAddressBinaryField.from_db_value`.
+        # The addresses are used only as lookup keys (membership tests, event
+        # filtering), never displayed, so the checksum is not needed.
         return SafeContract.objects.all().annotate(
             address_bytes=Cast("address", output_field=BinaryField())
         )
