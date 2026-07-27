@@ -16,6 +16,13 @@ from safe_eth.safe.addresses import (
     safe_singleton_contract_names,
 )
 
+from safe_transaction_service.policies.constants import (
+    GUARD_DEPLOYMENTS,
+    POLICY_DEPLOYMENTS,
+    GuardDeployment,
+)
+from safe_transaction_service.policies.models import PolicyContract, SafePolicyGuard
+
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
 
 
@@ -116,6 +123,14 @@ TASKS = [
         description="Index ERC20/721 Events (every 14 seconds)",
         interval=14,
         period=IntervalSchedule.SECONDS,
+    ),
+    CeleryTaskConfiguration(
+        name="safe_transaction_service.policies.tasks.index_policy_events_task",
+        description="Index Safe Policy Guard Events (every 15 seconds)",
+        interval=15,
+        period=IntervalSchedule.SECONDS,
+        # Enabled by `_setup_policy_engine` when the chain has a guard to index
+        enabled=False,
     ),
     CeleryTaskConfiguration(
         name="safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task",
@@ -225,6 +240,49 @@ class Command(BaseCommand):
                     f"Cannot find any SafeMasterCopy and ProxyFactory for chain id {ethereum_client.get_chain_id()}"
                 )
             )
+
+        self._setup_policy_engine(ethereum_client.get_chain_id())
+
+    def _setup_policy_engine(self, chain_id: int) -> None:
+        """
+        Set up the Safe Policy Guards to index and the policies whose configuration data can
+        be decoded, and enable the indexing task only if there is a guard to index
+        """
+        guard_deployments = [
+            GuardDeployment(address, 0)
+            for address in settings.ETH_POLICY_GUARD_ADDRESSES
+        ] or GUARD_DEPLOYMENTS.get(chain_id, [])
+
+        if not guard_deployments:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"No Safe Policy Guard known for chain id {chain_id}, policy indexing is disabled"
+                )
+            )
+            return
+
+        for guard_deployment in guard_deployments:
+            SafePolicyGuard.objects.get_or_create(
+                address=guard_deployment.address,
+                defaults={
+                    "initial_block_number": guard_deployment.initial_block_number,
+                    "tx_block_number": guard_deployment.initial_block_number,
+                },
+            )
+
+        for address, name in POLICY_DEPLOYMENTS.get(chain_id, {}).items():
+            PolicyContract.objects.update_or_create(
+                address=address, defaults={"name": name}
+            )
+
+        PeriodicTask.objects.filter(
+            task="safe_transaction_service.policies.tasks.index_policy_events_task"
+        ).update(enabled=True)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Setting up {len(guard_deployments)} Safe Policy Guard address(es)"
+            )
+        )
 
     def _setup_safe_singleton_addresses(
         self, safe_singleton_addresses: Sequence[tuple[str, int, str]]

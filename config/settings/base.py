@@ -133,6 +133,7 @@ LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.events.apps.EventsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
+    "safe_transaction_service.policies.apps.PoliciesConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
 ]
@@ -658,6 +659,13 @@ ETH_EVENTS_IGNORED_TO: set[ChecksumAddress] = {
     ChecksumAddress(HexAddress(HexStr(address)))
     for address in env.list("ETH_EVENTS_IGNORED_TO", default=[])
 }  # Transaction 'to' addresses to ignore during L2 indexing
+
+# Policy Engine indexing configuration
+# ------------------------------------------------------------------------------
+ETH_POLICY_GUARD_ADDRESSES: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("ETH_POLICY_GUARD_ADDRESSES", default=[])
+}  # `SafePolicyGuard` addresses to index. Overrides the deployments known for the chain.
 
 
 # ENABLE/DISABLE COLLECTIBLES DOWNLOAD METADATA, enable=True, disabled by default
