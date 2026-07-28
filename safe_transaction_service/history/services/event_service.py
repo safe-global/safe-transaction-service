@@ -3,7 +3,6 @@
 Build event payloads for the queue
 """
 
-import json
 from datetime import timedelta
 from logging import getLogger
 from typing import Any, Literal, TypedDict
@@ -161,8 +160,6 @@ def build_event_payload(
             payload["type"] = (
                 TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name
             )
-            # Deprecated: stringified boolean kept for legacy clients, use `isFailed` instead
-            payload["failed"] = json.dumps(instance.failed)
             payload["isFailed"] = instance.failed
             payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
         else:
