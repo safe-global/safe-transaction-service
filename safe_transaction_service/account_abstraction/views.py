@@ -7,6 +7,8 @@ from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIV
 from rest_framework.response import Response
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from safe_transaction_service.utils.views.mixins import BannedSafeMixin
+
 from . import filters, pagination, serializers
 from .models import SafeOperation, SafeOperationConfirmation, UserOperation
 
@@ -25,7 +27,7 @@ class SafeOperationView(RetrieveAPIView):
     serializer_class = serializers.SafeOperationWithUserOperationResponseSerializer
 
 
-class SafeOperationsView(ListCreateAPIView):
+class SafeOperationsView(BannedSafeMixin, ListCreateAPIView):
     filter_backends = [
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
@@ -165,7 +167,7 @@ class UserOperationView(RetrieveAPIView):
     serializer_class = serializers.UserOperationWithSafeOperationResponseSerializer
 
 
-class UserOperationsView(ListAPIView):
+class UserOperationsView(BannedSafeMixin, ListAPIView):
     filter_backends = [
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,

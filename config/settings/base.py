@@ -789,6 +789,10 @@ SPECTACULAR_SETTINGS = {
     "SORT_OPERATION_PARAMETERS": False,
 }
 
+BANNED_SAFES_CACHE_TTL = env.int(
+    "BANNED_SAFES_CACHE_TTL", default=60 * 5
+)  # Seconds the in-memory set of banned Safe addresses is cached for (default 5m)
+
 # Addresses not allowed to interact with the service
 # List taken from https://www.ic3.gov/PSA/2025/PSA250226
 BANNED_EOAS: set[ChecksumAddress] = {

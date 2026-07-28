@@ -5364,3 +5364,119 @@ class TestViewsV111(TestViewsV150):
         :return: Deploy last available Safe
         """
         return self.deploy_test_safe_v1_1_1(*args, **kwargs)
+
+
+class TestBannedSafeViews(SafeTestCaseMixin, APITestCase):
+    """
+    Isolates the behavior for banned Safes (``SafeContract.banned``), which
+    must return HTTP 451 Unavailable For Legal Reasons on every Safe-scoped
+    endpoint and be excluded from the owners endpoints
+    """
+
+    banned_response = {"detail": "Safe is unavailable for legal reasons"}
+
+    def test_get_safe_info_banned(self):
+        safe_contract = SafeContractFactory()
+        response = self.client.get(
+            reverse("v1:history:safe-info", args=(safe_contract.address,))
+        )
+        self.assertNotEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+
+        banned_safe_contract = SafeContractFactory(banned=True)
+        response = self.client.get(
+            reverse("v1:history:safe-info", args=(banned_safe_contract.address,))
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+    def test_get_multisig_transactions_banned(self):
+        safe_contract = SafeContractFactory()
+        response = self.client.get(
+            reverse("v1:history:multisig-transactions", args=(safe_contract.address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        banned_safe_contract = SafeContractFactory(banned=True)
+        url = reverse(
+            "v1:history:multisig-transactions", args=(banned_safe_contract.address,)
+        )
+        response = self.client.get(url)
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+    def test_post_multisig_transactions_banned(self):
+        banned_safe_contract = SafeContractFactory(banned=True)
+        response = self.client.post(
+            reverse(
+                "v1:history:multisig-transactions",
+                args=(banned_safe_contract.address,),
+            ),
+            format="json",
+            data={},
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+    def test_banned_safe_views(self):
+        banned_safe_contract = SafeContractFactory(banned=True)
+        get_url_names = (
+            "v1:history:all-transactions",
+            "v1:history:incoming-transfers",
+            "v1:history:transfers",
+            "v1:history:module-transactions",
+            "v1:history:safe-creation",
+            "v1:history:safe-balances",
+            "v1:history:safe-export",
+        )
+        for url_name in get_url_names:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(
+                    reverse(url_name, args=(banned_safe_contract.address,))
+                )
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
+                )
+                self.assertEqual(response.json(), self.banned_response)
+
+        response = self.client.post(
+            reverse(
+                "v1:history:multisig-transaction-estimate",
+                args=(banned_safe_contract.address,),
+            ),
+            format="json",
+            data={},
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+
+        response = self.client.delete(
+            reverse(
+                "v1:history:safe-delegate",
+                args=(banned_safe_contract.address, Account.create().address),
+            )
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+
+    def test_owners_view_excludes_banned(self):
+        owner_address = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner_address])
+        banned_safe_last_status = SafeLastStatusFactory(owners=[owner_address])
+        SafeContractFactory(address=banned_safe_last_status.address, banned=True)
+
+        response = self.client.get(
+            reverse("v1:history:owners", args=(owner_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["safes"], [safe_last_status.address])

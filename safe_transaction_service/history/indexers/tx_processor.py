@@ -469,9 +469,7 @@ class SafeTxProcessor(TxProcessor):
             internal_tx_decoded.internal_tx._from
             for internal_tx_decoded in internal_txs_decoded
         }
-        banned_addresses = set(
-            SafeContract.objects.get_banned_addresses(addresses=contract_addresses)
-        )
+        banned_addresses = SafeContract.objects.get_banned_addresses_cached()
 
         try:
             for internal_tx_decoded in internal_txs_decoded:

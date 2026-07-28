@@ -31,6 +31,7 @@ from safe_eth.safe.safe_signature import SafeSignatureEOA, SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.history.tests.factories import SafeContractFactory
 from safe_transaction_service.utils.utils import datetime_to_str
 
 from .. import models
@@ -1018,3 +1019,52 @@ class TestAccountAbstractionViews(SafeTestCaseMixin, APITestCase):
             response.json(),
             {"count": 1, "next": None, "previous": None, "results": [expected]},
         )
+
+
+class TestBannedSafeViews(SafeTestCaseMixin, APITestCase):
+    """
+    Isolates the behavior for banned Safes (``SafeContract.banned``), which
+    must return HTTP 451 Unavailable For Legal Reasons on every Safe-scoped
+    endpoint
+    """
+
+    banned_response = {"detail": "Safe is unavailable for legal reasons"}
+
+    def test_banned_safe_operations_view(self):
+        safe_contract = SafeContractFactory()
+        response = self.client.get(
+            reverse(
+                "v1:account_abstraction:safe-operations", args=(safe_contract.address,)
+            )
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        banned_safe_contract = SafeContractFactory(banned=True)
+        url = reverse(
+            "v1:account_abstraction:safe-operations",
+            args=(banned_safe_contract.address,),
+        )
+        response = self.client.get(url)
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+        response = self.client.post(url, format="json", data={})
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+    def test_banned_user_operations_view(self):
+        banned_safe_contract = SafeContractFactory(banned=True)
+        response = self.client.get(
+            reverse(
+                "v1:account_abstraction:user-operations",
+                args=(banned_safe_contract.address,),
+            )
+        )
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)

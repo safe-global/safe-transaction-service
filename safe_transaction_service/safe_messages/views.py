@@ -11,6 +11,8 @@ from rest_framework.generics import CreateAPIView, ListCreateAPIView, RetrieveAP
 from rest_framework.response import Response
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from safe_transaction_service.utils.views.mixins import BannedSafeMixin
+
 from . import pagination, serializers
 from .models import SafeMessage
 
@@ -63,7 +65,7 @@ class SafeMessageSignatureView(CreateAPIView):
         return Response(status=status.HTTP_201_CREATED)
 
 
-class SafeMessagesView(ListCreateAPIView):
+class SafeMessagesView(BannedSafeMixin, ListCreateAPIView):
     filter_backends = [
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,

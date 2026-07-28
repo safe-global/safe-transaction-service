@@ -813,3 +813,36 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(record.delegate, delegate.address)
         self.assertEqual(record.delegator, safe2.address)
         self.assertEqual(record.safe_contract_id, safe3.address)
+
+
+class TestBannedSafeViews(SafeTestCaseMixin, APITestCase):
+    """
+    Isolates the behavior for banned Safes (``SafeContract.banned``), which
+    must return HTTP 451 Unavailable For Legal Reasons on every Safe-scoped
+    endpoint
+    """
+
+    banned_response = {"detail": "Safe is unavailable for legal reasons"}
+
+    def test_banned_safe_messages_view(self):
+        safe_contract = SafeContractFactory()
+        response = self.client.get(
+            reverse("v1:safe_messages:safe-messages", args=(safe_contract.address,))
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        banned_safe_contract = SafeContractFactory(banned=True)
+        url = reverse(
+            "v1:safe_messages:safe-messages", args=(banned_safe_contract.address,)
+        )
+        response = self.client.get(url)
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)
+
+        response = self.client.post(url, format="json", data={})
+        self.assertEqual(
+            response.status_code, status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+        )
+        self.assertEqual(response.json(), self.banned_response)

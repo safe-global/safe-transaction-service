@@ -38,6 +38,7 @@ from safe_eth.safe.safe_deployments import safe_deployments
 from safe_transaction_service import __version__
 from safe_transaction_service.utils.ethereum import get_chain_id
 from safe_transaction_service.utils.utils import parse_boolean_query_param
+from safe_transaction_service.utils.views.mixins import BannedSafeMixin
 
 from ..loggers.custom_logger import http_request_log
 from . import filters, pagination, serializers
@@ -275,7 +276,7 @@ class SafeDeploymentsView(ListAPIView):
     },
 )
 @extend_schema(deprecated=True)
-class AllTransactionsListView(ListAPIView):
+class AllTransactionsListView(BannedSafeMixin, ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
@@ -470,7 +471,7 @@ class SafeModuleTransactionView(RetrieveAPIView):
         ),
     },
 )
-class SafeModuleTransactionListView(ListAPIView):
+class SafeModuleTransactionListView(BannedSafeMixin, ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
@@ -643,7 +644,7 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class SafeMultisigTransactionListView(ListAPIView):
+class SafeMultisigTransactionListView(BannedSafeMixin, ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
@@ -698,6 +699,9 @@ class SafeMultisigTransactionListView(ListAPIView):
                 response=serializers.CodeErrorResponse,
                 description="Invalid ethereum address",
             ),
+            451: OpenApiResponse(
+                description="Safe is unavailable for legal reasons (banned)"
+            ),
         },
     )
     @cache_txs_view_for_address(
@@ -736,6 +740,9 @@ class SafeMultisigTransactionListView(ListAPIView):
                 response=serializers.CodeErrorResponse,
                 description="Invalid ethereum address | User is not an owner | Invalid safeTxHash |"
                 "Invalid signature | Nonce already executed | Sender is not an owner",
+            ),
+            451: OpenApiResponse(
+                description="Safe is unavailable for legal reasons (banned)"
             ),
         },
     )
@@ -794,7 +801,7 @@ def swagger_assets_parameters():
     ]
 
 
-class SafeBalanceView(GenericAPIView):
+class SafeBalanceView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
@@ -942,7 +949,7 @@ class TransferView(RetrieveAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeTransferListView(ListAPIView):
+class SafeTransferListView(BannedSafeMixin, ListAPIView):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = filters.TransferListFilter
     serializer_class = serializers.TransferWithTokenInfoResponseSerializer
@@ -1065,7 +1072,7 @@ class SafeIncomingTransferListView(SafeTransferListView):
         ).order_by("-execution_date")
 
 
-class SafeCreationView(GenericAPIView):
+class SafeCreationView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeCreationInfoResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
@@ -1105,7 +1112,7 @@ class SafeCreationView(GenericAPIView):
         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
 
-class SafeInfoView(GenericAPIView):
+class SafeInfoView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeInfoResponseSerializer
     pagination_class = None  # Don't show limit/offset in swagger
 
@@ -1115,6 +1122,9 @@ class SafeInfoView(GenericAPIView):
             404: OpenApiResponse(description="Safe not found"),
             422: OpenApiResponse(
                 description="code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info"
+            ),
+            451: OpenApiResponse(
+                description="Safe is unavailable for legal reasons (banned)"
             ),
         }
     )
@@ -1269,7 +1279,7 @@ class DataDecoderView(GenericAPIView):
                 return Response(status=status.HTTP_404_NOT_FOUND, data=data_decoded)
 
 
-class SafeMultisigTransactionEstimateView(GenericAPIView):
+class SafeMultisigTransactionEstimateView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeMultisigTransactionEstimateSerializer
     response_serializer = serializers.SafeMultisigTransactionEstimateResponseSerializer
 
@@ -1449,7 +1459,7 @@ class DelegateDeleteView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-class SafeDelegateDestroyView(DestroyAPIView):
+class SafeDelegateDestroyView(BannedSafeMixin, DestroyAPIView):
     """
 
     .. deprecated:: 4.38.0
@@ -1554,7 +1564,7 @@ class SafeDelegateDestroyView(DestroyAPIView):
         ),
     },
 )
-class SafeExportView(GenericAPIView):
+class SafeExportView(BannedSafeMixin, GenericAPIView):
     """
     Export endpoint for CSV export feature - optimized for large datasets
     """

@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 
 from logging import getLogger
+from typing import Any
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -29,6 +31,7 @@ from .services.event_service import (
     build_delete_delegate_payload,
     build_event_payload,
     build_save_delegate_payload,
+    filter_banned_payloads,
     is_relevant_event,
 )
 
@@ -121,6 +124,51 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
+@receiver(
+    post_save,
+    sender=SafeContract,
+    dispatch_uid="safe_contract.clear_banned_addresses_cache",
+)
+@receiver(
+    post_delete,
+    sender=SafeContract,
+    dispatch_uid="safe_contract.clear_banned_addresses_cache",
+)
+def safe_contract_clear_banned_addresses_cache(
+    sender: type[Model],
+    instance: SafeContract,
+    **kwargs,
+) -> None:
+    """
+    Clear the in-memory banned Safes cache when a `SafeContract` changes.
+    Cleared right away so the change is visible in this process, and again on
+    transaction commit because a concurrent request could refill the cache
+    from the not-yet-committed database snapshot. Other processes refresh
+    when the cache TTL expires
+
+    :param sender:
+    :param instance:
+    :param kwargs:
+    :return:
+    """
+    SafeContract.objects.clear_banned_addresses_cache()
+    transaction.on_commit(SafeContract.objects.clear_banned_addresses_cache)
+
+
+def send_payloads_on_commit(payloads: list[dict[str, Any]]) -> None:
+    """
+    Publish the payloads when the current database transaction commits,
+    excluding payloads addressed to a banned Safe. Payloads without an
+    ``address`` are kept (e.g. delegate events not tied to a Safe). Every
+    event producer must publish through here so banned Safes never leak
+
+    :param payloads:
+    :return:
+    """
+    if payloads_to_send := filter_banned_payloads(payloads):
+        get_queue_service().send_events_on_commit(payloads_to_send)
+
+
 def _process_event(
     sender: type[Model],
     instance: TokenTransfer
@@ -172,10 +220,7 @@ def _process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    payloads_to_send = [payload for payload in payloads if payload.get("address")]
-    if not payloads_to_send:
-        return None
-    get_queue_service().send_events_on_commit(payloads_to_send)
+    send_payloads_on_commit([payload for payload in payloads if payload.get("address")])
 
 
 # `dispatch_uid` uniqueness is per signal, so the same uid can be shared by
@@ -281,7 +326,7 @@ def process_save_delegate_user_event(
     **kwargs,
 ):
     payload_event = build_save_delegate_payload(instance, created)
-    get_queue_service().send_events_on_commit([payload_event])
+    send_payloads_on_commit([payload_event])
 
 
 @receiver(
@@ -293,4 +338,4 @@ def process_delete_delegate_user_event(
     sender: type[Model], instance: SafeContractDelegate, *args, **kwargs
 ):
     payload_event = build_delete_delegate_payload(instance)
-    get_queue_service().send_events_on_commit([payload_event])
+    send_payloads_on_commit([payload_event])
