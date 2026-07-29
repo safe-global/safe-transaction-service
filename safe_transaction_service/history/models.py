@@ -2402,12 +2402,11 @@ class SafeLastStatusManager(models.Manager):
     def addresses_for_module(self, module_address: str) -> QuerySet[str]:
         """
         :param module_address:
-        :return: Safes where the provided `module_address` is enabled
+        :return: Safes where the provided `module_address` is enabled.
+            Banned Safes are excluded
         """
 
-        return self.filter(enabled_modules__contains=[module_address]).values_list(
-            "address", flat=True
-        )
+        return self.safes_for_module(module_address).values_list("address", flat=True)
 
     def addresses_for_owner(self, owner_address: str) -> QuerySet[str]:
         """
@@ -2425,15 +2424,18 @@ class SafeLastStatusManager(models.Manager):
             Banned Safes are excluded
         """
         return self.filter(owners__contains=[owner_address]).exclude(
-            address__in=SafeContract.objects.banned().values("address")
+            address__in=SafeContract.objects.get_banned_addresses()
         )
 
     def safes_for_module(self, module_address: str) -> QuerySet["SafeLastStatus"]:
         """
         :param module_address:
-        :return: SafeLastStatus queryset where the provided `module_address` is enabled
+        :return: SafeLastStatus queryset where the provided `module_address` is enabled.
+            Banned Safes are excluded
         """
-        return self.filter(enabled_modules__contains=[module_address])
+        return self.filter(enabled_modules__contains=[module_address]).exclude(
+            address__in=SafeContract.objects.get_banned_addresses()
+        )
 
 
 class SafeLastStatus(SafeStatusBase):

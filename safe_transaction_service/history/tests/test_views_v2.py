@@ -3003,3 +3003,20 @@ class TestBannedSafeViews(SafeTestCaseMixin, APITestCase):
         self.assertEqual(
             response.data["results"][0]["address"], safe_last_status.address
         )
+
+    def test_modules_view_excludes_banned(self):
+        module_address = Account.create().address
+        safe_last_status = SafeLastStatusFactory(enabled_modules=[module_address])
+        banned_safe_last_status = SafeLastStatusFactory(
+            enabled_modules=[module_address]
+        )
+        SafeContractFactory(address=banned_safe_last_status.address, banned=True)
+
+        response = self.client.get(
+            reverse("v2:history:modules", args=(module_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["address"], safe_last_status.address
+        )

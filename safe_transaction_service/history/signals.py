@@ -158,15 +158,27 @@ def safe_contract_clear_banned_addresses_cache(
 def send_payloads_on_commit(payloads: list[dict[str, Any]]) -> None:
     """
     Publish the payloads when the current database transaction commits,
-    excluding payloads addressed to a banned Safe. Payloads without an
+    excluding payloads addressed to a banned Safe. The banned check runs at
+    commit time using the cached banned set, so a Safe banned inside the open
+    transaction is enforced in this process and bans propagate to other
+    processes within ``BANNED_SAFES_CACHE_TTL`` at worst. Payloads without an
     ``address`` are kept (e.g. delegate events not tied to a Safe). Every
-    event producer must publish through here so banned Safes never leak
+    event producer must publish through here
 
     :param payloads:
     :return:
     """
-    if payloads_to_send := filter_banned_payloads(payloads):
-        get_queue_service().send_events_on_commit(payloads_to_send)
+    if not payloads:
+        return None
+
+    def filter_and_send() -> None:
+        if payloads_to_send := filter_banned_payloads(payloads):
+            # Outside of the transaction already, so events are sent right away
+            get_queue_service().send_events_on_commit(payloads_to_send)
+
+    # `robust=True` so an unexpected failure here cannot prevent sibling
+    # `on_commit` callbacks, mirroring `send_events_on_commit`
+    transaction.on_commit(filter_and_send, robust=True)
 
 
 def _process_event(
