@@ -247,6 +247,14 @@ class Command(BaseCommand):
         Set up the Safe Policy Guards to index and the policies whose configuration data can
         be decoded, and enable the indexing task only if there is a guard to index
         """
+        if not settings.POLICIES_ENABLE_INDEXING:
+            self.stdout.write(
+                self.style.WARNING(
+                    "POLICIES_ENABLE_INDEXING is disabled, policy indexing is disabled"
+                )
+            )
+            return
+
         guard_deployments = GUARD_DEPLOYMENTS.get(chain_id, [])
 
         if not guard_deployments:

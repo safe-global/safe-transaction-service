@@ -675,6 +675,16 @@ PROCESSING_ALL_SAFES_TOGETHER = env.bool(
     "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
 
+# Policies
+# ------------------------------------------------------------------------------
+POLICIES_ENABLE_INDEXING = env.bool(
+    "POLICIES_ENABLE_INDEXING", default=True
+)  # Index `SafePolicyGuard` events. Indexing additionally requires the chain to have a
+# known guard deployment, see `policies.constants.GUARD_DEPLOYMENTS`
+POLICIES_ENABLE_API = env.bool(
+    "POLICIES_ENABLE_API", default=True
+)  # Expose the policy endpoints under `/api/v2`
+
 # Tokens
 # ------------------------------------------------------------------------------
 TOKENS_LOGO_BASE_URI = env.str(

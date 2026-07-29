@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import contextlib
 
+from django.conf import settings
+
 from celery import app
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
@@ -25,6 +27,12 @@ def index_policy_events_task(self) -> tuple[int, int] | None:
     """
     :return: Tuple of number of policy events indexed and number of blocks processed
     """
+    if not settings.POLICIES_ENABLE_INDEXING:
+        # `setup_service` leaves the periodic task disabled, this also covers the flag
+        # being turned off without recreating the schedule
+        logger.info("Policy indexing is disabled by POLICIES_ENABLE_INDEXING")
+        return None
+
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of policy guard events")

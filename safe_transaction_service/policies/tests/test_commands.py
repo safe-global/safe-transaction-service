@@ -2,7 +2,7 @@
 from io import StringIO
 
 from django.core.management import CommandError, call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
@@ -50,6 +50,14 @@ class TestSetupPolicyEngine(TestCase):
 
     def test_unknown_chain_disables_indexing(self):
         self.command._setup_policy_engine(1337)
+
+        self.assertEqual(SafePolicyGuard.objects.count(), 0)
+        self.assertEqual(PolicyContract.objects.count(), 0)
+        self.assertFalse(self._is_task_enabled())
+
+    @override_settings(POLICIES_ENABLE_INDEXING=False)
+    def test_setting_disables_indexing_on_a_known_chain(self):
+        self.command._setup_policy_engine(11155111)
 
         self.assertEqual(SafePolicyGuard.objects.count(), 0)
         self.assertEqual(PolicyContract.objects.count(), 0)
