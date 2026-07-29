@@ -249,8 +249,7 @@ class Command(BaseCommand):
         be decoded, and enable the indexing task only if there is a guard to index
         """
         guard_deployments = [
-            GuardDeployment(address, 0)
-            for address in settings.ETH_POLICY_GUARD_ADDRESSES
+            GuardDeployment(address, 0) for address in settings.POLICIES_GUARD_ADDRESSES
         ] or GUARD_DEPLOYMENTS.get(chain_id, [])
 
         if not guard_deployments:

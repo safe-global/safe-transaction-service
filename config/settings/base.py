@@ -660,13 +660,6 @@ ETH_EVENTS_IGNORED_TO: set[ChecksumAddress] = {
     for address in env.list("ETH_EVENTS_IGNORED_TO", default=[])
 }  # Transaction 'to' addresses to ignore during L2 indexing
 
-# Policy Engine indexing configuration
-# ------------------------------------------------------------------------------
-ETH_POLICY_GUARD_ADDRESSES: set[ChecksumAddress] = {
-    ChecksumAddress(HexAddress(HexStr(address)))
-    for address in env.list("ETH_POLICY_GUARD_ADDRESSES", default=[])
-}  # `SafePolicyGuard` addresses to index. Overrides the deployments known for the chain.
-
 
 # ENABLE/DISABLE COLLECTIBLES DOWNLOAD METADATA, enable=True, disabled by default
 COLLECTIBLES_ENABLE_DOWNLOAD_METADATA = env.bool(
@@ -682,6 +675,14 @@ PROCESSING_ALL_SAFES_TOGETHER = env.bool(
     "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
 
+
+# Policies
+# ------------------------------------------------------------------------------
+POLICIES_GUARD_ADDRESSES: set[ChecksumAddress] = {
+    ChecksumAddress(HexAddress(HexStr(address)))
+    for address in env.list("POLICIES_GUARD_ADDRESSES", default=[])
+}  # `SafePolicyGuard` addresses to index, overriding the deployments known for the chain.
+# When empty and the chain has no known deployment, policy indexing stays disabled
 
 # Tokens
 # ------------------------------------------------------------------------------

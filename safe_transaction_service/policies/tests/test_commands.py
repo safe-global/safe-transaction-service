@@ -56,7 +56,7 @@ class TestSetupPolicyEngine(TestCase):
         self.assertFalse(self._is_task_enabled())
 
     @override_settings(
-        ETH_POLICY_GUARD_ADDRESSES={"0x5aFE3855358E112B5647B952709E6165e1c1eEEe"}
+        POLICIES_GUARD_ADDRESSES={"0x5aFE3855358E112B5647B952709E6165e1c1eEEe"}
     )
     def test_setting_overrides_the_known_deployments(self):
         self.command._setup_policy_engine(11155111)
