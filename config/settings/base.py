@@ -321,6 +321,10 @@ CELERY_TASK_ROUTES = (
             {"queue": "indexing", "delivery_mode": "transient"},
         ),
         (
+            "safe_transaction_service.policies.tasks.*",
+            {"queue": "indexing", "delivery_mode": "transient"},
+        ),
+        (
             "safe_transaction_service.contracts.tasks.*",
             {"queue": "contracts", "delivery_mode": "transient"},
         ),
