@@ -7,5 +7,4 @@ class CoSignerPolicyDataDecoder(AbiPolicyDataDecoder):
     """``abi.decode(data, (address))``, the co-signer required for the access selector."""
 
     name = COSIGNER_POLICY
-    abi_types = ("address",)
-    field_names = ("cosigner",)
+    abi_inputs = [{"name": "cosigner", "type": "address"}]

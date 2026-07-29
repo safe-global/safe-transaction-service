@@ -11,6 +11,13 @@ class Erc20TransferPolicyDataDecoder(AbiPolicyDataDecoder):
     """
 
     name = ERC20_TRANSFER_POLICY
-    abi_types = ("(address,bool)[]",)
-    field_names = ("recipients",)
-    struct_names = ("recipient", "allowed")
+    abi_inputs = [
+        {
+            "name": "recipients",
+            "type": "tuple[]",
+            "components": [
+                {"name": "recipient", "type": "address"},
+                {"name": "allowed", "type": "bool"},
+            ],
+        }
+    ]

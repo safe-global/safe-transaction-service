@@ -12,23 +12,15 @@ from ..decoders import (
     PolicyDataDecoderRegistry,
     policy_data_decoder_registry,
 )
-from ..decoders.base import split_abi_tuple
 from .factories import PolicyContractFactory
-
-
-class TestSplitAbiTuple(TestCase):
-    def test_split_abi_tuple(self):
-        self.assertEqual(split_abi_tuple("(address,bool)"), ["address", "bool"])
-        self.assertEqual(split_abi_tuple("(address)"), ["address"])
-        self.assertEqual(
-            split_abi_tuple("(address,(uint256,bool)[],bytes)"),
-            ["address", "(uint256,bool)[]", "bytes"],
-        )
 
 
 class TestErc20TransferPolicyDataDecoder(TestCase):
     def setUp(self):
         self.decoder = Erc20TransferPolicyDataDecoder()
+
+    def test_abi_types_derived_from_abi_inputs(self):
+        self.assertEqual(self.decoder.abi_types, ["(address,bool)[]"])
 
     def test_decode(self):
         recipients = [Account.create().address for _ in range(2)]
@@ -45,6 +37,14 @@ class TestErc20TransferPolicyDataDecoder(TestCase):
                 ]
             },
         )
+
+    def test_decode_checksums_addresses_inside_the_struct(self):
+        recipient = Account.create().address
+        data = encode_abi(["(address,bool)[]"], [[(recipient.lower(), True)]])
+
+        decoded = self.decoder.decode(data)
+
+        self.assertEqual(decoded["recipients"][0]["recipient"], recipient)
 
     def test_decode_empty_list(self):
         self.assertEqual(

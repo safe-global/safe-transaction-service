@@ -6,8 +6,6 @@ configuration entrypoints, so `TxDecoder` can decode guard calldata.
 https://github.com/safe-research/policy-engine
 """
 
-from eth_typing import ABI
-
 # struct Configuration { address target; bytes4 selector; Operation operation; address policy; bytes data; }
 _CONFIGURATION_COMPONENTS = [
     {"internalType": "address", "name": "target", "type": "address"},
@@ -24,7 +22,7 @@ _CONFIGURATIONS_INPUT = {
     "type": "tuple[]",
 }
 
-SAFE_POLICY_GUARD_ABI: ABI = [
+SAFE_POLICY_GUARD_ABI = [
     {
         "anonymous": False,
         "inputs": [
