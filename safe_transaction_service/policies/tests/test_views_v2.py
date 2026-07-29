@@ -14,7 +14,7 @@ from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.tests import factories as history_factories
 
-from ..constants import COSIGNER_POLICY, ERC20_TRANSFER_POLICY
+from ..constants import ALLOW_POLICY, COSIGNER_POLICY, ERC20_TRANSFER_POLICY
 from ..models import FALLBACK_SELECTOR, PolicyRootStatus
 from .factories import (
     ERC20_TRANSFER_SELECTOR,
@@ -81,6 +81,7 @@ class TestSafePolicyConfirmationsView(APITestCase):
                     "selector": to_0x_hex_str(ERC20_TRANSFER_SELECTOR),
                     "operation": SafeOperationEnum.CALL.value,
                     "policy": policy_contract.address,
+                    "policy_type": ERC20_TRANSFER_POLICY,
                     "removed": False,
                     "fallback": False,
                     "data": to_0x_hex_str(bytes(confirmation.data)),
@@ -109,6 +110,24 @@ class TestSafePolicyConfirmationsView(APITestCase):
         response = self.client.get(self.url)
 
         self.assertIsNone(response.data["results"][0]["data_decoded"])
+
+    def test_policy_type_is_null_for_an_unknown_policy(self):
+        PolicyConfirmationFactory(safe=self.safe)
+
+        response = self.client.get(self.url)
+
+        self.assertIsNone(response.data["results"][0]["policy_type"])
+
+    def test_policy_type_is_returned_for_a_policy_without_a_decoder(self):
+        """The name does not depend on a decoder being registered for it"""
+        policy_contract = PolicyContractFactory(name=ALLOW_POLICY)
+        PolicyConfirmationFactory(safe=self.safe, policy=policy_contract.address)
+
+        response = self.client.get(self.url)
+
+        result = response.data["results"][0]
+        self.assertEqual(result["policy_type"], ALLOW_POLICY)
+        self.assertIsNone(result["data_decoded"])
 
     def test_ordered_by_newest_first(self):
         oldest = PolicyConfirmationFactory(safe=self.safe)

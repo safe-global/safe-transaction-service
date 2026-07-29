@@ -6,7 +6,12 @@ from rest_framework import serializers
 from safe_eth.eth.django import serializers as eth_serializers
 
 from .decoders import policy_data_decoder_registry
-from .models import PolicyConfirmation, PolicyRootRequest, PolicyRootStatus
+from .models import (
+    PolicyConfirmation,
+    PolicyContract,
+    PolicyRootRequest,
+    PolicyRootStatus,
+)
 
 
 class PolicyDataDecodedResponseSerializer(serializers.Serializer):
@@ -31,6 +36,7 @@ class PolicyConfirmationResponseSerializer(serializers.Serializer):
     policy = eth_serializers.EthereumAddressField(
         help_text="Policy enforcing the access, empty address when the policy was removed"
     )
+    policy_type = serializers.SerializerMethodField()
     removed = serializers.BooleanField(
         help_text="`true` if the policy was removed for this target, selector and operation"
     )
@@ -47,6 +53,19 @@ class PolicyConfirmationResponseSerializer(serializers.Serializer):
     block_number = serializers.IntegerField()
     log_index = serializers.IntegerField()
     timestamp = serializers.DateTimeField()
+
+    @extend_schema_field(
+        serializers.CharField(
+            allow_null=True,
+            help_text=(
+                "Name of the policy contract deployed on `policy`, as registered in "
+                "`PolicyContract`. `null` when the address is not a known policy, which is "
+                "always the case on a removal"
+            ),
+        )
+    )
+    def get_policy_type(self, obj: PolicyConfirmation) -> str | None:
+        return PolicyContract.objects.get_name_for_address(obj.policy)
 
     @extend_schema_field(PolicyDataDecodedResponseSerializer(allow_null=True))
     def get_data_decoded(self, obj: PolicyConfirmation) -> dict[str, Any] | None:
