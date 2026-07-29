@@ -21,6 +21,7 @@ __all__ = [
     "policy_data_decoder_registry",
 ]
 
+# TODO: Add decoders for all policies
 policy_data_decoder_registry = PolicyDataDecoderRegistry()
 policy_data_decoder_registry.register(Erc20TransferPolicyDataDecoder())
 policy_data_decoder_registry.register(CoSignerPolicyDataDecoder())
