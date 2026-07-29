@@ -19,7 +19,6 @@ from safe_eth.safe.addresses import (
 from safe_transaction_service.policies.constants import (
     GUARD_DEPLOYMENTS,
     POLICY_DEPLOYMENTS,
-    GuardDeployment,
 )
 from safe_transaction_service.policies.models import PolicyContract, SafePolicyGuard
 
@@ -248,9 +247,7 @@ class Command(BaseCommand):
         Set up the Safe Policy Guards to index and the policies whose configuration data can
         be decoded, and enable the indexing task only if there is a guard to index
         """
-        guard_deployments = [
-            GuardDeployment(address, 0) for address in settings.POLICIES_GUARD_ADDRESSES
-        ] or GUARD_DEPLOYMENTS.get(chain_id, [])
+        guard_deployments = GUARD_DEPLOYMENTS.get(chain_id, [])
 
         if not guard_deployments:
             self.stdout.write(

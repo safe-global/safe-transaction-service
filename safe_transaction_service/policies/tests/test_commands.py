@@ -2,7 +2,7 @@
 from io import StringIO
 
 from django.core.management import CommandError, call_command
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
@@ -55,17 +55,19 @@ class TestSetupPolicyEngine(TestCase):
         self.assertEqual(PolicyContract.objects.count(), 0)
         self.assertFalse(self._is_task_enabled())
 
-    @override_settings(
-        POLICIES_GUARD_ADDRESSES={"0x5aFE3855358E112B5647B952709E6165e1c1eEEe"}
-    )
-    def test_setting_overrides_the_known_deployments(self):
-        self.command._setup_policy_engine(11155111)
+    def test_seeds_the_deployment_block_number(self):
+        chain_id = 11155111
+        self.command._setup_policy_engine(chain_id)
 
-        self.assertEqual(
-            list(SafePolicyGuard.objects.values_list("address", flat=True)),
-            ["0x5aFE3855358E112B5647B952709E6165e1c1eEEe"],
+        guard = SafePolicyGuard.objects.get(
+            address=GUARD_DEPLOYMENTS[chain_id][0].address
         )
-        self.assertTrue(self._is_task_enabled())
+        # Indexing must start at the deployment block, not at 0
+        self.assertEqual(
+            guard.initial_block_number,
+            GUARD_DEPLOYMENTS[chain_id][0].initial_block_number,
+        )
+        self.assertEqual(guard.tx_block_number, guard.initial_block_number)
 
     def test_is_idempotent(self):
         chain_id = 11155111

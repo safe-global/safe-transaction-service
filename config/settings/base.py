@@ -675,15 +675,6 @@ PROCESSING_ALL_SAFES_TOGETHER = env.bool(
     "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
 
-
-# Policies
-# ------------------------------------------------------------------------------
-POLICIES_GUARD_ADDRESSES: set[ChecksumAddress] = {
-    ChecksumAddress(HexAddress(HexStr(address)))
-    for address in env.list("POLICIES_GUARD_ADDRESSES", default=[])
-}  # `SafePolicyGuard` addresses to index, overriding the deployments known for the chain.
-# When empty and the chain has no known deployment, policy indexing stays disabled
-
 # Tokens
 # ------------------------------------------------------------------------------
 TOKENS_LOGO_BASE_URI = env.str(
