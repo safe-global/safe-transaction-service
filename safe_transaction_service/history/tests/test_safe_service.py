@@ -5,9 +5,12 @@ from unittest.mock import MagicMock
 from django.test import TestCase
 
 from eth_account import Account
+from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.contracts import get_proxy_factory_V1_5_0_contract
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
+from web3 import Web3
 
 from ..exceptions import CannotGetSafeInfoFromBlockchain, CannotGetSafeInfoFromDB
 from ..models import InternalTxType, SafeMasterCopy
@@ -293,3 +296,31 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                 f"[{random_safe_address}] Proxy creation data is not matching the proxies deployed {multiple_safes_same_tx_creation_mock['proxies_deployed']}",
                 cm.output[0],
             )
+
+    def test_decode_creation_data_v1_5_0(self):
+        """
+        1.5.0 ProxyFactory adds ``createProxyWithNonceL2`` and ``createChainSpecificProxyWithNonceL2``.
+        The legacy ``createProxyWithNonce`` keeps the same signature and must keep decoding too.
+        """
+        proxy_factory_contract = get_proxy_factory_V1_5_0_contract(Web3())
+        singleton = Account.create().address
+        initializer = b"\x12\x34\x56"
+        salt_nonce = 42
+
+        for function_name in (
+            "createProxyWithNonce",
+            "createProxyWithNonceL2",
+            "createChainSpecificProxyWithNonceL2",
+        ):
+            with self.subTest(function_name=function_name):
+                data = HexBytes(
+                    proxy_factory_contract.encode_abi(
+                        function_name, args=[singleton, initializer, salt_nonce]
+                    )
+                )
+                proxy_creation_data_list = self.safe_service._decode_creation_data(data)
+                self.assertEqual(len(proxy_creation_data_list), 1)
+                proxy_creation_data = proxy_creation_data_list[0]
+                self.assertEqual(proxy_creation_data.singleton, singleton)
+                self.assertEqual(bytes(proxy_creation_data.initializer), initializer)
+                self.assertEqual(proxy_creation_data.salt_nonce, salt_nonce)

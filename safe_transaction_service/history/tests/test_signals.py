@@ -291,7 +291,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         ]
         for to_is_a_safe, from_is_a_safe, expected in cases:
             with self.subTest(to=to_is_a_safe, from_=from_is_a_safe):
-                internal_tx = InternalTxFactory()
+                internal_tx = InternalTxFactory(value=1)
                 set_safe_membership(
                     internal_tx,
                     to_is_a_safe=to_is_a_safe,

@@ -11,6 +11,7 @@ from safe_eth.eth.contracts import (
     get_cpk_factory_contract,
     get_proxy_factory_V1_3_0_contract,
     get_proxy_factory_V1_4_1_contract,
+    get_proxy_factory_V1_5_0_contract,
 )
 from safe_eth.safe import Safe
 from safe_eth.safe.exceptions import CannotRetrieveSafeInfoException
@@ -93,6 +94,7 @@ class SafeService:
         self.ethereum_client = ethereum_client
         self.ethereum_tracing_client = ethereum_tracing_client
         dummy_w3 = Web3()  # Not needed, just used to decode contracts
+        self.proxy_factory_v1_5_0_contract = get_proxy_factory_V1_5_0_contract(dummy_w3)
         self.proxy_factory_v1_4_1_contract = get_proxy_factory_V1_4_1_contract(dummy_w3)
         self.proxy_factory_v1_3_0_contract = get_proxy_factory_V1_3_0_contract(dummy_w3)
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
@@ -320,25 +322,31 @@ class SafeService:
 
     def _decode_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
         """
-        Decode contract creation function for Safe ProxyFactory 1.3.0 and 1.4.1 deployments
+        Decode contract creation function for Safe ProxyFactory 1.3.0, 1.4.1 and 1.5.0 deployments.
+
+        1.5.0 adds ``createProxyWithNonceL2`` and ``createChainSpecificProxyWithNonceL2``, only decodable
+        with the 1.5.0 ABI. The legacy ``createProxyWithNonce`` keeps the same signature across versions.
 
         :param data:
         :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
         if not data:
             return None
-        try:
-            _, data_decoded = self.proxy_factory_v1_3_0_contract.decode_function_input(
-                data
-            )
-        except ValueError:
+
+        data_decoded = None
+        for proxy_factory_contract in (
+            self.proxy_factory_v1_3_0_contract,
+            self.proxy_factory_v1_4_1_contract,
+            self.proxy_factory_v1_5_0_contract,
+        ):
             try:
-                (
-                    _,
-                    data_decoded,
-                ) = self.proxy_factory_v1_4_1_contract.decode_function_input(data)
+                _, data_decoded = proxy_factory_contract.decode_function_input(data)
+                break
             except ValueError:
-                return None
+                continue
+
+        if data_decoded is None:
+            return None
 
         singleton = (
             data_decoded.get("masterCopy")
