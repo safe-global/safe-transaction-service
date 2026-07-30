@@ -4,7 +4,6 @@ from logging import getLogger
 from typing import Any
 
 from django.conf import settings
-from django.db import transaction
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -124,61 +123,19 @@ def safe_master_copy_clear_cache(
     SafeMasterCopy.objects.get_version_for_address.cache_clear()
 
 
-@receiver(
-    post_save,
-    sender=SafeContract,
-    dispatch_uid="safe_contract.clear_banned_addresses_cache",
-)
-@receiver(
-    post_delete,
-    sender=SafeContract,
-    dispatch_uid="safe_contract.clear_banned_addresses_cache",
-)
-def safe_contract_clear_banned_addresses_cache(
-    sender: type[Model],
-    instance: SafeContract,
-    **kwargs,
-) -> None:
-    """
-    Clear the in-memory banned Safes cache when a `SafeContract` changes.
-    Cleared right away so the change is visible in this process, and again on
-    transaction commit because a concurrent request could refill the cache
-    from the not-yet-committed database snapshot. Other processes refresh
-    when the cache TTL expires
-
-    :param sender:
-    :param instance:
-    :param kwargs:
-    :return:
-    """
-    SafeContract.objects.clear_banned_addresses_cache()
-    transaction.on_commit(SafeContract.objects.clear_banned_addresses_cache)
-
-
 def send_payloads_on_commit(payloads: list[dict[str, Any]]) -> None:
     """
     Publish the payloads when the current database transaction commits,
-    excluding payloads addressed to a banned Safe. The banned check runs at
-    commit time using the cached banned set, so a Safe banned inside the open
-    transaction is enforced in this process and bans propagate to other
-    processes within ``BANNED_SAFES_CACHE_TTL`` at worst. Payloads without an
-    ``address`` are kept (e.g. delegate events not tied to a Safe). Every
-    event producer must publish through here
+    excluding payloads addressed to a banned Safe. The banned set is cached
+    in memory, so bans propagate within ``BANNED_SAFES_CACHE_TTL``. Payloads
+    without an ``address`` are kept (e.g. delegate events not tied to a
+    Safe). Every event producer must publish through here
 
     :param payloads:
     :return:
     """
-    if not payloads:
-        return None
-
-    def filter_and_send() -> None:
-        if payloads_to_send := filter_banned_payloads(payloads):
-            # Outside of the transaction already, so events are sent right away
-            get_queue_service().send_events_on_commit(payloads_to_send)
-
-    # `robust=True` so an unexpected failure here cannot prevent sibling
-    # `on_commit` callbacks, mirroring `send_events_on_commit`
-    transaction.on_commit(filter_and_send, robust=True)
+    if payloads_to_send := filter_banned_payloads(payloads):
+        get_queue_service().send_events_on_commit(payloads_to_send)
 
 
 def _process_event(

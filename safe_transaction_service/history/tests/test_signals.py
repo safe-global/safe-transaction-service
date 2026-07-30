@@ -648,19 +648,10 @@ class TestBannedSafeEvents(SafeTestCaseMixin, TestCase):
 
         send_events_mock.reset_mock()
         SafeContractFactory(address=multisig_tx.safe, banned=True)
+        # Bans only propagate when the cached banned set expires or is cleared
+        SafeContract.objects.clear_banned_addresses_cache()
         with self.captureOnCommitCallbacks(execute=True):
             MultisigTransactionFactory(safe=multisig_tx.safe, trusted=True)
-        send_events_mock.assert_not_called()
-
-    @mock.patch.object(QueueService, "send_events")
-    def test_events_not_sent_for_safe_banned_before_commit(
-        self, send_events_mock: MagicMock
-    ):
-        # The Safe is banned after the event is scheduled but before the
-        # transaction commits: the ban must still be enforced
-        with self.captureOnCommitCallbacks(execute=True):
-            multisig_tx = MultisigTransactionFactory(trusted=True)
-            SafeContractFactory(address=multisig_tx.safe, banned=True)
         send_events_mock.assert_not_called()
 
     @mock.patch.object(QueueService, "send_events")

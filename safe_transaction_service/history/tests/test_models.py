@@ -1834,14 +1834,19 @@ class TestBannedSafeContractManager(TestCase):
             SafeContract.objects.get_banned_addresses_cached(), frozenset()
         )
 
-        # Saving a SafeContract clears the cache in the same process
+        # Banning a Safe is not visible until the cache expires or is cleared
         banned_safe_contract = SafeContractFactory(banned=True)
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(), frozenset()
+        )
+
+        SafeContract.objects.clear_banned_addresses_cache()
         self.assertEqual(
             SafeContract.objects.get_banned_addresses_cached(),
             frozenset([banned_safe_contract.address]),
         )
 
-        # `update` does not fire signals, so the previous value is still cached
+        # Same for unbanning
         SafeContract.objects.filter(pk=banned_safe_contract.address).update(
             banned=False
         )
