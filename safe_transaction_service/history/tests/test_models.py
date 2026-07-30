@@ -1822,3 +1822,40 @@ class TestMultisigTransactions(TestCase):
             MultisigTransaction.objects.last_valid_transaction(safe_address),
             multisig_transaction_2,
         )
+
+
+class TestBannedSafeContractManager(TestCase):
+    def setUp(self):
+        SafeContract.objects.clear_banned_addresses_cache()
+        self.addCleanup(SafeContract.objects.clear_banned_addresses_cache)
+
+    def test_get_banned_addresses_cached(self):
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(), frozenset()
+        )
+
+        # Banning a Safe is not visible until the cache expires or is cleared
+        banned_safe_contract = SafeContractFactory(banned=True)
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(), frozenset()
+        )
+
+        SafeContract.objects.clear_banned_addresses_cache()
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(),
+            frozenset([banned_safe_contract.address]),
+        )
+
+        # Same for unbanning
+        SafeContract.objects.filter(pk=banned_safe_contract.address).update(
+            banned=False
+        )
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(),
+            frozenset([banned_safe_contract.address]),
+        )
+
+        SafeContract.objects.clear_banned_addresses_cache()
+        self.assertEqual(
+            SafeContract.objects.get_banned_addresses_cached(), frozenset()
+        )

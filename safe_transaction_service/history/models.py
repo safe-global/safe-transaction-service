@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import json
+import operator
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from enum import Enum
 from functools import cache, lru_cache
 from itertools import islice
 from logging import getLogger
+from threading import Condition, Lock
 from typing import (
     Any,
     Optional,
@@ -46,6 +48,7 @@ from django.db.models.signals import Signal
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from cachetools import TTLCache, cachedmethod
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from model_utils.models import TimeStampedModel
@@ -2027,10 +2030,34 @@ class SafeMasterCopy(MonitoredAddress):
 
 
 class SafeContractManager(models.Manager):
+    # Shared by every manager instance, like the model table it caches.
+    # The condition prevents a stampede of concurrent queries refilling the cache
+    _banned_addresses_cache: TTLCache = TTLCache(
+        maxsize=1, ttl=settings.BANNED_SAFES_CACHE_TTL
+    )
+    _banned_addresses_lock = Lock()
+    _banned_addresses_condition = Condition(_banned_addresses_lock)
+
     def get_banned_addresses(
         self, addresses: list[ChecksumAddress] | None = None
     ) -> QuerySet[ChecksumAddress]:
         return self.banned(addresses=addresses).values_list("address", flat=True)
+
+    @cachedmethod(
+        cache=operator.attrgetter("_banned_addresses_cache"),
+        lock=operator.attrgetter("_banned_addresses_lock"),
+        condition=operator.attrgetter("_banned_addresses_condition"),
+    )
+    def get_banned_addresses_cached(self) -> frozenset[ChecksumAddress]:
+        """
+        :return: Set with the addresses of every banned Safe. Cached in memory
+            for ``BANNED_SAFES_CACHE_TTL`` seconds.
+        """
+        return frozenset(self.get_banned_addresses())
+
+    def clear_banned_addresses_cache(self) -> None:
+        with self._banned_addresses_lock:
+            self._banned_addresses_cache.clear()
 
     def get_minimum_creation_block_number(
         self, addresses: list[ChecksumAddress]
@@ -2375,36 +2402,40 @@ class SafeLastStatusManager(models.Manager):
     def addresses_for_module(self, module_address: str) -> QuerySet[str]:
         """
         :param module_address:
-        :return: Safes where the provided `module_address` is enabled
+        :return: Safes where the provided `module_address` is enabled.
+            Banned Safes are excluded
         """
 
-        return self.filter(enabled_modules__contains=[module_address]).values_list(
-            "address", flat=True
-        )
+        return self.safes_for_module(module_address).values_list("address", flat=True)
 
     def addresses_for_owner(self, owner_address: str) -> QuerySet[str]:
         """
         :param owner_address:
-        :return: Safes where the provided `owner_address` is an owner
+        :return: Safes where the provided `owner_address` is an owner.
+            Banned Safes are excluded
         """
 
-        return self.filter(owners__contains=[owner_address]).values_list(
-            "address", flat=True
-        )
+        return self.safes_for_owner(owner_address).values_list("address", flat=True)
 
     def safes_for_owner(self, owner_address: str) -> QuerySet["SafeLastStatus"]:
         """
         :param owner_address:
-        :return: SafeLastStatus queryset where the provided `owner_address` is an owner
+        :return: SafeLastStatus queryset where the provided `owner_address` is an owner.
+            Banned Safes are excluded
         """
-        return self.filter(owners__contains=[owner_address])
+        return self.filter(owners__contains=[owner_address]).exclude(
+            address__in=SafeContract.objects.get_banned_addresses()
+        )
 
     def safes_for_module(self, module_address: str) -> QuerySet["SafeLastStatus"]:
         """
         :param module_address:
-        :return: SafeLastStatus queryset where the provided `module_address` is enabled
+        :return: SafeLastStatus queryset where the provided `module_address` is enabled.
+            Banned Safes are excluded
         """
-        return self.filter(enabled_modules__contains=[module_address])
+        return self.filter(enabled_modules__contains=[module_address]).exclude(
+            address__in=SafeContract.objects.get_banned_addresses()
+        )
 
 
 class SafeLastStatus(SafeStatusBase):

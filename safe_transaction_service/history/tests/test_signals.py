@@ -33,10 +33,11 @@ from ..models import (
     ModuleTransaction,
     MultisigConfirmation,
     MultisigTransaction,
+    SafeContract,
     TransactionServiceEventType,
     post_bulk_create,
 )
-from ..services.event_service import set_safe_membership
+from ..services.event_service import filter_banned_payloads, set_safe_membership
 from ..signals import (
     _process_event,
     build_event_payload,
@@ -612,3 +613,66 @@ class TestSignals(SafeTestCaseMixin, TestCase):
                 TransactionServiceEventType.OUTGOING_TOKEN.name,
             ],
         )
+
+
+class TestBannedSafeEvents(SafeTestCaseMixin, TestCase):
+    """
+    Isolates the behavior for banned Safes (``SafeContract.banned``): no
+    events must be emitted for them
+    """
+
+    def setUp(self):
+        super().setUp()
+        SafeContract.objects.clear_banned_addresses_cache()
+        self.addCleanup(SafeContract.objects.clear_banned_addresses_cache)
+
+    def test_filter_banned_payloads(self):
+        banned_safe_contract = SafeContractFactory(banned=True)
+        safe_contract = SafeContractFactory()
+        no_address_payload = {"type": "NEW_DELEGATE", "address": None}
+        payloads = [
+            {"address": banned_safe_contract.address},
+            {"address": safe_contract.address},
+            no_address_payload,
+        ]
+        self.assertEqual(
+            filter_banned_payloads(payloads),
+            [{"address": safe_contract.address}, no_address_payload],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_events_not_sent_for_banned_safe(self, send_events_mock: MagicMock):
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx = MultisigTransactionFactory(trusted=True)
+        send_events_mock.assert_called()
+
+        send_events_mock.reset_mock()
+        SafeContractFactory(address=multisig_tx.safe, banned=True)
+        # Bans only propagate when the cached banned set expires or is cleared
+        SafeContract.objects.clear_banned_addresses_cache()
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigTransactionFactory(safe=multisig_tx.safe, trusted=True)
+        send_events_mock.assert_not_called()
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_message_events_not_sent_for_banned_safe(self, send_events_mock: MagicMock):
+        safe_address = self.deploy_test_safe().address
+        SafeContractFactory(address=safe_address, banned=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            SafeMessageFactory(safe=safe_address)
+        send_events_mock.assert_not_called()
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_delegate_events_not_sent_for_banned_safe(
+        self, send_events_mock: MagicMock
+    ):
+        banned_safe_contract = SafeContractFactory(banned=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            safe_contract_delegate = SafeContractDelegateFactory(
+                safe_contract=banned_safe_contract
+            )
+        send_events_mock.assert_not_called()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            safe_contract_delegate.delete()
+        send_events_mock.assert_not_called()

@@ -264,6 +264,27 @@ def build_event_payload(
     return payloads
 
 
+def filter_banned_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Exclude event payloads addressed to a banned Safe (``SafeContract.banned``),
+    so no events are emitted for them. Payloads without an ``address`` (e.g.
+    global delegates) are kept.
+
+    :param payloads:
+    :return: Payloads not addressed to a banned Safe
+    """
+    if not payloads:
+        return payloads
+    banned_addresses = SafeContract.objects.get_banned_addresses_cached()
+    if not banned_addresses:
+        return payloads
+    return [
+        payload
+        for payload in payloads
+        if payload.get("address") not in banned_addresses
+    ]
+
+
 def is_relevant_event(
     sender: type[Model],
     instance: TokenTransfer | InternalTx | MultisigConfirmation | MultisigTransaction,

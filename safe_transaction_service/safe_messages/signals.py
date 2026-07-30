@@ -6,8 +6,8 @@ from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from safe_transaction_service.events.services.queue_service import get_queue_service
 from safe_transaction_service.history.services.event_service import build_event_payload
+from safe_transaction_service.history.signals import send_payloads_on_commit
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
@@ -40,7 +40,4 @@ def process_event(
     logger.debug(
         "End building payloads %s for created=%s object=%s", payloads, created, instance
     )
-    payloads_to_send = [payload for payload in payloads if payload.get("address")]
-    if not payloads_to_send:
-        return None
-    get_queue_service().send_events_on_commit(payloads_to_send)
+    send_payloads_on_commit([payload for payload in payloads if payload.get("address")])

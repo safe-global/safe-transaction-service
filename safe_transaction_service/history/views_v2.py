@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from safe_eth.eth.utils import fast_is_checksum_address
 
 from safe_transaction_service.utils.utils import parse_boolean_query_param
+from safe_transaction_service.utils.views.mixins import BannedSafeMixin
 
 from ..loggers.custom_logger import http_request_log
 from . import filters, pagination, serializers
@@ -74,7 +75,7 @@ def swagger_pagination_parameters():
         ),
     },
 )
-class SafeCollectiblesView(GenericAPIView):
+class SafeCollectiblesView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeCollectibleResponseSerializer
 
     def get(self, request, address):
@@ -237,7 +238,7 @@ class DelegateDeleteView(GenericAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-class SafeBalanceView(GenericAPIView):
+class SafeBalanceView(BannedSafeMixin, GenericAPIView):
     serializer_class = serializers.SafeBalanceResponseSerializer
 
     def get_parameters(self) -> tuple[bool, bool]:
@@ -373,7 +374,7 @@ class SafeMultisigTransactionDetailView(RetrieveAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class SafeMultisigTransactionListView(ListAPIView):
+class SafeMultisigTransactionListView(BannedSafeMixin, ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
@@ -497,7 +498,7 @@ class SafeMultisigTransactionListView(ListAPIView):
             return Response(status=status.HTTP_201_CREATED)
 
 
-class AllTransactionsListView(ListAPIView):
+class AllTransactionsListView(BannedSafeMixin, ListAPIView):
     filter_backends = (
         django_filters.rest_framework.DjangoFilterBackend,
         OrderingFilter,
