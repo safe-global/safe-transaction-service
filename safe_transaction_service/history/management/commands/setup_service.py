@@ -229,14 +229,49 @@ class Command(BaseCommand):
     def _setup_safe_singleton_addresses(
         self, safe_singleton_addresses: Sequence[tuple[str, int, str]]
     ):
+        """
+        Insert new ``SafeMasterCopy`` singletons.
+
+        A new L2 singleton whose deploy block is at or above the L2 scan floor starts at the
+        current L2 frontier (lowest ``tx_block_number`` among existing L2 singletons) instead of
+        its deploy block: those events are already covered by the shared topic scan (addresses are
+        ignored on L2), so a lower start would needlessly drag the scan window back. An L2 singleton
+        deployed below the scan floor, a fresh DB, or an L1 singleton fall back to the deploy block.
+        ``initial_block_number`` always records the real deploy block.
+
+        :param safe_singleton_addresses: ``(address, deploy_block_number, version)`` tuples
+        """
+        # Frontier: highest fully-scanned block (lowest tx_block_number). Floor: lowest block
+        # ever scanned (lowest initial_block_number). Read once; a concurrent indexer run could
+        # leave the frontier slightly stale, which self-heals on the next scan.
+        l2_blocks = SafeMasterCopy.objects.l2().aggregate(
+            frontier=Min("tx_block_number"),
+            floor=Min("initial_block_number"),
+        )
+        l2_frontier_block_number = l2_blocks["frontier"]
+        l2_scan_floor_block_number = l2_blocks["floor"]
+
         for address, initial_block_number, version in safe_singleton_addresses:
+            is_l2 = version.endswith("+L2")
+            if (
+                is_l2
+                and l2_frontier_block_number is not None
+                and initial_block_number >= l2_scan_floor_block_number
+            ):
+                # Deploy block is within the already-scanned range, so its events are covered
+                # by the shared topic scan: start at the frontier, skipping a redundant re-scan.
+                tx_block_number = l2_frontier_block_number
+            else:
+                # L1, fresh DB, or an L2 singleton deployed below the scan floor (an unscanned
+                # gap exists): start from the deploy block.
+                tx_block_number = initial_block_number
             safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
                 address=address,
                 defaults={
                     "initial_block_number": initial_block_number,
-                    "tx_block_number": initial_block_number,
+                    "tx_block_number": tx_block_number,
                     "version": version,
-                    "l2": version.endswith("+L2"),
+                    "l2": is_l2,
                 },
             )
             if (

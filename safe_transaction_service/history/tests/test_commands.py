@@ -7,6 +7,7 @@ from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
 from django.core.management import CommandError, call_command
+from django.db.models import Min
 from django.test import TestCase
 from django.utils import timezone
 
@@ -20,6 +21,7 @@ from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
+from ..management.commands.setup_service import Command
 from ..models import (
     EthereumTx,
     IndexingStatus,
@@ -474,6 +476,82 @@ class TestCommands(SafeTestCaseMixin, TestCase):
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
             first_safe_block_deployed + 20,
         )
+
+    def test_setup_safe_singleton_addresses_l2_frontier(self):
+        """
+        A new L2 singleton added to an already-synced chain must start at the current L2
+        frontier (lowest tx_block_number among L2 singletons), not its deploy block, so it
+        doesn't drag the shared topic-based scan window back. L1 singletons still start
+        from the deploy block.
+        """
+        # Already-synced chain: an existing L2 singleton indexed up to a high block
+        existing_l2 = SafeMasterCopyFactory(
+            l2=True, initial_block_number=100, tx_block_number=5000
+        )
+        l2_frontier = existing_l2.tx_block_number
+
+        new_l2_address = Account.create().address
+        new_l1_address = Account.create().address
+        deploy_block = 4000  # Lower than the frontier
+
+        Command()._setup_safe_singleton_addresses(
+            [
+                (new_l2_address, deploy_block, "1.5.0+L2"),
+                (new_l1_address, deploy_block, "1.5.0"),
+            ]
+        )
+
+        # New L2 singleton starts at the frontier; the real deploy block is kept as
+        # initial_block_number
+        new_l2 = SafeMasterCopy.objects.get(address=new_l2_address)
+        self.assertEqual(new_l2.tx_block_number, l2_frontier)
+        self.assertEqual(new_l2.initial_block_number, deploy_block)
+        self.assertTrue(new_l2.l2)
+
+        # The shared L2 scan window is not dragged back
+        self.assertEqual(
+            SafeMasterCopy.objects.l2().aggregate(m=Min("tx_block_number"))["m"],
+            l2_frontier,
+        )
+
+        # L1 singleton still starts from its deploy block
+        new_l1 = SafeMasterCopy.objects.get(address=new_l1_address)
+        self.assertEqual(new_l1.tx_block_number, deploy_block)
+        self.assertEqual(new_l1.initial_block_number, deploy_block)
+        self.assertFalse(new_l1.l2)
+
+        # Existing row is untouched
+        existing_l2.refresh_from_db()
+        self.assertEqual(existing_l2.tx_block_number, 5000)
+
+    def test_setup_safe_singleton_addresses_l2_fresh_db(self):
+        """
+        On a fresh DB (no L2 singletons yet) a new L2 singleton starts from its deploy block.
+        """
+        address = Account.create().address
+        deploy_block = 4000
+        Command()._setup_safe_singleton_addresses([(address, deploy_block, "1.4.1+L2")])
+
+        master_copy = SafeMasterCopy.objects.get(address=address)
+        self.assertEqual(master_copy.tx_block_number, deploy_block)
+        self.assertEqual(master_copy.initial_block_number, deploy_block)
+
+    def test_setup_safe_singleton_addresses_l2_below_scan_floor(self):
+        """
+        A new L2 singleton deployed below the scan floor (its deploy block is lower than the
+        lowest block ever scanned) starts from its deploy block, not the frontier, so events
+        in the never-scanned gap are not missed.
+        """
+        # Already-synced chain that was only ever scanned from block 2000 up to 8000
+        SafeMasterCopyFactory(l2=True, initial_block_number=2000, tx_block_number=8000)
+
+        address = Account.create().address
+        deploy_block = 1000  # Below the scan floor (2000)
+        Command()._setup_safe_singleton_addresses([(address, deploy_block, "1.3.0+L2")])
+
+        master_copy = SafeMasterCopy.objects.get(address=address)
+        self.assertEqual(master_copy.tx_block_number, deploy_block)
+        self.assertEqual(master_copy.initial_block_number, deploy_block)
 
     def test_setup_service_sepolia(self):
         self._test_setup_service(EthereumNetwork.SEPOLIA)
