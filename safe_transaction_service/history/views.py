@@ -699,9 +699,6 @@ class SafeMultisigTransactionListView(BannedSafeMixin, ListAPIView):
                 response=serializers.CodeErrorResponse,
                 description="Invalid ethereum address",
             ),
-            451: OpenApiResponse(
-                description="Safe is unavailable for legal reasons (banned)"
-            ),
         },
     )
     @cache_txs_view_for_address(
@@ -740,9 +737,6 @@ class SafeMultisigTransactionListView(BannedSafeMixin, ListAPIView):
                 response=serializers.CodeErrorResponse,
                 description="Invalid ethereum address | User is not an owner | Invalid safeTxHash |"
                 "Invalid signature | Nonce already executed | Sender is not an owner",
-            ),
-            451: OpenApiResponse(
-                description="Safe is unavailable for legal reasons (banned)"
             ),
         },
     )
@@ -1122,9 +1116,6 @@ class SafeInfoView(BannedSafeMixin, GenericAPIView):
             404: OpenApiResponse(description="Safe not found"),
             422: OpenApiResponse(
                 description="code = 1: Checksum address validation failed\ncode = 50: Cannot get Safe info"
-            ),
-            451: OpenApiResponse(
-                description="Safe is unavailable for legal reasons (banned)"
             ),
         }
     )

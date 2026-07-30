@@ -361,7 +361,7 @@ REST_FRAMEWORK = {
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
     "ALLOWED_VERSIONS": ["v1", "v2"],
     "EXCEPTION_HANDLER": "safe_transaction_service.history.exceptions.custom_exception_handler",
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "safe_transaction_service.utils.swagger.SafeAutoSchema",
 }
 
 # CUSTOM LOGGERS LEVEL

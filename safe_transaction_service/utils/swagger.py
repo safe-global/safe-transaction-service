@@ -9,6 +9,25 @@ from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.plumbing import camelize_operation
 from drf_spectacular.settings import spectacular_settings
 
+from safe_transaction_service.utils.views.mixins import BannedSafeMixin
+
+
+class SafeAutoSchema(AutoSchema):
+    """
+    Service-wide schema customizations. Documents the HTTP 451 response on
+    every view guarded by ``BannedSafeMixin``, so the OpenAPI schema always
+    matches the behavior without documenting it on each view
+    """
+
+    def _get_response_bodies(self, direction="response"):
+        response_bodies = super()._get_response_bodies(direction)
+        if direction == "response" and isinstance(self.view, BannedSafeMixin):
+            response_bodies.setdefault(
+                "451",
+                {"description": "Safe is unavailable for legal reasons (banned)"},
+            )
+        return response_bodies
+
 
 class IgnoreVersionSchemaGenerator(SchemaGenerator):
     def get_schema(self, request=None, public=False):
