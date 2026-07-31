@@ -232,38 +232,52 @@ class Command(BaseCommand):
         """
         Insert new ``SafeMasterCopy`` singletons.
 
-        A new L2 singleton whose deploy block is at or above the L2 scan floor starts at the
-        current L2 frontier (lowest ``tx_block_number`` among existing L2 singletons) instead of
-        its deploy block: those events are already covered by the shared topic scan (addresses are
-        ignored on L2), so a lower start would needlessly drag the scan window back. An L2 singleton
-        deployed below the scan floor, a fresh DB, or an L1 singleton fall back to the deploy block.
-        ``initial_block_number`` always records the real deploy block.
+        Only on an **L2 network** does ``SafeEventsIndexer`` run, filtering logs by topic while
+        ignoring addresses. There a new ``+L2`` singleton whose deploy block is at or above the
+        lowest block L2 indexing has scanned from starts at the current L2 indexing position
+        (lowest ``tx_block_number`` among existing L2 singletons), bounded below by its own deploy
+        block, instead of always the deploy block: those events are already covered by the shared
+        scan, so a lower start would needlessly drag the scan window back.
+
+        Everything else starts from the deploy block: an L1/tracing network (where
+        ``InternalTxIndexer`` matches traces by address, and ``+L2`` singletons are tracked too, so
+        skipping a range would lose them), a fresh DB, or a ``+L2`` singleton deployed below the
+        lowest scanned block (an unscanned gap exists). ``initial_block_number`` always records the
+        real deploy block.
 
         :param safe_singleton_addresses: ``(address, deploy_block_number, version)`` tuples
         """
-        # Frontier: highest fully-scanned block (lowest tx_block_number). Floor: lowest block
-        # ever scanned (lowest initial_block_number). Read once; a concurrent indexer run could
-        # leave the frontier slightly stale, which self-heals on the next scan.
-        l2_blocks = SafeMasterCopy.objects.l2().aggregate(
-            frontier=Min("tx_block_number"),
-            floor=Min("initial_block_number"),
-        )
-        l2_frontier_block_number = l2_blocks["frontier"]
-        l2_scan_floor_block_number = l2_blocks["floor"]
+        # The shortcut is only valid where SafeEventsIndexer (topic scan, addresses ignored) is
+        # the indexer, i.e. on L2 networks. `l2_current_block_number` is the current L2 indexing
+        # position (lowest tx_block_number); `l2_min_initial_block_number` is the lowest block L2
+        # indexing has scanned from (lowest initial_block_number). Read once; a concurrent indexer
+        # run could leave them slightly stale, which self-heals on the next scan.
+        if settings.ETH_L2_NETWORK:
+            l2_blocks = SafeMasterCopy.objects.l2().aggregate(
+                current_block_number=Min("tx_block_number"),
+                min_initial_block_number=Min("initial_block_number"),
+            )
+            l2_current_block_number = l2_blocks["current_block_number"]
+            l2_min_initial_block_number = l2_blocks["min_initial_block_number"]
+        else:
+            l2_current_block_number = l2_min_initial_block_number = None
 
         for address, initial_block_number, version in safe_singleton_addresses:
             is_l2 = version.endswith("+L2")
             if (
                 is_l2
-                and l2_frontier_block_number is not None
-                and initial_block_number >= l2_scan_floor_block_number
+                and l2_current_block_number is not None
+                and l2_min_initial_block_number is not None
+                and initial_block_number >= l2_min_initial_block_number
             ):
-                # Deploy block is within the already-scanned range, so its events are covered
-                # by the shared topic scan: start at the frontier, skipping a redundant re-scan.
-                tx_block_number = l2_frontier_block_number
+                # Deploy block is within the already-scanned range, so its events are covered by
+                # the shared topic scan: start at the current indexing position, skipping a
+                # redundant re-scan. Bounded below by the deploy block so tx_block_number stays
+                # >= initial_block_number while the chain is still catching up.
+                tx_block_number = max(l2_current_block_number, initial_block_number)
             else:
-                # L1, fresh DB, or an L2 singleton deployed below the scan floor (an unscanned
-                # gap exists): start from the deploy block.
+                # L1 network, fresh DB, non-`+L2` singleton, or a `+L2` singleton deployed below
+                # the lowest scanned block (an unscanned gap exists): start from the deploy block.
                 tx_block_number = initial_block_number
             safe_singleton_address, _ = SafeMasterCopy.objects.get_or_create(
                 address=address,
