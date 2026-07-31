@@ -1,14 +1,8 @@
-# AGENTS.md
-
-## How Codex Uses This File
-Codex will read `AGENTS.md` for project-specific guidance, workflows, and conventions.
-It is the preferred place to capture shared context and expectations.
+## Linear
+All tickets go into `PLATFORM` team and with labels `Backend` and `Transaction Service`
 
 ## Indexer Architecture (Summary)
 This repository includes multiple indexers under `safe_transaction_service/history/indexers/`.
-
-## Linear
-- All tickets go into `PLATFORM` team and with labels `Backend` and `Transaction Service`
 
 ### Base Classes
 - `ethereum_indexer.py`
@@ -54,6 +48,9 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 - `uv.lock` is the source of pinned truth and must be committed. Always run `uv lock` after editing `pyproject.toml`, then commit both files together.
 - All `uv sync` calls use `--frozen`. CI is the canonical way to update dependencies; never bypass the lockfile locally.
 - `[tool.uv] exclude-newer = "7 days"` rejects packages published less than 7 days ago. If `uv lock` fails due to a recently released pin, revert it to the previous version and re-pin after 7 days.
+
+## Docs
+- Use reST for annotating Python functions.
 
 ## Testing
 - Virtualenv is managed by uv at `.venv`. Activate with `source .venv/bin/activate` or prefix commands with `uv run`.
