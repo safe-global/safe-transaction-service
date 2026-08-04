@@ -69,6 +69,12 @@ class InternalValidationError(APIException):
     default_code = "internal_validation_error"
 
 
+class BannedSafeException(APIException):
+    status_code = status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+    default_detail = "Safe is unavailable for legal reasons"
+    default_code = "unavailable_for_legal_reasons"
+
+
 class SafeServiceException(Exception):
     pass
 

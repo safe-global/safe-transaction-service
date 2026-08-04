@@ -528,6 +528,8 @@ class SafeEventsIndexer(EventsIndexer):
                 # Change Master Copy
                 safe_v1_1_1_contract.events.ChangedMasterCopy(),
                 # Proxy creation
+                # v1.5.0 emits the same ProxyCreation signature as v1.4.1, so the
+                # v1.4.1 entry decodes 1.5.0 proxy creations too.
                 proxy_factory_v1_4_1_contract.events.ProxyCreation(),
                 proxy_factory_v1_3_0_contract.events.ProxyCreation(),
             )

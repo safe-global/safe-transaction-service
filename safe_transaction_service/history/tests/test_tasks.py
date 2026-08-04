@@ -315,6 +315,7 @@ class TestTasks(TestCase):
             internal_tx___from=safe_address,
         )
         SafeContractFactory(address=safe_address, banned=True)
+        SafeContract.objects.clear_banned_addresses_cache()
         self.assertTrue(SafeContract.objects.get(address=safe_address).banned)
         self.assertFalse(internal_tx_decoded.processed)
         process_decoded_internal_txs_task.delay()

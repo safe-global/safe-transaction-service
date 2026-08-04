@@ -366,7 +366,7 @@ REST_FRAMEWORK = {
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
     "ALLOWED_VERSIONS": ["v1", "v2"],
     "EXCEPTION_HANDLER": "safe_transaction_service.history.exceptions.custom_exception_handler",
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "safe_transaction_service.utils.swagger.SafeAutoSchema",
 }
 
 # CUSTOM LOGGERS LEVEL
@@ -802,6 +802,10 @@ SPECTACULAR_SETTINGS = {
     ],
     "SORT_OPERATION_PARAMETERS": False,
 }
+
+BANNED_SAFES_CACHE_TTL = env.int(
+    "BANNED_SAFES_CACHE_TTL", default=60 * 5
+)  # Seconds the in-memory set of banned Safe addresses is cached for (default 5m)
 
 # Addresses not allowed to interact with the service
 # List taken from https://www.ic3.gov/PSA/2025/PSA250226

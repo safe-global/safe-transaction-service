@@ -3,7 +3,6 @@
 Build event payloads for the queue
 """
 
-import json
 from datetime import timedelta
 from logging import getLogger
 from typing import Any, Literal, TypedDict
@@ -161,8 +160,6 @@ def build_event_payload(
             payload["type"] = (
                 TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name
             )
-            # Deprecated: stringified boolean kept for legacy clients, use `isFailed` instead
-            payload["failed"] = json.dumps(instance.failed)
             payload["isFailed"] = instance.failed
             payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
         else:
@@ -265,6 +262,27 @@ def build_event_payload(
             payload["chainId"] = chain_id
 
     return payloads
+
+
+def filter_banned_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Exclude event payloads addressed to a banned Safe (``SafeContract.banned``),
+    so no events are emitted for them. Payloads without an ``address`` (e.g.
+    global delegates) are kept.
+
+    :param payloads:
+    :return: Payloads not addressed to a banned Safe
+    """
+    if not payloads:
+        return payloads
+    banned_addresses = SafeContract.objects.get_banned_addresses_cached()
+    if not banned_addresses:
+        return payloads
+    return [
+        payload
+        for payload in payloads
+        if payload.get("address") not in banned_addresses
+    ]
 
 
 def is_relevant_event(
