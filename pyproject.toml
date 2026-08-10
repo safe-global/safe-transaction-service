@@ -3,8 +3,8 @@ name = "safe-transaction-service"
 dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
-    "boto3>=1.43.59",
-    "cachetools==7.1.6",
+    "boto3>=1.43.62",
+    "cachetools==7.1.7",
     "celery[librabbitmq]==5.6.3",
     "django>=5.2.13,<5.3",
     "django-cache-memoize==0.2.1",
