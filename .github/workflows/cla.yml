@@ -9,7 +9,9 @@ permissions: {}
 jobs:
   CLAAssistant:
     permissions:
-      contents: read
+      actions: write # re-run the failed check after "recheck"/signing
+      contents: read # signatures are stored in the remote cla-signatures repo
+      pull-requests: write # post and update the signing comment
     runs-on: ubuntu-latest
     steps:
       - name: 'CLA Assistant'
