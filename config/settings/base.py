@@ -793,11 +793,13 @@ BANNED_SAFES_CACHE_TTL = env.int(
     "BANNED_SAFES_CACHE_TTL", default=60 * 5
 )  # Seconds the in-memory set of banned Safe addresses is cached for (default 5m)
 
-# Addresses not allowed to interact with the service
-# List taken from https://www.ic3.gov/PSA/2025/PSA250226
+# Addresses not allowed to interact with the service.
+# Addresses must be EIP-55 checksummed: they are compared against signature-recovered
+# owners, which are always checksummed, so a badly-cased entry would never match.
 BANNED_EOAS: set[ChecksumAddress] = {
     ChecksumAddress(HexAddress(HexStr(address)))
     for address in (
+        # List taken from https://www.ic3.gov/PSA/2025/PSA250226
         "0x51E9d833Ecae4E8D9D8Be17300AEE6D3398C135D",
         "0x96244D83DC15d36847C35209bBDc5bdDE9bEc3D8",
         "0x83c7678492D623fb98834F0fbcb2E7b7f5Af8950",
@@ -849,6 +851,23 @@ BANNED_EOAS: set[ChecksumAddress] = {
         "0xf03AfB1c6A11A7E370920ad42e6eE735dBedF0b1",
         "0xEB0bAA3A556586192590CAD296b1e48dF62a8549",
         "0xD5b58Cf7813c1eDC412367b97876bD400ea5c489",
+        # Sanctioned signer EOAs, see PLA-1886
+        "0x02177E3CF0592C6FdDE8A6E1E429DB3cDA4BF7cA",
+        "0x53Ce11837e3e4830Baa205e43E2aac68Ff7764B0",
+        "0x18709E89BD403F470088aBDAcEbE86CC60dda12e",
+        "0x1452cc00D05498D937De975591709855f4c5627c",
+        "0x406ea8F3C6464171f3dEccF6Ba99748D9487CD52",
+        "0xD0388ddedf55C5a0f962Ca9405Fb088D5303614a",
+        "0x3f95d25BfB08e6cF5bA3e159e477D28852BA3F04",
+        "0x0B938Cb5C5953Ea93B9AD56738f0808724C6d085",
+        "0xE6d30d392D4ef53Ff2ce27De3077b38680692676",
+        "0x2e82be7e98ec003d06B8581C4F05812f86450f01",
+        "0xb19d34A2b1eFC72C1508Cc804EB1A23edaa49581",
+        "0x9405c470f4D831a2Bf4461d417E0556F148F08Ce",
+        "0x683F3cC357568B24Cf1B51c70AA61ce5e9F22Da3",
+        "0x5B0b1Fe72302fD66c6CE6A530be03d3b634fD3c7",
+        "0x1d8133Ba1Cf2c1D8B7066976ACDDDC31245a2870",
+        "0xb865D3112B3CF67F09027d209c0b866BC6312a03",
     )
 }
 
