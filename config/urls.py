@@ -65,6 +65,14 @@ urlpatterns_v2 = [
     path("", include("safe_transaction_service.history.urls_v2", namespace="history")),
 ]
 
+if settings.POLICIES_ENABLE_API:
+    urlpatterns_v2 += [
+        path(
+            "",
+            include("safe_transaction_service.policies.urls_v2", namespace="policies"),
+        ),
+    ]
+
 if settings.ENABLE_ANALYTICS:
     urlpatterns_v2 += [
         path(
