@@ -22,6 +22,9 @@ from web3.exceptions import Web3RPCError
 
 from safe_transaction_service.account_abstraction import models as aa_models
 from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
+from safe_transaction_service.utils.abis.rhinestone import (
+    rhinestone_safe_relay_executor_abi,
+)
 
 from ..exceptions import (
     CannotGetSafeInfoFromBlockchain,
@@ -100,6 +103,16 @@ class SafeService:
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
         self.gelato_relay_1_balance_v2_contract = dummy_w3.eth.contract(
             abi=gelato_relay_1_balance_v2_abi
+        )
+        self.rhinestone_safe_relay_executor_contract = dummy_w3.eth.contract(
+            abi=rhinestone_safe_relay_executor_abi
+        )
+        # Relayers wrapping the creation call, with the name of the parameter holding the forwarded calldata.
+        # Creation data is decoded at read time from the stored transaction, so entries must be kept
+        # for as long as Safes created through that relayer exist (Gelato is deprecated but still needed)
+        self.relay_contracts = (
+            (self.gelato_relay_1_balance_v2_contract, "_data"),
+            (self.rhinestone_safe_relay_executor_contract, "data"),
         )
         self.proxy_creation_event_topic = event_abi_to_log_topic(
             self.proxy_factory_v1_4_1_contract.events.ProxyCreation().abi
@@ -277,20 +290,21 @@ class SafeService:
         """
         Decode creation data for Safe ProxyFactory deployments.
 
-        For L1 networks the trace is present, so no need for `MultiSend` or `Gelato Relay` decoding. At much one
+        For L1 networks the trace is present, so no need for `MultiSend` or relayer decoding. At much one
         `ProxyCreationData` will be returned.
 
         For L2 networks the data for the whole transaction will be decoded, so an approximation must
         be done to find the function parameters. There could be more than one `ProxyCreationData` when
-        deploying Safes via contracts like `MultiSend`. `MultiSend` and `Gelato Relay` transactions are supported.
+        deploying Safes via contracts like `MultiSend`. `MultiSend`, `Gelato Relay` and Rhinestone
+        `SafeRelayExecutor` transactions are supported.
 
         :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
         if not data:
             return []
 
-        # Try to decode using Gelato Relayer (relayer must be the first call)
-        data = self._decode_gelato_relay(data)
+        # Try to unwrap a relayer call (Gelato, Rhinestone). Relayer must be the first call
+        data = self._decode_relay(data)
 
         # Try to decode using MultiSend. If not, take the original data
         multisend_data = [
@@ -305,20 +319,26 @@ class SafeService:
                 results.append(result)
         return results
 
-    def _decode_gelato_relay(self, data: bytes) -> bytes:
+    def _decode_relay(self, data: bytes) -> bytes:
         """
-        Try to decode transaction for Gelato Relayer
+        Try to unwrap the calldata forwarded by a supported relayer:
+
+        - Gelato Relay 1Balance V2 ``sponsoredCallV2(_target, _data, ...)``
+        - Rhinestone ``SafeRelayExecutor.execute(id, target, data)``
+
+        The forwarded calldata is not validated here, the following `MultiSend`/`ProxyFactory` decoding
+        will discard anything that is not a Safe creation.
 
         :param data:
-        :return: Decoded `data` if possible, original `data` otherwise
+        :return: Forwarded `data` if a relayer is detected, original `data` otherwise
         """
-        try:
-            _, decoded_gelato_data = (
-                self.gelato_relay_1_balance_v2_contract.decode_function_input(data)
-            )
-            return HexBytes(decoded_gelato_data["_data"])
-        except ValueError:
-            return data
+        for relay_contract, data_parameter in self.relay_contracts:
+            try:
+                _, decoded_relay_data = relay_contract.decode_function_input(data)
+                return HexBytes(decoded_relay_data[data_parameter])
+            except ValueError:
+                continue
+        return data
 
     def _decode_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
         """
