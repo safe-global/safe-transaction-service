@@ -14,6 +14,7 @@ from web3 import Web3
 
 from ..exceptions import CannotGetSafeInfoFromBlockchain, CannotGetSafeInfoFromDB
 from ..models import InternalTxType, SafeMasterCopy
+from ..serializers import SafeCreationInfoResponseSerializer
 from ..services.safe_service import SafeCreationInfo, SafeInfo, SafeServiceProvider
 from ..services.safe_service import logger as safe_service_logger
 from ..utils import clean_receipt_log
@@ -27,6 +28,7 @@ from .mocks.mocks_safe_creation import (
     gelato_relay_creation_mock,
     multiple_safes_same_tx_creation_mock,
     multisend_creation_mock,
+    rhinestone_relay_creation_mock,
 )
 from .mocks.traces import create_trace, creation_internal_txs
 
@@ -242,6 +244,73 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                 )
                 self.assertEqual(
                     proxy_creation_data.salt_nonce, creation_mock["expected_salt_nonce"]
+                )
+
+    def test_decode_rhinestone_relay_creation_data(self):
+        proxy_creation_data_list = self.safe_service._decode_creation_data(
+            rhinestone_relay_creation_mock["data"]
+        )
+
+        self.assertEqual(len(proxy_creation_data_list), 1)
+        proxy_creation_data = proxy_creation_data_list[0]
+        self.assertEqual(
+            proxy_creation_data.singleton,
+            rhinestone_relay_creation_mock["expected_singleton"],
+        )
+        self.assertEqual(
+            proxy_creation_data.initializer,
+            rhinestone_relay_creation_mock["expected_initializer"],
+        )
+        self.assertEqual(
+            proxy_creation_data.salt_nonce,
+            rhinestone_relay_creation_mock["expected_salt_nonce"],
+        )
+
+    def test_get_safe_creation_info_rhinestone_relay(self):
+        safe_address = Account.create().address
+        InternalTxFactory(
+            contract_address=safe_address,
+            tx_type=InternalTxType.CREATE.value,
+            ethereum_tx__status=1,
+            ethereum_tx__data=rhinestone_relay_creation_mock["data"],
+            trace_address="0",
+        )
+
+        safe_creation_info = self.safe_service.get_safe_creation_info(safe_address)
+        serialized_creation_info = SafeCreationInfoResponseSerializer(
+            safe_creation_info
+        ).data
+
+        self.assertEqual(
+            serialized_creation_info["setup_data"],
+            rhinestone_relay_creation_mock["setup_data"],
+        )
+        self.assertEqual(
+            serialized_creation_info["salt_nonce"],
+            str(rhinestone_relay_creation_mock["expected_salt_nonce"]),
+        )
+        self.assertEqual(
+            serialized_creation_info["data_decoded"],
+            rhinestone_relay_creation_mock["expected_data_decoded"],
+        )
+
+    def test_decode_invalid_rhinestone_relay_creation_data(self):
+        relay_data = rhinestone_relay_creation_mock["data"]
+        inner_data_offset = 4 + 32 * 3 + 32
+        unrelated_relay_data = (
+            relay_data[:inner_data_offset]
+            + HexBytes("0xdeadbeef")
+            + relay_data[inner_data_offset + 4 :]
+        )
+
+        for invalid_data in (
+            relay_data[:4],
+            relay_data[:-1],
+            unrelated_relay_data,
+        ):
+            with self.subTest(invalid_data=invalid_data):
+                self.assertEqual(
+                    self.safe_service._decode_creation_data(invalid_data), []
                 )
 
     def test_decode_creation_data_multiple_safes_same_tx(self):
