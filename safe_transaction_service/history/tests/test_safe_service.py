@@ -27,6 +27,7 @@ from .mocks.mocks_safe_creation import (
     gelato_relay_creation_mock,
     multiple_safes_same_tx_creation_mock,
     multisend_creation_mock,
+    rhinestone_relay_creation_mock,
 )
 from .mocks.traces import create_trace, creation_internal_txs
 
@@ -225,8 +226,37 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         self.assertEqual(safe_info.module_guard, NULL_ADDRESS)
         self.assertEqual(safe_info.version, None)
 
+    def test_decode_relay(self):
+        create_proxy_with_nonce_selector = HexBytes("0x1688f0b9")
+
+        # Gelato `sponsoredCallV2` -> forwarded `_data`
+        gelato_unwrapped = self.safe_service._decode_relay(
+            gelato_relay_creation_mock["data"]
+        )
+        self.assertNotEqual(gelato_unwrapped, gelato_relay_creation_mock["data"])
+        self.assertEqual(gelato_unwrapped[:4], create_proxy_with_nonce_selector)
+
+        # Rhinestone `SafeRelayExecutor.execute` -> forwarded `data`
+        rhinestone_unwrapped = self.safe_service._decode_relay(
+            rhinestone_relay_creation_mock["data"]
+        )
+        self.assertNotEqual(
+            rhinestone_unwrapped, rhinestone_relay_creation_mock["data"]
+        )
+        self.assertEqual(rhinestone_unwrapped[:4], create_proxy_with_nonce_selector)
+
+        # Not relayed -> returned unchanged
+        self.assertEqual(
+            self.safe_service._decode_relay(multisend_creation_mock["data"]),
+            multisend_creation_mock["data"],
+        )
+
     def test_decode_creation_data(self):
-        for creation_mock in (multisend_creation_mock, gelato_relay_creation_mock):
+        for creation_mock in (
+            multisend_creation_mock,
+            gelato_relay_creation_mock,
+            rhinestone_relay_creation_mock,
+        ):
             with self.subTest(creation_mock=creation_mock):
                 proxy_creation_data_list = self.safe_service._decode_creation_data(
                     creation_mock["data"]
