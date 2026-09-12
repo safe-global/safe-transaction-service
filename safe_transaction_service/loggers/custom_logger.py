@@ -199,13 +199,22 @@ class IgnoreCheckUrl(logging.Filter):
     Failing probes (e.g. a `503` from the readiness endpoint) are kept.
     """
 
-    PROBE_PATHS = ("/check/", "/health/live", "/health/ready")
+    PROBE_PATHS = frozenset(("/check", "/health/live", "/health/ready"))
 
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        if "200" not in message:
+        # Gunicorn passes its access log atoms as the record arguments. The
+        # status and the path are read from there, as the formatted message
+        # also contains the client address, the query string and the user
+        # agent, any of which can hold the value being looked for.
+        atoms = record.args
+        if not isinstance(atoms, dict):
             return True
-        return not any(f"GET {path}" in message for path in self.PROBE_PATHS)
+
+        if str(atoms.get("s")) != "200" or atoms.get("m") != "GET":
+            return True
+
+        path = str(atoms.get("U", "")).rstrip("/")
+        return path not in self.PROBE_PATHS
 
 
 class PatchedCeleryFormatterOriginal(TaskFormatter):  # pragma: no cover

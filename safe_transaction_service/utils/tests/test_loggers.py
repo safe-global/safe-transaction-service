@@ -14,28 +14,79 @@ class TestLoggers(TestCase):
         lineno = 2
         ignore_check_url = IgnoreCheckUrl(name)
 
-        def build_log(message: str) -> LogRecord:
+        def build_log(
+            status: str,
+            path: str,
+            method: str = "GET",
+            remote_address: str = "127.0.0.1",
+        ) -> LogRecord:
+            """
+            Build a record the way Gunicorn does, passing the access log atoms
+            as the record arguments.
+            """
+            atoms = {
+                "h": remote_address,
+                "m": method,
+                "U": path,
+                "q": "",
+                "s": status,
+                "a": "python-requests/2.32.3",
+            }
             return LogRecord(
-                name, level, pathname, lineno, message, args=(), exc_info=()
+                name,
+                level,
+                pathname,
+                lineno,
+                "%(h)s %(m)s %(U)s %(s)s %(a)s",
+                args=(atoms,),
+                exc_info=(),
             )
 
-        for message in (
-            "200 GET /check/",
-            "200 GET /health/live",
-            "200 GET /health/live/",
-            "200 GET /health/ready",
-            "200 GET /health/ready/",
+        for status, path in (
+            ("200", "/check/"),
+            ("200", "/health/live"),
+            ("200", "/health/live/"),
+            ("200", "/health/ready"),
+            ("200", "/health/ready/"),
         ):
-            with self.subTest(message=message):
-                self.assertFalse(ignore_check_url.filter(build_log(message)))
+            with self.subTest(status=status, path=path):
+                self.assertFalse(ignore_check_url.filter(build_log(status, path)))
 
-        for message in (
-            "200 GET /not-check/",
-            "200 GET /api/v1/about/",
-            "503 GET /health/ready",
+        for status, path in (
+            ("200", "/not-check/"),
+            ("200", "/api/v1/about/"),
+            ("503", "/health/ready"),
+            ("503", "/check/"),
         ):
-            with self.subTest(message=message):
-                self.assertTrue(ignore_check_url.filter(build_log(message)))
+            with self.subTest(status=status, path=path):
+                self.assertTrue(ignore_check_url.filter(build_log(status, path)))
+
+        with self.subTest("Only GET is a probe"):
+            self.assertTrue(
+                ignore_check_url.filter(build_log("200", "/check/", method="POST"))
+            )
+
+        with self.subTest("A 200 elsewhere in the line does not drop a failing probe"):
+            self.assertTrue(
+                ignore_check_url.filter(
+                    build_log("503", "/health/ready", remote_address="2001:db8::1")
+                )
+            )
+
+        with self.subTest("Records without atoms are kept"):
+            self.assertTrue(
+                ignore_check_url.filter(
+                    LogRecord(
+                        name,
+                        level,
+                        pathname,
+                        lineno,
+                        "200 GET /check/",
+                        args=(),
+                        exc_info=(),
+                    )
+                )
+            )
 
     def test_ignore_succeeded_none(self):
         name = "name"
