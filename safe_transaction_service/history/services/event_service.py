@@ -11,6 +11,7 @@ from django.db.models import Model
 from django.utils import timezone
 
 from hexbytes import HexBytes
+from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
 from safe_transaction_service.history.helpers import build_transfer_unique_id
@@ -126,15 +127,22 @@ def build_event_payload(
     :return: A list of messages generated from the instance provided
     """
     payloads: list[dict[str, Any]] = []
-    if sender == MultisigConfirmation and instance.multisig_transaction_id:
-        # Off-chain event: use the confirmation creation time
+    if sender == MultisigConfirmation and (safe_address := instance.safe_address):
         payloads = [
             {
+                # `created` is the block timestamp for on-chain approvals and the
+                # confirmation creation time for off-chain signatures
                 "timestamp": int(instance.created.timestamp()),
-                "address": instance.multisig_transaction.safe,  # This could make a db call
+                "address": safe_address,
                 "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
                 "owner": instance.owner,
-                "safeTxHash": to_0x_hex_str(HexBytes(instance.multisig_transaction_id)),
+                "safeTxHash": to_0x_hex_str(
+                    HexBytes(
+                        instance.multisig_transaction_hash
+                        or instance.multisig_transaction_id
+                    )
+                ),
+                "signatureType": SafeSignatureType(instance.signature_type).name,
             }
         ]
     elif sender == MultisigTransaction and deleted:
