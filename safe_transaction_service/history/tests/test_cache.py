@@ -1,12 +1,18 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from django.db.models.signals import post_save
 from django.test import TestCase
 
+import factory
+from eth_account import Account
 from gevent.testing import mock
 
 from safe_transaction_service.history.cache import (
     CacheSafeTxsView,
+    get_cache_view_tag_and_addresses,
     remove_cache_view_for_addresses,
 )
+
+from .factories import MultisigConfirmationFactory
 
 
 class TestCacheSafeTxsView(TestCase):
@@ -76,3 +82,33 @@ class TestCacheSafeTxsView(TestCase):
 
         remove_cache_views_mock.assert_called_once_with([f"testtag:{safe_address}"])
         connection_mock.on_commit.assert_not_called()
+
+
+class TestGetCacheViewTagAndAddresses(TestCase):
+    @factory.django.mute_signals(post_save)
+    def test_multisig_confirmation_with_transaction(self):
+        confirmation = MultisigConfirmationFactory()
+        self.assertEqual(
+            get_cache_view_tag_and_addresses(confirmation),
+            (
+                CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY,
+                [confirmation.multisig_transaction.safe],
+            ),
+        )
+
+    @factory.django.mute_signals(post_save)
+    def test_multisig_confirmation_without_transaction(self):
+        # A confirmation indexed from `approveHash` invalidates the list view of the Safe
+        # annotated by the indexer, the FK is not bound on the in-memory instance
+        confirmation = MultisigConfirmationFactory(multisig_transaction=None)
+        self.assertIsNone(get_cache_view_tag_and_addresses(confirmation))
+
+        safe_address = Account.create().address
+        confirmation.safe_address = safe_address
+        self.assertEqual(
+            get_cache_view_tag_and_addresses(confirmation),
+            (
+                CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY,
+                [safe_address],
+            ),
+        )

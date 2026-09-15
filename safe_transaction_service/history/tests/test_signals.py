@@ -10,9 +10,11 @@ from django.test import TestCase
 from django.utils import timezone
 
 import factory
+from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
@@ -358,6 +360,36 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertFalse(
             is_relevant_event(multisig_tx.__class__, multisig_tx, created=False)
         )
+
+    @factory.django.mute_signals(post_save)
+    def test_build_confirmation_payload_without_transaction(self):
+        # A confirmation indexed from `approveHash` is stored with the transaction hash
+        # only, and the transaction may not exist in this service at all
+        confirmation = MultisigConfirmationFactory(multisig_transaction=None)
+        self.assertEqual(build_event_payload(MultisigConfirmation, confirmation), [])
+
+        safe_address = Account.create().address
+        confirmation.safe_address = safe_address
+        payload = build_event_payload(MultisigConfirmation, confirmation)[0]
+        self.assertEqual(
+            payload["type"], TransactionServiceEventType.NEW_CONFIRMATION.name
+        )
+        self.assertEqual(payload["address"], safe_address)
+        self.assertEqual(payload["safeTxHash"], confirmation.multisig_transaction_hash)
+        self.assertEqual(payload["owner"], confirmation.owner)
+        self.assertEqual(payload["timestamp"], int(confirmation.created.timestamp()))
+
+    @factory.django.mute_signals(post_save)
+    def test_build_confirmation_payload_signature_type(self):
+        # The queue service rebuilds an `APPROVED_HASH` signature from the owner, so it
+        # needs to tell on-chain approvals apart from off-chain signatures
+        for signature_type in (SafeSignatureType.APPROVED_HASH, SafeSignatureType.EOA):
+            with self.subTest(signature_type=signature_type):
+                confirmation = MultisigConfirmationFactory(
+                    signature_type=signature_type.value
+                )
+                payload = build_event_payload(MultisigConfirmation, confirmation)[0]
+                self.assertEqual(payload["signatureType"], signature_type.name)
 
     @mock.patch.object(QueueService, "send_events")
     def test_signals_are_correctly_fired(self, send_events_mock: MagicMock):

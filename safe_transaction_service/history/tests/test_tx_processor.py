@@ -1,17 +1,20 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
 from eth_account import Account
 from eth_utils import keccak
+from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.events.services.queue_service import QueueService
 from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
 from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
@@ -34,6 +37,7 @@ from ..models import (
     SafeLastStatus,
     SafeRelevantTransaction,
     SafeStatus,
+    TransactionServiceEventType,
 )
 from .factories import (
     EthereumTxFactory,
@@ -401,6 +405,89 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         self.assertEqual(
             multisig_confirmation.signature_type,
             SafeSignatureType.APPROVED_HASH.value,
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_approve_hash_sends_event(self, send_events_mock: MagicMock):
+        tx_processor = self.tx_processor
+        safe_address = Account.create().address
+        owner = Account.create().address
+        hash_to_approve = to_0x_hex_str(fast_keccak_text("hash-to-approve"))
+        SafeLastStatusFactory(address=safe_address)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            tx_processor.process_decoded_transactions(
+                [
+                    InternalTxDecodedFactory(
+                        function_name="approveHash",
+                        arguments={
+                            "hashToApprove": hash_to_approve,
+                            "owner": owner,
+                        },
+                        internal_tx___from=safe_address,
+                        internal_tx__value=0,
+                    )
+                ]
+            )
+
+        multisig_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=hash_to_approve, owner=owner
+        )
+        # The transaction is not in this service, so the Safe comes from the indexed contract
+        self.assertIsNone(multisig_confirmation.multisig_transaction_id)
+        send_events_mock.assert_called_once_with(
+            [
+                {
+                    "timestamp": int(multisig_confirmation.created.timestamp()),
+                    "address": safe_address,
+                    "type": TransactionServiceEventType.NEW_CONFIRMATION.name,
+                    "owner": owner,
+                    "safeTxHash": hash_to_approve,
+                    "signatureType": SafeSignatureType.APPROVED_HASH.name,
+                    "chainId": str(EthereumNetwork.GANACHE.value),
+                }
+            ]
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_approve_hash_existing_confirmation_sends_no_event(
+        self, send_events_mock: MagicMock
+    ):
+        # An owner that signed off-chain already got a `NEW_CONFIRMATION`, approving the
+        # same hash on-chain must not send a second one
+        tx_processor = self.tx_processor
+        safe_address = Account.create().address
+        multisig_transaction = MultisigTransactionFactory(safe=safe_address)
+        confirmation = MultisigConfirmationFactory(
+            multisig_transaction=multisig_transaction,
+            multisig_transaction_hash=multisig_transaction.safe_tx_hash,
+            ethereum_tx=None,
+            signature_type=SafeSignatureType.EOA.value,
+        )
+        SafeLastStatusFactory(address=safe_address)
+        send_events_mock.reset_mock()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            tx_processor.process_decoded_transactions(
+                [
+                    InternalTxDecodedFactory(
+                        function_name="approveHash",
+                        arguments={
+                            "hashToApprove": multisig_transaction.safe_tx_hash,
+                            "owner": confirmation.owner,
+                        },
+                        internal_tx___from=safe_address,
+                        internal_tx__value=0,
+                    )
+                ]
+            )
+
+        send_events_mock.assert_not_called()
+        self.assertEqual(
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_hash=multisig_transaction.safe_tx_hash
+            ).count(),
+            1,
         )
 
     def test_tx_processor_get_execution_result(self):

@@ -1914,6 +1914,29 @@ class MultisigConfirmation(TimeStampedModel):
         ]
         ordering = ["created"]
 
+    # Transient (non-DB) Safe address, set through the `safe_address` property. The
+    # indexer sets it for confirmations built from an on-chain `approveHash`: those are
+    # stored with `multisig_transaction_hash` only, and the transaction may not exist in
+    # this service at all, so the Safe cannot be resolved from the FK.
+    _safe_address: ChecksumAddress | None = None
+
+    @property
+    def safe_address(self) -> ChecksumAddress | None:
+        """
+        :return: Safe this confirmation belongs to, preferring the address set by the
+            indexer and falling back to the `MultisigTransaction`, or `None` when neither
+            is available
+        """
+        if self._safe_address:
+            return self._safe_address
+        if self.multisig_transaction_id:
+            return self.multisig_transaction.safe  # This could make a db call
+        return None
+
+    @safe_address.setter
+    def safe_address(self, safe_address: ChecksumAddress) -> None:
+        self._safe_address = safe_address
+
     def __str__(self):
         if self.multisig_transaction_id:
             return f"Confirmation of owner={self.owner} for transaction-hash={self.multisig_transaction_hash}"
