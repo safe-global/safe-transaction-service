@@ -3,6 +3,10 @@
 # Safe transactions. `execute` forwards `data` verbatim to `target` (Safe, MultiSendCallOnly or a
 # canonical Safe ProxyFactory). Deployed with CREATE2 at the same address on every chain, e.g.
 # https://optimistic.etherscan.io/address/0x781388759eacb9892f60d77d9a99c9be2f7f4ada
+RHINESTONE_SAFE_RELAY_EXECUTOR_ADDRESSES = (
+    "0x781388759EacB9892f60D77D9A99c9BE2F7F4ada",
+)
+
 rhinestone_safe_relay_executor_abi = [
     {
         "anonymous": False,

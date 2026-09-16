@@ -197,6 +197,8 @@ rhinestone_relay_creation_mock = {
         "1900c76200000000000000000000000000000000000000000000000000000000"
     ),
     "expected_salt_nonce": 1788840152716,
+    # Rhinestone `SafeRelayExecutor`
+    "to": "0x781388759EacB9892f60D77D9A99c9BE2F7F4ada",
 }
 
 # Safes created in the same tx using MultiSend on Sepolia

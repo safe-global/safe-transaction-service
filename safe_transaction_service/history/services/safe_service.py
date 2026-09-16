@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
 
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -23,6 +24,7 @@ from web3.exceptions import Web3RPCError
 from safe_transaction_service.account_abstraction import models as aa_models
 from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
 from safe_transaction_service.utils.abis.rhinestone import (
+    RHINESTONE_SAFE_RELAY_EXECUTOR_ADDRESSES,
     rhinestone_safe_relay_executor_abi,
 )
 
@@ -107,12 +109,17 @@ class SafeService:
         self.rhinestone_safe_relay_executor_contract = dummy_w3.eth.contract(
             abi=rhinestone_safe_relay_executor_abi
         )
-        # Relayers wrapping the creation call, with the name of the parameter holding the forwarded calldata.
+        # Relayers wrapping the creation call, with the name of the parameter holding the forwarded calldata
+        # and the relayer addresses (`None` if the function selector is specific enough).
         # Creation data is decoded at read time from the stored transaction, so entries must be kept
         # for as long as Safes created through that relayer exist (Gelato is deprecated but still needed)
         self.relay_contracts = (
-            (self.gelato_relay_1_balance_v2_contract, "_data"),
-            (self.rhinestone_safe_relay_executor_contract, "data"),
+            (self.gelato_relay_1_balance_v2_contract, "_data", None),
+            (
+                self.rhinestone_safe_relay_executor_contract,
+                "data",
+                RHINESTONE_SAFE_RELAY_EXECUTOR_ADDRESSES,
+            ),
         )
         self.proxy_creation_event_topic = event_abi_to_log_topic(
             self.proxy_factory_v1_4_1_contract.events.ProxyCreation().abi
@@ -158,7 +165,10 @@ class SafeService:
             # ``data`` for the transaction
             proxy_creation_data = (
                 self._process_creation_data(
-                    safe_address, HexBytes(data_tx.data), creation_ethereum_tx
+                    safe_address,
+                    HexBytes(data_tx.data),
+                    creation_ethereum_tx,
+                    data_tx.to,
                 )
                 if data_tx.data
                 else None
@@ -253,16 +263,20 @@ class SafeService:
         safe_address: ChecksumAddress,
         data: bytes,
         ethereum_tx: EthereumTx,
+        to: ChecksumAddress | None,
     ) -> ProxyCreationData | None:
         """
         Process creation data and return the proper one for the provided Safe, as for L2s multiple deployments
         can be present in the data, so we need to check the events and match them with the decoded data.
 
-        :param data:
+        :param safe_address:
+        :param data: creation calldata, could hold more than one deployment (`MultiSend`, relayers...)
+        :param ethereum_tx: holds the `ProxyCreation` logs
+        :param to: contract called with `data`, used to detect relayers
         :return: ProxyCreationData for the provided Safe
         """
 
-        proxy_creation_data_list = self._decode_creation_data(data)
+        proxy_creation_data_list = self._decode_creation_data(data, to)
 
         if not proxy_creation_data_list:
             return None
@@ -286,7 +300,9 @@ class SafeService:
         )
         return None
 
-    def _decode_creation_data(self, data: bytes) -> list[ProxyCreationData]:
+    def _decode_creation_data(
+        self, data: bytes, to: ChecksumAddress | None = None
+    ) -> list[ProxyCreationData]:
         """
         Decode creation data for Safe ProxyFactory deployments.
 
@@ -298,13 +314,15 @@ class SafeService:
         deploying Safes via contracts like `MultiSend`. `MultiSend`, `Gelato Relay` and Rhinestone
         `SafeRelayExecutor` transactions are supported.
 
+        :param data:
+        :param to: contract called with `data`, used to detect relayers
         :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
         if not data:
             return []
 
         # Try to unwrap a relayer call (Gelato, Rhinestone). Relayer must be the first call
-        data = self._decode_relay(data)
+        data = self._decode_relay(data, to)
 
         # Try to decode using MultiSend. If not, take the original data
         multisend_data = [
@@ -319,25 +337,38 @@ class SafeService:
                 results.append(result)
         return results
 
-    def _decode_relay(self, data: bytes) -> bytes:
+    def _decode_relay(self, data: bytes, to: ChecksumAddress | None) -> bytes:
         """
         Try to unwrap the calldata forwarded by a supported relayer:
 
         - Gelato Relay 1Balance V2 ``sponsoredCallV2(_target, _data, ...)``
-        - Rhinestone ``SafeRelayExecutor.execute(id, target, data)``
+        - Rhinestone ``SafeRelayExecutor.execute(id, target, data)``, only when `to` is the Rhinestone contract,
+          as ``execute(uint256,address,bytes)`` is a generic selector used by other contracts
 
         The forwarded calldata is not validated here, the following `MultiSend`/`ProxyFactory` decoding
         will discard anything that is not a Safe creation.
 
         :param data:
+        :param to: contract called with `data`
         :return: Forwarded `data` if a relayer is detected, original `data` otherwise
         """
-        for relay_contract, data_parameter in self.relay_contracts:
+        for relay_contract, data_parameter, relay_addresses in self.relay_contracts:
             try:
                 _, decoded_relay_data = relay_contract.decode_function_input(data)
-                return HexBytes(decoded_relay_data[data_parameter])
-            except ValueError:
+            except (ValueError, DecodingError):
+                # `ValueError` if the selector does not match, `DecodingError` if it matches but the payload
+                # has a different shape
                 continue
+
+            if relay_addresses is not None and to not in relay_addresses:
+                # Surfaces a relayer redeployment on a new address
+                logger.warning(
+                    "[%s] Relayer selector matched on an unknown relayer address",
+                    to,
+                )
+                continue
+
+            return HexBytes(decoded_relay_data[data_parameter])
         return data
 
     def _decode_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
@@ -362,7 +393,7 @@ class SafeService:
             try:
                 _, data_decoded = proxy_factory_contract.decode_function_input(data)
                 break
-            except ValueError:
+            except (ValueError, DecodingError):
                 continue
 
         if data_decoded is None:
@@ -402,7 +433,7 @@ class SafeService:
             setup_data = data_decoded.get("data")
             salt_nonce = data_decoded.get("saltNonce")
             return ProxyCreationData(master_copy, setup_data, salt_nonce)
-        except ValueError:
+        except (ValueError, DecodingError):
             return None
 
     def _get_next_internal_tx(self, internal_tx: InternalTx) -> InternalTx | None:

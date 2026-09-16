@@ -228,28 +228,49 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
 
     def test_decode_relay(self):
         create_proxy_with_nonce_selector = HexBytes("0x1688f0b9")
+        rhinestone_data = rhinestone_relay_creation_mock["data"]
+        rhinestone_address = rhinestone_relay_creation_mock["to"]
 
-        # Gelato `sponsoredCallV2` -> forwarded `_data`
+        # Gelato `sponsoredCallV2` -> forwarded `_data`. Selector is specific, address is not checked
         gelato_unwrapped = self.safe_service._decode_relay(
-            gelato_relay_creation_mock["data"]
+            gelato_relay_creation_mock["data"], Account.create().address
         )
         self.assertNotEqual(gelato_unwrapped, gelato_relay_creation_mock["data"])
         self.assertEqual(gelato_unwrapped[:4], create_proxy_with_nonce_selector)
 
         # Rhinestone `SafeRelayExecutor.execute` -> forwarded `data`
         rhinestone_unwrapped = self.safe_service._decode_relay(
-            rhinestone_relay_creation_mock["data"]
+            rhinestone_data, rhinestone_address
         )
-        self.assertNotEqual(
-            rhinestone_unwrapped, rhinestone_relay_creation_mock["data"]
-        )
+        self.assertNotEqual(rhinestone_unwrapped, rhinestone_data)
         self.assertEqual(rhinestone_unwrapped[:4], create_proxy_with_nonce_selector)
+
+        # `execute(uint256,address,bytes)` is generic, only calls to the Rhinestone contract are unwrapped
+        for to in (Account.create().address, None):
+            with self.subTest(to=to):
+                with self.assertLogs(safe_service_logger, level="WARNING"):
+                    self.assertEqual(
+                        self.safe_service._decode_relay(rhinestone_data, to),
+                        rhinestone_data,
+                    )
 
         # Not relayed -> returned unchanged
         self.assertEqual(
-            self.safe_service._decode_relay(multisend_creation_mock["data"]),
+            self.safe_service._decode_relay(
+                multisend_creation_mock["data"], rhinestone_address
+            ),
             multisend_creation_mock["data"],
         )
+
+        # Relayer selector with a malformed payload -> returned unchanged instead of raising
+        for data in (
+            bytes.fromhex("710a9f68" + "ff" * 96),  # NonEmptyPaddingBytes
+            bytes.fromhex("ad718d2a" + "00" * 8),  # InsufficientDataBytes
+        ):
+            with self.subTest(data=data):
+                self.assertEqual(
+                    self.safe_service._decode_relay(data, rhinestone_address), data
+                )
 
     def test_decode_creation_data(self):
         for creation_mock in (
@@ -259,7 +280,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
         ):
             with self.subTest(creation_mock=creation_mock):
                 proxy_creation_data_list = self.safe_service._decode_creation_data(
-                    creation_mock["data"]
+                    creation_mock["data"], creation_mock.get("to")
                 )
                 self.assertEqual(len(proxy_creation_data_list), 1)
                 proxy_creation_data = proxy_creation_data_list[0]
@@ -273,6 +294,14 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                 self.assertEqual(
                     proxy_creation_data.salt_nonce, creation_mock["expected_salt_nonce"]
                 )
+
+        # ProxyFactory selector with a malformed payload must not raise
+        self.assertEqual(
+            self.safe_service._decode_creation_data(
+                bytes.fromhex("1688f0b9" + "ff" * 96)
+            ),
+            [],
+        )
 
     def test_decode_creation_data_multiple_safes_same_tx(self):
         ethereum_tx = EthereumTxFactory(
@@ -299,6 +328,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                     safe_address,
                     multiple_safes_same_tx_creation_mock["data"],
                     ethereum_tx,
+                    ethereum_tx.to,
                 )
                 creation_mock = multiple_safes_same_tx_creation_mock[safe_address]
                 self.assertEqual(
@@ -319,6 +349,7 @@ class TestSafeService(SafeTestCaseMixin, TestCase):
                     random_safe_address,
                     multiple_safes_same_tx_creation_mock["data"],
                     ethereum_tx,
+                    ethereum_tx.to,
                 )
             )
 
