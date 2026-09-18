@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass, replace
 from datetime import datetime
 
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress
 from eth_utils import event_abi_to_log_topic
 from hexbytes import HexBytes
@@ -22,6 +23,9 @@ from web3.exceptions import Web3RPCError
 
 from safe_transaction_service.account_abstraction import models as aa_models
 from safe_transaction_service.utils.abis.gelato import gelato_relay_1_balance_v2_abi
+from safe_transaction_service.utils.abis.rhinestone import (
+    rhinestone_safe_relay_executor_abi,
+)
 
 from ..exceptions import (
     CannotGetSafeInfoFromBlockchain,
@@ -100,6 +104,9 @@ class SafeService:
         self.cpk_proxy_factory_contract = get_cpk_factory_contract(dummy_w3)
         self.gelato_relay_1_balance_v2_contract = dummy_w3.eth.contract(
             abi=gelato_relay_1_balance_v2_abi
+        )
+        self.rhinestone_safe_relay_executor_contract = dummy_w3.eth.contract(
+            abi=rhinestone_safe_relay_executor_abi
         )
         self.proxy_creation_event_topic = event_abi_to_log_topic(
             self.proxy_factory_v1_4_1_contract.events.ProxyCreation().abi
@@ -282,7 +289,8 @@ class SafeService:
 
         For L2 networks the data for the whole transaction will be decoded, so an approximation must
         be done to find the function parameters. There could be more than one `ProxyCreationData` when
-        deploying Safes via contracts like `MultiSend`. `MultiSend` and `Gelato Relay` transactions are supported.
+        deploying Safes via contracts like `MultiSend`. `MultiSend`, `Gelato Relay` and `Rhinestone Relay`
+        transactions are supported.
 
         :return: `ProxyCreationData`, `None` if it cannot be decoded
         """
@@ -291,6 +299,7 @@ class SafeService:
 
         # Try to decode using Gelato Relayer (relayer must be the first call)
         data = self._decode_gelato_relay(data)
+        data = self._decode_rhinestone_relay(data)
 
         # Try to decode using MultiSend. If not, take the original data
         multisend_data = [
@@ -318,6 +327,21 @@ class SafeService:
             )
             return HexBytes(decoded_gelato_data["_data"])
         except ValueError:
+            return data
+
+    def _decode_rhinestone_relay(self, data: bytes) -> bytes:
+        """
+        Try to decode transaction for the Rhinestone Safe Relay Executor.
+
+        :param data:
+        :return: Decoded ``data`` if possible, original ``data`` otherwise
+        """
+        try:
+            _, decoded_rhinestone_data = (
+                self.rhinestone_safe_relay_executor_contract.decode_function_input(data)
+            )
+            return HexBytes(decoded_rhinestone_data["data"])
+        except (ValueError, DecodingError):
             return data
 
     def _decode_proxy_factory(self, data: bytes) -> ProxyCreationData | None:
