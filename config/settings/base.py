@@ -133,6 +133,7 @@ LOCAL_APPS = [
     "safe_transaction_service.contracts.apps.ContractsConfig",
     "safe_transaction_service.events.apps.EventsConfig",
     "safe_transaction_service.history.apps.HistoryConfig",
+    "safe_transaction_service.policies.apps.PoliciesConfig",
     "safe_transaction_service.safe_messages.apps.SafeMessagesConfig",
     "safe_transaction_service.tokens.apps.TokensConfig",
 ]
@@ -317,6 +318,10 @@ CELERY_TASK_ROUTES = (
         ),
         (
             "safe_transaction_service.history.tasks.*",
+            {"queue": "indexing", "delivery_mode": "transient"},
+        ),
+        (
+            "safe_transaction_service.policies.tasks.*",
             {"queue": "indexing", "delivery_mode": "transient"},
         ),
         (
@@ -674,6 +679,15 @@ PROCESSING_ALL_SAFES_TOGETHER = env.bool(
     "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
 
+# Policies
+# ------------------------------------------------------------------------------
+POLICIES_ENABLE_INDEXING = env.bool(
+    "POLICIES_ENABLE_INDEXING", default=True
+)  # Index `SafePolicyGuard` events. Indexing additionally requires the chain to have a
+# known guard deployment, see `policies.constants.GUARD_DEPLOYMENTS`
+POLICIES_ENABLE_API = env.bool(
+    "POLICIES_ENABLE_API", default=True
+)  # Expose the policy endpoints under `/api/v2`
 
 # Tokens
 # ------------------------------------------------------------------------------
