@@ -24,6 +24,7 @@ from safe_transaction_service.utils.redis import get_redis
 from ..services import CollectiblesService
 from ..services.collectibles_service import (
     Collectible,
+    CollectiblesServiceException,
     CollectiblesServiceProvider,
     CollectibleWithMetadata,
     Erc721InfoWithLogo,
@@ -32,7 +33,7 @@ from ..services.collectibles_service import (
 )
 from .factories import ERC721TransferFactory
 from .mocks.mock_dappcon_nft import dappcon_nft_metadata_mock
-from .utils import just_test_if_mainnet_node
+from .utils import just_test_if_mainnet_node, skip_on
 
 
 class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
@@ -392,6 +393,10 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             ],
         )
 
+    @skip_on(
+        CollectiblesServiceException,
+        reason="IPFS gateway not available",
+    )
     def test_retrieve_metadata_from_uri(self):
         collectibles_service = CollectiblesServiceProvider()
         # Test ipfs
