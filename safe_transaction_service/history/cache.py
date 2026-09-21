@@ -176,9 +176,11 @@ def get_cache_view_tag_and_addresses(
     elif isinstance(instance, MultisigTransaction):
         cache_tag = CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY
         addresses.append(instance.safe)
-    elif isinstance(instance, MultisigConfirmation) and instance.multisig_transaction:
+    elif isinstance(instance, MultisigConfirmation) and (
+        safe_address := instance.safe_address
+    ):
         cache_tag = CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY
-        addresses.append(instance.multisig_transaction.safe)
+        addresses.append(safe_address)
     elif isinstance(instance, InternalTx):
         cache_tag = CacheSafeTxsView.LIST_TRANSFERS_VIEW_CACHE_KEY
         addresses.append(instance.to)

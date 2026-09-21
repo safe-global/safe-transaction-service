@@ -3,7 +3,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)
 ![Django 5](https://img.shields.io/badge/Django-5-blue.svg)
-[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/safeglobal/safe-transaction-service?label=Docker&sort=semver)](https://hub.docker.com/r/safeglobal/safe-transaction-service)
+[![Container image](https://img.shields.io/badge/ghcr.io-safe--global%2Fsafe--transaction--service-0b5d52?logo=github&logoColor=white)](https://github.com/safe-global/safe-transaction-service/pkgs/container/safe-transaction-service)
 
 # Safe Transaction Service
 Keeps track of transactions sent via Safe contracts. It uses events and

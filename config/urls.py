@@ -13,6 +13,8 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from safe_transaction_service.utils.views import health
+
 schema_cache_timeout = 60 * 60 * 24 * 7  # 1 week
 swagger_urlpatterns = [
     path(
@@ -81,6 +83,9 @@ urlpatterns = swagger_urlpatterns + [
     path("api/v1/", include((urlpatterns_v1, "v1"))),
     path("api/v2/", include((urlpatterns_v2, "v2"))),
     path("check/", lambda request: HttpResponse("Ok"), name="check"),
+    # Trailing slash is optional so `APPEND_SLASH` never answers a probe with a redirect
+    re_path(r"^health/live/?$", health.live, name="health-live"),
+    re_path(r"^health/ready/?$", health.ready, name="health-ready"),
 ]
 
 

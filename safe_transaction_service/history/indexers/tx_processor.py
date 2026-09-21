@@ -763,6 +763,10 @@ class SafeTxProcessor(TxProcessor):
                         "ethereum_tx": ethereum_tx,
                         "signature": safe_signature.export_signature(),
                         "signature_type": safe_signature.signature_type.value,
+                        # Stored without the `MultisigTransaction` FK, and the transaction
+                        # may not exist in this service, so the event payload and the view
+                        # cache take the Safe from the contract being indexed
+                        "safe_address": contract_address,
                     },
                 )
                 if not multisig_confirmation.ethereum_tx_id:

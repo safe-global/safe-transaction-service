@@ -112,6 +112,7 @@ jobs:
   docker-deploy:
     permissions:
       contents: read
+      packages: write
     runs-on: ubuntu-latest
     needs:
       - linting
@@ -128,6 +129,12 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: GHCR login
+      uses: docker/login-action@371161bbe7024a29a25c5e19bfcbc0804fe9ad2c # v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     - name: Deploy Master
       if: github.ref == 'refs/heads/main'
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
@@ -135,7 +142,9 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
-        tags: safeglobal/safe-transaction-service:staging
+        tags: |
+          safeglobal/safe-transaction-service:staging
+          ghcr.io/safe-global/safe-transaction-service:staging
         platforms: |
           linux/amd64
           linux/arm64
@@ -148,7 +157,9 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
-        tags: safeglobal/safe-transaction-service:develop
+        tags: |
+          safeglobal/safe-transaction-service:develop
+          ghcr.io/safe-global/safe-transaction-service:develop
         platforms: |
           linux/amd64
           linux/arm64
@@ -164,6 +175,8 @@ jobs:
         tags: |
           safeglobal/safe-transaction-service:${{ github.event.release.tag_name }}
           safeglobal/safe-transaction-service:latest
+          ghcr.io/safe-global/safe-transaction-service:${{ github.event.release.tag_name }}
+          ghcr.io/safe-global/safe-transaction-service:latest
         platforms: |
           linux/amd64
           linux/arm64
