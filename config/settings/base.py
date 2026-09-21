@@ -744,7 +744,8 @@ AWS_CONFIGURED = bool(
     AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET_NAME
 )
 
-IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://ipfs.io/ipfs/")
+# Public IPFS gateways are best effort and rate limited, a dedicated gateway is needed for production usage
+IPFS_GATEWAY = env("IPFS_GATEWAY", default="https://ipfs.filebase.io/ipfs/")
 
 # Shell Plus
 # ------------------------------------------------------------------------------
