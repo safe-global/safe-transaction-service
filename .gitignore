@@ -125,3 +125,7 @@ safe_transaction_service/media
 # User-specific stuff:
 .idea/
 .vscode/
+
+# Claude Code worktrees
+/.claude/worktrees/
+/.claude/settings.local.json
