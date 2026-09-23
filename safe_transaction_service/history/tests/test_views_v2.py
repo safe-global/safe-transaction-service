@@ -213,6 +213,19 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             ),
         }
         response = self.client.post(url, format="json", data=data)
+        self.assertEqual(
+            response.data["non_field_errors"][0],
+            f"No valid signature found for signer={delegator.address}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Valid signature from an account that is not the delegator
+        data["signature"] = to_0x_hex_str(
+            Account.create().unsafe_sign_hash(fast_keccak_text("not-the-delegator"))[
+                "signature"
+            ]
+        )
+        response = self.client.post(url, format="json", data=data)
         self.assertIn(
             "Signature does not match provided delegator",
             response.data["non_field_errors"][0],

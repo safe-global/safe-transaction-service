@@ -2304,6 +2304,60 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             response.data["non_field_errors"][0],
         )
 
+    def test_post_multisig_transactions_with_zero_address_signature(self):
+        """
+        A signature that cannot be recovered parses with ``NULL_ADDRESS`` as owner, and
+        it must be rejected as not valid.
+        """
+        safe_owner = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+        safe_address = safe.address
+
+        data = {
+            "to": Account.create().address,
+            "value": 0,
+            "data": None,
+            "operation": 0,
+            "nonce": 0,
+            "safeTxGas": 0,
+            "baseGas": 0,
+            "gasPrice": 0,
+            "gasToken": NULL_ADDRESS,
+            "refundReceiver": NULL_ADDRESS,
+            "sender": safe_owner.address,
+        }
+        safe_tx = safe.build_multisig_tx(
+            data["to"],
+            data["value"],
+            data["data"],
+            data["operation"],
+            data["safeTxGas"],
+            data["baseGas"],
+            data["gasPrice"],
+            data["gasToken"],
+            data["refundReceiver"],
+            safe_nonce=data["nonce"],
+        )
+        data["contractTransactionHash"] = to_0x_hex_str(safe_tx.safe_tx_hash)
+        # `r = s = 0` cannot be recovered. `v=27` is EOA and `v=31` is eth_sign
+        for v in (27, 31):
+            with self.subTest(v=v):
+                signature = bytes(64) + bytes([v])
+                data["signature"] = to_0x_hex_str(signature)
+                response = self.client.post(
+                    reverse("v1:history:multisig-transactions", args=(safe_address,)),
+                    format="json",
+                    data=data,
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+                self.assertEqual(
+                    response.data["non_field_errors"][0],
+                    f"Signature={to_0x_hex_str(signature)} for owner={NULL_ADDRESS} is not valid",
+                )
+        self.assertEqual(MultisigTransaction.objects.count(), 0)
+
     def test_post_multisig_transactions_with_owner_and_delegate(self):
         """Owner that is also a delegate should be able to sign alongside other owners."""
         safe_owners = [Account.create() for _ in range(4)]
