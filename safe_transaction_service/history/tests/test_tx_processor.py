@@ -423,8 +423,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             internal_tx___from=safe_address,
             internal_tx__value=0,
         )
-        # `not_an_owner` is not a current owner, so this fails with `OwnerCannotBeRemoved`
-        # after trying to set the threshold to 99.
+        # `not_an_owner` is not an owner, so this fails with `OwnerCannotBeRemoved`
+        # and its threshold must not reach the cached Safe status.
         failing_remove_owner_tx = InternalTxDecodedFactory(
             function_name="removeOwner",
             old_owner=not_an_owner,
