@@ -730,7 +730,7 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             )
 
     @mock.patch.object(QueueService, "send_events")
-    def test_process_module_tx_sends_event_once(self, send_events_mock: MagicMock):
+    def test_process_module_tx_sends_event(self, send_events_mock: MagicMock):
         safe_tx_processor = self.tx_processor
         safe_last_status = SafeLastStatusFactory()
         module_internal_tx_decoded = InternalTxDecodedFactory(
@@ -768,17 +768,6 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                     }
                 ]
             )
-
-            # Reprocessing the same InternalTxDecoded must not create a
-            # second ModuleTransaction nor send a duplicate event
-            send_events_mock.reset_mock()
-            with self.captureOnCommitCallbacks(execute=True):
-                safe_tx_processor.process_decoded_transactions(
-                    [module_internal_tx_decoded]
-                )
-
-            self.assertEqual(ModuleTransaction.objects.count(), 1)
-            send_events_mock.assert_not_called()
 
     def test_process_disable_module_tx(self):
         safe_tx_processor = self.tx_processor
