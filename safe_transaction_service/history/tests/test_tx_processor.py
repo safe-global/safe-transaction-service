@@ -7,6 +7,7 @@ from django.test import TestCase
 
 from eth_account import Account
 from eth_utils import keccak
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.eth.utils import fast_keccak_text
@@ -24,6 +25,7 @@ from safe_transaction_service.safe_messages.tests.factories import (
 from ..indexers.tx_processor import (
     CannotFindPreviousTrace,
     ModuleCannotBeDisabled,
+    OwnerCannotBeRemoved,
     SafeTxProcessor,
     SafeTxProcessorProvider,
 )
@@ -407,6 +409,55 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             SafeSignatureType.APPROVED_HASH.value,
         )
 
+    def test_process_decoded_txs_failed_remove_owner_does_not_corrupt_batch_cache(self):
+        tx_processor = self.tx_processor
+        owner = Account.create().address
+        not_an_owner = Account.create().address
+        new_owner = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner], threshold=1, nonce=0)
+        safe_address = safe_last_status.address
+
+        # This tx succeeds and puts the Safe status in the batch cache.
+        change_threshold_tx = InternalTxDecodedFactory(
+            function_name="changeThreshold",
+            threshold=1,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        # `not_an_owner` is not an owner, so this fails with `OwnerCannotBeRemoved`
+        # and its threshold must not reach the cached Safe status.
+        failing_remove_owner_tx = InternalTxDecodedFactory(
+            function_name="removeOwner",
+            old_owner=not_an_owner,
+            threshold=99,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        # `threshold=0` means the event has no threshold, so it falls back to the
+        # cached Safe status threshold.
+        add_owner_tx = InternalTxDecodedFactory(
+            function_name="addOwnerWithThreshold",
+            owner=new_owner,
+            threshold=0,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+
+        with self.assertLogs(
+            "safe_transaction_service.history.indexers.tx_processor", level="ERROR"
+        ) as cm:
+            results = tx_processor.process_decoded_transactions(
+                [change_threshold_tx, failing_remove_owner_tx, add_owner_tx]
+            )
+            self.assertTrue(
+                any(OwnerCannotBeRemoved.__name__ in line for line in cm.output)
+            )
+        self.assertEqual(results, [True, False, True])
+
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_last_status.threshold, 1)
+        self.assertEqual(safe_last_status.owners, [new_owner, owner])
+
     @mock.patch.object(QueueService, "send_events")
     def test_tx_processor_approve_hash_sends_event(self, send_events_mock: MagicMock):
         tx_processor = self.tx_processor
@@ -726,6 +777,46 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             self.assertEqual(module_tx.to, module_internal_tx_decoded.arguments["to"])
             self.assertEqual(
                 module_tx.value, module_internal_tx_decoded.arguments["value"]
+            )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_process_module_tx_sends_event(self, send_events_mock: MagicMock):
+        safe_tx_processor = self.tx_processor
+        safe_last_status = SafeLastStatusFactory()
+        module_internal_tx_decoded = InternalTxDecodedFactory(
+            function_name="execTransactionFromModule",
+            internal_tx___from=safe_last_status.address,
+            internal_tx__to="0x34CfAC646f301356fAa8B21e94227e3583Fe3F5F",
+            internal_tx__trace_address="0,0,0,4",
+            internal_tx__ethereum_tx__tx_hash="0x59f20a56a94ad4ee934468eb26b9148151289c97fefece779e05d98befd156f0",
+        )
+
+        with mock.patch.object(
+            TracingManager,
+            "trace_transaction",
+            autospec=True,
+            return_value=module_traces,
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                safe_tx_processor.process_decoded_transactions(
+                    [module_internal_tx_decoded]
+                )
+
+            self.assertEqual(ModuleTransaction.objects.count(), 1)
+            module_tx = ModuleTransaction.objects.get()
+            send_events_mock.assert_called_once_with(
+                [
+                    {
+                        "timestamp": int(module_tx.internal_tx.timestamp.timestamp()),
+                        "address": module_tx.safe,
+                        "type": TransactionServiceEventType.MODULE_TRANSACTION.name,
+                        "module": module_tx.module,
+                        "txHash": to_0x_hex_str(
+                            HexBytes(module_tx.internal_tx.ethereum_tx_id)
+                        ),
+                        "chainId": str(EthereumNetwork.GANACHE.value),
+                    }
+                ]
             )
 
     def test_process_disable_module_tx(self):

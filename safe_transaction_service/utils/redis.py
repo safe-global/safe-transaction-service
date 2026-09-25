@@ -17,10 +17,9 @@ def get_redis() -> Redis:
     # Encode memoryview for redis when using pickle
     copyreg.pickle(memoryview, lambda val: (memoryview, (bytes(val),)))
 
-    connection_pool = ConnectionPool(
-        max_connections=settings.REDIS_POOL_MAX_CONNECTIONS
-    ).from_url(
+    connection_pool = ConnectionPool.from_url(
         settings.REDIS_URL,
+        max_connections=settings.REDIS_POOL_MAX_CONNECTIONS,
         socket_connect_timeout=settings.REDIS_CONNECTION_TIMEOUT_SECONDS,
         socket_timeout=settings.REDIS_TIMEOUT_SECONDS,
         health_check_interval=30,

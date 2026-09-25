@@ -600,14 +600,14 @@ class SafeTxProcessor(TxProcessor):
                 logger.debug(
                     "[%s] Processing owner/threshold modification", contract_address
                 )
-                safe_last_status.threshold = (
-                    arguments["_threshold"] or safe_last_status.threshold
-                )  # Event doesn't have threshold
                 owner = arguments["owner"]
                 if function_name == "addOwnerWithThreshold":
                     safe_last_status.owners.insert(0, owner)
                 else:  # removeOwner, removeOwnerWithThreshold
                     self.swap_owner(internal_tx, safe_last_status, owner, None)
+                safe_last_status.threshold = (
+                    arguments["_threshold"] or safe_last_status.threshold
+                )
                 self.store_new_safe_status(
                     safe_last_status, internal_tx, ["owners", "threshold"]
                 )
