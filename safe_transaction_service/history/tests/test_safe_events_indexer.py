@@ -1459,8 +1459,15 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
                 self.ethereum_client, "get_transaction_receipt", return_value=None
             ),
         ):
-            with self.assertRaises(TransactionNotFoundException):
+            with self.assertRaises(TransactionNotFoundException) as cm:
                 safe_events_indexer.process_elements(safe_events_mock)
+        self.assertIn(
+            cm.exception.tx_hash,
+            {
+                HexBytes(safe_event["transactionHash"])
+                for safe_event in safe_events_mock
+            },
+        )
 
         # Receipt fetch failed: no InternalTx/InternalTxDecoded created
         self.assertEqual(InternalTx.objects.count(), 0)
@@ -1505,8 +1512,15 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
                 self.ethereum_client, "get_transaction", return_value=None
             ),
         ):
-            with self.assertRaises(TransactionNotFoundException):
+            with self.assertRaises(TransactionNotFoundException) as cm:
                 safe_events_indexer.process_elements(safe_events_mock)
+        self.assertIn(
+            cm.exception.tx_hash,
+            {
+                HexBytes(safe_event["transactionHash"])
+                for safe_event in safe_events_mock
+            },
+        )
 
         # Tx fetch failed: no InternalTx/InternalTxDecoded created
         self.assertEqual(InternalTx.objects.count(), 0)

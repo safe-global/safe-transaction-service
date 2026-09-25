@@ -647,6 +647,12 @@ ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES = env.int(
     "ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES", default=3
 )  # Consecutive failures before aborting the out-of-sync erc20/721 indexing loop,
 # so a persistently failing RPC does not spin forever until the Celery timeout
+ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES = env.int(
+    "ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES", default=10
+)  # Failures fetching the same tx, in any indexer, between critical alerts
+ETH_INDEX_STUCK_TX_FAILURE_COUNTER_TTL = env.int(
+    "ETH_INDEX_STUCK_TX_FAILURE_COUNTER_TTL", default=60 * 10
+)  # Seconds the per-tx failure counter is kept in Redis after its last failure
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`

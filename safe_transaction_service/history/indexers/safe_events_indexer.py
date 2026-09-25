@@ -973,7 +973,8 @@ class SafeEventsIndexer(EventsIndexer):
             tx = tx or self.ethereum_client.get_transaction(tx_hash)  # Retry if failed
             if not tx:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
+                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}",
+                    tx_hash=HexBytes(tx_hash),
                 )
             txs.append(tx)
 
@@ -1015,7 +1016,8 @@ class SafeEventsIndexer(EventsIndexer):
             )  # Retry if failed
             if not tx_receipt:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx['hash']))}"
+                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx['hash']))}",
+                    tx_hash=HexBytes(tx["hash"]),
                 )
             txs_with_receipts.append((tx, tx_receipt))
 
