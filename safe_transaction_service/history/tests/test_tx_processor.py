@@ -24,6 +24,7 @@ from safe_transaction_service.safe_messages.tests.factories import (
 from ..indexers.tx_processor import (
     CannotFindPreviousTrace,
     ModuleCannotBeDisabled,
+    OwnerCannotBeRemoved,
     SafeTxProcessor,
     SafeTxProcessorProvider,
 )
@@ -406,6 +407,55 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             multisig_confirmation.signature_type,
             SafeSignatureType.APPROVED_HASH.value,
         )
+
+    def test_process_decoded_txs_failed_remove_owner_does_not_corrupt_batch_cache(self):
+        tx_processor = self.tx_processor
+        owner = Account.create().address
+        not_an_owner = Account.create().address
+        new_owner = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner], threshold=1, nonce=0)
+        safe_address = safe_last_status.address
+
+        # This tx succeeds and puts the Safe status in the batch cache.
+        change_threshold_tx = InternalTxDecodedFactory(
+            function_name="changeThreshold",
+            threshold=1,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        # `not_an_owner` is not a current owner, so this fails with `OwnerCannotBeRemoved`
+        # after trying to set the threshold to 99.
+        failing_remove_owner_tx = InternalTxDecodedFactory(
+            function_name="removeOwner",
+            old_owner=not_an_owner,
+            threshold=99,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        # `threshold=0` means the event has no threshold, so it falls back to the
+        # cached Safe status threshold.
+        add_owner_tx = InternalTxDecodedFactory(
+            function_name="addOwnerWithThreshold",
+            owner=new_owner,
+            threshold=0,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+
+        with self.assertLogs(
+            "safe_transaction_service.history.indexers.tx_processor", level="ERROR"
+        ) as cm:
+            results = tx_processor.process_decoded_transactions(
+                [change_threshold_tx, failing_remove_owner_tx, add_owner_tx]
+            )
+            self.assertTrue(
+                any(OwnerCannotBeRemoved.__name__ in line for line in cm.output)
+            )
+        self.assertEqual(results, [True, False, True])
+
+        safe_last_status = SafeLastStatus.objects.get(address=safe_address)
+        self.assertEqual(safe_last_status.threshold, 1)
+        self.assertEqual(safe_last_status.owners, [new_owner, owner])
 
     @mock.patch.object(QueueService, "send_events")
     def test_tx_processor_approve_hash_sends_event(self, send_events_mock: MagicMock):
