@@ -249,8 +249,8 @@ class SafeEventsIndexer(EventsIndexer):
         processed_elements = self._process_decoded_elements(processable_events)
 
         # 13. Mark ALL original receipts as processed so blocked/filtered-out ones
-        # are never re-fetched. Receipt-fetch failures never reach here (they raise
-        # in step 11), so nothing that still needs indexing is marked here.
+        # are never re-fetched. Tx and receipt fetch failures never reach here (they
+        # raise in steps 4 and 11), so nothing that still needs indexing is marked here.
         for log_receipt in not_processed_log_receipts:
             self._mark_processed(
                 log_receipt["transactionHash"],
@@ -958,6 +958,8 @@ class SafeEventsIndexer(EventsIndexer):
 
         :param tx_hashes: List of transaction hashes to fetch
         :return: List of transactions
+        :raises TransactionNotFoundException: if any tx cannot be fetched, so the
+            block range is retried and its events are not marked as processed
         """
         if not tx_hashes:
             return []
@@ -969,8 +971,11 @@ class SafeEventsIndexer(EventsIndexer):
             strict=False,
         ):
             tx = tx or self.ethereum_client.get_transaction(tx_hash)  # Retry if failed
-            if tx:
-                txs.append(tx)
+            if not tx:
+                raise TransactionNotFoundException(
+                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
+                )
+            txs.append(tx)
 
         return txs
 
