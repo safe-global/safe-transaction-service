@@ -956,8 +956,13 @@ class SafeEventsIndexer(EventsIndexer):
         Fetch transactions from RPC without receipts.
         Used for conditional indexing to check tx._from before deciding to fetch receipts.
 
+        If a tx cannot be fetched, raises ``TransactionNotFoundException`` so the
+        caller retries the whole block range instead of advancing past a tx whose
+        events would otherwise be dropped.
+
         :param tx_hashes: List of transaction hashes to fetch
         :return: List of transactions
+        :raises TransactionNotFoundException: if any tx cannot be fetched
         """
         if not tx_hashes:
             return []
@@ -969,8 +974,11 @@ class SafeEventsIndexer(EventsIndexer):
             strict=False,
         ):
             tx = tx or self.ethereum_client.get_transaction(tx_hash)  # Retry if failed
-            if tx:
-                txs.append(tx)
+            if not tx:
+                raise TransactionNotFoundException(
+                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
+                )
+            txs.append(tx)
 
         return txs
 

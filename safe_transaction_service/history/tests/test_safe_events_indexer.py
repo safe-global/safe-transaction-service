@@ -1476,6 +1476,52 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
                 )
             )
 
+    def test_conditional_indexing_tx_fetch_failure(self):
+        """
+        When conditional indexing is enabled and a tx cannot be fetched, `process_elements`
+        must raise `TransactionNotFoundException` so the block range is retried on a later
+        run. No events must be processed and no log receipt must be marked processed, since
+        advancing past them would drop their events.
+        """
+        blocklisted_address = Account.create().address
+
+        # Do NOT create EthereumTx rows: txs are missing and must be fetched from RPC
+        self.assertEqual(EthereumTx.objects.count(), 0)
+
+        safe_events_indexer = SafeEventsIndexer(
+            self.ethereum_client,
+            confirmations=0,
+            blocks_to_reindex_again=0,
+            ignored_initiators={blocklisted_address},
+        )
+
+        with (
+            mock.patch.object(
+                self.ethereum_client,
+                "get_transactions",
+                side_effect=lambda tx_hashes: [None] * len(tx_hashes),
+            ),
+            mock.patch.object(
+                self.ethereum_client, "get_transaction", return_value=None
+            ),
+        ):
+            with self.assertRaises(TransactionNotFoundException):
+                safe_events_indexer.process_elements(safe_events_mock)
+
+        # Tx fetch failed: no InternalTx/InternalTxDecoded created
+        self.assertEqual(InternalTx.objects.count(), 0)
+        self.assertEqual(InternalTxDecoded.objects.count(), 0)
+
+        # Log receipts must remain unprocessed so they are retried on a later run
+        for safe_event in safe_events_mock:
+            self.assertFalse(
+                safe_events_indexer._is_processed(
+                    safe_event["transactionHash"],
+                    safe_event["blockHash"],
+                    safe_event["logIndex"],
+                )
+            )
+
 
 class TestSafeEventsIndexerV1_5_0(SafeEventsIndexerBaseAbstractTestBase):
     @property
