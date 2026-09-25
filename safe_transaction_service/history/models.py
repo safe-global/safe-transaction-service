@@ -1790,7 +1790,7 @@ class MultisigTransaction(TimeStampedModel):
         )
 
 
-class ModuleTransactionManager(models.Manager):
+class ModuleTransactionManager(BulkCreateSignalMixin, models.Manager):
     def not_indexed_metadata_contract_addresses(self):
         """
         Find contracts with metadata (abi, contract name) not indexed
