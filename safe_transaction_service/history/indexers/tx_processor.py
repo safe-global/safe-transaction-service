@@ -707,9 +707,9 @@ class SafeTxProcessor(TxProcessor):
                     ethereum_tx, module_address, contract_address
                 )
                 module_data = HexBytes(arguments["data"])
-                # `get_or_create`, not `bulk_create`: `post_save` only fires with
-                # `created=True` on the first insert, so the MODULE_TRANSACTION
-                # event is sent once per module transaction, not on reprocessing.
+                # `post_save` fires with `created=True` only on the first insert,
+                # so the MODULE_TRANSACTION event is sent once per module
+                # transaction, not again on reprocessing.
                 ModuleTransaction.objects.get_or_create(
                     internal_tx=internal_tx,
                     defaults={
