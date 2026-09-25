@@ -10,7 +10,7 @@ max_requests_jitter = (
     10_000  # Randomize max_requests to prevent all workers restarting at the same time
 )
 # graceful_timeout = 90  # https://stackoverflow.com/a/24305939
-log_level = "info"
+loglevel = "info"
 preload_app = False  # Load application code before the worker processes are forked (problems with gevent patching)
 # For timeout to work with gevent, a custom GeventWorker needs to be used
 timeout = gunicorn_request_timeout
