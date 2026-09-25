@@ -249,8 +249,8 @@ class SafeEventsIndexer(EventsIndexer):
         processed_elements = self._process_decoded_elements(processable_events)
 
         # 13. Mark ALL original receipts as processed so blocked/filtered-out ones
-        # are never re-fetched. Receipt-fetch failures never reach here (they raise
-        # in step 11), so nothing that still needs indexing is marked here.
+        # are never re-fetched. Tx and receipt fetch failures never reach here (they
+        # raise in steps 4 and 11), so nothing that still needs indexing is marked here.
         for log_receipt in not_processed_log_receipts:
             self._mark_processed(
                 log_receipt["transactionHash"],
@@ -956,13 +956,10 @@ class SafeEventsIndexer(EventsIndexer):
         Fetch transactions from RPC without receipts.
         Used for conditional indexing to check tx._from before deciding to fetch receipts.
 
-        If a tx cannot be fetched, raises ``TransactionNotFoundException`` so the
-        caller retries the whole block range instead of advancing past a tx whose
-        events would otherwise be dropped.
-
         :param tx_hashes: List of transaction hashes to fetch
         :return: List of transactions
-        :raises TransactionNotFoundException: if any tx cannot be fetched
+        :raises TransactionNotFoundException: if any tx cannot be fetched, so the
+            block range is retried and its events are not marked as processed
         """
         if not tx_hashes:
             return []
