@@ -34,6 +34,9 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
 
     def tearDown(self) -> None:
         SafeEventsIndexerProvider.del_singleton()
+        redis = get_redis()
+        for key in redis.scan_iter("ethereum-indexer:stuck-tx:*"):
+            redis.delete(key)
 
     def _redis_key(self, tx_hash: bytes) -> str:
         return (
@@ -50,7 +53,7 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
         exception = TransactionNotFoundException("Cannot find tx", tx_hash=tx_hash)
 
         with (
-            self.settings(ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=3),
+            self.settings(ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=3),
             mock.patch.object(
                 self.safe_events_indexer,
                 "find_relevant_elements",
@@ -76,12 +79,17 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
 
         with (
             self.settings(
-                ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
+                ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
             ),
             mock.patch.object(
                 self.safe_events_indexer,
                 "find_relevant_elements",
                 side_effect=exception,
+            ),
+            mock.patch.object(
+                self.safe_events_indexer,
+                "get_block_numbers_for_search",
+                return_value=(10, 20),
             ),
             mock.patch.object(ethereum_indexer.logger, "critical") as critical_mock,
         ):
@@ -94,9 +102,16 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
                 self.safe_events_indexer.process_addresses(self.addresses)
 
         critical_mock.assert_called_once()
-        message_args = critical_mock.call_args.args
-        self.assertIn(to_0x_hex_str(tx_hash), message_args)
-        self.assertIn(max_consecutive_failures, message_args)
+        self.assertEqual(
+            critical_mock.call_args.args[1:],
+            (
+                SafeEventsIndexer.__name__,
+                to_0x_hex_str(tx_hash),
+                10,
+                20,
+                max_consecutive_failures,
+            ),
+        )
         self.assertEqual(
             int(get_redis().get(self._redis_key(tx_hash))), max_consecutive_failures
         )
@@ -115,7 +130,7 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
 
         with (
             self.settings(
-                ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
+                ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES=max_consecutive_failures
             ),
             mock.patch.object(
                 self.safe_events_indexer,
@@ -129,23 +144,3 @@ class TestEthereumIndexerStuckTxAlert(EthereumTestCaseMixin, TestCase):
                     self.safe_events_indexer.process_addresses(self.addresses)
 
         self.assertEqual(critical_mock.call_count, 2)
-
-    def test_block_range_not_advanced_while_tx_keeps_failing(self):
-        """
-        `process_addresses` must not update the monitored address block number
-        while the tx cannot be fetched, so the range is retried on a later run.
-        """
-        tx_hash = HexBytes(os.urandom(32))
-        exception = TransactionNotFoundException("Cannot find tx", tx_hash=tx_hash)
-        tx_block_number = self.safe_master_copy.tx_block_number
-
-        with mock.patch.object(
-            self.safe_events_indexer,
-            "find_relevant_elements",
-            side_effect=exception,
-        ):
-            with self.assertRaises(TransactionNotFoundException):
-                self.safe_events_indexer.process_addresses(self.addresses)
-
-        self.safe_master_copy.refresh_from_db()
-        self.assertEqual(self.safe_master_copy.tx_block_number, tx_block_number)

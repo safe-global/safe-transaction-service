@@ -122,30 +122,32 @@ class EthereumIndexer(ABC):
         self, tx_hash: bytes, from_block_number: int, to_block_number: int
     ) -> None:
         """
-        Count, across indexer runs, how many times in a row a tx could not be
-        fetched from the RPC and log a critical alert every
-        `ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES` failures.
-
-        The count is kept in Redis instead of in memory: consecutive runs of the
-        same periodic task are not guaranteed to land on the same worker process.
+        Count the failures fetching `tx_hash` and log a critical alert every
+        `ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES` failures. The counter lives
+        in Redis, as consecutive runs of a task can land on different workers.
 
         :param tx_hash:
         :param from_block_number: first block of the range being indexed
         :param to_block_number: last block of the range being indexed
         """
-        redis = get_redis()
-        key = f"ethereum-indexer:stuck-tx:{self.__class__.__name__}:{to_0x_hex_str(HexBytes(tx_hash))}"
-        consecutive_failures = redis.incr(key)
-        redis.expire(key, settings.ETH_EVENTS_INDEX_STUCK_TX_FAILURE_COUNTER_TTL)
+        tx_hash_hex = to_0x_hex_str(HexBytes(tx_hash))
+        key = f"ethereum-indexer:stuck-tx:{self.__class__.__name__}:{tx_hash_hex}"
+        consecutive_failures, _ = (
+            get_redis()
+            .pipeline()
+            .incr(key)
+            .expire(key, settings.ETH_INDEX_STUCK_TX_FAILURE_COUNTER_TTL)
+            .execute()
+        )
 
-        max_consecutive_failures = (
-            settings.ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES
+        max_consecutive_failures = max(
+            settings.ETH_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES, 1
         )
         if consecutive_failures % max_consecutive_failures == 0:
             logger.critical(
                 "%s: Cannot fetch tx-hash=%s for block-range=[%d, %d], failed %d consecutive times",
                 self.__class__.__name__,
-                to_0x_hex_str(HexBytes(tx_hash)),
+                tx_hash_hex,
                 from_block_number,
                 to_block_number,
                 consecutive_failures,
@@ -501,7 +503,7 @@ class EthereumIndexer(ABC):
                 self._alert_on_stuck_tx_fetch(
                     e.tx_hash, from_block_number, to_block_number
                 )
-            raise e
+            raise
         except (
             FindRelevantElementsException,
             SoftTimeLimitExceeded,

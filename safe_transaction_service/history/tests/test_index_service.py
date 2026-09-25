@@ -5,6 +5,7 @@ from unittest.mock import PropertyMock
 from django.test import TestCase
 
 from eth_account import Account
+from hexbytes import HexBytes
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from safe_eth.eth import EthereumClient
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
@@ -48,8 +49,9 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         tx_hashes = [
             "0x52fcb05f2ad209d53d84b0a9a7ce6474ab415db88bc364c088758d70c8b5b0ef"
         ]
-        with self.assertRaisesMessage(TransactionNotFoundException, tx_hashes[0]):
+        with self.assertRaisesMessage(TransactionNotFoundException, tx_hashes[0]) as cm:
             index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
+        self.assertEqual(cm.exception.tx_hash, HexBytes(tx_hashes[0]))
 
         # Test with database txs. Use block_number > current_block_number to prevent storing blocks with wrong
         # hashes that will be indexed by next tests
