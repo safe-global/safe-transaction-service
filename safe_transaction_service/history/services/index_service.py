@@ -56,7 +56,13 @@ class IndexingException(Exception):
 
 
 class TransactionNotFoundException(IndexingException):
-    pass
+    def __init__(self, message: str, tx_hash: bytes | None = None):
+        """
+        :param message:
+        :param tx_hash: hash of the transaction that could not be fetched
+        """
+        super().__init__(message)
+        self.tx_hash = tx_hash
 
 
 class TransactionWithoutBlockException(IndexingException):
@@ -307,7 +313,8 @@ class IndexService:
             )  # Retry fetching if failed
             if not tx_receipt:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
+                    f"Cannot find tx-receipt with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}",
+                    tx_hash=HexBytes(tx_hash),
                 )
             if tx_receipt.get("blockHash") is None:
                 raise TransactionWithoutBlockException(
@@ -320,7 +327,8 @@ class IndexService:
             )  # Retry fetching if failed
             if not tx:
                 raise TransactionNotFoundException(
-                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}"
+                    f"Cannot find tx with tx-hash={to_0x_hex_str(HexBytes(tx_hash))}",
+                    tx_hash=HexBytes(tx_hash),
                 )
             if tx.get("blockHash") is None:
                 raise TransactionWithoutBlockException(

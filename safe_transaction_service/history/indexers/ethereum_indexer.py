@@ -6,15 +6,25 @@ from contextlib import contextmanager
 from logging import getLogger
 from typing import Any
 
+from django.conf import settings
 from django.db.models import Min, QuerySet
 
 from celery.exceptions import SoftTimeLimitExceeded
 from eth_typing import ChecksumAddress, HexStr
+from hexbytes import HexBytes
 from requests import Timeout
 from safe_eth.eth import EthereumClient
+from safe_eth.util.util import to_0x_hex_str
 from web3.exceptions import Web3RPCError
 
-from ..services import IndexingException, IndexService, IndexServiceProvider
+from safe_transaction_service.utils.redis import get_redis
+
+from ..services import (
+    IndexingException,
+    IndexService,
+    IndexServiceProvider,
+    TransactionNotFoundException,
+)
 from .element_already_processed_checker import ElementAlreadyProcessedChecker
 
 logger = getLogger(__name__)
@@ -107,6 +117,39 @@ class EthereumIndexer(ABC):
         ethereum_txs = self.index_service.txs_create_or_update_from_tx_hashes(tx_hashes)
         logger.debug("End prefetching and storing of ethereum txs")
         return ethereum_txs
+
+    def _alert_on_stuck_tx_fetch(
+        self, tx_hash: bytes, from_block_number: int, to_block_number: int
+    ) -> None:
+        """
+        Count, across indexer runs, how many times in a row a tx could not be
+        fetched from the RPC and log a critical alert every
+        `ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES` failures.
+
+        The count is kept in Redis instead of in memory: consecutive runs of the
+        same periodic task are not guaranteed to land on the same worker process.
+
+        :param tx_hash:
+        :param from_block_number: first block of the range being indexed
+        :param to_block_number: last block of the range being indexed
+        """
+        redis = get_redis()
+        key = f"ethereum-indexer:stuck-tx:{self.__class__.__name__}:{to_0x_hex_str(HexBytes(tx_hash))}"
+        consecutive_failures = redis.incr(key)
+        redis.expire(key, settings.ETH_EVENTS_INDEX_STUCK_TX_FAILURE_COUNTER_TTL)
+
+        max_consecutive_failures = (
+            settings.ETH_EVENTS_INDEX_STUCK_TX_MAX_CONSECUTIVE_FAILURES
+        )
+        if consecutive_failures % max_consecutive_failures == 0:
+            logger.critical(
+                "%s: Cannot fetch tx-hash=%s for block-range=[%d, %d], failed %d consecutive times",
+                self.__class__.__name__,
+                to_0x_hex_str(HexBytes(tx_hash)),
+                from_block_number,
+                to_block_number,
+                consecutive_failures,
+            )
 
     @property
     @abstractmethod
@@ -453,6 +496,12 @@ class EthereumIndexer(ABC):
                 current_block_number=current_block_number,
             )
             processed_elements = self.process_elements(elements)
+        except TransactionNotFoundException as e:
+            if e.tx_hash is not None:
+                self._alert_on_stuck_tx_fetch(
+                    e.tx_hash, from_block_number, to_block_number
+                )
+            raise e
         except (
             FindRelevantElementsException,
             SoftTimeLimitExceeded,
