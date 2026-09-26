@@ -33,16 +33,16 @@ class CoinMarketCapClient(BaseHTTPClient):
             "X-CMC_PRO_API_KEY": api_token,
         }
 
-    def download_file(self, url: str, taget_folder: str, local_filename: str) -> str:
-        if not os.path.exists(taget_folder):
-            os.makedirs(taget_folder)
+    def download_file(self, url: str, target_folder: str, local_filename: str) -> str:
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder)
         with self.http_session.get(
             url, stream=True, timeout=self.request_timeout
         ) as response:
             if not response.ok:
                 logger.warning("Image not found for url %s", url)
                 return None
-            with open(os.path.join(taget_folder, local_filename), "wb") as f:
+            with open(os.path.join(target_folder, local_filename), "wb") as f:
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
                         f.write(chunk)
