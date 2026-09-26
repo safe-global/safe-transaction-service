@@ -40,6 +40,7 @@ from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.contract import Contract
 
 from safe_transaction_service.contracts.models import ContractAbi
+from safe_transaction_service.policies.abis import SAFE_POLICY_GUARD_ABI
 from safe_transaction_service.utils.utils import running_on_gevent
 
 from .decoder_abis.aave import (
@@ -479,6 +480,8 @@ class TxDecoder(SafeTxDecoder):
 
         gnosis_safe = [gnosis_safe_allowance_module_abi]
 
+        safe_policy_guard = [SAFE_POLICY_GUARD_ABI]
+
         safe_to_l2_migration = [get_safe_to_l2_migration_contract(self.dummy_w3).abi]
 
         erc_contracts = [
@@ -507,6 +510,7 @@ class TxDecoder(SafeTxDecoder):
             + sight_contracts
             + gnosis_protocol
             + gnosis_safe
+            + safe_policy_guard
             + safe_to_l2_migration
             + erc_contracts
             + self.multisend_abis
