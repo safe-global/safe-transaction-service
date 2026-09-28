@@ -66,5 +66,7 @@ def only_one_running_task(
     lock_name = get_task_lock_name(task.name, lock_name_suffix=lock_name_suffix)
     with redis.lock(lock_name, blocking=False, timeout=lock_timeout) as lock:
         ACTIVE_LOCKS.add(lock_name)
-        yield lock
-        ACTIVE_LOCKS.remove(lock_name)
+        try:
+            yield lock
+        finally:
+            ACTIVE_LOCKS.discard(lock_name)
