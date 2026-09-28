@@ -1,17 +1,24 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from unittest import mock
+from unittest.mock import MagicMock
+
 from django.test import TestCase
 
 from hexbytes import HexBytes
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 
+from safe_transaction_service.events.services.queue_service import QueueService
+
 from ..indexers import Erc20EventsIndexerProvider
 from ..indexers.erc20_events_indexer import AddressesCache
 from ..models import (
     ERC20Transfer,
+    ERC721Transfer,
     EthereumBlock,
     EthereumTx,
     IndexingStatus,
     SafeRelevantTransaction,
+    TransactionServiceEventType,
 )
 from .factories import EthereumTxFactory, SafeContractFactory
 from .mocks.mocks_erc20_events_indexer import log_receipt_mock
@@ -194,6 +201,58 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         (transfer,) = list(indexer.events_to_erc20_transfer(log_receipt_mock))
         self.assertFalse(transfer._to_is_a_safe)
         self.assertTrue(transfer._from_is_a_safe)
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_process_elements_erc20_sends_event(self, send_events_mock: MagicMock):
+        log_receipt = log_receipt_mock[0]
+        EthereumTxFactory(
+            tx_hash=log_receipt["transactionHash"],
+            block__block_hash=log_receipt["blockHash"],
+        )
+        SafeContractFactory(address=log_receipt["args"]["to"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.erc20_events_indexer.process_elements(log_receipt_mock)
+
+        self.assertEqual(ERC20Transfer.objects.count(), 1)
+        self.assertEqual(
+            [
+                payload["type"]
+                for call in send_events_mock.call_args_list
+                for payload in call.args[0]
+            ],
+            [TransactionServiceEventType.INCOMING_TOKEN.name],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_process_elements_erc721_sends_event(self, send_events_mock: MagicMock):
+        log_receipt = log_receipt_mock[0]
+        erc721_log_receipt = {
+            **log_receipt,
+            "args": {
+                "from": log_receipt["args"]["from"],
+                "to": log_receipt["args"]["to"],
+                "tokenId": 7,
+            },
+        }
+        EthereumTxFactory(
+            tx_hash=log_receipt["transactionHash"],
+            block__block_hash=log_receipt["blockHash"],
+        )
+        SafeContractFactory(address=log_receipt["args"]["from"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.erc20_events_indexer.process_elements([erc721_log_receipt])
+
+        self.assertEqual(ERC721Transfer.objects.count(), 1)
+        self.assertEqual(
+            [
+                payload["type"]
+                for call in send_events_mock.call_args_list
+                for payload in call.args[0]
+            ],
+            [TransactionServiceEventType.OUTGOING_TOKEN.name],
+        )
 
     def test_get_almost_updated_addresses(self):
         self.assertIsNone(self.erc20_events_indexer.addresses_cache)

@@ -12,6 +12,8 @@ from safe_eth.eth import EthereumClient
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.events.services.queue_service import QueueService
+
 from ..indexers import InternalTxIndexer, InternalTxIndexerProvider
 from ..indexers.internal_tx_indexer import InternalTxIndexerWithTraceBlock
 from ..indexers.tx_processor import SafeTxProcessorProvider
@@ -27,6 +29,7 @@ from ..models import (
     SafeMasterCopy,
     SafeRelevantTransaction,
     SafeStatus,
+    TransactionServiceEventType,
 )
 from .factories import EthereumTxFactory, SafeMasterCopyFactory
 from .mocks.mocks_internal_tx_indexer import (
@@ -454,4 +457,24 @@ class TestInternalTxIndexer(TestCase):
         self.internal_tx_indexer.element_already_processed_checker.clear()
         self.assertEqual(
             len(self.internal_tx_indexer.process_elements(tx_hash_with_traces)), 2
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_process_elements_sends_event(self, send_events_mock: MagicMock):
+        traces = trace_transactions_result[1]
+        tx_hash = traces[0]["transactionHash"]
+        SafeMasterCopyFactory(address=traces[1]["action"]["to"])
+        EthereumTxFactory(tx_hash=tx_hash, status=1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.internal_tx_indexer.process_elements({tx_hash: traces})
+
+        self.assertEqual(InternalTx.objects.count(), 1)
+        self.assertEqual(
+            [
+                payload["type"]
+                for call in send_events_mock.call_args_list
+                for payload in call.args[0]
+            ],
+            [TransactionServiceEventType.INCOMING_ETHER.name],
         )
