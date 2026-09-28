@@ -15,7 +15,7 @@ dependencies = [
     "django-environ==0.14.0",
     "django-extensions==4.1",
     "django-filter==26.1",
-    "django-imagekit==6.1.0",
+    "django-imagekit==6.1.1",
     "django-model-utils==5.0.0",
     "django-redis==6.0.0",
     "django-s3-storage==0.15.0",
