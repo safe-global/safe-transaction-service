@@ -70,3 +70,14 @@ def validate_url(url: str) -> None:
         )
     ):
         raise ValidationError(f"{url} is not a valid url")
+
+
+def get_url_origin(url: str | None) -> str | None:
+    """
+    :param url: Url that can contain credentials in userinfo, path or query
+    :return: ``scheme://host[:port]`` of ``url``, or ``None`` if ``url`` is empty
+    """
+    if not url:
+        return None
+    result = urlparse(url)
+    return f"{result.scheme}://{result.netloc.rpartition('@')[2]}"
