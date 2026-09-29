@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -105,6 +106,25 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         url = reverse("v1:history:about")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        for node_url, expected in (
+            (None, None),
+            ("https://mainnet.infura.io/v3/secret", "https://mainnet.infura.io"),
+            ("https://user:secret@node.io:8545/path", "https://node.io:8545"),
+            ("http://node.io?apikey=secret", "http://node.io"),
+        ):
+            with self.subTest(node_url=node_url):
+                with override_settings(
+                    ETHEREUM_NODE_URL=node_url, ETHEREUM_TRACING_NODE_URL=node_url
+                ):
+                    response = self.client.get(url, format="json")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response.data["settings"]["ETHEREUM_NODE_URL"], expected
+                )
+                self.assertEqual(
+                    response.data["settings"]["ETHEREUM_TRACING_NODE_URL"], expected
+                )
 
     def test_swagger_json_schema(self):
         url = reverse("schema-json") + "?format=json"

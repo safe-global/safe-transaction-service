@@ -66,6 +66,7 @@ from .services import (
     SafeServiceProvider,
     TransactionServiceProvider,
 )
+from .utils import get_url_origin
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +90,10 @@ class AboutView(APIView):
             "settings": {
                 "AWS_CONFIGURED": settings.AWS_CONFIGURED,
                 "AWS_S3_PUBLIC_URL": settings.AWS_S3_PUBLIC_URL,
-                "ETHEREUM_NODE_URL": settings.ETHEREUM_NODE_URL,
-                "ETHEREUM_TRACING_NODE_URL": settings.ETHEREUM_TRACING_NODE_URL,
+                "ETHEREUM_NODE_URL": get_url_origin(settings.ETHEREUM_NODE_URL),
+                "ETHEREUM_TRACING_NODE_URL": get_url_origin(
+                    settings.ETHEREUM_TRACING_NODE_URL
+                ),
                 "ETH_EVENTS_BLOCK_PROCESS_LIMIT": settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT,
                 "ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX": settings.ETH_EVENTS_BLOCK_PROCESS_LIMIT_MAX,
                 "ETH_EVENTS_QUERY_CHUNK_SIZE": settings.ETH_EVENTS_QUERY_CHUNK_SIZE,
