@@ -9,7 +9,7 @@ from kombu import Connection, Exchange, Queue
 from kombu.exceptions import LimitExceeded
 from kombu.pools import producers
 
-from ..services.queue_service import QueueService
+from ..services.queue_service import EVENTS_APP_ID, QueueService
 
 
 class TestQueueService(TestCase):
@@ -44,6 +44,15 @@ class TestQueueService(TestCase):
         self.assertIsNone(self._get_message())
         queue_service.send_event(payload)
         self.assertEqual(self._get_message(), payload)
+
+    def test_send_event_sets_app_id(self):
+        queue_service = QueueService()
+        queue_service.send_event({"event": "test_event", "type": "event type"})
+        with self.conn.channel() as channel:
+            msg = self.test_queue(channel).get(no_ack=True)
+        self.assertIsNotNone(msg)
+        self.assertEqual(EVENTS_APP_ID, "safe-transaction-service")
+        self.assertEqual(msg.properties["app_id"], EVENTS_APP_ID)
 
     def test_send_unsent_messages(self):
         queue_service = QueueService()
