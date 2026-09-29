@@ -12,6 +12,11 @@ from kombu.pools import producers
 
 logger = logging.getLogger(__name__)
 
+# AMQP `app_id` set on every published event. Other services publish events
+# with the same payload shape to the same exchange, so consumers use it to
+# know the sender
+EVENTS_APP_ID = "safe-transaction-service"
+
 
 class BaseQueueService:
     """
@@ -148,6 +153,7 @@ class QueueService(BaseQueueService):
                 routing_key=routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
+                app_id=EVENTS_APP_ID,
                 retry=True,
                 retry_policy={"max_retries": 1, "interval_start": 0},
                 serializer="raw",
