@@ -7,6 +7,7 @@ from celery.app.task import Task as CeleryTask
 from redis.exceptions import LockError
 
 from ..tasks import (
+    ACTIVE_LOCKS,
     WORKER_STOPPED,
     only_one_running_task,
     worker_shutting_down_handler,
@@ -29,3 +30,12 @@ class TestTasks(TestCase):
             with self.assertRaisesMessage(LockError, "Worker is stopping"):
                 with only_one_running_task(celery_task):
                     pass
+
+    def test_only_one_running_task_removes_active_lock_on_error(self):
+        celery_task = CeleryTask()
+        celery_task.name = "Test Name"
+        with self.assertRaises(ValueError):
+            with only_one_running_task(celery_task):
+                self.assertEqual(len(ACTIVE_LOCKS), 1)
+                raise ValueError
+        self.assertEqual(ACTIVE_LOCKS, set())
