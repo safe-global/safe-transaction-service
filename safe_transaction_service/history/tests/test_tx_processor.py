@@ -541,6 +541,32 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             1,
         )
 
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_exec_transaction_sends_event(
+        self, send_events_mock: MagicMock
+    ):
+        safe_last_status = SafeLastStatusFactory(nonce=0)
+        exec_transaction_decoded = InternalTxDecodedFactory(
+            function_name="execTransaction",
+            internal_tx___from=safe_last_status.address,
+            internal_tx__value=0,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions([exec_transaction_decoded])
+
+        self.assertEqual(
+            [
+                payload["type"]
+                for call in send_events_mock.call_args_list
+                for payload in call.args[0]
+            ],
+            [
+                TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
+                TransactionServiceEventType.NEW_CONFIRMATION.name,
+            ],
+        )
+
     def test_tx_processor_get_execution_result(self):
         tx_processor = self.tx_processor
         other_hash = to_0x_hex_str(fast_keccak_text("hola"))
