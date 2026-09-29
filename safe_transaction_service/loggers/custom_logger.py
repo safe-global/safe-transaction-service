@@ -112,7 +112,7 @@ class SafeJsonFormatter(logging.Formatter):
         Format logging record as json string.
         """
 
-        if record.levelname == "ERROR":
+        if record.levelno >= logging.ERROR or record.exc_info:
             exception_info: str | None = None
             # Check if the error contains exception data
             if record.exc_info:
@@ -139,7 +139,7 @@ class SafeJsonFormatter(logging.Formatter):
 
         json_log = JsonLog(
             level=record.levelname,
-            timestamp=get_milliseconds_now(),
+            timestamp=int(record.created * 1000),
             context=f"{record.module}.{record.funcName}",
             message=record.getMessage(),
             contextMessage=context_message,
