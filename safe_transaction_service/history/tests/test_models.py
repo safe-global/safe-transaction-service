@@ -859,6 +859,7 @@ class TestInternalTxDecoded(TestCase):
         )
         self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
 
+        # Same timestamp as the oldest pending one is not out of order
         InternalTxDecodedFactory(
             internal_tx___from=random_safe,
             internal_tx__block_number=9,
@@ -875,6 +876,36 @@ class TestInternalTxDecoded(TestCase):
             internal_tx__timestamp=i.internal_tx.timestamp,
         )
         self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(random_safe))
+
+    @mock.patch.object(
+        InternalTxDecoded.objects.__class__, "OUT_OF_ORDER_CHECK_LIMIT", 3
+    )
+    def test_out_of_order_for_safe_limit(self):
+        safe_address = Account.create().address
+        now = timezone.now()
+
+        def create_decoded(minutes_ago: float, processed: bool) -> InternalTxDecoded:
+            return InternalTxDecodedFactory(
+                internal_tx___from=safe_address,
+                internal_tx__timestamp=now - timedelta(minutes=minutes_ago),
+                processed=processed,
+            )
+
+        create_decoded(10, processed=False)
+        create_decoded(9, processed=False)
+        create_decoded(8, processed=False)
+        create_decoded(7.5, processed=False)
+        create_decoded(7, processed=True)
+        # Processed internal tx is the 4th one after the oldest pending, over the limit
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(safe_address))
+
+        processed_inside_limit = create_decoded(9.5, processed=True)
+        self.assertTrue(InternalTxDecoded.objects.out_of_order_for_safe(safe_address))
+
+        # The internal tx is kept without InternalTxDecoded, it still counts for the limit
+        processed_inside_limit.delete()
+        create_decoded(7.2, processed=True)
+        self.assertFalse(InternalTxDecoded.objects.out_of_order_for_safe(safe_address))
 
 
 class TestLastSafeStatus(TestCase):

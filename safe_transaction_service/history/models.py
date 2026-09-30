@@ -1321,25 +1321,39 @@ class InternalTx(models.Model):
 
 
 class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
+    # Max number of internal txs checked after the oldest pending one
+    OUT_OF_ORDER_CHECK_LIMIT = 1_000
+
     def out_of_order_for_safe(self, safe_address: ChecksumAddress) -> bool:
         """
+        A Safe is out of order when a processed internal tx is newer than its oldest
+        pending one (e.g. a reindex found a tx missed by the RPC). Txs with the same
+        timestamp are not compared, as several blocks can share a timestamp on chains
+        with sub-second blocks. Only the next
+        ``OUT_OF_ORDER_CHECK_LIMIT`` internal txs after the oldest pending one are checked:
+        proving that none of them is processed means walking the whole history of the Safe,
+        which is what happens right after a reprocess, when nothing is processed.
+
         :param safe_address:
-        :return: `True` if there are internal txs out of order (processed newer
-            than no processed, e.g. due to a reindex), `False` otherwise
+        :return: `True` if there are internal txs out of order, `False` otherwise
         """
-        return (
+        oldest_pending_timestamp = (
             self.for_safe(safe_address)
             .not_processed()
-            .filter(
-                internal_tx__timestamp__lt=InternalTx.objects.for_safe(safe_address)
-                .filter(decoded_tx__processed=True)
-                .annotate(dummy_group_by=Value(1))
-                .values("dummy_group_by")
-                .annotate(max_timestamp=Max("timestamp"))
-                .values("max_timestamp")
-            )
-            .exists()
+            .annotate(dummy_group_by=Value(1))
+            .values("dummy_group_by")
+            .annotate(min_timestamp=Min("internal_tx__timestamp"))
+            .values("min_timestamp")
         )
+        next_internal_tx_ids = (
+            InternalTx.objects.for_safe(safe_address)
+            .filter(timestamp__gt=Subquery(oldest_pending_timestamp))
+            .order_by("timestamp", "id")
+            .values("id")[: self.OUT_OF_ORDER_CHECK_LIMIT]
+        )
+        return self.filter(
+            processed=True, internal_tx_id__in=Subquery(next_internal_tx_ids)
+        ).exists()
 
 
 class InternalTxDecodedQuerySet(models.QuerySet):
