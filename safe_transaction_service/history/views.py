@@ -972,15 +972,23 @@ class SafeTransferListView(BannedSafeMixin, ListAPIView):
             .token_txs()
             .order_by(order_by)
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
-        ether_queryset = self.filter_queryset(
-            InternalTx.objects.ether_txs_for_address(address).order_by(order_by)
+        ether_in_queryset = self.filter_queryset(
+            InternalTx.objects.ether_incoming_txs_for_address(address).order_by(
+                order_by
+            )
+        )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
+        ether_out_queryset = self.filter_queryset(
+            InternalTx.objects.ether_outgoing_txs_for_address(address).order_by(
+                order_by
+            )
         )[: settings.TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS]
         return InternalTx.objects.union_optimized_ether_and_token_txs(
             erc20_in_queryset,
             erc20_out_queryset,
             erc721_in_queryset,
             erc721_out_queryset,
-            ether_queryset,
+            ether_in_queryset,
+            ether_out_queryset,
         ).order_by("-execution_date")
 
     def get_queryset(self):

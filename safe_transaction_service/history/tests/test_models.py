@@ -603,6 +603,24 @@ class TestInternalTx(TestCase):
         self.assertEqual(InternalTx.objects.ether_txs().count(), 3)
         self.assertEqual(InternalTx.objects.token_txs().count(), 3)
 
+    def test_ether_outgoing_txs_for_address(self):
+        ethereum_address = Account.create().address
+        self.assertFalse(
+            InternalTx.objects.ether_outgoing_txs_for_address(ethereum_address)
+        )
+
+        outgoing = InternalTxFactory(_from=ethereum_address, value=5)
+        outgoing_to_none = InternalTxFactory(_from=ethereum_address, value=5)
+        InternalTx.objects.filter(pk=outgoing_to_none.pk).update(to=None)
+        InternalTxFactory(_from=ethereum_address, to=ethereum_address, value=5)  # Self
+        InternalTxFactory(to=ethereum_address, value=5)  # Incoming
+        InternalTxFactory(_from=ethereum_address, value=0)  # Not an ether transfer
+
+        self.assertCountEqual(
+            InternalTx.objects.ether_outgoing_txs_for_address(ethereum_address),
+            [outgoing, outgoing_to_none],
+        )
+
     def test_ether_and_token_incoming_txs(self):
         ethereum_address = Account.create().address
         incoming_txs = InternalTx.objects.ether_and_token_incoming_txs(ethereum_address)
