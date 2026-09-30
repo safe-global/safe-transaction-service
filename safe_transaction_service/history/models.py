@@ -1326,8 +1326,10 @@ class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
 
     def out_of_order_for_safe(self, safe_address: ChecksumAddress) -> bool:
         """
-        A Safe is out of order when a processed internal tx is newer or as old as its
-        oldest pending one (e.g. a reindex found a tx missed by the RPC). Only the next
+        A Safe is out of order when a processed internal tx is newer than its oldest
+        pending one (e.g. a reindex found a tx missed by the RPC). Txs with the same
+        timestamp are not compared, as several blocks can share a timestamp on chains
+        with sub-second blocks. Only the next
         ``OUT_OF_ORDER_CHECK_LIMIT`` internal txs after the oldest pending one are checked:
         proving that none of them is processed means walking the whole history of the Safe,
         which is what happens right after a reprocess, when nothing is processed.
@@ -1345,8 +1347,8 @@ class InternalTxDecodedManager(BulkCreateSignalMixin, models.Manager):
         )
         next_internal_tx_ids = (
             InternalTx.objects.for_safe(safe_address)
-            .filter(timestamp__gte=Subquery(oldest_pending_timestamp))
-            .order_by("timestamp")
+            .filter(timestamp__gt=Subquery(oldest_pending_timestamp))
+            .order_by("timestamp", "id")
             .values("id")[: self.OUT_OF_ORDER_CHECK_LIMIT]
         )
         return self.filter(
